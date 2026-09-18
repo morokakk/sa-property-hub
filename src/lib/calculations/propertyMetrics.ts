@@ -80,6 +80,9 @@ export interface OpportunityMetricsResult {
   monthlyCashFlow: number;
   annualNetOperatingIncome: number;
   totalCashRequired: number;
+  initialCapitalRequired: number;
+  bondAmount: number;
+  cashDeposit: number;
   monthlyBondPayment: number;
   projectedFlipNetProfit: number;
   projectedFlipRoi: number;
@@ -97,6 +100,8 @@ export function calculateDealMetrics(params: {
   targetExitPrice: number;
   holdingPeriodMonths: number;
   loanToValuePercent: number;
+  depositZAR?: number;
+  bondLTV?: number;
   interestRatePercent: number;
   loanTermYears: number;
   costs: AcquisitionCostBreakdown;
@@ -113,17 +118,28 @@ export function calculateDealMetrics(params: {
     targetExitPrice,
     holdingPeriodMonths,
     loanToValuePercent,
+    depositZAR,
+    bondLTV,
     interestRatePercent,
     loanTermYears,
     costs,
   } = params;
 
-  // Total Capital Outlay
+  // Effective LTV and Deposit
+  const effectiveLTV = bondLTV !== undefined ? bondLTV : loanToValuePercent;
+  const cashDeposit =
+    depositZAR !== undefined
+      ? depositZAR
+      : Math.round(purchasePrice * (1 - effectiveLTV / 100));
+
+  // Financed principal must strictly equal purchasePrice - cashDeposit
+  const bondAmount = Math.max(0, purchasePrice - cashDeposit);
+
+  // Total Capital Outlay & Day-1 Initial Capital Required
   const totalCost = costs.totalAcquisitionCost + estimatedRehabCost;
-  const bondAmount = (purchasePrice * loanToValuePercent) / 100;
-  const cashDeposit = purchasePrice - bondAmount;
   const cashFees = costs.totalAcquisitionCost - purchasePrice;
-  const totalCashRequired = cashDeposit + cashFees + estimatedRehabCost;
+  const initialCapitalRequired = cashDeposit + cashFees + estimatedRehabCost;
+  const totalCashRequired = initialCapitalRequired;
 
   // Monthly Bond Repayment
   const monthlyBondPayment = calculateMonthlyBondRepayment(
@@ -174,6 +190,9 @@ export function calculateDealMetrics(params: {
     monthlyCashFlow: Math.round(monthlyCashFlow),
     annualNetOperatingIncome: Math.round(annualNetOperatingIncome),
     totalCashRequired: Math.round(totalCashRequired),
+    initialCapitalRequired: Math.round(initialCapitalRequired),
+    bondAmount: Math.round(bondAmount),
+    cashDeposit: Math.round(cashDeposit),
     monthlyBondPayment: Math.round(monthlyBondPayment),
     projectedFlipNetProfit: Math.round(projectedFlipNetProfit),
     projectedFlipRoi: Number(projectedFlipRoi.toFixed(2)),

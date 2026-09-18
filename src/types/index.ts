@@ -120,6 +120,8 @@ export interface OpportunityDeal {
   holdingPeriodMonths: number;
   // Financing
   loanToValuePercent: number; // e.g. 80% or 0% for cash
+  bondLTV: number; // e.g. 100% or 80%
+  depositZAR: number; // e.g. R 0 or R 200,000
   interestRatePercent: number; // SA Prime ~11.75%
   loanTermYears: number; // e.g. 20
   // Overrides
@@ -136,6 +138,7 @@ export interface OpportunityDeal {
   capRate: number; // Net Initial Yield %
   netRoi: number; // %
   monthlyCashFlow: number; // ZAR
+  initialCapitalRequired?: number; // ZAR: Deposit + duty + legal + capex
   projectedFlipNetProfit: number; // ZAR
   projectedFlipRoi: number; // %
   // Funding Campaign & Investor Terms

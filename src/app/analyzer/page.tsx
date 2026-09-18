@@ -48,6 +48,7 @@ export default function OpportunityAnalyzerPage() {
   const promoteOpportunityToFlip = usePortfolioStore((state) => state.promoteOpportunityToFlip);
   const promoteOpportunityToRental = usePortfolioStore((state) => state.promoteOpportunityToRental);
   const investorProfile = usePortfolioStore((state) => state.investorProfile);
+  const liquidCapitalReserve = usePortfolioStore((state) => state.liquidCapitalReserve);
 
   // Form State for Deal Sourcing Calculator
   const [title, setTitle] = useState('');
@@ -73,10 +74,40 @@ export default function OpportunityAnalyzerPage() {
   const [clinicDistance, setClinicDistance] = useState<AmenityDistance>('0-5km');
   const [mallDistance, setMallDistance] = useState<AmenityDistance>('0-5km');
 
-  // Financing
-  const [loanToValue, setLoanToValue] = useState<number>(80);
+  // Financing & Bidirectional Deposit / LTV (Defaults to 100% LTV / 0% Deposit)
+  const [loanToValue, setLoanToValue] = useState<number>(100);
+  const [depositZAR, setDepositZAR] = useState<number>(0);
   const [interestRate, setInterestRate] = useState<number>(11.75); // SA Prime Rate
   const [loanTermYears, setLoanTermYears] = useState<number>(20);
+
+  // Bidirectional Handlers for Deposit, LTV, and Purchase Price
+  const handlePurchasePriceChange = (val: number) => {
+    const safePrice = Math.max(0, isNaN(val) ? 0 : val);
+    setPurchasePrice(safePrice);
+    // Preserve current LTV % and recalculate Deposit ZAR
+    const updatedDeposit = Math.max(0, Math.round(safePrice * (1 - loanToValue / 100)));
+    setDepositZAR(updatedDeposit);
+  };
+
+  const handleDepositChange = (val: number) => {
+    const safeDeposit = Math.max(0, isNaN(val) ? 0 : val);
+    setDepositZAR(safeDeposit);
+    // Recalculate LTV: ((purchasePrice - deposit) / purchasePrice) * 100
+    if (purchasePrice > 0) {
+      const calculatedLTV = Math.max(0, Math.min(100, Math.round(((purchasePrice - safeDeposit) / purchasePrice) * 100)));
+      setLoanToValue(calculatedLTV);
+    } else {
+      setLoanToValue(0);
+    }
+  };
+
+  const handleLTVChange = (val: number) => {
+    const safeLTV = Math.max(0, Math.min(100, isNaN(val) ? 0 : val));
+    setLoanToValue(safeLTV);
+    // Recalculate Deposit: purchasePrice * (1 - LTV / 100)
+    const calculatedDeposit = Math.max(0, Math.round(purchasePrice * (1 - safeLTV / 100)));
+    setDepositZAR(calculatedDeposit);
+  };
 
   // Manual Overrides
   const [overrideTax, setOverrideTax] = useState(false);
@@ -131,6 +162,8 @@ export default function OpportunityAnalyzerPage() {
       targetExitPrice,
       holdingPeriodMonths: 6,
       loanToValuePercent: loanToValue,
+      depositZAR,
+      bondLTV: loanToValue,
       interestRatePercent: interestRate,
       loanTermYears,
       costs: calculatedCosts,
@@ -143,10 +176,15 @@ export default function OpportunityAnalyzerPage() {
     monthlyRates,
     targetExitPrice,
     loanToValue,
+    depositZAR,
     interestRate,
     loanTermYears,
     calculatedCosts,
   ]);
+
+  // Day-1 Capital Required vs Liquid Capital Reserve comparison
+  const reserveDelta = liquidCapitalReserve - calculatedMetrics.initialCapitalRequired;
+  const isReserveSufficient = reserveDelta >= 0;
 
   // Section 13sex Tax Incentive Engine
   const calculatedSection13 = useMemo(() => {
@@ -182,6 +220,8 @@ export default function OpportunityAnalyzerPage() {
       targetExitPrice,
       holdingPeriodMonths: 6,
       loanToValuePercent: loanToValue,
+      bondLTV: loanToValue,
+      depositZAR,
       interestRatePercent: interestRate,
       loanTermYears,
       costs: calculatedCosts,
@@ -189,6 +229,7 @@ export default function OpportunityAnalyzerPage() {
       capRate: calculatedMetrics.capRate,
       netRoi: calculatedMetrics.netRoi,
       monthlyCashFlow: calculatedMetrics.monthlyCashFlow,
+      initialCapitalRequired: calculatedMetrics.initialCapitalRequired,
       projectedFlipNetProfit: calculatedMetrics.projectedFlipNetProfit,
       projectedFlipRoi: calculatedMetrics.projectedFlipRoi,
       status: 'Analyzing',
@@ -221,7 +262,10 @@ export default function OpportunityAnalyzerPage() {
     setMonthlyLevies(deal.propertyType === 'Freehold House' ? 0 : deal.monthlyLevies);
     setMonthlyRates(deal.monthlyRatesTaxes);
     setTargetExitPrice(deal.targetExitPrice || 0);
-    setLoanToValue(deal.loanToValuePercent);
+    const effectiveLtv = deal.bondLTV !== undefined ? deal.bondLTV : (deal.loanToValuePercent ?? 100);
+    setLoanToValue(effectiveLtv);
+    const effectiveDep = deal.depositZAR !== undefined ? deal.depositZAR : Math.max(0, Math.round(deal.purchasePrice * (1 - effectiveLtv / 100)));
+    setDepositZAR(effectiveDep);
     setInterestRate(deal.interestRatePercent);
     setLoanTermYears(deal.loanTermYears);
     setIsSection13Eligible(!!deal.section13sex);
@@ -241,6 +285,8 @@ export default function OpportunityAnalyzerPage() {
     setAddress('');
     setPropertyType('Sectional Title Apartment');
     setAgmDate('');
+    setLoanToValue(100);
+    setDepositZAR(0);
   };
 
   const handleSaveOpportunity = (e: React.FormEvent) => {
@@ -274,6 +320,8 @@ export default function OpportunityAnalyzerPage() {
         monthlyRatesTaxes: monthlyRates,
         targetExitPrice,
         loanToValuePercent: loanToValue,
+        bondLTV: loanToValue,
+        depositZAR,
         interestRatePercent: interestRate,
         loanTermYears,
         customTransferDuty: overrideTax ? customTransferDuty : undefined,
@@ -284,6 +332,7 @@ export default function OpportunityAnalyzerPage() {
         capRate: calculatedMetrics.capRate,
         netRoi: calculatedMetrics.netRoi,
         monthlyCashFlow: calculatedMetrics.monthlyCashFlow,
+        initialCapitalRequired: calculatedMetrics.initialCapitalRequired,
         projectedFlipNetProfit: calculatedMetrics.projectedFlipNetProfit,
         projectedFlipRoi: calculatedMetrics.projectedFlipRoi,
       });
@@ -293,6 +342,8 @@ export default function OpportunityAnalyzerPage() {
       setAddress('');
       setPropertyType('Sectional Title Apartment');
       setAgmDate('');
+      setLoanToValue(100);
+      setDepositZAR(0);
       return;
     }
 
@@ -320,6 +371,8 @@ export default function OpportunityAnalyzerPage() {
       targetExitPrice,
       holdingPeriodMonths: 6,
       loanToValuePercent: loanToValue,
+      bondLTV: loanToValue,
+      depositZAR,
       interestRatePercent: interestRate,
       loanTermYears,
       customTransferDuty: overrideTax ? customTransferDuty : undefined,
@@ -330,6 +383,7 @@ export default function OpportunityAnalyzerPage() {
       capRate: calculatedMetrics.capRate,
       netRoi: calculatedMetrics.netRoi,
       monthlyCashFlow: calculatedMetrics.monthlyCashFlow,
+      initialCapitalRequired: calculatedMetrics.initialCapitalRequired,
       projectedFlipNetProfit: calculatedMetrics.projectedFlipNetProfit,
       projectedFlipRoi: calculatedMetrics.projectedFlipRoi,
       status: 'Analyzing',
@@ -341,6 +395,8 @@ export default function OpportunityAnalyzerPage() {
     setAddress('');
     setPropertyType('Sectional Title Apartment');
     setAgmDate('');
+    setLoanToValue(100);
+    setDepositZAR(0);
     alert(`Deal "${title}" added to Deal Pipeline!`);
   };
 
@@ -684,7 +740,7 @@ export default function OpportunityAnalyzerPage() {
                       min="50000"
                       step="10000"
                       value={purchasePrice}
-                      onChange={(e) => setPurchasePrice(Number(e.target.value))}
+                      onChange={(e) => handlePurchasePriceChange(Number(e.target.value))}
                       className="w-full text-xs pl-7 pr-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-emerald-500 font-semibold text-slate-900 bg-white"
                     />
                   </div>
@@ -819,61 +875,166 @@ export default function OpportunityAnalyzerPage() {
               </div>
             </div>
 
-            {/* Bond Finance, SARS Overrides & Section 13sex Row */}
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-              {/* Financing Terms */}
-              <div className="p-4 rounded-xl border border-slate-200 bg-white">
-                <h4 className="text-xs font-bold text-slate-800 mb-3 flex items-center justify-between">
-                  <span>Mortgage / Bond Financing</span>
-                  <span className="text-[11px] text-slate-400 font-normal">0% for 100% Cash Purchase</span>
-                </h4>
-                <div className="grid grid-cols-3 gap-3">
-                  <div>
-                    <label className="block text-[11px] text-slate-500 mb-1">Loan-to-Value (LTV)</label>
-                    <div className="flex items-center">
-                      <input
-                        type="number"
-                        min="0"
-                        max="100"
-                        value={loanToValue}
-                        onChange={(e) => setLoanToValue(Number(e.target.value))}
-                        className="w-full text-xs px-2.5 py-1.5 border border-slate-300 rounded-lg"
-                      />
-                      <span className="ml-1 text-xs text-slate-500">%</span>
-                    </div>
+            {/* Mortgage / Bond Financing & Cash Deposit Sync Engine */}
+            <div className="p-4 sm:p-5 rounded-xl border border-slate-200 bg-white shadow-2xs space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-100">
+                <div className="flex items-center gap-2">
+                  <div className="p-1.5 bg-emerald-50 rounded-lg text-emerald-700">
+                    <Scale className="w-4 h-4" />
                   </div>
+                  <div>
+                    <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
+                      Mortgage Financing & Cash Deposit Engine
+                    </h4>
+                    <p className="text-[11px] text-slate-500">
+                      Bidirectional LTV & down-payment sync with live principal calculation
+                    </p>
+                  </div>
+                </div>
 
-                  <div>
-                    <label className="block text-[11px] text-slate-500 mb-1">Interest Rate (Prime)</label>
-                    <div className="flex items-center">
-                      <input
-                        type="number"
-                        step="0.25"
-                        value={interestRate}
-                        onChange={(e) => setInterestRate(Number(e.target.value))}
-                        className="w-full text-xs px-2.5 py-1.5 border border-slate-300 rounded-lg"
-                      />
-                      <span className="ml-1 text-xs text-slate-500">%</span>
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-[11px] text-slate-500 mb-1">Loan Term</label>
-                    <div className="flex items-center">
-                      <input
-                        type="number"
-                        min="5"
-                        max="30"
-                        value={loanTermYears}
-                        onChange={(e) => setLoanTermYears(Number(e.target.value))}
-                        className="w-full text-xs px-2.5 py-1.5 border border-slate-300 rounded-lg"
-                      />
-                      <span className="ml-1 text-xs text-slate-500">yrs</span>
-                    </div>
-                  </div>
+                {/* Live Financed Principal Readout Badge */}
+                <div className="flex items-center gap-2 bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-200">
+                  <span className="text-[11px] text-slate-500 font-medium">Financed Bond:</span>
+                  <span className="text-xs font-black text-slate-900 font-mono">
+                    {formatZAR(calculatedMetrics.bondAmount)}
+                  </span>
+                  <span className="text-[10px] text-slate-400 font-semibold">
+                    ({loanToValue}% LTV)
+                  </span>
                 </div>
               </div>
 
+              {/* Main Inputs: Side-by-Side Deposit ZAR and LTV Slider */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-4">
+                {/* Column 1: Deposit (ZAR) */}
+                <div className="lg:col-span-4 bg-slate-50/70 p-3.5 rounded-xl border border-slate-200 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-bold text-slate-800">
+                      Cash Deposit (ZAR)
+                    </label>
+                    <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                      {purchasePrice > 0 ? ((depositZAR / purchasePrice) * 100).toFixed(1) : 0}% Equity
+                    </span>
+                  </div>
+                  <div className="relative">
+                    <span className="absolute left-3 top-2 text-xs text-slate-400 font-bold">R</span>
+                    <input
+                      type="number"
+                      min="0"
+                      max={purchasePrice}
+                      step="10000"
+                      value={depositZAR}
+                      onChange={(e) => handleDepositChange(Number(e.target.value))}
+                      className="w-full text-xs pl-7 pr-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-emerald-500 font-bold text-slate-900 bg-white"
+                      placeholder="0"
+                    />
+                  </div>
+                  <p className="text-[10px] text-slate-500 leading-tight">
+                    Paid directly to conveyancing attorney upon transfer.
+                  </p>
+                </div>
+
+                {/* Column 2: Bond LTV (%) Slider + Presets */}
+                <div className="lg:col-span-5 bg-slate-50/70 p-3.5 rounded-xl border border-slate-200 space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-bold text-slate-800">
+                      Bond Loan-to-Value (LTV)
+                    </label>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-xs font-extrabold text-emerald-800 font-mono bg-white px-2 py-0.5 rounded border border-slate-200">
+                        {loanToValue}%
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* LTV Range Slider */}
+                  <div className="pt-1">
+                    <input
+                      type="range"
+                      min="0"
+                      max="100"
+                      step="1"
+                      value={loanToValue}
+                      onChange={(e) => handleLTVChange(Number(e.target.value))}
+                      className="w-full accent-emerald-600 cursor-pointer h-2 bg-slate-200 rounded-lg"
+                    />
+                    <div className="flex justify-between text-[10px] text-slate-400 font-medium px-0.5">
+                      <span>0% (All Cash)</span>
+                      <span>50%</span>
+                      <span>80%</span>
+                      <span>90%</span>
+                      <span>100% (Zero Down)</span>
+                    </div>
+                  </div>
+
+                  {/* Quick Preset Buttons */}
+                  <div className="flex items-center gap-1.5 pt-1">
+                    {[
+                      { ltv: 100, label: '100% (0% Dep)' },
+                      { ltv: 90, label: '90% (10% Dep)' },
+                      { ltv: 80, label: '80% (20% Dep)' },
+                      { ltv: 0, label: '0% (All Cash)' },
+                    ].map((preset) => (
+                      <button
+                        key={preset.ltv}
+                        type="button"
+                        onClick={() => handleLTVChange(preset.ltv)}
+                        className={`flex-1 text-[10px] py-1 px-1.5 rounded-md font-semibold border transition-all ${
+                          loanToValue === preset.ltv
+                            ? 'bg-emerald-600 text-white border-emerald-600 shadow-2xs'
+                            : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-100'
+                        }`}
+                      >
+                        {preset.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Column 3: Interest Rate & Loan Term & Monthly Bond Repayment */}
+                <div className="lg:col-span-3 bg-slate-50/70 p-3.5 rounded-xl border border-slate-200 flex flex-col justify-between space-y-2">
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-[10px] font-semibold text-slate-600 mb-1">Interest Rate</label>
+                      <div className="flex items-center">
+                        <input
+                          type="number"
+                          step="0.25"
+                          value={interestRate}
+                          onChange={(e) => setInterestRate(Number(e.target.value))}
+                          className="w-full text-xs px-2 py-1.5 border border-slate-300 rounded-lg font-semibold bg-white"
+                        />
+                        <span className="ml-1 text-xs text-slate-500 font-bold">%</span>
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-semibold text-slate-600 mb-1">Loan Term</label>
+                      <div className="flex items-center">
+                        <input
+                          type="number"
+                          min="5"
+                          max="30"
+                          value={loanTermYears}
+                          onChange={(e) => setLoanTermYears(Number(e.target.value))}
+                          className="w-full text-xs px-2 py-1.5 border border-slate-300 rounded-lg font-semibold bg-white"
+                        />
+                        <span className="ml-1 text-xs text-slate-500 font-bold">yr</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="p-2 rounded-lg bg-white border border-slate-200">
+                    <span className="text-[10px] text-slate-500 block">Monthly Bond Repayment:</span>
+                    <span className="text-xs font-black text-slate-900 font-mono">
+                      {loanToValue > 0 ? `${formatZAR(calculatedMetrics.monthlyBondPayment)}/pm` : 'R 0 (Cash Deal)'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* SARS Tax & Legal Overrides + Section 13sex Row */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {/* SARS Tax & Legal Overrides */}
               <div className="p-4 rounded-xl border border-slate-200 bg-white">
                 <h4 className="text-xs font-bold text-slate-800 mb-3 flex items-center justify-between">
@@ -1011,18 +1172,80 @@ export default function OpportunityAnalyzerPage() {
             </div>
 
             {/* Real-time Calculation Result Bar */}
-            <div className="p-4 rounded-xl bg-gradient-to-r from-slate-900 to-slate-800 text-white shadow-sm">
-              <div className="flex items-center justify-between pb-1 mb-2">
-                <div className="text-xs uppercase font-semibold text-emerald-400 tracking-wider">
+            <div className="p-4 sm:p-5 rounded-xl bg-gradient-to-r from-slate-900 to-slate-800 text-white shadow-sm space-y-3.5">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-1 border-b border-slate-700/60">
+                <div className="text-xs uppercase font-semibold text-emerald-400 tracking-wider flex items-center gap-1.5">
+                  <Calculator className="w-4 h-4 text-emerald-400" />
                   Calculated Acquisition & Returns Breakdown
                 </div>
-                {isSection13Eligible && (
-                  <span className="text-[10px] font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 px-2 py-0.5 rounded-full flex items-center gap-1">
-                    <Sparkles className="w-3 h-3" /> Sec 13sex Active: +{formatZAR(calculatedSection13.annualTaxSavingsZAR)}/yr Shield
-                  </span>
-                )}
+                <div className="flex items-center gap-2">
+                  {isSection13Eligible && (
+                    <span className="text-[10px] font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 px-2 py-0.5 rounded-full flex items-center gap-1">
+                      <Sparkles className="w-3 h-3" /> Sec 13sex Active: +{formatZAR(calculatedSection13.annualTaxSavingsZAR)}/yr Shield
+                    </span>
+                  )}
+                </div>
               </div>
-              <div className={`grid grid-cols-2 sm:grid-cols-3 ${isSection13Eligible ? 'lg:grid-cols-4 xl:grid-cols-8' : 'lg:grid-cols-4 xl:grid-cols-7'} gap-4 text-xs`}>
+
+              {/* Prominent Day-1 Initial Capital Required Hero Banner */}
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 items-center bg-slate-800/80 p-3.5 rounded-xl border border-slate-700">
+                <div className="lg:col-span-5 flex items-center gap-3">
+                  <div className={`p-2.5 rounded-xl border ${
+                    isReserveSufficient
+                      ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
+                      : 'bg-rose-500/10 border-rose-500/30 text-rose-400'
+                  }`}>
+                    <ShieldCheck className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-xs font-bold uppercase tracking-wider text-slate-300">
+                        Initial Capital Required (Day 1)
+                      </span>
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                        isReserveSufficient
+                          ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                          : 'bg-rose-500/20 text-rose-300 border-rose-500/40'
+                      }`}>
+                        {isReserveSufficient
+                          ? `Reserve Surplus: +${formatZAR(reserveDelta)}`
+                          : `Reserve Shortfall: -${formatZAR(Math.abs(reserveDelta))}`}
+                      </span>
+                    </div>
+                    <div className="text-2xl font-black text-white font-mono mt-0.5">
+                      {formatZAR(calculatedMetrics.initialCapitalRequired)}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="lg:col-span-7 flex flex-wrap items-center gap-2 text-[11px] text-slate-300 bg-slate-900/60 p-2.5 rounded-lg border border-slate-700/60">
+                  <span className="font-semibold text-slate-400">Day-1 Outlay Breakdown:</span>
+                  <span className="bg-slate-800 px-2 py-0.5 rounded border border-slate-700 text-white">
+                    Deposit: <strong className="text-emerald-400">{formatZAR(calculatedMetrics.cashDeposit)}</strong>
+                  </span>
+                  <span className="text-slate-500">+</span>
+                  <span className="bg-slate-800 px-2 py-0.5 rounded border border-slate-700 text-white">
+                    SARS Duty: <strong className="text-slate-200">{formatZAR(calculatedCosts.transferDuty)}</strong>
+                  </span>
+                  <span className="text-slate-500">+</span>
+                  <span className="bg-slate-800 px-2 py-0.5 rounded border border-slate-700 text-white">
+                    Legal & Bond Fees: <strong className="text-slate-200">{formatZAR(calculatedCosts.conveyancingFee + calculatedCosts.bondRegistrationFee + calculatedCosts.deedsOfficeFee + calculatedCosts.ficaSundries)}</strong>
+                  </span>
+                  <span className="text-slate-500">+</span>
+                  <span className="bg-slate-800 px-2 py-0.5 rounded border border-slate-700 text-white">
+                    Rehab/Capex: <strong className="text-amber-400">{formatZAR(rehabCost)}</strong>
+                  </span>
+                  <span className="text-slate-400 text-[10px] block w-full mt-1 border-t border-slate-800 pt-1">
+                    Liquid Capital Reserve: <strong className="text-white">{formatZAR(liquidCapitalReserve)}</strong>
+                    {isReserveSufficient
+                      ? ' • Capital buffer intact for emergency reserves.'
+                      : ' • Outlay exceeds current liquid reserve; external syndicate/funder needed.'}
+                  </span>
+                </div>
+              </div>
+
+              {/* Standard Performance & Returns Metric Badges */}
+              <div className={`grid grid-cols-2 sm:grid-cols-3 ${isSection13Eligible ? 'lg:grid-cols-4 xl:grid-cols-8' : 'lg:grid-cols-4 xl:grid-cols-7'} gap-3 text-xs pt-1`}>
                 <div className="bg-emerald-950/60 p-2.5 rounded-lg border border-emerald-500/40">
                   <span className="text-emerald-400 block text-[10px] font-semibold">Built-in Equity</span>
                   <span className="text-sm font-extrabold text-emerald-300">{formatZAR(calculatedBuiltInEquity.builtInEquityZAR)}</span>
@@ -1284,7 +1507,7 @@ export default function OpportunityAnalyzerPage() {
                 </div>
 
                 {/* Financial Metric Badges - Full Width Responsive Grid */}
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 py-3 border-y border-slate-200/80 my-3 text-xs bg-white/70 px-3 rounded-lg">
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 py-3 border-y border-slate-200/80 my-3 text-xs bg-white/70 px-3 rounded-lg">
                   <div>
                     <span className="text-[10px] text-slate-400 block font-medium">Open Market Value</span>
                     <span className="font-semibold text-slate-700">{formatZAR(openMarket)}</span>
@@ -1294,8 +1517,21 @@ export default function OpportunityAnalyzerPage() {
                     <span className="font-bold text-slate-900">{formatZAR(deal.purchasePrice)}</span>
                   </div>
                   <div>
-                    <span className="text-[10px] text-slate-400 block font-medium">Acquisition All-in</span>
-                    <span className="font-semibold text-slate-700">{formatZAR(deal.costs.totalAcquisitionCost)}</span>
+                    <span className="text-[10px] text-slate-400 block font-medium">Financing / Deposit</span>
+                    <span className="font-semibold text-slate-800">
+                      {deal.bondLTV ?? deal.loanToValuePercent}% LTV ({formatZAR(deal.depositZAR ?? Math.round(deal.purchasePrice * (1 - (deal.bondLTV ?? deal.loanToValuePercent) / 100)))})
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-slate-400 block font-medium">Day-1 Capital Required</span>
+                    <span className="font-bold text-emerald-800">
+                      {formatZAR(
+                        deal.initialCapitalRequired ??
+                        ((deal.depositZAR ?? Math.round(deal.purchasePrice * (1 - (deal.bondLTV ?? deal.loanToValuePercent) / 100))) +
+                        (deal.costs.totalAcquisitionCost - deal.purchasePrice) +
+                        deal.estimatedRehabCost)
+                      )}
+                    </span>
                   </div>
                   <div>
                     <span className="text-[10px] text-slate-400 block font-medium">Gross Yield / Cap Rate</span>

@@ -639,6 +639,7 @@ function createSampleOpportunity(
     securityOffered?: string;
   }
 ): OpportunityDeal {
+  const depositZAR = Math.round(purchasePrice * (1 - ltv / 100));
   const costs = computeAcquisitionCosts(purchasePrice, ltv);
   const metrics = calculateDealMetrics({
     purchasePrice,
@@ -652,6 +653,8 @@ function createSampleOpportunity(
     targetExitPrice: exitPrice,
     holdingPeriodMonths: 6,
     loanToValuePercent: ltv,
+    depositZAR,
+    bondLTV: ltv,
     interestRatePercent: 11.75,
     loanTermYears: 20,
     costs,
@@ -691,6 +694,8 @@ function createSampleOpportunity(
     targetExitPrice: exitPrice,
     holdingPeriodMonths: 6,
     loanToValuePercent: ltv,
+    bondLTV: ltv,
+    depositZAR,
     interestRatePercent: 11.75,
     loanTermYears: 20,
     costs,
@@ -700,6 +705,7 @@ function createSampleOpportunity(
     capRate: metrics.capRate,
     netRoi: metrics.netRoi,
     monthlyCashFlow: metrics.monthlyCashFlow,
+    initialCapitalRequired: metrics.initialCapitalRequired,
     projectedFlipNetProfit: metrics.projectedFlipNetProfit,
     projectedFlipRoi: metrics.projectedFlipRoi,
     fundingRequiredZAR: fundingCampaign?.fundingRequiredZAR,

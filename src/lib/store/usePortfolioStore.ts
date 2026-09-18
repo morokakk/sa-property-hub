@@ -490,7 +490,10 @@ export const usePortfolioStore = create<PortfolioState>()(
         const opp = get().opportunities.find((o) => o.id === oppId);
         if (!opp) return;
 
-        const bondAmount = (opp.purchasePrice * opp.loanToValuePercent) / 100;
+        const effectiveLTV = opp.bondLTV ?? opp.loanToValuePercent;
+        const bondAmount = opp.depositZAR !== undefined
+          ? Math.max(0, opp.purchasePrice - opp.depositZAR)
+          : (opp.purchasePrice * effectiveLTV) / 100;
         const newRental: RentalProperty = {
           id: `rental-${Date.now()}`,
           title: opp.title,

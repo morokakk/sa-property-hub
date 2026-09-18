@@ -33,9 +33,16 @@ export function formatOpportunityForWhatsApp(
   text += `• Legal Conveyancing: ${formatZAR(deal.costs.conveyancingFee)}\n`;
   text += `• Total Acquisition: *${formatZAR(deal.costs.totalAcquisitionCost)}*\n`;
 
+  const ltvVal = deal.bondLTV ?? deal.loanToValuePercent ?? 100;
+  const depositVal = deal.depositZAR !== undefined ? deal.depositZAR : Math.round(deal.purchasePrice * (1 - ltvVal / 100));
+  text += `• Financing: *${ltvVal}% LTV* (Deposit: *${formatZAR(depositVal)}*)\n`;
+
   if (deal.estimatedRehabCost > 0) {
     text += `• Renovation / Capex: ${formatZAR(deal.estimatedRehabCost)}\n`;
   }
+
+  const initialCap = deal.initialCapitalRequired ?? (depositVal + (deal.costs.totalAcquisitionCost - deal.purchasePrice) + deal.estimatedRehabCost);
+  text += `• Initial Capital Required (Day 1): *${formatZAR(initialCap)}*\n`;
 
   text += `\n📊 *PROJECTED PERFORMANCE*\n`;
   if (deal.monthlyRentalEstimate > 0) {
