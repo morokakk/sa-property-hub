@@ -46,6 +46,7 @@ export const INITIAL_RENTALS: RentalProperty[] = [
     monthlyRatesTaxesZAR: 1_450,
     monthlyAgentFeeZAR: 1_702,
     monthlyMaintenanceReserveZAR: 800,
+    unpaidUtilityArrearsZAR: 0,
     status: 'Occupied',
     maintenanceHistory: [
       {
@@ -77,10 +78,10 @@ export const INITIAL_RENTALS: RentalProperty[] = [
       beetle: { type: 'Beetle', status: 'Not Applicable' },
     },
     driveVault: {
-      masterFolderUrl: 'https://drive.google.com/drive/folders/sandhurst-suite-demo',
-      otpDocumentUrl: 'https://drive.google.com/file/d/otp-sandhurst-signed/view',
-      ratesBillUrl: 'https://drive.google.com/file/d/rates-jhb-sandhurst/view',
-      titleDeedUrl: 'https://drive.google.com/file/d/titledeed-sandhurst/view',
+      masterFolderUrl: 'https://onedrive.live.com/?id=Sandhurst-Suite-35Fredman',
+      otpDocumentUrl: 'https://onedrive.live.com/?id=Signed-Lease-OTP-Sandhurst',
+      ratesBillUrl: 'https://onedrive.live.com/?id=Jhb-Rates-Levies-Sandhurst',
+      titleDeedUrl: 'https://onedrive.live.com/?id=Sandhurst-Sectional-Title-Deed',
     },
   },
   {
@@ -112,6 +113,7 @@ export const INITIAL_RENTALS: RentalProperty[] = [
     monthlyRatesTaxesZAR: 1_180,
     monthlyAgentFeeZAR: 0,
     monthlyMaintenanceReserveZAR: 600,
+    unpaidUtilityArrearsZAR: 3_850,
     status: 'Occupied',
     maintenanceHistory: [
       {
@@ -156,6 +158,7 @@ export const INITIAL_RENTALS: RentalProperty[] = [
     monthlyRatesTaxesZAR: 1_950,
     monthlyAgentFeeZAR: 2_254,
     monthlyMaintenanceReserveZAR: 1_000,
+    unpaidUtilityArrearsZAR: 0,
     status: 'Occupied',
     maintenanceHistory: [],
   },
@@ -172,6 +175,8 @@ export const INITIAL_FLIPS: FlipProject[] = [
     purchasePriceZAR: 3_800_000,
     acquisitionCostsZAR: 315_000,
     baselineRenovationBudgetZAR: 750_000,
+    estimatedDurationMonths: 6,
+    monthlyHoldingCostZAR: 22_500,
     targetExitPriceZAR: 5_650_000,
     targetCompletionDate: '2026-11-15',
     currentPhase: 'Finishes & Tiling',
@@ -279,10 +284,10 @@ export const INITIAL_FLIPS: FlipProject[] = [
       beetle: { type: 'Beetle', status: 'Certified / Valid', issueDate: '2026-08-10', certificateNumber: 'BC-99104' },
     },
     driveVault: {
-      masterFolderUrl: 'https://drive.google.com/drive/folders/kloof-heritage-flip-demo',
-      otpDocumentUrl: 'https://drive.google.com/file/d/kloof-otp-signed/view',
-      ratesBillUrl: 'https://drive.google.com/file/d/cityofcapetown-rates-kloof/view',
-      titleDeedUrl: 'https://drive.google.com/file/d/kloof-approved-plans-sg-diagram/view',
+      masterFolderUrl: 'https://1drv.ms/f/s!Am8KloofHeritageFlipCapeTown',
+      otpDocumentUrl: 'https://1drv.ms/b/s!Am8SignedOTP-Kloof74',
+      ratesBillUrl: 'https://1drv.ms/b/s!Am8CapeTownRates-Aug2026',
+      titleDeedUrl: 'https://1drv.ms/b/s!Am8SG-Diagram-TitleDeed-CapeTown',
     },
   },
   {
@@ -296,6 +301,8 @@ export const INITIAL_FLIPS: FlipProject[] = [
     purchasePriceZAR: 2_100_000,
     acquisitionCostsZAR: 148_000,
     baselineRenovationBudgetZAR: 480_000,
+    estimatedDurationMonths: 7,
+    monthlyHoldingCostZAR: 18_000,
     targetExitPriceZAR: 3_350_000,
     targetCompletionDate: '2026-12-20',
     currentPhase: 'First Fix (Plumbing/Elec)',
@@ -312,6 +319,12 @@ export const INITIAL_FLIPS: FlipProject[] = [
     securityOffered: 'JV Syndicate Profit Participation Agreement',
     status: 'Active',
     notes: 'Distressed purchase from bank repo. Converting outdated 3-bed into 4-bed modern family residence with entertainment patio.',
+    driveVault: {
+      masterFolderUrl: 'https://www.dropbox.com/scl/fo/waterkloof-fixer-vault',
+      otpDocumentUrl: 'https://www.dropbox.com/scl/fi/waterkloof-otp-signed.pdf',
+      ratesBillUrl: 'https://www.dropbox.com/scl/fi/tshwane-rates-statement.pdf',
+      titleDeedUrl: 'https://www.dropbox.com/scl/fi/waterkloof-deed-plans.pdf',
+    },
     boq: [
       {
         id: 'boq-7',
@@ -637,7 +650,9 @@ function createSampleOpportunity(
     promisedReturnRatePercent?: number;
     promisedPayoutSchedule?: 'Monthly Interest' | 'Quarterly' | 'At Exit (Maturity)' | 'Bi-Annual';
     securityOffered?: string;
-  }
+  },
+  auctioneerCommissionZAR?: number,
+  municipalArrearsZAR?: number
 ): OpportunityDeal {
   const depositZAR = Math.round(purchasePrice * (1 - ltv / 100));
   const costs = computeAcquisitionCosts(purchasePrice, ltv);
@@ -658,6 +673,8 @@ function createSampleOpportunity(
     interestRatePercent: 11.75,
     loanTermYears: 20,
     costs,
+    auctioneerCommissionZAR,
+    municipalArrearsZAR,
   });
 
   const { builtInEquityZAR, builtInEquityPercent } = computeBuiltInEquity(openMarketValue, purchasePrice);
@@ -699,6 +716,8 @@ function createSampleOpportunity(
     interestRatePercent: 11.75,
     loanTermYears: 20,
     costs,
+    auctioneerCommissionZAR,
+    municipalArrearsZAR,
     section13sex: isSection13Eligible ? calculateSection13sex(purchasePrice, 27, true) : undefined,
     driveVault,
     grossYield: metrics.grossYield,
@@ -742,8 +761,10 @@ export const INITIAL_OPPORTUNITIES: OpportunityDeal[] = [
     'Under Due Diligence',
     false,
     {
-      masterFolderUrl: 'https://drive.google.com/drive/folders/parkhurst-sheriff-auction',
-      otpDocumentUrl: 'https://drive.google.com/file/d/sheriff-conditions-of-sale/view',
+      masterFolderUrl: 'https://1drv.ms/f/s!Parkhurst-Sheriff-Auction-Pack',
+      otpDocumentUrl: 'https://1drv.ms/b/s!Conditions-Of-Sale-Sheriff-JhbNorth',
+      ratesBillUrl: 'https://1drv.ms/b/s!Sec118-City-Of-Joburg-Arrears-Statement',
+      titleDeedUrl: 'https://1drv.ms/b/s!Parkhurst-SG-Diagram-Erf42',
     },
     {
       schools: '0-5km',
@@ -760,7 +781,9 @@ export const INITIAL_OPPORTUNITIES: OpportunityDeal[] = [
       promisedReturnRatePercent: 14.5,
       promisedPayoutSchedule: 'Monthly Interest',
       securityOffered: '2nd Mortgage Bond registered over title deed',
-    }
+    },
+    201_250, // Auctioneer commission (10% + 15% VAT on R1.75M)
+    45_000   // Municipal Section 118 clearance arrears
   ),
   createSampleOpportunity(
     'opp-2',

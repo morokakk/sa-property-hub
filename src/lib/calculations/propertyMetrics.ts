@@ -105,6 +105,8 @@ export function calculateDealMetrics(params: {
   interestRatePercent: number;
   loanTermYears: number;
   costs: AcquisitionCostBreakdown;
+  auctioneerCommissionZAR?: number;
+  municipalArrearsZAR?: number;
 }): OpportunityMetricsResult {
   const {
     purchasePrice,
@@ -123,6 +125,8 @@ export function calculateDealMetrics(params: {
     interestRatePercent,
     loanTermYears,
     costs,
+    auctioneerCommissionZAR,
+    municipalArrearsZAR,
   } = params;
 
   // Effective LTV and Deposit
@@ -135,10 +139,13 @@ export function calculateDealMetrics(params: {
   // Financed principal must strictly equal purchasePrice - cashDeposit
   const bondAmount = Math.max(0, purchasePrice - cashDeposit);
 
+  // Auction & Distressed Municipal Outlays
+  const auctionCosts = (auctioneerCommissionZAR || 0) + (municipalArrearsZAR || 0);
+
   // Total Capital Outlay & Day-1 Initial Capital Required
-  const totalCost = costs.totalAcquisitionCost + estimatedRehabCost;
+  const totalCost = costs.totalAcquisitionCost + estimatedRehabCost + auctionCosts;
   const cashFees = costs.totalAcquisitionCost - purchasePrice;
-  const initialCapitalRequired = cashDeposit + cashFees + estimatedRehabCost;
+  const initialCapitalRequired = cashDeposit + cashFees + estimatedRehabCost + auctionCosts;
   const totalCashRequired = initialCapitalRequired;
 
   // Monthly Bond Repayment
@@ -177,6 +184,7 @@ export function calculateDealMetrics(params: {
   const totalFlipCosts =
     costs.totalAcquisitionCost +
     estimatedRehabCost +
+    auctionCosts +
     totalHoldingCosts +
     exitCommission;
 
@@ -212,9 +220,11 @@ export function calculateRentalCashflow(property: {
   agencyCommissionPercent?: number;
   agencyVatApplicable?: boolean;
   monthlyAgentFeeZAR?: number;
+  unpaidUtilityArrearsZAR?: number;
 }): {
   agencyCommissionZAR: number;
   totalMonthlyExpensesZAR: number;
+  unpaidUtilityArrearsZAR: number;
   netMonthlyCashflowZAR: number;
 } {
   const gross = property.monthlyGrossRentZAR || 0;
@@ -237,11 +247,13 @@ export function calculateRentalCashflow(property: {
     (property.monthlyMaintenanceReserveZAR || 0) +
     (property.monthlyBondPaymentZAR || 0);
 
-  const netMonthlyCashflowZAR = gross - totalMonthlyExpensesZAR;
+  const unpaidUtilityArrearsZAR = property.unpaidUtilityArrearsZAR || 0;
+  const netMonthlyCashflowZAR = gross - totalMonthlyExpensesZAR - unpaidUtilityArrearsZAR;
 
   return {
     agencyCommissionZAR,
     totalMonthlyExpensesZAR,
+    unpaidUtilityArrearsZAR,
     netMonthlyCashflowZAR,
   };
 }

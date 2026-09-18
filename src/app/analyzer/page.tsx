@@ -68,6 +68,10 @@ export default function OpportunityAnalyzerPage() {
   const [monthlyRates, setMonthlyRates] = useState<number>(1_100);
   const [targetExitPrice, setTargetExitPrice] = useState<number>(2_450_000);
 
+  // Auction Outlays & Distressed Arrears State
+  const [auctioneerCommission, setAuctioneerCommission] = useState<number>(0);
+  const [municipalArrears, setMunicipalArrears] = useState<number>(0);
+
   // Amenity Distance State
   const [schoolsDistance, setSchoolsDistance] = useState<AmenityDistance>('0-5km');
   const [policeDistance, setPoliceDistance] = useState<AmenityDistance>('0-5km');
@@ -167,6 +171,8 @@ export default function OpportunityAnalyzerPage() {
       interestRatePercent: interestRate,
       loanTermYears,
       costs: calculatedCosts,
+      auctioneerCommissionZAR: auctioneerCommission,
+      municipalArrearsZAR: municipalArrears,
     });
   }, [
     purchasePrice,
@@ -180,6 +186,8 @@ export default function OpportunityAnalyzerPage() {
     interestRate,
     loanTermYears,
     calculatedCosts,
+    auctioneerCommission,
+    municipalArrears,
   ]);
 
   // Day-1 Capital Required vs Liquid Capital Reserve comparison
@@ -225,6 +233,8 @@ export default function OpportunityAnalyzerPage() {
       interestRatePercent: interestRate,
       loanTermYears,
       costs: calculatedCosts,
+      auctioneerCommissionZAR: auctioneerCommission,
+      municipalArrearsZAR: municipalArrears,
       grossYield: calculatedMetrics.grossYield,
       capRate: calculatedMetrics.capRate,
       netRoi: calculatedMetrics.netRoi,
@@ -262,6 +272,8 @@ export default function OpportunityAnalyzerPage() {
     setMonthlyLevies(deal.propertyType === 'Freehold House' ? 0 : deal.monthlyLevies);
     setMonthlyRates(deal.monthlyRatesTaxes);
     setTargetExitPrice(deal.targetExitPrice || 0);
+    setAuctioneerCommission(deal.auctioneerCommissionZAR || 0);
+    setMunicipalArrears(deal.municipalArrearsZAR || 0);
     const effectiveLtv = deal.bondLTV !== undefined ? deal.bondLTV : (deal.loanToValuePercent ?? 100);
     setLoanToValue(effectiveLtv);
     const effectiveDep = deal.depositZAR !== undefined ? deal.depositZAR : Math.max(0, Math.round(deal.purchasePrice * (1 - effectiveLtv / 100)));
@@ -285,6 +297,8 @@ export default function OpportunityAnalyzerPage() {
     setAddress('');
     setPropertyType('Sectional Title Apartment');
     setAgmDate('');
+    setAuctioneerCommission(0);
+    setMunicipalArrears(0);
     setLoanToValue(100);
     setDepositZAR(0);
   };
@@ -319,6 +333,8 @@ export default function OpportunityAnalyzerPage() {
         monthlyLevies: finalLevies,
         monthlyRatesTaxes: monthlyRates,
         targetExitPrice,
+        auctioneerCommissionZAR: auctioneerCommission,
+        municipalArrearsZAR: municipalArrears,
         loanToValuePercent: loanToValue,
         bondLTV: loanToValue,
         depositZAR,
@@ -342,6 +358,8 @@ export default function OpportunityAnalyzerPage() {
       setAddress('');
       setPropertyType('Sectional Title Apartment');
       setAgmDate('');
+      setAuctioneerCommission(0);
+      setMunicipalArrears(0);
       setLoanToValue(100);
       setDepositZAR(0);
       return;
@@ -370,6 +388,8 @@ export default function OpportunityAnalyzerPage() {
       vacancyRatePercent: 5,
       targetExitPrice,
       holdingPeriodMonths: 6,
+      auctioneerCommissionZAR: auctioneerCommission,
+      municipalArrearsZAR: municipalArrears,
       loanToValuePercent: loanToValue,
       bondLTV: loanToValue,
       depositZAR,
@@ -395,6 +415,8 @@ export default function OpportunityAnalyzerPage() {
     setAddress('');
     setPropertyType('Sectional Title Apartment');
     setAgmDate('');
+    setAuctioneerCommission(0);
+    setMunicipalArrears(0);
     setLoanToValue(100);
     setDepositZAR(0);
     alert(`Deal "${title}" added to Deal Pipeline!`);
@@ -423,7 +445,7 @@ export default function OpportunityAnalyzerPage() {
               </div>
             </div>
             <span className="text-xs font-semibold bg-emerald-100 text-emerald-800 px-2.5 py-1 rounded-full flex items-center gap-1">
-              <Scale className="w-3.5 h-3.5" /> SARS 2024/2026 Brackets
+              <Scale className="w-3.5 h-3.5" /> SARS 2024–2026 Brackets
             </span>
           </div>
 
@@ -875,6 +897,90 @@ export default function OpportunityAnalyzerPage() {
               </div>
             </div>
 
+            {/* Auction / Distressed Costs Input Row */}
+            <div className="p-4 rounded-xl bg-amber-50/70 border border-amber-200 space-y-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-amber-200/80 pb-2">
+                <div className="flex items-center gap-2">
+                  <Scale className="w-4 h-4 text-amber-700" />
+                  <div>
+                    <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
+                      Auction / Distressed Costs
+                    </h4>
+                    <span className="text-[10px] text-slate-500">
+                      Immediate Day-1 cash outlays: buyer&apos;s commission & municipal clearance debt
+                    </span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] font-semibold text-slate-600">Total Auction Outlays:</span>
+                  <span className="text-xs font-bold text-amber-900 bg-amber-100 px-2.5 py-0.5 rounded border border-amber-300">
+                    {formatZAR((auctioneerCommission || 0) + (municipalArrears || 0))}
+                  </span>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* 1. Auctioneer Commission */}
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-[11px] font-semibold text-slate-700">
+                      Auctioneer Commission / Buyer&apos;s Premium (ZAR)
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => setAuctioneerCommission(Math.round(purchasePrice * 0.10 * 1.15))}
+                      className="text-[10px] text-amber-900 hover:text-amber-950 font-bold bg-amber-100/90 hover:bg-amber-200 px-2 py-0.5 rounded border border-amber-300 transition-colors cursor-pointer"
+                      title="Auto-calculate standard SA auction commission: 10% + 15% VAT = 11.5% of hammer price"
+                    >
+                      Calc 10% + VAT
+                    </button>
+                  </div>
+                  <div className="relative">
+                    <span className="absolute left-2.5 top-2 text-xs text-slate-400 font-bold">R</span>
+                    <input
+                      type="number"
+                      min="0"
+                      step="5000"
+                      value={auctioneerCommission || ''}
+                      onChange={(e) => setAuctioneerCommission(Number(e.target.value))}
+                      placeholder="0"
+                      className="w-full text-xs pl-7 pr-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-amber-500 font-semibold text-slate-900 bg-white"
+                    />
+                  </div>
+                  <span className="text-[10px] text-slate-500 mt-1 block">
+                    Mandatory buyer&apos;s premium payable immediately on auction day.
+                  </span>
+                </div>
+
+                {/* 2. Municipal Arrears */}
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-[11px] font-semibold text-slate-700">
+                      Municipal Arrears & Taxes Settlement (ZAR)
+                    </label>
+                    <span className="text-[10px] text-amber-800 font-bold bg-amber-100 px-1.5 py-0.2 rounded">
+                      Section 118
+                    </span>
+                  </div>
+                  <div className="relative">
+                    <span className="absolute left-2.5 top-2 text-xs text-slate-400 font-bold">R</span>
+                    <input
+                      type="number"
+                      min="0"
+                      step="5000"
+                      value={municipalArrears || ''}
+                      onChange={(e) => setMunicipalArrears(Number(e.target.value))}
+                      placeholder="0"
+                      className="w-full text-xs pl-7 pr-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-amber-500 font-semibold text-slate-900 bg-white"
+                    />
+                  </div>
+                  <span className="text-[10px] text-slate-500 mt-1 block">
+                    Historical city council rates/water debt settlement required for transfer clearance.
+                  </span>
+                </div>
+              </div>
+            </div>
+
             {/* Mortgage / Bond Financing & Cash Deposit Sync Engine */}
             <div className="p-4 sm:p-5 rounded-xl border border-slate-200 bg-white shadow-2xs space-y-4">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-100">
@@ -1235,6 +1341,22 @@ export default function OpportunityAnalyzerPage() {
                   <span className="bg-slate-800 px-2 py-0.5 rounded border border-slate-700 text-white">
                     Rehab/Capex: <strong className="text-amber-400">{formatZAR(rehabCost)}</strong>
                   </span>
+                  {auctioneerCommission > 0 && (
+                    <>
+                      <span className="text-slate-500">+</span>
+                      <span className="bg-amber-950/60 px-2 py-0.5 rounded border border-amber-500/40 text-amber-200">
+                        Auction Fee: <strong className="text-amber-300">{formatZAR(auctioneerCommission)}</strong>
+                      </span>
+                    </>
+                  )}
+                  {municipalArrears > 0 && (
+                    <>
+                      <span className="text-slate-500">+</span>
+                      <span className="bg-rose-950/60 px-2 py-0.5 rounded border border-rose-500/40 text-rose-200">
+                        Rates Arrears: <strong className="text-rose-300">{formatZAR(municipalArrears)}</strong>
+                      </span>
+                    </>
+                  )}
                   <span className="text-slate-400 text-[10px] block w-full mt-1 border-t border-slate-800 pt-1">
                     Liquid Capital Reserve: <strong className="text-white">{formatZAR(liquidCapitalReserve)}</strong>
                     {isReserveSufficient
@@ -1529,7 +1651,9 @@ export default function OpportunityAnalyzerPage() {
                         deal.initialCapitalRequired ??
                         ((deal.depositZAR ?? Math.round(deal.purchasePrice * (1 - (deal.bondLTV ?? deal.loanToValuePercent) / 100))) +
                         (deal.costs.totalAcquisitionCost - deal.purchasePrice) +
-                        deal.estimatedRehabCost)
+                        deal.estimatedRehabCost +
+                        (deal.auctioneerCommissionZAR || 0) +
+                        (deal.municipalArrearsZAR || 0))
                       )}
                     </span>
                   </div>
@@ -1553,6 +1677,16 @@ export default function OpportunityAnalyzerPage() {
                   <span>Conveyancing: <strong className="text-slate-700">{formatZAR(deal.costs.conveyancingFee)}</strong></span>
                   <span>Bond Reg: <strong className="text-slate-700">{formatZAR(deal.costs.bondRegistrationFee)}</strong></span>
                   <span>Deeds Office: <strong className="text-slate-700">{formatZAR(deal.costs.deedsOfficeFee)}</strong></span>
+                  {deal.auctioneerCommissionZAR !== undefined && deal.auctioneerCommissionZAR > 0 && (
+                    <span className="text-amber-800 bg-amber-50 px-2 py-0.5 rounded font-semibold border border-amber-200">
+                      Auction Fee (10%+VAT): <strong>{formatZAR(deal.auctioneerCommissionZAR)}</strong>
+                    </span>
+                  )}
+                  {deal.municipalArrearsZAR !== undefined && deal.municipalArrearsZAR > 0 && (
+                    <span className="text-rose-800 bg-rose-50 px-2 py-0.5 rounded font-semibold border border-rose-200">
+                      Sec 118 Arrears: <strong>{formatZAR(deal.municipalArrearsZAR)}</strong>
+                    </span>
+                  )}
                   <span>Net Monthly Cashflow: <strong className={deal.monthlyCashFlow >= 0 ? 'text-emerald-700' : 'text-rose-600'}>{formatZAR(deal.monthlyCashFlow)}</strong></span>
                   {deal.section13sex?.isEligible && (
                     <span className="text-emerald-800 bg-emerald-100/80 px-2 py-0.5 rounded font-semibold flex items-center gap-1 border border-emerald-200">

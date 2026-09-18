@@ -128,6 +128,9 @@ export interface OpportunityDeal {
   customTransferDuty?: number;
   customConveyancing?: number;
   customBondReg?: number;
+  // Auction Outlays & Distressed Arrears
+  auctioneerCommissionZAR?: number;
+  municipalArrearsZAR?: number;
   // Section 13sex Tax Incentive
   section13sex?: Section13sexCalculation;
   // Cloud Drive Link Vault
@@ -220,6 +223,9 @@ export interface FlipProject {
   purchasePriceZAR: number;
   acquisitionCostsZAR: number; // Transfer + legal
   baselineRenovationBudgetZAR: number;
+  // Holding Period Carrying Costs
+  estimatedDurationMonths?: number;
+  monthlyHoldingCostZAR?: number;
   targetExitPriceZAR: number;
   targetCompletionDate: string;
   currentPhase: 'Acquisition & Conveyancing' | 'Strip & Demolition' | 'First Fix (Plumbing/Elec)' | 'Finishes & Tiling' | 'Snagging' | 'Staging & Marketing' | 'Sold / Awaiting Transfer';
@@ -293,6 +299,8 @@ export interface RentalProperty {
   monthlyRatesTaxesZAR: number;
   monthlyAgentFeeZAR: number;
   monthlyMaintenanceReserveZAR: number;
+  // Tenant Utility Arrears & Operational Risk
+  unpaidUtilityArrearsZAR?: number;
   maintenanceHistory: MaintenanceLog[];
   status: 'Occupied' | 'Vacant' | 'Notice Given' | 'Sold';
   cocChecklist?: ComplianceCertificates;

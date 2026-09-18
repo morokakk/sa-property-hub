@@ -256,7 +256,7 @@ export default function GlobalDashboardPage() {
                       </span>
                     </div>
 
-                    <div className="grid grid-cols-3 gap-2 text-xs mt-3 pt-2 border-t border-slate-200/60">
+                    <div className="grid grid-cols-4 gap-2 text-xs mt-3 pt-2 border-t border-slate-200/60">
                       <div>
                         <span className="text-[10px] text-slate-400 block">Purchase</span>
                         <span className="font-semibold text-slate-800">{formatZAR(flip.purchasePriceZAR)}</span>
@@ -269,6 +269,12 @@ export default function GlobalDashboardPage() {
                         <span className="text-[10px] text-slate-400 block">BOQ Spend</span>
                         <span className="font-semibold text-slate-800">
                           {formatZAR(totalBoqActual)} ({formatPercent(progressPct)})
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-amber-700 block font-medium">Holding ({flip.estimatedDurationMonths ?? 6}m)</span>
+                        <span className="font-semibold text-amber-700">
+                          -{formatZAR((flip.estimatedDurationMonths ?? 6) * (flip.monthlyHoldingCostZAR ?? 0))}
                         </span>
                       </div>
                     </div>
@@ -296,6 +302,7 @@ export default function GlobalDashboardPage() {
             <div className="space-y-3">
               {rentals.map((rental) => {
                 const { netMonthlyCashflowZAR: netMonthly } = calculateRentalCashflow(rental);
+                const hasArrears = (rental.unpaidUtilityArrearsZAR || 0) > 0;
 
                 return (
                   <div
@@ -309,9 +316,16 @@ export default function GlobalDashboardPage() {
                           Tenant: <span className="font-medium text-slate-700">{rental.tenantName}</span> (Lease to {formatDate(rental.leaseEndDate)})
                         </p>
                       </div>
-                      <span className="text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded-full">
-                        {rental.status}
-                      </span>
+                      <div className="flex items-center gap-1">
+                        {hasArrears && (
+                          <span className="text-[9px] font-bold bg-rose-100 text-rose-800 border border-rose-300 px-1.5 py-0.5 rounded-full">
+                            ⚠️ Arrears: -{formatZAR(rental.unpaidUtilityArrearsZAR || 0)}
+                          </span>
+                        )}
+                        <span className="text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded-full">
+                          {rental.status}
+                        </span>
+                      </div>
                     </div>
 
                     <div className="grid grid-cols-3 gap-2 text-xs mt-3 pt-2 border-t border-slate-200/60">

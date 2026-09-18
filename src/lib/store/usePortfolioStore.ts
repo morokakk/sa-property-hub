@@ -401,8 +401,10 @@ export const usePortfolioStore = create<PortfolioState>()(
           purchasePriceZAR: opp.purchasePrice,
           acquisitionCostsZAR: opp.costs.totalAcquisitionCost - opp.purchasePrice,
           baselineRenovationBudgetZAR: opp.estimatedRehabCost || 250_000,
+          estimatedDurationMonths: opp.holdingPeriodMonths || 6,
+          monthlyHoldingCostZAR: (opp.monthlyLevies || 0) + (opp.monthlyRatesTaxes || 0) + (opp.monthlyCashFlow < 0 ? Math.abs(opp.monthlyCashFlow) : 0),
           targetExitPriceZAR: opp.targetExitPrice || opp.purchasePrice * 1.35,
-          targetCompletionDate: new Date(Date.now() + 180 * 24 * 60 * 60 * 1000)
+          targetCompletionDate: new Date(Date.now() + (opp.holdingPeriodMonths || 6) * 30 * 24 * 60 * 60 * 1000)
             .toISOString()
             .split('T')[0],
           currentPhase: 'Acquisition & Conveyancing',
@@ -419,6 +421,7 @@ export const usePortfolioStore = create<PortfolioState>()(
           securityOffered: opp.securityOffered || '2nd Mortgage Bond registered over title deed',
           status: 'Active',
           notes: `Promoted from Opportunity Analyzer. Source: ${opp.source}`,
+          driveVault: opp.driveVault ? { ...opp.driveVault } : undefined,
           boq: [
             {
               id: `boq-${Date.now()}-1`,
@@ -521,6 +524,7 @@ export const usePortfolioStore = create<PortfolioState>()(
           monthlyRatesTaxesZAR: opp.monthlyRatesTaxes,
           monthlyAgentFeeZAR: Math.round(opp.monthlyRentalEstimate * (opp.managementFeePercent / 100)),
           monthlyMaintenanceReserveZAR: 500,
+          driveVault: opp.driveVault ? { ...opp.driveVault } : undefined,
           maintenanceHistory: [],
           status: 'Vacant',
         };
@@ -704,7 +708,8 @@ export function computePortfolioSummary(state: {
       agentFee +
       (r.monthlyMaintenanceReserveZAR || 0) +
       (r.monthlyBondPaymentZAR || 0);
-    return sum + (gross - expenses);
+    const arrears = r.unpaidUtilityArrearsZAR || 0;
+    return sum + (gross - expenses - arrears);
   }, 0);
 
   // Projected profit on active pipeline flips
@@ -713,10 +718,12 @@ export function computePortfolioSummary(state: {
       (bSum, b) => bSum + (b.actualCostZAR || b.baselineTotalZAR || 0),
       0
     );
+    const totalHoldingCost = (f.estimatedDurationMonths || 0) * (f.monthlyHoldingCostZAR || 0);
     const totalCost =
       (f.purchasePriceZAR || 0) +
       (f.acquisitionCostsZAR || 0) +
-      totalBoqActual;
+      totalBoqActual +
+      totalHoldingCost;
     const profit = (f.targetExitPriceZAR || 0) - totalCost;
     return sum + profit;
   }, 0);
@@ -727,10 +734,12 @@ export function computePortfolioSummary(state: {
       (bSum, b) => bSum + (b.actualCostZAR || b.baselineTotalZAR || 0),
       0
     );
+    const totalHoldingCost = (f.estimatedDurationMonths || 0) * (f.monthlyHoldingCostZAR || 0);
     const totalCost =
       (f.purchasePriceZAR || 0) +
       (f.acquisitionCostsZAR || 0) +
-      totalBoqActual;
+      totalBoqActual +
+      totalHoldingCost;
     const exitPrice = f.actualSalePriceZAR ?? f.targetExitPriceZAR ?? 0;
     return sum + (exitPrice - totalCost);
   }, 0);

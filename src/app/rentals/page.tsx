@@ -6,7 +6,7 @@ import { usePortfolioStore, usePortfolioSummary } from '@/lib/store/usePortfolio
 import { formatZAR, formatPercent, formatDate } from '@/lib/formatters';
 import ComplianceChecklist from '@/components/common/ComplianceChecklist';
 import CloudDriveLinkVault from '@/components/common/CloudDriveLinkVault';
-import { RentalProperty, MaintenanceLog, PropertyTitleType } from '@/types';
+import { RentalProperty, MaintenanceLog, PropertyTitleType, CloudDriveVault } from '@/types';
 import { PropertyTypeBadge, AgmDateChip, isAgmUpcoming } from '@/components/common/PropertyTypeBadge';
 import { calculateRentalCashflow } from '@/lib/calculations/propertyMetrics';
 import {
@@ -180,6 +180,11 @@ export default function RentalPortfolioPage() {
     new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
   );
   const [depositHeld, setDepositHeld] = useState(30000);
+  const [unpaidUtilityArrears, setUnpaidUtilityArrears] = useState(0);
+  const [rentalMasterFolderUrl, setRentalMasterFolderUrl] = useState('');
+  const [rentalOtpUrl, setRentalOtpUrl] = useState('');
+  const [rentalRatesBillUrl, setRentalRatesBillUrl] = useState('');
+  const [rentalTitleDeedUrl, setRentalTitleDeedUrl] = useState('');
 
   // Agency Management Form State
   const [managementType, setManagementType] = useState<'Self-Managed' | 'Agency'>('Agency');
@@ -206,6 +211,11 @@ export default function RentalPortfolioPage() {
     setTenantEmail('');
     setLeaseEnd(new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]);
     setDepositHeld(30000);
+    setUnpaidUtilityArrears(0);
+    setRentalMasterFolderUrl('');
+    setRentalOtpUrl('');
+    setRentalRatesBillUrl('');
+    setRentalTitleDeedUrl('');
     setManagementType('Agency');
     setAgencyName('Pam Golding Sandton');
     setAgencyCommissionPercent(8.0);
@@ -232,6 +242,11 @@ export default function RentalPortfolioPage() {
     setTenantEmail(property.tenantEmail);
     setLeaseEnd(property.leaseEndDate);
     setDepositHeld(property.depositHeldZAR);
+    setUnpaidUtilityArrears(property.unpaidUtilityArrearsZAR || 0);
+    setRentalMasterFolderUrl(property.driveVault?.masterFolderUrl || '');
+    setRentalOtpUrl(property.driveVault?.otpDocumentUrl || '');
+    setRentalRatesBillUrl(property.driveVault?.ratesBillUrl || '');
+    setRentalTitleDeedUrl(property.driveVault?.titleDeedUrl || '');
     setManagementType(property.managementType || 'Self-Managed');
     setAgencyName(property.agencyName || 'Pam Golding');
     setAgencyCommissionPercent(property.agencyCommissionPercent ?? 8.0);
@@ -289,6 +304,7 @@ export default function RentalPortfolioPage() {
         tenantEmail: tenantEmail || 'tenant@email.co.za',
         leaseEndDate: leaseEnd,
         depositHeldZAR: depositHeld,
+        unpaidUtilityArrearsZAR: unpaidUtilityArrears,
         monthlyGrossRentZAR: monthlyGrossRent,
         monthlyLeviesZAR: finalLevies,
         monthlyRatesTaxesZAR: monthlyRates,
@@ -298,6 +314,12 @@ export default function RentalPortfolioPage() {
         agencyVatApplicable: managementType === 'Agency' ? agencyVatApplicable : false,
         agencyContact: managementType === 'Agency' ? agencyContact : undefined,
         monthlyAgentFeeZAR: agentFee,
+        driveVault: {
+          masterFolderUrl: rentalMasterFolderUrl.trim() || undefined,
+          otpDocumentUrl: rentalOtpUrl.trim() || undefined,
+          ratesBillUrl: rentalRatesBillUrl.trim() || undefined,
+          titleDeedUrl: rentalTitleDeedUrl.trim() || undefined,
+        },
       });
     } else {
       const newUnit: RentalProperty = {
@@ -319,6 +341,7 @@ export default function RentalPortfolioPage() {
         leaseStartDate: new Date().toISOString().split('T')[0],
         leaseEndDate: leaseEnd,
         depositHeldZAR: depositHeld,
+        unpaidUtilityArrearsZAR: unpaidUtilityArrears,
         annualEscalationPercent: 7.0,
         managementType,
         agencyName: managementType === 'Agency' ? agencyName : undefined,
@@ -330,6 +353,12 @@ export default function RentalPortfolioPage() {
         monthlyRatesTaxesZAR: monthlyRates,
         monthlyAgentFeeZAR: agentFee,
         monthlyMaintenanceReserveZAR: 600,
+        driveVault: {
+          masterFolderUrl: rentalMasterFolderUrl.trim() || undefined,
+          otpDocumentUrl: rentalOtpUrl.trim() || undefined,
+          ratesBillUrl: rentalRatesBillUrl.trim() || undefined,
+          titleDeedUrl: rentalTitleDeedUrl.trim() || undefined,
+        },
         maintenanceHistory: [],
         status: tenantName ? 'Occupied' : 'Vacant',
       };
@@ -515,6 +544,19 @@ export default function RentalPortfolioPage() {
                           </div>
                         </div>
 
+                        {/* Tenant Default Risk Alert Banner */}
+                        {(property.unpaidUtilityArrearsZAR || 0) > 0 && (
+                          <div className="bg-rose-50 border-y border-rose-200 px-4 py-2 flex items-center justify-between text-xs">
+                            <span className="flex items-center gap-1.5 font-bold text-rose-700">
+                              <AlertCircle className="w-3.5 h-3.5 text-rose-600 animate-pulse" />
+                              ⚠️ Tenant Default Risk: Utility Arrears Accruing
+                            </span>
+                            <span className="font-extrabold text-rose-700 font-mono">
+                              -{formatZAR(property.unpaidUtilityArrearsZAR || 0)}
+                            </span>
+                          </div>
+                        )}
+
                         {/* Property Financial Highlights */}
                         <div className="p-4 bg-slate-50/60 grid grid-cols-3 gap-2 text-center border-b border-slate-100 text-xs">
                           <div>
@@ -649,6 +691,82 @@ export default function RentalPortfolioPage() {
                                 <span>Bank Bond Payment:</span>
                                 <span>- {formatZAR(property.monthlyBondPaymentZAR)}</span>
                               </div>
+
+                              {(property.unpaidUtilityArrearsZAR || 0) > 0 && (
+                                <div className="flex justify-between text-rose-700 font-semibold bg-rose-50 px-2 py-1 rounded border border-rose-200 text-[11px]">
+                                  <span className="flex items-center gap-1">
+                                    <AlertCircle className="w-3 h-3 text-rose-600" />
+                                    Utility Arrears Deduction:
+                                  </span>
+                                  <span>- {formatZAR(property.unpaidUtilityArrearsZAR || 0)}</span>
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Inline Editable Utility Arrears Box */}
+                            <div className={`mx-4 mb-4 p-3 rounded-lg border text-xs transition-colors ${
+                              (property.unpaidUtilityArrearsZAR || 0) > 0
+                                ? 'bg-rose-50/80 border-rose-200 text-rose-950'
+                                : 'bg-slate-50 border-slate-200 text-slate-700'
+                            }`}>
+                              <div className="flex items-center justify-between mb-1.5">
+                                <div className="flex items-center gap-1.5">
+                                  <span className="font-bold text-[11px] uppercase tracking-wider">Utility Arrears</span>
+                                  {(property.unpaidUtilityArrearsZAR || 0) > 0 ? (
+                                    <span className="text-[9px] font-extrabold text-rose-700 bg-rose-100 px-1.5 py-0.5 rounded border border-rose-200 uppercase tracking-wider">
+                                      ⚠️ Tenant Default Risk
+                                    </span>
+                                  ) : (
+                                    <span className="text-[10px] text-emerald-600 font-semibold">✓ Paid Up</span>
+                                  )}
+                                </div>
+                                <span className="text-[10px] text-slate-400">Inline edit (auto-saves)</span>
+                              </div>
+                              <div className="flex items-center gap-1.5">
+                                <div className="relative flex-1">
+                                  <span className="absolute left-2.5 top-1.5 text-xs text-slate-400 font-bold">R</span>
+                                  <input
+                                    type="number"
+                                    min={0}
+                                    step={100}
+                                    key={`${property.id}-${property.unpaidUtilityArrearsZAR || 0}`}
+                                    defaultValue={property.unpaidUtilityArrearsZAR || 0}
+                                    onBlur={(e) => {
+                                      const val = Math.max(0, Number(e.target.value) || 0);
+                                      if (val !== (property.unpaidUtilityArrearsZAR || 0)) {
+                                        updateRental(property.id, { unpaidUtilityArrearsZAR: val });
+                                      }
+                                    }}
+                                    onKeyDown={(e) => {
+                                      if (e.key === 'Enter') {
+                                        (e.target as HTMLInputElement).blur();
+                                      }
+                                    }}
+                                    className={`w-full pl-6 pr-2 py-1 text-xs font-mono font-bold rounded border transition-colors focus:outline-none focus:ring-1 ${
+                                      (property.unpaidUtilityArrearsZAR || 0) > 0
+                                        ? 'bg-white border-rose-300 text-rose-700 focus:ring-rose-400'
+                                        : 'bg-white border-slate-300 text-slate-700 focus:ring-emerald-400'
+                                    }`}
+                                    placeholder="0"
+                                    title="Edit utility arrears and press Enter or click away to save"
+                                  />
+                                </div>
+                                {(property.unpaidUtilityArrearsZAR || 0) > 0 && (
+                                  <button
+                                    type="button"
+                                    onClick={() => updateRental(property.id, { unpaidUtilityArrearsZAR: 0 })}
+                                    className="px-2 py-1 text-[10px] font-semibold bg-white border border-rose-200 text-rose-600 hover:bg-rose-50 rounded transition-colors cursor-pointer"
+                                    title="Mark arrears as cleared"
+                                  >
+                                    Clear
+                                  </button>
+                                )}
+                              </div>
+                              <p className="text-[10px] text-slate-500 mt-1">
+                                {(property.unpaidUtilityArrearsZAR || 0) > 0
+                                  ? 'Unpaid municipal water/lights debt deducted directly from Net Monthly Cashflow.'
+                                  : 'No outstanding municipal utility debt on this unit.'}
+                              </p>
                             </div>
                           </>
                         )}
@@ -1440,6 +1558,57 @@ export default function RentalPortfolioPage() {
                 </div>
               </div>
 
+              {/* Tenant Utility Arrears Section */}
+              <div className={`p-3 rounded-lg border transition-colors ${
+                unpaidUtilityArrears > 0
+                  ? 'bg-rose-50/70 border-rose-200'
+                  : 'bg-slate-50 border-slate-200'
+              }`}>
+                <div className="flex items-center justify-between mb-1.5">
+                  <div className="flex items-center gap-1.5">
+                    <label className="block font-bold text-slate-800 text-[11px] uppercase tracking-wider">
+                      Tenant Utility Arrears (Water & Lights)
+                    </label>
+                    {unpaidUtilityArrears > 0 && (
+                      <span className="text-[10px] font-bold text-rose-700 bg-rose-100 px-1.5 py-0.5 rounded border border-rose-300">
+                        ⚠️ Tenant Default Risk
+                      </span>
+                    )}
+                  </div>
+                  <span className="text-[10px] text-slate-500">Deducts directly from Net Monthly Cashflow</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="relative flex-1">
+                    <span className="absolute left-3 top-2 text-slate-400 font-bold text-xs">R</span>
+                    <input
+                      type="number"
+                      min="0"
+                      step="100"
+                      value={unpaidUtilityArrears}
+                      onChange={(e) => setUnpaidUtilityArrears(Math.max(0, Number(e.target.value)))}
+                      className={`w-full pl-7 pr-3 py-1.5 border rounded-lg font-bold text-xs bg-white ${
+                        unpaidUtilityArrears > 0
+                          ? 'border-rose-300 text-rose-700 focus:ring-rose-400'
+                          : 'border-slate-300 text-slate-800 focus:ring-emerald-400'
+                      }`}
+                      placeholder="0"
+                    />
+                  </div>
+                  {unpaidUtilityArrears > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setUnpaidUtilityArrears(0)}
+                      className="text-xs px-2.5 py-1.5 bg-white text-slate-600 hover:text-emerald-700 border border-slate-200 rounded-lg hover:border-emerald-300 transition-colors cursor-pointer"
+                    >
+                      Clear to R 0
+                    </button>
+                  )}
+                </div>
+                <p className="text-[10px] text-slate-500 mt-1">
+                  SA municipal utility debt remains attached to the property. Unrecovered balances directly impair monthly net cashflow.
+                </p>
+              </div>
+
               <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 space-y-3">
                 <span className="font-bold text-slate-800 block text-[11px]">Tenant & Lease Info</span>
                 <div className="grid grid-cols-2 gap-3">
@@ -1482,6 +1651,58 @@ export default function RentalPortfolioPage() {
                       value={depositHeld}
                       onChange={(e) => setDepositHeld(Number(e.target.value))}
                       className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg bg-white font-semibold"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Cloud & Web Document Vault Section */}
+              <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-[11px] text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                    <span>☁️ Cloud & Web Document Vault</span>
+                  </span>
+                  <span className="text-[10px] text-slate-500">OneDrive • GDrive • Dropbox</span>
+                </div>
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-600 mb-1">Deal Folder URL</label>
+                    <input
+                      type="url"
+                      placeholder="https://1drv.ms/... or drive.google.com/..."
+                      value={rentalMasterFolderUrl}
+                      onChange={(e) => setRentalMasterFolderUrl(e.target.value)}
+                      className="w-full px-2 py-1 text-[11px] border border-slate-300 rounded-lg bg-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-600 mb-1">Signed Lease / OTP PDF URL</label>
+                    <input
+                      type="url"
+                      placeholder="https://..."
+                      value={rentalOtpUrl}
+                      onChange={(e) => setRentalOtpUrl(e.target.value)}
+                      className="w-full px-2 py-1 text-[11px] border border-slate-300 rounded-lg bg-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-600 mb-1">Rates & Levies Statement</label>
+                    <input
+                      type="url"
+                      placeholder="https://..."
+                      value={rentalRatesBillUrl}
+                      onChange={(e) => setRentalRatesBillUrl(e.target.value)}
+                      className="w-full px-2 py-1 text-[11px] border border-slate-300 rounded-lg bg-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-600 mb-1">Title Deed / Sectional Plan</label>
+                    <input
+                      type="url"
+                      placeholder="https://..."
+                      value={rentalTitleDeedUrl}
+                      onChange={(e) => setRentalTitleDeedUrl(e.target.value)}
+                      className="w-full px-2 py-1 text-[11px] border border-slate-300 rounded-lg bg-white"
                     />
                   </div>
                 </div>
