@@ -83,6 +83,51 @@ interface PortfolioState {
   importPortfolioJSON: (jsonString: string) => boolean;
 }
 
+function syncAgmReminderTask(
+  tasks: TaskItem[],
+  entityType: 'rental' | 'flip' | 'opportunity',
+  entityId: string,
+  entityTitle: string,
+  agmDate?: string
+): TaskItem[] {
+  const existingIdx = tasks.findIndex(
+    (t) => t.id === `task-agm-${entityId}` || (t.linkedEntity?.id === entityId && t.title.startsWith('Attend Body Corporate AGM'))
+  );
+
+  if (!agmDate) {
+    if (existingIdx >= 0) {
+      return tasks.filter((_, idx) => idx !== existingIdx);
+    }
+    return tasks;
+  }
+
+  const agmTime = new Date(agmDate).getTime();
+  const reminderDate = isNaN(agmTime) ? agmDate : new Date(agmTime - 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+
+  const agmTask: TaskItem = {
+    id: `task-agm-${entityId}`,
+    title: `Attend Body Corporate AGM & Review Budget: ${entityTitle}`,
+    description: `Scheduled Body Corporate AGM on ${agmDate}. Review financials, trustee election, and proposed levy increases.`,
+    dueDate: reminderDate,
+    priority: 'High',
+    status: 'Pending',
+    linkedEntity: {
+      type: entityType,
+      id: entityId,
+      name: entityTitle,
+    },
+    createdAt: new Date().toISOString().split('T')[0],
+  };
+
+  if (existingIdx >= 0) {
+    const nextTasks = [...tasks];
+    nextTasks[existingIdx] = { ...nextTasks[existingIdx], ...agmTask };
+    return nextTasks;
+  }
+
+  return [agmTask, ...tasks];
+}
+
 export const usePortfolioStore = create<PortfolioState>()(
   persist(
     (set, get) => ({
@@ -107,13 +152,27 @@ export const usePortfolioStore = create<PortfolioState>()(
 
       // Rentals
       addRental: (rental) =>
-        set((state) => ({ rentals: [rental, ...state.rentals] })),
-      updateRental: (id, updates) =>
         set((state) => ({
-          rentals: state.rentals.map((r) =>
-            r.id === id ? { ...r, ...updates } : r
-          ),
+          rentals: [rental, ...state.rentals],
+          tasks: rental.agmDate
+            ? syncAgmReminderTask(state.tasks, 'rental', rental.id, rental.title, rental.agmDate)
+            : state.tasks,
         })),
+      updateRental: (id, updates) =>
+        set((state) => {
+          const updatedRentals = state.rentals.map((r) =>
+            r.id === id ? { ...r, ...updates } : r
+          );
+          const target = updatedRentals.find((r) => r.id === id);
+          const agmDate = updates.agmDate !== undefined ? updates.agmDate : target?.agmDate;
+          const tasks = target
+            ? syncAgmReminderTask(state.tasks, 'rental', id, target.title, agmDate)
+            : state.tasks;
+          return {
+            rentals: updatedRentals,
+            tasks,
+          };
+        }),
       deleteRental: (id) =>
         set((state) => ({
           rentals: state.rentals.filter((r) => r.id !== id),
@@ -132,13 +191,27 @@ export const usePortfolioStore = create<PortfolioState>()(
 
       // Flips
       addFlip: (flip) =>
-        set((state) => ({ flips: [flip, ...state.flips] })),
-      updateFlip: (id, updates) =>
         set((state) => ({
-          flips: state.flips.map((f) =>
-            f.id === id ? { ...f, ...updates } : f
-          ),
+          flips: [flip, ...state.flips],
+          tasks: flip.agmDate
+            ? syncAgmReminderTask(state.tasks, 'flip', flip.id, flip.title, flip.agmDate)
+            : state.tasks,
         })),
+      updateFlip: (id, updates) =>
+        set((state) => {
+          const updatedFlips = state.flips.map((f) =>
+            f.id === id ? { ...f, ...updates } : f
+          );
+          const target = updatedFlips.find((f) => f.id === id);
+          const agmDate = updates.agmDate !== undefined ? updates.agmDate : target?.agmDate;
+          const tasks = target
+            ? syncAgmReminderTask(state.tasks, 'flip', id, target.title, agmDate)
+            : state.tasks;
+          return {
+            flips: updatedFlips,
+            tasks,
+          };
+        }),
       deleteFlip: (id) =>
         set((state) => ({
           flips: state.flips.filter((f) => f.id !== id),
@@ -201,13 +274,27 @@ export const usePortfolioStore = create<PortfolioState>()(
 
       // Opportunities
       addOpportunity: (opp) =>
-        set((state) => ({ opportunities: [opp, ...state.opportunities] })),
-      updateOpportunity: (id, updates) =>
         set((state) => ({
-          opportunities: state.opportunities.map((o) =>
-            o.id === id ? { ...o, ...updates } : o
-          ),
+          opportunities: [opp, ...state.opportunities],
+          tasks: opp.agmDate
+            ? syncAgmReminderTask(state.tasks, 'opportunity', opp.id, opp.title, opp.agmDate)
+            : state.tasks,
         })),
+      updateOpportunity: (id, updates) =>
+        set((state) => {
+          const updatedOpps = state.opportunities.map((o) =>
+            o.id === id ? { ...o, ...updates } : o
+          );
+          const target = updatedOpps.find((o) => o.id === id);
+          const agmDate = updates.agmDate !== undefined ? updates.agmDate : target?.agmDate;
+          const tasks = target
+            ? syncAgmReminderTask(state.tasks, 'opportunity', id, target.title, agmDate)
+            : state.tasks;
+          return {
+            opportunities: updatedOpps,
+            tasks,
+          };
+        }),
       deleteOpportunity: (id) =>
         set((state) => ({
           opportunities: state.opportunities.filter((o) => o.id !== id),
@@ -221,6 +308,8 @@ export const usePortfolioStore = create<PortfolioState>()(
           title: `${opp.title} (Flip)`,
           address: opp.address,
           city: opp.city,
+          propertyType: opp.propertyType || 'Freehold House',
+          agmDate: opp.agmDate,
           purchaseDate: new Date().toISOString().split('T')[0],
           purchasePriceZAR: opp.purchasePrice,
           acquisitionCostsZAR: opp.costs.totalAcquisitionCost - opp.purchasePrice,
@@ -263,31 +352,42 @@ export const usePortfolioStore = create<PortfolioState>()(
           ],
         };
 
-        set((state) => ({
-          flips: [newFlip, ...state.flips],
-          opportunities: state.opportunities.map((o) =>
-            o.id === oppId ? { ...o, status: 'Promoted to Flip' } : o
-          ),
-          tasks: [
-            {
-              id: `task-${Date.now()}`,
-              title: `Instruct conveyancing attorney for ${opp.title}`,
-              description: `Conveyancing fee estimated at R ${opp.costs.conveyancingFee.toLocaleString('en-ZA')}`,
-              dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
-                .toISOString()
-                .split('T')[0],
-              priority: 'Urgent',
-              status: 'Pending',
-              linkedEntity: {
-                type: 'flip',
-                id: newFlip.id,
-                name: newFlip.title,
-              },
-              createdAt: new Date().toISOString(),
-            },
-            ...state.tasks,
-          ],
-        }));
+        const conveyancingTask: TaskItem = {
+          id: `task-${Date.now()}`,
+          title: `Instruct conveyancing attorney for ${opp.title}`,
+          description: `Conveyancing fee estimated at R ${opp.costs.conveyancingFee.toLocaleString('en-ZA')}`,
+          dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+            .toISOString()
+            .split('T')[0],
+          priority: 'Urgent',
+          status: 'Pending',
+          linkedEntity: {
+            type: 'flip',
+            id: newFlip.id,
+            name: newFlip.title,
+          },
+          createdAt: new Date().toISOString(),
+        };
+
+        set((state) => {
+          let updatedTasks = [conveyancingTask, ...state.tasks];
+          if (newFlip.agmDate) {
+            updatedTasks = syncAgmReminderTask(
+              updatedTasks,
+              'flip',
+              newFlip.id,
+              newFlip.title,
+              newFlip.agmDate
+            );
+          }
+          return {
+            flips: [newFlip, ...state.flips],
+            opportunities: state.opportunities.map((o) =>
+              o.id === oppId ? { ...o, status: 'Promoted to Flip' } : o
+            ),
+            tasks: updatedTasks,
+          };
+        });
       },
       promoteOpportunityToRental: (oppId) => {
         const opp = get().opportunities.find((o) => o.id === oppId);
@@ -299,7 +399,8 @@ export const usePortfolioStore = create<PortfolioState>()(
           title: opp.title,
           address: opp.address,
           city: opp.city,
-          propertyType: 'Sectional Title Apartment',
+          propertyType: opp.propertyType || 'Sectional Title Apartment',
+          agmDate: opp.agmDate,
           marketValueZAR: opp.purchasePrice,
           purchasePriceZAR: opp.purchasePrice,
           purchaseDate: new Date().toISOString().split('T')[0],
@@ -324,12 +425,25 @@ export const usePortfolioStore = create<PortfolioState>()(
           status: 'Vacant',
         };
 
-        set((state) => ({
-          rentals: [newRental, ...state.rentals],
-          opportunities: state.opportunities.map((o) =>
-            o.id === oppId ? { ...o, status: 'Promoted to Rental' } : o
-          ),
-        }));
+        set((state) => {
+          let updatedTasks = state.tasks;
+          if (newRental.agmDate) {
+            updatedTasks = syncAgmReminderTask(
+              updatedTasks,
+              'rental',
+              newRental.id,
+              newRental.title,
+              newRental.agmDate
+            );
+          }
+          return {
+            rentals: [newRental, ...state.rentals],
+            opportunities: state.opportunities.map((o) =>
+              o.id === oppId ? { ...o, status: 'Promoted to Rental' } : o
+            ),
+            tasks: updatedTasks,
+          };
+        });
       },
 
       // Tasks

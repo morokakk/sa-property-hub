@@ -6,6 +6,7 @@ import {
   LocalSupplier,
   TaskItem,
   InvestorProfile,
+  PropertyTitleType,
 } from '@/types';
 import { computeAcquisitionCosts, calculateSection13sex } from '@/lib/calculations/sarsTax';
 import {
@@ -21,6 +22,7 @@ export const INITIAL_RENTALS: RentalProperty[] = [
     address: '35 Fredman Drive, Sandton',
     city: 'Johannesburg',
     propertyType: 'Sectional Title Apartment',
+    agmDate: '2026-11-12',
     marketValueZAR: 2_450_000,
     purchasePriceZAR: 2_100_000,
     purchaseDate: '2023-03-15',
@@ -87,6 +89,7 @@ export const INITIAL_RENTALS: RentalProperty[] = [
     address: '14 The Boulevard, Umhlanga Ridge',
     city: 'Durban',
     propertyType: 'Sectional Title Apartment',
+    agmDate: '2026-10-14',
     marketValueZAR: 1_850_000,
     purchasePriceZAR: 1_650_000,
     purchaseDate: '2023-09-01',
@@ -129,6 +132,7 @@ export const INITIAL_RENTALS: RentalProperty[] = [
     address: '88 Somerset Road, Green Point',
     city: 'Cape Town',
     propertyType: 'Sectional Title Apartment',
+    agmDate: '2027-02-18',
     marketValueZAR: 3_200_000,
     purchasePriceZAR: 2_750_000,
     purchaseDate: '2022-11-10',
@@ -163,6 +167,7 @@ export const INITIAL_FLIPS: FlipProject[] = [
     title: 'Kloof Street Heritage Redesign',
     address: '74 Kloof Street, Gardens',
     city: 'Cape Town',
+    propertyType: 'Freehold House',
     purchaseDate: '2026-03-01',
     purchasePriceZAR: 3_800_000,
     acquisitionCostsZAR: 315_000,
@@ -275,6 +280,8 @@ export const INITIAL_FLIPS: FlipProject[] = [
     title: 'Waterkloof Diplomatic Fixer',
     address: '112 Crown Avenue, Waterkloof',
     city: 'Pretoria',
+    propertyType: 'Townhouse / Cluster',
+    agmDate: '2026-11-20',
     purchaseDate: '2026-05-15',
     purchasePriceZAR: 2_100_000,
     acquisitionCostsZAR: 148_000,
@@ -542,6 +549,34 @@ export const INITIAL_TASKS: TaskItem[] = [
     },
     createdAt: '2026-09-16',
   },
+  {
+    id: 'task-agm-rental-1',
+    title: 'Attend Body Corporate AGM & Review Budget: Sandhurst Executive Suite',
+    description: 'Scheduled Body Corporate AGM on 2026-11-12. Review audited annual financial statements, trustee election, and proposed levy escalation.',
+    dueDate: '2026-10-29', // 14 days before 2026-11-12
+    priority: 'High',
+    status: 'Pending',
+    linkedEntity: {
+      type: 'rental',
+      id: 'rental-1',
+      name: 'Sandhurst Executive Suite',
+    },
+    createdAt: '2026-09-16',
+  },
+  {
+    id: 'task-agm-rental-2',
+    title: 'Attend Body Corporate AGM & Review Budget: Umhlanga Ridge Coastal Vista',
+    description: 'Scheduled Body Corporate AGM on 2026-10-14. Review scheme maintenance plan, CSOS compliance, and reserve fund status.',
+    dueDate: '2026-09-30', // 14 days before 2026-10-14
+    priority: 'High',
+    status: 'Pending',
+    linkedEntity: {
+      type: 'rental',
+      id: 'rental-2',
+      name: 'Umhlanga Ridge Coastal Vista',
+    },
+    createdAt: '2026-09-16',
+  },
 ];
 
 // Helper to create pre-calculated initial opportunities
@@ -568,7 +603,9 @@ function createSampleOpportunity(
     policeStation: any;
     medicalClinic: any;
     shoppingMall: any;
-  }
+  },
+  propertyType: PropertyTitleType = 'Sectional Title Apartment',
+  agmDate?: string
 ): OpportunityDeal {
   const costs = computeAcquisitionCosts(purchasePrice, ltv);
   const metrics = calculateDealMetrics({
@@ -604,6 +641,8 @@ function createSampleOpportunity(
     address,
     city,
     province,
+    propertyType,
+    agmDate,
     source,
     openMarketValueZAR: openMarketValue,
     purchasePrice,
@@ -663,7 +702,8 @@ export const INITIAL_OPPORTUNITIES: OpportunityDeal[] = [
       policeStation: '0-5km',
       medicalClinic: '0-5km',
       shoppingMall: '0-5km',
-    }
+    },
+    'Freehold House'
   ),
   createSampleOpportunity(
     'opp-2',
@@ -691,7 +731,9 @@ export const INITIAL_OPPORTUNITIES: OpportunityDeal[] = [
       policeStation: '6-10km',
       medicalClinic: '6-10km',
       shoppingMall: '0-5km',
-    }
+    },
+    'Sectional Title Apartment',
+    '2026-11-28'
   ),
   createSampleOpportunity(
     'opp-3',
@@ -716,7 +758,9 @@ export const INITIAL_OPPORTUNITIES: OpportunityDeal[] = [
       policeStation: '0-5km',
       medicalClinic: '0-5km',
       shoppingMall: '0-5km',
-    }
+    },
+    'Sectional Title Apartment',
+    '2027-01-20'
   ),
 ];
 

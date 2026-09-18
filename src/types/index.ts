@@ -88,6 +88,12 @@ export interface AmenityScorecard {
   compositeScore: number; // 4 to 12 points
 }
 
+export type PropertyTitleType =
+  | 'Sectional Title Apartment'
+  | 'Freehold House'
+  | 'Townhouse / Cluster'
+  | 'Multi-unit Commercial';
+
 // Opportunity Analyzer Model
 export interface OpportunityDeal {
   id: string;
@@ -95,6 +101,8 @@ export interface OpportunityDeal {
   address: string;
   city: string;
   province: 'Gauteng' | 'Western Cape' | 'KwaZulu-Natal' | 'Eastern Cape' | 'Free State' | 'Other';
+  propertyType?: PropertyTitleType;
+  agmDate?: string; // Body Corporate AGM Date (Sectional Title / Cluster)
   source: DealSource;
   openMarketValueZAR: number; // Professional valuation / Lightstone report value
   purchasePrice: number; // Target Purchase Price / Max Bid
@@ -192,6 +200,8 @@ export interface FlipProject {
   title: string;
   address: string;
   city: string;
+  propertyType?: PropertyTitleType;
+  agmDate?: string;
   purchaseDate: string;
   purchasePriceZAR: number;
   acquisitionCostsZAR: number; // Transfer + legal
@@ -225,7 +235,8 @@ export interface RentalProperty {
   title: string;
   address: string;
   city: string;
-  propertyType: 'Sectional Title Apartment' | 'Freehold House' | 'Townhouse / Cluster' | 'Multi-unit Commercial';
+  propertyType: PropertyTitleType;
+  agmDate?: string;
   marketValueZAR: number;
   purchasePriceZAR: number;
   purchaseDate: string;

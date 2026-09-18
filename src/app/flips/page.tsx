@@ -7,7 +7,8 @@ import { formatZAR, formatPercent, formatDate } from '@/lib/formatters';
 import { formatFlipForWhatsApp } from '@/lib/whatsappFormatter';
 import ComplianceChecklist from '@/components/common/ComplianceChecklist';
 import CloudDriveLinkVault from '@/components/common/CloudDriveLinkVault';
-import { FlipProject, BOQItem, LocalSupplier } from '@/types';
+import { FlipProject, BOQItem, LocalSupplier, PropertyTitleType } from '@/types';
+import { PropertyTypeBadge, AgmDateChip } from '@/components/common/PropertyTypeBadge';
 import {
   Hammer,
   PlusCircle,
@@ -74,6 +75,8 @@ export default function FlipsManagerPage() {
   const [newFlipCompletionDate, setNewFlipCompletionDate] = useState(
     new Date(Date.now() + 180 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
   );
+  const [newFlipPropertyType, setNewFlipPropertyType] = useState<PropertyTitleType>('Freehold House');
+  const [newFlipAgmDate, setNewFlipAgmDate] = useState<string>('');
 
   // New Supplier Form State
   const [supName, setSupName] = useState('');
@@ -111,11 +114,14 @@ export default function FlipsManagerPage() {
     e.preventDefault();
     if (!newFlipTitle) return;
 
+    const isScheme = newFlipPropertyType === 'Sectional Title Apartment' || newFlipPropertyType === 'Townhouse / Cluster';
     const createdFlip: FlipProject = {
       id: `flip-${Date.now()}`,
       title: newFlipTitle,
       address: newFlipAddress || `${newFlipCity} Project`,
       city: newFlipCity,
+      propertyType: newFlipPropertyType,
+      agmDate: isScheme && newFlipAgmDate ? newFlipAgmDate : undefined,
       purchaseDate: new Date().toISOString().split('T')[0],
       purchasePriceZAR: newFlipPurchasePrice,
       acquisitionCostsZAR: newFlipAcquisitionCosts,
@@ -133,6 +139,8 @@ export default function FlipsManagerPage() {
     setShowAddFlipModal(false);
     setNewFlipTitle('');
     setNewFlipAddress('');
+    setNewFlipPropertyType('Freehold House');
+    setNewFlipAgmDate('');
   };
 
   const handleAddSupplier = (e: React.FormEvent) => {
@@ -267,6 +275,25 @@ export default function FlipsManagerPage() {
 
         {activeFlip ? (
           <>
+            {/* Active Flip Header Banner */}
+            <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <div className="flex items-center gap-2 flex-wrap mb-1">
+                  <PropertyTypeBadge type={activeFlip.propertyType} />
+                  <AgmDateChip agmDate={activeFlip.agmDate} />
+                  <span className="text-[10px] font-semibold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full">
+                    {activeFlip.currentPhase}
+                  </span>
+                </div>
+                <h2 className="text-base font-bold text-slate-900">{activeFlip.title}</h2>
+                <p className="text-xs text-slate-500">{activeFlip.address}, {activeFlip.city}</p>
+              </div>
+              <div className="text-xs text-slate-500 sm:text-right">
+                <span className="block text-[10px] text-slate-400">Target Completion</span>
+                <span className="font-semibold text-slate-800">{formatDate(activeFlip.targetCompletionDate)}</span>
+              </div>
+            </div>
+
             {/* Active Flip Overview & Financial Health Bar */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
               <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
@@ -674,6 +701,60 @@ export default function FlipsManagerPage() {
                     className="w-full px-3 py-2 border border-slate-300 rounded-lg"
                   />
                 </div>
+              </div>
+
+              {/* Property Title Type & Body Corporate AGM Section */}
+              <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 space-y-3">
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="block font-bold text-slate-800 text-[11px] uppercase tracking-wider">
+                      Property Title Type
+                    </label>
+                    <span className="text-[10px] text-slate-500">STSMA & Governance Classification</span>
+                  </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
+                    {(
+                      [
+                        { id: 'Freehold House', label: '🏡 Freehold House' },
+                        { id: 'Townhouse / Cluster', label: '🏘️ Townhouse / Cluster' },
+                        { id: 'Sectional Title Apartment', label: '🏢 Sectional Title' },
+                        { id: 'Multi-unit Commercial', label: '🏬 Commercial' },
+                      ] as const
+                    ).map((pt) => (
+                      <button
+                        key={pt.id}
+                        type="button"
+                        onClick={() => setNewFlipPropertyType(pt.id)}
+                        className={`py-1.5 px-2 rounded-lg text-[11px] font-semibold transition-all text-center border ${
+                          newFlipPropertyType === pt.id
+                            ? 'bg-slate-900 text-white border-slate-900 shadow-2xs font-bold'
+                            : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100'
+                        }`}
+                      >
+                        {pt.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {(newFlipPropertyType === 'Sectional Title Apartment' || newFlipPropertyType === 'Townhouse / Cluster') && (
+                  <div className="pt-2 border-t border-slate-200">
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="block font-semibold text-slate-700 text-xs">
+                        📅 Scheduled Body Corporate AGM Date
+                      </label>
+                      <span className="text-[10px] text-indigo-600 font-medium">
+                        Auto-schedules reminder task 14 days prior
+                      </span>
+                    </div>
+                    <input
+                      type="date"
+                      value={newFlipAgmDate}
+                      onChange={(e) => setNewFlipAgmDate(e.target.value)}
+                      className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg bg-white text-xs"
+                    />
+                  </div>
+                )}
               </div>
 
               <div className="grid grid-cols-2 gap-3">

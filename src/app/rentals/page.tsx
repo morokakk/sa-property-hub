@@ -6,7 +6,8 @@ import { usePortfolioStore, usePortfolioSummary } from '@/lib/store/usePortfolio
 import { formatZAR, formatPercent, formatDate } from '@/lib/formatters';
 import ComplianceChecklist from '@/components/common/ComplianceChecklist';
 import CloudDriveLinkVault from '@/components/common/CloudDriveLinkVault';
-import { RentalProperty, MaintenanceLog } from '@/types';
+import { RentalProperty, MaintenanceLog, PropertyTitleType } from '@/types';
+import { PropertyTypeBadge, AgmDateChip, isAgmUpcoming } from '@/components/common/PropertyTypeBadge';
 import { calculateRentalCashflow } from '@/lib/calculations/propertyMetrics';
 import {
   Building2,
@@ -25,6 +26,54 @@ import {
   Edit3,
   MessageCircle,
 } from 'lucide-react';
+
+export function renderPropertyTypeBadge(type?: PropertyTitleType) {
+  switch (type) {
+    case 'Freehold House':
+      return (
+        <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200">
+          <span>🏡 Freehold House</span>
+        </span>
+      );
+    case 'Townhouse / Cluster':
+      return (
+        <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-200">
+          <span>🏘️ Townhouse / Cluster</span>
+        </span>
+      );
+    case 'Multi-unit Commercial':
+      return (
+        <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-purple-50 text-purple-700 border border-purple-200">
+          <span>🏬 Commercial</span>
+        </span>
+      );
+    case 'Sectional Title Apartment':
+    default:
+      return (
+        <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200">
+          <span>🏢 Sectional Title</span>
+        </span>
+      );
+  }
+}
+
+export function renderAgmChip(agmDate?: string) {
+  if (!agmDate) return null;
+  const upcoming = isAgmUpcoming(agmDate);
+  return (
+    <span
+      className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full border ${
+        upcoming
+          ? 'bg-amber-100 text-amber-950 border-amber-300 font-bold'
+          : 'bg-slate-100 text-slate-700 border-slate-200'
+      }`}
+      title={upcoming ? 'Body Corporate AGM scheduled within next 30 days!' : 'Scheduled Body Corporate AGM'}
+    >
+      <Calendar className={`w-2.5 h-2.5 ${upcoming ? 'text-amber-700' : 'text-slate-500'}`} />
+      <span>AGM: {formatDate(agmDate)}{upcoming ? ' (Upcoming)' : ''}</span>
+    </span>
+  );
+}
 
 function renderAgencyContactLinks(contact: string) {
   if (!contact) return null;
@@ -51,7 +100,7 @@ function renderAgencyContactLinks(contact: string) {
             className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-700 hover:text-emerald-900 bg-emerald-50 hover:bg-emerald-100 px-2 py-0.5 rounded border border-emerald-200 transition-colors"
             title="WhatsApp Agent"
           >
-            <MessageCircle className="w-2.5 h-2.5 text-emerald-600" />
+            <MessageCircle className="w-2.5 h-2.5" />
             <span>WhatsApp</span>
           </a>
         </>
@@ -97,6 +146,8 @@ export default function RentalPortfolioPage() {
   const [title, setTitle] = useState('');
   const [address, setAddress] = useState('');
   const [city, setCity] = useState('Johannesburg');
+  const [propertyType, setPropertyType] = useState<PropertyTitleType>('Sectional Title Apartment');
+  const [agmDate, setAgmDate] = useState('');
   const [marketValue, setMarketValue] = useState(1800000);
   const [purchasePrice, setPurchasePrice] = useState(1650000);
   const [bondBalance, setBondBalance] = useState(1100000);
@@ -123,6 +174,8 @@ export default function RentalPortfolioPage() {
     setTitle('');
     setAddress('');
     setCity('Johannesburg');
+    setPropertyType('Sectional Title Apartment');
+    setAgmDate('');
     setMarketValue(1800000);
     setPurchasePrice(1650000);
     setBondBalance(1100000);
@@ -147,11 +200,13 @@ export default function RentalPortfolioPage() {
     setTitle(property.title);
     setAddress(property.address);
     setCity(property.city);
+    setPropertyType(property.propertyType || 'Sectional Title Apartment');
+    setAgmDate(property.agmDate || '');
     setMarketValue(property.marketValueZAR);
     setPurchasePrice(property.purchasePriceZAR);
     setBondBalance(property.outstandingBondBalanceZAR);
     setMonthlyGrossRent(property.monthlyGrossRentZAR);
-    setMonthlyLevies(property.monthlyLeviesZAR);
+    setMonthlyLevies(property.propertyType === 'Freehold House' ? 0 : property.monthlyLeviesZAR);
     setMonthlyRates(property.monthlyRatesTaxesZAR);
     setTenantName(property.tenantName);
     setTenantPhone(property.tenantPhone);
@@ -175,11 +230,17 @@ export default function RentalPortfolioPage() {
     const baseComm = managementType === 'Agency' ? monthlyGrossRent * (agencyCommissionPercent / 100) : 0;
     const agentFee = Math.round(baseComm * (agencyVatApplicable !== false ? 1.15 : 1.0));
 
+    const finalLevies = propertyType === 'Freehold House' ? 0 : monthlyLevies;
+    const isScheme = propertyType === 'Sectional Title Apartment' || propertyType === 'Townhouse / Cluster';
+    const finalAgmDate = isScheme && agmDate ? agmDate : undefined;
+
     if (editingRentalId) {
       updateRental(editingRentalId, {
         title,
         address: address || `${city} Property`,
         city,
+        propertyType,
+        agmDate: finalAgmDate,
         marketValueZAR: marketValue,
         purchasePriceZAR: purchasePrice,
         outstandingBondBalanceZAR: bondBalance,
@@ -190,7 +251,7 @@ export default function RentalPortfolioPage() {
         leaseEndDate: leaseEnd,
         depositHeldZAR: depositHeld,
         monthlyGrossRentZAR: monthlyGrossRent,
-        monthlyLeviesZAR: monthlyLevies,
+        monthlyLeviesZAR: finalLevies,
         monthlyRatesTaxesZAR: monthlyRates,
         managementType,
         agencyName: managementType === 'Agency' ? agencyName : undefined,
@@ -205,7 +266,8 @@ export default function RentalPortfolioPage() {
         title,
         address: address || `${city} Property`,
         city,
-        propertyType: 'Sectional Title Apartment',
+        propertyType,
+        agmDate: finalAgmDate,
         marketValueZAR: marketValue,
         purchasePriceZAR: purchasePrice,
         purchaseDate: new Date().toISOString().split('T')[0],
@@ -225,7 +287,7 @@ export default function RentalPortfolioPage() {
         agencyVatApplicable: managementType === 'Agency' ? agencyVatApplicable : false,
         agencyContact: managementType === 'Agency' ? agencyContact : undefined,
         monthlyGrossRentZAR: monthlyGrossRent,
-        monthlyLeviesZAR: monthlyLevies,
+        monthlyLeviesZAR: finalLevies,
         monthlyRatesTaxesZAR: monthlyRates,
         monthlyAgentFeeZAR: agentFee,
         monthlyMaintenanceReserveZAR: 600,
@@ -328,6 +390,10 @@ export default function RentalPortfolioPage() {
                   <div className="p-4 border-b border-slate-100 flex flex-col gap-2">
                     <div className="flex items-start justify-between gap-2">
                       <div>
+                        <div className="flex items-center gap-1.5 flex-wrap mb-1.5">
+                          <PropertyTypeBadge type={property.propertyType} />
+                          <AgmDateChip agmDate={property.agmDate} />
+                        </div>
                         <h3 className="font-bold text-sm text-slate-900">{property.title}</h3>
                         <p className="text-xs text-slate-500 mt-0.5">{property.address}, {property.city}</p>
                       </div>
@@ -464,8 +530,8 @@ export default function RentalPortfolioPage() {
                           <strong className="text-slate-900">{formatZAR(property.monthlyGrossRentZAR)}</strong>
                         </div>
                         <div className="flex justify-between text-slate-500">
-                          <span>Body Corporate Levies:</span>
-                          <span>- {formatZAR(property.monthlyLeviesZAR)}</span>
+                          <span>{property.propertyType === 'Freehold House' ? 'Body Corporate Levies (N/A):' : 'Body Corporate / HOA Levies:'}</span>
+                          <span>{property.propertyType === 'Freehold House' ? 'R 0 (Freehold)' : `- ${formatZAR(property.monthlyLeviesZAR)}`}</span>
                         </div>
                         <div className="flex justify-between text-slate-500">
                           <span>Municipal Rates & Taxes:</span>
@@ -729,6 +795,65 @@ export default function RentalPortfolioPage() {
                 />
               </div>
 
+              {/* Property Title Type & Body Corporate AGM Section */}
+              <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 space-y-3">
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="block font-bold text-slate-800 text-[11px] uppercase tracking-wider">
+                      Property Title Type
+                    </label>
+                    <span className="text-[10px] text-slate-500">STSMA & Governance Classification</span>
+                  </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
+                    {(
+                      [
+                        { id: 'Sectional Title Apartment', label: '🏢 Sectional Title' },
+                        { id: 'Freehold House', label: '🏡 Freehold House' },
+                        { id: 'Townhouse / Cluster', label: '🏘️ Townhouse / Cluster' },
+                        { id: 'Multi-unit Commercial', label: '🏬 Commercial' },
+                      ] as const
+                    ).map((pt) => (
+                      <button
+                        key={pt.id}
+                        type="button"
+                        onClick={() => {
+                          setPropertyType(pt.id);
+                          if (pt.id === 'Freehold House') {
+                            setMonthlyLevies(0);
+                          }
+                        }}
+                        className={`py-1.5 px-2 rounded-lg text-[11px] font-semibold transition-all text-center border ${
+                          propertyType === pt.id
+                            ? 'bg-slate-900 text-white border-slate-900 shadow-2xs font-bold'
+                            : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100'
+                        }`}
+                      >
+                        {pt.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {(propertyType === 'Sectional Title Apartment' || propertyType === 'Townhouse / Cluster') && (
+                  <div className="pt-2 border-t border-slate-200">
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="block font-semibold text-slate-700">
+                        📅 Body Corporate AGM Date
+                      </label>
+                      <span className="text-[10px] text-indigo-600 font-medium">
+                        Auto-schedules reminder task 14 days prior
+                      </span>
+                    </div>
+                    <input
+                      type="date"
+                      value={agmDate}
+                      onChange={(e) => setAgmDate(e.target.value)}
+                      className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg bg-white"
+                    />
+                  </div>
+                )}
+              </div>
+
               {/* Property Management Mandate Section */}
               <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 space-y-3">
                 <div className="flex items-center justify-between">
@@ -913,14 +1038,28 @@ export default function RentalPortfolioPage() {
                   />
                 </div>
                 <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Monthly Levies</label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block font-semibold text-slate-700">
+                      {propertyType === 'Freehold House' ? 'Monthly Levies' : 'Body Corporate Levies'}
+                    </label>
+                    {propertyType === 'Freehold House' && (
+                      <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-200">
+                        N/A (Freehold Title)
+                      </span>
+                    )}
+                  </div>
                   <input
                     type="number"
                     min="0"
                     step="100"
-                    value={monthlyLevies}
+                    disabled={propertyType === 'Freehold House'}
+                    value={propertyType === 'Freehold House' ? 0 : monthlyLevies}
                     onChange={(e) => setMonthlyLevies(Number(e.target.value))}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg"
+                    className={`w-full px-3 py-2 border rounded-lg ${
+                      propertyType === 'Freehold House'
+                        ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'
+                        : 'border-slate-300'
+                    }`}
                   />
                 </div>
                 <div>
