@@ -215,6 +215,11 @@ export interface FlipProject {
   notes?: string;
   cocChecklist?: ComplianceCertificates;
   driveVault?: CloudDriveVault;
+  // Realized Sale / Exit Fields
+  actualSalePriceZAR?: number;
+  netCashProceedsZAR?: number;
+  soldDate?: string;
+  exitNotes?: string;
 }
 
 // Maintenance Log Item
@@ -264,9 +269,14 @@ export interface RentalProperty {
   monthlyAgentFeeZAR: number;
   monthlyMaintenanceReserveZAR: number;
   maintenanceHistory: MaintenanceLog[];
-  status: 'Occupied' | 'Vacant' | 'Notice Given';
+  status: 'Occupied' | 'Vacant' | 'Notice Given' | 'Sold';
   cocChecklist?: ComplianceCertificates;
   driveVault?: CloudDriveVault;
+  // Realized Sale / Exit Fields
+  actualSalePriceZAR?: number;
+  netCashProceedsZAR?: number;
+  soldDate?: string;
+  exitNotes?: string;
 }
 
 // Global Portfolio Aggregates
@@ -275,14 +285,19 @@ export interface PortfolioSummary {
   totalRentalValue: number;
   totalFlipValue: number;
   liquidCapitalReserve: number;
+  unallocatedFundingReserve: number;
+  totalAvailablePurchasingPower: number;
   totalFundingLiabilities: number;
   totalPrivateFundingLiability: number;
   totalBondLiabilities: number;
   netEquity: number;
   monthlyNetRentalCashflow: number;
   totalProjectedFlipProfits: number;
+  totalRealizedFlipProfits: number;
   activeRentalsCount: number;
+  soldRentalsCount: number;
   activeFlipsCount: number;
+  completedFlipsCount: number;
   pendingOpportunitiesCount: number;
 }
 

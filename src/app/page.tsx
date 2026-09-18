@@ -18,6 +18,10 @@ import {
   PlusCircle,
   FileCheck2,
   Users,
+  Wallet,
+  Edit3,
+  ArrowRight,
+  Check,
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -26,6 +30,10 @@ export default function GlobalDashboardPage() {
   const rentals = usePortfolioStore((state) => state.rentals);
   const flips = usePortfolioStore((state) => state.flips);
   const funding = usePortfolioStore((state) => state.funding);
+  const updateLiquidReserve = usePortfolioStore((state) => state.updateLiquidReserve);
+
+  const [showEditSeedModal, setShowEditSeedModal] = React.useState(false);
+  const [seedAmount, setSeedAmount] = React.useState(summary.liquidCapitalReserve);
 
   const equityRatio = summary.totalGrossAssetValue > 0
     ? (summary.netEquity / summary.totalGrossAssetValue) * 100
@@ -48,6 +56,73 @@ export default function GlobalDashboardPage() {
       />
 
       <main className="flex-1 p-4 sm:p-6 space-y-6 max-w-7xl w-full mx-auto">
+        {/* Available Liquidity & Purchasing Power Banner */}
+        <div className="bg-gradient-to-r from-emerald-950 via-slate-900 to-slate-900 rounded-2xl p-5 text-white border border-emerald-800/40 shadow-lg relative overflow-hidden">
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-5 relative z-10">
+            <div className="flex items-start sm:items-center gap-3.5">
+              <div className="w-12 h-12 rounded-xl bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shrink-0 shadow-inner">
+                <Wallet className="w-6 h-6" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-400 bg-emerald-950/80 px-2 py-0.5 rounded border border-emerald-700/50">
+                    Seed Capital & Purchasing Power
+                  </span>
+                  <span className="text-xs text-slate-400">Ready for next flip / acquisition</span>
+                </div>
+                <h3 className="text-xl sm:text-2xl font-black text-white mt-1 tracking-tight flex items-baseline gap-2">
+                  {formatZAR(summary.totalAvailablePurchasingPower)}
+                  <span className="text-xs font-normal text-slate-400 font-sans">Total Purchasing Power</span>
+                </h3>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 border-t lg:border-t-0 lg:border-l border-slate-800 pt-3 lg:pt-0 lg:pl-6">
+              <div className="bg-slate-800/60 rounded-xl p-3 border border-slate-700/60">
+                <div className="flex items-center justify-between text-[11px] text-slate-400 mb-0.5">
+                  <span>Liquid Cash Reserve</span>
+                  <button
+                    onClick={() => {
+                      setSeedAmount(summary.liquidCapitalReserve);
+                      setShowEditSeedModal(true);
+                    }}
+                    className="text-emerald-400 hover:text-emerald-300 p-0.5 rounded hover:bg-emerald-950 transition-colors"
+                    title="Edit Seed Capital Reserve"
+                  >
+                    <Edit3 className="w-3 h-3" />
+                  </button>
+                </div>
+                <div className="text-base font-bold text-emerald-300">
+                  {formatZAR(summary.liquidCapitalReserve)}
+                </div>
+                <div className="text-[10px] text-slate-400 mt-0.5">
+                  Direct cash in reserve
+                </div>
+              </div>
+
+              <div className="bg-slate-800/60 rounded-xl p-3 border border-slate-700/60">
+                <div className="text-[11px] text-slate-400 mb-0.5">Unallocated Debt/Facilities</div>
+                <div className="text-base font-bold text-indigo-300">
+                  {formatZAR(summary.unallocatedFundingReserve)}
+                </div>
+                <div className="text-[10px] text-slate-400 mt-0.5">
+                  Pre-approved lender facilities
+                </div>
+              </div>
+
+              <div className="bg-slate-800/60 rounded-xl p-3 border border-slate-700/60 col-span-2 sm:col-span-1">
+                <div className="text-[11px] text-slate-400 mb-0.5">Realized Flip Profits</div>
+                <div className="text-base font-bold text-amber-300">
+                  {formatZAR(summary.totalRealizedFlipProfits)}
+                </div>
+                <div className="text-[10px] text-slate-400 mt-0.5">
+                  From {summary.completedFlipsCount} completed exits
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
         {/* Top Executive KPI Metric Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
           {/* Total Portfolio Value */}
@@ -288,6 +363,80 @@ export default function GlobalDashboardPage() {
             </Link>
           </div>
         </div>
+
+        {/* Quick Edit Seed Capital Modal */}
+        {showEditSeedModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-xs animate-in fade-in duration-150">
+            <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200">
+              <div className="flex items-center justify-between pb-4 border-b border-slate-100">
+                <div className="flex items-center gap-2.5">
+                  <div className="p-2 rounded-xl bg-emerald-100 text-emerald-700">
+                    <Wallet className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-bold text-slate-900">Adjust Liquid Seed Capital</h3>
+                    <p className="text-xs text-slate-500">Unallocated cash reserve for future deals</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowEditSeedModal(false)}
+                  className="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <div className="py-4 space-y-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                    Liquid Cash in Reserve (ZAR)
+                  </label>
+                  <div className="relative">
+                    <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm font-semibold text-slate-400">R</span>
+                    <input
+                      type="number"
+                      value={seedAmount}
+                      onChange={(e) => setSeedAmount(Number(e.target.value))}
+                      className="w-full pl-8 pr-4 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-slate-900 font-bold text-lg focus:ring-2 focus:ring-emerald-500 focus:bg-white transition-all"
+                      placeholder="650000"
+                    />
+                  </div>
+                  <p className="text-[11px] text-slate-500 mt-2 leading-relaxed">
+                    Note: Marking flipped projects or sold rental properties as completed will automatically credit 100% of their net sale cash proceeds into this liquid balance.
+                  </p>
+                </div>
+
+                <div className="p-3 bg-emerald-50 rounded-xl border border-emerald-200/60 flex items-start gap-2.5 text-xs text-emerald-900">
+                  <Check className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                  <div>
+                    <p className="font-semibold">Automatic Multi-Property Flow</p>
+                    <p className="text-emerald-700 text-[11px] mt-0.5">
+                      Current realized profits from closed exits: <span className="font-bold">{formatZAR(summary.totalRealizedFlipProfits)}</span>
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-2.5 pt-4 border-t border-slate-100">
+                <button
+                  onClick={() => setShowEditSeedModal(false)}
+                  className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => {
+                    updateLiquidReserve(Number(seedAmount));
+                    setShowEditSeedModal(false);
+                  }}
+                  className="px-5 py-2 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm transition-colors"
+                >
+                  Save Reserve Balance
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </main>
     </div>
   );

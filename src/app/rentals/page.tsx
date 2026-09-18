@@ -25,6 +25,10 @@ import {
   FileCheck2,
   Edit3,
   MessageCircle,
+  Coins,
+  Archive,
+  RotateCcw,
+  CheckCircle2,
 } from 'lucide-react';
 
 export function renderPropertyTypeBadge(type?: PropertyTitleType) {
@@ -124,7 +128,14 @@ export default function RentalPortfolioPage() {
   const updateRental = usePortfolioStore((state) => state.updateRental);
   const deleteRental = usePortfolioStore((state) => state.deleteRental);
   const addMaintenanceLog = usePortfolioStore((state) => state.addMaintenanceLog);
+  const markRentalAsSold = usePortfolioStore((state) => state.markRentalAsSold);
+  const reopenRental = usePortfolioStore((state) => state.reopenRental);
   const summary = usePortfolioSummary();
+
+  // Active vs Sold Archive View Tab
+  const [viewTab, setViewTab] = useState<'active' | 'archive'>('active');
+  const activeRentals = rentals.filter((r) => r.status !== 'Sold');
+  const soldRentals = rentals.filter((r) => r.status === 'Sold');
 
   // Per-card tab selection ('financials' | 'coc' | 'vault')
   const [cardTab, setCardTab] = useState<Record<string, 'financials' | 'coc' | 'vault'>>({});
@@ -135,6 +146,14 @@ export default function RentalPortfolioPage() {
   // Add / Edit Rental Modal State
   const [showRentalModal, setShowRentalModal] = useState(false);
   const [editingRentalId, setEditingRentalId] = useState<string | null>(null);
+
+  // Mark as Sold Exit Modal State
+  const [showExitModal, setShowExitModal] = useState(false);
+  const [selectedRentalForExit, setSelectedRentalForExit] = useState<RentalProperty | null>(null);
+  const [exitSalePrice, setExitSalePrice] = useState<number>(0);
+  const [exitNetProceeds, setExitNetProceeds] = useState<number>(0);
+  const [exitSoldDate, setExitSoldDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [exitNotes, setExitNotes] = useState('');
 
   // New Maintenance Form State
   const [maintIssue, setMaintIssue] = useState('');
@@ -219,6 +238,26 @@ export default function RentalPortfolioPage() {
     setAgencyVatApplicable(property.agencyVatApplicable !== false);
     setAgencyContact(property.agencyContact || '');
     setShowRentalModal(true);
+  };
+
+  const handleOpenExit = (property: RentalProperty) => {
+    setSelectedRentalForExit(property);
+    const estSale = property.marketValueZAR || property.purchasePriceZAR || 0;
+    setExitSalePrice(estSale);
+    const estProceeds = Math.max(0, estSale - (property.outstandingBondBalanceZAR || 0));
+    setExitNetProceeds(estProceeds);
+    setExitSoldDate(new Date().toISOString().split('T')[0]);
+    setExitNotes('');
+    setShowExitModal(true);
+  };
+
+  const handleCompleteRentalSale = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedRentalForExit || exitSalePrice <= 0) return;
+    markRentalAsSold(selectedRentalForExit.id, exitSalePrice, exitNetProceeds, exitSoldDate, exitNotes);
+    setShowExitModal(false);
+    setSelectedRentalForExit(null);
+    setViewTab('archive');
   };
 
   const handleSaveRental = (e: React.FormEvent) => {
@@ -321,7 +360,7 @@ export default function RentalPortfolioPage() {
     if (updated) setSelectedRentalForMaint(updated);
   };
 
-  const totalGrossMonthlyRent = rentals.reduce((s, r) => s + r.monthlyGrossRentZAR, 0);
+  const totalGrossMonthlyRent = activeRentals.reduce((s, r) => s + r.monthlyGrossRentZAR, 0);
   const totalNetMonthlyRent = summary.monthlyNetRentalCashflow;
 
   return (
@@ -332,7 +371,7 @@ export default function RentalPortfolioPage() {
         actionButton={
           <button
             onClick={handleOpenAdd}
-            className="inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold px-3 py-2 rounded-lg shadow-sm transition-colors"
+            className="inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold px-3 py-2 rounded-lg shadow-sm transition-colors cursor-pointer"
           >
             <PlusCircle className="w-3.5 h-3.5" />
             Add Rental Property
@@ -346,7 +385,7 @@ export default function RentalPortfolioPage() {
           <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-xs">
             <span className="text-[11px] font-semibold text-slate-500 uppercase">Total Rental Asset Value</span>
             <div className="text-xl font-bold text-slate-900 mt-1">{formatZAR(summary.totalRentalValue)}</div>
-            <p className="text-[11px] text-slate-400 mt-0.5">{rentals.length} active rental units</p>
+            <p className="text-[11px] text-slate-400 mt-0.5">{activeRentals.length} active rental units</p>
           </div>
 
           <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-xs">
@@ -366,266 +405,592 @@ export default function RentalPortfolioPage() {
           <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-xs">
             <span className="text-[11px] font-semibold text-slate-500 uppercase">Rental Bonds Outstanding</span>
             <div className="text-xl font-bold text-slate-900 mt-1">{formatZAR(summary.totalBondLiabilities)}</div>
-            <p className="text-[11px] text-slate-400 mt-0.5">Deeds-registered mortgage debt</p>
+            <p className="text-[11px] text-slate-400 mt-0.5">Active mortgage debt</p>
           </div>
         </div>
 
-        {/* Rental Properties Cards Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {rentals.map((property) => {
-            const { agencyCommissionZAR, netMonthlyCashflowZAR: netCashflow } = calculateRentalCashflow(property);
+        {/* Active vs Sold Archive Tab Toggle */}
+        <div className="flex items-center justify-between bg-slate-100 p-1 rounded-xl max-w-md">
+          <button
+            type="button"
+            onClick={() => setViewTab('active')}
+            className={`flex-1 py-2 px-4 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
+              viewTab === 'active'
+                ? 'bg-white text-slate-900 shadow-xs'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <Building2 className="w-3.5 h-3.5 text-emerald-600" />
+            <span>Active Portfolio ({activeRentals.length})</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setViewTab('archive')}
+            className={`flex-1 py-2 px-4 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
+              viewTab === 'archive'
+                ? 'bg-white text-emerald-800 shadow-xs'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <Archive className="w-3.5 h-3.5 text-indigo-600" />
+            <span>Sold Archive ({soldRentals.length})</span>
+          </button>
+        </div>
 
-            const yieldGross =
-              property.marketValueZAR > 0
-                ? ((property.monthlyGrossRentZAR * 12) / property.marketValueZAR) * 100
-                : 0;
+        {/* ACTIVE PORTFOLIO VIEW */}
+        {viewTab === 'active' && (
+          <>
+            {activeRentals.length === 0 ? (
+              <div className="bg-white rounded-xl p-12 text-center border border-slate-200">
+                <Building2 className="w-8 h-8 text-slate-400 mx-auto mb-3" />
+                <p className="text-sm font-semibold text-slate-700">No active rental units in portfolio.</p>
+                <p className="text-xs text-slate-400 mt-1">Add a rental unit or promote one from the Opportunity Analyzer.</p>
+                {soldRentals.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setViewTab('archive')}
+                    className="mt-4 inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-slate-900 text-white rounded-lg text-xs font-semibold"
+                  >
+                    <Archive className="w-3.5 h-3.5" />
+                    <span>View {soldRentals.length} Sold Rental(s) in Archive</span>
+                  </button>
+                )}
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                {activeRentals.map((property) => {
+                  const { agencyCommissionZAR, netMonthlyCashflowZAR: netCashflow } = calculateRentalCashflow(property);
 
-            return (
-              <div
-                key={property.id}
-                className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-xs flex flex-col justify-between"
-              >
-                <div>
-                  {/* Property Header */}
-                  <div className="p-4 border-b border-slate-100 flex flex-col gap-2">
-                    <div className="flex items-start justify-between gap-2">
+                  const yieldGross =
+                    property.marketValueZAR > 0
+                      ? ((property.monthlyGrossRentZAR * 12) / property.marketValueZAR) * 100
+                      : 0;
+
+                  return (
+                    <div
+                      key={property.id}
+                      className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-xs flex flex-col justify-between"
+                    >
                       <div>
-                        <div className="flex items-center gap-1.5 flex-wrap mb-1.5">
-                          <PropertyTypeBadge type={property.propertyType} />
-                          <AgmDateChip agmDate={property.agmDate} />
-                        </div>
-                        <h3 className="font-bold text-sm text-slate-900">{property.title}</h3>
-                        <p className="text-xs text-slate-500 mt-0.5">{property.address}, {property.city}</p>
-                      </div>
-                      <span
-                        className={`text-[10px] font-semibold px-2 py-0.5 rounded-full shrink-0 ${
-                          property.status === 'Occupied'
-                            ? 'bg-emerald-100 text-emerald-800'
-                            : 'bg-amber-100 text-amber-800'
-                        }`}
-                      >
-                        {property.status}
-                      </span>
-                    </div>
-
-                    {/* Management Status & 1-Click Contact */}
-                    <div className="flex items-center justify-between gap-2 flex-wrap pt-1 border-t border-slate-50">
-                      {property.managementType === 'Agency' ? (
-                        <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200">
-                          <Building2 className="w-3 h-3 text-indigo-600" />
-                          <span>🏢 Managed: {property.agencyName || 'Agency'} ({property.agencyCommissionPercent || 8}%{property.agencyVatApplicable !== false ? ` + VAT = ${((property.agencyCommissionPercent || 8) * 1.15).toFixed(1)}%` : ''})</span>
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200">
-                          <span>👤 Self-Managed</span>
-                        </span>
-                      )}
-
-                      {property.managementType === 'Agency' && property.agencyContact && (
-                        <div className="flex items-center gap-1 text-[11px]">
-                          {renderAgencyContactLinks(property.agencyContact)}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Property Financial Highlights */}
-                  <div className="p-4 bg-slate-50/60 grid grid-cols-3 gap-2 text-center border-b border-slate-100 text-xs">
-                    <div>
-                      <span className="text-[10px] text-slate-400 block">Market Value</span>
-                      <strong className="text-slate-900">{formatZAR(property.marketValueZAR, { compact: true })}</strong>
-                    </div>
-                    <div>
-                      <span className="text-[10px] text-slate-400 block">Gross Yield</span>
-                      <strong className="text-emerald-700">{formatPercent(yieldGross)}</strong>
-                    </div>
-                    <div>
-                      <span className="text-[10px] text-slate-400 block">Net Cashflow</span>
-                      <strong className={netCashflow >= 0 ? 'text-emerald-700' : 'text-rose-600'}>
-                        {formatZAR(netCashflow)}/m
-                      </strong>
-                    </div>
-                  </div>
-
-                  {/* Card Tab Switcher */}
-                  <div className="flex border-b border-slate-200 bg-slate-100/70 p-1 gap-1 text-[11px] font-semibold">
-                    <button
-                      type="button"
-                      onClick={() => setCardTab((prev) => ({ ...prev, [property.id]: 'financials' }))}
-                      className={`flex-1 py-1.5 px-2 rounded-md transition-all flex items-center justify-center gap-1.5 ${
-                        (cardTab[property.id] || 'financials') === 'financials'
-                          ? 'bg-white text-slate-900 shadow-2xs'
-                          : 'text-slate-600 hover:text-slate-900'
-                      }`}
-                    >
-                      <UserCheck className="w-3.5 h-3.5" />
-                      <span>Lease & Costs</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => setCardTab((prev) => ({ ...prev, [property.id]: 'coc' }))}
-                      className={`flex-1 py-1.5 px-2 rounded-md transition-all flex items-center justify-center gap-1.5 ${
-                        cardTab[property.id] === 'coc'
-                          ? 'bg-white text-emerald-800 shadow-2xs'
-                          : 'text-slate-600 hover:text-slate-900'
-                      }`}
-                    >
-                      <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-                      <span>Mandatory CoC</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => setCardTab((prev) => ({ ...prev, [property.id]: 'vault' }))}
-                      className={`flex-1 py-1.5 px-2 rounded-md transition-all flex items-center justify-center gap-1.5 ${
-                        cardTab[property.id] === 'vault'
-                          ? 'bg-white text-indigo-800 shadow-2xs'
-                          : 'text-slate-600 hover:text-slate-900'
-                      }`}
-                    >
-                      <FolderArchive className="w-3.5 h-3.5 text-indigo-600" />
-                      <span>Cloud Vault</span>
-                    </button>
-                  </div>
-
-                  {(cardTab[property.id] || 'financials') === 'financials' && (
-                    <>
-                      {/* Tenant Lease Details */}
-                      <div className="p-4 space-y-2 text-xs border-b border-slate-100">
-                        <div className="flex items-center justify-between text-slate-600">
-                          <span className="flex items-center gap-1.5 font-medium">
-                            <UserCheck className="w-3.5 h-3.5 text-slate-400" />
-                            Tenant:
-                          </span>
-                          <strong className="text-slate-900">{property.tenantName}</strong>
-                        </div>
-
-                        <div className="flex items-center justify-between text-slate-600">
-                          <span className="flex items-center gap-1.5 font-medium">
-                            <Calendar className="w-3.5 h-3.5 text-slate-400" />
-                            Lease Expiry:
-                          </span>
-                          <span>{formatDate(property.leaseEndDate)}</span>
-                        </div>
-
-                        <div className="flex items-center justify-between text-slate-600">
-                          <span className="flex items-center gap-1.5 font-medium">
-                            <ShieldCheck className="w-3.5 h-3.5 text-slate-400" />
-                            Deposit Held in Trust:
-                          </span>
-                          <strong className="text-slate-800">{formatZAR(property.depositHeldZAR)}</strong>
-                        </div>
-
-                        <div className="flex items-center justify-between text-slate-600">
-                          <span className="text-slate-500">Annual Escalation:</span>
-                          <strong className="text-emerald-700">{property.annualEscalationPercent}% p.a.</strong>
-                        </div>
-                      </div>
-
-                      {/* Monthly Expenses Breakdown */}
-                      <div className="p-4 text-xs space-y-1.5 text-slate-600">
-                        <div className="flex justify-between">
-                          <span>Gross Monthly Rent:</span>
-                          <strong className="text-slate-900">{formatZAR(property.monthlyGrossRentZAR)}</strong>
-                        </div>
-                        <div className="flex justify-between text-slate-500">
-                          <span>{property.propertyType === 'Freehold House' ? 'Body Corporate Levies (N/A):' : 'Body Corporate / HOA Levies:'}</span>
-                          <span>{property.propertyType === 'Freehold House' ? 'R 0 (Freehold)' : `- ${formatZAR(property.monthlyLeviesZAR)}`}</span>
-                        </div>
-                        <div className="flex justify-between text-slate-500">
-                          <span>Municipal Rates & Taxes:</span>
-                          <span>- {formatZAR(property.monthlyRatesTaxesZAR)}</span>
-                        </div>
-
-                        {property.managementType === 'Agency' ? (
-                          <div className="flex justify-between text-slate-700 font-medium bg-indigo-50/60 px-2 py-1 rounded border border-indigo-100">
-                            <span className="flex items-center gap-1 text-[11px]">
-                              <Building2 className="w-3 h-3 text-indigo-600" />
-                              Agency Fee ({property.agencyCommissionPercent || 8}%{property.agencyVatApplicable !== false ? ' + 15% VAT' : ''} - {property.agencyName || 'Agent'}):
+                        {/* Property Header */}
+                        <div className="p-4 border-b border-slate-100 flex flex-col gap-2">
+                          <div className="flex items-start justify-between gap-2">
+                            <div>
+                              <div className="flex items-center gap-1.5 flex-wrap mb-1.5">
+                                <PropertyTypeBadge type={property.propertyType} />
+                                <AgmDateChip agmDate={property.agmDate} />
+                              </div>
+                              <h3 className="font-bold text-sm text-slate-900">{property.title}</h3>
+                              <p className="text-xs text-slate-500 mt-0.5">{property.address}, {property.city}</p>
+                            </div>
+                            <span
+                              className={`text-[10px] font-semibold px-2 py-0.5 rounded-full shrink-0 ${
+                                property.status === 'Occupied'
+                                  ? 'bg-emerald-100 text-emerald-800'
+                                  : 'bg-amber-100 text-amber-800'
+                              }`}
+                            >
+                              {property.status}
                             </span>
-                            <span className="text-rose-600 font-semibold">- {formatZAR(agencyCommissionZAR)}</span>
                           </div>
-                        ) : (
-                          <div className="flex justify-between text-slate-500 bg-slate-50 px-2 py-1 rounded border border-slate-100 text-[11px]">
-                            <span className="flex items-center gap-1">
-                              <span>👤</span> Agency Fee (Self-Managed):
-                            </span>
-                            <span className="text-emerald-700 font-semibold">R 0 (0%)</span>
+
+                          {/* Management Status & 1-Click Contact */}
+                          <div className="flex items-center justify-between gap-2 flex-wrap pt-1 border-t border-slate-50">
+                            {property.managementType === 'Agency' ? (
+                              <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200">
+                                <Building2 className="w-3 h-3 text-indigo-600" />
+                                <span>🏢 Managed: {property.agencyName || 'Agency'} ({property.agencyCommissionPercent || 8}%{property.agencyVatApplicable !== false ? ` + VAT = ${((property.agencyCommissionPercent || 8) * 1.15).toFixed(1)}%` : ''})</span>
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200">
+                                <span>👤 Self-Managed</span>
+                              </span>
+                            )}
+
+                            {property.managementType === 'Agency' && property.agencyContact && (
+                              <div className="flex items-center gap-1 text-[11px]">
+                                {renderAgencyContactLinks(property.agencyContact)}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Property Financial Highlights */}
+                        <div className="p-4 bg-slate-50/60 grid grid-cols-3 gap-2 text-center border-b border-slate-100 text-xs">
+                          <div>
+                            <span className="text-[10px] text-slate-400 block">Market Value</span>
+                            <strong className="text-slate-900">{formatZAR(property.marketValueZAR, { compact: true })}</strong>
+                          </div>
+                          <div>
+                            <span className="text-[10px] text-slate-400 block">Gross Yield</span>
+                            <strong className="text-emerald-700">{formatPercent(yieldGross)}</strong>
+                          </div>
+                          <div>
+                            <span className="text-[10px] text-slate-400 block">Net Cashflow</span>
+                            <strong className={netCashflow >= 0 ? 'text-emerald-700' : 'text-rose-600'}>
+                              {formatZAR(netCashflow)}/m
+                            </strong>
+                          </div>
+                        </div>
+
+                        {/* Card Tab Switcher */}
+                        <div className="flex border-b border-slate-200 bg-slate-100/70 p-1 gap-1 text-[11px] font-semibold">
+                          <button
+                            type="button"
+                            onClick={() => setCardTab((prev) => ({ ...prev, [property.id]: 'financials' }))}
+                            className={`flex-1 py-1.5 px-2 rounded-md transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                              (cardTab[property.id] || 'financials') === 'financials'
+                                ? 'bg-white text-slate-900 shadow-2xs'
+                                : 'text-slate-600 hover:text-slate-900'
+                            }`}
+                          >
+                            <UserCheck className="w-3.5 h-3.5" />
+                            <span>Lease & Costs</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => setCardTab((prev) => ({ ...prev, [property.id]: 'coc' }))}
+                            className={`flex-1 py-1.5 px-2 rounded-md transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                              cardTab[property.id] === 'coc'
+                                ? 'bg-white text-emerald-800 shadow-2xs'
+                                : 'text-slate-600 hover:text-slate-900'
+                            }`}
+                          >
+                            <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+                            <span>Mandatory CoC</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => setCardTab((prev) => ({ ...prev, [property.id]: 'vault' }))}
+                            className={`flex-1 py-1.5 px-2 rounded-md transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                              cardTab[property.id] === 'vault'
+                                ? 'bg-white text-indigo-800 shadow-2xs'
+                                : 'text-slate-600 hover:text-slate-900'
+                            }`}
+                          >
+                            <FolderArchive className="w-3.5 h-3.5 text-indigo-600" />
+                            <span>Cloud Vault</span>
+                          </button>
+                        </div>
+
+                        {(cardTab[property.id] || 'financials') === 'financials' && (
+                          <>
+                            {/* Tenant Lease Details */}
+                            <div className="p-4 space-y-2 text-xs border-b border-slate-100">
+                              <div className="flex items-center justify-between text-slate-600">
+                                <span className="flex items-center gap-1.5 font-medium">
+                                  <UserCheck className="w-3.5 h-3.5 text-slate-400" />
+                                  Tenant:
+                                </span>
+                                <strong className="text-slate-900">{property.tenantName}</strong>
+                              </div>
+
+                              <div className="flex items-center justify-between text-slate-600">
+                                <span className="flex items-center gap-1.5 font-medium">
+                                  <Calendar className="w-3.5 h-3.5 text-slate-400" />
+                                  Lease Expiry:
+                                </span>
+                                <span>{formatDate(property.leaseEndDate)}</span>
+                              </div>
+
+                              <div className="flex items-center justify-between text-slate-600">
+                                <span className="flex items-center gap-1.5 font-medium">
+                                  <ShieldCheck className="w-3.5 h-3.5 text-slate-400" />
+                                  Deposit Held in Trust:
+                                </span>
+                                <strong className="text-slate-800">{formatZAR(property.depositHeldZAR)}</strong>
+                              </div>
+
+                              <div className="flex items-center justify-between text-slate-600">
+                                <span className="text-slate-500">Annual Escalation:</span>
+                                <strong className="text-emerald-700">{property.annualEscalationPercent}% p.a.</strong>
+                              </div>
+                            </div>
+
+                            {/* Monthly Expenses Breakdown */}
+                            <div className="p-4 text-xs space-y-1.5 text-slate-600">
+                              <div className="flex justify-between">
+                                <span>Gross Monthly Rent:</span>
+                                <strong className="text-slate-900">{formatZAR(property.monthlyGrossRentZAR)}</strong>
+                              </div>
+                              <div className="flex justify-between text-slate-500">
+                                <span>{property.propertyType === 'Freehold House' ? 'Body Corporate Levies (N/A):' : 'Body Corporate / HOA Levies:'}</span>
+                                <span>{property.propertyType === 'Freehold House' ? 'R 0 (Freehold)' : `- ${formatZAR(property.monthlyLeviesZAR)}`}</span>
+                              </div>
+                              <div className="flex justify-between text-slate-500">
+                                <span>Municipal Rates & Taxes:</span>
+                                <span>- {formatZAR(property.monthlyRatesTaxesZAR)}</span>
+                              </div>
+
+                              {property.managementType === 'Agency' ? (
+                                <div className="flex justify-between text-slate-700 font-medium bg-indigo-50/60 px-2 py-1 rounded border border-indigo-100">
+                                  <span className="flex items-center gap-1 text-[11px]">
+                                    <Building2 className="w-3 h-3 text-indigo-600" />
+                                    Agency Fee ({property.agencyCommissionPercent || 8}%{property.agencyVatApplicable !== false ? ' + 15% VAT' : ''} - {property.agencyName || 'Agent'}):
+                                  </span>
+                                  <span className="text-rose-600 font-semibold">- {formatZAR(agencyCommissionZAR)}</span>
+                                </div>
+                              ) : (
+                                <div className="flex justify-between text-slate-500 bg-slate-50 px-2 py-1 rounded border border-slate-100 text-[11px]">
+                                  <span className="flex items-center gap-1">
+                                    <span>👤</span> Agency Fee (Self-Managed):
+                                  </span>
+                                  <span className="text-emerald-700 font-semibold">R 0 (0%)</span>
+                                </div>
+                              )}
+
+                              <div className="flex justify-between text-slate-500">
+                                <span>Maintenance Reserve:</span>
+                                <span>- {formatZAR(property.monthlyMaintenanceReserveZAR)}</span>
+                              </div>
+                              <div className="flex justify-between text-slate-500">
+                                <span>Bank Bond Payment:</span>
+                                <span>- {formatZAR(property.monthlyBondPaymentZAR)}</span>
+                              </div>
+                            </div>
+                          </>
+                        )}
+
+                        {cardTab[property.id] === 'coc' && (
+                          <div className="p-3 bg-white">
+                            <ComplianceChecklist
+                              certificates={property.cocChecklist}
+                              onUpdate={(updated) => updateRental(property.id, { cocChecklist: updated })}
+                            />
                           </div>
                         )}
 
-                        <div className="flex justify-between text-slate-500">
-                          <span>Maintenance Reserve:</span>
-                          <span>- {formatZAR(property.monthlyMaintenanceReserveZAR)}</span>
-                        </div>
-                        <div className="flex justify-between text-slate-500">
-                          <span>Bank Bond Payment:</span>
-                          <span>- {formatZAR(property.monthlyBondPaymentZAR)}</span>
+                        {cardTab[property.id] === 'vault' && (
+                          <div className="p-3 bg-white">
+                            <CloudDriveLinkVault
+                              vault={property.driveVault}
+                              onUpdate={(updated) => updateRental(property.id, { driveVault: updated })}
+                            />
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Footer: Maintenance & Actions */}
+                      <div className="p-4 bg-slate-50 border-t border-slate-100 flex items-center justify-between gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setSelectedRentalForMaint(property)}
+                          className="text-xs font-semibold text-slate-700 hover:text-emerald-700 flex items-center gap-1.5 transition-colors cursor-pointer"
+                        >
+                          <Wrench className="w-3.5 h-3.5" />
+                          <span>Maintenance ({property.maintenanceHistory?.length || 0})</span>
+                        </button>
+
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => handleOpenExit(property)}
+                            className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700 hover:text-emerald-900 bg-emerald-50 hover:bg-emerald-100 px-2.5 py-1 rounded-md border border-emerald-300 transition-colors cursor-pointer"
+                            title="Mark rental property as sold"
+                          >
+                            <Coins className="w-3 h-3 text-emerald-600" />
+                            <span>Mark as Sold</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleOpenEdit(property)}
+                            className="inline-flex items-center gap-1 text-[11px] font-semibold text-indigo-700 hover:text-indigo-900 bg-indigo-50 hover:bg-indigo-100 px-2.5 py-1 rounded-md border border-indigo-200 transition-colors cursor-pointer"
+                            title="Edit property & agency mandate"
+                          >
+                            <Edit3 className="w-3 h-3" />
+                            <span>Edit</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (confirm(`Remove rental "${property.title}"?`)) {
+                                deleteRental(property.id);
+                              }
+                            }}
+                            className="p-1.5 text-slate-400 hover:text-rose-600 rounded transition-colors cursor-pointer"
+                            title="Delete property"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
                         </div>
                       </div>
-                    </>
-                  )}
-
-                  {cardTab[property.id] === 'coc' && (
-                    <div className="p-3 bg-white">
-                      <ComplianceChecklist
-                        certificates={property.cocChecklist}
-                        onUpdate={(updated) => updateRental(property.id, { cocChecklist: updated })}
-                      />
                     </div>
-                  )}
+                  );
+                })}
+              </div>
+            )}
+          </>
+        )}
 
-                  {cardTab[property.id] === 'vault' && (
-                    <div className="p-3 bg-white">
-                      <CloudDriveLinkVault
-                        vault={property.driveVault}
-                        onUpdate={(updated) => updateRental(property.id, { driveVault: updated })}
-                      />
+        {/* SOLD & EXITED ARCHIVE VIEW */}
+        {viewTab === 'archive' && (
+          <div className="space-y-6">
+            <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+              <div>
+                <h3 className="font-bold text-slate-900 text-base flex items-center gap-2">
+                  <Archive className="w-5 h-5 text-indigo-600" />
+                  <span>Sold & Exited Rental Properties Archive</span>
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Historical record of disposed rental assets, realized capital gains, and liquid cash recycled into seed capital reserves.
+                </p>
+              </div>
+              <span className="text-xs font-bold text-emerald-800 bg-emerald-50 border border-emerald-200 px-3 py-1 rounded-lg">
+                {soldRentals.length} Disposed Asset(s)
+              </span>
+            </div>
+
+            {soldRentals.length === 0 ? (
+              <div className="bg-white rounded-xl p-12 text-center border border-slate-200">
+                <Archive className="w-10 h-10 text-slate-300 mx-auto mb-3" />
+                <h4 className="text-sm font-bold text-slate-800">No sold rentals in archive</h4>
+                <p className="text-xs text-slate-400 mt-1 max-w-sm mx-auto">
+                  When you dispose of or sell a rental property, click &quot;Mark as Sold&quot; to cancel its bond liability, archive its historical record, and credit your seed capital.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setViewTab('active')}
+                  className="mt-4 inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-slate-900 text-white font-semibold text-xs rounded-lg hover:bg-slate-800 cursor-pointer"
+                >
+                  <Building2 className="w-3.5 h-3.5" />
+                  <span>Go to Active Portfolio</span>
+                </button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                {soldRentals.map((property) => {
+                  const salePrice = property.actualSalePriceZAR || property.marketValueZAR || 0;
+                  const purchasePrice = property.purchasePriceZAR || 0;
+                  const grossCapitalGain = salePrice - purchasePrice;
+                  const gainPercent = purchasePrice > 0 ? (grossCapitalGain / purchasePrice) * 100 : 0;
+
+                  return (
+                    <div
+                      key={property.id}
+                      className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden flex flex-col justify-between"
+                    >
+                      <div className="p-4 space-y-3">
+                        <div className="flex items-start justify-between gap-2">
+                          <div>
+                            <div className="flex items-center gap-1.5 flex-wrap mb-1">
+                              <PropertyTypeBadge type={property.propertyType} />
+                              <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">
+                                <CheckCircle2 className="w-2.5 h-2.5 text-emerald-600" />
+                                <span>SOLD & EXITED</span>
+                              </span>
+                            </div>
+                            <h3 className="font-bold text-sm text-slate-900">{property.title}</h3>
+                            <p className="text-xs text-slate-500 mt-0.5">{property.address}, {property.city}</p>
+                          </div>
+                          {property.soldDate && (
+                            <span className="text-[10px] font-semibold text-slate-500 bg-slate-100 px-2 py-0.5 rounded shrink-0">
+                              {formatDate(property.soldDate)}
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Realized Disposal Metrics */}
+                        <div className="p-3 bg-slate-50 rounded-lg border border-slate-100 grid grid-cols-3 gap-2 text-center text-xs">
+                          <div>
+                            <span className="text-[10px] text-slate-400 block uppercase font-semibold">Exit Price</span>
+                            <strong className="text-slate-900 font-bold">{formatZAR(salePrice, { compact: true })}</strong>
+                          </div>
+                          <div>
+                            <span className="text-[10px] text-slate-400 block uppercase font-semibold">Purchase</span>
+                            <strong className="text-slate-700 font-bold">{formatZAR(purchasePrice, { compact: true })}</strong>
+                          </div>
+                          <div>
+                            <span className="text-[10px] text-slate-400 block uppercase font-semibold">Gain</span>
+                            <strong className={`font-bold ${grossCapitalGain >= 0 ? 'text-emerald-700' : 'text-rose-600'}`}>
+                              {grossCapitalGain >= 0 ? `+${formatPercent(gainPercent)}` : formatPercent(gainPercent)}
+                            </strong>
+                          </div>
+                        </div>
+
+                        <div className="p-3 bg-emerald-50/70 rounded-lg border border-emerald-200 flex items-center justify-between text-xs">
+                          <div>
+                            <span className="text-[10px] font-bold text-emerald-800 uppercase block">
+                              Liquid Cash Released to Seed Capital
+                            </span>
+                            <span className="text-[11px] text-emerald-700">
+                              Credited to Reserve for next purchase
+                            </span>
+                          </div>
+                          <strong className="text-sm font-black text-emerald-900">
+                            {formatZAR(property.netCashProceedsZAR || 0)}
+                          </strong>
+                        </div>
+
+                        {property.exitNotes && (
+                          <div className="text-xs text-slate-600 bg-slate-50 p-2.5 rounded-lg border border-slate-200">
+                            <span className="font-semibold text-slate-700">Disposal Notes: </span>
+                            <span>{property.exitNotes}</span>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="p-4 bg-slate-50 border-t border-slate-100 flex items-center justify-between">
+                        <span className="text-[11px] text-slate-500">
+                          Bond liability settled & cancelled
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (confirm(`Reopen rental "${property.title}" back to active portfolio? This will revert the credited cash of ${formatZAR(property.netCashProceedsZAR || 0)} from Cash in Reserve.`)) {
+                              reopenRental(property.id);
+                              setViewTab('active');
+                            }
+                          }}
+                          className="inline-flex items-center gap-1 text-xs font-semibold text-slate-600 hover:text-slate-900 bg-white hover:bg-slate-100 border border-slate-200 px-3 py-1.5 rounded-lg transition-colors cursor-pointer"
+                        >
+                          <RotateCcw className="w-3.5 h-3.5 text-slate-500" />
+                          <span>Reopen Unit</span>
+                        </button>
+                      </div>
                     </div>
-                  )}
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+      </main>
+
+      {/* Mark Rental as Sold Exit Modal */}
+      {showExitModal && selectedRentalForExit && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-xl max-w-lg w-full p-6 shadow-xl border border-slate-200 animate-in fade-in">
+            <div className="flex items-center justify-between pb-3 mb-4 border-b border-slate-100">
+              <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+                <span>Mark Rental Property as Sold</span>
+              </h3>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowExitModal(false);
+                  setSelectedRentalForExit(null);
+                }}
+                className="text-slate-400 hover:text-slate-700 font-bold cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-500 mb-4">
+              Disposal of <strong>{selectedRentalForExit.title}</strong>. This records your realized exit price, removes the unit and its bond from active portfolio liabilities, and automatically deposits the net cash proceeds directly into your <strong>Liquid Cash Reserve / Seed Capital</strong>.
+            </p>
+
+            <form onSubmit={handleCompleteRentalSale} className="space-y-4 text-xs">
+              <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 grid grid-cols-2 gap-3">
+                <div>
+                  <span className="text-[10px] text-slate-400 uppercase font-semibold block">Original Purchase Price</span>
+                  <strong className="text-sm text-slate-800">{formatZAR(selectedRentalForExit.purchasePriceZAR)}</strong>
+                  <span className="text-[10px] text-slate-500 block mt-0.5">Purchased {formatDate(selectedRentalForExit.purchaseDate)}</span>
                 </div>
+                <div>
+                  <span className="text-[10px] text-slate-400 uppercase font-semibold block">Outstanding Bond Debt</span>
+                  <strong className="text-sm text-rose-600">{formatZAR(selectedRentalForExit.outstandingBondBalanceZAR)}</strong>
+                  <span className="text-[10px] text-slate-500 block mt-0.5">Cancelled / Settled upon transfer</span>
+                </div>
+              </div>
 
-                {/* Footer: Maintenance & Actions */}
-                <div className="p-4 bg-slate-50 border-t border-slate-100 flex items-center justify-between gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setSelectedRentalForMaint(property)}
-                    className="text-xs font-semibold text-slate-700 hover:text-emerald-700 flex items-center gap-1.5 transition-colors"
-                  >
-                    <Wrench className="w-3.5 h-3.5" />
-                    <span>Maintenance ({property.maintenanceHistory?.length || 0})</span>
-                  </button>
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">
+                  Actual Realized Sale Price (ZAR) *
+                </label>
+                <input
+                  type="number"
+                  required
+                  min="1"
+                  step="10000"
+                  value={exitSalePrice || ''}
+                  onChange={(e) => {
+                    const price = Number(e.target.value);
+                    setExitSalePrice(price);
+                    setExitNetProceeds(Math.max(0, price - (selectedRentalForExit.outstandingBondBalanceZAR || 0)));
+                  }}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg font-bold text-emerald-700 text-sm"
+                  placeholder="e.g. 2100000"
+                />
+              </div>
 
-                  <div className="flex items-center gap-1.5">
-                    <button
-                      type="button"
-                      onClick={() => handleOpenEdit(property)}
-                      className="inline-flex items-center gap-1 text-[11px] font-semibold text-indigo-700 hover:text-indigo-900 bg-indigo-50 hover:bg-indigo-100 px-2.5 py-1 rounded-md border border-indigo-200 transition-colors"
-                      title="Edit property & agency mandate"
-                    >
-                      <Edit3 className="w-3 h-3" />
-                      <span>Edit</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (confirm(`Remove rental "${property.title}"?`)) {
-                          deleteRental(property.id);
-                        }
-                      }}
-                      className="p-1.5 text-slate-400 hover:text-rose-600 rounded transition-colors"
-                      title="Delete property"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block font-semibold text-slate-700">
+                    Net Cash Proceeds Received (ZAR) *
+                  </label>
+                  <span className="text-[10px] text-emerald-600 font-semibold">
+                    Deposited 100% to Cash in Reserve
+                  </span>
+                </div>
+                <input
+                  type="number"
+                  required
+                  min="0"
+                  step="5000"
+                  value={exitNetProceeds || ''}
+                  onChange={(e) => setExitNetProceeds(Number(e.target.value))}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg font-bold text-slate-900 text-sm"
+                  placeholder="Net cash received after bond settlement & agent fee"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Sale / Registration Date *</label>
+                  <input
+                    type="date"
+                    required
+                    value={exitSoldDate}
+                    onChange={(e) => setExitSoldDate(e.target.value)}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg"
+                  />
+                </div>
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Gross Capital Gain</label>
+                  <div className="w-full px-3 py-2 bg-slate-100 border border-slate-200 rounded-lg font-bold text-slate-800">
+                    {formatZAR((exitSalePrice || 0) - selectedRentalForExit.purchasePriceZAR)}
                   </div>
                 </div>
               </div>
-            );
-          })}
+
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">Disposal Notes (Optional)</label>
+                <input
+                  type="text"
+                  placeholder="e.g. Sold with sitting tenant, conveyanced by STBB"
+                  value={exitNotes}
+                  onChange={(e) => setExitNotes(e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-200">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowExitModal(false);
+                    setSelectedRentalForExit(null);
+                  }}
+                  className="px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50 font-semibold cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-semibold flex items-center gap-1.5 cursor-pointer"
+                >
+                  <CheckCircle2 className="w-4 h-4" />
+                  <span>Confirm Sale & Credit Reserve</span>
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
-      </main>
+      )}
 
       {/* Maintenance Log Modal */}
       {selectedRentalForMaint && (

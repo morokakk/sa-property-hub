@@ -17,6 +17,7 @@ import {
   Trash2,
   CheckCircle,
   Clock,
+  Wallet,
 } from 'lucide-react';
 
 export default function FundingTrackerPage() {
@@ -123,6 +124,53 @@ export default function FundingTrackerPage() {
       />
 
       <main className="flex-1 p-4 sm:p-6 space-y-6 max-w-7xl w-full mx-auto">
+        {/* Purchasing Power & Seed Capital Banner */}
+        <div className="bg-gradient-to-r from-slate-950 via-slate-900 to-emerald-950 rounded-2xl p-5 text-white border border-emerald-800/40 shadow-lg">
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-5">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-xl bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shrink-0">
+                <Wallet className="w-6 h-6" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-400 bg-emerald-950/80 px-2 py-0.5 rounded border border-emerald-700/50">
+                    Deployable War Chest
+                  </span>
+                  <span className="text-xs text-slate-400">Cash + Pre-Approved Facility Capacity</span>
+                </div>
+                <div className="text-2xl font-black text-white mt-1">
+                  {formatZAR(summary.totalAvailablePurchasingPower)}
+                  <span className="text-xs font-normal text-slate-400 ml-2 font-mono">Total Purchasing Power</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 border-t lg:border-t-0 lg:border-l border-slate-800 pt-3 lg:pt-0 lg:pl-6">
+              <div className="bg-slate-800/60 rounded-xl p-3 border border-slate-700/60">
+                <span className="text-[11px] text-slate-400 block">Liquid Cash Reserve</span>
+                <span className="text-base font-bold text-emerald-300 block mt-0.5">
+                  {formatZAR(summary.liquidCapitalReserve)}
+                </span>
+                <span className="text-[10px] text-slate-400 block">Includes exit proceeds</span>
+              </div>
+              <div className="bg-slate-800/60 rounded-xl p-3 border border-slate-700/60">
+                <span className="text-[11px] text-slate-400 block">Unallocated Facilities</span>
+                <span className="text-base font-bold text-indigo-300 block mt-0.5">
+                  {formatZAR(summary.unallocatedFundingReserve)}
+                </span>
+                <span className="text-[10px] text-slate-400 block">General liquidity lines</span>
+              </div>
+              <div className="bg-slate-800/60 rounded-xl p-3 border border-slate-700/60 col-span-2 sm:col-span-1">
+                <span className="text-[11px] text-slate-400 block">Realized Flip Gains</span>
+                <span className="text-base font-bold text-amber-300 block mt-0.5">
+                  {formatZAR(summary.totalRealizedFlipProfits)}
+                </span>
+                <span className="text-[10px] text-slate-400 block">From {summary.completedFlipsCount} exits</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
         {/* Top KPI Metrics Bar */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-xs">

@@ -43,6 +43,8 @@ interface PortfolioState {
   updateRental: (id: string, updates: Partial<RentalProperty>) => void;
   deleteRental: (id: string) => void;
   addMaintenanceLog: (rentalId: string, log: Omit<RentalProperty['maintenanceHistory'][0], 'id'>) => void;
+  markRentalAsSold: (rentalId: string, actualSalePrice: number, netCashProceeds: number, soldDate: string, exitNotes?: string) => void;
+  reopenRental: (rentalId: string) => void;
 
   // Flip Actions
   addFlip: (flip: FlipProject) => void;
@@ -51,6 +53,8 @@ interface PortfolioState {
   addBOQItem: (flipId: string, item: Omit<BOQItem, 'id'>) => void;
   updateBOQItem: (flipId: string, boqId: string, updates: Partial<BOQItem>) => void;
   deleteBOQItem: (flipId: string, boqId: string) => void;
+  markFlipAsCompleted: (flipId: string, actualSalePrice: number, netCashProceeds: number, soldDate: string, exitNotes?: string) => void;
+  reopenFlip: (flipId: string) => void;
 
   // Funding Actions
   addFunding: (source: FundingSource) => void;
@@ -188,6 +192,47 @@ export const usePortfolioStore = create<PortfolioState>()(
             };
           }),
         })),
+      markRentalAsSold: (rentalId, actualSalePrice, netCashProceeds, soldDate, exitNotes) =>
+        set((state) => {
+          const rental = state.rentals.find((r) => r.id === rentalId);
+          if (!rental) return state;
+          return {
+            rentals: state.rentals.map((r) =>
+              r.id === rentalId
+                ? {
+                    ...r,
+                    status: 'Sold',
+                    actualSalePriceZAR: actualSalePrice,
+                    netCashProceedsZAR: netCashProceeds,
+                    soldDate,
+                    exitNotes,
+                  }
+                : r
+            ),
+            liquidCapitalReserve: state.liquidCapitalReserve + (netCashProceeds || 0),
+          };
+        }),
+      reopenRental: (rentalId) =>
+        set((state) => {
+          const rental = state.rentals.find((r) => r.id === rentalId);
+          if (!rental) return state;
+          const deducted = Math.max(0, state.liquidCapitalReserve - (rental.netCashProceedsZAR || 0));
+          return {
+            rentals: state.rentals.map((r) =>
+              r.id === rentalId
+                ? {
+                    ...r,
+                    status: 'Occupied',
+                    actualSalePriceZAR: undefined,
+                    netCashProceedsZAR: undefined,
+                    soldDate: undefined,
+                    exitNotes: undefined,
+                  }
+                : r
+            ),
+            liquidCapitalReserve: deducted,
+          };
+        }),
 
       // Flips
       addFlip: (flip) =>
@@ -257,6 +302,48 @@ export const usePortfolioStore = create<PortfolioState>()(
             };
           }),
         })),
+      markFlipAsCompleted: (flipId, actualSalePrice, netCashProceeds, soldDate, exitNotes) =>
+        set((state) => {
+          const flip = state.flips.find((f) => f.id === flipId);
+          if (!flip) return state;
+          return {
+            flips: state.flips.map((f) =>
+              f.id === flipId
+                ? {
+                    ...f,
+                    status: 'Completed',
+                    currentPhase: 'Sold / Awaiting Transfer',
+                    actualSalePriceZAR: actualSalePrice,
+                    netCashProceedsZAR: netCashProceeds,
+                    soldDate,
+                    exitNotes,
+                  }
+                : f
+            ),
+            liquidCapitalReserve: state.liquidCapitalReserve + (netCashProceeds || 0),
+          };
+        }),
+      reopenFlip: (flipId) =>
+        set((state) => {
+          const flip = state.flips.find((f) => f.id === flipId);
+          if (!flip) return state;
+          const deducted = Math.max(0, state.liquidCapitalReserve - (flip.netCashProceedsZAR || 0));
+          return {
+            flips: state.flips.map((f) =>
+              f.id === flipId
+                ? {
+                    ...f,
+                    status: 'Active',
+                    actualSalePriceZAR: undefined,
+                    netCashProceedsZAR: undefined,
+                    soldDate: undefined,
+                    exitNotes: undefined,
+                  }
+                : f
+            ),
+            liquidCapitalReserve: deducted,
+          };
+        }),
 
       // Funding
       addFunding: (source) =>
@@ -547,20 +634,36 @@ export function computePortfolioSummary(state: {
   liquidCapitalReserve: number;
   opportunities?: OpportunityDeal[];
 }): PortfolioSummary {
-  const totalRentalValue = (state.rentals || []).reduce(
+  const activeRentals = (state.rentals || []).filter((r) => r.status !== 'Sold');
+  const soldRentals = (state.rentals || []).filter((r) => r.status === 'Sold');
+  const activeFlips = (state.flips || []).filter((f) => f.status === 'Active' || f.status === 'Delayed');
+  const completedFlips = (state.flips || []).filter((f) => f.status === 'Completed');
+
+  const totalRentalValue = activeRentals.reduce(
     (sum, r) => sum + (r.marketValueZAR || 0),
     0
   );
-  const totalBondLiabilities = (state.rentals || []).reduce(
+  const totalBondLiabilities = activeRentals.reduce(
     (sum, r) => sum + (r.outstandingBondBalanceZAR || 0),
     0
   );
-  const totalFlipValue = (state.flips || []).reduce(
+  const totalFlipValue = activeFlips.reduce(
     (sum, f) => sum + (f.targetExitPriceZAR || 0),
     0
   );
   const liquidCapitalReserve = state.liquidCapitalReserve || 0;
   const totalGrossAssetValue = totalRentalValue + totalFlipValue + liquidCapitalReserve;
+
+  // Unallocated private funding facilities for next acquisitions
+  const unallocatedFundingReserve = (state.funding || [])
+    .filter(
+      (f) =>
+        (f.status === 'Active' || f.status === 'Accruing') &&
+        (!f.linkedDealId || f.linkedDealName === 'General Portfolio Liquidity')
+    )
+    .reduce((sum, f) => sum + Math.max(0, (f.capitalAmountZAR || 0) - (f.totalRepaidZAR || 0)), 0);
+
+  const totalAvailablePurchasingPower = liquidCapitalReserve + unallocatedFundingReserve;
 
   const totalPrivateFundingLiability = (state.funding || [])
     .filter((f) => f.status === 'Active' || f.status === 'Accruing')
@@ -569,7 +672,8 @@ export function computePortfolioSummary(state: {
   const totalFundingLiabilities = totalPrivateFundingLiability + totalBondLiabilities;
   const netEquity = totalGrossAssetValue - totalFundingLiabilities;
 
-  const monthlyNetRentalCashflow = (state.rentals || []).reduce((sum, r) => {
+  // Monthly rental cash flow only counts active tenancies (not sold properties)
+  const monthlyNetRentalCashflow = activeRentals.reduce((sum, r) => {
     const gross = r.monthlyGrossRentZAR || 0;
     let agentFee = 0;
     if (r.managementType === 'Agency') {
@@ -590,7 +694,8 @@ export function computePortfolioSummary(state: {
     return sum + (gross - expenses);
   }, 0);
 
-  const totalProjectedFlipProfits = (state.flips || []).reduce((sum, f) => {
+  // Projected profit on active pipeline flips
+  const totalProjectedFlipProfits = activeFlips.reduce((sum, f) => {
     const totalBoqActual = (f.boq || []).reduce(
       (bSum, b) => bSum + (b.actualCostZAR || b.baselineTotalZAR || 0),
       0
@@ -603,19 +708,38 @@ export function computePortfolioSummary(state: {
     return sum + profit;
   }, 0);
 
+  // Realized profit on completed/sold flips
+  const totalRealizedFlipProfits = completedFlips.reduce((sum, f) => {
+    const totalBoqActual = (f.boq || []).reduce(
+      (bSum, b) => bSum + (b.actualCostZAR || b.baselineTotalZAR || 0),
+      0
+    );
+    const totalCost =
+      (f.purchasePriceZAR || 0) +
+      (f.acquisitionCostsZAR || 0) +
+      totalBoqActual;
+    const exitPrice = f.actualSalePriceZAR ?? f.targetExitPriceZAR ?? 0;
+    return sum + (exitPrice - totalCost);
+  }, 0);
+
   return {
     totalGrossAssetValue,
     totalRentalValue,
     totalFlipValue,
     liquidCapitalReserve,
+    unallocatedFundingReserve,
+    totalAvailablePurchasingPower,
     totalFundingLiabilities,
     totalPrivateFundingLiability,
     totalBondLiabilities,
     netEquity,
     monthlyNetRentalCashflow,
     totalProjectedFlipProfits,
-    activeRentalsCount: (state.rentals || []).length,
-    activeFlipsCount: (state.flips || []).filter((f) => f.status === 'Active').length,
+    totalRealizedFlipProfits,
+    activeRentalsCount: activeRentals.length,
+    soldRentalsCount: soldRentals.length,
+    activeFlipsCount: activeFlips.length,
+    completedFlipsCount: completedFlips.length,
     pendingOpportunitiesCount: (state.opportunities || []).length,
   };
 }
