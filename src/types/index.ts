@@ -240,6 +240,12 @@ export interface RentalProperty {
   leaseEndDate: string;
   depositHeldZAR: number;
   annualEscalationPercent: number; // e.g. 7%
+  // Agency & Property Management
+  managementType?: 'Self-Managed' | 'Agency';
+  agencyName?: string;
+  agencyCommissionPercent?: number;
+  agencyVatApplicable?: boolean;
+  agencyContact?: string;
   // Monthly Cash Flow Ledger
   monthlyGrossRentZAR: number;
   monthlyLeviesZAR: number;

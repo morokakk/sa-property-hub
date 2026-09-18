@@ -7,6 +7,7 @@ import UpcomingDeadlines from '@/components/dashboard/UpcomingDeadlines';
 import PriorityTasksWidget from '@/components/dashboard/PriorityTasksWidget';
 import { usePortfolioStore, usePortfolioSummary } from '@/lib/store/usePortfolioStore';
 import { formatZAR, formatPercent, formatDate } from '@/lib/formatters';
+import { calculateRentalCashflow } from '@/lib/calculations/propertyMetrics';
 import {
   TrendingUp,
   ShieldCheck,
@@ -219,13 +220,7 @@ export default function GlobalDashboardPage() {
 
             <div className="space-y-3">
               {rentals.map((rental) => {
-                const netMonthly =
-                  rental.monthlyGrossRentZAR -
-                  (rental.monthlyLeviesZAR +
-                    rental.monthlyRatesTaxesZAR +
-                    rental.monthlyAgentFeeZAR +
-                    rental.monthlyMaintenanceReserveZAR +
-                    rental.monthlyBondPaymentZAR);
+                const { netMonthlyCashflowZAR: netMonthly } = calculateRentalCashflow(rental);
 
                 return (
                   <div

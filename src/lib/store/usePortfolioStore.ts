@@ -457,10 +457,20 @@ export function computePortfolioSummary(state: {
 
   const monthlyNetRentalCashflow = (state.rentals || []).reduce((sum, r) => {
     const gross = r.monthlyGrossRentZAR || 0;
+    let agentFee = 0;
+    if (r.managementType === 'Agency') {
+      if (typeof r.agencyCommissionPercent === 'number' && r.agencyCommissionPercent > 0) {
+        const base = gross * (r.agencyCommissionPercent / 100);
+        const vat = r.agencyVatApplicable ? 1.15 : 1.0;
+        agentFee = Math.round(base * vat);
+      } else {
+        agentFee = r.monthlyAgentFeeZAR || 0;
+      }
+    }
     const expenses =
       (r.monthlyLeviesZAR || 0) +
       (r.monthlyRatesTaxesZAR || 0) +
-      (r.monthlyAgentFeeZAR || 0) +
+      agentFee +
       (r.monthlyMaintenanceReserveZAR || 0) +
       (r.monthlyBondPaymentZAR || 0);
     return sum + (gross - expenses);

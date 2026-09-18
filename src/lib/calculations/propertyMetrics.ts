@@ -179,3 +179,51 @@ export function calculateDealMetrics(params: {
     projectedFlipRoi: Number(projectedFlipRoi.toFixed(2)),
   };
 }
+
+/**
+ * Computes monthly agency commission and net cash flow for a rental property
+ */
+export function calculateRentalCashflow(property: {
+  monthlyGrossRentZAR: number;
+  monthlyLeviesZAR: number;
+  monthlyRatesTaxesZAR: number;
+  monthlyMaintenanceReserveZAR: number;
+  monthlyBondPaymentZAR: number;
+  managementType?: 'Self-Managed' | 'Agency';
+  agencyCommissionPercent?: number;
+  agencyVatApplicable?: boolean;
+  monthlyAgentFeeZAR?: number;
+}): {
+  agencyCommissionZAR: number;
+  totalMonthlyExpensesZAR: number;
+  netMonthlyCashflowZAR: number;
+} {
+  const gross = property.monthlyGrossRentZAR || 0;
+  let agencyCommissionZAR = 0;
+
+  if (property.managementType === 'Agency') {
+    if (typeof property.agencyCommissionPercent === 'number' && property.agencyCommissionPercent > 0) {
+      const baseCommission = gross * (property.agencyCommissionPercent / 100);
+      const vatMultiplier = property.agencyVatApplicable ? 1.15 : 1.0;
+      agencyCommissionZAR = Math.round(baseCommission * vatMultiplier);
+    } else {
+      agencyCommissionZAR = property.monthlyAgentFeeZAR || 0;
+    }
+  }
+
+  const totalMonthlyExpensesZAR =
+    (property.monthlyLeviesZAR || 0) +
+    (property.monthlyRatesTaxesZAR || 0) +
+    agencyCommissionZAR +
+    (property.monthlyMaintenanceReserveZAR || 0) +
+    (property.monthlyBondPaymentZAR || 0);
+
+  const netMonthlyCashflowZAR = gross - totalMonthlyExpensesZAR;
+
+  return {
+    agencyCommissionZAR,
+    totalMonthlyExpensesZAR,
+    netMonthlyCashflowZAR,
+  };
+}
+
