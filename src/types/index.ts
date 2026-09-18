@@ -351,3 +351,18 @@ export interface InvestorProfile {
   defaultAgentCommissionPercent: number; // e.g. 5.0%
 }
 
+// Deal Sourcing Calculator Scratchpad State
+export interface AnalyzerDraft {
+  openMarketValue: number;
+  purchasePrice: number;
+  rehabCost: number;
+  monthlyRent: number;
+  monthlyLevies: number;
+  monthlyRates: number;
+  targetExitPrice: number;
+  auctioneerCommission: number;
+  municipalArrears: number;
+  depositZAR: number;
+  loanToValue: number;
+}
+

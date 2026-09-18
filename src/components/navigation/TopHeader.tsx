@@ -5,12 +5,17 @@ import { usePortfolioStore, usePortfolioSummary } from '@/lib/store/usePortfolio
 import { formatZAR } from '@/lib/formatters';
 import {
   RotateCcw,
+  Trash2,
   Download,
   Upload,
   Coins,
   ShieldAlert,
   CheckCircle2,
+  FileSpreadsheet,
+  FileCode2,
+  ChevronDown,
 } from 'lucide-react';
+import { exportPortfolioToExcel } from '@/lib/export/excelExport';
 
 interface TopHeaderProps {
   title: string;
@@ -21,14 +26,28 @@ interface TopHeaderProps {
 export default function TopHeader({ title, subtitle, actionButton }: TopHeaderProps) {
   const summary = usePortfolioSummary();
   const resetToDemoData = usePortfolioStore((state) => state.resetToDemoData);
+  const clearAllData = usePortfolioStore((state) => state.clearAllData);
   const importPortfolioJSON = usePortfolioStore((state) => state.importPortfolioJSON);
 
   const [notification, setNotification] = useState<string | null>(null);
   const [isMounted, setIsMounted] = useState(false);
+  const [showExportMenu, setShowExportMenu] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const exportMenuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setIsMounted(true);
+  }, []);
+
+  // Close export dropdown when clicking outside
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (exportMenuRef.current && !exportMenuRef.current.contains(event.target as Node)) {
+        setShowExportMenu(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
   const showNotification = (msg: string) => {
@@ -43,7 +62,33 @@ export default function TopHeader({ title, subtitle, actionButton }: TopHeaderPr
     }
   };
 
-  const handleExport = () => {
+  const handleClearDemo = () => {
+    if (
+      confirm(
+        'Clear all demo data and start with an empty portfolio? (You can always restore the demo dataset anytime using Reset Demo)'
+      )
+    ) {
+      clearAllData();
+      showNotification('Portfolio cleared. Ready for your own properties and deals.');
+    }
+  };
+
+  const handleExportExcel = () => {
+    setShowExportMenu(false);
+    const currentState = usePortfolioStore.getState();
+    exportPortfolioToExcel({
+      rentals: currentState.rentals,
+      flips: currentState.flips,
+      opportunities: currentState.opportunities,
+      funding: currentState.funding,
+      summary: currentState.getSummary(),
+      investorProfile: currentState.investorProfile,
+    });
+    showNotification('Multi-tab portfolio spreadsheet exported to Excel (.xlsx).');
+  };
+
+  const handleExportJSON = () => {
+    setShowExportMenu(false);
     const currentState = usePortfolioStore.getState();
     const dataStr = JSON.stringify(
       {
@@ -124,13 +169,59 @@ export default function TopHeader({ title, subtitle, actionButton }: TopHeaderPr
             </button>
 
             <button
-              onClick={handleExport}
-              title="Export state to JSON file"
+              onClick={handleClearDemo}
+              title="Clear all demo data to enter your own portfolio"
               className="p-1.5 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-md transition-colors flex items-center gap-1 text-xs font-medium min-h-[36px] min-w-[36px] justify-center"
             >
-              <Download className="w-3.5 h-3.5" />
-              <span className="hidden lg:inline">Export</span>
+              <Trash2 className="w-3.5 h-3.5" />
+              <span className="hidden lg:inline">Clear Demo Data</span>
             </button>
+
+            {/* Export Dropdown Menu */}
+            <div className="relative" ref={exportMenuRef}>
+              <button
+                onClick={() => setShowExportMenu(!showExportMenu)}
+                title="Export portfolio data to Excel or JSON"
+                className="p-1.5 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-md transition-colors flex items-center gap-1 text-xs font-medium min-h-[36px] min-w-[36px] justify-center cursor-pointer"
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span className="hidden lg:inline">Export</span>
+                <ChevronDown className="w-3 h-3 text-slate-400" />
+              </button>
+
+              {showExportMenu && (
+                <div className="absolute right-0 mt-1.5 w-60 bg-white rounded-xl shadow-xl border border-slate-200 py-1.5 z-50 animate-in fade-in zoom-in-95 duration-150">
+                  <div className="px-3 py-1.5 border-b border-slate-100 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                    Export Portfolio Data
+                  </div>
+                  <button
+                    onClick={handleExportExcel}
+                    className="w-full px-3 py-2 text-left text-xs text-slate-700 hover:bg-emerald-50 hover:text-emerald-900 flex items-start gap-2.5 transition-colors cursor-pointer"
+                  >
+                    <div className="p-1 rounded bg-emerald-100 text-emerald-700 mt-0.5 shrink-0">
+                      <FileSpreadsheet className="w-3.5 h-3.5" />
+                    </div>
+                    <div>
+                      <div className="font-semibold text-slate-900">Excel Workbook (.xlsx)</div>
+                      <div className="text-[10px] text-slate-500">Multi-tab financial model & tables</div>
+                    </div>
+                  </button>
+
+                  <button
+                    onClick={handleExportJSON}
+                    className="w-full px-3 py-2 text-left text-xs text-slate-700 hover:bg-indigo-50 hover:text-indigo-900 flex items-start gap-2.5 transition-colors cursor-pointer"
+                  >
+                    <div className="p-1 rounded bg-indigo-100 text-indigo-700 mt-0.5 shrink-0">
+                      <FileCode2 className="w-3.5 h-3.5" />
+                    </div>
+                    <div>
+                      <div className="font-semibold text-slate-900">Full JSON Backup (.json)</div>
+                      <div className="text-[10px] text-slate-500">Lossless backup for 1-click restore</div>
+                    </div>
+                  </button>
+                </div>
+              )}
+            </div>
 
             <label
               title="Import state from JSON file"

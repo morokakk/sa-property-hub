@@ -11,6 +11,7 @@ import {
   PortfolioSummary,
   BOQItem,
   InvestorProfile,
+  AnalyzerDraft,
 } from '@/types';
 import {
   INITIAL_RENTALS,
@@ -20,6 +21,8 @@ import {
   INITIAL_TASKS,
   INITIAL_OPPORTUNITIES,
   INITIAL_INVESTOR_PROFILE,
+  INITIAL_ANALYZER_DRAFT,
+  EMPTY_ANALYZER_DRAFT,
 } from './initialData';
 
 interface PortfolioState {
@@ -31,12 +34,16 @@ interface PortfolioState {
   tasks: TaskItem[];
   liquidCapitalReserve: number;
   investorProfile: InvestorProfile;
+  analyzerDraft: AnalyzerDraft;
 
   // Computed selector
   getSummary: () => PortfolioSummary;
 
   // Investor Profile Action
   updateInvestorProfile: (profile: Partial<InvestorProfile>) => void;
+
+  // Analyzer Draft Action
+  updateAnalyzerDraft: (patch: Partial<AnalyzerDraft>) => void;
 
   // Rental Actions
   addRental: (rental: RentalProperty) => void;
@@ -143,6 +150,7 @@ export const usePortfolioStore = create<PortfolioState>()(
       tasks: INITIAL_TASKS,
       liquidCapitalReserve: 650_000, // ZAR 650k operational cash reserve
       investorProfile: INITIAL_INVESTOR_PROFILE,
+      analyzerDraft: INITIAL_ANALYZER_DRAFT,
 
       getSummary: (): PortfolioSummary => {
         return computePortfolioSummary(get());
@@ -152,6 +160,12 @@ export const usePortfolioStore = create<PortfolioState>()(
       updateInvestorProfile: (updates) =>
         set((state) => ({
           investorProfile: { ...state.investorProfile, ...updates },
+        })),
+
+      // Analyzer Draft
+      updateAnalyzerDraft: (patch) =>
+        set((state) => ({
+          analyzerDraft: { ...state.analyzerDraft, ...patch },
         })),
 
       // Rentals
@@ -603,17 +617,20 @@ export const usePortfolioStore = create<PortfolioState>()(
           tasks: INITIAL_TASKS,
           liquidCapitalReserve: 650_000,
           investorProfile: INITIAL_INVESTOR_PROFILE,
+          analyzerDraft: INITIAL_ANALYZER_DRAFT,
         }),
       clearAllData: () =>
-        set({
+        set((state) => ({
           rentals: [],
           flips: [],
           funding: [],
           opportunities: [],
-          suppliers: [],
           tasks: [],
           liquidCapitalReserve: 0,
-        }),
+          analyzerDraft: EMPTY_ANALYZER_DRAFT,
+          // Preserve South African trade suppliers directory for immediate BOQ contractor selection
+          suppliers: state.suppliers.length > 0 ? state.suppliers : INITIAL_SUPPLIERS,
+        })),
       importPortfolioJSON: (jsonString) => {
         try {
           const parsed = JSON.parse(jsonString);

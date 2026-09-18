@@ -22,6 +22,7 @@ import {
   Edit3,
   ArrowRight,
   Check,
+  Sparkles,
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -122,6 +123,88 @@ export default function GlobalDashboardPage() {
             </div>
           </div>
         </div>
+
+        {/* Clean Slate Onboarding Guide (Shown when portfolio is empty) */}
+        {rentals.length === 0 && flips.length === 0 && (
+          <div className="bg-white rounded-2xl p-6 border-2 border-dashed border-emerald-300 shadow-xs">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-slate-100">
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-800 flex items-center justify-center shrink-0">
+                  <Sparkles className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-900">
+                    Clean Slate: Ready to Model Your Real Portfolio
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Demo records have been cleared. Begin entering your own South African assets, or analyze potential acquisition deals below.
+                  </p>
+                </div>
+              </div>
+              <div className="text-xs text-slate-400">
+                Tip: You can restore demo data anytime via <strong className="text-slate-700">Reset Demo</strong> in the top bar.
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-4">
+              <Link
+                href="/analyzer"
+                className="p-3.5 rounded-xl border border-slate-200 bg-slate-50/70 hover:bg-emerald-50/60 hover:border-emerald-300 transition-all group cursor-pointer"
+              >
+                <div className="flex items-center gap-2 mb-1.5">
+                  <div className="p-1.5 bg-emerald-100 text-emerald-700 rounded-lg group-hover:bg-emerald-600 group-hover:text-white transition-colors">
+                    <PlusCircle className="w-4 h-4" />
+                  </div>
+                  <span className="text-xs font-bold text-slate-900 group-hover:text-emerald-800">1. Analyze Deal</span>
+                </div>
+                <p className="text-[11px] text-slate-500">Calculate SARS transfer duty, bond repayments, and Day-1 outlays.</p>
+              </Link>
+
+              <Link
+                href="/rentals"
+                className="p-3.5 rounded-xl border border-slate-200 bg-slate-50/70 hover:bg-emerald-50/60 hover:border-emerald-300 transition-all group cursor-pointer"
+              >
+                <div className="flex items-center gap-2 mb-1.5">
+                  <div className="p-1.5 bg-indigo-100 text-indigo-700 rounded-lg group-hover:bg-indigo-600 group-hover:text-white transition-colors">
+                    <Building className="w-4 h-4" />
+                  </div>
+                  <span className="text-xs font-bold text-slate-900 group-hover:text-indigo-800">2. Add Rental Unit</span>
+                </div>
+                <p className="text-[11px] text-slate-500">Track leases, Sectional Title levies, agency fees, and utility arrears.</p>
+              </Link>
+
+              <Link
+                href="/flips"
+                className="p-3.5 rounded-xl border border-slate-200 bg-slate-50/70 hover:bg-emerald-50/60 hover:border-emerald-300 transition-all group cursor-pointer"
+              >
+                <div className="flex items-center gap-2 mb-1.5">
+                  <div className="p-1.5 bg-amber-100 text-amber-700 rounded-lg group-hover:bg-amber-600 group-hover:text-white transition-colors">
+                    <Hammer className="w-4 h-4" />
+                  </div>
+                  <span className="text-xs font-bold text-slate-900 group-hover:text-amber-800">3. Start Flip Project</span>
+                </div>
+                <p className="text-[11px] text-slate-500">Manage BOQ contractor lines, holding carrying burn, and target exit profit.</p>
+              </Link>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setSeedAmount(summary.liquidCapitalReserve);
+                  setShowEditSeedModal(true);
+                }}
+                className="p-3.5 rounded-xl border border-slate-200 bg-slate-50/70 hover:bg-teal-50/60 hover:border-teal-300 transition-all group text-left cursor-pointer"
+              >
+                <div className="flex items-center gap-2 mb-1.5">
+                  <div className="p-1.5 bg-teal-100 text-teal-700 rounded-lg group-hover:bg-teal-600 group-hover:text-white transition-colors">
+                    <Wallet className="w-4 h-4" />
+                  </div>
+                  <span className="text-xs font-bold text-slate-900 group-hover:text-teal-800">4. Set Liquid Reserve</span>
+                </div>
+                <p className="text-[11px] text-slate-500">Configure your starting cash balance to measure purchasing power.</p>
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Top Executive KPI Metric Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
@@ -230,58 +313,72 @@ export default function GlobalDashboardPage() {
               </Link>
             </div>
 
-            <div className="space-y-3">
-              {flips.map((flip) => {
-                const totalBoqActual = flip.boq.reduce(
-                  (sum, item) => sum + (item.actualCostZAR || item.baselineTotalZAR),
-                  0
-                );
-                const progressPct =
-                  flip.baselineRenovationBudgetZAR > 0
-                    ? Math.min(100, (totalBoqActual / flip.baselineRenovationBudgetZAR) * 100)
-                    : 0;
+            {flips.length === 0 ? (
+              <div className="p-6 rounded-lg border border-dashed border-slate-200 text-center bg-slate-50/50">
+                <Hammer className="w-6 h-6 text-slate-400 mx-auto mb-1.5" />
+                <p className="text-xs font-semibold text-slate-700">No active flips in pipeline</p>
+                <p className="text-[11px] text-slate-400 mt-0.5 mb-3">Model your renovation, carrying costs, and exit upside.</p>
+                <Link
+                  href="/flips"
+                  className="inline-flex items-center gap-1 text-[11px] font-semibold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 px-2.5 py-1 rounded-md border border-indigo-200 transition-colors"
+                >
+                  <PlusCircle className="w-3 h-3" /> New Flip Project
+                </Link>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {flips.map((flip) => {
+                  const totalBoqActual = flip.boq.reduce(
+                    (sum, item) => sum + (item.actualCostZAR || item.baselineTotalZAR),
+                    0
+                  );
+                  const progressPct =
+                    flip.baselineRenovationBudgetZAR > 0
+                      ? Math.min(100, (totalBoqActual / flip.baselineRenovationBudgetZAR) * 100)
+                      : 0;
 
-                return (
-                  <div
-                    key={flip.id}
-                    className="p-3 rounded-lg border border-slate-100 bg-slate-50/70 hover:bg-slate-100/80 transition-colors"
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <div>
-                        <h4 className="text-xs font-bold text-slate-900">{flip.title}</h4>
-                        <p className="text-[11px] text-slate-500">{flip.address}, {flip.city}</p>
-                      </div>
-                      <span className="text-[10px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200 px-2 py-0.5 rounded-full">
-                        {flip.currentPhase}
-                      </span>
-                    </div>
-
-                    <div className="grid grid-cols-4 gap-2 text-xs mt-3 pt-2 border-t border-slate-200/60">
-                      <div>
-                        <span className="text-[10px] text-slate-400 block">Purchase</span>
-                        <span className="font-semibold text-slate-800">{formatZAR(flip.purchasePriceZAR)}</span>
-                      </div>
-                      <div>
-                        <span className="text-[10px] text-slate-400 block">Target Exit</span>
-                        <span className="font-semibold text-emerald-700">{formatZAR(flip.targetExitPriceZAR)}</span>
-                      </div>
-                      <div>
-                        <span className="text-[10px] text-slate-400 block">BOQ Spend</span>
-                        <span className="font-semibold text-slate-800">
-                          {formatZAR(totalBoqActual)} ({formatPercent(progressPct)})
+                  return (
+                    <div
+                      key={flip.id}
+                      className="p-3 rounded-lg border border-slate-100 bg-slate-50/70 hover:bg-slate-100/80 transition-colors"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <h4 className="text-xs font-bold text-slate-900">{flip.title}</h4>
+                          <p className="text-[11px] text-slate-500">{flip.address}, {flip.city}</p>
+                        </div>
+                        <span className="text-[10px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200 px-2 py-0.5 rounded-full">
+                          {flip.currentPhase}
                         </span>
                       </div>
-                      <div>
-                        <span className="text-[10px] text-amber-700 block font-medium">Holding ({flip.estimatedDurationMonths ?? 6}m)</span>
-                        <span className="font-semibold text-amber-700">
-                          -{formatZAR((flip.estimatedDurationMonths ?? 6) * (flip.monthlyHoldingCostZAR ?? 0))}
-                        </span>
+
+                      <div className="grid grid-cols-4 gap-2 text-xs mt-3 pt-2 border-t border-slate-200/60">
+                        <div>
+                          <span className="text-[10px] text-slate-400 block">Purchase</span>
+                          <span className="font-semibold text-slate-800">{formatZAR(flip.purchasePriceZAR)}</span>
+                        </div>
+                        <div>
+                          <span className="text-[10px] text-slate-400 block">Target Exit</span>
+                          <span className="font-semibold text-emerald-700">{formatZAR(flip.targetExitPriceZAR)}</span>
+                        </div>
+                        <div>
+                          <span className="text-[10px] text-slate-400 block">BOQ Spend</span>
+                          <span className="font-semibold text-slate-800">
+                            {formatZAR(totalBoqActual)} ({formatPercent(progressPct)})
+                          </span>
+                        </div>
+                        <div>
+                          <span className="text-[10px] text-amber-700 block font-medium">Holding ({flip.estimatedDurationMonths ?? 6}m)</span>
+                          <span className="font-semibold text-amber-700">
+                            -{formatZAR((flip.estimatedDurationMonths ?? 6) * (flip.monthlyHoldingCostZAR ?? 0))}
+                          </span>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                );
-              })}
-            </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
           {/* Active Rental Portfolio Quick Look */}
@@ -299,55 +396,69 @@ export default function GlobalDashboardPage() {
               </Link>
             </div>
 
-            <div className="space-y-3">
-              {rentals.map((rental) => {
-                const { netMonthlyCashflowZAR: netMonthly } = calculateRentalCashflow(rental);
-                const hasArrears = (rental.unpaidUtilityArrearsZAR || 0) > 0;
+            {rentals.length === 0 ? (
+              <div className="p-6 rounded-lg border border-dashed border-slate-200 text-center bg-slate-50/50">
+                <Building className="w-6 h-6 text-slate-400 mx-auto mb-1.5" />
+                <p className="text-xs font-semibold text-slate-700">No active rental units</p>
+                <p className="text-[11px] text-slate-400 mt-0.5 mb-3">Track leases, Sectional Title levies, and cashflows.</p>
+                <Link
+                  href="/rentals"
+                  className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-2.5 py-1 rounded-md border border-emerald-200 transition-colors"
+                >
+                  <PlusCircle className="w-3 h-3" /> Add Rental Property
+                </Link>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {rentals.map((rental) => {
+                  const { netMonthlyCashflowZAR: netMonthly } = calculateRentalCashflow(rental);
+                  const hasArrears = (rental.unpaidUtilityArrearsZAR || 0) > 0;
 
-                return (
-                  <div
-                    key={rental.id}
-                    className="p-3 rounded-lg border border-slate-100 bg-slate-50/70 hover:bg-slate-100/80 transition-colors"
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <div>
-                        <h4 className="text-xs font-bold text-slate-900">{rental.title}</h4>
-                        <p className="text-[11px] text-slate-500">
-                          Tenant: <span className="font-medium text-slate-700">{rental.tenantName}</span> (Lease to {formatDate(rental.leaseEndDate)})
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        {hasArrears && (
-                          <span className="text-[9px] font-bold bg-rose-100 text-rose-800 border border-rose-300 px-1.5 py-0.5 rounded-full">
-                            ⚠️ Arrears: -{formatZAR(rental.unpaidUtilityArrearsZAR || 0)}
+                  return (
+                    <div
+                      key={rental.id}
+                      className="p-3 rounded-lg border border-slate-100 bg-slate-50/70 hover:bg-slate-100/80 transition-colors"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <h4 className="text-xs font-bold text-slate-900">{rental.title}</h4>
+                          <p className="text-[11px] text-slate-500">
+                            Tenant: <span className="font-medium text-slate-700">{rental.tenantName}</span> (Lease to {formatDate(rental.leaseEndDate)})
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          {hasArrears && (
+                            <span className="text-[9px] font-bold bg-rose-100 text-rose-800 border border-rose-300 px-1.5 py-0.5 rounded-full">
+                              ⚠️ Arrears: -{formatZAR(rental.unpaidUtilityArrearsZAR || 0)}
+                            </span>
+                          )}
+                          <span className="text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded-full">
+                            {rental.status}
                           </span>
-                        )}
-                        <span className="text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded-full">
-                          {rental.status}
-                        </span>
+                        </div>
                       </div>
-                    </div>
 
-                    <div className="grid grid-cols-3 gap-2 text-xs mt-3 pt-2 border-t border-slate-200/60">
-                      <div>
-                        <span className="text-[10px] text-slate-400 block">Market Value</span>
-                        <span className="font-semibold text-slate-800">{formatZAR(rental.marketValueZAR)}</span>
-                      </div>
-                      <div>
-                        <span className="text-[10px] text-slate-400 block">Gross Rent</span>
-                        <span className="font-semibold text-slate-800">{formatZAR(rental.monthlyGrossRentZAR)}/m</span>
-                      </div>
-                      <div>
-                        <span className="text-[10px] text-slate-400 block">Net Cashflow</span>
-                        <span className={`font-bold ${netMonthly >= 0 ? 'text-emerald-700' : 'text-rose-600'}`}>
-                          {formatZAR(netMonthly)}/m
-                        </span>
+                      <div className="grid grid-cols-3 gap-2 text-xs mt-3 pt-2 border-t border-slate-200/60">
+                        <div>
+                          <span className="text-[10px] text-slate-400 block">Market Value</span>
+                          <span className="font-semibold text-slate-800">{formatZAR(rental.marketValueZAR)}</span>
+                        </div>
+                        <div>
+                          <span className="text-[10px] text-slate-400 block">Gross Rent</span>
+                          <span className="font-semibold text-slate-800">{formatZAR(rental.monthlyGrossRentZAR)}/m</span>
+                        </div>
+                        <div>
+                          <span className="text-[10px] text-slate-400 block">Net Cashflow</span>
+                          <span className={`font-bold ${netMonthly >= 0 ? 'text-emerald-700' : 'text-rose-600'}`}>
+                            {formatZAR(netMonthly)}/m
+                          </span>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                );
-              })}
-            </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </div>
 

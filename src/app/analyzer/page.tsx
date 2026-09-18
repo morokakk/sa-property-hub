@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import TopHeader from '@/components/navigation/TopHeader';
 import { usePortfolioStore } from '@/lib/store/usePortfolioStore';
 import { computeAcquisitionCosts, calculateSection13sex } from '@/lib/calculations/sarsTax';
@@ -37,8 +37,10 @@ import {
   MapPin,
   TrendingUp,
   Edit3,
+  FileSpreadsheet,
 } from 'lucide-react';
 import Link from 'next/link';
+import { exportOpportunitiesCSV } from '@/lib/export/csvExport';
 
 export default function OpportunityAnalyzerPage() {
   const opportunities = usePortfolioStore((state) => state.opportunities);
@@ -49,6 +51,8 @@ export default function OpportunityAnalyzerPage() {
   const promoteOpportunityToRental = usePortfolioStore((state) => state.promoteOpportunityToRental);
   const investorProfile = usePortfolioStore((state) => state.investorProfile);
   const liquidCapitalReserve = usePortfolioStore((state) => state.liquidCapitalReserve);
+  const analyzerDraft = usePortfolioStore((state) => state.analyzerDraft);
+  const updateAnalyzerDraft = usePortfolioStore((state) => state.updateAnalyzerDraft);
 
   // Form State for Deal Sourcing Calculator
   const [title, setTitle] = useState('');
@@ -60,17 +64,17 @@ export default function OpportunityAnalyzerPage() {
   const [agmDate, setAgmDate] = useState<string>('');
 
   // Valuation vs. Purchase Price
-  const [openMarketValue, setOpenMarketValue] = useState<number>(2_150_000);
-  const [purchasePrice, setPurchasePrice] = useState<number>(1_800_000);
-  const [rehabCost, setRehabCost] = useState<number>(200_000);
-  const [monthlyRent, setMonthlyRent] = useState<number>(16_500);
-  const [monthlyLevies, setMonthlyLevies] = useState<number>(1_650);
-  const [monthlyRates, setMonthlyRates] = useState<number>(1_100);
-  const [targetExitPrice, setTargetExitPrice] = useState<number>(2_450_000);
+  const [openMarketValue, setOpenMarketValue] = useState<number>(analyzerDraft?.openMarketValue ?? 2_150_000);
+  const [purchasePrice, setPurchasePrice] = useState<number>(analyzerDraft?.purchasePrice ?? 1_800_000);
+  const [rehabCost, setRehabCost] = useState<number>(analyzerDraft?.rehabCost ?? 200_000);
+  const [monthlyRent, setMonthlyRent] = useState<number>(analyzerDraft?.monthlyRent ?? 16_500);
+  const [monthlyLevies, setMonthlyLevies] = useState<number>(analyzerDraft?.monthlyLevies ?? 1_650);
+  const [monthlyRates, setMonthlyRates] = useState<number>(analyzerDraft?.monthlyRates ?? 1_100);
+  const [targetExitPrice, setTargetExitPrice] = useState<number>(analyzerDraft?.targetExitPrice ?? 2_450_000);
 
   // Auction Outlays & Distressed Arrears State
-  const [auctioneerCommission, setAuctioneerCommission] = useState<number>(0);
-  const [municipalArrears, setMunicipalArrears] = useState<number>(0);
+  const [auctioneerCommission, setAuctioneerCommission] = useState<number>(analyzerDraft?.auctioneerCommission ?? 0);
+  const [municipalArrears, setMunicipalArrears] = useState<number>(analyzerDraft?.municipalArrears ?? 0);
 
   // Amenity Distance State
   const [schoolsDistance, setSchoolsDistance] = useState<AmenityDistance>('0-5km');
@@ -79,10 +83,27 @@ export default function OpportunityAnalyzerPage() {
   const [mallDistance, setMallDistance] = useState<AmenityDistance>('0-5km');
 
   // Financing & Bidirectional Deposit / LTV (Defaults to 100% LTV / 0% Deposit)
-  const [loanToValue, setLoanToValue] = useState<number>(100);
-  const [depositZAR, setDepositZAR] = useState<number>(0);
+  const [loanToValue, setLoanToValue] = useState<number>(analyzerDraft?.loanToValue ?? 100);
+  const [depositZAR, setDepositZAR] = useState<number>(analyzerDraft?.depositZAR ?? 0);
   const [interestRate, setInterestRate] = useState<number>(11.75); // SA Prime Rate
   const [loanTermYears, setLoanTermYears] = useState<number>(20);
+
+  // Synchronize scratchpad calculator inputs when store draft changes (e.g. Clear Demo Data or Reset Demo)
+  useEffect(() => {
+    if (analyzerDraft) {
+      setOpenMarketValue(analyzerDraft.openMarketValue ?? 0);
+      setPurchasePrice(analyzerDraft.purchasePrice ?? 0);
+      setRehabCost(analyzerDraft.rehabCost ?? 0);
+      setMonthlyRent(analyzerDraft.monthlyRent ?? 0);
+      setMonthlyLevies(analyzerDraft.monthlyLevies ?? 0);
+      setMonthlyRates(analyzerDraft.monthlyRates ?? 0);
+      setTargetExitPrice(analyzerDraft.targetExitPrice ?? 0);
+      setAuctioneerCommission(analyzerDraft.auctioneerCommission ?? 0);
+      setMunicipalArrears(analyzerDraft.municipalArrears ?? 0);
+      setDepositZAR(analyzerDraft.depositZAR ?? 0);
+      setLoanToValue(analyzerDraft.loanToValue ?? 0);
+    }
+  }, [analyzerDraft]);
 
   // Bidirectional Handlers for Deposit, LTV, and Purchase Price
   const handlePurchasePriceChange = (val: number) => {
@@ -91,6 +112,7 @@ export default function OpportunityAnalyzerPage() {
     // Preserve current LTV % and recalculate Deposit ZAR
     const updatedDeposit = Math.max(0, Math.round(safePrice * (1 - loanToValue / 100)));
     setDepositZAR(updatedDeposit);
+    updateAnalyzerDraft({ purchasePrice: safePrice, depositZAR: updatedDeposit });
   };
 
   const handleDepositChange = (val: number) => {
@@ -100,8 +122,10 @@ export default function OpportunityAnalyzerPage() {
     if (purchasePrice > 0) {
       const calculatedLTV = Math.max(0, Math.min(100, Math.round(((purchasePrice - safeDeposit) / purchasePrice) * 100)));
       setLoanToValue(calculatedLTV);
+      updateAnalyzerDraft({ depositZAR: safeDeposit, loanToValue: calculatedLTV });
     } else {
       setLoanToValue(0);
+      updateAnalyzerDraft({ depositZAR: safeDeposit, loanToValue: 0 });
     }
   };
 
@@ -111,6 +135,7 @@ export default function OpportunityAnalyzerPage() {
     // Recalculate Deposit: purchasePrice * (1 - LTV / 100)
     const calculatedDeposit = Math.max(0, Math.round(purchasePrice * (1 - safeLTV / 100)));
     setDepositZAR(calculatedDeposit);
+    updateAnalyzerDraft({ loanToValue: safeLTV, depositZAR: calculatedDeposit });
   };
 
   // Manual Overrides
@@ -740,10 +765,14 @@ export default function OpportunityAnalyzerPage() {
                     <span className="absolute left-2.5 top-2 text-xs text-slate-400 font-bold">R</span>
                     <input
                       type="number"
-                      min="50000"
+                      min="0"
                       step="10000"
                       value={openMarketValue}
-                      onChange={(e) => setOpenMarketValue(Number(e.target.value))}
+                      onChange={(e) => {
+                        const val = Number(e.target.value);
+                        setOpenMarketValue(val);
+                        updateAnalyzerDraft({ openMarketValue: val });
+                      }}
                       className="w-full text-xs pl-7 pr-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-emerald-500 font-semibold text-slate-900 bg-white"
                     />
                   </div>
@@ -759,7 +788,7 @@ export default function OpportunityAnalyzerPage() {
                     <span className="absolute left-2.5 top-2 text-xs text-slate-400 font-bold">R</span>
                     <input
                       type="number"
-                      min="50000"
+                      min="0"
                       step="10000"
                       value={purchasePrice}
                       onChange={(e) => handlePurchasePriceChange(Number(e.target.value))}
@@ -816,7 +845,11 @@ export default function OpportunityAnalyzerPage() {
                     min="0"
                     step="5000"
                     value={rehabCost}
-                    onChange={(e) => setRehabCost(Number(e.target.value))}
+                    onChange={(e) => {
+                      const val = Number(e.target.value);
+                      setRehabCost(val);
+                      updateAnalyzerDraft({ rehabCost: val });
+                    }}
                     className="w-full text-xs pl-7 pr-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-emerald-500 font-semibold text-slate-900 bg-white"
                   />
                 </div>
@@ -831,7 +864,11 @@ export default function OpportunityAnalyzerPage() {
                     min="0"
                     step="500"
                     value={monthlyRent}
-                    onChange={(e) => setMonthlyRent(Number(e.target.value))}
+                    onChange={(e) => {
+                      const val = Number(e.target.value);
+                      setMonthlyRent(val);
+                      updateAnalyzerDraft({ monthlyRent: val });
+                    }}
                     className="w-full text-xs pl-7 pr-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-emerald-500 font-semibold text-slate-900 bg-white"
                   />
                 </div>
@@ -856,7 +893,11 @@ export default function OpportunityAnalyzerPage() {
                     step="100"
                     disabled={propertyType === 'Freehold House'}
                     value={propertyType === 'Freehold House' ? 0 : monthlyLevies}
-                    onChange={(e) => setMonthlyLevies(Number(e.target.value))}
+                    onChange={(e) => {
+                      const val = Number(e.target.value);
+                      setMonthlyLevies(val);
+                      updateAnalyzerDraft({ monthlyLevies: val });
+                    }}
                     className={`w-full text-xs pl-7 pr-3 py-2 border rounded-lg font-semibold ${
                       propertyType === 'Freehold House'
                         ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'
@@ -875,7 +916,11 @@ export default function OpportunityAnalyzerPage() {
                     min="0"
                     step="50"
                     value={monthlyRates}
-                    onChange={(e) => setMonthlyRates(Number(e.target.value))}
+                    onChange={(e) => {
+                      const val = Number(e.target.value);
+                      setMonthlyRates(val);
+                      updateAnalyzerDraft({ monthlyRates: val });
+                    }}
                     className="w-full text-xs pl-7 pr-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-emerald-500 font-semibold text-slate-900 bg-white"
                   />
                 </div>
@@ -888,10 +933,14 @@ export default function OpportunityAnalyzerPage() {
                   <input
                     type="number"
                     min="0"
-                    step="25000"
+                    step="10000"
                     value={targetExitPrice}
-                    onChange={(e) => setTargetExitPrice(Number(e.target.value))}
-                    className="w-full text-xs pl-7 pr-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-emerald-500 font-semibold text-emerald-700 bg-white"
+                    onChange={(e) => {
+                      const val = Number(e.target.value);
+                      setTargetExitPrice(val);
+                      updateAnalyzerDraft({ targetExitPrice: val });
+                    }}
+                    className="w-full text-xs pl-7 pr-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-emerald-500 font-semibold text-slate-900 bg-white"
                   />
                 </div>
               </div>
@@ -928,7 +977,11 @@ export default function OpportunityAnalyzerPage() {
                     </label>
                     <button
                       type="button"
-                      onClick={() => setAuctioneerCommission(Math.round(purchasePrice * 0.10 * 1.15))}
+                      onClick={() => {
+                        const fee = Math.round(purchasePrice * 0.10 * 1.15);
+                        setAuctioneerCommission(fee);
+                        updateAnalyzerDraft({ auctioneerCommission: fee });
+                      }}
                       className="text-[10px] text-amber-900 hover:text-amber-950 font-bold bg-amber-100/90 hover:bg-amber-200 px-2 py-0.5 rounded border border-amber-300 transition-colors cursor-pointer"
                       title="Auto-calculate standard SA auction commission: 10% + 15% VAT = 11.5% of hammer price"
                     >
@@ -942,7 +995,11 @@ export default function OpportunityAnalyzerPage() {
                       min="0"
                       step="5000"
                       value={auctioneerCommission || ''}
-                      onChange={(e) => setAuctioneerCommission(Number(e.target.value))}
+                      onChange={(e) => {
+                        const val = Number(e.target.value);
+                        setAuctioneerCommission(val);
+                        updateAnalyzerDraft({ auctioneerCommission: val });
+                      }}
                       placeholder="0"
                       className="w-full text-xs pl-7 pr-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-amber-500 font-semibold text-slate-900 bg-white"
                     />
@@ -969,7 +1026,11 @@ export default function OpportunityAnalyzerPage() {
                       min="0"
                       step="5000"
                       value={municipalArrears || ''}
-                      onChange={(e) => setMunicipalArrears(Number(e.target.value))}
+                      onChange={(e) => {
+                        const val = Number(e.target.value);
+                        setMunicipalArrears(val);
+                        updateAnalyzerDraft({ municipalArrears: val });
+                      }}
                       placeholder="0"
                       className="w-full text-xs pl-7 pr-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-amber-500 font-semibold text-slate-900 bg-white"
                     />
@@ -1457,21 +1518,42 @@ export default function OpportunityAnalyzerPage() {
 
         {/* Opportunity Pipeline List */}
         <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-xs">
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
             <div>
               <h3 className="text-base font-bold text-slate-900">Active Deal Sourcing Pipeline</h3>
               <p className="text-xs text-slate-500">
                 Track candidates, promote them to live Flips or Rentals, or generate a lender pitch proposal.
               </p>
             </div>
-            <span className="text-xs font-semibold text-slate-600 bg-slate-100 px-3 py-1 rounded-full">
-              {opportunities.length} Pipeline Deals
-            </span>
+            <div className="flex items-center gap-2">
+              {opportunities.length > 0 && (
+                <button
+                  onClick={() => exportOpportunitiesCSV(opportunities)}
+                  title="Download deal sourcing pipeline as CSV"
+                  className="inline-flex items-center gap-1.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 text-xs font-semibold px-3 py-1.5 rounded-lg shadow-2xs transition-colors cursor-pointer"
+                >
+                  <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>Export Pipeline (CSV)</span>
+                </button>
+              )}
+              <span className="text-xs font-semibold text-slate-600 bg-slate-100 px-3 py-1 rounded-full">
+                {opportunities.length} Pipeline Deals
+              </span>
+            </div>
           </div>
 
           <div className="space-y-4">
-            {opportunities.map((deal) => {
-              const openMarket = deal.openMarketValueZAR || Math.round(deal.purchasePrice * 1.2);
+            {opportunities.length === 0 ? (
+              <div className="p-8 text-center rounded-xl border border-dashed border-slate-200 bg-slate-50/60">
+                <Calculator className="w-8 h-8 text-slate-400 mx-auto mb-2" />
+                <h4 className="text-sm font-bold text-slate-800">No deals in sourcing pipeline</h4>
+                <p className="text-xs text-slate-400 mt-1 max-w-md mx-auto">
+                  Use the South African deal analyzer form above to model purchase price, bond leverage, transfer duty, and projected returns, then save candidates to your pipeline.
+                </p>
+              </div>
+            ) : (
+              opportunities.map((deal) => {
+                const openMarket = deal.openMarketValueZAR || Math.round(deal.purchasePrice * 1.2);
               const builtInEquity = deal.builtInEquityZAR ?? (openMarket - deal.purchasePrice);
               const builtInPercent = deal.builtInEquityPercent ?? Number(((builtInEquity / openMarket) * 100).toFixed(1));
               const scorecard = deal.amenityScorecard ?? {
@@ -1709,8 +1791,9 @@ export default function OpportunityAnalyzerPage() {
                 </div>
               </div>
             );
-          })}
-          </div>
+          })
+        )}
+        </div>
         </div>
       </main>
     </div>

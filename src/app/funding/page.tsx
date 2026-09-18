@@ -14,11 +14,13 @@ import {
   CreditCard,
   ShieldCheck,
   Building,
-  Trash2,
   CheckCircle,
   Clock,
   Wallet,
+  Trash2,
+  FileSpreadsheet,
 } from 'lucide-react';
+import { exportFundingCSV } from '@/lib/export/csvExport';
 
 export default function FundingTrackerPage() {
   const funding = usePortfolioStore((state) => state.funding);
@@ -113,13 +115,25 @@ export default function FundingTrackerPage() {
         title="Funding & Capital Tracker"
         subtitle="Centralized ledger managing private debt, syndicate equity splits, and loan repayments"
         actionButton={
-          <button
-            onClick={() => setShowAddModal(true)}
-            className="inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold px-3 py-2 rounded-lg shadow-sm transition-colors"
-          >
-            <PlusCircle className="w-3.5 h-3.5" />
-            Add Capital Source
-          </button>
+          <div className="flex items-center gap-2">
+            {funding.length > 0 && (
+              <button
+                onClick={() => exportFundingCSV(funding)}
+                title="Download funding ledger as CSV"
+                className="inline-flex items-center gap-1.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 text-xs font-semibold px-3 py-2 rounded-lg shadow-2xs transition-colors cursor-pointer"
+              >
+                <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
+                <span>Export CSV</span>
+              </button>
+            )}
+            <button
+              onClick={() => setShowAddModal(true)}
+              className="inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold px-3 py-2 rounded-lg shadow-sm transition-colors cursor-pointer"
+            >
+              <PlusCircle className="w-3.5 h-3.5" />
+              <span>Add Capital Source</span>
+            </button>
+          </div>
         }
       />
 
@@ -228,8 +242,16 @@ export default function FundingTrackerPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-slate-700">
-                {funding.map((item) => {
-                  const balance = Math.max(0, item.capitalAmountZAR - item.totalRepaidZAR);
+                {funding.length === 0 ? (
+                  <tr>
+                    <td colSpan={9} className="p-8 text-center text-slate-400 bg-slate-50/50">
+                      <p className="text-xs font-semibold text-slate-700">No funding sources registered yet</p>
+                      <p className="text-[11px] text-slate-400 mt-0.5">Click &quot;Add Capital Source&quot; above to register private lenders, JV syndicate partners, or bank facilities.</p>
+                    </td>
+                  </tr>
+                ) : (
+                  funding.map((item) => {
+                    const balance = Math.max(0, item.capitalAmountZAR - item.totalRepaidZAR);
                   return (
                     <tr key={item.id} className="hover:bg-slate-50/70 transition-colors">
                       <td className="p-3.5 pl-5">
@@ -302,7 +324,8 @@ export default function FundingTrackerPage() {
                       </td>
                     </tr>
                   );
-                })}
+                })
+              )}
               </tbody>
             </table>
           </div>

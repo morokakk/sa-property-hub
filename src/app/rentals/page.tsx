@@ -25,11 +25,13 @@ import {
   FileCheck2,
   Edit3,
   MessageCircle,
-  Coins,
   Archive,
   RotateCcw,
   CheckCircle2,
+  Coins,
+  FileSpreadsheet,
 } from 'lucide-react';
+import { exportRentalsCSV } from '@/lib/export/csvExport';
 
 export function renderPropertyTypeBadge(type?: PropertyTitleType) {
   switch (type) {
@@ -398,13 +400,23 @@ export default function RentalPortfolioPage() {
         title="Rental Portfolio"
         subtitle="Manage active income properties, tenant leases, trust deposits, and maintenance histories"
         actionButton={
-          <button
-            onClick={handleOpenAdd}
-            className="inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold px-3 py-2 rounded-lg shadow-sm transition-colors cursor-pointer"
-          >
-            <PlusCircle className="w-3.5 h-3.5" />
-            Add Rental Property
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => exportRentalsCSV(activeRentals)}
+              title="Download active rentals register as CSV"
+              className="inline-flex items-center gap-1.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 text-xs font-semibold px-3 py-2 rounded-lg shadow-2xs transition-colors cursor-pointer"
+            >
+              <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
+              <span>Export CSV</span>
+            </button>
+            <button
+              onClick={handleOpenAdd}
+              className="inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold px-3 py-2 rounded-lg shadow-sm transition-colors cursor-pointer"
+            >
+              <PlusCircle className="w-3.5 h-3.5" />
+              <span>Add Rental Property</span>
+            </button>
+          </div>
         }
       />
 

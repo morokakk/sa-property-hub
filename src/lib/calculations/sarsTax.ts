@@ -90,6 +90,20 @@ export function computeAcquisitionCosts(
     customBondReg?: number;
   }
 ): AcquisitionCostBreakdown {
+  if (purchasePrice <= 0) {
+    return {
+      purchasePrice: 0,
+      transferDuty: 0,
+      conveyancingFee: 0,
+      bondRegistrationFee: 0,
+      deedsOfficeFee: 0,
+      ficaSundries: 0,
+      totalAcquisitionCost: 0,
+      isTransferDutyOverridden: false,
+      isConveyancingOverridden: false,
+    };
+  }
+
   const bondAmount = (purchasePrice * loanToValuePercent) / 100;
   
   const transferDuty = overrides?.customTransferDuty !== undefined

@@ -7,6 +7,7 @@ import {
   TaskItem,
   InvestorProfile,
   PropertyTitleType,
+  AnalyzerDraft,
 } from '@/types';
 import { computeAcquisitionCosts, calculateSection13sex } from '@/lib/calculations/sarsTax';
 import {
@@ -857,4 +858,32 @@ export const INITIAL_INVESTOR_PROFILE: InvestorProfile = {
   defaultPrimeRatePercent: 11.75,
   baselineHurdleYieldPercent: 10.0,
   defaultAgentCommissionPercent: 5.0,
+};
+
+export const INITIAL_ANALYZER_DRAFT: AnalyzerDraft = {
+  openMarketValue: 2_150_000,
+  purchasePrice: 1_800_000,
+  rehabCost: 200_000,
+  monthlyRent: 16_500,
+  monthlyLevies: 1_650,
+  monthlyRates: 1_100,
+  targetExitPrice: 2_450_000,
+  auctioneerCommission: 0,
+  municipalArrears: 0,
+  depositZAR: 0,
+  loanToValue: 100,
+};
+
+export const EMPTY_ANALYZER_DRAFT: AnalyzerDraft = {
+  openMarketValue: 0,
+  purchasePrice: 0,
+  rehabCost: 0,
+  monthlyRent: 0,
+  monthlyLevies: 0,
+  monthlyRates: 0,
+  targetExitPrice: 0,
+  auctioneerCommission: 0,
+  municipalArrears: 0,
+  depositZAR: 0,
+  loanToValue: 0,
 };
