@@ -461,7 +461,7 @@ export function computePortfolioSummary(state: {
     if (r.managementType === 'Agency') {
       if (typeof r.agencyCommissionPercent === 'number' && r.agencyCommissionPercent > 0) {
         const base = gross * (r.agencyCommissionPercent / 100);
-        const vat = r.agencyVatApplicable ? 1.15 : 1.0;
+        const vat = r.agencyVatApplicable !== false ? 1.15 : 1.0;
         agentFee = Math.round(base * vat);
       } else {
         agentFee = r.monthlyAgentFeeZAR || 0;

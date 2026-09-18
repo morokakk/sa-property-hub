@@ -204,7 +204,7 @@ export function calculateRentalCashflow(property: {
   if (property.managementType === 'Agency') {
     if (typeof property.agencyCommissionPercent === 'number' && property.agencyCommissionPercent > 0) {
       const baseCommission = gross * (property.agencyCommissionPercent / 100);
-      const vatMultiplier = property.agencyVatApplicable ? 1.15 : 1.0;
+      const vatMultiplier = property.agencyVatApplicable !== false ? 1.15 : 1.0;
       agencyCommissionZAR = Math.round(baseCommission * vatMultiplier);
     } else {
       agencyCommissionZAR = property.monthlyAgentFeeZAR || 0;

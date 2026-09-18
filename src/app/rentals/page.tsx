@@ -115,7 +115,7 @@ export default function RentalPortfolioPage() {
   const [managementType, setManagementType] = useState<'Self-Managed' | 'Agency'>('Agency');
   const [agencyName, setAgencyName] = useState('Pam Golding Sandton');
   const [agencyCommissionPercent, setAgencyCommissionPercent] = useState(8.0);
-  const [agencyVatApplicable, setAgencyVatApplicable] = useState(false);
+  const [agencyVatApplicable, setAgencyVatApplicable] = useState(true);
   const [agencyContact, setAgencyContact] = useState('+27 82 555 1234');
 
   const handleOpenAdd = () => {
@@ -137,7 +137,7 @@ export default function RentalPortfolioPage() {
     setManagementType('Agency');
     setAgencyName('Pam Golding Sandton');
     setAgencyCommissionPercent(8.0);
-    setAgencyVatApplicable(false);
+    setAgencyVatApplicable(true);
     setAgencyContact('+27 82 555 1234');
     setShowRentalModal(true);
   };
@@ -161,7 +161,7 @@ export default function RentalPortfolioPage() {
     setManagementType(property.managementType || 'Self-Managed');
     setAgencyName(property.agencyName || 'Pam Golding');
     setAgencyCommissionPercent(property.agencyCommissionPercent ?? 8.0);
-    setAgencyVatApplicable(property.agencyVatApplicable || false);
+    setAgencyVatApplicable(property.agencyVatApplicable !== false);
     setAgencyContact(property.agencyContact || '');
     setShowRentalModal(true);
   };
@@ -173,7 +173,7 @@ export default function RentalPortfolioPage() {
     // Approximate monthly bond payment (11.75% over 20 yrs ~ 1.08% of loan)
     const estBondPayment = bondBalance > 0 ? Math.round(bondBalance * 0.0108) : 0;
     const baseComm = managementType === 'Agency' ? monthlyGrossRent * (agencyCommissionPercent / 100) : 0;
-    const agentFee = Math.round(baseComm * (agencyVatApplicable ? 1.15 : 1.0));
+    const agentFee = Math.round(baseComm * (agencyVatApplicable !== false ? 1.15 : 1.0));
 
     if (editingRentalId) {
       updateRental(editingRentalId, {
@@ -347,7 +347,7 @@ export default function RentalPortfolioPage() {
                       {property.managementType === 'Agency' ? (
                         <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200">
                           <Building2 className="w-3 h-3 text-indigo-600" />
-                          <span>🏢 Managed: {property.agencyName || 'Agency'} ({property.agencyCommissionPercent || 8}%{property.agencyVatApplicable ? ' + VAT' : ''})</span>
+                          <span>🏢 Managed: {property.agencyName || 'Agency'} ({property.agencyCommissionPercent || 8}%{property.agencyVatApplicable !== false ? ` + VAT = ${((property.agencyCommissionPercent || 8) * 1.15).toFixed(1)}%` : ''})</span>
                         </span>
                       ) : (
                         <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200">
@@ -476,7 +476,7 @@ export default function RentalPortfolioPage() {
                           <div className="flex justify-between text-slate-700 font-medium bg-indigo-50/60 px-2 py-1 rounded border border-indigo-100">
                             <span className="flex items-center gap-1 text-[11px]">
                               <Building2 className="w-3 h-3 text-indigo-600" />
-                              Agency Fee ({property.agencyCommissionPercent || 8}%{property.agencyVatApplicable ? ' + VAT' : ''} - {property.agencyName || 'Agent'}):
+                              Agency Fee ({property.agencyCommissionPercent || 8}%{property.agencyVatApplicable !== false ? ' + 15% VAT' : ''} - {property.agencyName || 'Agent'}):
                             </span>
                             <span className="text-rose-600 font-semibold">- {formatZAR(agencyCommissionZAR)}</span>
                           </div>
