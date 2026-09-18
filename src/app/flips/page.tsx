@@ -28,6 +28,7 @@ import {
   Archive,
   RotateCcw,
   Sparkles,
+  Coins,
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -64,6 +65,19 @@ export default function FlipsManagerPage() {
   const [showAddFlipModal, setShowAddFlipModal] = useState(false);
   const [showSupplierModal, setShowSupplierModal] = useState(false);
   const [showExitModal, setShowExitModal] = useState(false);
+  const [showFundingModal, setShowFundingModal] = useState(false);
+
+  // Funding Campaign Modal State
+  const [fundingRequired, setFundingRequired] = useState<number>(0);
+  const [capitalRaised, setCapitalRaised] = useState<number>(0);
+  const [primaryFunderName, setPrimaryFunderName] = useState('');
+  const [primaryFunderContact, setPrimaryFunderContact] = useState('');
+  const [primaryFunderType, setPrimaryFunderType] = useState<FlipProject['primaryFunderType']>('Private Lender');
+  const [coFundersNotes, setCoFundersNotes] = useState('');
+  const [promisedReturnType, setPromisedReturnType] = useState<FlipProject['promisedReturnType']>('Fixed Interest');
+  const [promisedReturnRatePercent, setPromisedReturnRatePercent] = useState<number>(14);
+  const [promisedPayoutSchedule, setPromisedPayoutSchedule] = useState<FlipProject['promisedPayoutSchedule']>('Monthly Interest');
+  const [securityOffered, setSecurityOffered] = useState('2nd Mortgage Bond registered over title deed');
 
   // Exit Modal State
   const [exitSalePrice, setExitSalePrice] = useState<number>(0);
@@ -147,6 +161,12 @@ export default function FlipsManagerPage() {
       targetCompletionDate: newFlipCompletionDate,
       currentPhase: 'Acquisition & Conveyancing',
       linkedFundingIds: [],
+      fundingRequiredZAR: Math.round((newFlipPurchasePrice + newFlipAcquisitionCosts + newFlipRenovationBudget) * 0.7),
+      capitalRaisedZAR: 0,
+      promisedReturnType: 'Fixed Interest',
+      promisedReturnRatePercent: 14.0,
+      promisedPayoutSchedule: 'Monthly Interest',
+      securityOffered: '2nd Mortgage Bond registered over title deed',
       status: 'Active',
       boq: [],
     };
@@ -209,6 +229,54 @@ export default function FlipsManagerPage() {
     (f) => f.linkedDealId === activeFlip?.id || (activeFlip?.linkedFundingIds || []).includes(f.id)
   );
   const totalCapitalSecured = linkedFunding.reduce((sum, f) => sum + f.capitalAmountZAR, 0);
+
+  // Funding Campaign Calculations
+  const fundingRequiredVal = activeFlip?.fundingRequiredZAR ?? Math.round(totalCostBasis * 0.7);
+  const capitalRaisedVal = activeFlip?.capitalRaisedZAR ?? totalCapitalSecured;
+  const capitalRemainingVal = Math.max(0, fundingRequiredVal - capitalRaisedVal);
+  const fundingProgressPercent = fundingRequiredVal > 0 ? Math.min(100, Math.round((capitalRaisedVal / fundingRequiredVal) * 100)) : 0;
+
+  const openFundingModal = () => {
+    if (!activeFlip) return;
+    const defaultRequired = activeFlip.fundingRequiredZAR ?? Math.round(totalCostBasis * 0.7);
+    const defaultRaised = activeFlip.capitalRaisedZAR ?? totalCapitalSecured;
+    setFundingRequired(defaultRequired);
+    setCapitalRaised(defaultRaised);
+    setPrimaryFunderName(activeFlip.primaryFunderName || '');
+    setPrimaryFunderContact(activeFlip.primaryFunderContact || '');
+    setPrimaryFunderType(activeFlip.primaryFunderType || 'Private Lender');
+    setCoFundersNotes(activeFlip.coFundersNotes || '');
+    setPromisedReturnType(activeFlip.promisedReturnType || 'Fixed Interest');
+    setPromisedReturnRatePercent(activeFlip.promisedReturnRatePercent ?? 14);
+    setPromisedPayoutSchedule(activeFlip.promisedPayoutSchedule || 'Monthly Interest');
+    setSecurityOffered(activeFlip.securityOffered || '2nd Mortgage Bond registered over title deed');
+    setShowFundingModal(true);
+  };
+
+  const handleSaveFunding = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!activeFlip) return;
+    updateFlip(activeFlip.id, {
+      fundingRequiredZAR: Number(fundingRequired),
+      capitalRaisedZAR: Number(capitalRaised),
+      primaryFunderName: primaryFunderName.trim() || undefined,
+      primaryFunderContact: primaryFunderContact.trim() || undefined,
+      primaryFunderType,
+      coFundersNotes: coFundersNotes.trim() || undefined,
+      promisedReturnType,
+      promisedReturnRatePercent: Number(promisedReturnRatePercent),
+      promisedPayoutSchedule,
+      securityOffered: securityOffered.trim() || undefined,
+    });
+    setShowFundingModal(false);
+  };
+
+  const handleSyncLedgerToDeal = () => {
+    if (!activeFlip) return;
+    updateFlip(activeFlip.id, {
+      capitalRaisedZAR: totalCapitalSecured,
+    });
+  };
 
   return (
     <div className="flex-1 flex flex-col">
@@ -442,31 +510,153 @@ export default function FlipsManagerPage() {
                   </div>
                 </div>
 
-                {/* Dynamic Funding Utilization Linked Section */}
-                <div className="p-4 bg-slate-900 text-white rounded-xl shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-semibold text-emerald-400 uppercase tracking-wider">
-                        Funding & Capital Utilization
-                      </span>
-                      <span className="text-[10px] bg-slate-800 px-2 py-0.5 rounded text-slate-300">
-                        Linked to Capital Tracker
-                      </span>
+                {/* Funding Campaign & Investor Returns Section */}
+                <div className="bg-slate-900 text-white rounded-xl shadow-xs border border-slate-800 overflow-hidden">
+                  <div className="p-4 sm:p-5 border-b border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div className="flex items-center gap-2.5">
+                      <div className="p-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
+                        <Coins className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h3 className="text-sm font-bold text-white tracking-wide">
+                            Funding Campaign & Capital Progress
+                          </h3>
+                          <span className="text-[10px] bg-slate-800 px-2 py-0.5 rounded text-emerald-400 font-semibold border border-slate-700">
+                            {fundingProgressPercent}% Raised
+                          </span>
+                        </div>
+                        <p className="text-xs text-slate-400 mt-0.5">
+                          Track target facility, capital secured to date, lead funder, and promised return structure
+                        </p>
+                      </div>
                     </div>
-                    <p className="text-xs text-slate-300 mt-1">
-                      {linkedFunding.length > 0
-                        ? `Backed by: ${linkedFunding.map((f) => `${f.lenderName} (${formatZAR(f.capitalAmountZAR)})`).join(', ')}`
-                        : 'No specific private lender tranche tagged to this flip yet.'}
-                    </p>
+
+                    <div className="flex items-center gap-2 self-start sm:self-auto">
+                      <button
+                        onClick={handleSyncLedgerToDeal}
+                        className="px-2.5 py-1.5 text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer"
+                        title="Sync 'Capital Raised' with active linked ledger tranches"
+                      >
+                        <RotateCcw className="w-3.5 h-3.5 text-slate-400" />
+                        <span>Sync from Ledger</span>
+                      </button>
+                      <button
+                        onClick={openFundingModal}
+                        className="px-3 py-1.5 text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg shadow-sm transition-colors cursor-pointer"
+                      >
+                        Edit Funding Terms
+                      </button>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-4">
-                    <div className="text-right">
-                      <span className="text-[10px] text-slate-400 block">Capital Secured</span>
-                      <span className="text-sm font-bold text-emerald-400">{formatZAR(totalCapitalSecured)}</span>
+
+                  <div className="p-4 sm:p-5 space-y-4">
+                    {/* Metrics Grid */}
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                      <div className="bg-slate-800/60 p-3 rounded-lg border border-slate-800">
+                        <span className="text-[10px] uppercase font-bold text-slate-400 block">Funding Required</span>
+                        <div className="text-base sm:text-lg font-extrabold text-white mt-0.5">
+                          {formatZAR(fundingRequiredVal)}
+                        </div>
+                        <span className="text-[9px] text-slate-400">Target raise facility</span>
+                      </div>
+
+                      <div className="bg-slate-800/60 p-3 rounded-lg border border-slate-800">
+                        <span className="text-[10px] uppercase font-bold text-emerald-400 block">Capital Raised</span>
+                        <div className="text-base sm:text-lg font-extrabold text-emerald-400 mt-0.5">
+                          {formatZAR(capitalRaisedVal)}
+                        </div>
+                        <span className="text-[9px] text-slate-400">Managed to raise</span>
+                      </div>
+
+                      <div className="bg-slate-800/60 p-3 rounded-lg border border-slate-800">
+                        <span className="text-[10px] uppercase font-bold text-amber-400 block">Remaining Required</span>
+                        <div className="text-base sm:text-lg font-extrabold text-amber-400 mt-0.5">
+                          {formatZAR(capitalRemainingVal)}
+                        </div>
+                        <span className="text-[9px] text-slate-400">
+                          {capitalRemainingVal === 0 ? 'Fully funded! 🎉' : 'Still to secure'}
+                        </span>
+                      </div>
+
+                      <div className="bg-slate-800/60 p-3 rounded-lg border border-slate-800">
+                        <span className="text-[10px] uppercase font-bold text-slate-400 block">Cost Basis Drawn</span>
+                        <div className="text-base sm:text-lg font-extrabold text-slate-200 mt-0.5">
+                          {formatZAR(totalCostBasis)}
+                        </div>
+                        <span className="text-[9px] text-slate-400">Purchase + legal + spend</span>
+                      </div>
                     </div>
-                    <div className="text-right">
-                      <span className="text-[10px] text-slate-400 block">Funds Drawn (Cost Basis)</span>
-                      <span className="text-sm font-bold text-white">{formatZAR(totalCostBasis)}</span>
+
+                    {/* Visual Progress Bar */}
+                    <div>
+                      <div className="flex items-center justify-between text-xs mb-1.5">
+                        <span className="font-semibold text-slate-300 text-[11px]">Fundraising Progress</span>
+                        <span className="font-extrabold text-emerald-400 text-xs">
+                          {formatZAR(capitalRaisedVal)} / {formatZAR(fundingRequiredVal)} ({fundingProgressPercent}%)
+                        </span>
+                      </div>
+                      <div className="w-full bg-slate-800 h-2.5 rounded-full overflow-hidden border border-slate-700/60">
+                        <div
+                          className={`h-full transition-all duration-500 rounded-full ${
+                            fundingProgressPercent >= 100
+                              ? 'bg-gradient-to-r from-emerald-500 to-teal-400'
+                              : 'bg-gradient-to-r from-emerald-600 to-indigo-500'
+                          }`}
+                          style={{ width: `${Math.min(100, Math.max(0, fundingProgressPercent))}%` }}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Primary Funder & Promised Terms Detailed Bar */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2">
+                      <div className="bg-slate-800/40 p-3 rounded-lg border border-slate-700/60 space-y-1">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] uppercase tracking-wider font-bold text-slate-400">
+                            Primary Funder / Syndicate Lead
+                          </span>
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-950/80 text-emerald-300 border border-emerald-800/60">
+                            {activeFlip.primaryFunderType || 'Private Lender'}
+                          </span>
+                        </div>
+                        <div className="text-sm font-bold text-white">
+                          {activeFlip.primaryFunderName || 'No Lead Funder Assigned'}
+                        </div>
+                        {activeFlip.primaryFunderContact && (
+                          <div className="text-[11px] text-slate-400">
+                            {activeFlip.primaryFunderContact}
+                          </div>
+                        )}
+                        {activeFlip.coFundersNotes && (
+                          <div className="text-[10px] text-indigo-300 italic pt-0.5">
+                            Co-funders: {activeFlip.coFundersNotes}
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="bg-slate-800/40 p-3 rounded-lg border border-slate-700/60 space-y-1">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] uppercase tracking-wider font-bold text-slate-400">
+                            Promised Return & Collateral
+                          </span>
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-indigo-950/80 text-indigo-300 border border-indigo-800/60">
+                            {activeFlip.promisedReturnType || 'Fixed Interest'}
+                          </span>
+                        </div>
+                        <div className="text-sm font-bold text-emerald-400">
+                          {activeFlip.promisedReturnRatePercent ?? 14}%{' '}
+                          {activeFlip.promisedReturnType === 'Fixed Interest'
+                            ? 'p.a. Fixed Interest'
+                            : activeFlip.promisedReturnType === 'Equity Profit Split'
+                            ? 'Net Flip Profit Split'
+                            : activeFlip.promisedReturnType || 'Fixed Interest'}
+                        </div>
+                        <div className="text-[11px] text-slate-300 flex flex-wrap items-center gap-x-2">
+                          <span>Payout: {activeFlip.promisedPayoutSchedule || 'Monthly Interest'}</span>
+                          <span>•</span>
+                          <span className="text-slate-400">{activeFlip.securityOffered || '2nd Mortgage Bond registered'}</span>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -1358,6 +1548,163 @@ export default function FlipsManagerPage() {
                 </div>
               </form>
             </div>
+          </div>
+        </div>
+      )}
+      {/* Edit Funding Campaign Modal */}
+      {showFundingModal && activeFlip && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-xl max-w-lg w-full p-6 shadow-xl border border-slate-200">
+            <h3 className="text-base font-bold text-slate-900 mb-4 flex items-center gap-2">
+              <Coins className="w-5 h-5 text-emerald-600" />
+              Edit Deal Funding Campaign & Investor Terms
+            </h3>
+
+            <form onSubmit={handleSaveFunding} className="space-y-4 text-xs">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Target Facility (ZAR) *</label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="50000"
+                    required
+                    value={fundingRequired}
+                    onChange={(e) => setFundingRequired(Number(e.target.value))}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg font-bold text-slate-900"
+                  />
+                  <span className="text-[10px] text-slate-400">Total capital needed</span>
+                </div>
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Capital Raised to Date (ZAR)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="50000"
+                    value={capitalRaised}
+                    onChange={(e) => setCapitalRaised(Number(e.target.value))}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg font-bold text-emerald-700"
+                  />
+                  <span className="text-[10px] text-slate-400">Managed to raise so far</span>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Primary Funder Name</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Johan Meyer"
+                    value={primaryFunderName}
+                    onChange={(e) => setPrimaryFunderName(e.target.value)}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg"
+                  />
+                </div>
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Funder Category</label>
+                  <select
+                    value={primaryFunderType}
+                    onChange={(e) => setPrimaryFunderType(e.target.value as any)}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white"
+                  >
+                    <option value="Private Lender">Private Lender (Angel / HNW)</option>
+                    <option value="Syndicate JV Partner">Syndicate JV Partner</option>
+                    <option value="Friends & Family">Friends & Family</option>
+                    <option value="Equity Partner">Equity Partner</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">Funder Contact / Trust Info</label>
+                <input
+                  type="text"
+                  placeholder="e.g. Meyer Family Trust / +27 82 555 1234"
+                  value={primaryFunderContact}
+                  onChange={(e) => setPrimaryFunderContact(e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Promised Return Structure</label>
+                  <select
+                    value={promisedReturnType}
+                    onChange={(e) => setPromisedReturnType(e.target.value as any)}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white"
+                  >
+                    <option value="Fixed Interest">Fixed Interest (% p.a.)</option>
+                    <option value="Equity Profit Split">Equity Profit Split (% of Net Flip)</option>
+                    <option value="Monthly Coupon">Monthly Coupon</option>
+                    <option value="Bullet Repayment">Bullet Repayment</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Promised Rate / Split (%)</label>
+                  <input
+                    type="number"
+                    step="0.5"
+                    value={promisedReturnRatePercent}
+                    onChange={(e) => setPromisedReturnRatePercent(Number(e.target.value))}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg font-bold text-emerald-700"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Payout Schedule</label>
+                  <select
+                    value={promisedPayoutSchedule}
+                    onChange={(e) => setPromisedPayoutSchedule(e.target.value as any)}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white"
+                  >
+                    <option value="Monthly Interest">Monthly Interest</option>
+                    <option value="Quarterly">Quarterly</option>
+                    <option value="At Exit (Maturity)">At Exit (Maturity / Transfer)</option>
+                    <option value="Bi-Annual">Bi-Annual</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Security / Collateral Offered</label>
+                  <input
+                    type="text"
+                    value={securityOffered}
+                    onChange={(e) => setSecurityOffered(e.target.value)}
+                    placeholder="e.g. 2nd Mortgage Bond registered"
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">Co-Funders / Syndicate Notes</label>
+                <input
+                  type="text"
+                  placeholder="e.g. R300k open tranche or co-funded with Piet"
+                  value={coFundersNotes}
+                  onChange={(e) => setCoFundersNotes(e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-200">
+                <button
+                  type="button"
+                  onClick={() => setShowFundingModal(false)}
+                  className="px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50 font-semibold cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-semibold cursor-pointer"
+                >
+                  Save Funding Campaign
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

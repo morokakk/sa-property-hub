@@ -138,6 +138,17 @@ export interface OpportunityDeal {
   monthlyCashFlow: number; // ZAR
   projectedFlipNetProfit: number; // ZAR
   projectedFlipRoi: number; // %
+  // Funding Campaign & Investor Terms
+  fundingRequiredZAR?: number;
+  capitalRaisedZAR?: number;
+  primaryFunderName?: string;
+  primaryFunderContact?: string;
+  primaryFunderType?: 'Private Lender' | 'Syndicate JV Partner' | 'Friends & Family' | 'Equity Partner';
+  coFundersNotes?: string;
+  promisedReturnType?: 'Fixed Interest' | 'Equity Profit Split' | 'Monthly Coupon' | 'Bullet Repayment';
+  promisedReturnRatePercent?: number;
+  promisedPayoutSchedule?: 'Monthly Interest' | 'Quarterly' | 'At Exit (Maturity)' | 'Bi-Annual';
+  securityOffered?: string;
   status: 'Analyzing' | 'Offer Submitted' | 'Under Due Diligence' | 'Promoted to Flip' | 'Promoted to Rental' | 'Passed';
   notes?: string;
   createdAt: string;
@@ -215,6 +226,17 @@ export interface FlipProject {
   notes?: string;
   cocChecklist?: ComplianceCertificates;
   driveVault?: CloudDriveVault;
+  // Funding Campaign & Investor Terms
+  fundingRequiredZAR?: number;
+  capitalRaisedZAR?: number;
+  primaryFunderName?: string;
+  primaryFunderContact?: string;
+  primaryFunderType?: 'Private Lender' | 'Syndicate JV Partner' | 'Friends & Family' | 'Equity Partner';
+  coFundersNotes?: string;
+  promisedReturnType?: 'Fixed Interest' | 'Equity Profit Split' | 'Monthly Coupon' | 'Bullet Repayment';
+  promisedReturnRatePercent?: number;
+  promisedPayoutSchedule?: 'Monthly Interest' | 'Quarterly' | 'At Exit (Maturity)' | 'Bi-Annual';
+  securityOffered?: string;
   // Realized Sale / Exit Fields
   actualSalePriceZAR?: number;
   netCashProceedsZAR?: number;

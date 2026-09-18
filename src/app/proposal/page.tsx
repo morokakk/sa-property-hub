@@ -21,6 +21,8 @@ import {
   ShieldAlert,
   Stethoscope,
   ShoppingBag,
+  Check,
+  Save,
 } from 'lucide-react';
 
 function getSafeLogoUri(uri?: string): string {
@@ -47,6 +49,8 @@ function ProposalGeneratorContent() {
   const opportunities = usePortfolioStore((state) => state.opportunities);
   const suppliers = usePortfolioStore((state) => state.suppliers);
   const investorProfile = usePortfolioStore((state) => state.investorProfile);
+  const updateFlip = usePortfolioStore((state) => state.updateFlip);
+  const updateOpportunity = usePortfolioStore((state) => state.updateOpportunity);
 
   // Combine Flips and Opportunities as pitch candidates
   const allDeals = [
@@ -76,6 +80,16 @@ function ProposalGeneratorContent() {
       completionDate: f.targetCompletionDate,
       boq: f.boq,
       notes: f.notes,
+      fundingRequiredZAR: f.fundingRequiredZAR,
+      capitalRaisedZAR: f.capitalRaisedZAR,
+      primaryFunderName: f.primaryFunderName,
+      primaryFunderContact: f.primaryFunderContact,
+      primaryFunderType: f.primaryFunderType,
+      coFundersNotes: f.coFundersNotes,
+      promisedReturnType: f.promisedReturnType,
+      promisedReturnRatePercent: f.promisedReturnRatePercent,
+      promisedPayoutSchedule: f.promisedPayoutSchedule,
+      securityOffered: f.securityOffered,
     })),
     ...opportunities.map((o) => {
       const openMarket = o.openMarketValueZAR || Math.round(o.purchasePrice * 1.2);
@@ -109,6 +123,16 @@ function ProposalGeneratorContent() {
           .split('T')[0],
         boq: [],
         notes: `Sourced via ${o.source}. Gross Yield: ${o.grossYield}%, Cap Rate: ${o.capRate}%`,
+        fundingRequiredZAR: o.fundingRequiredZAR,
+        capitalRaisedZAR: o.capitalRaisedZAR,
+        primaryFunderName: o.primaryFunderName,
+        primaryFunderContact: o.primaryFunderContact,
+        primaryFunderType: o.primaryFunderType,
+        coFundersNotes: o.coFundersNotes,
+        promisedReturnType: o.promisedReturnType,
+        promisedReturnRatePercent: o.promisedReturnRatePercent,
+        promisedPayoutSchedule: o.promisedPayoutSchedule,
+        securityOffered: o.securityOffered,
       };
     }),
   ];
@@ -132,6 +156,46 @@ function ProposalGeneratorContent() {
   const [capitalRequested, setCapitalRequested] = useState<number>(
     deal ? Math.round((deal.purchasePrice + deal.acquisitionCosts + deal.renovationBudget) * 0.7) : 1000000
   );
+  const [isSavedFeedback, setIsSavedFeedback] = useState(false);
+
+  // Sync state when deal selection changes
+  useEffect(() => {
+    if (deal) {
+      const defaultCapital =
+        deal.fundingRequiredZAR ??
+        Math.round((deal.purchasePrice + deal.acquisitionCosts + deal.renovationBudget) * 0.7);
+      const defaultOfferType =
+        deal.promisedReturnType === 'Equity Profit Split' ? 'Profit Share' : 'Fixed Interest';
+      const defaultRate = deal.promisedReturnRatePercent ?? 14.5;
+      const defaultSec = deal.securityOffered ?? '2nd Mortgage Bond registered over title deed';
+      setCapitalRequested(defaultCapital);
+      setFundingOfferType(defaultOfferType);
+      setOfferedRate(defaultRate);
+      setSecurityType(defaultSec);
+    }
+  }, [selectedDealId]);
+
+  const handleSaveTermsToDeal = () => {
+    if (!deal) return;
+    const returnTypeToSave = fundingOfferType === 'Profit Share' ? 'Equity Profit Split' : 'Fixed Interest';
+    if (deal.type === 'flip') {
+      updateFlip(deal.id, {
+        fundingRequiredZAR: capitalRequested,
+        promisedReturnType: returnTypeToSave,
+        promisedReturnRatePercent: offeredRate,
+        securityOffered: securityType,
+      });
+    } else {
+      updateOpportunity(deal.id, {
+        fundingRequiredZAR: capitalRequested,
+        promisedReturnType: returnTypeToSave,
+        promisedReturnRatePercent: offeredRate,
+        securityOffered: securityType,
+      });
+    }
+    setIsSavedFeedback(true);
+    setTimeout(() => setIsSavedFeedback(false), 2500);
+  };
 
   // Financial calculations
   const totalProjectCost = (deal?.purchasePrice || 0) + (deal?.acquisitionCosts || 0) + (deal?.renovationBudget || 0);
@@ -236,6 +300,37 @@ function ProposalGeneratorContent() {
                 className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg"
               />
             </div>
+          </div>
+
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between pt-3 border-t border-slate-100 gap-2">
+            <div className="text-[11px] text-slate-500">
+              {deal.primaryFunderName ? (
+                <span>
+                  Assigned Lead Funder: <strong className="text-slate-800">{deal.primaryFunderName}</strong>{' '}
+                  <span className="text-slate-400">({deal.primaryFunderContact || 'Syndicate Lead'})</span>
+                </span>
+              ) : (
+                <span>No lead funder locked in yet. Pitch terms will update the deal&apos;s funding campaign.</span>
+              )}
+            </div>
+
+            <button
+              type="button"
+              onClick={handleSaveTermsToDeal}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold shadow-2xs transition-colors cursor-pointer self-start sm:self-auto"
+            >
+              {isSavedFeedback ? (
+                <>
+                  <Check className="w-3.5 h-3.5 text-emerald-200" />
+                  <span>Saved to Deal!</span>
+                </>
+              ) : (
+                <>
+                  <Save className="w-3.5 h-3.5" />
+                  <span>Save Terms to Deal</span>
+                </>
+              )}
+            </button>
           </div>
         </div>
 
@@ -491,6 +586,44 @@ function ProposalGeneratorContent() {
                   </tbody>
                 </table>
               </div>
+
+              {/* Campaign Progress Sub-Row */}
+              <div className="mt-3 p-3 bg-slate-50 border border-slate-200 rounded-lg flex flex-wrap items-center justify-between gap-3 text-xs">
+                <div>
+                  <span className="text-[10px] uppercase font-bold text-slate-500 block">
+                    Target Capital Raise
+                  </span>
+                  <span className="font-extrabold text-slate-900 text-sm">
+                    {formatZAR(deal.fundingRequiredZAR || capitalRequested)}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-[10px] uppercase font-bold text-emerald-800 block">
+                    Capital Secured to Date
+                  </span>
+                  <span className="font-extrabold text-emerald-700 text-sm">
+                    {formatZAR(deal.capitalRaisedZAR || 0)}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-[10px] uppercase font-bold text-amber-800 block">
+                    Remaining Tranche Open
+                  </span>
+                  <span className="font-extrabold text-amber-700 text-sm">
+                    {formatZAR(Math.max(0, (deal.fundingRequiredZAR || capitalRequested) - (deal.capitalRaisedZAR || 0)))}
+                  </span>
+                </div>
+                {deal.primaryFunderName && (
+                  <div>
+                    <span className="text-[10px] uppercase font-bold text-slate-500 block">
+                      Lead Syndicate Funder
+                    </span>
+                    <span className="font-bold text-slate-800">
+                      {deal.primaryFunderName}
+                    </span>
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* Proposed Lender / JV Partner Financing Terms */}
@@ -541,6 +674,23 @@ function ProposalGeneratorContent() {
                   </div>
                 </div>
               </div>
+
+              {deal.primaryFunderName && (
+                <div className="p-3 rounded-lg bg-emerald-50/70 border border-emerald-200 flex flex-wrap items-center justify-between gap-2 text-xs">
+                  <div>
+                    <span className="text-[10px] uppercase font-bold text-emerald-800 block">
+                      Lead Funder Committed:
+                    </span>
+                    <strong className="text-slate-900">{deal.primaryFunderName}</strong>{' '}
+                    <span className="text-slate-500">({deal.primaryFunderContact || 'Syndicate Lead'})</span>
+                  </div>
+                  {deal.coFundersNotes && (
+                    <div className="text-[11px] text-slate-600">
+                      Co-investors: {deal.coFundersNotes}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Sensitivity / Scenario Analysis Table */}

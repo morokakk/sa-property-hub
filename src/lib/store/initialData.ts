@@ -176,6 +176,16 @@ export const INITIAL_FLIPS: FlipProject[] = [
     targetCompletionDate: '2026-11-15',
     currentPhase: 'Finishes & Tiling',
     linkedFundingIds: ['fund-1'],
+    fundingRequiredZAR: 1_800_000,
+    capitalRaisedZAR: 1_500_000,
+    primaryFunderName: 'Johan Meyer',
+    primaryFunderContact: 'Meyer Family Trust / +27 82 555 1234',
+    primaryFunderType: 'Private Lender',
+    coFundersNotes: 'R300k balance open for private co-investment tranche',
+    promisedReturnType: 'Fixed Interest',
+    promisedReturnRatePercent: 14.0,
+    promisedPayoutSchedule: 'Monthly Interest',
+    securityOffered: '1st registered second-mortgage bond over Kloof Street',
     status: 'Active',
     notes: 'Restoring historic Victorian facade while introducing open-plan modern Scandinavian interior.',
     boq: [
@@ -290,6 +300,16 @@ export const INITIAL_FLIPS: FlipProject[] = [
     targetCompletionDate: '2026-12-20',
     currentPhase: 'First Fix (Plumbing/Elec)',
     linkedFundingIds: ['fund-2'],
+    fundingRequiredZAR: 1_200_000,
+    capitalRaisedZAR: 800_000,
+    primaryFunderName: 'Protea Property Syndicate',
+    primaryFunderContact: 'Kobus van Zyl (MD) / +27 83 777 9876',
+    primaryFunderType: 'Syndicate JV Partner',
+    coFundersNotes: 'JV syndicate backing the Waterkloof acquisition & BOQ tranche',
+    promisedReturnType: 'Equity Profit Split',
+    promisedReturnRatePercent: 25.0,
+    promisedPayoutSchedule: 'At Exit (Maturity)',
+    securityOffered: 'JV Syndicate Profit Participation Agreement',
     status: 'Active',
     notes: 'Distressed purchase from bank repo. Converting outdated 3-bed into 4-bed modern family residence with entertainment patio.',
     boq: [
@@ -605,7 +625,19 @@ function createSampleOpportunity(
     shoppingMall: any;
   },
   propertyType: PropertyTitleType = 'Sectional Title Apartment',
-  agmDate?: string
+  agmDate?: string,
+  fundingCampaign?: {
+    fundingRequiredZAR?: number;
+    capitalRaisedZAR?: number;
+    primaryFunderName?: string;
+    primaryFunderContact?: string;
+    primaryFunderType?: 'Private Lender' | 'Syndicate JV Partner' | 'Friends & Family' | 'Equity Partner';
+    coFundersNotes?: string;
+    promisedReturnType?: 'Fixed Interest' | 'Equity Profit Split' | 'Monthly Coupon' | 'Bullet Repayment';
+    promisedReturnRatePercent?: number;
+    promisedPayoutSchedule?: 'Monthly Interest' | 'Quarterly' | 'At Exit (Maturity)' | 'Bi-Annual';
+    securityOffered?: string;
+  }
 ): OpportunityDeal {
   const costs = computeAcquisitionCosts(purchasePrice, ltv);
   const metrics = calculateDealMetrics({
@@ -670,6 +702,16 @@ function createSampleOpportunity(
     monthlyCashFlow: metrics.monthlyCashFlow,
     projectedFlipNetProfit: metrics.projectedFlipNetProfit,
     projectedFlipRoi: metrics.projectedFlipRoi,
+    fundingRequiredZAR: fundingCampaign?.fundingRequiredZAR,
+    capitalRaisedZAR: fundingCampaign?.capitalRaisedZAR,
+    primaryFunderName: fundingCampaign?.primaryFunderName,
+    primaryFunderContact: fundingCampaign?.primaryFunderContact,
+    primaryFunderType: fundingCampaign?.primaryFunderType,
+    coFundersNotes: fundingCampaign?.coFundersNotes,
+    promisedReturnType: fundingCampaign?.promisedReturnType,
+    promisedReturnRatePercent: fundingCampaign?.promisedReturnRatePercent,
+    promisedPayoutSchedule: fundingCampaign?.promisedPayoutSchedule,
+    securityOffered: fundingCampaign?.securityOffered,
     status,
     createdAt: '2026-09-15',
   };
@@ -703,7 +745,16 @@ export const INITIAL_OPPORTUNITIES: OpportunityDeal[] = [
       medicalClinic: '0-5km',
       shoppingMall: '0-5km',
     },
-    'Freehold House'
+    'Freehold House',
+    undefined,
+    {
+      fundingRequiredZAR: 1_600_000,
+      capitalRaisedZAR: 0,
+      promisedReturnType: 'Fixed Interest',
+      promisedReturnRatePercent: 14.5,
+      promisedPayoutSchedule: 'Monthly Interest',
+      securityOffered: '2nd Mortgage Bond registered over title deed',
+    }
   ),
   createSampleOpportunity(
     'opp-2',

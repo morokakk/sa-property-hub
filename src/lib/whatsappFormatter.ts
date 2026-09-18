@@ -56,6 +56,17 @@ export function formatOpportunityForWhatsApp(
     text += `• 20-Yr Cumulative Benefit: *${formatZAR(deal.section13sex.twentyYearCumulativeSavingsZAR)}*\n`;
   }
 
+  if (deal.fundingRequiredZAR) {
+    const oppRemaining = Math.max(0, (deal.fundingRequiredZAR || 0) - (deal.capitalRaisedZAR || 0));
+    text += `\n🤝 *FUNDING CAMPAIGN*\n`;
+    text += `• Target Facility: *${formatZAR(deal.fundingRequiredZAR)}*\n`;
+    text += `• Capital Secured: *${formatZAR(deal.capitalRaisedZAR || 0)}*\n`;
+    text += `• Open Syndicate Balance: *${formatZAR(oppRemaining)}*\n`;
+    if (deal.promisedReturnRatePercent) {
+      text += `• Promised Return: *${deal.promisedReturnRatePercent}%* (${deal.promisedReturnType || 'Fixed Interest'})\n`;
+    }
+  }
+
   if (deal.driveVault?.masterFolderUrl) {
     text += `\n📁 *Document Vault:* ${deal.driveVault.masterFolderUrl}\n`;
   }
@@ -80,6 +91,11 @@ export function formatFlipForWhatsApp(
   const netProfit = flip.targetExitPriceZAR - totalCost;
   const roi = totalCost > 0 ? (netProfit / totalCost) * 100 : 0;
 
+  const fundingReq = flip.fundingRequiredZAR ?? Math.round(totalCost * 0.7);
+  const capitalRaised = flip.capitalRaisedZAR ?? 0;
+  const remainingReq = Math.max(0, fundingReq - capitalRaised);
+  const pctFunded = fundingReq > 0 ? Math.min(100, Math.round((capitalRaised / fundingReq) * 100)) : 0;
+
   let text = `🔨 *BUY-AND-FLIP DEAL SNAPSHOT* 🏡\n`;
   text += `━━━━━━━━━━━━━━━━━━━━━\n`;
   text += `📍 *Project:* ${flip.title}\n`;
@@ -96,6 +112,18 @@ export function formatFlipForWhatsApp(
   text += `• Target Exit Price: *${formatZAR(flip.targetExitPriceZAR)}*\n`;
   text += `• Projected Net Profit: *${formatZAR(netProfit)}*\n`;
   text += `• Annualized Net ROI: *${formatPercent(roi)}*\n`;
+
+  text += `\n🤝 *FUNDING & SYNDICATE STATUS*\n`;
+  text += `• Target Facility Required: *${formatZAR(fundingReq)}*\n`;
+  text += `• Capital Secured: *${formatZAR(capitalRaised)}* (${pctFunded}% Funded)\n`;
+  text += `• Balance Open: *${formatZAR(remainingReq)}*\n`;
+  if (flip.primaryFunderName) {
+    text += `• Lead Funder: *${flip.primaryFunderName}* (${flip.primaryFunderType || 'Private Lender'})\n`;
+  }
+  if (flip.promisedReturnRatePercent) {
+    text += `• Promised Return: *${flip.promisedReturnRatePercent}%* (${flip.promisedReturnType || 'Fixed Interest'})\n`;
+    text += `• Payout: ${flip.promisedPayoutSchedule || 'Monthly Interest'} | Security: ${flip.securityOffered || '2nd Mortgage Bond'}\n`;
+  }
 
   if (flip.driveVault?.masterFolderUrl) {
     text += `\n📁 *Cloud Deal Folder:* ${flip.driveVault.masterFolderUrl}\n`;
