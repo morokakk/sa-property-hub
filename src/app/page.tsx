@@ -5,7 +5,7 @@ import TopHeader from '@/components/navigation/TopHeader';
 import AssetAllocationChart from '@/components/dashboard/AssetAllocationChart';
 import UpcomingDeadlines from '@/components/dashboard/UpcomingDeadlines';
 import PriorityTasksWidget from '@/components/dashboard/PriorityTasksWidget';
-import { usePortfolioStore } from '@/lib/store/usePortfolioStore';
+import { usePortfolioStore, usePortfolioSummary } from '@/lib/store/usePortfolioStore';
 import { formatZAR, formatPercent, formatDate } from '@/lib/formatters';
 import {
   TrendingUp,
@@ -21,7 +21,7 @@ import {
 import Link from 'next/link';
 
 export default function GlobalDashboardPage() {
-  const summary = usePortfolioStore((state) => state.getSummary());
+  const summary = usePortfolioSummary();
   const rentals = usePortfolioStore((state) => state.rentals);
   const flips = usePortfolioStore((state) => state.flips);
   const funding = usePortfolioStore((state) => state.funding);

@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
+import { useShallow } from 'zustand/react/shallow';
 import {
   RentalProperty,
   FlipProject,
@@ -95,84 +96,7 @@ export const usePortfolioStore = create<PortfolioState>()(
       investorProfile: INITIAL_INVESTOR_PROFILE,
 
       getSummary: (): PortfolioSummary => {
-        const state = get();
-
-        // 1. Rental Asset Values & Bonds
-        const totalRentalValue = state.rentals.reduce(
-          (sum, r) => sum + (r.marketValueZAR || 0),
-          0
-        );
-        const totalBondLiabilities = state.rentals.reduce(
-          (sum, r) => sum + (r.outstandingBondBalanceZAR || 0),
-          0
-        );
-
-        // 2. Flip Asset Values (Target Exit Price as asset valuation or cost basis)
-        const totalFlipValue = state.flips.reduce(
-          (sum, f) => sum + (f.targetExitPriceZAR || 0),
-          0
-        );
-
-        // 3. Liquid Capital Reserve
-        const liquidCapitalReserve = state.liquidCapitalReserve || 0;
-
-        // Total Gross Asset Value
-        const totalGrossAssetValue =
-          totalRentalValue + totalFlipValue + liquidCapitalReserve;
-
-        // 4. Private / Proposal Funding Liabilities
-        const totalPrivateFundingLiability = state.funding
-          .filter((f) => f.status === 'Active' || f.status === 'Accruing')
-          .reduce((sum, f) => sum + Math.max(0, (f.capitalAmountZAR || 0) - (f.totalRepaidZAR || 0)), 0);
-
-        // Total Liabilities = Private Loans + Bank Bonds
-        const totalFundingLiabilities =
-          totalPrivateFundingLiability + totalBondLiabilities;
-
-        // Net Equity = Gross Asset Value - Total Liabilities
-        const netEquity = totalGrossAssetValue - totalFundingLiabilities;
-
-        // Net Rental Monthly Cashflow
-        const monthlyNetRentalCashflow = state.rentals.reduce((sum, r) => {
-          const gross = r.monthlyGrossRentZAR || 0;
-          const expenses =
-            (r.monthlyLeviesZAR || 0) +
-            (r.monthlyRatesTaxesZAR || 0) +
-            (r.monthlyAgentFeeZAR || 0) +
-            (r.monthlyMaintenanceReserveZAR || 0) +
-            (r.monthlyBondPaymentZAR || 0);
-          return sum + (gross - expenses);
-        }, 0);
-
-        // Projected Flip Profits
-        const totalProjectedFlipProfits = state.flips.reduce((sum, f) => {
-          const totalBoqActual = (f.boq || []).reduce(
-            (bSum, b) => bSum + (b.actualCostZAR || b.baselineTotalZAR || 0),
-            0
-          );
-          const totalCost =
-            (f.purchasePriceZAR || 0) +
-            (f.acquisitionCostsZAR || 0) +
-            totalBoqActual;
-          const profit = (f.targetExitPriceZAR || 0) - totalCost;
-          return sum + profit;
-        }, 0);
-
-        return {
-          totalGrossAssetValue,
-          totalRentalValue,
-          totalFlipValue,
-          liquidCapitalReserve,
-          totalFundingLiabilities,
-          totalPrivateFundingLiability,
-          totalBondLiabilities,
-          netEquity,
-          monthlyNetRentalCashflow,
-          totalProjectedFlipProfits,
-          activeRentalsCount: state.rentals.length,
-          activeFlipsCount: state.flips.filter((f) => f.status === 'Active').length,
-          pendingOpportunitiesCount: state.opportunities.length,
-        };
+        return computePortfolioSummary(get());
       },
 
       // Investor Profile
@@ -501,3 +425,79 @@ export const usePortfolioStore = create<PortfolioState>()(
     }
   )
 );
+
+export function computePortfolioSummary(state: {
+  rentals: RentalProperty[];
+  flips: FlipProject[];
+  funding: FundingSource[];
+  liquidCapitalReserve: number;
+  opportunities?: OpportunityDeal[];
+}): PortfolioSummary {
+  const totalRentalValue = (state.rentals || []).reduce(
+    (sum, r) => sum + (r.marketValueZAR || 0),
+    0
+  );
+  const totalBondLiabilities = (state.rentals || []).reduce(
+    (sum, r) => sum + (r.outstandingBondBalanceZAR || 0),
+    0
+  );
+  const totalFlipValue = (state.flips || []).reduce(
+    (sum, f) => sum + (f.targetExitPriceZAR || 0),
+    0
+  );
+  const liquidCapitalReserve = state.liquidCapitalReserve || 0;
+  const totalGrossAssetValue = totalRentalValue + totalFlipValue + liquidCapitalReserve;
+
+  const totalPrivateFundingLiability = (state.funding || [])
+    .filter((f) => f.status === 'Active' || f.status === 'Accruing')
+    .reduce((sum, f) => sum + Math.max(0, (f.capitalAmountZAR || 0) - (f.totalRepaidZAR || 0)), 0);
+
+  const totalFundingLiabilities = totalPrivateFundingLiability + totalBondLiabilities;
+  const netEquity = totalGrossAssetValue - totalFundingLiabilities;
+
+  const monthlyNetRentalCashflow = (state.rentals || []).reduce((sum, r) => {
+    const gross = r.monthlyGrossRentZAR || 0;
+    const expenses =
+      (r.monthlyLeviesZAR || 0) +
+      (r.monthlyRatesTaxesZAR || 0) +
+      (r.monthlyAgentFeeZAR || 0) +
+      (r.monthlyMaintenanceReserveZAR || 0) +
+      (r.monthlyBondPaymentZAR || 0);
+    return sum + (gross - expenses);
+  }, 0);
+
+  const totalProjectedFlipProfits = (state.flips || []).reduce((sum, f) => {
+    const totalBoqActual = (f.boq || []).reduce(
+      (bSum, b) => bSum + (b.actualCostZAR || b.baselineTotalZAR || 0),
+      0
+    );
+    const totalCost =
+      (f.purchasePriceZAR || 0) +
+      (f.acquisitionCostsZAR || 0) +
+      totalBoqActual;
+    const profit = (f.targetExitPriceZAR || 0) - totalCost;
+    return sum + profit;
+  }, 0);
+
+  return {
+    totalGrossAssetValue,
+    totalRentalValue,
+    totalFlipValue,
+    liquidCapitalReserve,
+    totalFundingLiabilities,
+    totalPrivateFundingLiability,
+    totalBondLiabilities,
+    netEquity,
+    monthlyNetRentalCashflow,
+    totalProjectedFlipProfits,
+    activeRentalsCount: (state.rentals || []).length,
+    activeFlipsCount: (state.flips || []).filter((f) => f.status === 'Active').length,
+    pendingOpportunitiesCount: (state.opportunities || []).length,
+  };
+}
+
+export function usePortfolioSummary(): PortfolioSummary {
+  return usePortfolioStore(
+    useShallow((state) => computePortfolioSummary(state))
+  );
+}

@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import TopHeader from '@/components/navigation/TopHeader';
-import { usePortfolioStore } from '@/lib/store/usePortfolioStore';
+import { usePortfolioStore, usePortfolioSummary } from '@/lib/store/usePortfolioStore';
 import { formatZAR, formatPercent, formatDate } from '@/lib/formatters';
 import { FundingSource, FundingType, ReturnTermType } from '@/types';
 import {
@@ -24,7 +24,7 @@ export default function FundingTrackerPage() {
   const addFunding = usePortfolioStore((state) => state.addFunding);
   const updateFunding = usePortfolioStore((state) => state.updateFunding);
   const deleteFunding = usePortfolioStore((state) => state.deleteFunding);
-  const summary = usePortfolioStore((state) => state.getSummary());
+  const summary = usePortfolioSummary();
   const flips = usePortfolioStore((state) => state.flips);
 
   // New Capital Source Form State

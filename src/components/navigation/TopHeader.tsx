@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useRef, useState, useEffect } from 'react';
-import { usePortfolioStore } from '@/lib/store/usePortfolioStore';
+import { usePortfolioStore, usePortfolioSummary } from '@/lib/store/usePortfolioStore';
 import { formatZAR } from '@/lib/formatters';
 import {
   RotateCcw,
@@ -19,10 +19,9 @@ interface TopHeaderProps {
 }
 
 export default function TopHeader({ title, subtitle, actionButton }: TopHeaderProps) {
-  const summary = usePortfolioStore((state) => state.getSummary());
+  const summary = usePortfolioSummary();
   const resetToDemoData = usePortfolioStore((state) => state.resetToDemoData);
   const importPortfolioJSON = usePortfolioStore((state) => state.importPortfolioJSON);
-  const state = usePortfolioStore();
 
   const [notification, setNotification] = useState<string | null>(null);
   const [isMounted, setIsMounted] = useState(false);
@@ -45,16 +44,17 @@ export default function TopHeader({ title, subtitle, actionButton }: TopHeaderPr
   };
 
   const handleExport = () => {
+    const currentState = usePortfolioStore.getState();
     const dataStr = JSON.stringify(
       {
-        rentals: state.rentals,
-        flips: state.flips,
-        funding: state.funding,
-        opportunities: state.opportunities,
-        suppliers: state.suppliers,
-        tasks: state.tasks,
-        liquidCapitalReserve: state.liquidCapitalReserve,
-        investorProfile: state.investorProfile,
+        rentals: currentState.rentals,
+        flips: currentState.flips,
+        funding: currentState.funding,
+        opportunities: currentState.opportunities,
+        suppliers: currentState.suppliers,
+        tasks: currentState.tasks,
+        liquidCapitalReserve: currentState.liquidCapitalReserve,
+        investorProfile: currentState.investorProfile,
         exportedAt: new Date().toISOString(),
       },
       null,

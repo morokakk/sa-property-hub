@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import TopHeader from '@/components/navigation/TopHeader';
 import { usePortfolioStore } from '@/lib/store/usePortfolioStore';
@@ -39,7 +39,7 @@ function getSafeLogoUri(uri?: string): string {
   return uri;
 }
 
-export default function ProposalGeneratorPage() {
+function ProposalGeneratorContent() {
   const searchParams = useSearchParams();
   const queryDealId = searchParams.get('dealId');
 
@@ -618,5 +618,22 @@ export default function ProposalGeneratorPage() {
         )}
       </main>
     </div>
+  );
+}
+
+export default function ProposalGeneratorPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex-1 flex items-center justify-center p-12">
+          <div className="flex flex-col items-center gap-3">
+            <div className="w-8 h-8 border-[3px] border-emerald-600 border-t-transparent rounded-full animate-spin"></div>
+            <span className="text-xs text-slate-500 font-medium">Loading Investment Proposal...</span>
+          </div>
+        </div>
+      }
+    >
+      <ProposalGeneratorContent />
+    </Suspense>
   );
 }

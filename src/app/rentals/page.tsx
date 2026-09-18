@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import TopHeader from '@/components/navigation/TopHeader';
-import { usePortfolioStore } from '@/lib/store/usePortfolioStore';
+import { usePortfolioStore, usePortfolioSummary } from '@/lib/store/usePortfolioStore';
 import { formatZAR, formatPercent, formatDate } from '@/lib/formatters';
 import ComplianceChecklist from '@/components/common/ComplianceChecklist';
 import CloudDriveLinkVault from '@/components/common/CloudDriveLinkVault';
@@ -29,7 +29,7 @@ export default function RentalPortfolioPage() {
   const updateRental = usePortfolioStore((state) => state.updateRental);
   const deleteRental = usePortfolioStore((state) => state.deleteRental);
   const addMaintenanceLog = usePortfolioStore((state) => state.addMaintenanceLog);
-  const summary = usePortfolioStore((state) => state.getSummary());
+  const summary = usePortfolioSummary();
 
   // Per-card tab selection ('financials' | 'coc' | 'vault')
   const [cardTab, setCardTab] = useState<Record<string, 'financials' | 'coc' | 'vault'>>({});

@@ -21,7 +21,9 @@ import { usePortfolioStore } from '@/lib/store/usePortfolioStore';
 
 export default function Sidebar() {
   const pathname = usePathname();
-  const summary = usePortfolioStore((state) => state.getSummary());
+  const pendingOpportunitiesCount = usePortfolioStore((state) => state.opportunities.length);
+  const activeFlipsCount = usePortfolioStore((state) => state.flips.filter((f) => f.status === 'Active').length);
+  const activeRentalsCount = usePortfolioStore((state) => state.rentals.length);
   const tasks = usePortfolioStore((state) => state.tasks);
   const pendingTasksCount = tasks.filter((t) => t.status !== 'Completed').length;
 
@@ -58,7 +60,7 @@ export default function Sidebar() {
       name: 'Opportunity Analyzer',
       href: '/analyzer',
       icon: Calculator,
-      badge: isMounted && summary.pendingOpportunitiesCount > 0 ? `${summary.pendingOpportunitiesCount}` : null,
+      badge: isMounted && pendingOpportunitiesCount > 0 ? `${pendingOpportunitiesCount}` : null,
     },
     {
       name: 'Funding & Capital',
@@ -70,13 +72,13 @@ export default function Sidebar() {
       name: 'Buy-and-Flip Manager',
       href: '/flips',
       icon: Hammer,
-      badge: isMounted && summary.activeFlipsCount > 0 ? `${summary.activeFlipsCount} Active` : null,
+      badge: isMounted && activeFlipsCount > 0 ? `${activeFlipsCount} Active` : null,
     },
     {
       name: 'Rental Portfolio',
       href: '/rentals',
       icon: Building2,
-      badge: isMounted && summary.activeRentalsCount > 0 ? `${summary.activeRentalsCount} Units` : null,
+      badge: isMounted && activeRentalsCount > 0 ? `${activeRentalsCount} Units` : null,
     },
     {
       name: 'Tasks & Reminders',
