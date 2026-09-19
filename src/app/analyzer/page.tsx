@@ -41,6 +41,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { exportOpportunitiesCSV } from '@/lib/export/csvExport';
+import ImportDropdown from '@/components/common/ImportDropdown';
 
 export default function OpportunityAnalyzerPage() {
   const opportunities = usePortfolioStore((state) => state.opportunities);
@@ -1526,6 +1527,7 @@ export default function OpportunityAnalyzerPage() {
               </p>
             </div>
             <div className="flex items-center gap-2">
+              <ImportDropdown type="pipeline" />
               {opportunities.length > 0 && (
                 <button
                   onClick={() => exportOpportunitiesCSV(opportunities)}

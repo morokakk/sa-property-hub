@@ -34,6 +34,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { exportFlipBOQCSV } from '@/lib/export/csvExport';
+import ImportDropdown from '@/components/common/ImportDropdown';
 
 export default function FlipsManagerPage() {
   const flips = usePortfolioStore((state) => state.flips);
@@ -377,6 +378,7 @@ export default function FlipsManagerPage() {
         subtitle="Dynamic budget tracker, Bill of Quantities (BOQ), and local South African trade suppliers"
         actionButton={
           <div className="flex items-center gap-2">
+            <ImportDropdown type="flips" />
             <button
               onClick={() => setShowSupplierModal(true)}
               className="inline-flex items-center gap-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-semibold px-3 py-2 rounded-lg border border-slate-300 transition-colors"

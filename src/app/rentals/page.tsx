@@ -32,6 +32,7 @@ import {
   FileSpreadsheet,
 } from 'lucide-react';
 import { exportRentalsCSV } from '@/lib/export/csvExport';
+import ImportDropdown from '@/components/common/ImportDropdown';
 
 export function renderPropertyTypeBadge(type?: PropertyTitleType) {
   switch (type) {
@@ -401,6 +402,7 @@ export default function RentalPortfolioPage() {
         subtitle="Manage active income properties, tenant leases, trust deposits, and maintenance histories"
         actionButton={
           <div className="flex items-center gap-2">
+            <ImportDropdown type="rentals" />
             <button
               onClick={() => exportRentalsCSV(activeRentals)}
               title="Download active rentals register as CSV"

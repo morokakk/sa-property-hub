@@ -47,6 +47,7 @@ interface PortfolioState {
 
   // Rental Actions
   addRental: (rental: RentalProperty) => void;
+  bulkAddRentals: (rentals: RentalProperty[]) => { addedCount: number; duplicateCount: number };
   updateRental: (id: string, updates: Partial<RentalProperty>) => void;
   deleteRental: (id: string) => void;
   addMaintenanceLog: (rentalId: string, log: Omit<RentalProperty['maintenanceHistory'][0], 'id'>) => void;
@@ -55,6 +56,7 @@ interface PortfolioState {
 
   // Flip Actions
   addFlip: (flip: FlipProject) => void;
+  bulkAddFlips: (flips: FlipProject[]) => { addedCount: number; duplicateCount: number };
   updateFlip: (id: string, updates: Partial<FlipProject>) => void;
   deleteFlip: (id: string) => void;
   addBOQItem: (flipId: string, item: Omit<BOQItem, 'id'>) => void;
@@ -70,6 +72,7 @@ interface PortfolioState {
 
   // Opportunity Actions
   addOpportunity: (opp: OpportunityDeal) => void;
+  bulkAddOpportunities: (opps: OpportunityDeal[]) => { addedCount: number; duplicateCount: number };
   updateOpportunity: (id: string, updates: Partial<OpportunityDeal>) => void;
   deleteOpportunity: (id: string) => void;
   promoteOpportunityToFlip: (oppId: string) => void;
@@ -176,6 +179,32 @@ export const usePortfolioStore = create<PortfolioState>()(
             ? syncAgmReminderTask(state.tasks, 'rental', rental.id, rental.title, rental.agmDate)
             : state.tasks,
         })),
+      bulkAddRentals: (newRentals) => {
+        let duplicateCount = 0;
+        const currentRentals = get().rentals;
+        const currentTasks = get().tasks;
+        let updatedTasks = [...currentTasks];
+
+        newRentals.forEach((r) => {
+          const isDup = currentRentals.some(
+            (cr) =>
+              cr.title.trim().toLowerCase() === r.title.trim().toLowerCase() ||
+              (r.address && cr.address.trim().toLowerCase() === r.address.trim().toLowerCase())
+          );
+          if (isDup) duplicateCount++;
+
+          if (r.agmDate) {
+            updatedTasks = syncAgmReminderTask(updatedTasks, 'rental', r.id, r.title, r.agmDate);
+          }
+        });
+
+        set((state) => ({
+          rentals: [...newRentals, ...state.rentals],
+          tasks: updatedTasks,
+        }));
+
+        return { addedCount: newRentals.length, duplicateCount };
+      },
       updateRental: (id, updates) =>
         set((state) => {
           const updatedRentals = state.rentals.map((r) =>
@@ -256,6 +285,32 @@ export const usePortfolioStore = create<PortfolioState>()(
             ? syncAgmReminderTask(state.tasks, 'flip', flip.id, flip.title, flip.agmDate)
             : state.tasks,
         })),
+      bulkAddFlips: (newFlips) => {
+        let duplicateCount = 0;
+        const currentFlips = get().flips;
+        const currentTasks = get().tasks;
+        let updatedTasks = [...currentTasks];
+
+        newFlips.forEach((f) => {
+          const isDup = currentFlips.some(
+            (cf) =>
+              cf.title.trim().toLowerCase() === f.title.trim().toLowerCase() ||
+              (f.address && cf.address.trim().toLowerCase() === f.address.trim().toLowerCase())
+          );
+          if (isDup) duplicateCount++;
+
+          if (f.agmDate) {
+            updatedTasks = syncAgmReminderTask(updatedTasks, 'flip', f.id, f.title, f.agmDate);
+          }
+        });
+
+        set((state) => ({
+          flips: [...newFlips, ...state.flips],
+          tasks: updatedTasks,
+        }));
+
+        return { addedCount: newFlips.length, duplicateCount };
+      },
       updateFlip: (id, updates) =>
         set((state) => {
           const updatedFlips = state.flips.map((f) =>
@@ -381,6 +436,32 @@ export const usePortfolioStore = create<PortfolioState>()(
             ? syncAgmReminderTask(state.tasks, 'opportunity', opp.id, opp.title, opp.agmDate)
             : state.tasks,
         })),
+      bulkAddOpportunities: (newOpps) => {
+        let duplicateCount = 0;
+        const currentOpps = get().opportunities;
+        const currentTasks = get().tasks;
+        let updatedTasks = [...currentTasks];
+
+        newOpps.forEach((o) => {
+          const isDup = currentOpps.some(
+            (co) =>
+              co.title.trim().toLowerCase() === o.title.trim().toLowerCase() ||
+              (o.address && co.address.trim().toLowerCase() === o.address.trim().toLowerCase())
+          );
+          if (isDup) duplicateCount++;
+
+          if (o.agmDate) {
+            updatedTasks = syncAgmReminderTask(updatedTasks, 'opportunity', o.id, o.title, o.agmDate);
+          }
+        });
+
+        set((state) => ({
+          opportunities: [...newOpps, ...state.opportunities],
+          tasks: updatedTasks,
+        }));
+
+        return { addedCount: newOpps.length, duplicateCount };
+      },
       updateOpportunity: (id, updates) =>
         set((state) => {
           const updatedOpps = state.opportunities.map((o) =>
