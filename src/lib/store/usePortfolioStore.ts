@@ -12,6 +12,8 @@ import {
   BOQItem,
   InvestorProfile,
   AnalyzerDraft,
+  AiSettings,
+  ExtractedRentalUnit,
 } from '@/types';
 import {
   INITIAL_RENTALS,
@@ -23,6 +25,7 @@ import {
   INITIAL_INVESTOR_PROFILE,
   INITIAL_ANALYZER_DRAFT,
   EMPTY_ANALYZER_DRAFT,
+  DEFAULT_AI_SETTINGS,
 } from './initialData';
 
 interface PortfolioState {
@@ -35,9 +38,13 @@ interface PortfolioState {
   liquidCapitalReserve: number;
   investorProfile: InvestorProfile;
   analyzerDraft: AnalyzerDraft;
+  aiSettings: AiSettings;
 
   // Computed selector
   getSummary: () => PortfolioSummary;
+
+  // AI Settings Action
+  updateAiSettings: (settings: Partial<AiSettings>) => void;
 
   // Investor Profile Action
   updateInvestorProfile: (profile: Partial<InvestorProfile>) => void;
@@ -48,6 +55,7 @@ interface PortfolioState {
   // Rental Actions
   addRental: (rental: RentalProperty) => void;
   bulkAddRentals: (rentals: RentalProperty[]) => { addedCount: number; duplicateCount: number };
+  reconcileImportedRentals: (units: ExtractedRentalUnit[]) => { updatedCount: number; newCount: number; addedCount: number; varianceCount: number };
   updateRental: (id: string, updates: Partial<RentalProperty>) => void;
   deleteRental: (id: string) => void;
   addMaintenanceLog: (rentalId: string, log: Omit<RentalProperty['maintenanceHistory'][0], 'id'>) => void;
@@ -154,10 +162,17 @@ export const usePortfolioStore = create<PortfolioState>()(
       liquidCapitalReserve: 650_000, // ZAR 650k operational cash reserve
       investorProfile: INITIAL_INVESTOR_PROFILE,
       analyzerDraft: INITIAL_ANALYZER_DRAFT,
+      aiSettings: DEFAULT_AI_SETTINGS,
 
       getSummary: (): PortfolioSummary => {
         return computePortfolioSummary(get());
       },
+
+      // AI Settings
+      updateAiSettings: (updates) =>
+        set((state) => ({
+          aiSettings: { ...state.aiSettings, ...updates },
+        })),
 
       // Investor Profile
       updateInvestorProfile: (updates) =>
@@ -204,6 +219,112 @@ export const usePortfolioStore = create<PortfolioState>()(
         }));
 
         return { addedCount: newRentals.length, duplicateCount };
+      },
+      reconcileImportedRentals: (units) => {
+        const currentRentals = get().rentals;
+        let updatedCount = 0;
+        let newCount = 0;
+        let varianceCount = 0;
+
+        const normalizeKey = (s?: string) =>
+          s ? s.toLowerCase().replace(/[^a-z0-9]/g, '') : '';
+
+        const updatedRentals = [...currentRentals];
+        const newlyCreatedRentals: RentalProperty[] = [];
+
+        units.forEach((unit, idx) => {
+          const unitKey = normalizeKey(unit.propertyName);
+          const unitAddrKey = normalizeKey(unit.address);
+
+          const matchIndex = updatedRentals.findIndex((r) => {
+            const titleKey = normalizeKey(r.title);
+            const addrKey = normalizeKey(r.address);
+            if (!unitKey) return false;
+            return (
+              titleKey === unitKey ||
+              (unitAddrKey && addrKey === unitAddrKey) ||
+              titleKey.includes(unitKey) ||
+              unitKey.includes(titleKey)
+            );
+          });
+
+          const calcNoi =
+            unit.grossRentZAR -
+            ((unit.leviesZAR || 0) +
+              (unit.municipalRatesZAR || 0) +
+              (unit.agencyCommissionZAR || 0));
+          if (Math.abs(calcNoi - (unit.netOperatingIncomeZAR || 0)) > 1.0) {
+            varianceCount++;
+          }
+
+          if (matchIndex >= 0) {
+            const existing = updatedRentals[matchIndex];
+            updatedRentals[matchIndex] = {
+              ...existing,
+              monthlyGrossRentZAR: unit.grossRentZAR,
+              monthlyLeviesZAR:
+                existing.propertyType === 'Freehold House' ? 0 : (unit.leviesZAR ?? existing.monthlyLeviesZAR),
+              monthlyRatesTaxesZAR: unit.municipalRatesZAR ?? existing.monthlyRatesTaxesZAR,
+              monthlyAgentFeeZAR: unit.agencyCommissionZAR ?? existing.monthlyAgentFeeZAR,
+              tenantName: unit.tenantName || existing.tenantName,
+              leaseEndDate: unit.leaseExpiryDate || unit.leaseEndDate || existing.leaseEndDate,
+              depositHeldZAR: unit.depositHeldZAR ?? existing.depositHeldZAR,
+            };
+            updatedCount++;
+          } else {
+            const isHouse =
+              unit.propertyName.toLowerCase().includes('house') ||
+              unit.propertyName.toLowerCase().includes('freehold');
+            const newProperty: RentalProperty = {
+              id: `rental-ai-${Date.now()}-${idx}`,
+              title: unit.propertyName,
+              address: unit.address || unit.propertyAddress || `${unit.propertyName}, South Africa`,
+              city: 'Johannesburg',
+              propertyType: isHouse ? 'Freehold House' : 'Sectional Title Apartment',
+              marketValueZAR: Math.round(unit.grossRentZAR * 120),
+              purchasePriceZAR: Math.round(unit.grossRentZAR * 110),
+              purchaseDate: new Date().toISOString().split('T')[0],
+              outstandingBondBalanceZAR: 0,
+              bondInterestRatePercent: 11.75,
+              monthlyBondPaymentZAR: 0,
+              tenantName: unit.tenantName || 'Tenant Unassigned',
+              tenantPhone: '+27 —',
+              tenantEmail: 'pending@tenant.co.za',
+              leaseStartDate: new Date().toISOString().split('T')[0],
+              leaseEndDate:
+                unit.leaseExpiryDate ||
+                unit.leaseEndDate ||
+                new Date(Date.now() + 365 * 24 * 60 * 60 * 1000)
+                  .toISOString()
+                  .split('T')[0],
+              depositHeldZAR: unit.depositHeldZAR ?? unit.grossRentZAR * 2,
+              annualEscalationPercent: 7.0,
+              managementType: 'Agency',
+              agencyName: unit.managingAgent || 'iGrow Rentals / WeconnectU',
+              agencyCommissionPercent:
+                unit.grossRentZAR > 0 && unit.agencyCommissionZAR !== undefined
+                  ? Number(((unit.agencyCommissionZAR / unit.grossRentZAR) * 100).toFixed(1))
+                  : 8.0,
+              agencyVatApplicable: true,
+              monthlyGrossRentZAR: unit.grossRentZAR,
+              monthlyLeviesZAR: isHouse ? 0 : (unit.leviesZAR ?? 0),
+              monthlyRatesTaxesZAR: unit.municipalRatesZAR ?? 0,
+              monthlyAgentFeeZAR: unit.agencyCommissionZAR ?? 0,
+              monthlyMaintenanceReserveZAR: 500,
+              unpaidUtilityArrearsZAR: 0,
+              maintenanceHistory: [],
+              status: 'Occupied',
+            };
+            newlyCreatedRentals.push(newProperty);
+            newCount++;
+          }
+        });
+
+        set((state) => ({
+          rentals: [...newlyCreatedRentals, ...updatedRentals],
+        }));
+
+        return { updatedCount, newCount, addedCount: newCount, varianceCount };
       },
       updateRental: (id, updates) =>
         set((state) => {
@@ -738,6 +859,17 @@ export const usePortfolioStore = create<PortfolioState>()(
     {
       name: 'sa_property_portfolio_hub_v1',
       storage: createJSONStorage(() => localStorage),
+      merge: (persistedState: unknown, currentState: PortfolioState): PortfolioState => {
+        const pState = (persistedState && typeof persistedState === 'object' ? persistedState : {}) as Partial<PortfolioState>;
+        return {
+          ...currentState,
+          ...pState,
+          aiSettings: {
+            ...DEFAULT_AI_SETTINGS,
+            ...(pState.aiSettings || {}),
+          },
+        };
+      },
     }
   )
 );

@@ -8,6 +8,7 @@ import {
   InvestorProfile,
   PropertyTitleType,
   AnalyzerDraft,
+  AiSettings,
 } from '@/types';
 import { computeAcquisitionCosts, calculateSection13sex } from '@/lib/calculations/sarsTax';
 import {
@@ -887,3 +888,10 @@ export const EMPTY_ANALYZER_DRAFT: AnalyzerDraft = {
   depositZAR: 0,
   loanToValue: 0,
 };
+
+export const DEFAULT_AI_SETTINGS: AiSettings = {
+  provider: 'anthropic',
+  apiKey: '',
+  model: 'claude-3-5-sonnet-20241022',
+};
+

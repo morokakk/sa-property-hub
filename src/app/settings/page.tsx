@@ -19,12 +19,19 @@ import {
   MapPin,
   Globe,
   Info,
+  Sparkles,
+  Eye,
+  EyeOff,
+  Key,
+  ShieldCheck,
 } from 'lucide-react';
 import Link from 'next/link';
 
 export default function SettingsPage() {
   const investorProfile = usePortfolioStore((state) => state.investorProfile);
   const updateInvestorProfile = usePortfolioStore((state) => state.updateInvestorProfile);
+  const aiSettings = usePortfolioStore((state) => state.aiSettings);
+  const updateAiSettings = usePortfolioStore((state) => state.updateAiSettings);
 
   // Form state initialized from Zustand
   const [entityName, setEntityName] = useState(investorProfile.entityName || '');
@@ -47,6 +54,16 @@ export default function SettingsPage() {
   const [defaultCommission, setDefaultCommission] = useState<number>(
     investorProfile.defaultAgentCommissionPercent || 5.0
   );
+
+  // Client-Side BYOK AI Settings
+  const [aiProvider, setAiProvider] = useState<'anthropic' | 'google'>(
+    aiSettings?.provider || 'anthropic'
+  );
+  const [aiApiKey, setAiApiKey] = useState<string>(aiSettings?.apiKey || '');
+  const [aiModel, setAiModel] = useState<string>(
+    aiSettings?.model || 'claude-3-5-sonnet-20241022'
+  );
+  const [showApiKey, setShowApiKey] = useState(false);
 
   const [savedSuccess, setSavedSuccess] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -97,6 +114,12 @@ export default function SettingsPage() {
       defaultPrimeRatePercent: defaultPrimeRate,
       baselineHurdleYieldPercent: baselineHurdleYield,
       defaultAgentCommissionPercent: defaultCommission,
+    });
+
+    updateAiSettings({
+      provider: aiProvider,
+      apiKey: aiApiKey.trim(),
+      model: aiModel,
     });
 
     setSavedSuccess(true);
@@ -399,6 +422,95 @@ export default function SettingsPage() {
                   />
                   <span className="ml-1.5 font-bold text-slate-600">%</span>
                 </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Card: AI Integration (BYOK) */}
+          <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-xs space-y-5">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2">
+                <div className="p-1.5 rounded-lg bg-indigo-50 text-indigo-700">
+                  <Sparkles className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900">AI Integration & Statement Extraction (BYOK)</h3>
+                  <p className="text-xs text-slate-500">
+                    Bring Your Own Key to parse visual managing agent statements (iGrow, WeconnectU) directly from your browser.
+                  </p>
+                </div>
+              </div>
+              <span className="text-[10px] font-bold uppercase tracking-wider bg-indigo-50 text-indigo-700 border border-indigo-200 px-2.5 py-1 rounded-full flex items-center gap-1">
+                <ShieldCheck className="w-3 h-3 text-indigo-600" /> Client-Side Only
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">AI Provider</label>
+                <select
+                  value={aiProvider}
+                  onChange={(e) => setAiProvider(e.target.value as 'anthropic' | 'google')}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white text-slate-800 font-medium focus:ring-1 focus:ring-indigo-500"
+                >
+                  <option value="anthropic">Anthropic Claude (Messages API - Active)</option>
+                  <option value="google" disabled>Google Gemini 1.5 Pro (Coming Soon)</option>
+                </select>
+                <p className="text-[11px] text-slate-400 mt-1">
+                  Claude 3.5 Sonnet supports high-precision multi-page PDF & image ledger extractions.
+                </p>
+              </div>
+
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">Extraction Model</label>
+                <select
+                  value={aiModel}
+                  onChange={(e) => setAiModel(e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white text-slate-800 font-medium focus:ring-1 focus:ring-indigo-500"
+                >
+                  <option value="claude-3-5-sonnet-20241022">claude-3-5-sonnet-20241022 (Recommended)</option>
+                  <option value="claude-3-7-sonnet-20250219">claude-3-7-sonnet-20250219 (Latest)</option>
+                </select>
+                <p className="text-[11px] text-slate-400 mt-1">
+                  Enforces structured tool-use schema for forensic rental extraction.
+                </p>
+              </div>
+            </div>
+
+            <div>
+              <label className="block font-semibold text-slate-700 mb-1">
+                Anthropic API Key <span className="text-slate-400 font-normal">(Client-Side Only)</span>
+              </label>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                  <Key className="w-4 h-4" />
+                </div>
+                <input
+                  type={showApiKey ? 'text' : 'password'}
+                  value={aiApiKey}
+                  onChange={(e) => setAiApiKey(e.target.value)}
+                  placeholder="sk-ant-api03-..."
+                  className="w-full pl-9 pr-10 py-2 border border-slate-300 rounded-lg font-mono text-xs text-slate-800 bg-white placeholder-slate-400 focus:ring-1 focus:ring-indigo-500"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowApiKey(!showApiKey)}
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 cursor-pointer"
+                  title={showApiKey ? 'Hide key' : 'Show key'}
+                >
+                  {showApiKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
+
+            {/* Privacy Disclaimer */}
+            <div className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 flex items-start gap-2.5 text-xs text-slate-600">
+              <Shield className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+              <div className="space-y-0.5">
+                <span className="font-bold text-slate-800 block">Direct Browser Processing Privacy Guarantee</span>
+                <p className="text-slate-500 leading-relaxed text-[11px]">
+                  API keys and uploaded managing agent statements are processed entirely in your browser and communicated directly with Anthropic via browser CORS. Your credentials and financial documents are never stored or logged on an external application server.
+                </p>
               </div>
             </div>
           </div>

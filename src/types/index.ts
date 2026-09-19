@@ -366,3 +366,30 @@ export interface AnalyzerDraft {
   loanToValue: number;
 }
 
+// Client-side BYOK AI Integration Settings
+export interface AiSettings {
+  provider: 'anthropic' | 'google';
+  apiKey: string;
+  model: string; // e.g. 'claude-3-5-sonnet-20241022'
+}
+
+// Extracted Rental Unit from Visual Statement Parser
+export interface ExtractedRentalUnit {
+  propertyName: string; // e.g. "Clearwater Village 128"
+  address?: string;
+  propertyAddress?: string;
+  tenantName?: string; // e.g. "Bongani June Mwale"
+  leaseExpiryDate?: string; // YYYY-MM-DD
+  leaseEndDate?: string; // alias for leaseExpiryDate
+  grossRentZAR: number; // e.g. 6900
+  leviesZAR?: number; // e.g. 477.07
+  municipalRatesZAR?: number; // e.g. 1021.00
+  agencyCommissionZAR?: number; // e.g. 850.54
+  depositHeldZAR?: number; // e.g. 6965.17
+  netOperatingIncomeZAR?: number; // e.g. 5525.03
+  netPayoutZAR?: number; // alias for netOperatingIncomeZAR
+  managingAgent?: string;
+  statementDate?: string;
+}
+
+

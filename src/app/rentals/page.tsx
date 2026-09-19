@@ -30,9 +30,13 @@ import {
   CheckCircle2,
   Coins,
   FileSpreadsheet,
+  Sparkles,
 } from 'lucide-react';
 import { exportRentalsCSV } from '@/lib/export/csvExport';
 import ImportDropdown from '@/components/common/ImportDropdown';
+import { ExtractedRentalUnit } from '@/types';
+import StatementUploadModal from '@/components/rentals/StatementUploadModal';
+import StatementReviewModal from '@/components/rentals/StatementReviewModal';
 
 export function renderPropertyTypeBadge(type?: PropertyTitleType) {
   switch (type) {
@@ -133,12 +137,18 @@ export default function RentalPortfolioPage() {
   const addMaintenanceLog = usePortfolioStore((state) => state.addMaintenanceLog);
   const markRentalAsSold = usePortfolioStore((state) => state.markRentalAsSold);
   const reopenRental = usePortfolioStore((state) => state.reopenRental);
+  const reconcileImportedRentals = usePortfolioStore((state) => state.reconcileImportedRentals);
   const summary = usePortfolioSummary();
 
   // Active vs Sold Archive View Tab
   const [viewTab, setViewTab] = useState<'active' | 'archive'>('active');
   const activeRentals = rentals.filter((r) => r.status !== 'Sold');
   const soldRentals = rentals.filter((r) => r.status === 'Sold');
+
+  // AI Statement BYOK Parser State
+  const [showAiUploadModal, setShowAiUploadModal] = useState(false);
+  const [showAiReviewModal, setShowAiReviewModal] = useState(false);
+  const [aiExtractedUnits, setAiExtractedUnits] = useState<ExtractedRentalUnit[]>([]);
 
   // Per-card tab selection ('financials' | 'coc' | 'vault')
   const [cardTab, setCardTab] = useState<Record<string, 'financials' | 'coc' | 'vault'>>({});
@@ -402,6 +412,14 @@ export default function RentalPortfolioPage() {
         subtitle="Manage active income properties, tenant leases, trust deposits, and maintenance histories"
         actionButton={
           <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowAiUploadModal(true)}
+              title="Parse managing agent PDF / image statements with AI"
+              className="inline-flex items-center gap-1.5 bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 text-xs font-semibold px-3 py-2 rounded-lg shadow-2xs transition-colors cursor-pointer"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-purple-600" />
+              <span>AI Statement Import</span>
+            </button>
             <ImportDropdown type="rentals" />
             <button
               onClick={() => exportRentalsCSV(activeRentals)}
@@ -1744,6 +1762,28 @@ export default function RentalPortfolioPage() {
           </div>
         </div>
       )}
+
+      {/* BYOK AI Statement Parser Modals */}
+      <StatementUploadModal
+        isOpen={showAiUploadModal}
+        onClose={() => setShowAiUploadModal(false)}
+        onExtracted={(units: ExtractedRentalUnit[]) => {
+          setAiExtractedUnits(units);
+          setShowAiUploadModal(false);
+          setShowAiReviewModal(true);
+        }}
+      />
+
+      <StatementReviewModal
+        isOpen={showAiReviewModal}
+        onClose={() => setShowAiReviewModal(false)}
+        extractedUnits={aiExtractedUnits}
+        onConfirmSync={(finalUnits: ExtractedRentalUnit[]) => {
+          reconcileImportedRentals(finalUnits);
+          setShowAiReviewModal(false);
+          setAiExtractedUnits([]);
+        }}
+      />
     </div>
   );
 }
