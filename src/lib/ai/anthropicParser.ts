@@ -52,7 +52,7 @@ export function getDemoStatementData(): ExtractedRentalUnit[] {
 export async function parseStatementWithAnthropic(
   file: File,
   apiKey: string,
-  model = 'claude-3-7-sonnet-20250219'
+  model = 'claude-sonnet-5'
 ): Promise<ParseStatementResult> {
   if (!apiKey || !apiKey.trim()) {
     return {
@@ -71,10 +71,16 @@ export async function parseStatementWithAnthropic(
     };
   }
 
-  // Auto-migrate any deprecated model strings
+  // Auto-migrate retired Claude 3.x model strings to active Claude 5 generation
+  const RETIRED_MODELS = [
+    'claude-3-5-sonnet-20241022',
+    'claude-3-7-sonnet-20250219',
+    'claude-3-5-sonnet-latest',
+    'claude-3-haiku-20240307',
+  ];
   const effectiveModel =
-    !model || model === 'claude-3-5-sonnet-20241022'
-      ? 'claude-3-7-sonnet-20250219'
+    !model || RETIRED_MODELS.includes(model.trim())
+      ? 'claude-sonnet-5'
       : model.trim();
 
   const base64Data = await fileToBase64(file);
@@ -215,7 +221,7 @@ export async function parseStatementWithAnthropic(
         return {
           success: false,
           units: [],
-          error: `Anthropic Model Not Found (404): The requested model "${effectiveModel}" is unavailable or retired on this API key tier. Please navigate to Settings and select a supported model (e.g. claude-3-7-sonnet-20250219, claude-3-5-sonnet-latest, or claude-3-5-haiku-latest).`,
+          error: `Anthropic Model Not Found (404): The requested model "${effectiveModel}" is unavailable or retired on this API key tier. Please navigate to Settings and select a supported active model (e.g. claude-sonnet-5 or claude-haiku-4-5).`,
         };
       }
 

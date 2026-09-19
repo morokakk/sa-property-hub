@@ -862,10 +862,12 @@ export const usePortfolioStore = create<PortfolioState>()(
       merge: (persistedState: unknown, currentState: PortfolioState): PortfolioState => {
         const pState = (persistedState && typeof persistedState === 'object' ? persistedState : {}) as Partial<PortfolioState>;
         const rawModel = pState.aiSettings?.model;
-        const migratedModel =
-          rawModel === 'claude-3-5-sonnet-20241022'
-            ? 'claude-3-7-sonnet-20250219'
-            : rawModel || DEFAULT_AI_SETTINGS.model;
+        const isRetired =
+          !rawModel ||
+          rawModel.startsWith('claude-3-') ||
+          rawModel.includes('2024') ||
+          rawModel.includes('2025');
+        const migratedModel = isRetired ? 'claude-sonnet-5' : rawModel;
 
         return {
           ...currentState,

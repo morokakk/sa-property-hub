@@ -457,7 +457,7 @@ export default function SettingsPage() {
                   <option value="google" disabled>Google Gemini 1.5 Pro (Coming Soon)</option>
                 </select>
                 <p className="text-[11px] text-slate-400 mt-1">
-                  Claude 3.5 Sonnet supports high-precision multi-page PDF & image ledger extractions.
+                  Claude Sonnet 5 supports high-precision multi-page PDF & image ledger extractions.
                 </p>
               </div>
 
@@ -465,7 +465,7 @@ export default function SettingsPage() {
                 <label className="block font-semibold text-slate-700 mb-1">Extraction Model</label>
                 <select
                   value={
-                    ['claude-3-7-sonnet-20250219', 'claude-3-5-sonnet-latest', 'claude-3-5-haiku-latest', 'claude-3-haiku-20240307'].includes(aiModel)
+                    ['claude-sonnet-5', 'claude-haiku-4-5', 'claude-opus-5', 'claude-fable-5-1', 'claude-sonnet-4-6'].includes(aiModel)
                       ? aiModel
                       : 'custom'
                   }
@@ -476,18 +476,19 @@ export default function SettingsPage() {
                   }}
                   className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white text-slate-800 font-medium focus:ring-1 focus:ring-indigo-500"
                 >
-                  <option value="claude-3-7-sonnet-20250219">Claude 3.7 Sonnet (claude-3-7-sonnet-20250219 - Recommended)</option>
-                  <option value="claude-3-5-sonnet-latest">Claude 3.5 Sonnet (claude-3-5-sonnet-latest)</option>
-                  <option value="claude-3-5-haiku-latest">Claude 3.5 Haiku (claude-3-5-haiku-latest - Fast & Cost-Efficient)</option>
-                  <option value="claude-3-haiku-20240307">Claude 3 Haiku (claude-3-haiku-20240307)</option>
+                  <option value="claude-sonnet-5">Claude Sonnet 5 (claude-sonnet-5 - Recommended)</option>
+                  <option value="claude-haiku-4-5">Claude Haiku 4.5 (claude-haiku-4-5 - Fast & Cost-Efficient)</option>
+                  <option value="claude-opus-5">Claude Opus 5 (claude-opus-5 - Deep Reasoning)</option>
+                  <option value="claude-fable-5-1">Claude Fable 5.1 (claude-fable-5-1 - Flagship)</option>
+                  <option value="claude-sonnet-4-6">Claude Sonnet 4.6 (claude-sonnet-4-6)</option>
                   <option value="custom">Custom Model Identifier...</option>
                 </select>
-                {!['claude-3-7-sonnet-20250219', 'claude-3-5-sonnet-latest', 'claude-3-5-haiku-latest', 'claude-3-haiku-20240307'].includes(aiModel) && (
+                {!['claude-sonnet-5', 'claude-haiku-4-5', 'claude-opus-5', 'claude-fable-5-1', 'claude-sonnet-4-6'].includes(aiModel) && (
                   <input
                     type="text"
                     value={aiModel}
                     onChange={(e) => setAiModel(e.target.value)}
-                    placeholder="Enter custom model identifier (e.g. claude-3-7-sonnet-latest)"
+                    placeholder="Enter custom model identifier (e.g. claude-sonnet-5)"
                     className="mt-2 w-full px-3 py-1.5 text-xs font-mono border border-slate-300 rounded-lg bg-white text-slate-800"
                   />
                 )}
