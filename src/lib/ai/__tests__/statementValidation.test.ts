@@ -86,6 +86,67 @@ describe('AI Statement Validation & Accounting Variance', () => {
         expect(parsed.data.units).toHaveLength(2);
       }
     });
+
+    it('robustly normalizes stringified JSON units (resolves "expected array, received string")', () => {
+      const stringifiedBatch = {
+        units: JSON.stringify([
+          {
+            propertyName: 'Clearwater Village 128',
+            grossRentZAR: 6900,
+            leviesZAR: 477.07,
+            municipalRatesZAR: 1021.0,
+            agencyCommissionZAR: 850.54,
+            netOperatingIncomeZAR: 5525.03,
+            tenantName: 'Bongani June Mwale',
+          },
+        ]),
+      };
+
+      const parsed = ExtractedStatementBatchSchema.safeParse(stringifiedBatch);
+      expect(parsed.success).toBe(true);
+      if (parsed.success) {
+        expect(parsed.data.units).toHaveLength(1);
+        expect(parsed.data.units[0].propertyName).toBe('Clearwater Village 128');
+        expect(parsed.data.units[0].grossRentZAR).toBe(6900);
+      }
+    });
+
+    it('normalizes top-level array without "units" wrapper', () => {
+      const rawArray = [
+        {
+          propertyName: 'Direct Array Unit',
+          grossRentZAR: 11000,
+          netOperatingIncomeZAR: 9000,
+        },
+      ];
+
+      const parsed = ExtractedStatementBatchSchema.safeParse(rawArray);
+      expect(parsed.success).toBe(true);
+      if (parsed.success) {
+        expect(parsed.data.units).toHaveLength(1);
+        expect(parsed.data.units[0].propertyName).toBe('Direct Array Unit');
+      }
+    });
+
+    it('coerces numeric strings from LLM output in batch normalization', () => {
+      const batchWithStringNumbers = {
+        units: [
+          {
+            propertyName: 'Numeric Coerce Unit',
+            grossRentZAR: '15000.00',
+            leviesZAR: '1850.50',
+            netOperatingIncomeZAR: '11500',
+          },
+        ],
+      };
+
+      const parsed = ExtractedStatementBatchSchema.safeParse(batchWithStringNumbers);
+      expect(parsed.success).toBe(true);
+      if (parsed.success) {
+        expect(parsed.data.units[0].grossRentZAR).toBe(15000);
+        expect(parsed.data.units[0].leviesZAR).toBe(1850.5);
+      }
+    });
   });
 
   describe('checkAccountingVariance', () => {

@@ -197,7 +197,7 @@ export async function parseStatementWithAnthropic(
               contentBlock,
               {
                 type: 'text',
-                text: 'Extract the rental property ledger details from this managing agent statement into the structured tool call.',
+                text: 'Extract the rental property ledger details from this managing agent statement into the structured tool call. Ensure the "units" parameter is passed as an array of unit objects.',
               },
             ],
           },
@@ -243,7 +243,18 @@ export async function parseStatementWithAnthropic(
       };
     }
 
-    const validation = validateExtractedStatementPayload(toolCall.input);
+    const rawInput =
+      typeof toolCall.input === 'string'
+        ? (() => {
+            try {
+              return JSON.parse(toolCall.input);
+            } catch {
+              return toolCall.input;
+            }
+          })()
+        : toolCall.input;
+
+    const validation = validateExtractedStatementPayload(rawInput);
     if (!validation.success) {
       return {
         success: false,

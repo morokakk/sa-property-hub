@@ -39,9 +39,118 @@ export const ExtractedRentalUnitSchema = z.object({
   };
 });
 
-export const ExtractedStatementBatchSchema = z.object({
-  units: z.array(ExtractedRentalUnitSchema).min(1, 'At least one rental unit must be extracted'),
-});
+/**
+ * Normalizes raw LLM tool-use payload to ensure `units` is a valid array of objects
+ * even if the model serialized it as a JSON string, wrapped it under a different key,
+ * or returned a single unit object directly.
+ */
+export function normalizeStatementPayload(raw: unknown): unknown {
+  let data = raw;
+
+  // 1. If payload itself is a JSON string, parse it
+  if (typeof data === 'string') {
+    const trimmed = data.trim();
+    try {
+      data = JSON.parse(trimmed);
+    } catch {
+      const startArr = trimmed.indexOf('[');
+      const endArr = trimmed.lastIndexOf(']');
+      if (startArr !== -1 && endArr !== -1 && endArr > startArr) {
+        try {
+          data = { units: JSON.parse(trimmed.slice(startArr, endArr + 1)) };
+        } catch {
+          // ignore
+        }
+      }
+    }
+  }
+
+  // 2. If data is an array directly, wrap it into { units: data }
+  if (Array.isArray(data)) {
+    data = { units: data };
+  }
+
+  // 3. If data is an object
+  if (data && typeof data === 'object') {
+    const obj = { ...(data as Record<string, any>) };
+
+    // If units is a string (e.g. JSON stringified array "[{...}]"), parse it
+    if (typeof obj.units === 'string') {
+      const trimmedUnits = obj.units.trim();
+      try {
+        const parsedUnits = JSON.parse(trimmedUnits);
+        obj.units = Array.isArray(parsedUnits) ? parsedUnits : [parsedUnits];
+      } catch {
+        const start = trimmedUnits.indexOf('[');
+        const end = trimmedUnits.lastIndexOf(']');
+        if (start !== -1 && end !== -1 && end > start) {
+          try {
+            obj.units = JSON.parse(trimmedUnits.slice(start, end + 1));
+          } catch {
+            // ignore
+          }
+        }
+      }
+    }
+
+    // Check alternative keys if units is missing or not an array
+    if (!Array.isArray(obj.units)) {
+      if (Array.isArray(obj.properties)) obj.units = obj.properties;
+      else if (Array.isArray(obj.items)) obj.units = obj.items;
+      else if (Array.isArray(obj.data)) obj.units = obj.data;
+      else if (Array.isArray(obj.statementUnits)) obj.units = obj.statementUnits;
+      else if (obj.propertyName) {
+        // It's a single unit object directly
+        obj.units = [obj];
+      }
+    }
+
+    // Clean individual units in the array
+    if (Array.isArray(obj.units)) {
+      obj.units = obj.units.map((u: any) => {
+        if (typeof u === 'string') {
+          try {
+            u = JSON.parse(u.trim());
+          } catch {
+            return u;
+          }
+        }
+        if (!u || typeof u !== 'object') return u;
+
+        const parseNum = (val: any) => {
+          if (typeof val === 'number') return val;
+          if (typeof val === 'string') {
+            const cleaned = val.replace(/[^0-9.-]/g, '');
+            const n = parseFloat(cleaned);
+            return isNaN(n) ? val : n;
+          }
+          return val;
+        };
+
+        return {
+          ...u,
+          grossRentZAR: parseNum(u.grossRentZAR),
+          leviesZAR: u.leviesZAR !== undefined ? parseNum(u.leviesZAR) : 0,
+          municipalRatesZAR: u.municipalRatesZAR !== undefined ? parseNum(u.municipalRatesZAR) : 0,
+          agencyCommissionZAR: u.agencyCommissionZAR !== undefined ? parseNum(u.agencyCommissionZAR) : 0,
+          depositHeldZAR: u.depositHeldZAR !== undefined ? parseNum(u.depositHeldZAR) : undefined,
+          netOperatingIncomeZAR: parseNum(u.netOperatingIncomeZAR ?? u.netPayoutZAR),
+        };
+      });
+    }
+
+    return obj;
+  }
+
+  return data;
+}
+
+export const ExtractedStatementBatchSchema = z.preprocess(
+  (raw) => normalizeStatementPayload(raw),
+  z.object({
+    units: z.array(ExtractedRentalUnitSchema).min(1, 'At least one rental unit must be extracted'),
+  })
+);
 
 export interface AccountingVarianceReport {
   calculatedNOI: number;
