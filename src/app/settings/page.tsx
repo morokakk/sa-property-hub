@@ -464,15 +464,35 @@ export default function SettingsPage() {
               <div>
                 <label className="block font-semibold text-slate-700 mb-1">Extraction Model</label>
                 <select
-                  value={aiModel}
-                  onChange={(e) => setAiModel(e.target.value)}
+                  value={
+                    ['claude-3-7-sonnet-20250219', 'claude-3-5-sonnet-latest', 'claude-3-5-haiku-latest', 'claude-3-haiku-20240307'].includes(aiModel)
+                      ? aiModel
+                      : 'custom'
+                  }
+                  onChange={(e) => {
+                    if (e.target.value !== 'custom') {
+                      setAiModel(e.target.value);
+                    }
+                  }}
                   className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white text-slate-800 font-medium focus:ring-1 focus:ring-indigo-500"
                 >
-                  <option value="claude-3-5-sonnet-20241022">claude-3-5-sonnet-20241022 (Recommended)</option>
-                  <option value="claude-3-7-sonnet-20250219">claude-3-7-sonnet-20250219 (Latest)</option>
+                  <option value="claude-3-7-sonnet-20250219">Claude 3.7 Sonnet (claude-3-7-sonnet-20250219 - Recommended)</option>
+                  <option value="claude-3-5-sonnet-latest">Claude 3.5 Sonnet (claude-3-5-sonnet-latest)</option>
+                  <option value="claude-3-5-haiku-latest">Claude 3.5 Haiku (claude-3-5-haiku-latest - Fast & Cost-Efficient)</option>
+                  <option value="claude-3-haiku-20240307">Claude 3 Haiku (claude-3-haiku-20240307)</option>
+                  <option value="custom">Custom Model Identifier...</option>
                 </select>
+                {!['claude-3-7-sonnet-20250219', 'claude-3-5-sonnet-latest', 'claude-3-5-haiku-latest', 'claude-3-haiku-20240307'].includes(aiModel) && (
+                  <input
+                    type="text"
+                    value={aiModel}
+                    onChange={(e) => setAiModel(e.target.value)}
+                    placeholder="Enter custom model identifier (e.g. claude-3-7-sonnet-latest)"
+                    className="mt-2 w-full px-3 py-1.5 text-xs font-mono border border-slate-300 rounded-lg bg-white text-slate-800"
+                  />
+                )}
                 <p className="text-[11px] text-slate-400 mt-1">
-                  Enforces structured tool-use schema for forensic rental extraction.
+                  Enforces structured tool-use schema for forensic rental ledger extraction.
                 </p>
               </div>
             </div>

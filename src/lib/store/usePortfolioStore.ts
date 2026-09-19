@@ -861,12 +861,19 @@ export const usePortfolioStore = create<PortfolioState>()(
       storage: createJSONStorage(() => localStorage),
       merge: (persistedState: unknown, currentState: PortfolioState): PortfolioState => {
         const pState = (persistedState && typeof persistedState === 'object' ? persistedState : {}) as Partial<PortfolioState>;
+        const rawModel = pState.aiSettings?.model;
+        const migratedModel =
+          rawModel === 'claude-3-5-sonnet-20241022'
+            ? 'claude-3-7-sonnet-20250219'
+            : rawModel || DEFAULT_AI_SETTINGS.model;
+
         return {
           ...currentState,
           ...pState,
           aiSettings: {
             ...DEFAULT_AI_SETTINGS,
             ...(pState.aiSettings || {}),
+            model: migratedModel,
           },
         };
       },

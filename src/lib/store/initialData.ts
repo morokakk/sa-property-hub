@@ -892,6 +892,6 @@ export const EMPTY_ANALYZER_DRAFT: AnalyzerDraft = {
 export const DEFAULT_AI_SETTINGS: AiSettings = {
   provider: 'anthropic',
   apiKey: '',
-  model: 'claude-3-5-sonnet-20241022',
+  model: 'claude-3-7-sonnet-20250219',
 };
 

@@ -52,7 +52,7 @@ export function getDemoStatementData(): ExtractedRentalUnit[] {
 export async function parseStatementWithAnthropic(
   file: File,
   apiKey: string,
-  model = 'claude-3-5-sonnet-20241022'
+  model = 'claude-3-7-sonnet-20250219'
 ): Promise<ParseStatementResult> {
   if (!apiKey || !apiKey.trim()) {
     return {
@@ -70,6 +70,12 @@ export async function parseStatementWithAnthropic(
       error: 'File exceeds 15MB size limit. Please upload a smaller document.',
     };
   }
+
+  // Auto-migrate any deprecated model strings
+  const effectiveModel =
+    !model || model === 'claude-3-5-sonnet-20241022'
+      ? 'claude-3-7-sonnet-20250219'
+      : model.trim();
 
   const base64Data = await fileToBase64(file);
   const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
@@ -98,7 +104,7 @@ export async function parseStatementWithAnthropic(
     {
       name: 'extract_rental_statements',
       description:
-        'Extract structured monthly rental statement ledger line items from South African managing agent statements (e.g. iGrow Rentals, WeconnectU, Trafalgar, PropAcademy). Strictly return numeric values without currency symbols.',
+        'Extracts structured South African rental property ledger items, management commissions, and disbursements from statements.',
       input_schema: {
         type: 'object',
         properties: {
@@ -109,15 +115,16 @@ export async function parseStatementWithAnthropic(
               properties: {
                 propertyName: {
                   type: 'string',
-                  description: 'Name of the sectional title complex, unit number, or street address.',
+                  description:
+                    'Scheme or complex name with unit number (e.g. "Clearwater Village 128", "The Blyde 402").',
                 },
                 address: {
                   type: 'string',
-                  description: 'Physical property address if available on statement.',
+                  description: 'Full physical address or street if visible on statement.',
                 },
                 tenantName: {
                   type: 'string',
-                  description: 'Name of the current tenant occupying the unit.',
+                  description: 'Full name of tenant leasing the unit.',
                 },
                 leaseExpiryDate: {
                   type: 'string',
@@ -125,7 +132,7 @@ export async function parseStatementWithAnthropic(
                 },
                 grossRentZAR: {
                   type: 'number',
-                  description: 'Monthly gross contractual rental amount charged in ZAR.',
+                  description: 'Gross rental billing amount in ZAR (positive number).',
                 },
                 leviesZAR: {
                   type: 'number',
@@ -170,9 +177,10 @@ export async function parseStatementWithAnthropic(
         'x-api-key': apiKey.trim(),
         'anthropic-version': '2023-06-01',
         'anthropic-dangerous-direct-browser-access': 'true',
+        'anthropic-beta': 'pdfs-2024-09-25',
       },
       body: JSON.stringify({
-        model,
+        model: effectiveModel,
         max_tokens: 4096,
         system:
           'You are an expert South African real estate forensic accountant analyzing visual managing agent statements (specifically iGrow Rentals / WeconnectU). Parse all rental ledger entries, fee deductions, and net owner payouts with exact mathematical fidelity. Always call the extract_rental_statements tool.',
@@ -202,6 +210,15 @@ export async function parseStatementWithAnthropic(
       } catch {
         // use raw text
       }
+
+      if (response.status === 404 && parsedErr.toLowerCase().includes('model')) {
+        return {
+          success: false,
+          units: [],
+          error: `Anthropic Model Not Found (404): The requested model "${effectiveModel}" is unavailable or retired on this API key tier. Please navigate to Settings and select a supported model (e.g. claude-3-7-sonnet-20250219, claude-3-5-sonnet-latest, or claude-3-5-haiku-latest).`,
+        };
+      }
+
       return {
         success: false,
         units: [],
