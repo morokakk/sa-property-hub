@@ -33,12 +33,6 @@ export default function StatementReviewModal({
   const rentals = usePortfolioStore((state) => state.rentals);
   const [editableUnits, setEditableUnits] = useState<ExtractedRentalUnit[]>([]);
 
-  useEffect(() => {
-    setEditableUnits(JSON.parse(JSON.stringify(extractedUnits || [])));
-  }, [extractedUnits]);
-
-  if (!isOpen) return null;
-
   const normalizeKey = (s?: string) =>
     s ? s.toLowerCase().replace(/[^a-z0-9]/g, '') : '';
 
@@ -58,6 +52,36 @@ export default function StatementReviewModal({
     });
   };
 
+  useEffect(() => {
+    if (!extractedUnits) return;
+    const cloned: ExtractedRentalUnit[] = JSON.parse(JSON.stringify(extractedUnits));
+    const initialized = cloned.map((unit) => {
+      const matched = findMatch(unit);
+      const estMarketValue =
+        unit.estimatedMarketValueZAR && unit.estimatedMarketValueZAR > 0
+          ? unit.estimatedMarketValueZAR
+          : matched
+          ? matched.marketValueZAR
+          : Math.round(unit.grossRentZAR * 120);
+
+      const isVatInc = unit.isCommissionInclusiveOfVat !== false;
+      const vatAmount =
+        unit.agencyCommissionVatZAR !== undefined
+          ? unit.agencyCommissionVatZAR
+          : isVatInc && unit.agencyCommissionZAR
+          ? Number(((unit.agencyCommissionZAR * 0.15) / 1.15).toFixed(2))
+          : 0;
+
+      return {
+        ...unit,
+        estimatedMarketValueZAR: estMarketValue,
+        isCommissionInclusiveOfVat: isVatInc,
+        agencyCommissionVatZAR: vatAmount,
+      };
+    });
+    setEditableUnits(initialized);
+  }, [extractedUnits, rentals]);
+
   const handleFieldChange = (
     index: number,
     field: keyof ExtractedRentalUnit,
@@ -73,6 +97,8 @@ export default function StatementReviewModal({
   const handleConfirm = () => {
     onConfirmSync(editableUnits);
   };
+
+  if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-150">
@@ -114,6 +140,26 @@ export default function StatementReviewModal({
             const matched = findMatch(unit);
             const varianceInfo = checkAccountingVariance(unit);
 
+            const estVal = unit.estimatedMarketValueZAR || 0;
+            const grossYield =
+              estVal > 0 && unit.grossRentZAR > 0
+                ? Number((((unit.grossRentZAR * 12) / estVal) * 100).toFixed(1))
+                : 0;
+
+            const commTotal = unit.agencyCommissionZAR || 0;
+            const isVatInc = unit.isCommissionInclusiveOfVat !== false;
+            const vatAmount =
+              unit.agencyCommissionVatZAR !== undefined
+                ? unit.agencyCommissionVatZAR
+                : isVatInc && commTotal > 0
+                ? Number(((commTotal * 0.15) / 1.15).toFixed(2))
+                : 0;
+            const commExVat = isVatInc ? Math.max(0, commTotal - vatAmount) : commTotal;
+            const effectivePercent =
+              unit.grossRentZAR > 0 && commTotal > 0
+                ? ((commExVat / unit.grossRentZAR) * 100).toFixed(1)
+                : '8.0';
+
             return (
               <div
                 key={idx}
@@ -144,7 +190,7 @@ export default function StatementReviewModal({
                 </div>
 
                 {/* Property & Tenant Meta Info */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 text-xs">
                   <div>
                     <label className="block font-semibold text-slate-700 mb-1">Property Name / Unit</label>
                     <input
@@ -184,6 +230,33 @@ export default function StatementReviewModal({
                       onChange={(e) => handleFieldChange(idx, 'leaseExpiryDate', e.target.value)}
                       className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg text-slate-800 bg-white"
                     />
+                  </div>
+
+                  <div className="p-2 rounded-lg bg-emerald-50/50 border border-emerald-200">
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="block font-bold text-slate-800">Estimated Market Value</label>
+                      {grossYield > 0 && (
+                        <span className="text-[10px] font-bold text-emerald-800 bg-emerald-100 px-1.5 py-0.2 rounded">
+                          {grossYield}% Yield
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-center">
+                      <span className="font-bold text-slate-400 mr-1">R</span>
+                      <input
+                        type="number"
+                        step="1000"
+                        value={unit.estimatedMarketValueZAR || ''}
+                        onChange={(e) => handleFieldChange(idx, 'estimatedMarketValueZAR', Number(e.target.value))}
+                        placeholder="828000"
+                        className="w-full px-2 py-1 border border-slate-300 rounded font-bold text-slate-900 bg-white text-xs"
+                      />
+                    </div>
+                    <span className="text-[10px] text-slate-500 block mt-1 truncate">
+                      {matched
+                        ? `Current: ${formatZAR(matched.marketValueZAR)}`
+                        : 'Baseline: 10% capitalization yield'}
+                    </span>
                   </div>
                 </div>
 
@@ -258,17 +331,51 @@ export default function StatementReviewModal({
                     </div>
 
                     <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-200">
-                      <span className="text-[10px] text-slate-500 block font-medium">Agency Commission (+VAT)</span>
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] text-slate-500 block font-medium">Agency Commission</span>
+                        {isVatInc && (
+                          <span className="text-[9px] font-semibold text-indigo-700 bg-indigo-50 border border-indigo-200 px-1 rounded">
+                            Incl. VAT
+                          </span>
+                        )}
+                      </div>
                       <div className="flex items-center mt-1">
                         <span className="font-bold text-slate-400 mr-1">R</span>
                         <input
                           type="number"
                           step="0.01"
-                          value={unit.agencyCommissionZAR}
+                          value={unit.agencyCommissionZAR ?? 0}
                           onChange={(e) => handleFieldChange(idx, 'agencyCommissionZAR', Number(e.target.value))}
                           className="w-full font-bold text-slate-900 bg-white border border-slate-300 rounded px-2 py-1 text-xs"
                         />
                       </div>
+
+                      <label className="flex items-center gap-1.5 mt-1.5 cursor-pointer text-[10px] text-slate-600 select-none">
+                        <input
+                          type="checkbox"
+                          checked={isVatInc}
+                          onChange={(e) => {
+                            const checked = e.target.checked;
+                            handleFieldChange(idx, 'isCommissionInclusiveOfVat', checked);
+                            if (checked && !unit.agencyCommissionVatZAR && unit.agencyCommissionZAR) {
+                              handleFieldChange(
+                                idx,
+                                'agencyCommissionVatZAR',
+                                Number(((unit.agencyCommissionZAR * 0.15) / 1.15).toFixed(2))
+                              );
+                            }
+                          }}
+                          className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 w-3 h-3"
+                        />
+                        <span className="font-medium text-slate-700">15% VAT included</span>
+                      </label>
+
+                      <span className="text-[9px] text-slate-500 block mt-0.5 font-mono truncate">
+                        {isVatInc
+                          ? `Ex-VAT: ${formatZAR(commExVat)} (${effectivePercent}%)`
+                          : `Pre-tax: ${effectivePercent}%`}
+                      </span>
+
                       {matched && (
                         <span className="text-[10px] text-slate-400 block mt-1">
                           Current: {formatZAR(matched.monthlyAgentFeeZAR)}

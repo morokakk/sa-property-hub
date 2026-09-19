@@ -20,6 +20,10 @@ export const ExtractedRentalUnitSchema = z.object({
   leviesZAR: z.number().min(0, 'Levies cannot be negative').default(0),
   municipalRatesZAR: z.number().min(0, 'Municipal rates cannot be negative').default(0),
   agencyCommissionZAR: z.number().min(0, 'Agency commission cannot be negative').default(0),
+  agencyCommissionVatZAR: z.number().min(0).optional(),
+  isCommissionInclusiveOfVat: z.boolean().optional(),
+  estimatedMarketValueZAR: z.number().positive().optional(),
+  purchasePriceZAR: z.number().positive().optional(),
   depositHeldZAR: z.number().optional(),
   netOperatingIncomeZAR: z.number().optional().default(0),
   netPayoutZAR: z.number().optional(),
@@ -29,6 +33,10 @@ export const ExtractedRentalUnitSchema = z.object({
   const finalAddress = data.address || data.propertyAddress;
   const finalNet = data.netOperatingIncomeZAR || data.netPayoutZAR || 0;
   const finalLease = data.leaseExpiryDate || data.leaseEndDate;
+  const isVatInclusive =
+    data.isCommissionInclusiveOfVat !== undefined
+      ? data.isCommissionInclusiveOfVat
+      : true; // SA managing agent deduction ledgers default to VAT inclusive
   return {
     ...data,
     address: finalAddress,
@@ -36,6 +44,7 @@ export const ExtractedRentalUnitSchema = z.object({
     netOperatingIncomeZAR: finalNet,
     leaseExpiryDate: finalLease,
     leaseEndDate: finalLease,
+    isCommissionInclusiveOfVat: isVatInclusive,
   };
 });
 
@@ -133,6 +142,15 @@ export function normalizeStatementPayload(raw: unknown): unknown {
           leviesZAR: u.leviesZAR !== undefined ? parseNum(u.leviesZAR) : 0,
           municipalRatesZAR: u.municipalRatesZAR !== undefined ? parseNum(u.municipalRatesZAR) : 0,
           agencyCommissionZAR: u.agencyCommissionZAR !== undefined ? parseNum(u.agencyCommissionZAR) : 0,
+          agencyCommissionVatZAR: u.agencyCommissionVatZAR !== undefined ? parseNum(u.agencyCommissionVatZAR) : undefined,
+          isCommissionInclusiveOfVat:
+            typeof u.isCommissionInclusiveOfVat === 'boolean'
+              ? u.isCommissionInclusiveOfVat
+              : typeof u.isCommissionInclusiveOfVat === 'string'
+                ? u.isCommissionInclusiveOfVat.toLowerCase() === 'true'
+                : true, // default to true on SA managing agent statements
+          estimatedMarketValueZAR: u.estimatedMarketValueZAR !== undefined ? parseNum(u.estimatedMarketValueZAR) : undefined,
+          purchasePriceZAR: u.purchasePriceZAR !== undefined ? parseNum(u.purchasePriceZAR) : undefined,
           depositHeldZAR: u.depositHeldZAR !== undefined ? parseNum(u.depositHeldZAR) : undefined,
           netOperatingIncomeZAR: parseNum(u.netOperatingIncomeZAR ?? u.netPayoutZAR),
         };

@@ -39,6 +39,9 @@ export function getDemoStatementData(): ExtractedRentalUnit[] {
       leviesZAR: 477.07,
       municipalRatesZAR: 1021.0,
       agencyCommissionZAR: 850.54, // iGrow management fee + VAT
+      agencyCommissionVatZAR: 110.94, // 15% SARS VAT
+      isCommissionInclusiveOfVat: true,
+      estimatedMarketValueZAR: 828000,
       depositHeldZAR: 6965.17,
       netOperatingIncomeZAR: 5525.03, // Statement payout
     },
@@ -150,7 +153,23 @@ export async function parseStatementWithAnthropic(
                 },
                 agencyCommissionZAR: {
                   type: 'number',
-                  description: 'Managing agent management fee / commission deducted in ZAR (including 15% VAT).',
+                  description:
+                    'Total managing agent management fee / commission deducted on statement in ZAR (invoiced amount deducted from owner payout).',
+                },
+                agencyCommissionVatZAR: {
+                  type: 'number',
+                  description:
+                    'The 15% SARS VAT portion of the agency commission if itemized separately on the statement (e.g. 110.94).',
+                },
+                isCommissionInclusiveOfVat: {
+                  type: 'boolean',
+                  description:
+                    'Whether the deducted agencyCommissionZAR is already inclusive of 15% VAT. South African managing agent statements (e.g. iGrow, WeconnectU) deduct the VAT-inclusive invoice total (e.g. R850.54 which includes R110.94 VAT). Set to true if VAT is included in commission.',
+                },
+                estimatedMarketValueZAR: {
+                  type: 'number',
+                  description:
+                    'Estimated property market value in ZAR if explicitly mentioned on statement, otherwise omit.',
                 },
                 depositHeldZAR: {
                   type: 'number',
@@ -189,7 +208,7 @@ export async function parseStatementWithAnthropic(
         model: effectiveModel,
         max_tokens: 4096,
         system:
-          'You are an expert South African real estate forensic accountant analyzing visual managing agent statements (specifically iGrow Rentals / WeconnectU). Parse all rental ledger entries, fee deductions, and net owner payouts with exact mathematical fidelity. Always call the extract_rental_statements tool.',
+          'You are an expert South African real estate forensic accountant analyzing visual managing agent statements (specifically iGrow Rentals / WeconnectU). Parse all rental ledger entries, fee deductions, and net owner payouts with exact mathematical fidelity. Pay special attention to agent commission: check if the deducted commission invoice is inclusive of 15% VAT (e.g. Invoiced fee R850.54 including R110.94 VAT), and set agencyCommissionVatZAR and isCommissionInclusiveOfVat: true accordingly so that VAT is not double-charged in downstream calculations. Always call the extract_rental_statements tool.',
         messages: [
           {
             role: 'user',

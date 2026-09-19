@@ -231,12 +231,12 @@ export function calculateRentalCashflow(property: {
   let agencyCommissionZAR = 0;
 
   if (property.managementType === 'Agency') {
-    if (typeof property.agencyCommissionPercent === 'number' && property.agencyCommissionPercent > 0) {
+    if (typeof property.monthlyAgentFeeZAR === 'number' && property.monthlyAgentFeeZAR > 0) {
+      agencyCommissionZAR = Math.round(property.monthlyAgentFeeZAR);
+    } else if (typeof property.agencyCommissionPercent === 'number' && property.agencyCommissionPercent > 0) {
       const baseCommission = gross * (property.agencyCommissionPercent / 100);
       const vatMultiplier = property.agencyVatApplicable !== false ? 1.15 : 1.0;
       agencyCommissionZAR = Math.round(baseCommission * vatMultiplier);
-    } else {
-      agencyCommissionZAR = property.monthlyAgentFeeZAR || 0;
     }
   }
 

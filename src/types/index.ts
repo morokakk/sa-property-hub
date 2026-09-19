@@ -385,6 +385,10 @@ export interface ExtractedRentalUnit {
   leviesZAR?: number; // e.g. 477.07
   municipalRatesZAR?: number; // e.g. 1021.00
   agencyCommissionZAR?: number; // e.g. 850.54
+  agencyCommissionVatZAR?: number; // e.g. 110.94 (15% SARS VAT)
+  isCommissionInclusiveOfVat?: boolean; // true if agencyCommissionZAR already includes VAT
+  estimatedMarketValueZAR?: number; // e.g. 828000
+  purchasePriceZAR?: number; // e.g. 759000
   depositHeldZAR?: number; // e.g. 6965.17
   netOperatingIncomeZAR?: number; // e.g. 5525.03
   netPayoutZAR?: number; // alias for netOperatingIncomeZAR

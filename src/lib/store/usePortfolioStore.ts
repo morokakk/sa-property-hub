@@ -257,6 +257,21 @@ export const usePortfolioStore = create<PortfolioState>()(
             varianceCount++;
           }
 
+          // Compute VAT & commission metrics accurately to avoid double-taxation
+          const isVatInclusive = unit.isCommissionInclusiveOfVat !== false;
+          const commTotal = unit.agencyCommissionZAR ?? 0;
+          const vatAmount =
+            unit.agencyCommissionVatZAR !== undefined
+              ? unit.agencyCommissionVatZAR
+              : isVatInclusive && commTotal > 0
+              ? (commTotal * 0.15) / 1.15
+              : 0;
+          const commExVat = isVatInclusive ? Math.max(0, commTotal - vatAmount) : commTotal;
+          const baseCommissionPercent =
+            unit.grossRentZAR > 0 && commTotal > 0
+              ? Number(((commExVat / unit.grossRentZAR) * 100).toFixed(2))
+              : 8.0;
+
           if (matchIndex >= 0) {
             const existing = updatedRentals[matchIndex];
             updatedRentals[matchIndex] = {
@@ -265,7 +280,26 @@ export const usePortfolioStore = create<PortfolioState>()(
               monthlyLeviesZAR:
                 existing.propertyType === 'Freehold House' ? 0 : (unit.leviesZAR ?? existing.monthlyLeviesZAR),
               monthlyRatesTaxesZAR: unit.municipalRatesZAR ?? existing.monthlyRatesTaxesZAR,
-              monthlyAgentFeeZAR: unit.agencyCommissionZAR ?? existing.monthlyAgentFeeZAR,
+              monthlyAgentFeeZAR:
+                unit.agencyCommissionZAR !== undefined
+                  ? Math.round(unit.agencyCommissionZAR)
+                  : existing.monthlyAgentFeeZAR,
+              agencyCommissionPercent:
+                unit.agencyCommissionZAR !== undefined
+                  ? baseCommissionPercent
+                  : existing.agencyCommissionPercent,
+              agencyVatApplicable:
+                unit.agencyCommissionZAR !== undefined
+                  ? isVatInclusive || vatAmount > 0
+                  : existing.agencyVatApplicable,
+              marketValueZAR:
+                unit.estimatedMarketValueZAR && unit.estimatedMarketValueZAR > 0
+                  ? Math.round(unit.estimatedMarketValueZAR)
+                  : existing.marketValueZAR,
+              purchasePriceZAR:
+                unit.purchasePriceZAR && unit.purchasePriceZAR > 0
+                  ? Math.round(unit.purchasePriceZAR)
+                  : existing.purchasePriceZAR,
               tenantName: unit.tenantName || existing.tenantName,
               leaseEndDate: unit.leaseExpiryDate || unit.leaseEndDate || existing.leaseEndDate,
               depositHeldZAR: unit.depositHeldZAR ?? existing.depositHeldZAR,
@@ -275,14 +309,23 @@ export const usePortfolioStore = create<PortfolioState>()(
             const isHouse =
               unit.propertyName.toLowerCase().includes('house') ||
               unit.propertyName.toLowerCase().includes('freehold');
+            const marketValue =
+              unit.estimatedMarketValueZAR && unit.estimatedMarketValueZAR > 0
+                ? Math.round(unit.estimatedMarketValueZAR)
+                : Math.round(unit.grossRentZAR * 120);
+            const purchasePrice =
+              unit.purchasePriceZAR && unit.purchasePriceZAR > 0
+                ? Math.round(unit.purchasePriceZAR)
+                : Math.round(unit.grossRentZAR * 110);
+
             const newProperty: RentalProperty = {
               id: `rental-ai-${Date.now()}-${idx}`,
               title: unit.propertyName,
               address: unit.address || unit.propertyAddress || `${unit.propertyName}, South Africa`,
               city: 'Johannesburg',
               propertyType: isHouse ? 'Freehold House' : 'Sectional Title Apartment',
-              marketValueZAR: Math.round(unit.grossRentZAR * 120),
-              purchasePriceZAR: Math.round(unit.grossRentZAR * 110),
+              marketValueZAR: marketValue,
+              purchasePriceZAR: purchasePrice,
               purchaseDate: new Date().toISOString().split('T')[0],
               outstandingBondBalanceZAR: 0,
               bondInterestRatePercent: 11.75,
@@ -301,15 +344,12 @@ export const usePortfolioStore = create<PortfolioState>()(
               annualEscalationPercent: 7.0,
               managementType: 'Agency',
               agencyName: unit.managingAgent || 'iGrow Rentals / WeconnectU',
-              agencyCommissionPercent:
-                unit.grossRentZAR > 0 && unit.agencyCommissionZAR !== undefined
-                  ? Number(((unit.agencyCommissionZAR / unit.grossRentZAR) * 100).toFixed(1))
-                  : 8.0,
-              agencyVatApplicable: true,
+              agencyCommissionPercent: baseCommissionPercent,
+              agencyVatApplicable: isVatInclusive || vatAmount > 0,
               monthlyGrossRentZAR: unit.grossRentZAR,
               monthlyLeviesZAR: isHouse ? 0 : (unit.leviesZAR ?? 0),
               monthlyRatesTaxesZAR: unit.municipalRatesZAR ?? 0,
-              monthlyAgentFeeZAR: unit.agencyCommissionZAR ?? 0,
+              monthlyAgentFeeZAR: Math.round(commTotal),
               monthlyMaintenanceReserveZAR: 500,
               unpaidUtilityArrearsZAR: 0,
               maintenanceHistory: [],

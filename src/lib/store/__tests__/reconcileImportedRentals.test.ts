@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { usePortfolioStore } from '../usePortfolioStore';
 import { ExtractedRentalUnit } from '@/types';
+import { calculateRentalCashflow } from '@/lib/calculations/propertyMetrics';
 
 describe('usePortfolioStore reconcileImportedRentals', () => {
   beforeEach(() => {
@@ -140,5 +141,54 @@ describe('usePortfolioStore reconcileImportedRentals', () => {
     expect(result.updatedCount).toBe(1);
     expect(result.addedCount).toBe(1);
     expect(usePortfolioStore.getState().rentals.length).toBe(initialCount + 1);
+  });
+
+  it('respects custom estimatedMarketValueZAR and purchasePriceZAR overrides during import', () => {
+    const brandNewWithValuation: ExtractedRentalUnit = {
+      propertyName: 'Kew House Custom Val',
+      grossRentZAR: 10000,
+      estimatedMarketValueZAR: 1250000,
+      purchasePriceZAR: 1100000,
+      netPayoutZAR: 8500,
+    };
+
+    usePortfolioStore.getState().reconcileImportedRentals([brandNewWithValuation]);
+
+    const created = usePortfolioStore.getState().rentals.find((r) => r.title === 'Kew House Custom Val')!;
+    expect(created).toBeDefined();
+    // Must use custom values, not the default 120x (1,200,000) or 110x (1,100,000)
+    expect(created.marketValueZAR).toBe(1250000);
+    expect(created.purchasePriceZAR).toBe(1100000);
+  });
+
+  it('correctly handles VAT-inclusive agent commission without double-taxation (R850.54 with R110.94 VAT yields R851, not R976)', () => {
+    const clearwaterUnit: ExtractedRentalUnit = {
+      propertyName: 'Clearwater Village 128',
+      grossRentZAR: 6900,
+      leviesZAR: 477.07,
+      municipalRatesZAR: 1021.0,
+      agencyCommissionZAR: 850.54,
+      agencyCommissionVatZAR: 110.94,
+      isCommissionInclusiveOfVat: true,
+      estimatedMarketValueZAR: 828000,
+      netPayoutZAR: 5525.03,
+      tenantName: 'Bongani June Mwale',
+      managingAgent: 'iGrow Rentals / WeconnectU',
+    };
+
+    usePortfolioStore.getState().reconcileImportedRentals([clearwaterUnit]);
+
+    const property = usePortfolioStore.getState().rentals.find((r) => r.title === 'Clearwater Village 128')!;
+    expect(property).toBeDefined();
+
+    // Pre-VAT base commission percent should be (850.54 - 110.94) / 6900 = 739.60 / 6900 = ~10.72%
+    expect(property.agencyCommissionPercent).toBeCloseTo(10.72, 1);
+    expect(property.agencyVatApplicable).toBe(true);
+    expect(property.monthlyAgentFeeZAR).toBe(851);
+
+    // Verify cash flow calculation produces R 851, NOT the double-taxed R 976
+    const cashflow = calculateRentalCashflow(property);
+    expect(cashflow.agencyCommissionZAR).toBe(851);
+    expect(cashflow.agencyCommissionZAR).not.toBe(976);
   });
 });

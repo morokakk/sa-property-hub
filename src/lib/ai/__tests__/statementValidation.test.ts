@@ -203,4 +203,42 @@ describe('AI Statement Validation & Accounting Variance', () => {
       expect(result.difference).toBeCloseTo(0.5, 2);
     });
   });
+
+  describe('VAT & Market Value Schema Validation', () => {
+    it('correctly parses agencyCommissionVatZAR, isCommissionInclusiveOfVat, and estimatedMarketValueZAR', () => {
+      const data = {
+        propertyName: 'Clearwater Village 128',
+        grossRentZAR: 6900,
+        agencyCommissionZAR: 850.54,
+        agencyCommissionVatZAR: 110.94,
+        isCommissionInclusiveOfVat: true,
+        estimatedMarketValueZAR: 828000,
+        purchasePriceZAR: 759000,
+        netPayoutZAR: 5525.03,
+      };
+
+      const parsed = ExtractedRentalUnitSchema.safeParse(data);
+      expect(parsed.success).toBe(true);
+      if (parsed.success) {
+        expect(parsed.data.agencyCommissionVatZAR).toBe(110.94);
+        expect(parsed.data.isCommissionInclusiveOfVat).toBe(true);
+        expect(parsed.data.estimatedMarketValueZAR).toBe(828000);
+        expect(parsed.data.purchasePriceZAR).toBe(759000);
+      }
+    });
+
+    it('defaults isCommissionInclusiveOfVat to true for managing agent trust ledgers when omitted', () => {
+      const data = {
+        propertyName: 'Midrand Complex 14',
+        grossRentZAR: 9000,
+        agencyCommissionZAR: 950,
+      };
+
+      const parsed = ExtractedRentalUnitSchema.safeParse(data);
+      expect(parsed.success).toBe(true);
+      if (parsed.success) {
+        expect(parsed.data.isCommissionInclusiveOfVat).toBe(true);
+      }
+    });
+  });
 });
