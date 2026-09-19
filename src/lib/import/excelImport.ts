@@ -40,6 +40,7 @@ export function normalizeHeader(header: string): string {
     .replace(/\(%\)/g, '')
     .replace(/\(months\)/g, '')
     .replace(/\(yyyy-mm-dd\)/g, '')
+    .replace(/\(yyyy-mm\)/g, '')
     .trim();
 }
 
@@ -200,6 +201,7 @@ export function downloadRentalsTemplate() {
     'Agency Name',
     'Agency Commission (%)',
     'Agency VAT Applicable',
+    'Monthly Agency Fee (ZAR)',
     'Agency Contact',
     'Monthly Maintenance Reserve (ZAR)',
     'Tenant Name',
@@ -209,6 +211,7 @@ export function downloadRentalsTemplate() {
     'Lease End Date (YYYY-MM-DD)',
     'Deposit Held (ZAR)',
     'Annual Escalation (%)',
+    'Bond Effective Month (YYYY-MM)',
     'AGM Date (YYYY-MM-DD)',
     'Status',
   ];
@@ -232,6 +235,7 @@ export function downloadRentalsTemplate() {
       'Pam Golding Rosebank',
       8.0,
       'Yes',
+      1242,
       'agent@pamgolding.co.za',
       600,
       'Sipho Ndlovu',
@@ -241,6 +245,7 @@ export function downloadRentalsTemplate() {
       '2027-02-28',
       27000,
       7.0,
+      '2026-04',
       '2026-11-20',
       'Occupied',
     ],
@@ -262,6 +267,7 @@ export function downloadRentalsTemplate() {
       '',
       0,
       'No',
+      0,
       '',
       1000,
       'Claire van der Merwe',
@@ -271,6 +277,7 @@ export function downloadRentalsTemplate() {
       '2026-08-31',
       50000,
       6.5,
+      '',
       '',
       'Occupied',
     ],
@@ -292,6 +299,7 @@ export function downloadRentalsTemplate() {
       'Wakefields Umhlanga',
       7.5,
       'Yes',
+      1293.75,
       '+27 31 561 1234',
       700,
       'Brandon Pillay',
@@ -301,6 +309,7 @@ export function downloadRentalsTemplate() {
       '2027-06-30',
       30000,
       7.0,
+      '',
       '',
       'Occupied',
     ],
@@ -355,6 +364,10 @@ export function downloadFlipsTemplate() {
     'Renovation Budget (ZAR) *',
     'Target Exit Price (ZAR) *',
     'Estimated Duration (Months)',
+    'Monthly Bond Payment (ZAR)',
+    'Monthly Levies (ZAR)',
+    'Monthly Rates & Taxes (ZAR)',
+    'Other Holding Costs (ZAR)',
     'Monthly Holding Cost (ZAR)',
     'Purchase Date (YYYY-MM-DD)',
     'Target Completion Date (YYYY-MM-DD)',
@@ -374,6 +387,10 @@ export function downloadFlipsTemplate() {
       380000,
       3250000,
       5,
+      4500,
+      0, // Freehold levies strictly R0
+      1200,
+      800,
       6500,
       '2026-08-01',
       '2027-01-15',
@@ -391,6 +408,10 @@ export function downloadFlipsTemplate() {
       180000,
       2100000,
       4,
+      2400,
+      1100,
+      450,
+      250,
       4200,
       '2026-09-01',
       '2027-01-01',
@@ -408,6 +429,10 @@ export function downloadFlipsTemplate() {
       260000,
       2650000,
       6,
+      3200,
+      1200,
+      650,
+      450,
       5500,
       '2026-07-15',
       '2027-01-30',
@@ -826,18 +851,26 @@ export function parseRentalsRows(rawRows: unknown[][]): ParseResult<RentalProper
       levies = 0;
     }
 
-    // SA Guardrail 2: Agency commission VAT calculation
     const isAgency = managementTypeRaw?.toLowerCase().includes('agency') || !!agencyName;
     const managementType: 'Self-Managed' | 'Agency' = isAgency ? 'Agency' : 'Self-Managed';
     const agencyCommissionPercent = isAgency ? parseNumber(rawAgencyComm) ?? 8.0 : 0;
     const agencyVatApplicable = isAgency ? (agencyVatRaw === 'no' || agencyVatRaw === 'false' ? false : true) : false;
 
+    const rawExplicitAgencyFee = getColVal(row, 'monthly agency fee') ?? getColVal(row, 'agency fee');
+    const explicitAgentFee = parseNumber(rawExplicitAgencyFee);
+
     let monthlyAgentFeeZAR = 0;
-    if (isAgency && grossRent) {
+    if (explicitAgentFee !== null && explicitAgentFee >= 0) {
+      monthlyAgentFeeZAR = Math.round(explicitAgentFee);
+    } else if (isAgency && grossRent) {
       const baseFee = grossRent * (agencyCommissionPercent / 100);
       const vatMultiplier = agencyVatApplicable ? 1.15 : 1.0;
       monthlyAgentFeeZAR = Math.round(baseFee * vatMultiplier);
     }
+
+    const rawBondEffectiveMonth =
+      getColVal(row, 'bond effective month') ?? getColVal(row, 'bond payment effective date');
+    const bondPaymentEffectiveDate = rawBondEffectiveMonth?.toString().trim();
 
     const validStatuses = ['Occupied', 'Vacant', 'Notice Given', 'Sold'] as const;
     const status = validStatuses.includes(statusRaw as any) ? (statusRaw as any) : 'Occupied';
@@ -856,6 +889,7 @@ export function parseRentalsRows(rawRows: unknown[][]): ParseResult<RentalProper
         outstandingBondBalanceZAR: outstandingBond,
         bondInterestRatePercent: bondInterestRate,
         monthlyBondPaymentZAR: monthlyBondPayment,
+        bondPaymentEffectiveDate: bondPaymentEffectiveDate || undefined,
         tenantName,
         tenantPhone,
         tenantEmail,
@@ -953,6 +987,13 @@ export function parseFlipsRows(rawRows: unknown[][]): ParseResult<FlipProject> {
     const rawExitPrice = getColVal(row, 'target exit price');
     const rawDuration = getColVal(row, 'estimated duration');
     const rawHoldingCost = getColVal(row, 'monthly holding cost');
+    const rawBondPayment = getColVal(row, 'monthly bond repayment') ?? getColVal(row, 'monthly bond payment');
+    const rawLevies = getColVal(row, 'monthly levies');
+    const rawRates = getColVal(row, 'monthly rates & taxes') ?? getColVal(row, 'monthly rates');
+    const rawOtherHoldingCost =
+      getColVal(row, 'other holding costs') ??
+      getColVal(row, 'monthly other holding cost') ??
+      getColVal(row, 'other holding cost');
     const purchaseDate = getColVal(row, 'purchase date')?.toString().trim() || todayStr;
     const rawCompletionDate = getColVal(row, 'target completion date')?.toString().trim();
     const currentPhaseRaw = getColVal(row, 'current phase')?.toString().trim();
@@ -997,7 +1038,28 @@ export function parseFlipsRows(rawRows: unknown[][]): ParseResult<FlipProject> {
     }
 
     const durationMonths = parseNumber(rawDuration) ?? 6;
-    const monthlyHoldingCost = parseNumber(rawHoldingCost) ?? 0;
+    const propertyType = parsePropertyType(propertyTypeRaw);
+
+    const bondPayment = parseNumber(rawBondPayment);
+    let levies = parseNumber(rawLevies);
+    const rates = parseNumber(rawRates);
+    const otherHoldingCost = parseNumber(rawOtherHoldingCost);
+
+    // Freehold House guardrail: strictly R0 levies
+    if (propertyType === 'Freehold House' && levies && levies > 0) {
+      warnings.push(`Row ${rowNum} (${title}): Levies of R ${levies} were automatically set to R0 for Freehold House.`);
+      levies = 0;
+    }
+
+    let monthlyHoldingCost = parseNumber(rawHoldingCost);
+    if (bondPayment !== null || levies !== null || rates !== null || otherHoldingCost !== null) {
+      const itemizedTotal = (bondPayment ?? 0) + (levies ?? 0) + (rates ?? 0) + (otherHoldingCost ?? 0);
+      if (monthlyHoldingCost === null || monthlyHoldingCost === 0) {
+        monthlyHoldingCost = itemizedTotal;
+      }
+    } else if (monthlyHoldingCost === null) {
+      monthlyHoldingCost = 0;
+    }
 
     // Automatic calculation of acquisition costs if omitted or 0
     let acquisitionCosts = parseNumber(rawAcqCosts);
@@ -1009,8 +1071,6 @@ export function parseFlipsRows(rawRows: unknown[][]): ParseResult<FlipProject> {
         acquisitionCosts = 0;
       }
     }
-
-    const propertyType = parsePropertyType(propertyTypeRaw);
 
     // Target completion date defaults to today + duration months
     const targetCompletionDate =
@@ -1065,6 +1125,10 @@ export function parseFlipsRows(rawRows: unknown[][]): ParseResult<FlipProject> {
         baselineRenovationBudgetZAR: renoBudget,
         estimatedDurationMonths: durationMonths,
         monthlyHoldingCostZAR: monthlyHoldingCost,
+        monthlyBondPaymentZAR: bondPayment !== null ? bondPayment : undefined,
+        monthlyLeviesZAR: levies !== null ? levies : undefined,
+        monthlyRatesTaxesZAR: rates !== null ? rates : undefined,
+        monthlyOtherHoldingCostZAR: otherHoldingCost !== null ? otherHoldingCost : undefined,
         targetExitPriceZAR: exitPrice,
         targetCompletionDate,
         currentPhase,

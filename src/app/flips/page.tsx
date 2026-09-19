@@ -63,6 +63,7 @@ export default function FlipsManagerPage() {
 
   // WhatsApp Copy Toast State
   const [copiedWhatsApp, setCopiedWhatsApp] = useState(false);
+  const [showHoldingBreakdown, setShowHoldingBreakdown] = useState(false);
 
   // Modals
   const [showAddBOQModal, setShowAddBOQModal] = useState(false);
@@ -80,7 +81,10 @@ export default function FlipsManagerPage() {
   const [editFlipAcquisitionCosts, setEditFlipAcquisitionCosts] = useState(0);
   const [editFlipRenovationBudget, setEditFlipRenovationBudget] = useState(0);
   const [editFlipEstimatedDuration, setEditFlipEstimatedDuration] = useState(6);
-  const [editFlipMonthlyHoldingCost, setEditFlipMonthlyHoldingCost] = useState(15000);
+  const [editFlipBondPayment, setEditFlipBondPayment] = useState(0);
+  const [editFlipLevies, setEditFlipLevies] = useState(0);
+  const [editFlipRates, setEditFlipRates] = useState(0);
+  const [editFlipOtherHoldingCost, setEditFlipOtherHoldingCost] = useState(0);
   const [editFlipTargetExit, setEditFlipTargetExit] = useState(0);
   const [editFlipCompletionDate, setEditFlipCompletionDate] = useState('');
   const [editFlipPropertyType, setEditFlipPropertyType] = useState<PropertyTitleType>('Freehold House');
@@ -99,7 +103,17 @@ export default function FlipsManagerPage() {
     setEditFlipAcquisitionCosts(activeFlip.acquisitionCostsZAR);
     setEditFlipRenovationBudget(activeFlip.baselineRenovationBudgetZAR);
     setEditFlipEstimatedDuration(activeFlip.estimatedDurationMonths ?? 6);
-    setEditFlipMonthlyHoldingCost(activeFlip.monthlyHoldingCostZAR ?? 15000);
+
+    const existingHolding = activeFlip.monthlyHoldingCostZAR ?? 15000;
+    const bond = activeFlip.monthlyBondPaymentZAR !== undefined ? activeFlip.monthlyBondPaymentZAR : Math.round(existingHolding * 0.6);
+    const levies = activeFlip.propertyType === 'Freehold House' ? 0 : (activeFlip.monthlyLeviesZAR !== undefined ? activeFlip.monthlyLeviesZAR : Math.round(existingHolding * 0.15));
+    const rates = activeFlip.monthlyRatesTaxesZAR !== undefined ? activeFlip.monthlyRatesTaxesZAR : Math.round(existingHolding * 0.15);
+    const other = activeFlip.monthlyOtherHoldingCostZAR !== undefined ? activeFlip.monthlyOtherHoldingCostZAR : Math.max(0, existingHolding - (bond + levies + rates));
+
+    setEditFlipBondPayment(bond);
+    setEditFlipLevies(levies);
+    setEditFlipRates(rates);
+    setEditFlipOtherHoldingCost(other);
     setEditFlipTargetExit(activeFlip.targetExitPriceZAR);
     setEditFlipCompletionDate(activeFlip.targetCompletionDate);
     setEditFlipPropertyType(activeFlip.propertyType || 'Freehold House');
@@ -121,6 +135,9 @@ export default function FlipsManagerPage() {
       ratesBillUrl: editFlipRatesBillUrl.trim() || undefined,
       titleDeedUrl: editFlipTitleDeedUrl.trim() || undefined,
     };
+    const finalLevies = editFlipPropertyType === 'Freehold House' ? 0 : Number(editFlipLevies);
+    const totalMonthlyHolding = Number(editFlipBondPayment) + finalLevies + Number(editFlipRates) + Number(editFlipOtherHoldingCost);
+
     updateFlip(activeFlip.id, {
       title: editFlipTitle,
       address: editFlipAddress,
@@ -131,7 +148,11 @@ export default function FlipsManagerPage() {
       acquisitionCostsZAR: Number(editFlipAcquisitionCosts),
       baselineRenovationBudgetZAR: Number(editFlipRenovationBudget),
       estimatedDurationMonths: Number(editFlipEstimatedDuration),
-      monthlyHoldingCostZAR: Number(editFlipMonthlyHoldingCost),
+      monthlyHoldingCostZAR: totalMonthlyHolding,
+      monthlyBondPaymentZAR: Number(editFlipBondPayment),
+      monthlyLeviesZAR: finalLevies,
+      monthlyRatesTaxesZAR: Number(editFlipRates),
+      monthlyOtherHoldingCostZAR: Number(editFlipOtherHoldingCost),
       targetExitPriceZAR: Number(editFlipTargetExit),
       targetCompletionDate: editFlipCompletionDate,
       driveVault: updatedDriveVault,
@@ -175,7 +196,10 @@ export default function FlipsManagerPage() {
   const [newFlipAcquisitionCosts, setNewFlipAcquisitionCosts] = useState(185000);
   const [newFlipRenovationBudget, setNewFlipRenovationBudget] = useState(450000);
   const [newFlipEstimatedDuration, setNewFlipEstimatedDuration] = useState(6);
-  const [newFlipMonthlyHoldingCost, setNewFlipMonthlyHoldingCost] = useState(15000);
+  const [newFlipBondPayment, setNewFlipBondPayment] = useState(9500);
+  const [newFlipLevies, setNewFlipLevies] = useState(0);
+  const [newFlipRates, setNewFlipRates] = useState(3500);
+  const [newFlipOtherHoldingCost, setNewFlipOtherHoldingCost] = useState(2000);
   const [newFlipTargetExit, setNewFlipTargetExit] = useState(3800000);
   const [newFlipCompletionDate, setNewFlipCompletionDate] = useState(
     new Date(Date.now() + 180 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
@@ -224,6 +248,9 @@ export default function FlipsManagerPage() {
     if (!newFlipTitle) return;
 
     const isScheme = newFlipPropertyType === 'Sectional Title Apartment' || newFlipPropertyType === 'Townhouse / Cluster';
+    const finalLevies = newFlipPropertyType === 'Freehold House' ? 0 : Number(newFlipLevies);
+    const totalMonthlyHolding = Number(newFlipBondPayment) + finalLevies + Number(newFlipRates) + Number(newFlipOtherHoldingCost);
+
     const createdFlip: FlipProject = {
       id: `flip-${Date.now()}`,
       title: newFlipTitle,
@@ -236,7 +263,11 @@ export default function FlipsManagerPage() {
       acquisitionCostsZAR: newFlipAcquisitionCosts,
       baselineRenovationBudgetZAR: newFlipRenovationBudget,
       estimatedDurationMonths: newFlipEstimatedDuration,
-      monthlyHoldingCostZAR: newFlipMonthlyHoldingCost,
+      monthlyHoldingCostZAR: totalMonthlyHolding,
+      monthlyBondPaymentZAR: Number(newFlipBondPayment),
+      monthlyLeviesZAR: finalLevies,
+      monthlyRatesTaxesZAR: Number(newFlipRates),
+      monthlyOtherHoldingCostZAR: Number(newFlipOtherHoldingCost),
       targetExitPriceZAR: newFlipTargetExit,
       targetCompletionDate: newFlipCompletionDate,
       currentPhase: 'Acquisition & Conveyancing',
@@ -579,19 +610,53 @@ export default function FlipsManagerPage() {
                     </div>
                   </div>
 
-                  {/* Total Holding Carrying Cost Card */}
-                  <div className="bg-white p-4 rounded-xl border border-amber-200/90 shadow-xs">
-                    <div className="flex items-center justify-between">
-                      <span className="text-[11px] font-semibold text-slate-500 uppercase">Total Holding Cost</span>
-                      <span className="text-[10px] text-amber-800 bg-amber-50 px-1.5 py-0.5 rounded font-bold border border-amber-200">
-                        {flipHoldingMonths} Mos
-                      </span>
+                  {/* Total Holding Carrying Cost Card (Expandable Itemization) */}
+                  <div className="bg-white p-4 rounded-xl border border-amber-200/90 shadow-xs flex flex-col justify-between">
+                    <div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] font-semibold text-slate-500 uppercase">Total Holding Cost</span>
+                        <span className="text-[10px] text-amber-800 bg-amber-50 px-1.5 py-0.5 rounded font-bold border border-amber-200">
+                          {flipHoldingMonths} Mos
+                        </span>
+                      </div>
+                      <div className="text-xl font-bold text-amber-700 mt-1">
+                        - {formatZAR(totalHoldingCost)}
+                      </div>
+                      <div className="text-[11px] text-slate-500 mt-0.5" title={`${formatZAR(flipMonthlyHoldingCost)}/mo carrying burn`}>
+                        {formatZAR(flipMonthlyHoldingCost)}/mo carrying burn
+                      </div>
                     </div>
-                    <div className="text-xl font-bold text-amber-700 mt-1">
-                      - {formatZAR(totalHoldingCost)}
-                    </div>
-                    <div className="text-[11px] text-slate-500 mt-0.5 truncate" title={`${formatZAR(flipMonthlyHoldingCost)}/mo (interim bond, rates, levies, security)`}>
-                      {formatZAR(flipMonthlyHoldingCost)}/mo carrying burn
+
+                    <div className="mt-2.5 pt-2 border-t border-amber-100">
+                      <button
+                        type="button"
+                        onClick={() => setShowHoldingBreakdown((prev) => !prev)}
+                        className="text-[10px] font-semibold text-amber-800 hover:text-amber-950 flex items-center justify-between w-full cursor-pointer transition-colors"
+                      >
+                        <span>{showHoldingBreakdown ? '▲ Hide Breakdown' : '▼ Itemized Breakdown'}</span>
+                        <span className="text-[9px] text-slate-400">Monthly</span>
+                      </button>
+
+                      {showHoldingBreakdown && (
+                        <div className="mt-2 space-y-1 text-[10px] text-slate-600 bg-amber-50/60 p-2 rounded-lg border border-amber-200/80 animate-in fade-in duration-150">
+                          <div className="flex justify-between">
+                            <span>Interim Bond:</span>
+                            <strong className="text-slate-800 font-semibold">{formatZAR(activeFlip.monthlyBondPaymentZAR || 0)}/m</strong>
+                          </div>
+                          <div className="flex justify-between">
+                            <span>{activeFlip.propertyType === 'Freehold House' ? 'Levies (N/A):' : 'Body Corporate / HOA:'}</span>
+                            <strong className="text-slate-800 font-semibold">{activeFlip.propertyType === 'Freehold House' ? 'R 0 (Freehold)' : `${formatZAR(activeFlip.monthlyLeviesZAR || 0)}/m`}</strong>
+                          </div>
+                          <div className="flex justify-between">
+                            <span>Rates & Taxes:</span>
+                            <strong className="text-slate-800 font-semibold">{formatZAR(activeFlip.monthlyRatesTaxesZAR || 0)}/m</strong>
+                          </div>
+                          <div className="flex justify-between">
+                            <span>Security & Other:</span>
+                            <strong className="text-slate-800 font-semibold">{formatZAR(activeFlip.monthlyOtherHoldingCostZAR || 0)}/m</strong>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
 
@@ -1525,43 +1590,95 @@ export default function FlipsManagerPage() {
                 </div>
               </div>
 
-              {/* Holding Period Carrying Costs Inputs */}
-              <div className="p-3 bg-amber-50/60 rounded-lg border border-amber-200/90 space-y-2">
+              {/* Holding Period Carrying Costs Inputs (Itemized) */}
+              <div className="p-3 bg-amber-50/60 rounded-lg border border-amber-200/90 space-y-2.5">
                 <div className="flex items-center justify-between">
                   <span className="font-bold text-[11px] text-amber-900 uppercase tracking-wider">
-                    Holding Period Carrying Costs
+                    Holding Period Carrying Costs (Itemized)
                   </span>
-                  <span className="text-[10px] text-amber-800 font-semibold">
-                    Total: {formatZAR(newFlipEstimatedDuration * newFlipMonthlyHoldingCost)}
+                  <span className="text-xs font-bold text-amber-800 bg-amber-100 px-2 py-0.5 rounded border border-amber-300">
+                    Total: {formatZAR(newFlipEstimatedDuration * (Number(newFlipBondPayment) + (newFlipPropertyType === 'Freehold House' ? 0 : Number(newFlipLevies)) + Number(newFlipRates) + Number(newFlipOtherHoldingCost)))}
                   </span>
                 </div>
-                <div className="grid grid-cols-2 gap-3">
+
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1 text-xs">Estimated Duration (Months)</label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="36"
+                    value={newFlipEstimatedDuration}
+                    onChange={(e) => setNewFlipEstimatedDuration(Number(e.target.value))}
+                    className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg bg-white font-medium text-xs"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-xs">
                   <div>
-                    <label className="block font-semibold text-slate-700 mb-1">Estimated Duration (Months)</label>
-                    <input
-                      type="number"
-                      min="1"
-                      max="36"
-                      value={newFlipEstimatedDuration}
-                      onChange={(e) => setNewFlipEstimatedDuration(Number(e.target.value))}
-                      className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg bg-white font-medium"
-                    />
-                  </div>
-                  <div>
-                    <label className="block font-semibold text-slate-700 mb-1">Monthly Holding Cost (ZAR)</label>
+                    <label className="block font-semibold text-slate-700 mb-1 text-[11px]">Interim Bond (ZAR/m)</label>
                     <input
                       type="number"
                       min="0"
                       step="500"
-                      value={newFlipMonthlyHoldingCost}
-                      onChange={(e) => setNewFlipMonthlyHoldingCost(Number(e.target.value))}
-                      className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg bg-white font-medium text-amber-800"
+                      value={newFlipBondPayment}
+                      onChange={(e) => setNewFlipBondPayment(Number(e.target.value))}
+                      className="w-full px-2 py-1.5 border border-slate-300 rounded-lg bg-white font-medium text-xs"
+                    />
+                  </div>
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="block font-semibold text-slate-700 text-[11px]">
+                        {newFlipPropertyType === 'Freehold House' ? 'Levies (N/A)' : 'Levies (ZAR/m)'}
+                      </label>
+                      {newFlipPropertyType === 'Freehold House' && (
+                        <span className="text-[9px] font-bold text-emerald-700 bg-emerald-100 px-1 rounded">R0</span>
+                      )}
+                    </div>
+                    <input
+                      type="number"
+                      min="0"
+                      step="100"
+                      disabled={newFlipPropertyType === 'Freehold House'}
+                      value={newFlipPropertyType === 'Freehold House' ? 0 : newFlipLevies}
+                      onChange={(e) => setNewFlipLevies(Number(e.target.value))}
+                      className={`w-full px-2 py-1.5 border rounded-lg text-xs font-medium ${
+                        newFlipPropertyType === 'Freehold House'
+                          ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'
+                          : 'bg-white border-slate-300'
+                      }`}
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-semibold text-slate-700 mb-1 text-[11px]">Rates & Taxes (ZAR/m)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="100"
+                      value={newFlipRates}
+                      onChange={(e) => setNewFlipRates(Number(e.target.value))}
+                      className="w-full px-2 py-1.5 border border-slate-300 rounded-lg bg-white font-medium text-xs"
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-semibold text-slate-700 mb-1 text-[11px]">Other Costs (ZAR/m)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="100"
+                      value={newFlipOtherHoldingCost}
+                      onChange={(e) => setNewFlipOtherHoldingCost(Number(e.target.value))}
+                      placeholder="Security, ins."
+                      className="w-full px-2 py-1.5 border border-slate-300 rounded-lg bg-white font-medium text-xs"
                     />
                   </div>
                 </div>
-                <p className="text-[10px] text-slate-500">
-                  Encompassing interim bond interest, municipal rates & taxes, body corporate levies, and site security.
-                </p>
+
+                <div className="p-2 bg-amber-100/70 rounded-lg flex items-center justify-between text-xs text-amber-950 font-semibold">
+                  <span>Total Monthly Carrying Burn:</span>
+                  <span className="font-bold text-sm text-amber-800">
+                    {formatZAR(Number(newFlipBondPayment) + (newFlipPropertyType === 'Freehold House' ? 0 : Number(newFlipLevies)) + Number(newFlipRates) + Number(newFlipOtherHoldingCost))}/mo
+                  </span>
+                </div>
               </div>
 
               {/* Cloud & Web Document Vault Section */}
@@ -2100,42 +2217,96 @@ export default function FlipsManagerPage() {
               </div>
 
               {/* Holding Period Carrying Costs Inputs */}
-              <div className="p-3 bg-amber-50/80 rounded-lg border border-amber-200 space-y-2">
+              {/* Holding Period Carrying Costs Inputs (Itemized) */}
+              <div className="p-3 bg-amber-50/80 rounded-lg border border-amber-200 space-y-2.5">
                 <div className="flex items-center justify-between">
                   <span className="font-bold text-[11px] text-amber-900 uppercase tracking-wider flex items-center gap-1.5">
-                    <span>Holding Period Carrying Costs</span>
+                    <span>Holding Period Carrying Costs (Itemized)</span>
                   </span>
                   <span className="text-xs font-bold text-amber-800 bg-amber-100 px-2 py-0.5 rounded border border-amber-300">
-                    Total: {formatZAR(editFlipEstimatedDuration * editFlipMonthlyHoldingCost)}
+                    Total: {formatZAR(editFlipEstimatedDuration * (Number(editFlipBondPayment) + (editFlipPropertyType === 'Freehold House' ? 0 : Number(editFlipLevies)) + Number(editFlipRates) + Number(editFlipOtherHoldingCost)))}
                   </span>
                 </div>
-                <div className="grid grid-cols-2 gap-3">
+
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1 text-xs">Estimated Duration (Months)</label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="36"
+                    required
+                    value={editFlipEstimatedDuration}
+                    onChange={(e) => setEditFlipEstimatedDuration(Number(e.target.value))}
+                    className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg bg-white font-bold text-slate-900 text-xs"
+                  />
+                  <span className="text-[10px] text-slate-400">Total flip lifecycle</span>
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-xs">
                   <div>
-                    <label className="block font-semibold text-slate-700 mb-1">Estimated Duration (Months)</label>
-                    <input
-                      type="number"
-                      min="1"
-                      max="36"
-                      required
-                      value={editFlipEstimatedDuration}
-                      onChange={(e) => setEditFlipEstimatedDuration(Number(e.target.value))}
-                      className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg bg-white font-bold text-slate-900"
-                    />
-                    <span className="text-[10px] text-slate-400">Total flip lifecycle</span>
-                  </div>
-                  <div>
-                    <label className="block font-semibold text-slate-700 mb-1">Monthly Holding Cost (ZAR)</label>
+                    <label className="block font-semibold text-slate-700 mb-1 text-[11px]">Interim Bond (ZAR/m)</label>
                     <input
                       type="number"
                       min="0"
                       step="500"
-                      required
-                      value={editFlipMonthlyHoldingCost}
-                      onChange={(e) => setEditFlipMonthlyHoldingCost(Number(e.target.value))}
-                      className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg bg-white font-bold text-amber-800"
+                      value={editFlipBondPayment}
+                      onChange={(e) => setEditFlipBondPayment(Number(e.target.value))}
+                      className="w-full px-2 py-1.5 border border-slate-300 rounded-lg bg-white font-medium text-xs"
                     />
-                    <span className="text-[10px] text-slate-400">Interim bond, rates, levies, security</span>
                   </div>
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="block font-semibold text-slate-700 text-[11px]">
+                        {editFlipPropertyType === 'Freehold House' ? 'Levies (N/A)' : 'Levies (ZAR/m)'}
+                      </label>
+                      {editFlipPropertyType === 'Freehold House' && (
+                        <span className="text-[9px] font-bold text-emerald-700 bg-emerald-100 px-1 rounded">R0</span>
+                      )}
+                    </div>
+                    <input
+                      type="number"
+                      min="0"
+                      step="100"
+                      disabled={editFlipPropertyType === 'Freehold House'}
+                      value={editFlipPropertyType === 'Freehold House' ? 0 : editFlipLevies}
+                      onChange={(e) => setEditFlipLevies(Number(e.target.value))}
+                      className={`w-full px-2 py-1.5 border rounded-lg text-xs font-medium ${
+                        editFlipPropertyType === 'Freehold House'
+                          ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'
+                          : 'bg-white border-slate-300'
+                      }`}
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-semibold text-slate-700 mb-1 text-[11px]">Rates & Taxes (ZAR/m)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="100"
+                      value={editFlipRates}
+                      onChange={(e) => setEditFlipRates(Number(e.target.value))}
+                      className="w-full px-2 py-1.5 border border-slate-300 rounded-lg bg-white font-medium text-xs"
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-semibold text-slate-700 mb-1 text-[11px]">Other Costs (ZAR/m)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="100"
+                      value={editFlipOtherHoldingCost}
+                      onChange={(e) => setEditFlipOtherHoldingCost(Number(e.target.value))}
+                      placeholder="Security, ins."
+                      className="w-full px-2 py-1.5 border border-slate-300 rounded-lg bg-white font-medium text-xs"
+                    />
+                  </div>
+                </div>
+
+                <div className="p-2 bg-amber-100/70 rounded-lg flex items-center justify-between text-xs text-amber-950 font-semibold">
+                  <span>Total Monthly Carrying Burn:</span>
+                  <span className="font-bold text-sm text-amber-800">
+                    {formatZAR(Number(editFlipBondPayment) + (editFlipPropertyType === 'Freehold House' ? 0 : Number(editFlipLevies)) + Number(editFlipRates) + Number(editFlipOtherHoldingCost))}/mo
+                  </span>
                 </div>
                 <p className="text-[10px] text-slate-600 italic">
                   Deducted automatically from Projected Net Upside to capture true operational cash burn during renovations.

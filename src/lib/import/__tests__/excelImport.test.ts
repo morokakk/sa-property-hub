@@ -202,6 +202,41 @@ describe('Excel Import Engine Unit Tests', () => {
       expect(result.data[0].monthlyLeviesZAR).toBe(0);
       expect(result.warnings.length).toBe(1);
     });
+
+    it('supports explicit Monthly Agency Fee (ZAR) and Bond Effective Month without double VAT', () => {
+      const headers = [
+        'Property Title *',
+        'Address *',
+        'City *',
+        'Market Value (ZAR) *',
+        'Purchase Price (ZAR) *',
+        'Monthly Gross Rent (ZAR) *',
+        'Monthly Agency Fee (ZAR)',
+        'Monthly Bond Payment (ZAR)',
+        'Bond Effective Month (YYYY-MM)',
+      ];
+
+      const dataRow = [
+        'Camps Bay Ocean View',
+        '100 Victoria Rd',
+        'Cape Town',
+        6500000,
+        5800000,
+        45000,
+        3850, // explicit fee
+        28500,
+        '2026-10',
+      ];
+
+      const result = parseRentalsRows([headers, dataRow]);
+      expect(result.success).toBe(true);
+      expect(result.data.length).toBe(1);
+
+      const rental = result.data[0];
+      expect(rental.monthlyAgentFeeZAR).toBe(3850);
+      expect(rental.monthlyBondPaymentZAR).toBe(28500);
+      expect(rental.bondPaymentEffectiveDate).toBe('2026-10');
+    });
   });
 
   describe('Flips Parser & Auto-Estimations', () => {
@@ -243,5 +278,49 @@ describe('Excel Import Engine Unit Tests', () => {
       expect(flip.boq.length).toBe(1);
       expect(flip.boq[0].baselineTotalZAR).toBe(400000);
     });
+
+    it('parses itemized holding costs and zeroes out levies for Freehold flips', () => {
+      const headers = [
+        'Project Title *',
+        'Address *',
+        'City *',
+        'Property Type',
+        'Purchase Price (ZAR) *',
+        'Target Exit Price (ZAR) *',
+        'Renovation Budget (ZAR) *',
+        'Monthly Bond Payment (ZAR)',
+        'Monthly Levies (ZAR)',
+        'Monthly Rates & Taxes (ZAR)',
+        'Other Holding Costs (ZAR)',
+      ];
+
+      const dataRow = [
+        'Kensington Fixer-Upper',
+        '45 Roberts Ave',
+        'Johannesburg',
+        'Freehold House',
+        1200000,
+        1950000,
+        300000,
+        12500,
+        2500, // Freehold house cannot have levies! Should be zeroed out
+        1800,
+        700,
+      ];
+
+      const result = parseFlipsRows([headers, dataRow]);
+      expect(result.success).toBe(true);
+      expect(result.data.length).toBe(1);
+
+      const flip = result.data[0];
+      expect(flip.monthlyBondPaymentZAR).toBe(12500);
+      expect(flip.monthlyLeviesZAR).toBe(0); // Zeroed out by Freehold guardrail!
+      expect(flip.monthlyRatesTaxesZAR).toBe(1800);
+      expect(flip.monthlyOtherHoldingCostZAR).toBe(700);
+      // Total monthly holding cost = 12500 + 0 + 1800 + 700 = 15000
+      expect(flip.monthlyHoldingCostZAR).toBe(15000);
+      expect(result.warnings.some((w) => w.includes('Freehold'))).toBe(true);
+    });
   });
 });
+

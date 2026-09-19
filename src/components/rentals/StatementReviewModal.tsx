@@ -72,11 +72,21 @@ export default function StatementReviewModal({
           ? Number(((unit.agencyCommissionZAR * 0.15) / 1.15).toFixed(2))
           : 0;
 
+      const bondPayment =
+        unit.monthlyBondPaymentZAR !== undefined && unit.monthlyBondPaymentZAR > 0
+          ? unit.monthlyBondPaymentZAR
+          : matched
+          ? matched.monthlyBondPaymentZAR
+          : 0;
+
       return {
         ...unit,
         estimatedMarketValueZAR: estMarketValue,
         isCommissionInclusiveOfVat: isVatInc,
         agencyCommissionVatZAR: vatAmount,
+        monthlyBondPaymentZAR: bondPayment,
+        bondPaymentEffectiveDate:
+          unit.bondPaymentEffectiveDate || (matched ? matched.bondPaymentEffectiveDate : undefined),
       };
     });
     setEditableUnits(initialized);
@@ -272,7 +282,7 @@ export default function StatementReviewModal({
                     </span>
                   </div>
 
-                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 text-xs">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 text-xs">
                     <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-200">
                       <span className="text-[10px] text-slate-500 block font-medium">Gross Contract Rent</span>
                       <div className="flex items-center mt-1">
@@ -381,6 +391,31 @@ export default function StatementReviewModal({
                           Current: {formatZAR(matched.monthlyAgentFeeZAR)}
                         </span>
                       )}
+                    </div>
+
+                    <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-200">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] text-slate-500 block font-medium">Bank Bond Payment</span>
+                        <span className="text-[9px] font-semibold text-slate-600 bg-slate-200/80 px-1 rounded">
+                          Debit Order
+                        </span>
+                      </div>
+                      <div className="flex items-center mt-1">
+                        <span className="font-bold text-slate-400 mr-1">R</span>
+                        <input
+                          type="number"
+                          step="0.01"
+                          value={unit.monthlyBondPaymentZAR ?? 0}
+                          onChange={(e) => handleFieldChange(idx, 'monthlyBondPaymentZAR', Number(e.target.value))}
+                          placeholder="0"
+                          className="w-full font-bold text-slate-900 bg-white border border-slate-300 rounded px-2 py-1 text-xs"
+                        />
+                      </div>
+                      <span className="text-[9px] text-slate-400 block mt-1 truncate">
+                        {matched && matched.monthlyBondPaymentZAR
+                          ? `Current: ${formatZAR(matched.monthlyBondPaymentZAR)}`
+                          : 'Owner direct debit'}
+                      </span>
                     </div>
 
                     <div className="p-2.5 rounded-lg bg-indigo-50 border border-indigo-200">

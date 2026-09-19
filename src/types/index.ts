@@ -225,7 +225,12 @@ export interface FlipProject {
   baselineRenovationBudgetZAR: number;
   // Holding Period Carrying Costs
   estimatedDurationMonths?: number;
-  monthlyHoldingCostZAR?: number;
+  monthlyHoldingCostZAR?: number; // Total monthly holding cost
+  monthlyBondPaymentZAR?: number; // Interim bond interest / repayment
+  monthlyLeviesZAR?: number; // HOA / Body corporate levies (strictly R0 for Freehold)
+  monthlyRatesTaxesZAR?: number; // City municipal rates & taxes
+  monthlyOtherHoldingCostZAR?: number; // Site security, builder risk insurance, standing utilities
+  bondPaymentEffectiveDate?: string; // e.g. '2026-04'
   targetExitPriceZAR: number;
   targetCompletionDate: string;
   currentPhase: 'Acquisition & Conveyancing' | 'Strip & Demolition' | 'First Fix (Plumbing/Elec)' | 'Finishes & Tiling' | 'Snagging' | 'Staging & Marketing' | 'Sold / Awaiting Transfer';
@@ -279,6 +284,8 @@ export interface RentalProperty {
   outstandingBondBalanceZAR: number;
   bondInterestRatePercent: number; // e.g. 11.5%
   monthlyBondPaymentZAR: number;
+  bondPaymentEffectiveDate?: string; // e.g. '2026-04' (upcoming forward-only month)
+  bondRevisionNote?: string; // e.g. 'SARB 25bps repo rate cut'
   // Tenant & Lease details
   tenantName: string;
   tenantPhone: string;
@@ -389,6 +396,8 @@ export interface ExtractedRentalUnit {
   isCommissionInclusiveOfVat?: boolean; // true if agencyCommissionZAR already includes VAT
   estimatedMarketValueZAR?: number; // e.g. 828000
   purchasePriceZAR?: number; // e.g. 759000
+  monthlyBondPaymentZAR?: number; // Owner direct debit order (not on agent statement)
+  bondPaymentEffectiveDate?: string; // e.g. '2026-04'
   depositHeldZAR?: number; // e.g. 6965.17
   netOperatingIncomeZAR?: number; // e.g. 5525.03
   netPayoutZAR?: number; // alias for netOperatingIncomeZAR

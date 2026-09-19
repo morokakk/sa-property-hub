@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import TopHeader from '@/components/navigation/TopHeader';
 import { usePortfolioStore, usePortfolioSummary } from '@/lib/store/usePortfolioStore';
 import { formatZAR, formatPercent, formatDate } from '@/lib/formatters';
@@ -8,7 +8,7 @@ import ComplianceChecklist from '@/components/common/ComplianceChecklist';
 import CloudDriveLinkVault from '@/components/common/CloudDriveLinkVault';
 import { RentalProperty, MaintenanceLog, PropertyTitleType, CloudDriveVault } from '@/types';
 import { PropertyTypeBadge, AgmDateChip, isAgmUpcoming } from '@/components/common/PropertyTypeBadge';
-import { calculateRentalCashflow } from '@/lib/calculations/propertyMetrics';
+import { calculateRentalCashflow, calculateMonthlyBondRepayment } from '@/lib/calculations/propertyMetrics';
 import {
   Building2,
   PlusCircle,
@@ -31,6 +31,7 @@ import {
   Coins,
   FileSpreadsheet,
   Sparkles,
+  Calculator,
 } from 'lucide-react';
 import { exportRentalsCSV } from '@/lib/export/csvExport';
 import ImportDropdown from '@/components/common/ImportDropdown';
@@ -129,6 +130,80 @@ function renderAgencyContactLinks(contact: string) {
   );
 }
 
+function InlineEditableAmount({
+  value,
+  onSave,
+  prefix = '- ',
+  disabled = false,
+  disabledLabel,
+  title,
+}: {
+  value: number;
+  onSave: (val: number) => void;
+  prefix?: string;
+  disabled?: boolean;
+  disabledLabel?: string;
+  title?: string;
+}) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [inputVal, setInputVal] = useState(value.toString());
+
+  useEffect(() => {
+    setInputVal(value.toString());
+  }, [value]);
+
+  if (disabled) {
+    return (
+      <span className="text-slate-400 text-[11px]" title={disabledLabel}>
+        {disabledLabel || 'R 0'}
+      </span>
+    );
+  }
+
+  if (isEditing) {
+    return (
+      <div className="flex items-center gap-1">
+        <span className="text-slate-400 text-[11px] font-bold">R</span>
+        <input
+          type="number"
+          step="10"
+          autoFocus
+          value={inputVal}
+          onChange={(e) => setInputVal(e.target.value)}
+          onBlur={() => {
+            const num = Math.max(0, Number(inputVal) || 0);
+            if (num !== value) onSave(num);
+            setIsEditing(false);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              const num = Math.max(0, Number(inputVal) || 0);
+              if (num !== value) onSave(num);
+              setIsEditing(false);
+            } else if (e.key === 'Escape') {
+              setInputVal(value.toString());
+              setIsEditing(false);
+            }
+          }}
+          className="w-24 px-1.5 py-0.5 text-xs font-mono font-bold bg-white border border-indigo-400 rounded focus:outline-none focus:ring-1 focus:ring-indigo-500 text-slate-900 shadow-2xs"
+        />
+      </div>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={() => setIsEditing(true)}
+      className="group inline-flex items-center gap-1 text-slate-700 hover:text-indigo-600 font-medium transition-colors cursor-pointer"
+      title={title || 'Click to edit amount inline (auto-saves on blur or Enter)'}
+    >
+      <span>{prefix}{formatZAR(value)}</span>
+      <Edit3 className="w-3 h-3 text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity" />
+    </button>
+  );
+}
+
 export default function RentalPortfolioPage() {
   const rentals = usePortfolioStore((state) => state.rentals);
   const addRental = usePortfolioStore((state) => state.addRental);
@@ -186,6 +261,9 @@ export default function RentalPortfolioPage() {
   const [monthlyGrossRent, setMonthlyGrossRent] = useState(15000);
   const [monthlyLevies, setMonthlyLevies] = useState(1850);
   const [monthlyRates, setMonthlyRates] = useState(1100);
+  const [monthlyBondPayment, setMonthlyBondPayment] = useState(0);
+  const [bondPaymentEffectiveDate, setBondPaymentEffectiveDate] = useState('');
+  const [bondRevisionNote, setBondRevisionNote] = useState('');
   const [tenantName, setTenantName] = useState('');
   const [tenantPhone, setTenantPhone] = useState('');
   const [tenantEmail, setTenantEmail] = useState('');
@@ -206,6 +284,43 @@ export default function RentalPortfolioPage() {
   const [agencyVatApplicable, setAgencyVatApplicable] = useState(true);
   const [agencyContact, setAgencyContact] = useState('+27 82 555 1234');
 
+  // SARB Repo Rate PMT Calculator State
+  const [pmtTargetProperty, setPmtTargetProperty] = useState<RentalProperty | null>(null);
+  const [pmtInterestRate, setPmtInterestRate] = useState<number>(11.5);
+  const [pmtLoanBalance, setPmtLoanBalance] = useState<number>(0);
+  const [pmtLoanYears, setPmtLoanYears] = useState<number>(20);
+  const [pmtEffectiveMonth, setPmtEffectiveMonth] = useState<string>('');
+  const [pmtRevisionNote, setPmtRevisionNote] = useState<string>('SARB 25bps repo rate cut');
+
+  const handleOpenPmtCalculator = (property: RentalProperty) => {
+    setPmtTargetProperty(property);
+    setPmtInterestRate(property.bondInterestRatePercent || 11.5);
+    setPmtLoanBalance(property.outstandingBondBalanceZAR || 0);
+    setPmtLoanYears(20);
+
+    const now = new Date();
+    const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+    const monthStr = nextMonth.toLocaleString('en-ZA', { month: 'short', year: 'numeric' });
+
+    setPmtEffectiveMonth(property.bondPaymentEffectiveDate || monthStr);
+    setPmtRevisionNote(property.bondRevisionNote || 'SARB 25bps repo rate cut');
+  };
+
+  const handleApplyPmt = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!pmtTargetProperty) return;
+
+    const newPayment = calculateMonthlyBondRepayment(pmtLoanBalance, pmtInterestRate, pmtLoanYears);
+    updateRental(pmtTargetProperty.id, {
+      monthlyBondPaymentZAR: newPayment,
+      outstandingBondBalanceZAR: pmtLoanBalance,
+      bondInterestRatePercent: pmtInterestRate,
+      bondPaymentEffectiveDate: pmtEffectiveMonth.trim() || undefined,
+      bondRevisionNote: pmtRevisionNote.trim() || undefined,
+    });
+    setPmtTargetProperty(null);
+  };
+
   const handleOpenAdd = () => {
     setEditingRentalId(null);
     setTitle('');
@@ -219,6 +334,9 @@ export default function RentalPortfolioPage() {
     setMonthlyGrossRent(15000);
     setMonthlyLevies(1850);
     setMonthlyRates(1100);
+    setMonthlyBondPayment(0);
+    setBondPaymentEffectiveDate('');
+    setBondRevisionNote('');
     setTenantName('');
     setTenantPhone('');
     setTenantEmail('');
@@ -250,6 +368,18 @@ export default function RentalPortfolioPage() {
     setMonthlyGrossRent(property.monthlyGrossRentZAR);
     setMonthlyLevies(property.propertyType === 'Freehold House' ? 0 : property.monthlyLeviesZAR);
     setMonthlyRates(property.monthlyRatesTaxesZAR);
+    const estEditBond =
+      property.monthlyBondPaymentZAR ||
+      (property.outstandingBondBalanceZAR > 0
+        ? calculateMonthlyBondRepayment(
+            property.outstandingBondBalanceZAR,
+            property.bondInterestRatePercent || 11.75,
+            20
+          )
+        : 0);
+    setMonthlyBondPayment(estEditBond);
+    setBondPaymentEffectiveDate(property.bondPaymentEffectiveDate || '');
+    setBondRevisionNote(property.bondRevisionNote || '');
     setTenantName(property.tenantName);
     setTenantPhone(property.tenantPhone);
     setTenantEmail(property.tenantEmail);
@@ -292,8 +422,9 @@ export default function RentalPortfolioPage() {
     e.preventDefault();
     if (!title) return;
 
-    // Approximate monthly bond payment (11.75% over 20 yrs ~ 1.08% of loan)
-    const estBondPayment = bondBalance > 0 ? Math.round(bondBalance * 0.0108) : 0;
+    // Calculate monthly bond payment (or use user-specified debit order)
+    const calcBond = bondBalance > 0 ? calculateMonthlyBondRepayment(bondBalance, 11.75, 20) : 0;
+    const finalBondPayment = monthlyBondPayment > 0 ? monthlyBondPayment : calcBond;
     const baseComm = managementType === 'Agency' ? monthlyGrossRent * (agencyCommissionPercent / 100) : 0;
     const agentFee = Math.round(baseComm * (agencyVatApplicable !== false ? 1.15 : 1.0));
 
@@ -311,7 +442,9 @@ export default function RentalPortfolioPage() {
         marketValueZAR: marketValue,
         purchasePriceZAR: purchasePrice,
         outstandingBondBalanceZAR: bondBalance,
-        monthlyBondPaymentZAR: estBondPayment,
+        monthlyBondPaymentZAR: finalBondPayment,
+        bondPaymentEffectiveDate: bondPaymentEffectiveDate.trim() || undefined,
+        bondRevisionNote: bondRevisionNote.trim() || undefined,
         tenantName: tenantName || 'Tenant Unassigned',
         tenantPhone: tenantPhone || '+27 —',
         tenantEmail: tenantEmail || 'tenant@email.co.za',
@@ -347,7 +480,9 @@ export default function RentalPortfolioPage() {
         purchaseDate: new Date().toISOString().split('T')[0],
         outstandingBondBalanceZAR: bondBalance,
         bondInterestRatePercent: 11.75,
-        monthlyBondPaymentZAR: estBondPayment,
+        monthlyBondPaymentZAR: finalBondPayment,
+        bondPaymentEffectiveDate: bondPaymentEffectiveDate.trim() || undefined,
+        bondRevisionNote: bondRevisionNote.trim() || undefined,
         tenantName: tenantName || 'Tenant Unassigned',
         tenantPhone: tenantPhone || '+27 —',
         tenantEmail: tenantEmail || 'tenant@email.co.za',
@@ -684,22 +819,34 @@ export default function RentalPortfolioPage() {
                             </div>
 
                             {/* Monthly Expenses Breakdown */}
-                            <div className="p-4 text-xs space-y-1.5 text-slate-600">
-                              <div className="flex justify-between">
-                                <span>Gross Monthly Rent:</span>
-                                <strong className="text-slate-900">{formatZAR(property.monthlyGrossRentZAR)}</strong>
+                            <div className="p-4 text-xs space-y-2 text-slate-600">
+                              <div className="flex justify-between items-center">
+                                <span className="font-medium">Gross Monthly Rent:</span>
+                                <strong className="text-slate-900 font-bold">{formatZAR(property.monthlyGrossRentZAR)}</strong>
                               </div>
-                              <div className="flex justify-between text-slate-500">
+
+                              <div className="flex justify-between items-center text-slate-500">
                                 <span>{property.propertyType === 'Freehold House' ? 'Body Corporate Levies (N/A):' : 'Body Corporate / HOA Levies:'}</span>
-                                <span>{property.propertyType === 'Freehold House' ? 'R 0 (Freehold)' : `- ${formatZAR(property.monthlyLeviesZAR)}`}</span>
+                                <InlineEditableAmount
+                                  value={property.monthlyLeviesZAR}
+                                  disabled={property.propertyType === 'Freehold House'}
+                                  disabledLabel="R 0 (Freehold)"
+                                  onSave={(val) => updateRental(property.id, { monthlyLeviesZAR: val })}
+                                  title="Click to edit monthly levies inline"
+                                />
                               </div>
-                              <div className="flex justify-between text-slate-500">
+
+                              <div className="flex justify-between items-center text-slate-500">
                                 <span>Municipal Rates & Taxes:</span>
-                                <span>- {formatZAR(property.monthlyRatesTaxesZAR)}</span>
+                                <InlineEditableAmount
+                                  value={property.monthlyRatesTaxesZAR}
+                                  onSave={(val) => updateRental(property.id, { monthlyRatesTaxesZAR: val })}
+                                  title="Click to edit municipal rates & taxes inline"
+                                />
                               </div>
 
                               {property.managementType === 'Agency' ? (
-                                <div className="flex justify-between text-slate-700 font-medium bg-indigo-50/60 px-2 py-1 rounded border border-indigo-100">
+                                <div className="flex justify-between items-center text-slate-700 font-medium bg-indigo-50/60 px-2 py-1 rounded border border-indigo-100">
                                   <span className="flex items-center gap-1 text-[11px]">
                                     <Building2 className="w-3 h-3 text-indigo-600" />
                                     Agency Fee ({property.agencyCommissionPercent || 8}%{property.agencyVatApplicable !== false ? ' + 15% VAT' : ''} - {property.agencyName || 'Agent'}):
@@ -707,7 +854,7 @@ export default function RentalPortfolioPage() {
                                   <span className="text-rose-600 font-semibold">- {formatZAR(agencyCommissionZAR)}</span>
                                 </div>
                               ) : (
-                                <div className="flex justify-between text-slate-500 bg-slate-50 px-2 py-1 rounded border border-slate-100 text-[11px]">
+                                <div className="flex justify-between items-center text-slate-500 bg-slate-50 px-2 py-1 rounded border border-slate-100 text-[11px]">
                                   <span className="flex items-center gap-1">
                                     <span>👤</span> Agency Fee (Self-Managed):
                                   </span>
@@ -715,13 +862,37 @@ export default function RentalPortfolioPage() {
                                 </div>
                               )}
 
-                              <div className="flex justify-between text-slate-500">
+                              <div className="flex justify-between items-center text-slate-500">
                                 <span>Maintenance Reserve:</span>
                                 <span>- {formatZAR(property.monthlyMaintenanceReserveZAR)}</span>
                               </div>
-                              <div className="flex justify-between text-slate-500">
-                                <span>Bank Bond Payment:</span>
-                                <span>- {formatZAR(property.monthlyBondPaymentZAR)}</span>
+
+                              <div className="flex justify-between items-center text-slate-700 bg-slate-50/80 px-2 py-1.5 rounded-lg border border-slate-200">
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  <span className="font-semibold text-slate-800 text-[11px]">Bank Bond Payment:</span>
+                                  {property.bondPaymentEffectiveDate && (
+                                    <span
+                                      className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-indigo-100 text-indigo-800 border border-indigo-200"
+                                      title={property.bondRevisionNote || 'Forward-only effective month'}
+                                    >
+                                      Effective: {property.bondPaymentEffectiveDate}
+                                    </span>
+                                  )}
+                                  <button
+                                    type="button"
+                                    onClick={() => handleOpenPmtCalculator(property)}
+                                    className="inline-flex items-center gap-1 text-[10px] font-semibold text-indigo-700 hover:text-indigo-900 bg-white hover:bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-200 shadow-2xs transition-colors cursor-pointer"
+                                    title="SARB Repo Rate PMT Calculator - forward-only bond adjustment"
+                                  >
+                                    <Calculator className="w-3 h-3 text-indigo-600" />
+                                    <span>SARB PMT</span>
+                                  </button>
+                                </div>
+                                <InlineEditableAmount
+                                  value={property.monthlyBondPaymentZAR}
+                                  onSave={(val) => updateRental(property.id, { monthlyBondPaymentZAR: val })}
+                                  title="Click to edit bond repayment inline"
+                                />
                               </div>
 
                               {(property.unpaidUtilityArrearsZAR || 0) > 0 && (
@@ -1590,6 +1761,47 @@ export default function RentalPortfolioPage() {
                 </div>
               </div>
 
+              {/* Bank Bond Repayment & Effective Month Inputs */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 bg-slate-50 rounded-lg border border-slate-200">
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block font-semibold text-slate-700 text-xs">Bank Bond Repayment (Debit Order)</label>
+                    {bondBalance > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setMonthlyBondPayment(calculateMonthlyBondRepayment(bondBalance, 11.75, 20))}
+                        className="text-[10px] text-indigo-600 hover:text-indigo-800 font-semibold cursor-pointer"
+                        title="Auto-calculate 20-year bond at 11.75%"
+                      >
+                        Auto-PMT: {formatZAR(calculateMonthlyBondRepayment(bondBalance, 11.75, 20))}
+                      </button>
+                    )}
+                  </div>
+                  <input
+                    type="number"
+                    min="0"
+                    step="100"
+                    value={monthlyBondPayment || ''}
+                    onChange={(e) => setMonthlyBondPayment(Number(e.target.value))}
+                    placeholder="e.g. 11800"
+                    className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg bg-white font-bold text-slate-900 text-xs"
+                  />
+                  <span className="text-[10px] text-slate-400 block mt-0.5">Owner-paid direct debit order</span>
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1 text-xs">Bond Effective Month (Forward-Only)</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Apr 2026 or 2026-04"
+                    value={bondPaymentEffectiveDate}
+                    onChange={(e) => setBondPaymentEffectiveDate(e.target.value)}
+                    className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg bg-white text-slate-900 text-xs font-semibold"
+                  />
+                  <span className="text-[10px] text-slate-400 block mt-0.5">Upcoming effective payment date</span>
+                </div>
+              </div>
+
               {/* Tenant Utility Arrears Section */}
               <div className={`p-3 rounded-lg border transition-colors ${
                 unpaidUtilityArrears > 0
@@ -1756,6 +1968,157 @@ export default function RentalPortfolioPage() {
                   className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-semibold"
                 >
                   {editingRentalId ? 'Update Rental Property' : 'Save Rental Property'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* SARB Repo Rate PMT Calculator Modal */}
+      {pmtTargetProperty && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in duration-150">
+          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 animate-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-200 mb-4">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-indigo-50 text-indigo-600 border border-indigo-200 flex items-center justify-center font-bold">
+                  <Calculator className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-900">
+                    SARB Repo Rate Bond Recalculator
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    Forward-only adjustment for &ldquo;{pmtTargetProperty.title}&rdquo;
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setPmtTargetProperty(null)}
+                className="text-slate-400 hover:text-slate-700 text-sm font-bold p-1 rounded cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleApplyPmt} className="space-y-4 text-xs">
+              <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-amber-900 text-[11px] leading-relaxed">
+                💡 <strong>Forward-Only Guarantee:</strong> Modifying the bond repayment takes effect from the selected <strong>Effective Month</strong> for upcoming bank debit orders. Historical performance and past months remain uncorrupted.
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Outstanding Bond Balance (ZAR)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="10000"
+                    required
+                    value={pmtLoanBalance}
+                    onChange={(e) => setPmtLoanBalance(Number(e.target.value))}
+                    className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg font-bold bg-white text-slate-900"
+                  />
+                </div>
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">New Bond Interest Rate (%)</label>
+                  <div className="relative">
+                    <input
+                      type="number"
+                      step="0.05"
+                      min="0"
+                      max="30"
+                      required
+                      value={pmtInterestRate}
+                      onChange={(e) => setPmtInterestRate(Number(e.target.value))}
+                      className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg font-bold bg-white text-slate-900 pr-7"
+                    />
+                    <span className="absolute right-2.5 top-1.5 text-slate-400 font-bold">%</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Remaining Term (Years)</label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="30"
+                    required
+                    value={pmtLoanYears}
+                    onChange={(e) => setPmtLoanYears(Number(e.target.value))}
+                    className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg bg-white text-slate-900 font-medium"
+                  />
+                </div>
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Effective Month (Forward-Only)</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Apr 2026 or 2026-04"
+                    value={pmtEffectiveMonth}
+                    onChange={(e) => setPmtEffectiveMonth(e.target.value)}
+                    className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg bg-white text-slate-900 font-semibold"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">Revision Note / Memo</label>
+                <input
+                  type="text"
+                  placeholder="e.g. SARB 25bps repo rate cut"
+                  value={pmtRevisionNote}
+                  onChange={(e) => setPmtRevisionNote(e.target.value)}
+                  className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg bg-white text-slate-900"
+                />
+              </div>
+
+              {/* Dynamic PMT Calculation Comparison Preview */}
+              {(() => {
+                const calculatedPmt = calculateMonthlyBondRepayment(pmtLoanBalance, pmtInterestRate, pmtLoanYears);
+                const currentPmt = pmtTargetProperty.monthlyBondPaymentZAR || 0;
+                const savings = currentPmt - calculatedPmt;
+
+                return (
+                  <div className="bg-indigo-50/70 border border-indigo-200 rounded-xl p-3.5 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-bold text-indigo-900 uppercase">Recalculated Bond PMT</span>
+                      <span className="text-[10px] text-indigo-700 font-semibold bg-indigo-100 px-2 py-0.5 rounded">
+                        Standard SA Amortization Formula
+                      </span>
+                    </div>
+                    <div className="flex items-baseline justify-between">
+                      <span className="text-2xl font-black text-indigo-950 font-mono">
+                        {formatZAR(calculatedPmt)}/month
+                      </span>
+                      {currentPmt > 0 && (
+                        <div className="text-right">
+                          <span className="text-[10px] text-slate-500 block">Current: {formatZAR(currentPmt)}/m</span>
+                          <span className={`text-xs font-bold ${savings >= 0 ? 'text-emerald-700' : 'text-rose-600'}`}>
+                            {savings >= 0 ? `+${formatZAR(savings)}/m cashflow relief` : `${formatZAR(savings)}/m increase`}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })()}
+
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-200">
+                <button
+                  type="button"
+                  onClick={() => setPmtTargetProperty(null)}
+                  className="px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50 font-semibold cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-semibold flex items-center gap-1.5 cursor-pointer shadow-sm"
+                >
+                  <CheckCircle2 className="w-4 h-4" />
+                  <span>Apply Forward-Only ({pmtEffectiveMonth})</span>
                 </button>
               </div>
             </form>

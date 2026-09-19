@@ -24,6 +24,8 @@ export const ExtractedRentalUnitSchema = z.object({
   isCommissionInclusiveOfVat: z.boolean().optional(),
   estimatedMarketValueZAR: z.number().positive().optional(),
   purchasePriceZAR: z.number().positive().optional(),
+  monthlyBondPaymentZAR: z.number().min(0).optional(),
+  bondPaymentEffectiveDate: z.string().optional(),
   depositHeldZAR: z.number().optional(),
   netOperatingIncomeZAR: z.number().optional().default(0),
   netPayoutZAR: z.number().optional(),
@@ -151,6 +153,8 @@ export function normalizeStatementPayload(raw: unknown): unknown {
                 : true, // default to true on SA managing agent statements
           estimatedMarketValueZAR: u.estimatedMarketValueZAR !== undefined ? parseNum(u.estimatedMarketValueZAR) : undefined,
           purchasePriceZAR: u.purchasePriceZAR !== undefined ? parseNum(u.purchasePriceZAR) : undefined,
+          monthlyBondPaymentZAR: u.monthlyBondPaymentZAR !== undefined ? parseNum(u.monthlyBondPaymentZAR) : undefined,
+          bondPaymentEffectiveDate: u.bondPaymentEffectiveDate ? String(u.bondPaymentEffectiveDate).trim() : undefined,
           depositHeldZAR: u.depositHeldZAR !== undefined ? parseNum(u.depositHeldZAR) : undefined,
           netOperatingIncomeZAR: parseNum(u.netOperatingIncomeZAR ?? u.netPayoutZAR),
         };

@@ -191,4 +191,39 @@ describe('usePortfolioStore reconcileImportedRentals', () => {
     expect(cashflow.agencyCommissionZAR).toBe(851);
     expect(cashflow.agencyCommissionZAR).not.toBe(976);
   });
+
+  it('reconciles monthlyBondPaymentZAR and bondPaymentEffectiveDate for matched and new rentals', () => {
+    const state = usePortfolioStore.getState();
+    const existing = state.rentals[0];
+
+    // Matched rental update with owner bond payment and forward-only effective date
+    const updatedUnit: ExtractedRentalUnit = {
+      propertyName: existing.title,
+      grossRentZAR: 21000,
+      monthlyBondPaymentZAR: 11450,
+      bondPaymentEffectiveDate: '2026-10',
+      netPayoutZAR: 17000,
+    };
+
+    // New rental with owner bond payment
+    const newUnit: ExtractedRentalUnit = {
+      propertyName: 'Kloof Street Penthouse',
+      grossRentZAR: 28000,
+      monthlyBondPaymentZAR: 18500,
+      bondPaymentEffectiveDate: '2026-11',
+      netPayoutZAR: 22000,
+    };
+
+    usePortfolioStore.getState().reconcileImportedRentals([updatedUnit, newUnit]);
+
+    const updatedProperty = usePortfolioStore.getState().rentals.find((r) => r.id === existing.id)!;
+    expect(updatedProperty.monthlyBondPaymentZAR).toBe(11450);
+    expect(updatedProperty.bondPaymentEffectiveDate).toBe('2026-10');
+
+    const createdProperty = usePortfolioStore.getState().rentals.find((r) => r.title === 'Kloof Street Penthouse')!;
+    expect(createdProperty).toBeDefined();
+    expect(createdProperty.monthlyBondPaymentZAR).toBe(18500);
+    expect(createdProperty.bondPaymentEffectiveDate).toBe('2026-11');
+  });
 });
+

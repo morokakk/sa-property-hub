@@ -300,6 +300,12 @@ export const usePortfolioStore = create<PortfolioState>()(
                 unit.purchasePriceZAR && unit.purchasePriceZAR > 0
                   ? Math.round(unit.purchasePriceZAR)
                   : existing.purchasePriceZAR,
+              monthlyBondPaymentZAR:
+                unit.monthlyBondPaymentZAR !== undefined && unit.monthlyBondPaymentZAR > 0
+                  ? Math.round(unit.monthlyBondPaymentZAR)
+                  : existing.monthlyBondPaymentZAR,
+              bondPaymentEffectiveDate:
+                unit.bondPaymentEffectiveDate || existing.bondPaymentEffectiveDate,
               tenantName: unit.tenantName || existing.tenantName,
               leaseEndDate: unit.leaseExpiryDate || unit.leaseEndDate || existing.leaseEndDate,
               depositHeldZAR: unit.depositHeldZAR ?? existing.depositHeldZAR,
@@ -317,6 +323,10 @@ export const usePortfolioStore = create<PortfolioState>()(
               unit.purchasePriceZAR && unit.purchasePriceZAR > 0
                 ? Math.round(unit.purchasePriceZAR)
                 : Math.round(unit.grossRentZAR * 110);
+            const bondPayment =
+              unit.monthlyBondPaymentZAR && unit.monthlyBondPaymentZAR > 0
+                ? Math.round(unit.monthlyBondPaymentZAR)
+                : 0;
 
             const newProperty: RentalProperty = {
               id: `rental-ai-${Date.now()}-${idx}`,
@@ -329,7 +339,8 @@ export const usePortfolioStore = create<PortfolioState>()(
               purchaseDate: new Date().toISOString().split('T')[0],
               outstandingBondBalanceZAR: 0,
               bondInterestRatePercent: 11.75,
-              monthlyBondPaymentZAR: 0,
+              monthlyBondPaymentZAR: bondPayment,
+              bondPaymentEffectiveDate: unit.bondPaymentEffectiveDate,
               tenantName: unit.tenantName || 'Tenant Unassigned',
               tenantPhone: '+27 —',
               tenantEmail: 'pending@tenant.co.za',
