@@ -10,6 +10,7 @@ interface LongTermProjectionChartProps {
   compact?: boolean;
   showCashflowTrack?: boolean;
   showMilestones?: boolean;
+  displayMode?: 'stacked' | 'wealth-only' | 'cashflow-only';
   className?: string;
 }
 
@@ -59,10 +60,14 @@ export default function LongTermProjectionChart({
   compact = false,
   showCashflowTrack = true,
   showMilestones = true,
+  displayMode = 'stacked',
   className = '',
 }: LongTermProjectionChartProps) {
   const [hoverIndex, setHoverIndex] = useState<number | null>(null);
   const chartRef = useRef<SVGSVGElement | null>(null);
+
+  const showWealth = displayMode === 'stacked' || displayMode === 'wealth-only';
+  const showCashflow = (displayMode === 'stacked' || displayMode === 'cashflow-only') && showCashflowTrack;
 
   if (!data || data.length === 0) {
     return (
@@ -164,8 +169,9 @@ export default function LongTermProjectionChart({
 
   // Mouse hover tracking
   const handleMouseMove = (e: React.MouseEvent<SVGSVGElement>) => {
-    if (!chartRef.current) return;
-    const rect = chartRef.current.getBoundingClientRect();
+    const targetSvg = e.currentTarget || chartRef.current;
+    if (!targetSvg) return;
+    const rect = targetSvg.getBoundingClientRect();
     const clientX = e.clientX - rect.left;
     const scaleX = width / rect.width;
     const svgX = clientX * scaleX;
@@ -222,18 +228,24 @@ export default function LongTermProjectionChart({
           </div>
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+        <div className={`grid gap-2 text-xs ${compact ? 'grid-cols-2' : 'grid-cols-2 sm:grid-cols-4'}`}>
           <div className="bg-slate-800/80 p-2 rounded-lg border border-slate-700">
             <span className="text-[10px] text-slate-400 block font-medium">Property Value</span>
-            <span className="font-bold text-slate-100 text-xs">{formatZAR(activeSnapshot.propertyValue)}</span>
+            <span className="font-bold text-slate-100 text-xs">
+              {compact ? formatCompactZAR(activeSnapshot.propertyValue) : formatZAR(activeSnapshot.propertyValue)}
+            </span>
           </div>
           <div className="bg-slate-800/80 p-2 rounded-lg border border-slate-700">
             <span className="text-[10px] text-rose-400 block font-medium">Outstanding Bond</span>
-            <span className="font-bold text-rose-300 text-xs">{formatZAR(activeSnapshot.outstandingBond)}</span>
+            <span className="font-bold text-rose-300 text-xs">
+              {compact ? formatCompactZAR(activeSnapshot.outstandingBond) : formatZAR(activeSnapshot.outstandingBond)}
+            </span>
           </div>
           <div className="bg-slate-800/80 p-2 rounded-lg border border-slate-700">
             <span className="text-[10px] text-indigo-400 block font-medium">Annual Rent</span>
-            <span className="font-bold text-indigo-300 text-xs">{formatZAR(activeSnapshot.rent)}</span>
+            <span className="font-bold text-indigo-300 text-xs">
+              {compact ? formatCompactZAR(activeSnapshot.rent) : formatZAR(activeSnapshot.rent)}
+            </span>
           </div>
           <div className="bg-slate-800/80 p-2 rounded-lg border border-slate-700">
             <span className="text-[10px] text-emerald-400 block font-medium">Annual Cashflow</span>
@@ -242,192 +254,194 @@ export default function LongTermProjectionChart({
                 activeSnapshot.netCashflow >= 0 ? 'text-emerald-400' : 'text-rose-400'
               }`}
             >
-              {formatZAR(activeSnapshot.netCashflow)}
+              {compact ? formatCompactZAR(activeSnapshot.netCashflow) : formatZAR(activeSnapshot.netCashflow)}
             </span>
           </div>
         </div>
       </div>
 
       {/* Chart 1: Wealth & Amortization Track */}
-      <div className="bg-white rounded-xl border border-slate-200 p-4 sm:p-5 shadow-xs print:border-slate-300 print:p-3 print:shadow-none">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3 pb-2 border-b border-slate-100">
-          <div>
-            <h4 className="text-xs font-bold uppercase tracking-wider text-slate-800 flex items-center gap-1.5">
-              <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-              Capital Growth & Bond Amortization Schedule
-            </h4>
-            <p className="text-[11px] text-slate-500">
-              Tracking asset valuation vs. outstanding mortgage principal paydown over {data.length} years
-            </p>
+      {showWealth && (
+        <div className="bg-white rounded-xl border border-slate-200 p-4 sm:p-5 shadow-xs print:border-slate-300 print:p-3 print:shadow-none">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3 pb-2 border-b border-slate-100">
+            <div>
+              <h4 className="text-xs font-bold uppercase tracking-wider text-slate-800 flex items-center gap-1.5">
+                <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+                Capital Growth & Bond Amortization Schedule
+              </h4>
+              <p className="text-[11px] text-slate-500">
+                Tracking asset valuation vs. outstanding mortgage principal paydown over {data.length} years
+              </p>
+            </div>
+
+            {/* Legend */}
+            <div className="flex items-center gap-2 sm:gap-3 text-[11px] font-semibold flex-wrap">
+              <div className="flex items-center gap-1.5 text-slate-700">
+                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block"></span>
+                <span>Property Value</span>
+              </div>
+              <div className="flex items-center gap-1.5 text-slate-700">
+                <span className="w-2.5 h-2.5 rounded-full bg-teal-500 inline-block"></span>
+                <span>Net Equity</span>
+              </div>
+              <div className="flex items-center gap-1.5 text-slate-700">
+                <span className="w-2.5 h-2.5 rounded-full bg-rose-500 inline-block"></span>
+                <span>Outstanding Bond</span>
+              </div>
+            </div>
           </div>
 
-          {/* Legend */}
-          <div className="flex items-center gap-3 text-[11px] font-semibold">
-            <div className="flex items-center gap-1.5 text-slate-700">
-              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block"></span>
-              <span>Property Value</span>
-            </div>
-            <div className="flex items-center gap-1.5 text-slate-700">
-              <span className="w-2.5 h-2.5 rounded-full bg-teal-500 inline-block"></span>
-              <span>Net Equity</span>
-            </div>
-            <div className="flex items-center gap-1.5 text-slate-700">
-              <span className="w-2.5 h-2.5 rounded-full bg-rose-500 inline-block"></span>
-              <span>Outstanding Bond</span>
-            </div>
+          {/* Wealth Track SVG */}
+          <div className="w-full overflow-hidden">
+            <svg
+              ref={chartRef}
+              viewBox={`0 0 ${width} ${wealthHeight}`}
+              className="w-full h-auto cursor-crosshair select-none"
+              onMouseMove={handleMouseMove}
+              onMouseLeave={handleMouseLeave}
+            >
+              <defs>
+                <linearGradient id="equityGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#06b6d4" stopOpacity="0.25" />
+                  <stop offset="100%" stopColor="#06b6d4" stopOpacity="0.0" />
+                </linearGradient>
+                <linearGradient id="propGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#10b981" stopOpacity="0.15" />
+                  <stop offset="100%" stopColor="#10b981" stopOpacity="0.0" />
+                </linearGradient>
+              </defs>
+
+              {/* Horizontal Grid Lines */}
+              {wealthTicks.map((tick, i) => {
+                const y = getYWealth(tick);
+                return (
+                  <g key={i}>
+                    <line
+                      x1={margin.left}
+                      y1={y}
+                      x2={width - margin.right}
+                      y2={y}
+                      stroke="#e2e8f0"
+                      strokeDasharray="4 4"
+                      strokeWidth="1"
+                    />
+                    <text
+                      x={margin.left - 8}
+                      y={y + 3.5}
+                      textAnchor="end"
+                      className="text-[10px] fill-slate-400 font-medium font-mono"
+                    >
+                      {formatCompactZAR(tick)}
+                    </text>
+                  </g>
+                );
+              })}
+
+              {/* X-Axis Ticks */}
+              {data.map((d, i) => {
+                // Show label every 5 years and year 1 & last
+                const isKeyYear = d.year === 1 || d.year % 5 === 0 || d.year === data.length;
+                if (!isKeyYear) return null;
+                const x = getX(i);
+                return (
+                  <g key={i}>
+                    <line
+                      x1={x}
+                      y1={wealthBaselineY}
+                      x2={x}
+                      y2={wealthBaselineY + 4}
+                      stroke="#cbd5e1"
+                      strokeWidth="1"
+                    />
+                    <text
+                      x={x}
+                      y={wealthBaselineY + 16}
+                      textAnchor="middle"
+                      className="text-[10px] fill-slate-500 font-semibold font-mono"
+                    >
+                      Y{d.year}
+                    </text>
+                  </g>
+                );
+              })}
+
+              {/* Gradient Fills */}
+              <path d={createAreaPath(propValuePoints, wealthBaselineY)} fill="url(#propGrad)" />
+              <path d={createAreaPath(netEquityPoints, wealthBaselineY)} fill="url(#equityGrad)" />
+
+              {/* Trend Lines */}
+              {/* Property Value Line */}
+              <path
+                d={createSmoothSvgPath(propValuePoints)}
+                fill="none"
+                stroke="#10b981"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+              />
+              {/* Net Equity Line */}
+              <path
+                d={createSmoothSvgPath(netEquityPoints)}
+                fill="none"
+                stroke="#06b6d4"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+              />
+              {/* Outstanding Bond Line */}
+              <path
+                d={createSmoothSvgPath(bondPoints)}
+                fill="none"
+                stroke="#f43f5e"
+                strokeWidth="2"
+                strokeDasharray="5 3"
+                strokeLinecap="round"
+              />
+
+              {/* Interactive Vertical Crosshair */}
+              {hoverIndex !== null && (
+                <g>
+                  <line
+                    x1={getX(hoverIndex)}
+                    y1={margin.top}
+                    x2={getX(hoverIndex)}
+                    y2={wealthBaselineY}
+                    stroke="#475569"
+                    strokeWidth="1.5"
+                    strokeDasharray="3 3"
+                  />
+                  {/* Dots on Curves */}
+                  <circle
+                    cx={propValuePoints[hoverIndex].x}
+                    cy={propValuePoints[hoverIndex].y}
+                    r={4}
+                    fill="#10b981"
+                    stroke="#ffffff"
+                    strokeWidth="2"
+                  />
+                  <circle
+                    cx={netEquityPoints[hoverIndex].x}
+                    cy={netEquityPoints[hoverIndex].y}
+                    r={4}
+                    fill="#06b6d4"
+                    stroke="#ffffff"
+                    strokeWidth="2"
+                  />
+                  <circle
+                    cx={bondPoints[hoverIndex].x}
+                    cy={bondPoints[hoverIndex].y}
+                    r={4}
+                    fill="#f43f5e"
+                    stroke="#ffffff"
+                    strokeWidth="2"
+                  />
+                </g>
+              )}
+            </svg>
           </div>
         </div>
-
-        {/* Wealth Track SVG */}
-        <div className="w-full overflow-hidden">
-          <svg
-            ref={chartRef}
-            viewBox={`0 0 ${width} ${wealthHeight}`}
-            className="w-full h-auto cursor-crosshair select-none"
-            onMouseMove={handleMouseMove}
-            onMouseLeave={handleMouseLeave}
-          >
-            <defs>
-              <linearGradient id="equityGrad" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#06b6d4" stopOpacity="0.25" />
-                <stop offset="100%" stopColor="#06b6d4" stopOpacity="0.0" />
-              </linearGradient>
-              <linearGradient id="propGrad" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#10b981" stopOpacity="0.15" />
-                <stop offset="100%" stopColor="#10b981" stopOpacity="0.0" />
-              </linearGradient>
-            </defs>
-
-            {/* Horizontal Grid Lines */}
-            {wealthTicks.map((tick, i) => {
-              const y = getYWealth(tick);
-              return (
-                <g key={i}>
-                  <line
-                    x1={margin.left}
-                    y1={y}
-                    x2={width - margin.right}
-                    y2={y}
-                    stroke="#e2e8f0"
-                    strokeDasharray="4 4"
-                    strokeWidth="1"
-                  />
-                  <text
-                    x={margin.left - 8}
-                    y={y + 3.5}
-                    textAnchor="end"
-                    className="text-[10px] fill-slate-400 font-medium font-mono"
-                  >
-                    {formatCompactZAR(tick)}
-                  </text>
-                </g>
-              );
-            })}
-
-            {/* X-Axis Ticks */}
-            {data.map((d, i) => {
-              // Show label every 5 years and year 1 & last
-              const isKeyYear = d.year === 1 || d.year % 5 === 0 || d.year === data.length;
-              if (!isKeyYear) return null;
-              const x = getX(i);
-              return (
-                <g key={i}>
-                  <line
-                    x1={x}
-                    y1={wealthBaselineY}
-                    x2={x}
-                    y2={wealthBaselineY + 4}
-                    stroke="#cbd5e1"
-                    strokeWidth="1"
-                  />
-                  <text
-                    x={x}
-                    y={wealthBaselineY + 16}
-                    textAnchor="middle"
-                    className="text-[10px] fill-slate-500 font-semibold font-mono"
-                  >
-                    Y{d.year}
-                  </text>
-                </g>
-              );
-            })}
-
-            {/* Gradient Fills */}
-            <path d={createAreaPath(propValuePoints, wealthBaselineY)} fill="url(#propGrad)" />
-            <path d={createAreaPath(netEquityPoints, wealthBaselineY)} fill="url(#equityGrad)" />
-
-            {/* Trend Lines */}
-            {/* Property Value Line */}
-            <path
-              d={createSmoothSvgPath(propValuePoints)}
-              fill="none"
-              stroke="#10b981"
-              strokeWidth="2.5"
-              strokeLinecap="round"
-            />
-            {/* Net Equity Line */}
-            <path
-              d={createSmoothSvgPath(netEquityPoints)}
-              fill="none"
-              stroke="#06b6d4"
-              strokeWidth="2.5"
-              strokeLinecap="round"
-            />
-            {/* Outstanding Bond Line */}
-            <path
-              d={createSmoothSvgPath(bondPoints)}
-              fill="none"
-              stroke="#f43f5e"
-              strokeWidth="2"
-              strokeDasharray="5 3"
-              strokeLinecap="round"
-            />
-
-            {/* Interactive Vertical Crosshair */}
-            {hoverIndex !== null && (
-              <g>
-                <line
-                  x1={getX(hoverIndex)}
-                  y1={margin.top}
-                  x2={getX(hoverIndex)}
-                  y2={wealthBaselineY}
-                  stroke="#475569"
-                  strokeWidth="1.5"
-                  strokeDasharray="3 3"
-                />
-                {/* Dots on Curves */}
-                <circle
-                  cx={propValuePoints[hoverIndex].x}
-                  cy={propValuePoints[hoverIndex].y}
-                  r="4"
-                  fill="#10b981"
-                  stroke="#ffffff"
-                  strokeWidth="2"
-                />
-                <circle
-                  cx={netEquityPoints[hoverIndex].x}
-                  cy={netEquityPoints[hoverIndex].y}
-                  r="4"
-                  fill="#06b6d4"
-                  stroke="#ffffff"
-                  strokeWidth="2"
-                />
-                <circle
-                  cx={bondPoints[hoverIndex].x}
-                  cy={bondPoints[hoverIndex].y}
-                  r="4"
-                  fill="#f43f5e"
-                  stroke="#ffffff"
-                  strokeWidth="2"
-                />
-              </g>
-            )}
-          </svg>
-        </div>
-      </div>
+      )}
 
       {/* Chart 2: Cashflow & Escalating Rental Track */}
-      {showCashflowTrack && (
+      {showCashflow && (
         <div className="bg-white rounded-xl border border-slate-200 p-4 sm:p-5 shadow-xs print:border-slate-300 print:p-3 print:shadow-none">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3 pb-2 border-b border-slate-100">
             <div>
@@ -441,7 +455,7 @@ export default function LongTermProjectionChart({
             </div>
 
             {/* Legend */}
-            <div className="flex items-center gap-3 text-[11px] font-semibold">
+            <div className="flex items-center gap-2 sm:gap-3 text-[11px] font-semibold flex-wrap">
               <div className="flex items-center gap-1.5 text-slate-700">
                 <span className="w-2.5 h-2.5 rounded-full bg-indigo-500 inline-block"></span>
                 <span>Gross Rental</span>
@@ -608,13 +622,13 @@ export default function LongTermProjectionChart({
 
       {/* Strategic Milestone Cards (Print-friendly & Responsive) */}
       {showMilestones && (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-xs print:grid-cols-4 print:gap-2">
+        <div className={`grid gap-2 text-xs print:grid-cols-4 print:gap-2 ${compact ? 'grid-cols-2' : 'grid-cols-2 sm:grid-cols-4'}`}>
           {milestoneYears.map((snap) => {
             const isMaturity = snap.year === data.length;
             return (
               <div
                 key={snap.year}
-                className={`p-3 rounded-xl border ${
+                className={`p-2.5 sm:p-3 rounded-xl border ${
                   isMaturity
                     ? 'bg-emerald-50/80 border-emerald-300'
                     : 'bg-slate-50 border-slate-200'
@@ -640,11 +654,15 @@ export default function LongTermProjectionChart({
                 <div className="space-y-1 mt-1.5">
                   <div className="flex items-center justify-between">
                     <span className="text-slate-500 text-[10px]">Net Equity:</span>
-                    <strong className="text-slate-900 font-mono text-xs">{formatZAR(snap.netEquity)}</strong>
+                    <strong className="text-slate-900 font-mono text-xs">
+                      {compact ? formatCompactZAR(snap.netEquity) : formatZAR(snap.netEquity)}
+                    </strong>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-slate-500 text-[10px]">Property Value:</span>
-                    <span className="text-slate-700 font-mono text-[11px]">{formatZAR(snap.propertyValue)}</span>
+                    <span className="text-slate-700 font-mono text-[11px]">
+                      {compact ? formatCompactZAR(snap.propertyValue) : formatZAR(snap.propertyValue)}
+                    </span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-slate-500 text-[10px]">Net Cashflow:</span>
@@ -653,7 +671,7 @@ export default function LongTermProjectionChart({
                         snap.netCashflow >= 0 ? 'text-emerald-700' : 'text-rose-700'
                       }`}
                     >
-                      {formatZAR(snap.netCashflow)}/yr
+                      {compact ? `${formatCompactZAR(snap.netCashflow)}/yr` : `${formatZAR(snap.netCashflow)}/yr`}
                     </span>
                   </div>
                 </div>

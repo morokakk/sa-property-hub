@@ -1,4 +1,4 @@
-import { AcquisitionCostBreakdown, AmenityDistance, AmenityScorecard, LongTermProjectionYear, OpportunityDeal } from '@/types';
+import { AcquisitionCostBreakdown, AmenityDistance, AmenityScorecard, LongTermProjectionYear, OpportunityDeal, RentalProperty } from '@/types';
 
 /**
  * Computes Built-in Equity and discount percentage
@@ -389,6 +389,55 @@ export function generateLongTermProjection(
   }
 
   return projections;
+}
+
+/**
+ * Adapts an existing RentalProperty into the 20-year Long-Term Projection engine.
+ * Applies standard South African defaults:
+ * - 5% annual capital growth
+ * - 6% annual rental escalation (or property.annualEscalationPercent)
+ * - 6% annual expense inflation
+ * - 20-year term
+ * - Accurate bond amortization starting strictly from property.outstandingBondBalanceZAR
+ */
+export function generateRentalLongTermProjection(property: RentalProperty): LongTermProjectionYear[] {
+  const purchasePrice = property.marketValueZAR || property.purchasePriceZAR || 0;
+  const currentBond = property.outstandingBondBalanceZAR ?? 0;
+  const effectivePrice = Math.max(purchasePrice, currentBond);
+  const depositZAR = Math.max(0, effectivePrice - currentBond);
+
+  const grossRent = property.monthlyGrossRentZAR || 0;
+  let agencyFeeMonthly = 0;
+  if (property.managementType === 'Agency') {
+    if (typeof property.monthlyAgentFeeZAR === 'number' && property.monthlyAgentFeeZAR > 0) {
+      agencyFeeMonthly = property.monthlyAgentFeeZAR;
+    } else if (typeof property.agencyCommissionPercent === 'number' && property.agencyCommissionPercent > 0) {
+      const baseCommission = grossRent * (property.agencyCommissionPercent / 100);
+      const vatMultiplier = property.agencyVatApplicable !== false ? 1.15 : 1.0;
+      agencyFeeMonthly = baseCommission * vatMultiplier;
+    }
+  }
+
+  const managementFeePercent = grossRent > 0 ? (agencyFeeMonthly / grossRent) * 100 : 0;
+  const monthlyLevies = (property.monthlyLeviesZAR || 0) + (property.monthlyMaintenanceReserveZAR || 0);
+  const monthlyRatesTaxes = property.monthlyRatesTaxesZAR || 0;
+
+  return generateLongTermProjection({
+    purchasePrice: effectivePrice,
+    openMarketValueZAR: property.marketValueZAR || property.purchasePriceZAR || 0,
+    depositZAR,
+    interestRatePercent: property.bondInterestRatePercent || 11.75,
+    bondTermYears: 20,
+    annualCapitalGrowthPercent: 5.0,
+    annualRentalEscalationPercent: property.annualEscalationPercent || 6.0,
+    annualExpenseInflationPercent: 6.0,
+    monthlyRentalEstimate: grossRent,
+    monthlyLevies,
+    monthlyRatesTaxes,
+    annualInsurance: 0,
+    managementFeePercent,
+    vacancyRatePercent: property.status === 'Vacant' ? 10 : 0,
+  });
 }
 
 

@@ -39,9 +39,13 @@ interface PortfolioState {
   investorProfile: InvestorProfile;
   analyzerDraft: AnalyzerDraft;
   aiSettings: AiSettings;
+  rentalForecastView: 'wealth-only' | 'cashflow-only';
 
   // Computed selector
   getSummary: () => PortfolioSummary;
+
+  // Rental Forecast View Action
+  setRentalForecastView: (mode: 'wealth-only' | 'cashflow-only') => void;
 
   // AI Settings Action
   updateAiSettings: (settings: Partial<AiSettings>) => void;
@@ -163,10 +167,13 @@ export const usePortfolioStore = create<PortfolioState>()(
       investorProfile: INITIAL_INVESTOR_PROFILE,
       analyzerDraft: INITIAL_ANALYZER_DRAFT,
       aiSettings: DEFAULT_AI_SETTINGS,
+      rentalForecastView: 'wealth-only',
 
       getSummary: (): PortfolioSummary => {
         return computePortfolioSummary(get());
       },
+
+      setRentalForecastView: (mode) => set({ rentalForecastView: mode }),
 
       // AI Settings
       updateAiSettings: (updates) =>
@@ -871,6 +878,7 @@ export const usePortfolioStore = create<PortfolioState>()(
           liquidCapitalReserve: 650_000,
           investorProfile: INITIAL_INVESTOR_PROFILE,
           analyzerDraft: INITIAL_ANALYZER_DRAFT,
+          rentalForecastView: 'wealth-only',
         }),
       clearAllData: () =>
         set((state) => ({

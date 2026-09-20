@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { generateLongTermProjection } from '../propertyMetrics';
+import { generateLongTermProjection, generateRentalLongTermProjection } from '../propertyMetrics';
+import { RentalProperty } from '@/types';
 
 describe('generateLongTermProjection Engine', () => {
   it('accurately computes 20-year bond amortization and zeroes out balance at year 20', () => {
@@ -80,3 +81,79 @@ describe('generateLongTermProjection Engine', () => {
     });
   });
 });
+
+describe('generateRentalLongTermProjection Adapter', () => {
+  const sampleRental: RentalProperty = {
+    id: 'rental-test-1',
+    title: 'Rosebank Executive Studio',
+    address: '15 Tyrwhitt Ave',
+    city: 'Johannesburg',
+    propertyType: 'Sectional Title Apartment',
+    marketValueZAR: 1_650_000,
+    purchasePriceZAR: 1_450_000,
+    purchaseDate: '2023-05-15',
+    outstandingBondBalanceZAR: 1_250_000,
+    bondInterestRatePercent: 11.5,
+    monthlyBondPaymentZAR: 13_300,
+    tenantName: 'Thabo Ndlovu',
+    tenantPhone: '+27 82 555 1234',
+    tenantEmail: 'thabo@example.com',
+    leaseStartDate: '2024-01-01',
+    leaseEndDate: '2024-12-31',
+    depositHeldZAR: 28_000,
+    annualEscalationPercent: 7,
+    managementType: 'Agency',
+    agencyName: 'Pam Golding',
+    agencyCommissionPercent: 8,
+    agencyVatApplicable: true,
+    monthlyGrossRentZAR: 14_000,
+    monthlyLeviesZAR: 1_850,
+    monthlyRatesTaxesZAR: 950,
+    monthlyAgentFeeZAR: 1_288,
+    monthlyMaintenanceReserveZAR: 500,
+    maintenanceHistory: [],
+    status: 'Occupied',
+  };
+
+  it('generates 20-year projection starting bond amortization from outstandingBondBalanceZAR', () => {
+    const projections = generateRentalLongTermProjection(sampleRental);
+
+    expect(projections).toHaveLength(20);
+
+    // Year 1 checks
+    const yr1 = projections[0];
+    expect(yr1.year).toBe(1);
+    expect(yr1.rent).toBe(14_000 * 12);
+    // Bond should amortize from 1,250,000
+    expect(yr1.outstandingBond).toBeLessThan(1_250_000);
+    expect(yr1.outstandingBond).toBeGreaterThan(1_150_000);
+    expect(yr1.propertyValue).toBe(Math.round(1_650_000 * 1.05));
+    expect(yr1.netEquity).toBe(yr1.propertyValue - yr1.outstandingBond);
+
+    // Year 20 (Bond paid off)
+    const yr20 = projections[19];
+    expect(yr20.year).toBe(20);
+    expect(yr20.outstandingBond).toBe(0);
+    expect(yr20.netEquity).toBe(yr20.propertyValue);
+  });
+
+  it('handles unbonded property with 0 bond balance correctly', () => {
+    const unbondedRental: RentalProperty = {
+      ...sampleRental,
+      id: 'rental-test-2',
+      outstandingBondBalanceZAR: 0,
+      monthlyBondPaymentZAR: 0,
+      managementType: 'Self-Managed',
+    };
+
+    const projections = generateRentalLongTermProjection(unbondedRental);
+
+    expect(projections).toHaveLength(20);
+    projections.forEach((yearSnap) => {
+      expect(yearSnap.outstandingBond).toBe(0);
+      expect(yearSnap.bondPayment).toBe(0);
+      expect(yearSnap.netEquity).toBe(yearSnap.propertyValue);
+    });
+  });
+});
+
