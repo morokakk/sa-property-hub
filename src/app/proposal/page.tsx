@@ -1,10 +1,12 @@
 'use client';
 
-import React, { useState, useEffect, Suspense } from 'react';
+import React, { useState, useEffect, Suspense, useMemo } from 'react';
 import { useSearchParams } from 'next/navigation';
 import TopHeader from '@/components/navigation/TopHeader';
 import { usePortfolioStore } from '@/lib/store/usePortfolioStore';
 import { formatZAR, formatPercent, formatDate } from '@/lib/formatters';
+import { generateLongTermProjection } from '@/lib/calculations/propertyMetrics';
+import LongTermProjectionChart from '@/components/analytics/LongTermProjectionChart';
 import {
   Printer,
   FileCheck2,
@@ -90,6 +92,17 @@ function ProposalGeneratorContent() {
       promisedReturnRatePercent: f.promisedReturnRatePercent,
       promisedPayoutSchedule: f.promisedPayoutSchedule,
       securityOffered: f.securityOffered,
+      monthlyRent: Math.round(f.purchasePriceZAR * 0.009),
+      monthlyLevies: f.monthlyLeviesZAR || 0,
+      monthlyRates: f.monthlyRatesTaxesZAR || 0,
+      depositZAR: 0,
+      loanToValue: 100,
+      interestRatePercent: 11.75,
+      loanTermYears: 20,
+      annualCapitalGrowthPercent: 5.0,
+      annualRentalEscalationPercent: 6.0,
+      annualExpenseInflationPercent: 6.0,
+      bondTermYears: 20,
     })),
     ...opportunities.map((o) => {
       const openMarket = o.openMarketValueZAR || Math.round(o.purchasePrice * 1.2);
@@ -133,6 +146,17 @@ function ProposalGeneratorContent() {
         promisedReturnRatePercent: o.promisedReturnRatePercent,
         promisedPayoutSchedule: o.promisedPayoutSchedule,
         securityOffered: o.securityOffered,
+        monthlyRent: o.monthlyRentalEstimate,
+        monthlyLevies: o.monthlyLevies,
+        monthlyRates: o.monthlyRatesTaxes,
+        depositZAR: o.depositZAR,
+        loanToValue: o.loanToValuePercent,
+        interestRatePercent: o.interestRatePercent,
+        loanTermYears: o.loanTermYears,
+        annualCapitalGrowthPercent: o.annualCapitalGrowthPercent ?? 5.0,
+        annualRentalEscalationPercent: o.annualRentalEscalationPercent ?? 6.0,
+        annualExpenseInflationPercent: o.annualExpenseInflationPercent ?? 6.0,
+        bondTermYears: o.bondTermYears ?? o.loanTermYears ?? 20,
       };
     }),
   ];
@@ -148,6 +172,29 @@ function ProposalGeneratorContent() {
   }, [queryDealId]);
 
   const deal = allDeals.find((d) => d.id === selectedDealId) || allDeals[0];
+
+  const projectionData = useMemo(() => {
+    if (!deal) return [];
+    return generateLongTermProjection({
+      purchasePrice: deal.purchasePrice,
+      openMarketValueZAR: deal.openMarketValue,
+      depositZAR: deal.depositZAR ?? 0,
+      bondLTV: deal.loanToValue ?? 100,
+      loanToValuePercent: deal.loanToValue ?? 100,
+      interestRatePercent: deal.interestRatePercent ?? 11.75,
+      loanTermYears: deal.bondTermYears ?? deal.loanTermYears ?? 20,
+      bondTermYears: deal.bondTermYears ?? 20,
+      annualCapitalGrowthPercent: deal.annualCapitalGrowthPercent ?? 5.0,
+      annualRentalEscalationPercent: deal.annualRentalEscalationPercent ?? 6.0,
+      annualExpenseInflationPercent: deal.annualExpenseInflationPercent ?? 6.0,
+      monthlyRentalEstimate: deal.monthlyRent || Math.round(deal.purchasePrice * 0.009),
+      monthlyLevies: deal.monthlyLevies || 0,
+      monthlyRatesTaxes: deal.monthlyRates || 0,
+      annualInsurance: 7_200,
+      managementFeePercent: 8,
+      vacancyRatePercent: 5,
+    });
+  }, [deal]);
 
   // Proposed Investor Terms state
   const [fundingOfferType, setFundingOfferType] = useState<'Fixed Interest' | 'Profit Share'>('Fixed Interest');
@@ -693,10 +740,30 @@ function ProposalGeneratorContent() {
               )}
             </div>
 
+            {/* Long-Term Wealth & Equity Projections */}
+            <div className="space-y-3 print:break-inside-avoid">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 border-b border-slate-200 pb-1">
+                <h2 className="text-sm uppercase tracking-wider font-extrabold text-slate-900">
+                  4. Long-Term Wealth & Equity Projections ({projectionData.length}-Year Horizon)
+                </h2>
+                <span className="text-[10px] font-semibold text-slate-500">
+                  Assumptions: {deal.annualCapitalGrowthPercent ?? 5}% Capital • {deal.annualRentalEscalationPercent ?? 6}% Rent Escalation
+                </span>
+              </div>
+              <p className="text-xs text-slate-600 leading-relaxed">
+                Projected asset valuation, net equity accumulation, and mortgage debt amortization schedule over a {projectionData.length}-year holding horizon. Compounding rental income covers operating expenses and amortizes the outstanding mortgage bond principal to zero.
+              </p>
+
+              {/* Custom SVG Trend Chart */}
+              <div className="print:border print:border-slate-300 rounded-xl overflow-hidden">
+                <LongTermProjectionChart data={projectionData} />
+              </div>
+            </div>
+
             {/* Sensitivity / Scenario Analysis Table */}
-            <div className="space-y-3">
+            <div className="space-y-3 print:break-inside-avoid">
               <h2 className="text-sm uppercase tracking-wider font-extrabold text-slate-900 border-b border-slate-200 pb-1">
-                4. Sensitivity & Scenario Analysis
+                5. Sensitivity & Scenario Analysis
               </h2>
               <div className="overflow-x-auto">
                 <table className="w-full text-xs text-left border border-slate-200 rounded-lg overflow-hidden">

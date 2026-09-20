@@ -1,4 +1,4 @@
-import { AcquisitionCostBreakdown, AmenityDistance, AmenityScorecard } from '@/types';
+import { AcquisitionCostBreakdown, AmenityDistance, AmenityScorecard, LongTermProjectionYear, OpportunityDeal } from '@/types';
 
 /**
  * Computes Built-in Equity and discount percentage
@@ -257,4 +257,138 @@ export function calculateRentalCashflow(property: {
     netMonthlyCashflowZAR,
   };
 }
+
+/**
+ * Generates 20/30-year financial, cashflow, and equity projections for an opportunity or rental deal.
+ * Simulates standard South African mortgage bond amortization, accurately zeroing out principal at term maturity.
+ * Applies compounding escalations to rent and expenses.
+ */
+export function generateLongTermProjection(
+  deal: Partial<OpportunityDeal> & {
+    purchasePrice?: number;
+    openMarketValueZAR?: number;
+    depositZAR?: number;
+    loanToValuePercent?: number;
+    bondLTV?: number;
+    interestRatePercent?: number;
+    loanTermYears?: number;
+    bondTermYears?: number;
+    annualCapitalGrowthPercent?: number;
+    annualRentalEscalationPercent?: number;
+    annualExpenseInflationPercent?: number;
+    monthlyRentalEstimate?: number;
+    monthlyLevies?: number;
+    monthlyRatesTaxes?: number;
+    annualInsurance?: number;
+    managementFeePercent?: number;
+    vacancyRatePercent?: number;
+  }
+): LongTermProjectionYear[] {
+  const purchasePrice = deal.purchasePrice ?? 0;
+  const openMarketValue =
+    deal.openMarketValueZAR && deal.openMarketValueZAR > 0
+      ? deal.openMarketValueZAR
+      : purchasePrice;
+
+  // Financed principal
+  let cashDeposit = 0;
+  if (deal.depositZAR !== undefined) {
+    cashDeposit = deal.depositZAR;
+  } else if (deal.bondLTV !== undefined) {
+    cashDeposit = Math.round(purchasePrice * (1 - deal.bondLTV / 100));
+  } else if (deal.loanToValuePercent !== undefined) {
+    cashDeposit = Math.round(purchasePrice * (1 - deal.loanToValuePercent / 100));
+  }
+  const bondPrincipal = Math.max(0, purchasePrice - cashDeposit);
+
+  const interestRate = deal.interestRatePercent ?? 11.75;
+  const termYears = deal.bondTermYears || deal.loanTermYears || 20;
+  const capitalGrowth = deal.annualCapitalGrowthPercent ?? 5.0;
+  const rentEscalation = deal.annualRentalEscalationPercent ?? 6.0;
+  const expenseInflation = deal.annualExpenseInflationPercent ?? 6.0;
+
+  // Monthly bond payment
+  const monthlyRate = interestRate > 0 ? (interestRate / 100) / 12 : 0;
+  const totalMonths = termYears * 12;
+  let pmt = 0;
+  if (bondPrincipal > 0 && monthlyRate > 0 && totalMonths > 0) {
+    const factor = Math.pow(1 + monthlyRate, totalMonths);
+    pmt = (bondPrincipal * (monthlyRate * factor)) / (factor - 1);
+  }
+
+  // Simulate month-by-month bond amortization schedule
+  let currentBalance = bondPrincipal;
+  const balancesAtEndOfYear: number[] = [];
+  const annualBondPayments: number[] = [];
+
+  for (let y = 1; y <= termYears; y++) {
+    let yearPayments = 0;
+    for (let m = 1; m <= 12; m++) {
+      if (currentBalance <= 0) {
+        currentBalance = 0;
+        continue;
+      }
+      const interest = currentBalance * monthlyRate;
+      const principalPaid = pmt - interest;
+
+      // Final month of loan or principal exceeds remaining balance
+      if (y === termYears && m === 12) {
+        yearPayments += interest + currentBalance;
+        currentBalance = 0;
+      } else if (principalPaid > currentBalance) {
+        yearPayments += interest + currentBalance;
+        currentBalance = 0;
+      } else {
+        currentBalance -= principalPaid;
+        yearPayments += pmt;
+      }
+    }
+    if (y === termYears) {
+      currentBalance = 0;
+    }
+    balancesAtEndOfYear.push(Math.round(currentBalance));
+    annualBondPayments.push(Math.round(yearPayments));
+  }
+
+  // Baseline Annual Rental and Operating Costs
+  const monthlyRent = deal.monthlyRentalEstimate ?? 0;
+  const vacancyRate = deal.vacancyRatePercent ?? 5;
+  const vacancyLoss = (monthlyRent * vacancyRate) / 100;
+  const managementFee = (monthlyRent * (deal.managementFeePercent ?? 8)) / 100;
+  const monthlyInsurance = (deal.annualInsurance ?? 7_200) / 12;
+  const monthlyLevies = deal.monthlyLevies ?? 0;
+  const monthlyRates = deal.monthlyRatesTaxes ?? 0;
+
+  const totalMonthlyCosts = monthlyLevies + monthlyRates + managementFee + monthlyInsurance + vacancyLoss;
+
+  const baseAnnualRent = monthlyRent * 12;
+  const baseAnnualCosts = totalMonthlyCosts * 12;
+
+  const projections: LongTermProjectionYear[] = [];
+
+  for (let y = 1; y <= termYears; y++) {
+    const escalatedRent = Math.round(baseAnnualRent * Math.pow(1 + rentEscalation / 100, y - 1));
+    const escalatedCosts = Math.round(baseAnnualCosts * Math.pow(1 + expenseInflation / 100, y - 1));
+    const bondPayment = annualBondPayments[y - 1] ?? 0;
+    const netCashflow = escalatedRent - escalatedCosts - bondPayment;
+
+    const propertyValue = Math.round(openMarketValue * Math.pow(1 + capitalGrowth / 100, y));
+    const outstandingBond = balancesAtEndOfYear[y - 1] ?? 0;
+    const netEquity = Math.max(0, propertyValue - outstandingBond);
+
+    projections.push({
+      year: y,
+      rent: escalatedRent,
+      costs: escalatedCosts,
+      bondPayment,
+      netCashflow,
+      propertyValue,
+      outstandingBond,
+      netEquity,
+    });
+  }
+
+  return projections;
+}
+
 

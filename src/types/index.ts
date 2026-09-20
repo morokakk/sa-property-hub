@@ -124,6 +124,11 @@ export interface OpportunityDeal {
   depositZAR: number; // e.g. R 0 or R 200,000
   interestRatePercent: number; // SA Prime ~11.75%
   loanTermYears: number; // e.g. 20
+  // Long-Term Projections & Escalation Assumptions
+  annualCapitalGrowthPercent?: number; // e.g. 5%
+  annualRentalEscalationPercent?: number; // e.g. 6%
+  annualExpenseInflationPercent?: number; // e.g. 6%
+  bondTermYears?: number; // e.g. 20 or 30
   // Overrides
   customTransferDuty?: number;
   customConveyancing?: number;
@@ -358,6 +363,18 @@ export interface InvestorProfile {
   defaultAgentCommissionPercent: number; // e.g. 5.0%
 }
 
+// Long-Term Financial & Wealth Projection Yearly Snapshot
+export interface LongTermProjectionYear {
+  year: number;
+  rent: number;
+  costs: number;
+  bondPayment: number;
+  netCashflow: number;
+  propertyValue: number;
+  outstandingBond: number;
+  netEquity: number;
+}
+
 // Deal Sourcing Calculator Scratchpad State
 export interface AnalyzerDraft {
   openMarketValue: number;
@@ -371,6 +388,10 @@ export interface AnalyzerDraft {
   municipalArrears: number;
   depositZAR: number;
   loanToValue: number;
+  annualCapitalGrowthPercent?: number;
+  annualRentalEscalationPercent?: number;
+  annualExpenseInflationPercent?: number;
+  bondTermYears?: number;
 }
 
 // Client-side BYOK AI Integration Settings

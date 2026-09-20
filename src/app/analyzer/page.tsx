@@ -8,11 +8,13 @@ import {
   calculateDealMetrics,
   computeBuiltInEquity,
   computeAmenityScore,
+  generateLongTermProjection,
 } from '@/lib/calculations/propertyMetrics';
 import { formatOpportunityForWhatsApp } from '@/lib/whatsappFormatter';
 import { formatZAR, formatPercent } from '@/lib/formatters';
 import { OpportunityDeal, DealSource, AmenityDistance, AmenityScorecard, PropertyTitleType } from '@/types';
 import { PropertyTypeBadge, AgmDateChip } from '@/components/common/PropertyTypeBadge';
+import LongTermProjectionChart from '@/components/analytics/LongTermProjectionChart';
 import {
   Calculator,
   PlusCircle,
@@ -22,6 +24,7 @@ import {
   Trash2,
   ExternalLink,
   ChevronDown,
+  ChevronUp,
   CheckCircle2,
   Info,
   Scale,
@@ -87,7 +90,14 @@ export default function OpportunityAnalyzerPage() {
   const [loanToValue, setLoanToValue] = useState<number>(analyzerDraft?.loanToValue ?? 100);
   const [depositZAR, setDepositZAR] = useState<number>(analyzerDraft?.depositZAR ?? 0);
   const [interestRate, setInterestRate] = useState<number>(11.75); // SA Prime Rate
-  const [loanTermYears, setLoanTermYears] = useState<number>(20);
+  const [loanTermYears, setLoanTermYears] = useState<number>(analyzerDraft?.bondTermYears ?? 20);
+
+  // Long-Term Projections & Escalation Assumptions
+  const [annualCapitalGrowth, setAnnualCapitalGrowth] = useState<number>(analyzerDraft?.annualCapitalGrowthPercent ?? 5.0);
+  const [annualRentalEscalation, setAnnualRentalEscalation] = useState<number>(analyzerDraft?.annualRentalEscalationPercent ?? 6.0);
+  const [annualExpenseInflation, setAnnualExpenseInflation] = useState<number>(analyzerDraft?.annualExpenseInflationPercent ?? 6.0);
+  const [bondTermYears, setBondTermYears] = useState<number>(analyzerDraft?.bondTermYears ?? 20);
+  const [showAdvancedAssumptions, setShowAdvancedAssumptions] = useState<boolean>(false);
 
   // Synchronize scratchpad calculator inputs when store draft changes (e.g. Clear Demo Data or Reset Demo)
   useEffect(() => {
@@ -103,8 +113,40 @@ export default function OpportunityAnalyzerPage() {
       setMunicipalArrears(analyzerDraft.municipalArrears ?? 0);
       setDepositZAR(analyzerDraft.depositZAR ?? 0);
       setLoanToValue(analyzerDraft.loanToValue ?? 0);
+      if (analyzerDraft.annualCapitalGrowthPercent !== undefined) setAnnualCapitalGrowth(analyzerDraft.annualCapitalGrowthPercent);
+      if (analyzerDraft.annualRentalEscalationPercent !== undefined) setAnnualRentalEscalation(analyzerDraft.annualRentalEscalationPercent);
+      if (analyzerDraft.annualExpenseInflationPercent !== undefined) setAnnualExpenseInflation(analyzerDraft.annualExpenseInflationPercent);
+      if (analyzerDraft.bondTermYears !== undefined) {
+        setBondTermYears(analyzerDraft.bondTermYears);
+        setLoanTermYears(analyzerDraft.bondTermYears);
+      }
     }
   }, [analyzerDraft]);
+
+  const handleCapitalGrowthChange = (val: number) => {
+    const safeVal = isNaN(val) ? 0 : val;
+    setAnnualCapitalGrowth(safeVal);
+    updateAnalyzerDraft({ annualCapitalGrowthPercent: safeVal });
+  };
+
+  const handleRentalEscalationChange = (val: number) => {
+    const safeVal = isNaN(val) ? 0 : val;
+    setAnnualRentalEscalation(safeVal);
+    updateAnalyzerDraft({ annualRentalEscalationPercent: safeVal });
+  };
+
+  const handleExpenseInflationChange = (val: number) => {
+    const safeVal = isNaN(val) ? 0 : val;
+    setAnnualExpenseInflation(safeVal);
+    updateAnalyzerDraft({ annualExpenseInflationPercent: safeVal });
+  };
+
+  const handleBondTermChange = (val: number) => {
+    const safeVal = Math.max(1, isNaN(val) ? 20 : val);
+    setBondTermYears(safeVal);
+    setLoanTermYears(safeVal);
+    updateAnalyzerDraft({ bondTermYears: safeVal });
+  };
 
   // Bidirectional Handlers for Deposit, LTV, and Purchase Price
   const handlePurchasePriceChange = (val: number) => {
@@ -225,6 +267,43 @@ export default function OpportunityAnalyzerPage() {
     return calculateSection13sex(purchasePrice, section13TaxRate, isSection13Eligible);
   }, [purchasePrice, section13TaxRate, isSection13Eligible]);
 
+  // Long-Term Wealth & Cashflow Projections Engine
+  const calculatedProjections = useMemo(() => {
+    return generateLongTermProjection({
+      purchasePrice,
+      openMarketValueZAR: openMarketValue,
+      depositZAR,
+      bondLTV: loanToValue,
+      loanToValuePercent: loanToValue,
+      interestRatePercent: interestRate,
+      loanTermYears: bondTermYears,
+      bondTermYears,
+      annualCapitalGrowthPercent: annualCapitalGrowth,
+      annualRentalEscalationPercent: annualRentalEscalation,
+      annualExpenseInflationPercent: annualExpenseInflation,
+      monthlyRentalEstimate: monthlyRent,
+      monthlyLevies: propertyType === 'Freehold House' ? 0 : monthlyLevies,
+      monthlyRatesTaxes: monthlyRates,
+      annualInsurance: 7_200,
+      managementFeePercent: 8,
+      vacancyRatePercent: 5,
+    });
+  }, [
+    purchasePrice,
+    openMarketValue,
+    depositZAR,
+    loanToValue,
+    interestRate,
+    bondTermYears,
+    annualCapitalGrowth,
+    annualRentalEscalation,
+    annualExpenseInflation,
+    monthlyRent,
+    monthlyLevies,
+    monthlyRates,
+    propertyType,
+  ]);
+
   const handleCopyCurrentCalcWhatsApp = () => {
     const isScheme = propertyType === 'Sectional Title Apartment' || propertyType === 'Townhouse / Cluster';
     const finalAgmDate = isScheme && agmDate ? agmDate : undefined;
@@ -257,7 +336,11 @@ export default function OpportunityAnalyzerPage() {
       bondLTV: loanToValue,
       depositZAR,
       interestRatePercent: interestRate,
-      loanTermYears,
+      loanTermYears: bondTermYears,
+      bondTermYears,
+      annualCapitalGrowthPercent: annualCapitalGrowth,
+      annualRentalEscalationPercent: annualRentalEscalation,
+      annualExpenseInflationPercent: annualExpenseInflation,
       costs: calculatedCosts,
       auctioneerCommissionZAR: auctioneerCommission,
       municipalArrearsZAR: municipalArrears,
@@ -305,7 +388,11 @@ export default function OpportunityAnalyzerPage() {
     const effectiveDep = deal.depositZAR !== undefined ? deal.depositZAR : Math.max(0, Math.round(deal.purchasePrice * (1 - effectiveLtv / 100)));
     setDepositZAR(effectiveDep);
     setInterestRate(deal.interestRatePercent);
-    setLoanTermYears(deal.loanTermYears);
+    setLoanTermYears(deal.bondTermYears ?? deal.loanTermYears);
+    setBondTermYears(deal.bondTermYears ?? deal.loanTermYears ?? 20);
+    setAnnualCapitalGrowth(deal.annualCapitalGrowthPercent ?? 5.0);
+    setAnnualRentalEscalation(deal.annualRentalEscalationPercent ?? 6.0);
+    setAnnualExpenseInflation(deal.annualExpenseInflationPercent ?? 6.0);
     setIsSection13Eligible(!!deal.section13sex);
     setSection13TaxRate(deal.section13sex?.taxRatePercent || 27);
     if (deal.amenityScorecard) {
@@ -327,6 +414,11 @@ export default function OpportunityAnalyzerPage() {
     setMunicipalArrears(0);
     setLoanToValue(100);
     setDepositZAR(0);
+    setAnnualCapitalGrowth(5.0);
+    setAnnualRentalEscalation(6.0);
+    setAnnualExpenseInflation(6.0);
+    setBondTermYears(20);
+    setLoanTermYears(20);
   };
 
   const handleSaveOpportunity = (e: React.FormEvent) => {
@@ -365,7 +457,11 @@ export default function OpportunityAnalyzerPage() {
         bondLTV: loanToValue,
         depositZAR,
         interestRatePercent: interestRate,
-        loanTermYears,
+        loanTermYears: bondTermYears,
+        bondTermYears,
+        annualCapitalGrowthPercent: annualCapitalGrowth,
+        annualRentalEscalationPercent: annualRentalEscalation,
+        annualExpenseInflationPercent: annualExpenseInflation,
         customTransferDuty: overrideTax ? customTransferDuty : undefined,
         customConveyancing: overrideLegal ? customConveyancing : undefined,
         costs: calculatedCosts,
@@ -388,6 +484,11 @@ export default function OpportunityAnalyzerPage() {
       setMunicipalArrears(0);
       setLoanToValue(100);
       setDepositZAR(0);
+      setAnnualCapitalGrowth(5.0);
+      setAnnualRentalEscalation(6.0);
+      setAnnualExpenseInflation(6.0);
+      setBondTermYears(20);
+      setLoanTermYears(20);
       return;
     }
 
@@ -420,7 +521,11 @@ export default function OpportunityAnalyzerPage() {
       bondLTV: loanToValue,
       depositZAR,
       interestRatePercent: interestRate,
-      loanTermYears,
+      loanTermYears: bondTermYears,
+      bondTermYears,
+      annualCapitalGrowthPercent: annualCapitalGrowth,
+      annualRentalEscalationPercent: annualRentalEscalation,
+      annualExpenseInflationPercent: annualExpenseInflation,
       customTransferDuty: overrideTax ? customTransferDuty : undefined,
       customConveyancing: overrideLegal ? customConveyancing : undefined,
       costs: calculatedCosts,
@@ -1183,7 +1288,11 @@ export default function OpportunityAnalyzerPage() {
                           min="5"
                           max="30"
                           value={loanTermYears}
-                          onChange={(e) => setLoanTermYears(Number(e.target.value))}
+                          onChange={(e) => {
+                            const val = Number(e.target.value);
+                            setLoanTermYears(val);
+                            handleBondTermChange(val);
+                          }}
                           className="w-full text-xs px-2 py-1.5 border border-slate-300 rounded-lg font-semibold bg-white"
                         />
                         <span className="ml-1 text-xs text-slate-500 font-bold">yr</span>
@@ -1199,6 +1308,189 @@ export default function OpportunityAnalyzerPage() {
                   </div>
                 </div>
               </div>
+            </div>
+
+            {/* Advanced Assumptions & Long-Term Projections Collapsible Section */}
+            <div className="rounded-xl border border-slate-200 bg-white overflow-hidden shadow-2xs">
+              <button
+                type="button"
+                onClick={() => setShowAdvancedAssumptions(!showAdvancedAssumptions)}
+                className="w-full p-4 flex items-center justify-between text-left hover:bg-slate-50 transition-colors cursor-pointer"
+              >
+                <div className="flex items-center gap-2.5">
+                  <div className="p-1.5 bg-indigo-50 text-indigo-600 rounded-lg">
+                    <TrendingUp className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
+                        Advanced Assumptions & Long-Term Wealth Projections
+                      </h4>
+                      <span className="text-[10px] font-semibold bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-full border border-indigo-200">
+                        {bondTermYears}-Year Model
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-500 mt-0.5">
+                      Model 20/30-year capital appreciation, rent escalation, inflation, and bond amortization
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] font-semibold text-slate-500 hidden sm:inline">
+                    {showAdvancedAssumptions ? 'Hide Projections' : 'Expand Projections & Graph'}
+                  </span>
+                  <div className="p-1 rounded-md text-slate-400">
+                    {showAdvancedAssumptions ? (
+                      <ChevronUp className="w-4 h-4" />
+                    ) : (
+                      <ChevronDown className="w-4 h-4" />
+                    )}
+                  </div>
+                </div>
+              </button>
+
+              {showAdvancedAssumptions && (
+                <div className="p-4 sm:p-5 border-t border-slate-200 bg-slate-50/50 space-y-5">
+                  {/* Assumptions Inputs Grid */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                    {/* Annual Capital Growth */}
+                    <div className="bg-white p-3 rounded-xl border border-slate-200 space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <label className="text-xs font-bold text-slate-800">
+                          Annual Capital Growth
+                        </label>
+                        <span className="text-[10px] text-slate-400 font-medium">SA Avg: 5.0%</span>
+                      </div>
+                      <div className="flex items-center">
+                        <input
+                          type="number"
+                          step="0.5"
+                          min="0"
+                          max="25"
+                          value={annualCapitalGrowth}
+                          onChange={(e) => handleCapitalGrowthChange(Number(e.target.value))}
+                          className="w-full text-xs px-2.5 py-1.5 border border-slate-300 rounded-lg font-bold text-emerald-700 bg-white"
+                        />
+                        <span className="ml-1.5 text-xs text-slate-500 font-bold">% p.a.</span>
+                      </div>
+                      <p className="text-[10px] text-slate-400">Annual property valuation appreciation</p>
+                    </div>
+
+                    {/* Annual Rental Escalation */}
+                    <div className="bg-white p-3 rounded-xl border border-slate-200 space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <label className="text-xs font-bold text-slate-800">
+                          Rental Escalation
+                        </label>
+                        <span className="text-[10px] text-slate-400 font-medium">SA Avg: 6.0%</span>
+                      </div>
+                      <div className="flex items-center">
+                        <input
+                          type="number"
+                          step="0.5"
+                          min="0"
+                          max="25"
+                          value={annualRentalEscalation}
+                          onChange={(e) => handleRentalEscalationChange(Number(e.target.value))}
+                          className="w-full text-xs px-2.5 py-1.5 border border-slate-300 rounded-lg font-bold text-indigo-700 bg-white"
+                        />
+                        <span className="ml-1.5 text-xs text-slate-500 font-bold">% p.a.</span>
+                      </div>
+                      <p className="text-[10px] text-slate-400">Compounding yearly tenant lease increase</p>
+                    </div>
+
+                    {/* Annual Expense Inflation */}
+                    <div className="bg-white p-3 rounded-xl border border-slate-200 space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <label className="text-xs font-bold text-slate-800">
+                          Expense Inflation
+                        </label>
+                        <span className="text-[10px] text-slate-400 font-medium">SA Avg: 6.0%</span>
+                      </div>
+                      <div className="flex items-center">
+                        <input
+                          type="number"
+                          step="0.5"
+                          min="0"
+                          max="25"
+                          value={annualExpenseInflation}
+                          onChange={(e) => handleExpenseInflationChange(Number(e.target.value))}
+                          className="w-full text-xs px-2.5 py-1.5 border border-slate-300 rounded-lg font-bold text-amber-700 bg-white"
+                        />
+                        <span className="ml-1.5 text-xs text-slate-500 font-bold">% p.a.</span>
+                      </div>
+                      <p className="text-[10px] text-slate-400">Municipal rates & levy inflation</p>
+                    </div>
+
+                    {/* Bond / Projection Term */}
+                    <div className="bg-white p-3 rounded-xl border border-slate-200 space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <label className="text-xs font-bold text-slate-800">
+                          Projection Horizon
+                        </label>
+                        <div className="flex items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() => handleBondTermChange(20)}
+                            className={`text-[10px] px-1.5 py-0.5 rounded font-bold transition-colors ${
+                              bondTermYears === 20
+                                ? 'bg-emerald-600 text-white'
+                                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                            }`}
+                          >
+                            20y
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleBondTermChange(30)}
+                            className={`text-[10px] px-1.5 py-0.5 rounded font-bold transition-colors ${
+                              bondTermYears === 30
+                                ? 'bg-emerald-600 text-white'
+                                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                            }`}
+                          >
+                            30y
+                          </button>
+                        </div>
+                      </div>
+                      <div className="flex items-center">
+                        <input
+                          type="number"
+                          min="5"
+                          max="35"
+                          value={bondTermYears}
+                          onChange={(e) => handleBondTermChange(Number(e.target.value))}
+                          className="w-full text-xs px-2.5 py-1.5 border border-slate-300 rounded-lg font-bold text-slate-900 bg-white"
+                        />
+                        <span className="ml-1.5 text-xs text-slate-500 font-bold">Years</span>
+                      </div>
+                      <p className="text-[10px] text-slate-400">Term for amortization & wealth buildup</p>
+                    </div>
+                  </div>
+
+                  {/* Reset to SA Averages Button */}
+                  <div className="flex items-center justify-end">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        handleCapitalGrowthChange(5.0);
+                        handleRentalEscalationChange(6.0);
+                        handleExpenseInflationChange(6.0);
+                        handleBondTermChange(20);
+                      }}
+                      className="text-[11px] font-semibold text-slate-600 hover:text-slate-900 underline transition-colors cursor-pointer"
+                    >
+                      Reset to South African Benchmark Averages (5% Growth / 6% Escalation / 20 Yrs)
+                    </button>
+                  </div>
+
+                  {/* Embedded Custom SVG Multi-line Projection Chart */}
+                  <div className="pt-2">
+                    <LongTermProjectionChart data={calculatedProjections} />
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* SARS Tax & Legal Overrides + Section 13sex Row */}
@@ -1466,6 +1758,13 @@ export default function OpportunityAnalyzerPage() {
                   <span className="text-slate-400 block text-[10px]">Projected Flip ROI</span>
                   <span className="text-sm font-bold text-white">{formatPercent(calculatedMetrics.projectedFlipRoi)}</span>
                   <span className="text-[10px] text-slate-400 block">On invested capital</span>
+                </div>
+                <div className="bg-slate-900 p-2 rounded-lg border border-slate-700">
+                  <span className="text-teal-400 block text-[10px] font-semibold">{bondTermYears}y Net Equity</span>
+                  <span className="text-sm font-bold text-teal-300">
+                    {formatZAR(calculatedProjections[calculatedProjections.length - 1]?.netEquity || 0)}
+                  </span>
+                  <span className="text-[9px] text-slate-400 block">Compounding asset</span>
                 </div>
                 {isSection13Eligible && (
                   <div className="bg-emerald-950/70 p-2 rounded-lg border border-emerald-500/40">

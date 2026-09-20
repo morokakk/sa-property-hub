@@ -725,6 +725,10 @@ function createSampleOpportunity(
     depositZAR,
     interestRatePercent: 11.75,
     loanTermYears: 20,
+    annualCapitalGrowthPercent: 5.0,
+    annualRentalEscalationPercent: 6.0,
+    annualExpenseInflationPercent: 6.0,
+    bondTermYears: 20,
     costs,
     auctioneerCommissionZAR,
     municipalArrearsZAR,
@@ -881,6 +885,10 @@ export const INITIAL_ANALYZER_DRAFT: AnalyzerDraft = {
   municipalArrears: 0,
   depositZAR: 0,
   loanToValue: 100,
+  annualCapitalGrowthPercent: 5.0,
+  annualRentalEscalationPercent: 6.0,
+  annualExpenseInflationPercent: 6.0,
+  bondTermYears: 20,
 };
 
 export const EMPTY_ANALYZER_DRAFT: AnalyzerDraft = {
@@ -895,6 +903,10 @@ export const EMPTY_ANALYZER_DRAFT: AnalyzerDraft = {
   municipalArrears: 0,
   depositZAR: 0,
   loanToValue: 0,
+  annualCapitalGrowthPercent: 5.0,
+  annualRentalEscalationPercent: 6.0,
+  annualExpenseInflationPercent: 6.0,
+  bondTermYears: 20,
 };
 
 export const DEFAULT_AI_SETTINGS: AiSettings = {
