@@ -187,22 +187,22 @@ export default function CloudDriveLinkVault({
   const activeProvider = urlInput ? detectCloudProvider(urlInput) : null;
 
   return (
-    <div className="bg-slate-50/90 rounded-xl border border-slate-200/80 p-3.5 space-y-2.5">
-      <div className="flex items-center justify-between pb-2 border-b border-slate-200/60 flex-wrap gap-2">
-        <div className="flex items-center gap-1.5 text-xs font-bold text-slate-800">
-          <Cloud className="w-4 h-4 text-indigo-600" />
+    <div className="bg-slate-50/90 rounded-xl border border-slate-200/80 p-4 sm:p-5 space-y-3">
+      <div className="flex items-center justify-between pb-2.5 border-b border-slate-200/60 flex-wrap gap-2">
+        <div className="flex items-center gap-2 text-xs sm:text-sm font-bold text-slate-900">
+          <Cloud className="w-4 h-4 text-indigo-600 shrink-0" />
           <span>Cloud & Web Document Vault</span>
         </div>
-        <div className="flex items-center gap-1.5 text-[10px] text-slate-500">
+        <div className="flex items-center gap-1.5 text-[10px] sm:text-[11px] text-slate-500">
           <span className="font-semibold text-slate-600">Zero-Storage URL Links</span>
           <span>•</span>
-          <span className="bg-white px-1.5 py-0.5 rounded border border-slate-200 text-slate-600 font-medium">
+          <span className="bg-white px-2 py-0.5 rounded border border-slate-200 text-slate-600 font-medium">
             OneDrive • GDrive • Dropbox • Web
           </span>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
         {slots.map(({ key, label, sub, icon: Icon }) => {
           const hasUrl = Boolean(links[key]);
           const currentUrl = links[key];
@@ -212,23 +212,23 @@ export default function CloudDriveLinkVault({
           return (
             <div
               key={key}
-              className={`p-2.5 rounded-lg border text-xs flex flex-col justify-between transition-all ${
+              className={`p-3.5 rounded-xl border text-xs flex flex-col justify-between transition-all min-h-[110px] ${
                 hasUrl
                   ? 'bg-white border-slate-300/80 shadow-2xs'
                   : 'bg-slate-100/60 border-slate-200'
               }`}
             >
               <div>
-                <div className="flex items-center justify-between gap-1 mb-1">
+                <div className="flex items-center justify-between gap-2 mb-1">
                   <div className="flex items-center gap-1.5 min-w-0">
-                    <Icon className={`w-3.5 h-3.5 shrink-0 ${hasUrl ? 'text-indigo-600' : 'text-slate-400'}`} />
-                    <span className="font-bold text-[11px] text-slate-800 truncate" title={label}>
+                    <Icon className={`w-4 h-4 shrink-0 ${hasUrl ? 'text-indigo-600' : 'text-slate-400'}`} />
+                    <span className="font-bold text-xs text-slate-900 truncate" title={label}>
                       {label}
                     </span>
                   </div>
                   {provider && (
                     <span
-                      className={`shrink-0 inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded border ${provider.badgeBg} ${provider.badgeText} ${provider.badgeBorder}`}
+                      className={`shrink-0 inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded border ${provider.badgeBg} ${provider.badgeText} ${provider.badgeBorder}`}
                       title={`Stored on ${provider.name}`}
                     >
                       <span>{provider.iconText}</span>
@@ -236,7 +236,7 @@ export default function CloudDriveLinkVault({
                     </span>
                   )}
                 </div>
-                <p className="text-[9px] text-slate-500 truncate mb-2">{sub}</p>
+                <p className="text-[10px] text-slate-500 leading-tight line-clamp-1 mb-2.5" title={sub}>{sub}</p>
               </div>
 
               {isEditing ? (
@@ -318,11 +318,11 @@ export default function CloudDriveLinkVault({
                     href={currentUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1 text-[11px] font-bold text-indigo-600 hover:text-indigo-800 hover:underline truncate"
+                    className="inline-flex items-center gap-1.5 text-xs font-bold text-indigo-600 hover:text-indigo-800 hover:underline truncate"
                     title={`Open ${label} (${provider?.name || 'Link'})`}
                   >
                     <span>Open Link</span>
-                    <ExternalLink className="w-3 h-3 shrink-0" />
+                    <ExternalLink className="w-3.5 h-3.5 shrink-0" />
                   </a>
 
                   {!readOnly && (

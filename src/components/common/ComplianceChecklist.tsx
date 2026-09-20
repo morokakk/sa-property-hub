@@ -99,18 +99,18 @@ export default function ComplianceChecklist({
   };
 
   return (
-    <div className="bg-slate-50/90 rounded-xl border border-slate-200/80 p-3.5 space-y-2.5">
-      <div className="flex items-center justify-between pb-2 border-b border-slate-200/60">
-        <div className="flex items-center gap-1.5 text-xs font-bold text-slate-800">
-          <ShieldCheck className="w-4 h-4 text-emerald-600" />
+    <div className="bg-slate-50/90 rounded-xl border border-slate-200/80 p-4 sm:p-5 space-y-3">
+      <div className="flex items-center justify-between pb-2.5 border-b border-slate-200/60">
+        <div className="flex items-center gap-2 text-xs sm:text-sm font-bold text-slate-900">
+          <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
           <span>Mandatory SA Compliance Certificates (CoC)</span>
         </div>
-        <span className="text-[10px] bg-slate-200 text-slate-700 px-1.5 py-0.2 rounded font-semibold">
+        <span className="text-[10px] sm:text-[11px] bg-slate-200 text-slate-700 px-2 py-0.5 rounded font-semibold">
           Deeds Office Clearance
         </span>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-5 gap-2">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
         {(Object.keys(certMeta) as Array<keyof ComplianceCertificates>).map((key) => {
           const item = certs[key] || { type: certMeta[key].label, status: 'Not Applicable' };
           const meta = certMeta[key];
@@ -119,28 +119,26 @@ export default function ComplianceChecklist({
           return (
             <div
               key={key}
-              className={`p-2.5 rounded-lg border text-xs flex flex-col justify-between transition-all ${
+              className={`p-3 rounded-xl border text-xs flex flex-col justify-between transition-all min-h-[110px] ${
                 item.status === 'Certified / Valid'
-                  ? 'bg-emerald-50/70 border-emerald-200 text-emerald-950'
+                  ? 'bg-emerald-50/70 border-emerald-200 text-emerald-950 shadow-2xs'
                   : item.status === 'Pending Inspection'
-                  ? 'bg-amber-50/70 border-amber-200 text-amber-950'
+                  ? 'bg-amber-50/70 border-amber-200 text-amber-950 shadow-2xs'
                   : 'bg-slate-100/50 border-slate-200 text-slate-500'
               }`}
             >
               <div>
-                <div className="flex items-center justify-between gap-1 mb-1">
-                  <div className="flex items-center gap-1">
-                    <Icon className="w-3.5 h-3.5 shrink-0 opacity-80" />
-                    <span className="font-bold text-[11px] truncate">{meta.label}</span>
-                  </div>
+                <div className="flex items-center gap-1.5 min-w-0 mb-1">
+                  <Icon className="w-3.5 h-3.5 shrink-0 opacity-80" />
+                  <span className="font-bold text-xs truncate" title={meta.label}>{meta.label}</span>
                 </div>
-                <p className="text-[9px] text-slate-500 truncate mb-1.5">{meta.sub}</p>
+                <p className="text-[10px] text-slate-500 leading-tight line-clamp-1 mb-2" title={meta.sub}>{meta.sub}</p>
               </div>
 
-              <div className="space-y-1 mt-1">
+              <div className="space-y-1.5 mt-auto">
                 {readOnly ? (
                   <span
-                    className={`inline-block text-[10px] font-bold px-1.5 py-0.2 rounded ${
+                    className={`inline-block text-xs font-semibold px-2 py-0.5 rounded ${
                       item.status === 'Certified / Valid'
                         ? 'bg-emerald-200 text-emerald-900'
                         : item.status === 'Pending Inspection'
@@ -154,7 +152,7 @@ export default function ComplianceChecklist({
                   <select
                     value={item.status}
                     onChange={(e) => handleStatusChange(key, e.target.value as CoCStatus)}
-                    className="w-full text-[10px] font-bold py-1 px-1 rounded border border-slate-300 bg-white cursor-pointer"
+                    className="w-full text-xs font-semibold py-1.5 px-2 rounded-lg border border-slate-300 bg-white cursor-pointer shadow-2xs"
                   >
                     <option value="Not Applicable">N/A</option>
                     <option value="Pending Inspection">Pending</option>

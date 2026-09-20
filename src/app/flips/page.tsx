@@ -870,17 +870,17 @@ export default function FlipsManagerPage() {
                   </div>
                 </div>
 
-                {/* SA Statutory Compliance (CoC) & Cloud Drive Vault */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                  <ComplianceChecklist
-                    certificates={activeFlip.cocChecklist}
-                    onUpdate={(updated) => updateFlip(activeFlip.id, { cocChecklist: updated })}
-                  />
-                  <CloudDriveLinkVault
-                    vault={activeFlip.driveVault}
-                    onUpdate={(updated) => updateFlip(activeFlip.id, { driveVault: updated })}
-                  />
-                </div>
+                {/* SA Statutory Compliance (CoC) */}
+                <ComplianceChecklist
+                  certificates={activeFlip.cocChecklist}
+                  onUpdate={(updated) => updateFlip(activeFlip.id, { cocChecklist: updated })}
+                />
+
+                {/* Cloud & Web Document Vault */}
+                <CloudDriveLinkVault
+                  vault={activeFlip.driveVault}
+                  onUpdate={(updated) => updateFlip(activeFlip.id, { driveVault: updated })}
+                />
 
                 {/* Bill of Quantities (BOQ) Table */}
                 <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-xs">
