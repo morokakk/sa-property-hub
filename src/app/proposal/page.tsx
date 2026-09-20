@@ -7,6 +7,7 @@ import { usePortfolioStore } from '@/lib/store/usePortfolioStore';
 import { formatZAR, formatPercent, formatDate } from '@/lib/formatters';
 import { generateLongTermProjection } from '@/lib/calculations/propertyMetrics';
 import LongTermProjectionChart from '@/components/analytics/LongTermProjectionChart';
+import { DealStrategy } from '@/types';
 import {
   Printer,
   FileCheck2,
@@ -78,6 +79,18 @@ function ProposalGeneratorContent() {
       },
       acquisitionCosts: f.acquisitionCostsZAR,
       renovationBudget: f.baselineRenovationBudgetZAR,
+      strategy: f.strategy ?? 'Flip',
+      holdingDurationMonths: f.estimatedDurationMonths ?? 6,
+      monthlyBondHolding: f.monthlyBondPaymentZAR ?? 0,
+      monthlyLeviesHolding: f.monthlyLeviesZAR ?? 0,
+      monthlyRatesHolding: f.monthlyRatesTaxesZAR ?? 0,
+      monthlyOtherHolding: f.monthlyOtherHoldingCostZAR ?? 0,
+      monthlyHoldingCost: f.monthlyHoldingCostZAR ?? (
+        (f.monthlyBondPaymentZAR ?? 0) +
+        (f.monthlyLeviesZAR ?? 0) +
+        (f.monthlyRatesTaxesZAR ?? 0) +
+        (f.monthlyOtherHoldingCostZAR ?? 0)
+      ),
       targetExitPrice: f.targetExitPriceZAR,
       completionDate: f.targetCompletionDate,
       boq: f.boq,
@@ -130,6 +143,18 @@ function ProposalGeneratorContent() {
         amenityScorecard: scorecard,
         acquisitionCosts: o.costs.totalAcquisitionCost - o.purchasePrice,
         renovationBudget: o.estimatedRehabCost,
+        strategy: o.strategy ?? 'Rental',
+        holdingDurationMonths: o.holdingPeriodMonths ?? 6,
+        monthlyBondHolding: o.monthlyBondPaymentZAR ?? (o.bondLTV ? Math.round(o.purchasePrice * (o.bondLTV / 100) * 0.0108) : 0),
+        monthlyLeviesHolding: o.monthlyLevies ?? 0,
+        monthlyRatesHolding: o.monthlyRatesTaxes ?? 0,
+        monthlyOtherHolding: o.monthlyOtherHoldingCostZAR ?? 1500,
+        monthlyHoldingCost: o.monthlyHoldingCostZAR ?? (
+          (o.monthlyLevies ?? 0) +
+          (o.monthlyRatesTaxes ?? 0) +
+          (o.monthlyBondPaymentZAR ?? (o.bondLTV ? Math.round(o.purchasePrice * (o.bondLTV / 100) * 0.0108) : 0)) +
+          (o.monthlyOtherHoldingCostZAR ?? 1500)
+        ),
         targetExitPrice: o.targetExitPrice,
         completionDate: new Date(Date.now() + 180 * 24 * 60 * 60 * 1000)
           .toISOString()
@@ -173,8 +198,14 @@ function ProposalGeneratorContent() {
 
   const deal = allDeals.find((d) => d.id === selectedDealId) || allDeals[0];
 
+  const [pitchStrategy, setPitchStrategy] = useState<DealStrategy>(
+    deal?.strategy ?? (deal?.type === 'flip' ? 'Flip' : 'Rental')
+  );
+
+  const isFlip = pitchStrategy === 'Flip';
+
   const projectionData = useMemo(() => {
-    if (!deal) return [];
+    if (!deal || isFlip) return [];
     return generateLongTermProjection({
       purchasePrice: deal.purchasePrice,
       openMarketValueZAR: deal.openMarketValue,
@@ -194,7 +225,7 @@ function ProposalGeneratorContent() {
       managementFeePercent: 8,
       vacancyRatePercent: 5,
     });
-  }, [deal]);
+  }, [deal, isFlip]);
 
   // Proposed Investor Terms state
   const [fundingOfferType, setFundingOfferType] = useState<'Fixed Interest' | 'Profit Share'>('Fixed Interest');
@@ -208,9 +239,18 @@ function ProposalGeneratorContent() {
   // Sync state when deal selection changes
   useEffect(() => {
     if (deal) {
+      const initialStrategy = deal.strategy ?? (deal.type === 'flip' ? 'Flip' : 'Rental');
+      setPitchStrategy(initialStrategy);
+
+      const isDealFlip = initialStrategy === 'Flip';
+      const duration = deal.holdingDurationMonths || 6;
+      const burn = deal.monthlyHoldingCost || (deal.monthlyBondHolding + deal.monthlyLeviesHolding + deal.monthlyRatesHolding + deal.monthlyOtherHolding);
+      const reserve = isDealFlip ? burn * duration : 0;
+      const fullProjectOutlay = deal.purchasePrice + deal.acquisitionCosts + deal.renovationBudget + reserve;
+
       const defaultCapital =
         deal.fundingRequiredZAR ??
-        Math.round((deal.purchasePrice + deal.acquisitionCosts + deal.renovationBudget) * 0.7);
+        Math.round(fullProjectOutlay * 0.7);
       const defaultOfferType =
         deal.promisedReturnType === 'Equity Profit Split' ? 'Profit Share' : 'Fixed Interest';
       const defaultRate = deal.promisedReturnRatePercent ?? 14.5;
@@ -227,6 +267,7 @@ function ProposalGeneratorContent() {
     const returnTypeToSave = fundingOfferType === 'Profit Share' ? 'Equity Profit Split' : 'Fixed Interest';
     if (deal.type === 'flip') {
       updateFlip(deal.id, {
+        strategy: pitchStrategy,
         fundingRequiredZAR: capitalRequested,
         promisedReturnType: returnTypeToSave,
         promisedReturnRatePercent: offeredRate,
@@ -234,6 +275,7 @@ function ProposalGeneratorContent() {
       });
     } else {
       updateOpportunity(deal.id, {
+        strategy: pitchStrategy,
         fundingRequiredZAR: capitalRequested,
         promisedReturnType: returnTypeToSave,
         promisedReturnRatePercent: offeredRate,
@@ -245,7 +287,15 @@ function ProposalGeneratorContent() {
   };
 
   // Financial calculations
-  const totalProjectCost = (deal?.purchasePrice || 0) + (deal?.acquisitionCosts || 0) + (deal?.renovationBudget || 0);
+  const holdingDuration = deal?.holdingDurationMonths || 6;
+  const monthlyBond = deal?.monthlyBondHolding ?? 0;
+  const monthlyLevies = deal?.monthlyLeviesHolding ?? 0;
+  const monthlyRates = deal?.monthlyRatesHolding ?? 0;
+  const monthlyOther = deal?.monthlyOtherHolding ?? 0;
+  const monthlyBurnRate = deal?.monthlyHoldingCost || (monthlyBond + monthlyLevies + monthlyRates + monthlyOther);
+  const totalHoldingReserve = isFlip ? monthlyBurnRate * holdingDuration : 0;
+
+  const totalProjectCost = (deal?.purchasePrice || 0) + (deal?.acquisitionCosts || 0) + (deal?.renovationBudget || 0) + totalHoldingReserve;
   const projectedNetProfit = (deal?.targetExitPrice || 0) - totalProjectCost;
   const netProjectROI = totalProjectCost > 0 ? (projectedNetProfit / totalProjectCost) * 100 : 0;
   const loanToCost = totalProjectCost > 0 ? (capitalRequested / totalProjectCost) * 100 : 0;
@@ -349,6 +399,59 @@ function ProposalGeneratorContent() {
             </div>
           </div>
 
+          {/* Strategy Selector */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3 border-t border-slate-100">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-semibold text-slate-700">Pitch Strategy:</span>
+              <div className="inline-flex p-0.5 bg-slate-100 rounded-lg border border-slate-200">
+                <button
+                  type="button"
+                  onClick={() => setPitchStrategy('Flip')}
+                  className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all flex items-center gap-1.5 ${
+                    pitchStrategy === 'Flip'
+                      ? 'bg-white text-emerald-800 shadow-xs border border-slate-200/60'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  <span>🔄</span>
+                  <span>Buy & Flip</span>
+                  {pitchStrategy === 'Flip' && <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPitchStrategy('Rental')}
+                  className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all flex items-center gap-1.5 ${
+                    pitchStrategy === 'Rental'
+                      ? 'bg-white text-indigo-800 shadow-xs border border-slate-200/60'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  <span>🏠</span>
+                  <span>Buy & Hold Rental</span>
+                  {pitchStrategy === 'Rental' && <span className="w-1.5 h-1.5 rounded-full bg-indigo-500"></span>}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPitchStrategy('BRRRR')}
+                  className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all flex items-center gap-1.5 ${
+                    pitchStrategy === 'BRRRR'
+                      ? 'bg-white text-purple-800 shadow-xs border border-slate-200/60'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  <span>⚡</span>
+                  <span>Hybrid BRRRR</span>
+                  {pitchStrategy === 'BRRRR' && <span className="w-1.5 h-1.5 rounded-full bg-purple-500"></span>}
+                </button>
+              </div>
+            </div>
+            <span className="text-[11px] text-slate-500">
+              {pitchStrategy === 'Flip'
+                ? `Models ${holdingDuration}-month carrying cost burn rate & liquid escrow reserve.`
+                : 'Models 20/30-year compounding rental cash flow & bond amortization.'}
+            </span>
+          </div>
+
           <div className="flex flex-col sm:flex-row sm:items-center justify-between pt-3 border-t border-slate-100 gap-2">
             <div className="text-[11px] text-slate-500">
               {deal.primaryFunderName ? (
@@ -390,12 +493,21 @@ function ProposalGeneratorContent() {
             {/* Document Header */}
             <div className="flex flex-col sm:flex-row items-start justify-between border-b-2 border-slate-900 pb-6 gap-4">
               <div>
-                <div className="flex items-center gap-2 mb-1.5">
+                <div className="flex items-center gap-2 mb-1.5 flex-wrap">
                   <span className="text-[11px] uppercase tracking-widest font-black text-emerald-700">
                     Confidential Investment Memorandum
                   </span>
                   <span className="text-[10px] bg-slate-100 text-slate-700 font-bold px-2 py-0.5 rounded">
                     South Africa (ZAR)
+                  </span>
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${
+                    isFlip 
+                      ? 'bg-amber-50 text-amber-800 border-amber-200' 
+                      : pitchStrategy === 'BRRRR'
+                      ? 'bg-purple-50 text-purple-800 border-purple-200'
+                      : 'bg-indigo-50 text-indigo-800 border-indigo-200'
+                  }`}>
+                    {isFlip ? '🔄 Buy & Flip Mandate' : pitchStrategy === 'BRRRR' ? '⚡ Hybrid BRRRR Strategy' : '🏠 Buy & Hold Rental'}
                   </span>
                 </div>
                 <h1 className="text-2xl md:text-3xl font-black tracking-tight text-slate-900">
@@ -621,14 +733,31 @@ function ProposalGeneratorContent() {
                     <tr>
                       <td className="p-2.5 font-medium">Bill of Quantities (BOQ) Renovation & Materials</td>
                       <td className="p-2.5 font-bold">{formatZAR(deal.renovationBudget)}</td>
-                      <td className="p-2.5">{formatPercent((deal.renovationBudget / totalProjectCost) * 100)}</td>
+                      <td className="p-2.5">{totalProjectCost > 0 ? formatPercent((deal.renovationBudget / totalProjectCost) * 100) : '0%'}</td>
                       <td className="p-2.5 text-slate-500">Milestone Tranches (1st Fix / Finishes)</td>
                     </tr>
+                    {isFlip && (
+                      <tr className="bg-amber-50/50">
+                        <td className="p-2.5 font-medium text-amber-950 flex items-center gap-1.5 flex-wrap">
+                          <span>Holding Period Carrying Costs & Operational Burn Reserve</span>
+                          <span className="text-[10px] bg-amber-100 text-amber-900 font-bold px-1.5 py-0.2 rounded border border-amber-200">
+                            {holdingDuration} Months
+                          </span>
+                        </td>
+                        <td className="p-2.5 font-bold text-amber-900">{formatZAR(totalHoldingReserve)}</td>
+                        <td className="p-2.5 text-amber-900">{totalProjectCost > 0 ? formatPercent((totalHoldingReserve / totalProjectCost) * 100) : '0%'}</td>
+                        <td className="p-2.5 text-slate-600 font-medium">
+                          Escrow buffer ({formatZAR(monthlyBurnRate)}/mo)
+                        </td>
+                      </tr>
+                    )}
                     <tr className="bg-slate-50 font-bold">
                       <td className="p-2.5">Total Project Capital Outlay</td>
                       <td className="p-2.5 text-emerald-800">{formatZAR(totalProjectCost)}</td>
                       <td className="p-2.5">100.0%</td>
-                      <td className="p-2.5 text-slate-700">Full Project Horizon</td>
+                      <td className="p-2.5 text-slate-700">
+                        {isFlip ? `${holdingDuration}-Month Flip Horizon` : 'Full Project Horizon'}
+                      </td>
                     </tr>
                   </tbody>
                 </table>
@@ -740,25 +869,138 @@ function ProposalGeneratorContent() {
               )}
             </div>
 
-            {/* Long-Term Wealth & Equity Projections */}
-            <div className="space-y-3 print:break-inside-avoid">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 border-b border-slate-200 pb-1">
-                <h2 className="text-sm uppercase tracking-wider font-extrabold text-slate-900">
-                  4. Long-Term Wealth & Equity Projections ({projectionData.length}-Year Horizon)
-                </h2>
-                <span className="text-[10px] font-semibold text-slate-500">
-                  Assumptions: {deal.annualCapitalGrowthPercent ?? 5}% Capital • {deal.annualRentalEscalationPercent ?? 6}% Rent Escalation
-                </span>
-              </div>
-              <p className="text-xs text-slate-600 leading-relaxed">
-                Projected asset valuation, net equity accumulation, and mortgage debt amortization schedule over a {projectionData.length}-year holding horizon. Compounding rental income covers operating expenses and amortizes the outstanding mortgage bond principal to zero.
-              </p>
+            {/* Strategy-Adaptive Section 4: Holding Period Carrying Costs (Flip) OR Long-Term Projections (Rental/BRRRR) */}
+            {isFlip ? (
+              <div className="space-y-4 print:break-inside-avoid">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 border-b border-slate-200 pb-1">
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-sm uppercase tracking-wider font-extrabold text-slate-900">
+                      4. Holding Period Carrying Costs & Renovation Burn Rate ({holdingDuration}-Month Horizon)
+                    </h2>
+                    <span className="text-[10px] bg-amber-100 text-amber-800 font-bold px-2 py-0.5 rounded border border-amber-300">
+                      Flip Liquidity Reserve
+                    </span>
+                  </div>
+                  <span className="text-[10px] font-semibold text-slate-500">
+                    Monthly Burn: {formatZAR(monthlyBurnRate)}/mo • {holdingDuration} Months Holding
+                  </span>
+                </div>
 
-              {/* Custom SVG Trend Chart */}
-              <div className="print:border print:border-slate-300 rounded-xl overflow-hidden">
-                <LongTermProjectionChart data={projectionData} />
+                <p className="text-xs text-slate-600 leading-relaxed">
+                  During the active stripout, construction, and staging cycle, the property generates zero tenant revenue. To eliminate insolvency and completion risk, the project capitalizes an itemized carrying cost escrow of <strong>{formatZAR(totalHoldingReserve)}</strong> covering debt service, municipal rates, body corporate levies, and on-site builder risk insurance for the full {holdingDuration}-month flip horizon.
+                </p>
+
+                {/* 4 Summary Highlight Cards */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  <div className="p-3 rounded-lg bg-slate-50 border border-slate-200">
+                    <span className="text-[10px] uppercase font-bold text-slate-500 block">Monthly Operational Burn</span>
+                    <span className="text-sm font-extrabold text-slate-900 block mt-0.5 font-mono">
+                      {formatZAR(monthlyBurnRate)}/mo
+                    </span>
+                    <span className="text-[9px] text-slate-400">All standing carrying lines</span>
+                  </div>
+                  <div className="p-3 rounded-lg bg-amber-50/80 border border-amber-300">
+                    <span className="text-[10px] uppercase font-bold text-amber-800 block">Total Holding Reserve</span>
+                    <span className="text-sm font-extrabold text-amber-900 block mt-0.5 font-mono">
+                      {formatZAR(totalHoldingReserve)}
+                    </span>
+                    <span className="text-[9px] text-amber-700 font-semibold">{holdingDuration}-month pre-funded buffer</span>
+                  </div>
+                  <div className="p-3 rounded-lg bg-slate-50 border border-slate-200">
+                    <span className="text-[10px] uppercase font-bold text-slate-500 block">Flip Horizon</span>
+                    <span className="text-sm font-extrabold text-slate-900 block mt-0.5">
+                      {holdingDuration} Months
+                    </span>
+                    <span className="text-[9px] text-slate-400">Target exit: {formatDate(deal.completionDate)}</span>
+                  </div>
+                  <div className="p-3 rounded-lg bg-emerald-50 border border-emerald-300">
+                    <span className="text-[10px] uppercase font-bold text-emerald-800 block">Lender Risk Protection</span>
+                    <span className="text-sm font-extrabold text-emerald-900 block mt-0.5">
+                      Ring-Fenced Escrow
+                    </span>
+                    <span className="text-[9px] text-emerald-700 font-semibold">Zero monthly out-of-pocket</span>
+                  </div>
+                </div>
+
+                {/* Itemized Carrying Cost Breakdown Table */}
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs text-left border border-slate-200 rounded-lg overflow-hidden">
+                    <thead className="bg-slate-100 text-slate-700 font-bold uppercase text-[10px]">
+                      <tr>
+                        <th className="p-2.5">Carrying Cost Component</th>
+                        <th className="p-2.5">Monthly Outlay (ZAR)</th>
+                        <th className="p-2.5">{holdingDuration}-Month Reserve (ZAR)</th>
+                        <th className="p-2.5">% of Burn</th>
+                        <th className="p-2.5">Obligation & Statutory Mandate</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-200 text-slate-800">
+                      <tr>
+                        <td className="p-2.5 font-medium">Interim Bond / Debt Facility Interest Service</td>
+                        <td className="p-2.5 font-bold font-mono">{formatZAR(monthlyBond)}</td>
+                        <td className="p-2.5 font-bold font-mono text-slate-900">{formatZAR(monthlyBond * holdingDuration)}</td>
+                        <td className="p-2.5">{totalHoldingReserve > 0 ? formatPercent(((monthlyBond * holdingDuration) / totalHoldingReserve) * 100) : '0%'}</td>
+                        <td className="p-2.5 text-slate-500">Senior mortgage or bridge facility interest during works</td>
+                      </tr>
+                      <tr>
+                        <td className="p-2.5 font-medium">Body Corporate / HOA Levies</td>
+                        <td className="p-2.5 font-bold font-mono">{formatZAR(monthlyLevies)}</td>
+                        <td className="p-2.5 font-bold font-mono text-slate-900">{formatZAR(monthlyLevies * holdingDuration)}</td>
+                        <td className="p-2.5">{totalHoldingReserve > 0 ? formatPercent(((monthlyLevies * holdingDuration) / totalHoldingReserve) * 100) : '0%'}</td>
+                        <td className="p-2.5 text-slate-500">
+                          {monthlyLevies === 0 ? 'Freehold standalone title (R0 levies)' : 'Sectional title scheme statutory levies'}
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="p-2.5 font-medium">Municipal Rates & Taxes (City Council)</td>
+                        <td className="p-2.5 font-bold font-mono">{formatZAR(monthlyRates)}</td>
+                        <td className="p-2.5 font-bold font-mono text-slate-900">{formatZAR(monthlyRates * holdingDuration)}</td>
+                        <td className="p-2.5">{totalHoldingReserve > 0 ? formatPercent(((monthlyRates * holdingDuration) / totalHoldingReserve) * 100) : '0%'}</td>
+                        <td className="p-2.5 text-slate-500">Statutory municipal property rates & refuse service</td>
+                      </tr>
+                      <tr>
+                        <td className="p-2.5 font-medium">Site Operational Burn & Builder&apos;s Risk Insurance</td>
+                        <td className="p-2.5 font-bold font-mono">{formatZAR(monthlyOther)}</td>
+                        <td className="p-2.5 font-bold font-mono text-slate-900">{formatZAR(monthlyOther * holdingDuration)}</td>
+                        <td className="p-2.5">{totalHoldingReserve > 0 ? formatPercent(((monthlyOther * holdingDuration) / totalHoldingReserve) * 100) : '0%'}</td>
+                        <td className="p-2.5 text-slate-500">Active perimeter security, contractor insurance, and utilities</td>
+                      </tr>
+                      <tr className="bg-amber-50/70 font-bold">
+                        <td className="p-2.5 text-amber-950">Total Carrying Cost Reserve (Escrow Tranche)</td>
+                        <td className="p-2.5 text-amber-950 font-mono">{formatZAR(monthlyBurnRate)}/mo</td>
+                        <td className="p-2.5 text-amber-950 font-mono">{formatZAR(totalHoldingReserve)}</td>
+                        <td className="p-2.5 text-amber-950">100.0%</td>
+                        <td className="p-2.5 text-amber-900 font-semibold">Pre-funded and capitalized into Total Project Outlay</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
               </div>
-            </div>
+            ) : (
+              <div className="space-y-3 print:break-inside-avoid">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 border-b border-slate-200 pb-1">
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-sm uppercase tracking-wider font-extrabold text-slate-900">
+                      4. Long-Term Wealth & Equity Projections ({projectionData.length}-Year Horizon)
+                    </h2>
+                    <span className="text-[10px] bg-indigo-100 text-indigo-800 font-bold px-2 py-0.5 rounded border border-indigo-200">
+                      {pitchStrategy === 'BRRRR' ? '⚡ BRRRR Strategy' : '🏠 Buy & Hold'}
+                    </span>
+                  </div>
+                  <span className="text-[10px] font-semibold text-slate-500">
+                    Assumptions: {deal.annualCapitalGrowthPercent ?? 5}% Capital • {deal.annualRentalEscalationPercent ?? 6}% Rent Escalation
+                  </span>
+                </div>
+                <p className="text-xs text-slate-600 leading-relaxed">
+                  Projected asset valuation, net equity accumulation, and mortgage debt amortization schedule over a {projectionData.length}-year holding horizon. Compounding rental income covers operating expenses and amortizes the outstanding mortgage bond principal to zero.
+                </p>
+
+                {/* Custom SVG Trend Chart */}
+                <div className="print:border print:border-slate-300 rounded-xl overflow-hidden">
+                  <LongTermProjectionChart data={projectionData} />
+                </div>
+              </div>
+            )}
 
             {/* Sensitivity / Scenario Analysis Table */}
             <div className="space-y-3 print:break-inside-avoid">

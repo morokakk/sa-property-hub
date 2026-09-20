@@ -9,6 +9,7 @@ import {
   PropertyTitleType,
   AnalyzerDraft,
   AiSettings,
+  DealStrategy,
 } from '@/types';
 import { computeAcquisitionCosts, calculateSection13sex } from '@/lib/calculations/sarsTax';
 import {
@@ -177,6 +178,7 @@ export const INITIAL_FLIPS: FlipProject[] = [
     purchasePriceZAR: 3_800_000,
     acquisitionCostsZAR: 315_000,
     baselineRenovationBudgetZAR: 750_000,
+    strategy: 'Flip',
     estimatedDurationMonths: 6,
     monthlyHoldingCostZAR: 22_500,
     monthlyBondPaymentZAR: 16_000,
@@ -307,6 +309,7 @@ export const INITIAL_FLIPS: FlipProject[] = [
     purchasePriceZAR: 2_100_000,
     acquisitionCostsZAR: 148_000,
     baselineRenovationBudgetZAR: 480_000,
+    strategy: 'Flip',
     estimatedDurationMonths: 7,
     monthlyHoldingCostZAR: 18_000,
     monthlyBondPaymentZAR: 12_500,
@@ -662,7 +665,8 @@ function createSampleOpportunity(
     securityOffered?: string;
   },
   auctioneerCommissionZAR?: number,
-  municipalArrearsZAR?: number
+  municipalArrearsZAR?: number,
+  strategy: DealStrategy = 'Rental'
 ): OpportunityDeal {
   const depositZAR = Math.round(purchasePrice * (1 - ltv / 100));
   const costs = computeAcquisitionCosts(purchasePrice, ltv);
@@ -720,6 +724,7 @@ function createSampleOpportunity(
     vacancyRatePercent: 5,
     targetExitPrice: exitPrice,
     holdingPeriodMonths: 6,
+    strategy,
     loanToValuePercent: ltv,
     bondLTV: ltv,
     depositZAR,
@@ -797,7 +802,8 @@ export const INITIAL_OPPORTUNITIES: OpportunityDeal[] = [
       securityOffered: '2nd Mortgage Bond registered over title deed',
     },
     201_250, // Auctioneer commission (10% + 15% VAT on R1.75M)
-    45_000   // Municipal Section 118 clearance arrears
+    45_000,  // Municipal Section 118 clearance arrears
+    'Flip'   // Strategy
   ),
   createSampleOpportunity(
     'opp-2',
@@ -827,7 +833,11 @@ export const INITIAL_OPPORTUNITIES: OpportunityDeal[] = [
       shoppingMall: '0-5km',
     },
     'Sectional Title Apartment',
-    '2026-11-28'
+    '2026-11-28',
+    undefined,
+    undefined,
+    undefined,
+    'Rental'
   ),
   createSampleOpportunity(
     'opp-3',
@@ -854,7 +864,11 @@ export const INITIAL_OPPORTUNITIES: OpportunityDeal[] = [
       shoppingMall: '0-5km',
     },
     'Sectional Title Apartment',
-    '2027-01-20'
+    '2027-01-20',
+    undefined,
+    undefined,
+    undefined,
+    'Rental'
   ),
 ];
 
@@ -874,6 +888,7 @@ export const INITIAL_INVESTOR_PROFILE: InvestorProfile = {
 };
 
 export const INITIAL_ANALYZER_DRAFT: AnalyzerDraft = {
+  strategy: 'Rental',
   openMarketValue: 2_150_000,
   purchasePrice: 1_800_000,
   rehabCost: 200_000,
@@ -892,6 +907,7 @@ export const INITIAL_ANALYZER_DRAFT: AnalyzerDraft = {
 };
 
 export const EMPTY_ANALYZER_DRAFT: AnalyzerDraft = {
+  strategy: 'Rental',
   openMarketValue: 0,
   purchasePrice: 0,
   rehabCost: 0,

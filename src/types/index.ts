@@ -1,4 +1,5 @@
 export type PropertyType = 'rental' | 'flip' | 'opportunity';
+export type DealStrategy = 'Flip' | 'Rental' | 'BRRRR';
 
 export type DealSource = 'iGrow Rentals' | 'High-Street Auction' | 'Distressed Sale / Repo' | 'Private Agent' | 'Direct Owner';
 
@@ -118,6 +119,10 @@ export interface OpportunityDeal {
   vacancyRatePercent: number; // e.g. 5%
   targetExitPrice: number; // For flip exit
   holdingPeriodMonths: number;
+  strategy?: DealStrategy; // 'Flip' | 'Rental' | 'BRRRR'
+  monthlyHoldingCostZAR?: number;
+  monthlyBondPaymentZAR?: number;
+  monthlyOtherHoldingCostZAR?: number;
   // Financing
   loanToValuePercent: number; // e.g. 80% or 0% for cash
   bondLTV: number; // e.g. 100% or 80%
@@ -228,6 +233,7 @@ export interface FlipProject {
   purchasePriceZAR: number;
   acquisitionCostsZAR: number; // Transfer + legal
   baselineRenovationBudgetZAR: number;
+  strategy?: DealStrategy; // Defaults to 'Flip'
   // Holding Period Carrying Costs
   estimatedDurationMonths?: number;
   monthlyHoldingCostZAR?: number; // Total monthly holding cost
@@ -392,6 +398,7 @@ export interface AnalyzerDraft {
   annualRentalEscalationPercent?: number;
   annualExpenseInflationPercent?: number;
   bondTermYears?: number;
+  strategy?: DealStrategy;
 }
 
 // Client-side BYOK AI Integration Settings

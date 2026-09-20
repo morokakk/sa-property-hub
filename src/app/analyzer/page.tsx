@@ -12,7 +12,7 @@ import {
 } from '@/lib/calculations/propertyMetrics';
 import { formatOpportunityForWhatsApp } from '@/lib/whatsappFormatter';
 import { formatZAR, formatPercent } from '@/lib/formatters';
-import { OpportunityDeal, DealSource, AmenityDistance, AmenityScorecard, PropertyTitleType } from '@/types';
+import { OpportunityDeal, DealSource, AmenityDistance, AmenityScorecard, PropertyTitleType, DealStrategy } from '@/types';
 import { PropertyTypeBadge, AgmDateChip } from '@/components/common/PropertyTypeBadge';
 import LongTermProjectionChart from '@/components/analytics/LongTermProjectionChart';
 import {
@@ -92,6 +92,9 @@ export default function OpportunityAnalyzerPage() {
   const [interestRate, setInterestRate] = useState<number>(11.75); // SA Prime Rate
   const [loanTermYears, setLoanTermYears] = useState<number>(analyzerDraft?.bondTermYears ?? 20);
 
+  // Strategy Selection
+  const [strategy, setStrategy] = useState<DealStrategy>(analyzerDraft?.strategy ?? 'Rental');
+
   // Long-Term Projections & Escalation Assumptions
   const [annualCapitalGrowth, setAnnualCapitalGrowth] = useState<number>(analyzerDraft?.annualCapitalGrowthPercent ?? 5.0);
   const [annualRentalEscalation, setAnnualRentalEscalation] = useState<number>(analyzerDraft?.annualRentalEscalationPercent ?? 6.0);
@@ -102,6 +105,7 @@ export default function OpportunityAnalyzerPage() {
   // Synchronize scratchpad calculator inputs when store draft changes (e.g. Clear Demo Data or Reset Demo)
   useEffect(() => {
     if (analyzerDraft) {
+      if (analyzerDraft.strategy) setStrategy(analyzerDraft.strategy);
       setOpenMarketValue(analyzerDraft.openMarketValue ?? 0);
       setPurchasePrice(analyzerDraft.purchasePrice ?? 0);
       setRehabCost(analyzerDraft.rehabCost ?? 0);
@@ -122,6 +126,11 @@ export default function OpportunityAnalyzerPage() {
       }
     }
   }, [analyzerDraft]);
+
+  const handleStrategyChange = (newStrategy: DealStrategy) => {
+    setStrategy(newStrategy);
+    updateAnalyzerDraft({ strategy: newStrategy });
+  };
 
   const handleCapitalGrowthChange = (val: number) => {
     const safeVal = isNaN(val) ? 0 : val;
@@ -383,6 +392,7 @@ export default function OpportunityAnalyzerPage() {
     setTargetExitPrice(deal.targetExitPrice || 0);
     setAuctioneerCommission(deal.auctioneerCommissionZAR || 0);
     setMunicipalArrears(deal.municipalArrearsZAR || 0);
+    setStrategy(deal.strategy ?? 'Rental');
     const effectiveLtv = deal.bondLTV !== undefined ? deal.bondLTV : (deal.loanToValuePercent ?? 100);
     setLoanToValue(effectiveLtv);
     const effectiveDep = deal.depositZAR !== undefined ? deal.depositZAR : Math.max(0, Math.round(deal.purchasePrice * (1 - effectiveLtv / 100)));
@@ -410,6 +420,7 @@ export default function OpportunityAnalyzerPage() {
     setAddress('');
     setPropertyType('Sectional Title Apartment');
     setAgmDate('');
+    setStrategy('Rental');
     setAuctioneerCommission(0);
     setMunicipalArrears(0);
     setLoanToValue(100);
@@ -440,6 +451,7 @@ export default function OpportunityAnalyzerPage() {
         province,
         source,
         propertyType,
+        strategy,
         agmDate: finalAgmDate,
         openMarketValueZAR: openMarketValue,
         purchasePrice,
@@ -480,6 +492,7 @@ export default function OpportunityAnalyzerPage() {
       setAddress('');
       setPropertyType('Sectional Title Apartment');
       setAgmDate('');
+      setStrategy('Rental');
       setAuctioneerCommission(0);
       setMunicipalArrears(0);
       setLoanToValue(100);
@@ -500,6 +513,7 @@ export default function OpportunityAnalyzerPage() {
       province,
       source,
       propertyType,
+      strategy,
       agmDate: finalAgmDate,
       openMarketValueZAR: openMarketValue,
       purchasePrice,
@@ -653,6 +667,47 @@ export default function OpportunityAnalyzerPage() {
                   <option value="Private Agent">Private Agent / MLS</option>
                   <option value="Direct Owner">Direct Owner</option>
                 </select>
+              </div>
+            </div>
+
+            {/* Investment Strategy: Buy & Hold Rental vs Buy & Flip vs Hybrid BRRRR */}
+            <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/70 space-y-3">
+              <div className="flex items-center justify-between mb-1">
+                <div className="flex items-center gap-1.5">
+                  <TrendingUp className="w-4 h-4 text-emerald-600" />
+                  <label className="text-xs font-bold text-slate-900 uppercase tracking-wider">
+                    Investment Strategy & Exit Horizon
+                  </label>
+                </div>
+                <span className="text-[10px] text-slate-500">Tailors carrying burn rate vs 20/30-yr projection models</span>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                {(
+                  [
+                    { id: 'Rental' as const, label: '🏠 Buy & Hold Rental', desc: 'Long-term cash flow & equity compounding' },
+                    { id: 'Flip' as const, label: '🔄 Buy & Flip', desc: 'Short-term renovation & capital liquidation' },
+                    { id: 'BRRRR' as const, label: '⚡ Hybrid BRRRR', desc: 'Rehab, refinance & compound hold' },
+                  ] as const
+                ).map((st) => (
+                  <button
+                    key={st.id}
+                    type="button"
+                    onClick={() => handleStrategyChange(st.id)}
+                    className={`py-2 px-3 rounded-lg text-xs font-semibold transition-all text-left border cursor-pointer ${
+                      strategy === st.id
+                        ? 'bg-slate-900 text-white border-slate-900 shadow-2xs font-bold'
+                        : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
+                    }`}
+                  >
+                    <div className="font-bold flex items-center justify-between">
+                      <span>{st.label}</span>
+                      {strategy === st.id && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>}
+                    </div>
+                    <div className={`text-[10px] truncate mt-0.5 ${strategy === st.id ? 'text-slate-300' : 'text-slate-500'}`}>
+                      {st.desc}
+                    </div>
+                  </button>
+                ))}
               </div>
             </div>
 
@@ -1890,6 +1945,15 @@ export default function OpportunityAnalyzerPage() {
                       </span>
                       <span className="text-[10px] font-semibold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded">
                         {deal.status}
+                      </span>
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${
+                        deal.strategy === 'Flip'
+                          ? 'bg-amber-100 text-amber-900 border-amber-300'
+                          : deal.strategy === 'BRRRR'
+                          ? 'bg-purple-100 text-purple-900 border-purple-300'
+                          : 'bg-indigo-100 text-indigo-900 border-indigo-300'
+                      }`}>
+                        {deal.strategy === 'Flip' ? '🔄 Flip' : deal.strategy === 'BRRRR' ? '⚡ BRRRR' : '🏠 Rental'}
                       </span>
                     </div>
                     <p className="text-xs text-slate-500 mt-0.5">
