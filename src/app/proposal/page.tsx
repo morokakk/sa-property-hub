@@ -6,6 +6,7 @@ import TopHeader from '@/components/navigation/TopHeader';
 import { usePortfolioStore } from '@/lib/store/usePortfolioStore';
 import { formatZAR, formatPercent, formatDate } from '@/lib/formatters';
 import { generateLongTermProjection } from '@/lib/calculations/propertyMetrics';
+import { formatProposalPitchForWhatsApp } from '@/lib/whatsappFormatter';
 import LongTermProjectionChart from '@/components/analytics/LongTermProjectionChart';
 import { DealStrategy } from '@/types';
 import {
@@ -26,6 +27,8 @@ import {
   ShoppingBag,
   Check,
   Save,
+  Copy,
+  Share2,
 } from 'lucide-react';
 
 function getSafeLogoUri(uri?: string): string {
@@ -300,6 +303,34 @@ function ProposalGeneratorContent() {
   const netProjectROI = totalProjectCost > 0 ? (projectedNetProfit / totalProjectCost) * 100 : 0;
   const loanToCost = totalProjectCost > 0 ? (capitalRequested / totalProjectCost) * 100 : 0;
 
+  const [copiedPitchWhatsApp, setCopiedPitchWhatsApp] = useState(false);
+
+  const pitchWhatsAppText = useMemo(() => {
+    if (!deal) return '';
+    return formatProposalPitchForWhatsApp({
+      deal,
+      strategy: pitchStrategy,
+      capitalRequested,
+      fundingOfferType,
+      offeredRate,
+      securityType,
+      investorProfile,
+    });
+  }, [deal, pitchStrategy, capitalRequested, fundingOfferType, offeredRate, securityType, investorProfile]);
+
+  const handleCopyPitchWhatsApp = async () => {
+    if (!pitchWhatsAppText) return;
+    try {
+      if (navigator?.clipboard?.writeText) {
+        await navigator.clipboard.writeText(pitchWhatsAppText);
+      }
+    } catch {
+      // Ignore clipboard permission restrictions in headless/sandboxed browsers
+    }
+    setCopiedPitchWhatsApp(true);
+    setTimeout(() => setCopiedPitchWhatsApp(false), 2500);
+  };
+
   const handlePrint = () => {
     window.print();
   };
@@ -310,13 +341,38 @@ function ProposalGeneratorContent() {
         title="Proposal Generator"
         subtitle="Professional one-page executive tear-sheet to pitch deals to private lenders and JV partners"
         actionButton={
-          <button
-            onClick={handlePrint}
-            className="inline-flex items-center gap-1.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold px-4 py-2 rounded-lg shadow-sm transition-colors cursor-pointer"
-          >
-            <Printer className="w-4 h-4 text-emerald-400" />
-            Print / Export PDF
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleCopyPitchWhatsApp}
+              className="inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold px-3 py-2 rounded-lg shadow-sm transition-colors cursor-pointer"
+              title="Copy private lender pitch formatted for WhatsApp to clipboard"
+            >
+              {copiedPitchWhatsApp ? (
+                <Check className="w-4 h-4 text-white" />
+              ) : (
+                <Copy className="w-4 h-4 text-emerald-100" />
+              )}
+              <span>{copiedPitchWhatsApp ? 'Copied Pitch!' : 'WhatsApp Pitch'}</span>
+            </button>
+
+            <a
+              href={`https://wa.me/?text=${encodeURIComponent(pitchWhatsAppText)}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center p-2 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg shadow-sm transition-colors"
+              title="Share pitch directly via WhatsApp Web/App"
+            >
+              <Share2 className="w-4 h-4 text-white" />
+            </a>
+
+            <button
+              onClick={handlePrint}
+              className="inline-flex items-center gap-1.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold px-3.5 py-2 rounded-lg shadow-sm transition-colors cursor-pointer"
+            >
+              <Printer className="w-4 h-4 text-emerald-400" />
+              <span>Print / Export PDF</span>
+            </button>
+          </div>
         }
       />
 

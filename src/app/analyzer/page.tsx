@@ -318,6 +318,8 @@ export default function OpportunityAnalyzerPage() {
     const finalAgmDate = isScheme && agmDate ? agmDate : undefined;
     const finalLevies = propertyType === 'Freehold House' ? 0 : monthlyLevies;
 
+    const monthlyHolding = (finalLevies || 0) + (monthlyRates || 0) + (calculatedMetrics.monthlyBondPayment || 0) + 1500;
+
     const tempDeal: OpportunityDeal = {
       id: 'current-calc',
       title: title || `${city} Investment Opportunity`,
@@ -326,6 +328,7 @@ export default function OpportunityAnalyzerPage() {
       province,
       source,
       propertyType,
+      strategy,
       agmDate: finalAgmDate,
       openMarketValueZAR: openMarketValue,
       purchasePrice,
@@ -341,6 +344,9 @@ export default function OpportunityAnalyzerPage() {
       vacancyRatePercent: 5,
       targetExitPrice,
       holdingPeriodMonths: 6,
+      monthlyBondPaymentZAR: calculatedMetrics.monthlyBondPayment,
+      monthlyOtherHoldingCostZAR: 1500,
+      monthlyHoldingCostZAR: monthlyHolding,
       loanToValuePercent: loanToValue,
       bondLTV: loanToValue,
       depositZAR,
@@ -463,6 +469,10 @@ export default function OpportunityAnalyzerPage() {
         monthlyLevies: finalLevies,
         monthlyRatesTaxes: monthlyRates,
         targetExitPrice,
+        holdingPeriodMonths: 6,
+        monthlyBondPaymentZAR: calculatedMetrics.monthlyBondPayment,
+        monthlyOtherHoldingCostZAR: 1500,
+        monthlyHoldingCostZAR: (finalLevies || 0) + (monthlyRates || 0) + (calculatedMetrics.monthlyBondPayment || 0) + 1500,
         auctioneerCommissionZAR: auctioneerCommission,
         municipalArrearsZAR: municipalArrears,
         loanToValuePercent: loanToValue,
@@ -529,6 +539,9 @@ export default function OpportunityAnalyzerPage() {
       vacancyRatePercent: 5,
       targetExitPrice,
       holdingPeriodMonths: 6,
+      monthlyBondPaymentZAR: calculatedMetrics.monthlyBondPayment,
+      monthlyOtherHoldingCostZAR: 1500,
+      monthlyHoldingCostZAR: (finalLevies || 0) + (monthlyRates || 0) + (calculatedMetrics.monthlyBondPayment || 0) + 1500,
       auctioneerCommissionZAR: auctioneerCommission,
       municipalArrearsZAR: municipalArrears,
       loanToValuePercent: loanToValue,
@@ -1920,8 +1933,22 @@ export default function OpportunityAnalyzerPage() {
                 compositeGrade: 'A-Grade (Prime Hub)' as const,
                 compositeScore: 12,
               };
-              const displayDeal = {
+              const effectiveLtv = deal.bondLTV !== undefined ? deal.bondLTV : (deal.loanToValuePercent ?? 100);
+              const bondPayment = deal.monthlyBondPaymentZAR ?? (
+                effectiveLtv > 0 ? Math.round(deal.purchasePrice * (effectiveLtv / 100) * 0.0108) : 0
+              );
+              const holdingLevies = deal.monthlyLevies ?? 0;
+              const holdingRates = deal.monthlyRatesTaxes ?? 0;
+              const holdingOther = deal.monthlyOtherHoldingCostZAR ?? 1500;
+              const holdingCost = deal.monthlyHoldingCostZAR ?? (bondPayment + holdingLevies + holdingRates + holdingOther);
+
+              const displayDeal: OpportunityDeal = {
                 ...deal,
+                strategy: deal.strategy ?? 'Rental',
+                holdingPeriodMonths: deal.holdingPeriodMonths ?? 6,
+                monthlyBondPaymentZAR: bondPayment,
+                monthlyHoldingCostZAR: holdingCost,
+                monthlyOtherHoldingCostZAR: holdingOther,
                 openMarketValueZAR: openMarket,
                 builtInEquityZAR: builtInEquity,
                 builtInEquityPercent: builtInPercent,
