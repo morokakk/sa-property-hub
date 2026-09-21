@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { generateLongTermProjection, generateRentalLongTermProjection } from '../propertyMetrics';
+import { generateLongTermProjection, generateRentalLongTermProjection, calculateRentalCashflow } from '../propertyMetrics';
 import { RentalProperty } from '@/types';
 
 describe('generateLongTermProjection Engine', () => {
@@ -155,5 +155,46 @@ describe('generateRentalLongTermProjection Adapter', () => {
       expect(yearSnap.netEquity).toBe(yearSnap.propertyValue);
     });
   });
+
+  it('correctly calculates Freehold building insurance deduction in calculateRentalCashflow', () => {
+    const freeholdRental = {
+      propertyType: 'Freehold House' as const,
+      monthlyGrossRentZAR: 20_000,
+      monthlyLeviesZAR: 2_500, // Should be ignored because Freehold has R0 levies
+      monthlyRatesTaxesZAR: 1_200,
+      monthlyMaintenanceReserveZAR: 800,
+      monthlyBondPaymentZAR: 12_000,
+      annualBuildingInsuranceZAR: 7_200, // R600/month
+      managementType: 'Self-Managed' as const,
+    };
+
+    const cashflow = calculateRentalCashflow(freeholdRental);
+    // Insurance = 7200 / 12 = 600
+    expect(cashflow.monthlyInsuranceZAR).toBe(600);
+    // Total expenses = rates (1200) + maintenance (800) + insurance (600) + bond (12000) = 14600 (levies ignored)
+    expect(cashflow.totalMonthlyExpensesZAR).toBe(14_600);
+    // Net cashflow = 20000 - 14600 = 5400
+    expect(cashflow.netMonthlyCashflowZAR).toBe(5_400);
+  });
+
+  it('includes Freehold building insurance in 20-year long-term projection costs', () => {
+    const freeholdRental: RentalProperty = {
+      ...sampleRental,
+      id: 'rental-test-freehold',
+      propertyType: 'Freehold House',
+      monthlyLeviesZAR: 0,
+      annualBuildingInsuranceZAR: 7_200, // R600/month
+      managementType: 'Self-Managed',
+      monthlyAgentFeeZAR: 0,
+    };
+
+    const projections = generateRentalLongTermProjection(freeholdRental);
+    expect(projections).toHaveLength(20);
+    
+    // Year 1 costs should include rates (950) + reserve (500) + insurance (600) = 2050/mo => 24,600/yr
+    const yr1 = projections[0];
+    expect(yr1.costs).toBe((950 + 500 + 600) * 12);
+  });
 });
+
 

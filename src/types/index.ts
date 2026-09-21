@@ -317,6 +317,7 @@ export interface RentalProperty {
   monthlyRatesTaxesZAR: number;
   monthlyAgentFeeZAR: number;
   monthlyMaintenanceReserveZAR: number;
+  annualBuildingInsuranceZAR?: number; // Homeowner structural insurance for Freehold properties
   // Tenant Utility Arrears & Operational Risk
   unpaidUtilityArrearsZAR?: number;
   maintenanceHistory: MaintenanceLog[];
@@ -399,6 +400,7 @@ export interface AnalyzerDraft {
   annualExpenseInflationPercent?: number;
   bondTermYears?: number;
   strategy?: DealStrategy;
+  annualInsurance?: number;
 }
 
 // Client-side BYOK AI Integration Settings

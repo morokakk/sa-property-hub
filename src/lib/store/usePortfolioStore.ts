@@ -794,7 +794,8 @@ export const usePortfolioStore = create<PortfolioState>()(
           depositHeldZAR: opp.monthlyRentalEstimate * 2,
           annualEscalationPercent: 7.0,
           monthlyGrossRentZAR: opp.monthlyRentalEstimate,
-          monthlyLeviesZAR: opp.monthlyLevies,
+          monthlyLeviesZAR: opp.propertyType === 'Freehold House' ? 0 : opp.monthlyLevies,
+          annualBuildingInsuranceZAR: opp.propertyType === 'Freehold House' ? (opp.annualInsurance ?? 7_200) : 0,
           monthlyRatesTaxesZAR: opp.monthlyRatesTaxes,
           monthlyAgentFeeZAR: Math.round(opp.monthlyRentalEstimate * (opp.managementFeePercent / 100)),
           monthlyMaintenanceReserveZAR: 500,
@@ -1000,8 +1001,12 @@ export function computePortfolioSummary(state: {
         agentFee = r.monthlyAgentFeeZAR || 0;
       }
     }
+    const isFreehold = r.propertyType === 'Freehold House';
+    const insuranceMonthly = isFreehold ? Math.round((r.annualBuildingInsuranceZAR || 0) / 12) : 0;
+    const levies = isFreehold ? 0 : (r.monthlyLeviesZAR || 0);
     const expenses =
-      (r.monthlyLeviesZAR || 0) +
+      levies +
+      insuranceMonthly +
       (r.monthlyRatesTaxesZAR || 0) +
       agentFee +
       (r.monthlyMaintenanceReserveZAR || 0) +

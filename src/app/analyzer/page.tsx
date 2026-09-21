@@ -73,6 +73,7 @@ export default function OpportunityAnalyzerPage() {
   const [rehabCost, setRehabCost] = useState<number>(analyzerDraft?.rehabCost ?? 200_000);
   const [monthlyRent, setMonthlyRent] = useState<number>(analyzerDraft?.monthlyRent ?? 16_500);
   const [monthlyLevies, setMonthlyLevies] = useState<number>(analyzerDraft?.monthlyLevies ?? 1_650);
+  const [annualInsurance, setAnnualInsurance] = useState<number>(analyzerDraft?.annualInsurance ?? (propertyType === 'Freehold House' ? 7_200 : 0));
   const [monthlyRates, setMonthlyRates] = useState<number>(analyzerDraft?.monthlyRates ?? 1_100);
   const [targetExitPrice, setTargetExitPrice] = useState<number>(analyzerDraft?.targetExitPrice ?? 2_450_000);
 
@@ -111,6 +112,9 @@ export default function OpportunityAnalyzerPage() {
       setRehabCost(analyzerDraft.rehabCost ?? 0);
       setMonthlyRent(analyzerDraft.monthlyRent ?? 0);
       setMonthlyLevies(analyzerDraft.monthlyLevies ?? 0);
+      if (analyzerDraft.annualInsurance !== undefined) {
+        setAnnualInsurance(analyzerDraft.annualInsurance);
+      }
       setMonthlyRates(analyzerDraft.monthlyRates ?? 0);
       setTargetExitPrice(analyzerDraft.targetExitPrice ?? 0);
       setAuctioneerCommission(analyzerDraft.auctioneerCommission ?? 0);
@@ -235,9 +239,9 @@ export default function OpportunityAnalyzerPage() {
       purchasePrice,
       estimatedRehabCost: rehabCost,
       monthlyRentalEstimate: monthlyRent,
-      monthlyLevies,
+      monthlyLevies: propertyType === 'Freehold House' ? 0 : monthlyLevies,
       monthlyRatesTaxes: monthlyRates,
-      annualInsurance: 7_200,
+      annualInsurance: propertyType === 'Freehold House' ? annualInsurance : 0,
       managementFeePercent: 8,
       vacancyRatePercent: 5,
       targetExitPrice,
@@ -257,6 +261,8 @@ export default function OpportunityAnalyzerPage() {
     monthlyRent,
     monthlyLevies,
     monthlyRates,
+    annualInsurance,
+    propertyType,
     targetExitPrice,
     loanToValue,
     depositZAR,
@@ -293,7 +299,7 @@ export default function OpportunityAnalyzerPage() {
       monthlyRentalEstimate: monthlyRent,
       monthlyLevies: propertyType === 'Freehold House' ? 0 : monthlyLevies,
       monthlyRatesTaxes: monthlyRates,
-      annualInsurance: 7_200,
+      annualInsurance: propertyType === 'Freehold House' ? annualInsurance : 0,
       managementFeePercent: 8,
       vacancyRatePercent: 5,
     });
@@ -310,6 +316,7 @@ export default function OpportunityAnalyzerPage() {
     monthlyRent,
     monthlyLevies,
     monthlyRates,
+    annualInsurance,
     propertyType,
   ]);
 
@@ -317,8 +324,10 @@ export default function OpportunityAnalyzerPage() {
     const isScheme = propertyType === 'Sectional Title Apartment' || propertyType === 'Townhouse / Cluster';
     const finalAgmDate = isScheme && agmDate ? agmDate : undefined;
     const finalLevies = propertyType === 'Freehold House' ? 0 : monthlyLevies;
+    const finalInsurance = propertyType === 'Freehold House' ? annualInsurance : 0;
+    const monthlyInsurance = Math.round(finalInsurance / 12);
 
-    const monthlyHolding = (finalLevies || 0) + (monthlyRates || 0) + (calculatedMetrics.monthlyBondPayment || 0) + 1500;
+    const monthlyHolding = (finalLevies || 0) + (monthlyRates || 0) + monthlyInsurance + (calculatedMetrics.monthlyBondPayment || 0) + 1500;
 
     const tempDeal: OpportunityDeal = {
       id: 'current-calc',
@@ -339,7 +348,7 @@ export default function OpportunityAnalyzerPage() {
       monthlyRentalEstimate: monthlyRent,
       monthlyLevies: finalLevies,
       monthlyRatesTaxes: monthlyRates,
-      annualInsurance: 7_200,
+      annualInsurance: finalInsurance,
       managementFeePercent: 8,
       vacancyRatePercent: 5,
       targetExitPrice,
@@ -394,6 +403,7 @@ export default function OpportunityAnalyzerPage() {
     setRehabCost(deal.estimatedRehabCost || 0);
     setMonthlyRent(deal.monthlyRentalEstimate);
     setMonthlyLevies(deal.propertyType === 'Freehold House' ? 0 : deal.monthlyLevies);
+    setAnnualInsurance(deal.propertyType === 'Freehold House' ? (deal.annualInsurance || 7_200) : 0);
     setMonthlyRates(deal.monthlyRatesTaxes);
     setTargetExitPrice(deal.targetExitPrice || 0);
     setAuctioneerCommission(deal.auctioneerCommissionZAR || 0);
@@ -426,6 +436,7 @@ export default function OpportunityAnalyzerPage() {
     setAddress('');
     setPropertyType('Sectional Title Apartment');
     setAgmDate('');
+    setAnnualInsurance(0);
     setStrategy('Rental');
     setAuctioneerCommission(0);
     setMunicipalArrears(0);
@@ -446,6 +457,8 @@ export default function OpportunityAnalyzerPage() {
     }
 
     const finalLevies = propertyType === 'Freehold House' ? 0 : monthlyLevies;
+    const finalInsurance = propertyType === 'Freehold House' ? annualInsurance : 0;
+    const monthlyInsurance = Math.round(finalInsurance / 12);
     const isScheme = propertyType === 'Sectional Title Apartment' || propertyType === 'Townhouse / Cluster';
     const finalAgmDate = isScheme && agmDate ? agmDate : undefined;
 
@@ -467,12 +480,13 @@ export default function OpportunityAnalyzerPage() {
         estimatedRehabCost: rehabCost,
         monthlyRentalEstimate: monthlyRent,
         monthlyLevies: finalLevies,
+        annualInsurance: finalInsurance,
         monthlyRatesTaxes: monthlyRates,
         targetExitPrice,
         holdingPeriodMonths: 6,
         monthlyBondPaymentZAR: calculatedMetrics.monthlyBondPayment,
         monthlyOtherHoldingCostZAR: 1500,
-        monthlyHoldingCostZAR: (finalLevies || 0) + (monthlyRates || 0) + (calculatedMetrics.monthlyBondPayment || 0) + 1500,
+        monthlyHoldingCostZAR: (finalLevies || 0) + (monthlyRates || 0) + monthlyInsurance + (calculatedMetrics.monthlyBondPayment || 0) + 1500,
         auctioneerCommissionZAR: auctioneerCommission,
         municipalArrearsZAR: municipalArrears,
         loanToValuePercent: loanToValue,
@@ -502,6 +516,7 @@ export default function OpportunityAnalyzerPage() {
       setAddress('');
       setPropertyType('Sectional Title Apartment');
       setAgmDate('');
+      setAnnualInsurance(0);
       setStrategy('Rental');
       setAuctioneerCommission(0);
       setMunicipalArrears(0);
@@ -534,14 +549,14 @@ export default function OpportunityAnalyzerPage() {
       monthlyRentalEstimate: monthlyRent,
       monthlyLevies: finalLevies,
       monthlyRatesTaxes: monthlyRates,
-      annualInsurance: 7_200,
+      annualInsurance: finalInsurance,
       managementFeePercent: 8,
       vacancyRatePercent: 5,
       targetExitPrice,
       holdingPeriodMonths: 6,
       monthlyBondPaymentZAR: calculatedMetrics.monthlyBondPayment,
       monthlyOtherHoldingCostZAR: 1500,
-      monthlyHoldingCostZAR: (finalLevies || 0) + (monthlyRates || 0) + (calculatedMetrics.monthlyBondPayment || 0) + 1500,
+      monthlyHoldingCostZAR: (finalLevies || 0) + (monthlyRates || 0) + monthlyInsurance + (calculatedMetrics.monthlyBondPayment || 0) + 1500,
       auctioneerCommissionZAR: auctioneerCommission,
       municipalArrearsZAR: municipalArrears,
       loanToValuePercent: loanToValue,
@@ -573,6 +588,7 @@ export default function OpportunityAnalyzerPage() {
     setAddress('');
     setPropertyType('Sectional Title Apartment');
     setAgmDate('');
+    setAnnualInsurance(0);
     setAuctioneerCommission(0);
     setMunicipalArrears(0);
     setLoanToValue(100);
@@ -752,6 +768,12 @@ export default function OpportunityAnalyzerPage() {
                         setPropertyType(pt.id);
                         if (pt.id === 'Freehold House') {
                           setMonthlyLevies(0);
+                          const newIns = annualInsurance > 0 ? annualInsurance : 7_200;
+                          setAnnualInsurance(newIns);
+                          updateAnalyzerDraft({ monthlyLevies: 0, annualInsurance: newIns });
+                        } else {
+                          setAnnualInsurance(0);
+                          updateAnalyzerDraft({ annualInsurance: 0 });
                         }
                       }}
                       className={`py-2 px-3 rounded-lg text-xs font-semibold transition-all text-center border ${
@@ -1048,38 +1070,52 @@ export default function OpportunityAnalyzerPage() {
                 </div>
               </div>
 
-              <div>
-                <div className="flex items-center justify-between mb-1">
-                  <label className="block text-[11px] font-semibold text-slate-700">
-                    {propertyType === 'Freehold House' ? 'Levies (N/A - Freehold)' : 'Monthly Levies (BC)'}
-                  </label>
-                  {propertyType === 'Freehold House' && (
+              {propertyType === 'Freehold House' ? (
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-[11px] font-semibold text-slate-700">
+                      Annual Building Insurance (ZAR)
+                    </label>
                     <span className="text-[9px] font-bold text-emerald-700 bg-emerald-100/70 px-1 rounded">
-                      R0 Freehold
+                      R{Math.round((annualInsurance || 0) / 12).toLocaleString()}/pm
                     </span>
-                  )}
+                  </div>
+                  <div className="relative">
+                    <span className="absolute left-2.5 top-2 text-xs text-slate-400 font-bold">R</span>
+                    <input
+                      type="number"
+                      min="0"
+                      step="100"
+                      value={annualInsurance}
+                      onChange={(e) => {
+                        const val = Number(e.target.value);
+                        setAnnualInsurance(val);
+                        updateAnalyzerDraft({ annualInsurance: val });
+                      }}
+                      className="w-full text-xs pl-7 pr-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-emerald-500 font-semibold text-slate-900 bg-white"
+                    />
+                  </div>
                 </div>
-                <div className="relative">
-                  <span className="absolute left-2.5 top-2 text-xs text-slate-400 font-bold">R</span>
-                  <input
-                    type="number"
-                    min="0"
-                    step="100"
-                    disabled={propertyType === 'Freehold House'}
-                    value={propertyType === 'Freehold House' ? 0 : monthlyLevies}
-                    onChange={(e) => {
-                      const val = Number(e.target.value);
-                      setMonthlyLevies(val);
-                      updateAnalyzerDraft({ monthlyLevies: val });
-                    }}
-                    className={`w-full text-xs pl-7 pr-3 py-2 border rounded-lg font-semibold ${
-                      propertyType === 'Freehold House'
-                        ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'
-                        : 'border-slate-300 text-slate-900 bg-white focus:ring-1 focus:ring-emerald-500'
-                    }`}
-                  />
+              ) : (
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-700 mb-1">Monthly Levies (BC)</label>
+                  <div className="relative">
+                    <span className="absolute left-2.5 top-2 text-xs text-slate-400 font-bold">R</span>
+                    <input
+                      type="number"
+                      min="0"
+                      step="100"
+                      value={monthlyLevies}
+                      onChange={(e) => {
+                        const val = Number(e.target.value);
+                        setMonthlyLevies(val);
+                        updateAnalyzerDraft({ monthlyLevies: val });
+                      }}
+                      className="w-full text-xs pl-7 pr-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-emerald-500 font-semibold text-slate-900 bg-white"
+                    />
+                  </div>
                 </div>
-              </div>
+              )}
 
               <div>
                 <label className="block text-[11px] font-semibold text-slate-700 mb-1">Rates & Taxes (City)</label>
@@ -1937,10 +1973,11 @@ export default function OpportunityAnalyzerPage() {
               const bondPayment = deal.monthlyBondPaymentZAR ?? (
                 effectiveLtv > 0 ? Math.round(deal.purchasePrice * (effectiveLtv / 100) * 0.0108) : 0
               );
-              const holdingLevies = deal.monthlyLevies ?? 0;
+              const holdingLevies = deal.propertyType === 'Freehold House' ? 0 : (deal.monthlyLevies ?? 0);
               const holdingRates = deal.monthlyRatesTaxes ?? 0;
+              const holdingInsurance = deal.propertyType === 'Freehold House' ? Math.round((deal.annualInsurance ?? 0) / 12) : 0;
               const holdingOther = deal.monthlyOtherHoldingCostZAR ?? 1500;
-              const holdingCost = deal.monthlyHoldingCostZAR ?? (bondPayment + holdingLevies + holdingRates + holdingOther);
+              const holdingCost = deal.monthlyHoldingCostZAR ?? (bondPayment + holdingLevies + holdingRates + holdingInsurance + holdingOther);
 
               const displayDeal: OpportunityDeal = {
                 ...deal,

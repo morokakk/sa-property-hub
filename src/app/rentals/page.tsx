@@ -277,6 +277,7 @@ export default function RentalPortfolioPage() {
   const [bondBalance, setBondBalance] = useState(1100000);
   const [monthlyGrossRent, setMonthlyGrossRent] = useState(15000);
   const [monthlyLevies, setMonthlyLevies] = useState(1850);
+  const [annualBuildingInsurance, setAnnualBuildingInsurance] = useState(0);
   const [monthlyRates, setMonthlyRates] = useState(1100);
   const [monthlyBondPayment, setMonthlyBondPayment] = useState(0);
   const [bondPaymentEffectiveDate, setBondPaymentEffectiveDate] = useState('');
@@ -350,6 +351,7 @@ export default function RentalPortfolioPage() {
     setBondBalance(1100000);
     setMonthlyGrossRent(15000);
     setMonthlyLevies(1850);
+    setAnnualBuildingInsurance(0);
     setMonthlyRates(1100);
     setMonthlyBondPayment(0);
     setBondPaymentEffectiveDate('');
@@ -384,6 +386,7 @@ export default function RentalPortfolioPage() {
     setBondBalance(property.outstandingBondBalanceZAR);
     setMonthlyGrossRent(property.monthlyGrossRentZAR);
     setMonthlyLevies(property.propertyType === 'Freehold House' ? 0 : property.monthlyLeviesZAR);
+    setAnnualBuildingInsurance(property.annualBuildingInsuranceZAR || (property.propertyType === 'Freehold House' ? 7_200 : 0));
     setMonthlyRates(property.monthlyRatesTaxesZAR);
     const estEditBond =
       property.monthlyBondPaymentZAR ||
@@ -446,6 +449,7 @@ export default function RentalPortfolioPage() {
     const agentFee = Math.round(baseComm * (agencyVatApplicable !== false ? 1.15 : 1.0));
 
     const finalLevies = propertyType === 'Freehold House' ? 0 : monthlyLevies;
+    const finalInsurance = propertyType === 'Freehold House' ? annualBuildingInsurance : 0;
     const isScheme = propertyType === 'Sectional Title Apartment' || propertyType === 'Townhouse / Cluster';
     const finalAgmDate = isScheme && agmDate ? agmDate : undefined;
 
@@ -470,6 +474,7 @@ export default function RentalPortfolioPage() {
         unpaidUtilityArrearsZAR: unpaidUtilityArrears,
         monthlyGrossRentZAR: monthlyGrossRent,
         monthlyLeviesZAR: finalLevies,
+        annualBuildingInsuranceZAR: finalInsurance,
         monthlyRatesTaxesZAR: monthlyRates,
         managementType,
         agencyName: managementType === 'Agency' ? agencyName : undefined,
@@ -515,6 +520,7 @@ export default function RentalPortfolioPage() {
         agencyContact: managementType === 'Agency' ? agencyContact : undefined,
         monthlyGrossRentZAR: monthlyGrossRent,
         monthlyLeviesZAR: finalLevies,
+        annualBuildingInsuranceZAR: finalInsurance,
         monthlyRatesTaxesZAR: monthlyRates,
         monthlyAgentFeeZAR: agentFee,
         monthlyMaintenanceReserveZAR: 600,
@@ -842,16 +848,25 @@ export default function RentalPortfolioPage() {
                                 <strong className="text-slate-900 font-bold">{formatZAR(property.monthlyGrossRentZAR)}</strong>
                               </div>
 
-                              <div className="flex justify-between items-center text-slate-500">
-                                <span>{property.propertyType === 'Freehold House' ? 'Body Corporate Levies (N/A):' : 'Body Corporate / HOA Levies:'}</span>
-                                <InlineEditableAmount
-                                  value={property.monthlyLeviesZAR}
-                                  disabled={property.propertyType === 'Freehold House'}
-                                  disabledLabel="R 0 (Freehold)"
-                                  onSave={(val) => updateRental(property.id, { monthlyLeviesZAR: val })}
-                                  title="Click to edit monthly levies inline"
-                                />
-                              </div>
+                              {property.propertyType === 'Freehold House' ? (
+                                <div className="flex justify-between items-center text-slate-500">
+                                  <span>Building Insurance (Homeowner):</span>
+                                  <InlineEditableAmount
+                                    value={Math.round((property.annualBuildingInsuranceZAR || 0) / 12)}
+                                    onSave={(val) => updateRental(property.id, { annualBuildingInsuranceZAR: Math.round(val * 12) })}
+                                    title="Click to edit monthly building insurance inline"
+                                  />
+                                </div>
+                              ) : (
+                                <div className="flex justify-between items-center text-slate-500">
+                                  <span>Body Corporate / HOA Levies:</span>
+                                  <InlineEditableAmount
+                                    value={property.monthlyLeviesZAR}
+                                    onSave={(val) => updateRental(property.id, { monthlyLeviesZAR: val })}
+                                    title="Click to edit monthly levies inline"
+                                  />
+                                </div>
+                              )}
 
                               <div className="flex justify-between items-center text-slate-500">
                                 <span>Municipal Rates & Taxes:</span>
@@ -1598,6 +1613,9 @@ export default function RentalPortfolioPage() {
                           setPropertyType(pt.id);
                           if (pt.id === 'Freehold House') {
                             setMonthlyLevies(0);
+                            setAnnualBuildingInsurance((prev) => (prev > 0 ? prev : 7_200));
+                          } else {
+                            setAnnualBuildingInsurance(0);
                           }
                         }}
                         className={`py-1.5 px-2 rounded-lg text-[11px] font-semibold transition-all text-center border ${
@@ -1815,31 +1833,42 @@ export default function RentalPortfolioPage() {
                     className="w-full px-3 py-2 border border-slate-300 rounded-lg font-bold"
                   />
                 </div>
-                <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <label className="block font-semibold text-slate-700">
-                      {propertyType === 'Freehold House' ? 'Monthly Levies' : 'Body Corporate Levies'}
-                    </label>
-                    {propertyType === 'Freehold House' && (
+                {propertyType === 'Freehold House' ? (
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="block font-semibold text-slate-700">
+                        Annual Building Insurance
+                      </label>
                       <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-200">
-                        N/A (Freehold Title)
+                        R {Math.round(annualBuildingInsurance / 12).toLocaleString()}/m
                       </span>
-                    )}
+                    </div>
+                    <input
+                      type="number"
+                      min="0"
+                      step="50"
+                      value={annualBuildingInsurance}
+                      onChange={(e) => setAnnualBuildingInsurance(Number(e.target.value))}
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg font-semibold"
+                    />
                   </div>
-                  <input
-                    type="number"
-                    min="0"
-                    step="100"
-                    disabled={propertyType === 'Freehold House'}
-                    value={propertyType === 'Freehold House' ? 0 : monthlyLevies}
-                    onChange={(e) => setMonthlyLevies(Number(e.target.value))}
-                    className={`w-full px-3 py-2 border rounded-lg ${
-                      propertyType === 'Freehold House'
-                        ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'
-                        : 'border-slate-300'
-                    }`}
-                  />
-                </div>
+                ) : (
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="block font-semibold text-slate-700">
+                        Body Corporate Levies
+                      </label>
+                    </div>
+                    <input
+                      type="number"
+                      min="0"
+                      step="50"
+                      value={monthlyLevies}
+                      onChange={(e) => setMonthlyLevies(Number(e.target.value))}
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg"
+                    />
+                  </div>
+                )}
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">Rates & Taxes</label>
                   <input

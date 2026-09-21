@@ -1,4 +1,4 @@
-import { AcquisitionCostBreakdown, AmenityDistance, AmenityScorecard, LongTermProjectionYear, OpportunityDeal, RentalProperty } from '@/types';
+import { AcquisitionCostBreakdown, AmenityDistance, AmenityScorecard, LongTermProjectionYear, OpportunityDeal, PropertyTitleType, RentalProperty } from '@/types';
 
 /**
  * Computes Built-in Equity and discount percentage
@@ -216,6 +216,8 @@ export function calculateRentalCashflow(property: {
   monthlyRatesTaxesZAR: number;
   monthlyMaintenanceReserveZAR: number;
   monthlyBondPaymentZAR: number;
+  propertyType?: PropertyTitleType;
+  annualBuildingInsuranceZAR?: number;
   managementType?: 'Self-Managed' | 'Agency';
   agencyCommissionPercent?: number;
   agencyVatApplicable?: boolean;
@@ -223,6 +225,7 @@ export function calculateRentalCashflow(property: {
   unpaidUtilityArrearsZAR?: number;
 }): {
   agencyCommissionZAR: number;
+  monthlyInsuranceZAR: number;
   totalMonthlyExpensesZAR: number;
   unpaidUtilityArrearsZAR: number;
   netMonthlyCashflowZAR: number;
@@ -240,11 +243,21 @@ export function calculateRentalCashflow(property: {
     }
   }
 
+  // Monthly building insurance is applicable specifically for Freehold properties
+  const isFreehold = property.propertyType === 'Freehold House';
+  const monthlyInsuranceZAR = isFreehold && property.annualBuildingInsuranceZAR
+    ? Math.round(property.annualBuildingInsuranceZAR / 12)
+    : 0;
+
+  // Freehold properties have 0 body corporate levies
+  const effectiveLevies = isFreehold ? 0 : (property.monthlyLeviesZAR || 0);
+
   const totalMonthlyExpensesZAR =
-    (property.monthlyLeviesZAR || 0) +
+    effectiveLevies +
     (property.monthlyRatesTaxesZAR || 0) +
     agencyCommissionZAR +
     (property.monthlyMaintenanceReserveZAR || 0) +
+    monthlyInsuranceZAR +
     (property.monthlyBondPaymentZAR || 0);
 
   const unpaidUtilityArrearsZAR = property.unpaidUtilityArrearsZAR || 0;
@@ -252,6 +265,7 @@ export function calculateRentalCashflow(property: {
 
   return {
     agencyCommissionZAR,
+    monthlyInsuranceZAR,
     totalMonthlyExpensesZAR,
     unpaidUtilityArrearsZAR,
     netMonthlyCashflowZAR,
@@ -419,8 +433,10 @@ export function generateRentalLongTermProjection(property: RentalProperty): Long
   }
 
   const managementFeePercent = grossRent > 0 ? (agencyFeeMonthly / grossRent) * 100 : 0;
-  const monthlyLevies = (property.monthlyLeviesZAR || 0) + (property.monthlyMaintenanceReserveZAR || 0);
+  const isFreehold = property.propertyType === 'Freehold House';
+  const monthlyLevies = (isFreehold ? 0 : (property.monthlyLeviesZAR || 0)) + (property.monthlyMaintenanceReserveZAR || 0);
   const monthlyRatesTaxes = property.monthlyRatesTaxesZAR || 0;
+  const annualInsurance = isFreehold ? (property.annualBuildingInsuranceZAR || 0) : 0;
 
   return generateLongTermProjection({
     purchasePrice: effectivePrice,
@@ -434,7 +450,7 @@ export function generateRentalLongTermProjection(property: RentalProperty): Long
     monthlyRentalEstimate: grossRent,
     monthlyLevies,
     monthlyRatesTaxes,
-    annualInsurance: 0,
+    annualInsurance,
     managementFeePercent,
     vacancyRatePercent: property.status === 'Vacant' ? 10 : 0,
   });
