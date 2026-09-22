@@ -904,6 +904,7 @@ export const INITIAL_ANALYZER_DRAFT: AnalyzerDraft = {
   annualRentalEscalationPercent: 6.0,
   annualExpenseInflationPercent: 6.0,
   bondTermYears: 20,
+  source: 'High-Street Auction',
 };
 
 export const EMPTY_ANALYZER_DRAFT: AnalyzerDraft = {
@@ -923,6 +924,7 @@ export const EMPTY_ANALYZER_DRAFT: AnalyzerDraft = {
   annualRentalEscalationPercent: 6.0,
   annualExpenseInflationPercent: 6.0,
   bondTermYears: 20,
+  source: 'High-Street Auction',
 };
 
 export const DEFAULT_AI_SETTINGS: AiSettings = {

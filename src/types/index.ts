@@ -401,6 +401,7 @@ export interface AnalyzerDraft {
   bondTermYears?: number;
   strategy?: DealStrategy;
   annualInsurance?: number;
+  source?: DealSource;
 }
 
 // Client-side BYOK AI Integration Settings

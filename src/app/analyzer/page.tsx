@@ -63,7 +63,8 @@ export default function OpportunityAnalyzerPage() {
   const [address, setAddress] = useState('');
   const [city, setCity] = useState('Johannesburg');
   const [province, setProvince] = useState<'Gauteng' | 'Western Cape' | 'KwaZulu-Natal' | 'Eastern Cape' | 'Free State' | 'Other'>('Gauteng');
-  const [source, setSource] = useState<DealSource>('High-Street Auction');
+  const [source, setSource] = useState<DealSource>(analyzerDraft?.source ?? 'High-Street Auction');
+  const [feeResetToast, setFeeResetToast] = useState<string | null>(null);
   const [propertyType, setPropertyType] = useState<PropertyTitleType>('Sectional Title Apartment');
   const [agmDate, setAgmDate] = useState<string>('');
 
@@ -107,6 +108,7 @@ export default function OpportunityAnalyzerPage() {
   useEffect(() => {
     if (analyzerDraft) {
       if (analyzerDraft.strategy) setStrategy(analyzerDraft.strategy);
+      if (analyzerDraft.source) setSource(analyzerDraft.source);
       setOpenMarketValue(analyzerDraft.openMarketValue ?? 0);
       setPurchasePrice(analyzerDraft.purchasePrice ?? 0);
       setRehabCost(analyzerDraft.rehabCost ?? 0);
@@ -130,6 +132,44 @@ export default function OpportunityAnalyzerPage() {
       }
     }
   }, [analyzerDraft]);
+
+  // Auto-dismiss fee reset toast after 3 seconds
+  useEffect(() => {
+    if (!feeResetToast) return;
+    const timer = setTimeout(() => {
+      setFeeResetToast(null);
+    }, 3000);
+    return () => clearTimeout(timer);
+  }, [feeResetToast]);
+
+  const isDistressedSource = source === 'High-Street Auction' || source === 'Distressed Sale / Repo';
+
+  const handleSourceChange = (newSource: DealSource) => {
+    const isCurrentDistressed = source === 'High-Street Auction' || source === 'Distressed Sale / Repo';
+    const isNewDistressed = newSource === 'High-Street Auction' || newSource === 'Distressed Sale / Repo';
+
+    setSource(newSource);
+
+    if (isCurrentDistressed && !isNewDistressed) {
+      const hadFees = (auctioneerCommission || 0) > 0 || (municipalArrears || 0) > 0;
+      if (hadFees) {
+        setAuctioneerCommission(0);
+        setMunicipalArrears(0);
+        updateAnalyzerDraft({
+          source: newSource,
+          auctioneerCommission: 0,
+          municipalArrears: 0,
+        });
+        setFeeResetToast(
+          'Switched to standard retail channel. Auction commission and municipal arrears reset to R0.'
+        );
+      } else {
+        updateAnalyzerDraft({ source: newSource });
+      }
+    } else {
+      updateAnalyzerDraft({ source: newSource });
+    }
+  };
 
   const handleStrategyChange = (newStrategy: DealStrategy) => {
     setStrategy(newStrategy);
@@ -687,7 +727,7 @@ export default function OpportunityAnalyzerPage() {
                 <label className="block text-xs font-semibold text-slate-700 mb-1">Deal Sourcing Channel</label>
                 <select
                   value={source}
-                  onChange={(e) => setSource(e.target.value as DealSource)}
+                  onChange={(e) => handleSourceChange(e.target.value as DealSource)}
                   className="w-full text-xs px-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 bg-white"
                 >
                   <option value="iGrow Rentals">iGrow Rentals (Off-Plan/Sectional)</option>
@@ -1156,101 +1196,103 @@ export default function OpportunityAnalyzerPage() {
               </div>
             </div>
 
-            {/* Auction / Distressed Costs Input Row */}
-            <div className="p-4 rounded-xl bg-amber-50/70 border border-amber-200 space-y-3">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-amber-200/80 pb-2">
-                <div className="flex items-center gap-2">
-                  <Scale className="w-4 h-4 text-amber-700" />
+            {/* Auction / Distressed Costs Input Row - Conditionally rendered only for Auction & Distressed Bank Repo */}
+            {isDistressedSource && (
+              <div className="p-4 rounded-xl bg-amber-50/70 border border-amber-200 space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-amber-200/80 pb-2">
+                  <div className="flex items-center gap-2">
+                    <Scale className="w-4 h-4 text-amber-700" />
+                    <div>
+                      <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
+                        Auction / Distressed Costs
+                      </h4>
+                      <span className="text-[10px] text-slate-500">
+                        Immediate Day-1 cash outlays: buyer&apos;s commission & municipal clearance debt
+                      </span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[11px] font-semibold text-slate-600">Total Auction Outlays:</span>
+                    <span className="text-xs font-bold text-amber-900 bg-amber-100 px-2.5 py-0.5 rounded border border-amber-300">
+                      {formatZAR((auctioneerCommission || 0) + (municipalArrears || 0))}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* 1. Auctioneer Commission */}
                   <div>
-                    <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
-                      Auction / Distressed Costs
-                    </h4>
-                    <span className="text-[10px] text-slate-500">
-                      Immediate Day-1 cash outlays: buyer&apos;s commission & municipal clearance debt
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="text-[11px] font-semibold text-slate-700">
+                        Auctioneer Commission / Buyer&apos;s Premium (ZAR)
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const fee = Math.round(purchasePrice * 0.10 * 1.15);
+                          setAuctioneerCommission(fee);
+                          updateAnalyzerDraft({ auctioneerCommission: fee });
+                        }}
+                        className="text-[10px] text-amber-900 hover:text-amber-950 font-bold bg-amber-100/90 hover:bg-amber-200 px-2 py-0.5 rounded border border-amber-300 transition-colors cursor-pointer"
+                        title="Auto-calculate standard SA auction commission: 10% + 15% VAT = 11.5% of hammer price"
+                      >
+                        Calc 10% + VAT
+                      </button>
+                    </div>
+                    <div className="relative">
+                      <span className="absolute left-2.5 top-2 text-xs text-slate-400 font-bold">R</span>
+                      <input
+                        type="number"
+                        min="0"
+                        step="5000"
+                        value={auctioneerCommission || ''}
+                        onChange={(e) => {
+                          const val = Number(e.target.value);
+                          setAuctioneerCommission(val);
+                          updateAnalyzerDraft({ auctioneerCommission: val });
+                        }}
+                        placeholder="0"
+                        className="w-full text-xs pl-7 pr-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-amber-500 font-semibold text-slate-900 bg-white"
+                      />
+                    </div>
+                    <span className="text-[10px] text-slate-500 mt-1 block">
+                      Mandatory buyer&apos;s premium payable immediately on auction day.
+                    </span>
+                  </div>
+
+                  {/* 2. Municipal Arrears */}
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="text-[11px] font-semibold text-slate-700">
+                        Municipal Arrears & Taxes Settlement (ZAR)
+                      </label>
+                      <span className="text-[10px] text-amber-800 font-bold bg-amber-100 px-1.5 py-0.2 rounded">
+                        Section 118
+                      </span>
+                    </div>
+                    <div className="relative">
+                      <span className="absolute left-2.5 top-2 text-xs text-slate-400 font-bold">R</span>
+                      <input
+                        type="number"
+                        min="0"
+                        step="5000"
+                        value={municipalArrears || ''}
+                        onChange={(e) => {
+                          const val = Number(e.target.value);
+                          setMunicipalArrears(val);
+                          updateAnalyzerDraft({ municipalArrears: val });
+                        }}
+                        placeholder="0"
+                        className="w-full text-xs pl-7 pr-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-amber-500 font-semibold text-slate-900 bg-white"
+                      />
+                    </div>
+                    <span className="text-[10px] text-slate-500 mt-1 block">
+                      Historical city council rates/water debt settlement required for transfer clearance.
                     </span>
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-[11px] font-semibold text-slate-600">Total Auction Outlays:</span>
-                  <span className="text-xs font-bold text-amber-900 bg-amber-100 px-2.5 py-0.5 rounded border border-amber-300">
-                    {formatZAR((auctioneerCommission || 0) + (municipalArrears || 0))}
-                  </span>
-                </div>
               </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {/* 1. Auctioneer Commission */}
-                <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <label className="text-[11px] font-semibold text-slate-700">
-                      Auctioneer Commission / Buyer&apos;s Premium (ZAR)
-                    </label>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const fee = Math.round(purchasePrice * 0.10 * 1.15);
-                        setAuctioneerCommission(fee);
-                        updateAnalyzerDraft({ auctioneerCommission: fee });
-                      }}
-                      className="text-[10px] text-amber-900 hover:text-amber-950 font-bold bg-amber-100/90 hover:bg-amber-200 px-2 py-0.5 rounded border border-amber-300 transition-colors cursor-pointer"
-                      title="Auto-calculate standard SA auction commission: 10% + 15% VAT = 11.5% of hammer price"
-                    >
-                      Calc 10% + VAT
-                    </button>
-                  </div>
-                  <div className="relative">
-                    <span className="absolute left-2.5 top-2 text-xs text-slate-400 font-bold">R</span>
-                    <input
-                      type="number"
-                      min="0"
-                      step="5000"
-                      value={auctioneerCommission || ''}
-                      onChange={(e) => {
-                        const val = Number(e.target.value);
-                        setAuctioneerCommission(val);
-                        updateAnalyzerDraft({ auctioneerCommission: val });
-                      }}
-                      placeholder="0"
-                      className="w-full text-xs pl-7 pr-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-amber-500 font-semibold text-slate-900 bg-white"
-                    />
-                  </div>
-                  <span className="text-[10px] text-slate-500 mt-1 block">
-                    Mandatory buyer&apos;s premium payable immediately on auction day.
-                  </span>
-                </div>
-
-                {/* 2. Municipal Arrears */}
-                <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <label className="text-[11px] font-semibold text-slate-700">
-                      Municipal Arrears & Taxes Settlement (ZAR)
-                    </label>
-                    <span className="text-[10px] text-amber-800 font-bold bg-amber-100 px-1.5 py-0.2 rounded">
-                      Section 118
-                    </span>
-                  </div>
-                  <div className="relative">
-                    <span className="absolute left-2.5 top-2 text-xs text-slate-400 font-bold">R</span>
-                    <input
-                      type="number"
-                      min="0"
-                      step="5000"
-                      value={municipalArrears || ''}
-                      onChange={(e) => {
-                        const val = Number(e.target.value);
-                        setMunicipalArrears(val);
-                        updateAnalyzerDraft({ municipalArrears: val });
-                      }}
-                      placeholder="0"
-                      className="w-full text-xs pl-7 pr-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-amber-500 font-semibold text-slate-900 bg-white"
-                    />
-                  </div>
-                  <span className="text-[10px] text-slate-500 mt-1 block">
-                    Historical city council rates/water debt settlement required for transfer clearance.
-                  </span>
-                </div>
-              </div>
-            </div>
+            )}
 
             {/* Mortgage / Bond Financing & Cash Deposit Sync Engine */}
             <div className="p-4 sm:p-5 rounded-xl border border-slate-200 bg-white shadow-2xs space-y-4">
@@ -2224,6 +2266,14 @@ export default function OpportunityAnalyzerPage() {
         )}
         </div>
         </div>
+
+        {/* Fee Reset Toast Notification */}
+        {feeResetToast && (
+          <div className="fixed bottom-20 md:bottom-6 right-4 sm:right-6 z-50 bg-slate-900 text-white text-xs px-4 py-2.5 rounded-lg shadow-xl border border-slate-700 flex items-center gap-2 animate-in fade-in slide-in-from-bottom-2 duration-200">
+            <Scale className="w-4 h-4 text-amber-400 shrink-0" />
+            <span>{feeResetToast}</span>
+          </div>
+        )}
       </main>
     </div>
   );
