@@ -1365,7 +1365,7 @@ export default function FlipsManagerPage() {
                 <input
                   type="number"
                   required
-                  min="1"
+                  min="0"
                   step="10000"
                   value={exitSalePrice || ''}
                   onChange={(e) => {
@@ -1513,8 +1513,8 @@ export default function FlipsManagerPage() {
                   <input
                     type="number"
                     required
-                    min="1"
-                    step="10000"
+                    min="0"
+                    step="any"
                     value={convertMarketValue || ''}
                     onChange={(e) => setConvertMarketValue(Number(e.target.value))}
                     className="w-full px-3 py-2 border border-slate-300 rounded-lg font-bold text-slate-900 text-sm focus:ring-1 focus:ring-indigo-500"
@@ -1539,8 +1539,8 @@ export default function FlipsManagerPage() {
                   <input
                     type="number"
                     required
-                    min="1000"
-                    step="500"
+                    min="0"
+                    step="any"
                     value={convertGrossRent || ''}
                     onChange={(e) => setConvertGrossRent(Number(e.target.value))}
                     className="w-full px-3 py-2 border border-slate-300 rounded-lg font-bold text-emerald-700 text-sm focus:ring-1 focus:ring-emerald-500"

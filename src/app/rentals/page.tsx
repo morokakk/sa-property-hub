@@ -1454,7 +1454,7 @@ export default function RentalPortfolioPage() {
                 <input
                   type="number"
                   required
-                  min="1"
+                  min="0"
                   step="10000"
                   value={exitSalePrice || ''}
                   onChange={(e) => {
@@ -1592,8 +1592,8 @@ export default function RentalPortfolioPage() {
                 <input
                   type="number"
                   required
-                  min="1"
-                  step="10000"
+                  min="0"
+                  step="any"
                   value={refinanceNewValuation || ''}
                   onChange={(e) => {
                     const val = Number(e.target.value);
@@ -1616,7 +1616,7 @@ export default function RentalPortfolioPage() {
                   type="number"
                   required
                   min="0"
-                  step="100"
+                  step="any"
                   value={refinanceNewBondPayment || ''}
                   onChange={(e) => setRefinanceNewBondPayment(Number(e.target.value))}
                   className="w-full px-3 py-2 border border-slate-300 rounded-lg font-bold text-slate-900 text-sm focus:ring-1 focus:ring-purple-500"
@@ -1641,7 +1641,7 @@ export default function RentalPortfolioPage() {
                   type="number"
                   required
                   min="0"
-                  step="5000"
+                  step="any"
                   value={refinanceCashPulledOut || ''}
                   onChange={(e) => {
                     const cashOut = Number(e.target.value);
@@ -1672,7 +1672,7 @@ export default function RentalPortfolioPage() {
                   type="number"
                   required
                   min="0"
-                  step="5000"
+                  step="any"
                   value={refinanceNewBondBalance || ''}
                   onChange={(e) => setRefinanceNewBondBalance(Number(e.target.value))}
                   className="w-full px-3 py-2 border border-slate-300 rounded-lg font-bold text-slate-800 text-sm"
