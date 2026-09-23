@@ -234,6 +234,7 @@ export interface FlipProject {
   acquisitionCostsZAR: number; // Transfer + legal
   baselineRenovationBudgetZAR: number;
   strategy?: DealStrategy; // Defaults to 'Flip'
+  source?: DealSource;
   // Holding Period Carrying Costs
   estimatedDurationMonths?: number;
   monthlyHoldingCostZAR?: number; // Total monthly holding cost
@@ -290,6 +291,7 @@ export interface RentalProperty {
   address: string;
   city: string;
   propertyType: PropertyTitleType;
+  source?: DealSource;
   agmDate?: string;
   marketValueZAR: number;
   purchasePriceZAR: number;
@@ -326,6 +328,7 @@ export interface RentalProperty {
   status: 'Occupied' | 'Vacant' | 'Notice Given' | 'Sold';
   cocChecklist?: ComplianceCertificates;
   driveVault?: CloudDriveVault;
+  notes?: string;
   // Realized Sale / Exit Fields
   actualSalePriceZAR?: number;
   netCashProceedsZAR?: number;

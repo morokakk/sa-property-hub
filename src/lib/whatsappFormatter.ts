@@ -1,5 +1,5 @@
 import { formatZAR, formatPercent, formatDate } from './formatters';
-import { OpportunityDeal, FlipProject, InvestorProfile, DealStrategy } from '@/types';
+import { OpportunityDeal, FlipProject, InvestorProfile, DealStrategy, DealSource } from '@/types';
 import { generateLongTermProjection } from './calculations/propertyMetrics';
 
 export interface ProposalPitchParams {
@@ -14,8 +14,14 @@ export interface ProposalPitchParams {
     targetExitPrice: number;
     completionDate?: string;
     strategy?: DealStrategy;
+    source?: DealSource;
     builtInEquity?: number;
     builtInEquityPercent?: number;
+    auctioneerCommission?: number;
+    municipalArrears?: number;
+    isSection13Eligible?: boolean;
+    arvZAR?: number;
+    refinanceLtvPercent?: number;
     holdingDurationMonths?: number;
     monthlyHoldingCost?: number;
     monthlyBondHolding?: number;
@@ -291,8 +297,16 @@ export function formatProposalPitchForWhatsApp(
   const monthlyOther = deal.monthlyOtherHolding ?? 0;
   const monthlyBurn = deal.monthlyHoldingCost || (monthlyBond + monthlyLevies + monthlyRates + monthlyOther);
   const holdingReserve = isFlip ? monthlyBurn * holdingDuration : 0;
+  const auctionFee = deal.auctioneerCommission ?? 0;
+  const arrears = deal.municipalArrears ?? 0;
 
-  const totalProjectCost = deal.purchasePrice + deal.acquisitionCosts + deal.renovationBudget + holdingReserve;
+  const totalProjectCost =
+    deal.purchasePrice +
+    deal.acquisitionCosts +
+    deal.renovationBudget +
+    holdingReserve +
+    auctionFee +
+    arrears;
   const projectedNetProfit = deal.targetExitPrice - totalProjectCost;
   const projectROI = totalProjectCost > 0 ? (projectedNetProfit / totalProjectCost) * 100 : 0;
   const loanToCost = totalProjectCost > 0 ? (capitalRequested / totalProjectCost) * 100 : 0;
@@ -307,6 +321,21 @@ export function formatProposalPitchForWhatsApp(
   text += `📍 *Asset:* ${deal.title}\n`;
   text += `🏙️ *Location:* ${deal.address}, ${deal.city}, South Africa\n`;
   text += `🏷️ *Strategy Mandate:* *${isFlip ? '🔄 Buy & Flip' : strategy === 'BRRRR' ? '⚡ Hybrid BRRRR' : '🏠 Buy & Hold Rental'}*\n`;
+
+  if (deal.source) {
+    if (deal.source === 'High-Street Auction') {
+      text += `⚡ *Sourcing:* High-Street Auction (10% Cash Guarantee Secured)\n`;
+    } else if (deal.source === 'Distressed Sale / Repo') {
+      text += `🛡️ *Sourcing:* Distressed Bank Repo (Municipal Arrears & Clearance Tracked)\n`;
+    } else if (deal.source === 'iGrow Rentals') {
+      text += `🏢 *Sourcing:* iGrow Rentals (Turnkey • Section 13sex Tax Shield • R0 Transfer Duty)\n`;
+    } else if (deal.source === 'Direct Owner') {
+      text += `🤝 *Sourcing:* Direct Private Seller (Off-Market Sourced • 0% Agent Commission)\n`;
+    } else if (deal.source === 'Private Agent') {
+      text += `📋 *Sourcing:* Private Estate Agent (Compliant OTP • Verified Deeds Office CMA)\n`;
+    }
+  }
+
   if (investorProfile) {
     text += `👤 *Sponsor:* ${investorProfile.entityName} ${investorProfile.tradingAs ? `(T/A ${investorProfile.tradingAs})` : ''}\n`;
   }
@@ -316,6 +345,18 @@ export function formatProposalPitchForWhatsApp(
   text += `• Purchase Price: *${formatZAR(deal.purchasePrice)}*\n`;
   if (deal.builtInEquity && deal.builtInEquity > 0) {
     text += `• Built-in Equity: *${formatZAR(deal.builtInEquity)}* (${deal.builtInEquityPercent ? `+${formatPercent(deal.builtInEquityPercent)}` : 'Capital Upside'})\n`;
+  }
+  if (auctionFee > 0) {
+    text += `• Auctioneer Fee (10%+VAT): *${formatZAR(auctionFee)}*\n`;
+  }
+  if (arrears > 0) {
+    text += `• Municipal Clearance Arrears: *${formatZAR(arrears)}*\n`;
+  }
+  if (deal.source === 'iGrow Rentals') {
+    text += `• SARS Transfer Duty: *R 0* (VAT Inclusive Developer Stock)\n`;
+  }
+  if (deal.isSection13Eligible) {
+    text += `• SARS Tax Shield: *Section 13sex Eligible* (5% p.a. Building Deduction)\n`;
   }
   text += `• Capex & Legal: ${formatZAR(deal.acquisitionCosts + deal.renovationBudget)}\n`;
   if (isFlip) {
@@ -334,6 +375,13 @@ export function formatProposalPitchForWhatsApp(
   text += `• Security / Collateral: *${securityType}*\n`;
   if (deal.completionDate) {
     text += `• Target Maturity: ${formatDate(deal.completionDate)}\n`;
+  }
+  if (strategy === 'BRRRR') {
+    const arv = deal.arvZAR || deal.targetExitPrice || Math.round(deal.purchasePrice * 1.3);
+    const refiLtv = deal.refinanceLtvPercent || 75;
+    const estRefiCash = Math.round(arv * (refiLtv / 100));
+    text += `🏦 *Post-Rehab ARV Valuation:* *${formatZAR(arv)}* (${refiLtv}% LTV Refi: ${formatZAR(estRefiCash)})\n`;
+    text += `🔄 *Lender Capital Exit:* Phase 2 Bank Refinance @ Month 6 (100% Principal Repaid to Investor)\n`;
   }
   text += `• Projected Total Payout: *${formatZAR(projectedLenderPayout)}*\n`;
 

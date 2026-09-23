@@ -8,7 +8,7 @@ import { formatZAR, formatPercent, formatDate } from '@/lib/formatters';
 import { generateLongTermProjection } from '@/lib/calculations/propertyMetrics';
 import { formatProposalPitchForWhatsApp } from '@/lib/whatsappFormatter';
 import LongTermProjectionChart from '@/components/analytics/LongTermProjectionChart';
-import { DealStrategy } from '@/types';
+import { DealStrategy, DealSource } from '@/types';
 import {
   Printer,
   FileCheck2,
@@ -29,6 +29,9 @@ import {
   Save,
   Copy,
   Share2,
+  Zap,
+  Repeat,
+  AlertTriangle,
 } from 'lucide-react';
 
 function getSafeLogoUri(uri?: string): string {
@@ -51,14 +54,16 @@ function ProposalGeneratorContent() {
   const searchParams = useSearchParams();
   const queryDealId = searchParams.get('dealId');
 
+  const rentals = usePortfolioStore((state) => state.rentals);
   const flips = usePortfolioStore((state) => state.flips);
   const opportunities = usePortfolioStore((state) => state.opportunities);
   const suppliers = usePortfolioStore((state) => state.suppliers);
   const investorProfile = usePortfolioStore((state) => state.investorProfile);
+  const updateRental = usePortfolioStore((state) => state.updateRental);
   const updateFlip = usePortfolioStore((state) => state.updateFlip);
   const updateOpportunity = usePortfolioStore((state) => state.updateOpportunity);
 
-  // Combine Flips and Opportunities as pitch candidates
+  // Combine Flips, Opportunities, and Active Rentals as pitch candidates
   const allDeals = [
     ...flips.map((f) => ({
       id: f.id,
@@ -83,6 +88,10 @@ function ProposalGeneratorContent() {
       acquisitionCosts: f.acquisitionCostsZAR,
       renovationBudget: f.baselineRenovationBudgetZAR,
       strategy: f.strategy ?? 'Flip',
+      source: f.source ?? 'Private Agent',
+      auctioneerCommission: 0,
+      municipalArrears: 0,
+      isSection13Eligible: false,
       holdingDurationMonths: f.estimatedDurationMonths ?? 6,
       monthlyBondHolding: f.monthlyBondPaymentZAR ?? 0,
       monthlyLeviesHolding: f.monthlyLeviesZAR ?? 0,
@@ -147,6 +156,11 @@ function ProposalGeneratorContent() {
         acquisitionCosts: o.costs.totalAcquisitionCost - o.purchasePrice,
         renovationBudget: o.estimatedRehabCost,
         strategy: o.strategy ?? 'Rental',
+        source: o.source,
+        auctioneerCommission: o.auctioneerCommissionZAR ?? 0,
+        municipalArrears: o.municipalArrearsZAR ?? 0,
+        isSection13Eligible: o.section13sex?.isEligible ?? false,
+        section13Allowance: o.section13sex?.annualAllowanceZAR ?? 0,
         holdingDurationMonths: o.holdingPeriodMonths ?? 6,
         monthlyBondHolding: o.monthlyBondPaymentZAR ?? (o.bondLTV ? Math.round(o.purchasePrice * (o.bondLTV / 100) * 0.0108) : 0),
         monthlyLeviesHolding: o.monthlyLevies ?? 0,
@@ -185,6 +199,69 @@ function ProposalGeneratorContent() {
         annualRentalEscalationPercent: o.annualRentalEscalationPercent ?? 6.0,
         annualExpenseInflationPercent: o.annualExpenseInflationPercent ?? 6.0,
         bondTermYears: o.bondTermYears ?? o.loanTermYears ?? 20,
+      };
+    }),
+    ...rentals.map((r) => {
+      const openMarket = r.marketValueZAR || r.purchasePriceZAR;
+      const builtIn = Math.max(0, openMarket - (r.outstandingBondBalanceZAR || r.purchasePriceZAR));
+      const builtInPct = openMarket > 0 ? Number(((builtIn / openMarket) * 100).toFixed(1)) : 0;
+      return {
+        id: r.id,
+        type: 'rental' as const,
+        title: r.title,
+        address: r.address,
+        city: r.city,
+        openMarketValue: openMarket,
+        purchasePrice: r.purchasePriceZAR,
+        builtInEquity: builtIn,
+        builtInEquityPercent: builtInPct,
+        amenityScorecard: {
+          schools: '0-5km' as const,
+          policeStation: '0-5km' as const,
+          medicalClinic: '0-5km' as const,
+          shoppingMall: '0-5km' as const,
+          compositeGrade: 'A-Grade (Prime Hub)' as const,
+          compositeScore: 12,
+        },
+        acquisitionCosts: Math.round(r.purchasePriceZAR * 0.05),
+        renovationBudget: 0,
+        strategy: 'Rental' as DealStrategy,
+        source: r.source ?? 'Private Agent',
+        auctioneerCommission: 0,
+        municipalArrears: r.unpaidUtilityArrearsZAR ?? 0,
+        isSection13Eligible: false,
+        section13Allowance: 0,
+        holdingDurationMonths: 12,
+        monthlyBondHolding: r.monthlyBondPaymentZAR ?? 0,
+        monthlyLeviesHolding: r.monthlyLeviesZAR ?? 0,
+        monthlyRatesHolding: r.monthlyRatesTaxesZAR ?? 0,
+        monthlyOtherHolding: (r.monthlyAgentFeeZAR || 0) + (r.monthlyMaintenanceReserveZAR || 0),
+        monthlyHoldingCost: (r.monthlyBondPaymentZAR || 0) + (r.monthlyLeviesZAR || 0) + (r.monthlyRatesTaxesZAR || 0),
+        targetExitPrice: openMarket,
+        completionDate: r.leaseEndDate || new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+        boq: [],
+        notes: `Seasoned portfolio asset. Tenant: ${r.tenantName || 'In-place'}. Gross Rent: ${formatZAR(r.monthlyGrossRentZAR)}/mo. Bond balance: ${formatZAR(r.outstandingBondBalanceZAR || 0)}.`,
+        fundingRequiredZAR: Math.round(openMarket * 0.3),
+        capitalRaisedZAR: 0,
+        primaryFunderName: undefined,
+        primaryFunderContact: undefined,
+        primaryFunderType: undefined,
+        coFundersNotes: undefined,
+        promisedReturnType: 'Monthly Coupon',
+        promisedReturnRatePercent: 13.5,
+        promisedPayoutSchedule: 'Monthly Interest',
+        securityOffered: '2nd Mortgage Bond registered over title deed',
+        monthlyRent: r.monthlyGrossRentZAR,
+        monthlyLevies: r.monthlyLeviesZAR,
+        monthlyRates: r.monthlyRatesTaxesZAR,
+        depositZAR: Math.max(0, openMarket - (r.outstandingBondBalanceZAR || 0)),
+        loanToValue: openMarket > 0 ? Math.round(((r.outstandingBondBalanceZAR || 0) / openMarket) * 100) : 70,
+        interestRatePercent: r.bondInterestRatePercent || 11.75,
+        loanTermYears: 20,
+        annualCapitalGrowthPercent: 5.0,
+        annualRentalEscalationPercent: r.annualEscalationPercent || 6.0,
+        annualExpenseInflationPercent: 6.0,
+        bondTermYears: 20,
       };
     }),
   ];
@@ -249,7 +326,9 @@ function ProposalGeneratorContent() {
       const duration = deal.holdingDurationMonths || 6;
       const burn = deal.monthlyHoldingCost || (deal.monthlyBondHolding + deal.monthlyLeviesHolding + deal.monthlyRatesHolding + deal.monthlyOtherHolding);
       const reserve = isDealFlip ? burn * duration : 0;
-      const fullProjectOutlay = deal.purchasePrice + deal.acquisitionCosts + deal.renovationBudget + reserve;
+      const auctionFee = deal.auctioneerCommission || 0;
+      const arrears = deal.municipalArrears || 0;
+      const fullProjectOutlay = deal.purchasePrice + deal.acquisitionCosts + deal.renovationBudget + reserve + auctionFee + arrears;
 
       const defaultCapital =
         deal.fundingRequiredZAR ??
@@ -276,13 +355,17 @@ function ProposalGeneratorContent() {
         promisedReturnRatePercent: offeredRate,
         securityOffered: securityType,
       });
-    } else {
+    } else if (deal.type === 'opportunity') {
       updateOpportunity(deal.id, {
         strategy: pitchStrategy,
         fundingRequiredZAR: capitalRequested,
         promisedReturnType: returnTypeToSave,
         promisedReturnRatePercent: offeredRate,
         securityOffered: securityType,
+      });
+    } else if (deal.type === 'rental') {
+      updateRental(deal.id, {
+        notes: `Private pitch terms: ${offeredRate}% ${fundingOfferType}, security: ${securityType}`,
       });
     }
     setIsSavedFeedback(true);
@@ -297,8 +380,17 @@ function ProposalGeneratorContent() {
   const monthlyOther = deal?.monthlyOtherHolding ?? 0;
   const monthlyBurnRate = deal?.monthlyHoldingCost || (monthlyBond + monthlyLevies + monthlyRates + monthlyOther);
   const totalHoldingReserve = isFlip ? monthlyBurnRate * holdingDuration : 0;
+  const auctioneerCommission = deal?.auctioneerCommission ?? 0;
+  const municipalArrears = deal?.municipalArrears ?? 0;
 
-  const totalProjectCost = (deal?.purchasePrice || 0) + (deal?.acquisitionCosts || 0) + (deal?.renovationBudget || 0) + totalHoldingReserve;
+  const totalProjectCost =
+    (deal?.purchasePrice || 0) +
+    (deal?.acquisitionCosts || 0) +
+    (deal?.renovationBudget || 0) +
+    totalHoldingReserve +
+    auctioneerCommission +
+    municipalArrears;
+
   const projectedNetProfit = (deal?.targetExitPrice || 0) - totalProjectCost;
   const netProjectROI = totalProjectCost > 0 ? (projectedNetProfit / totalProjectCost) * 100 : 0;
   const loanToCost = totalProjectCost > 0 ? (capitalRequested / totalProjectCost) * 100 : 0;
@@ -308,7 +400,12 @@ function ProposalGeneratorContent() {
   const pitchWhatsAppText = useMemo(() => {
     if (!deal) return '';
     return formatProposalPitchForWhatsApp({
-      deal,
+      deal: {
+        ...deal,
+        auctioneerCommission,
+        municipalArrears,
+        isSection13Eligible: deal.isSection13Eligible,
+      },
       strategy: pitchStrategy,
       capitalRequested,
       fundingOfferType,
@@ -316,7 +413,7 @@ function ProposalGeneratorContent() {
       securityType,
       investorProfile,
     });
-  }, [deal, pitchStrategy, capitalRequested, fundingOfferType, offeredRate, securityType, investorProfile]);
+  }, [deal, pitchStrategy, capitalRequested, fundingOfferType, offeredRate, securityType, investorProfile, auctioneerCommission, municipalArrears]);
 
   const handleCopyPitchWhatsApp = async () => {
     if (!pitchWhatsAppText) return;
@@ -383,7 +480,7 @@ function ProposalGeneratorContent() {
             <div>
               <h3 className="font-bold text-sm text-slate-900">Select Deal & Tailor Pitch Terms</h3>
               <p className="text-xs text-slate-500">
-                Choose an opportunity or flip to render the executive pitch tear-sheet.
+                Choose an opportunity, flip project, or portfolio rental to render the executive pitch tear-sheet.
               </p>
             </div>
             <div className="flex items-center gap-2">
@@ -394,20 +491,32 @@ function ProposalGeneratorContent() {
                   setSelectedDealId(e.target.value);
                   const selected = allDeals.find((d) => d.id === e.target.value);
                   if (selected) {
+                    const selHold = selected.strategy === 'Flip' ? (selected.monthlyHoldingCost || 0) * (selected.holdingDurationMonths || 6) : 0;
+                    const selAuction = selected.auctioneerCommission || 0;
+                    const selArrears = selected.municipalArrears || 0;
+                    const selTotal = selected.purchasePrice + selected.acquisitionCosts + selected.renovationBudget + selHold + selAuction + selArrears;
                     setCapitalRequested(
-                      Math.round(
-                        (selected.purchasePrice + selected.acquisitionCosts + selected.renovationBudget) * 0.7
-                      )
+                      selected.fundingRequiredZAR ?? Math.round(selTotal * 0.7)
                     );
                   }
                 }}
                 className="text-xs font-bold px-3 py-2 border border-slate-300 rounded-lg bg-white shadow-xs text-slate-900"
               >
-                {allDeals.map((d) => (
-                  <option key={d.id} value={d.id}>
-                    [{d.type.toUpperCase()}] {d.title} ({d.city})
-                  </option>
-                ))}
+                {allDeals.map((d) => {
+                  let badge = '';
+                  if (d.type === 'rental') {
+                    badge = '[STABILIZED RENTAL]';
+                  } else {
+                    const stratTag = d.strategy?.toUpperCase() || (d.type === 'flip' ? 'FLIP' : 'RENTAL');
+                    const srcTag = d.source ? ` • ${d.source}` : '';
+                    badge = `[${stratTag}${srcTag}]`;
+                  }
+                  return (
+                    <option key={d.id} value={d.id}>
+                      {badge} {d.title} ({d.city})
+                    </option>
+                  );
+                })}
               </select>
             </div>
           </div>
@@ -565,6 +674,11 @@ function ProposalGeneratorContent() {
                   }`}>
                     {isFlip ? '🔄 Buy & Flip Mandate' : pitchStrategy === 'BRRRR' ? '⚡ Hybrid BRRRR Strategy' : '🏠 Buy & Hold Rental'}
                   </span>
+                  {deal.source && (
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-100 text-slate-800 border border-slate-300">
+                      Channel: {deal.source}
+                    </span>
+                  )}
                 </div>
                 <h1 className="text-2xl md:text-3xl font-black tracking-tight text-slate-900">
                   {deal.title}
@@ -687,14 +801,58 @@ function ProposalGeneratorContent() {
 
             {/* Investment Opportunity & Business Case */}
             <div className="space-y-3">
-              <h2 className="text-sm uppercase tracking-wider font-extrabold text-slate-900 border-b border-slate-200 pb-1">
-                1. Executive Opportunity Summary & Sponsor Mandate
-              </h2>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-200 pb-1">
+                <h2 className="text-sm uppercase tracking-wider font-extrabold text-slate-900">
+                  1. Executive Opportunity Summary & Sponsor Mandate
+                </h2>
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  {deal.source === 'High-Street Auction' && (
+                    <span className="text-[10px] font-extrabold px-2 py-0.5 rounded bg-amber-100 text-amber-900 border border-amber-300 flex items-center gap-1">
+                      ⚡ 10% Cash Deposit Fall-of-Hammer • 21-Day Bank Guarantee
+                    </span>
+                  )}
+                  {deal.source === 'Distressed Sale / Repo' && (
+                    <span className="text-[10px] font-extrabold px-2 py-0.5 rounded bg-rose-100 text-rose-900 border border-rose-300 flex items-center gap-1">
+                      🛡️ Bank Repo Foreclosure • Section 118 Rates Clearance
+                    </span>
+                  )}
+                  {deal.source === 'iGrow Rentals' && (
+                    <span className="text-[10px] font-extrabold px-2 py-0.5 rounded bg-emerald-100 text-emerald-900 border border-emerald-300 flex items-center gap-1">
+                      🏢 Turnkey Developer Stock • Section 13sex Eligible • R0 Transfer Duty
+                    </span>
+                  )}
+                  {deal.source === 'Direct Owner' && (
+                    <span className="text-[10px] font-extrabold px-2 py-0.5 rounded bg-indigo-100 text-indigo-900 border border-indigo-300 flex items-center gap-1">
+                      🤝 Off-Market Sourcing • Zero Agent Commission
+                    </span>
+                  )}
+                  {deal.source === 'Private Agent' && (
+                    <span className="text-[10px] font-extrabold px-2 py-0.5 rounded bg-blue-100 text-blue-900 border border-blue-300 flex items-center gap-1">
+                      📋 Compliant OTP • Verified Deeds Office CMA Comps
+                    </span>
+                  )}
+                  {deal.type === 'rental' && (
+                    <span className="text-[10px] font-extrabold px-2 py-0.5 rounded bg-teal-100 text-teal-900 border border-teal-300 flex items-center gap-1">
+                      💼 Stabilized Portfolio Asset • In-Place Paying Tenancy
+                    </span>
+                  )}
+                </div>
+              </div>
+
               <p className="text-xs text-slate-600 leading-relaxed">
-                The sponsor has secured the distressed/high-value property located at{' '}
-                <strong>{deal.address}, {deal.city}</strong> below market value. The asset presents an immediate
-                opportunity to create substantial capital value through strategic modernization, leveraging verified
-                trade suppliers (Builders Warehouse, Plumblink, Tile Africa) and experienced master contractors.
+                {deal.source === 'High-Street Auction' ? (
+                  <>The sponsor has secured competitive bidding position for <strong>{deal.address}, {deal.city}</strong> on auction block at a significant discount below open market valuation. Private equity / bridge funding will secure the mandatory 10% fall-of-hammer cash deposit and 21-day balance guarantees, unlocking rapid capital uplift through targeted value-add renovations.</>
+                ) : deal.source === 'Distressed Sale / Repo' ? (
+                  <>The sponsor has negotiated an urgent distressed acquisition for <strong>{deal.address}, {deal.city}</strong> under bank foreclosure / distressed liquidation terms. All municipal Section 118 clearance arrears have been factored into the project outlay, creating substantial built-in equity from day one.</>
+                ) : deal.source === 'iGrow Rentals' ? (
+                  <>The sponsor is acquiring brand-new turnkey sectional title development stock at <strong>{deal.address}, {deal.city}</strong>. Sourced directly via iGrow, this asset incurs <strong>R0 SARS Transfer Duty</strong> (VAT inclusive in developer price), qualifies for accelerated <strong>Section 13sex tax write-offs</strong>, and benefits from professional managing agent placement.</>
+                ) : deal.source === 'Direct Owner' ? (
+                  <>The sponsor has proprietary off-market access to <strong>{deal.address}, {deal.city}</strong> through direct seller negotiation. Eliminating traditional estate agency commission overhead allows for deep pricing discounts and clean transactional settlement terms.</>
+                ) : deal.type === 'rental' ? (
+                  <>The sponsor is pitching the seasoned, cash-flowing stabilized rental asset located at <strong>{deal.address}, {deal.city}</strong>. The property maintains strong in-place tenancy, generating predictable monthly yields with established municipal and body corporate records.</>
+                ) : (
+                  <>The sponsor has secured the high-value property located at <strong>{deal.address}, {deal.city}</strong> below market value via registered estate agent mandate. The asset presents an immediate opportunity to create substantial capital value through strategic modernization, leveraging verified trade suppliers (Builders Warehouse, Plumblink, Tile Africa) and experienced master contractors.</>
+                )}
               </p>
 
               {/* Qualitative Location & Amenity Scorecard */}
@@ -775,22 +933,86 @@ function ProposalGeneratorContent() {
                   </thead>
                   <tbody className="divide-y divide-slate-200 text-slate-800">
                     <tr>
-                      <td className="p-2.5 font-medium">Property Acquisition (Purchase Price)</td>
+                      <td className="p-2.5 font-medium">
+                        {deal.source === 'High-Street Auction'
+                          ? 'Knockdown Bid Price (Fall of the Hammer)'
+                          : deal.source === 'iGrow Rentals'
+                          ? 'Developer Unit Acquisition (VAT Inclusive)'
+                          : deal.source === 'Distressed Sale / Repo'
+                          ? 'Bank Distressed Settlement Price'
+                          : deal.type === 'rental'
+                          ? 'Stabilized Property Valuation / Asset Basis'
+                          : 'Property Acquisition (Purchase Price)'}
+                      </td>
                       <td className="p-2.5 font-bold">{formatZAR(deal.purchasePrice)}</td>
                       <td className="p-2.5">{formatPercent((deal.purchasePrice / totalProjectCost) * 100)}</td>
-                      <td className="p-2.5 text-slate-500">Deeds Office Lodgement</td>
+                      <td className="p-2.5 text-slate-500">
+                        {deal.source === 'High-Street Auction'
+                          ? '10% Immediate Deposit + 21-Day Guarantees'
+                          : 'Deeds Office Lodgement'}
+                      </td>
                     </tr>
+                    {auctioneerCommission > 0 && (
+                      <tr className="bg-amber-50/50">
+                        <td className="p-2.5 font-medium text-amber-950 flex items-center gap-1.5 flex-wrap">
+                          <span>Auctioneer's Commission (Buyer's Premium 10% + 15% VAT)</span>
+                          <span className="text-[10px] bg-amber-100 text-amber-900 font-bold px-1.5 py-0.2 rounded border border-amber-200">
+                            Auction Surcharge
+                          </span>
+                        </td>
+                        <td className="p-2.5 font-bold text-amber-900">{formatZAR(auctioneerCommission)}</td>
+                        <td className="p-2.5 text-amber-900">{totalProjectCost > 0 ? formatPercent((auctioneerCommission / totalProjectCost) * 100) : '0%'}</td>
+                        <td className="p-2.5 text-slate-500">Payable to auction house on fall of hammer</td>
+                      </tr>
+                    )}
+                    {municipalArrears > 0 && (
+                      <tr className="bg-rose-50/50">
+                        <td className="p-2.5 font-medium text-rose-950 flex items-center gap-1.5 flex-wrap">
+                          <span>Municipal Section 118 Rates Clearance Arrears</span>
+                          <span className="text-[10px] bg-rose-100 text-rose-900 font-bold px-1.5 py-0.2 rounded border border-rose-200">
+                            Statutory Clearance
+                          </span>
+                        </td>
+                        <td className="p-2.5 font-bold text-rose-900">{formatZAR(municipalArrears)}</td>
+                        <td className="p-2.5 text-rose-900">{totalProjectCost > 0 ? formatPercent((municipalArrears / totalProjectCost) * 100) : '0%'}</td>
+                        <td className="p-2.5 text-slate-500">City Council clearance certificate requirement</td>
+                      </tr>
+                    )}
                     <tr>
-                      <td className="p-2.5 font-medium">SARS Transfer Duty & Conveyancing Legal Fees</td>
+                      <td className="p-2.5 font-medium flex items-center gap-1.5 flex-wrap">
+                        <span>
+                          {deal.source === 'iGrow Rentals'
+                            ? 'Conveyancing Legal Fees & Registration'
+                            : 'SARS Transfer Duty & Conveyancing Legal Fees'}
+                        </span>
+                        {deal.source === 'iGrow Rentals' && (
+                          <span className="text-[10px] bg-emerald-100 text-emerald-900 font-bold px-1.5 py-0.2 rounded border border-emerald-200">
+                            R0 SARS Transfer Duty (VAT Incl.)
+                          </span>
+                        )}
+                      </td>
                       <td className="p-2.5 font-bold">{formatZAR(deal.acquisitionCosts)}</td>
                       <td className="p-2.5">{formatPercent((deal.acquisitionCosts / totalProjectCost) * 100)}</td>
-                      <td className="p-2.5 text-slate-500">On Contract Signing</td>
+                      <td className="p-2.5 text-slate-500">On Contract Signing (Conveyancers)</td>
                     </tr>
                     <tr>
-                      <td className="p-2.5 font-medium">Bill of Quantities (BOQ) Renovation & Materials</td>
+                      <td className="p-2.5 font-medium flex items-center gap-1.5 flex-wrap">
+                        <span>
+                          {deal.renovationBudget === 0
+                            ? 'Turnkey Delivery (Zero Renovation Capex Required)'
+                            : 'Bill of Quantities (BOQ) Renovation & Materials'}
+                        </span>
+                        {deal.renovationBudget === 0 && (
+                          <span className="text-[10px] bg-emerald-100 text-emerald-900 font-bold px-1.5 py-0.2 rounded border border-emerald-200">
+                            Turnkey Delivery
+                          </span>
+                        )}
+                      </td>
                       <td className="p-2.5 font-bold">{formatZAR(deal.renovationBudget)}</td>
                       <td className="p-2.5">{totalProjectCost > 0 ? formatPercent((deal.renovationBudget / totalProjectCost) * 100) : '0%'}</td>
-                      <td className="p-2.5 text-slate-500">Milestone Tranches (1st Fix / Finishes)</td>
+                      <td className="p-2.5 text-slate-500">
+                        {deal.renovationBudget === 0 ? 'Brand-new developer snag warranty' : 'Milestone Tranches (1st Fix / Finishes)'}
+                      </td>
                     </tr>
                     {isFlip && (
                       <tr className="bg-amber-50/50">
@@ -818,6 +1040,31 @@ function ProposalGeneratorContent() {
                   </tbody>
                 </table>
               </div>
+
+              {/* Deal Source Contextual Callouts */}
+              {deal.source === 'High-Street Auction' && (
+                <div className="p-3 rounded-lg bg-amber-50 border border-amber-300 text-xs text-amber-950 flex items-start gap-2.5">
+                  <AlertTriangle className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
+                  <div>
+                    <span className="font-bold block">Auction Terms & Settlement Mechanics:</span>
+                    <span>
+                      High-Street auctions require an immediate 10% non-refundable cash deposit (R{Math.round(deal.purchasePrice * 0.1).toLocaleString('en-ZA')}) plus auctioneer commission payable on the fall of the hammer. The 90% balance must be secured via bank or private facility guarantee within 21 days.
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {deal.source === 'iGrow Rentals' && (
+                <div className="p-3 rounded-lg bg-emerald-50 border border-emerald-300 text-xs text-emerald-950 flex items-start gap-2.5">
+                  <ShieldCheck className="w-4 h-4 text-emerald-700 shrink-0 mt-0.5" />
+                  <div>
+                    <span className="font-bold block">SARS Section 13sex Tax Shield & Rental Guarantee:</span>
+                    <span>
+                      Purchased directly from a VAT-registered developer, this asset attracts zero SARS transfer duty. Under Section 13sex, corporate and individual investors can claim a 5% annual building deduction (R{Math.round(deal.purchasePrice * 0.55 * 0.05).toLocaleString('en-ZA')}/year over 20 years), with tenant vetting and lease administration managed via iGrow / WeconnectU.
+                    </span>
+                  </div>
+                </div>
+              )}
 
               {/* Campaign Progress Sub-Row */}
               <div className="mt-3 p-3 bg-slate-50 border border-slate-200 rounded-lg flex flex-wrap items-center justify-between gap-3 text-xs">
@@ -1032,6 +1279,147 @@ function ProposalGeneratorContent() {
                   </table>
                 </div>
               </div>
+            ) : pitchStrategy === 'BRRRR' ? (
+              <div className="space-y-4 print:break-inside-avoid">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 border-b border-slate-200 pb-1">
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-sm uppercase tracking-wider font-extrabold text-slate-900">
+                      4. Hybrid BRRRR Strategy: 2-Phase Refinance & Capital Recycling Model
+                    </h2>
+                    <span className="text-[10px] bg-purple-100 text-purple-800 font-bold px-2 py-0.5 rounded border border-purple-300">
+                      ⚡ BRRRR Lifecycle
+                    </span>
+                  </div>
+                  <span className="text-[10px] font-semibold text-slate-500">
+                    Phase 1 Execution (0-6 Mo) → Phase 2 Bank Refinance (Mo 6-9)
+                  </span>
+                </div>
+
+                <p className="text-xs text-slate-600 leading-relaxed">
+                  The BRRRR (Buy, Rehab, Rent, Refinance, Repeat) strategy forces substantial capital appreciation through cosmetic and structural modernization. Upon tenant stabilization, a Tier-1 South African commercial bank issues a new long-term mortgage bond against the higher After-Repair Value (ARV). The cash proceeds from the bank bond are utilized to repay private investor capital in full, allowing the sponsor to retain the asset indefinitely with minimal to zero net equity trapped.
+                </p>
+
+                {/* 4-Step Process Pipeline */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+                  <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-200">
+                    <div className="text-[10px] uppercase font-bold text-slate-400">1. Buy (Discounted)</div>
+                    <div className="font-extrabold text-slate-900 text-xs mt-0.5">{formatZAR(deal.purchasePrice)}</div>
+                    <div className="text-[9px] text-slate-500">Agreed contract price</div>
+                  </div>
+                  <div className="p-2.5 rounded-lg bg-amber-50 border border-amber-200">
+                    <div className="text-[10px] uppercase font-bold text-amber-700">2. Rehab (Value-Add)</div>
+                    <div className="font-extrabold text-amber-900 text-xs mt-0.5">{formatZAR(deal.renovationBudget)}</div>
+                    <div className="text-[9px] text-amber-700">Modernize to high-spec</div>
+                  </div>
+                  <div className="p-2.5 rounded-lg bg-indigo-50 border border-indigo-200">
+                    <div className="text-[10px] uppercase font-bold text-indigo-700">3. Rent (Stabilize)</div>
+                    <div className="font-extrabold text-indigo-900 text-xs mt-0.5">{formatZAR(deal.monthlyRent || Math.round(deal.purchasePrice * 0.009))}/mo</div>
+                    <div className="text-[9px] text-indigo-700">Vetted tenant placed</div>
+                  </div>
+                  <div className="p-2.5 rounded-lg bg-emerald-50 border border-emerald-300">
+                    <div className="text-[10px] uppercase font-bold text-emerald-800">4. Refi & Return</div>
+                    <div className="font-extrabold text-emerald-900 text-xs mt-0.5">
+                      {formatZAR(Math.round((deal.targetExitPrice || Math.round(deal.purchasePrice * 1.35)) * 0.75))}
+                    </div>
+                    <div className="text-[9px] text-emerald-700 font-semibold">Repay lender capital</div>
+                  </div>
+                </div>
+
+                {/* Refinance Economics Metric Cards */}
+                {(() => {
+                  const postRehabArv = deal.targetExitPrice || Math.round(deal.purchasePrice * 1.35);
+                  const refiLtvPercent = 75;
+                  const newBankMortgage = Math.round(postRehabArv * (refiLtvPercent / 100));
+                  const totalCapitalInvested = totalProjectCost;
+                  const capitalExtracted = Math.min(totalCapitalInvested, newBankMortgage);
+                  const netEquityTrapped = Math.max(0, totalCapitalInvested - newBankMortgage);
+                  const monthlyRefiBond = Math.round(newBankMortgage * 0.0108); // ~11.75% 20y bond factor
+                  const netRentalCashflowPostRefi = (deal.monthlyRent || Math.round(deal.purchasePrice * 0.009)) - (monthlyRefiBond + monthlyLevies + monthlyRates);
+
+                  return (
+                    <>
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                        <div className="p-3 rounded-lg bg-slate-50 border border-slate-200">
+                          <span className="text-[10px] uppercase font-bold text-slate-500 block">Total Day-1 Outlay</span>
+                          <span className="text-sm font-extrabold text-slate-900 block mt-0.5 font-mono">
+                            {formatZAR(totalCapitalInvested)}
+                          </span>
+                          <span className="text-[9px] text-slate-400">All acquisition + capex</span>
+                        </div>
+                        <div className="p-3 rounded-lg bg-purple-50 border border-purple-200">
+                          <span className="text-[10px] uppercase font-bold text-purple-800 block">Post-Rehab Bank ARV</span>
+                          <span className="text-sm font-extrabold text-purple-900 block mt-0.5 font-mono">
+                            {formatZAR(postRehabArv)}
+                          </span>
+                          <span className="text-[9px] text-purple-700 font-semibold">Re-appraised valuation</span>
+                        </div>
+                        <div className="p-3 rounded-lg bg-emerald-50 border border-emerald-300">
+                          <span className="text-[10px] uppercase font-bold text-emerald-800 block">Bank Refinance Facility</span>
+                          <span className="text-sm font-extrabold text-emerald-900 block mt-0.5 font-mono">
+                            {formatZAR(newBankMortgage)}
+                          </span>
+                          <span className="text-[9px] text-emerald-700 font-semibold">{refiLtvPercent}% LTV bond payout</span>
+                        </div>
+                        <div className="p-3 rounded-lg bg-slate-900 text-white border border-slate-950">
+                          <span className="text-[10px] uppercase font-bold text-slate-300 block">Net Capital Left in Deal</span>
+                          <span className="text-sm font-extrabold text-emerald-400 block mt-0.5 font-mono">
+                            {netEquityTrapped <= 0 ? 'R 0 (Infinite ROI)' : formatZAR(netEquityTrapped)}
+                          </span>
+                          <span className="text-[9px] text-slate-300">
+                            {netEquityTrapped <= 0 ? '100% Capital Recycled' : `${formatPercent(((totalCapitalInvested - netEquityTrapped) / totalCapitalInvested) * 100)} Recycled`}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* 2-Phase Comparison Table */}
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-xs text-left border border-slate-200 rounded-lg overflow-hidden">
+                          <thead className="bg-slate-100 text-slate-700 font-bold uppercase text-[10px]">
+                            <tr>
+                              <th className="p-2.5">BRRRR Milestone Tranche</th>
+                              <th className="p-2.5">Amount (ZAR)</th>
+                              <th className="p-2.5">Capital Source</th>
+                              <th className="p-2.5">Investor Impact & Liquidity Milestone</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-200 text-slate-800">
+                            <tr>
+                              <td className="p-2.5 font-semibold">Phase 1: Total Initial Capital Deployed</td>
+                              <td className="p-2.5 font-bold font-mono">{formatZAR(totalCapitalInvested)}</td>
+                              <td className="p-2.5 text-slate-600">Private Lender Facility + Sponsor Equity</td>
+                              <td className="p-2.5 text-slate-600">Fund acquisition, BOQ renovation, and carrying buffer</td>
+                            </tr>
+                            <tr className="bg-purple-50/40">
+                              <td className="p-2.5 font-semibold text-purple-950">Phase 2: Post-Rehab Bank Mortgage Refinance</td>
+                              <td className="p-2.5 font-bold font-mono text-purple-900">{formatZAR(newBankMortgage)}</td>
+                              <td className="p-2.5 text-purple-900 font-medium">Tier-1 Commercial Bank (75% LTV)</td>
+                              <td className="p-2.5 text-slate-600">Replaces short-term private bridge facility with 20-year term debt</td>
+                            </tr>
+                            <tr className="bg-emerald-50/70 font-bold">
+                              <td className="p-2.5 text-emerald-950">Lender Principal Repayment Tranche</td>
+                              <td className="p-2.5 text-emerald-950 font-mono">{formatZAR(capitalRequested)}</td>
+                              <td className="p-2.5 text-emerald-900">Refinance Proceeds Drawdown</td>
+                              <td className="p-2.5 text-emerald-900">
+                                100% of Private Lender Principal + Return settled in full from bank refinance
+                              </td>
+                            </tr>
+                            <tr className="bg-slate-50">
+                              <td className="p-2.5 font-semibold">Post-Refinance Net Monthly Cash Flow</td>
+                              <td className={`p-2.5 font-bold font-mono ${netRentalCashflowPostRefi >= 0 ? 'text-emerald-700' : 'text-rose-600'}`}>
+                                {formatZAR(netRentalCashflowPostRefi)}/mo
+                              </td>
+                              <td className="p-2.5 text-slate-600">Tenant Rental Income</td>
+                              <td className="p-2.5 text-slate-600">
+                                After R{monthlyRefiBond.toLocaleString('en-ZA')} new bond, levies (R{monthlyLevies.toLocaleString('en-ZA')}), and rates (R{monthlyRates.toLocaleString('en-ZA')})
+                              </td>
+                            </tr>
+                          </tbody>
+                        </table>
+                      </div>
+                    </>
+                  );
+                })()}
+              </div>
             ) : (
               <div className="space-y-3 print:break-inside-avoid">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 border-b border-slate-200 pb-1">
@@ -1040,7 +1428,7 @@ function ProposalGeneratorContent() {
                       4. Long-Term Wealth & Equity Projections ({projectionData.length}-Year Horizon)
                     </h2>
                     <span className="text-[10px] bg-indigo-100 text-indigo-800 font-bold px-2 py-0.5 rounded border border-indigo-200">
-                      {pitchStrategy === 'BRRRR' ? '⚡ BRRRR Strategy' : '🏠 Buy & Hold'}
+                      🏠 Buy & Hold Rental
                     </span>
                   </div>
                   <span className="text-[10px] font-semibold text-slate-500">

@@ -272,4 +272,93 @@ describe('whatsappFormatter - Strategy Adaptive Formatting', () => {
     expect(output).toContain('Coupon Payout: Monthly in advance');
     expect(output).toContain('*Sponsor:* Apex Capital Properties');
   });
+
+  it('formats Proposal Generator pitch with High-Street Auction sourcing and distressed arrears', () => {
+    const output = formatProposalPitchForWhatsApp({
+      deal: {
+        id: 'deal-auction-1',
+        title: 'Parkhurst Distressed Sheriff Auction',
+        address: '42 4th Avenue, Parkhurst',
+        city: 'Johannesburg',
+        purchasePrice: 1_750_000,
+        acquisitionCosts: 95_000,
+        renovationBudget: 450_000,
+        targetExitPrice: 2_850_000,
+        strategy: 'Flip',
+        source: 'High-Street Auction',
+        auctioneerCommission: 201_250,
+        municipalArrears: 45_000,
+        holdingDurationMonths: 6,
+        monthlyHoldingCost: 15_000,
+      },
+      strategy: 'Flip',
+      capitalRequested: 1_500_000,
+      fundingOfferType: 'Fixed Interest',
+      offeredRate: 15.0,
+      securityType: '2nd Mortgage Bond registered over title deed',
+      investorProfile: mockInvestorProfile,
+    });
+
+    expect(output).toContain('Sourcing:* High-Street Auction (10% Cash Guarantee Secured)');
+    expect(output).toContain('Auctioneer Fee (10%+VAT):');
+    expect(output).toContain('Municipal Clearance Arrears:');
+  });
+
+  it('formats Proposal Generator pitch for iGrow Turnkey Rental with Section 13sex', () => {
+    const output = formatProposalPitchForWhatsApp({
+      deal: {
+        id: 'deal-igrow-1',
+        title: 'Greencreek Riverwalk Developer Unit',
+        address: 'Greencreek Estate',
+        city: 'Pretoria',
+        purchasePrice: 899_000,
+        acquisitionCosts: 35_000,
+        renovationBudget: 0,
+        targetExitPrice: 1_150_000,
+        strategy: 'Rental',
+        source: 'iGrow Rentals',
+        isSection13Eligible: true,
+      },
+      strategy: 'Rental',
+      capitalRequested: 600_000,
+      fundingOfferType: 'Profit Share',
+      offeredRate: 20.0,
+      securityType: 'JV Syndicate Profit Participation',
+      investorProfile: mockInvestorProfile,
+    });
+
+    expect(output).toContain('Sourcing:* iGrow Rentals (Turnkey • Section 13sex Tax Shield • R0 Transfer Duty)');
+    expect(output).toContain('SARS Transfer Duty: *R 0* (VAT Inclusive Developer Stock)');
+    expect(output).toContain('SARS Tax Shield: *Section 13sex Eligible*');
+  });
+
+  it('formats Proposal Generator pitch for BRRRR strategy with refinance exit terms', () => {
+    const output = formatProposalPitchForWhatsApp({
+      deal: {
+        id: 'deal-brrrr-1',
+        title: 'Berea Value-Add BRRRR Conversion',
+        address: '88 Tudhope Avenue',
+        city: 'Johannesburg',
+        purchasePrice: 650_000,
+        acquisitionCosts: 45_000,
+        renovationBudget: 250_000,
+        targetExitPrice: 1_350_000,
+        strategy: 'BRRRR',
+        source: 'Distressed Sale / Repo',
+        arvZAR: 1_350_000,
+        refinanceLtvPercent: 75,
+      },
+      strategy: 'BRRRR',
+      capitalRequested: 700_000,
+      fundingOfferType: 'Fixed Interest',
+      offeredRate: 14.0,
+      securityType: '1st Mortgage Bridge Bond',
+      investorProfile: mockInvestorProfile,
+    });
+
+    expect(output).toContain('Strategy Mandate:* *⚡ Hybrid BRRRR*');
+    expect(output).toContain('Sourcing:* Distressed Bank Repo');
+    expect(output).toContain('Post-Rehab ARV Valuation:');
+    expect(output).toContain('Lender Capital Exit:* Phase 2 Bank Refinance @ Month 6');
+  });
 });
