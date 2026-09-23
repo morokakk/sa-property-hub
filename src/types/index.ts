@@ -267,6 +267,8 @@ export interface FlipProject {
   netCashProceedsZAR?: number;
   soldDate?: string;
   exitNotes?: string;
+  exitStrategy?: 'Sold' | 'BRRRR';
+  convertedToRentalId?: string;
 }
 
 // Maintenance Log Item
@@ -329,6 +331,50 @@ export interface RentalProperty {
   netCashProceedsZAR?: number;
   soldDate?: string;
   exitNotes?: string;
+  // BRRRR Lifecycle Fields
+  convertedFromFlipId?: string;
+  isBrrrrProperty?: boolean;
+  totalEquityExtractedZAR?: number;
+  refinanceHistory?: RentalRefinanceRecord[];
+}
+
+// Rental Refinance Audit Record
+export interface RentalRefinanceRecord {
+  id: string;
+  refinanceDate: string;
+  newBankValuationZAR: number;
+  newMonthlyBondPaymentZAR: number;
+  cashEquityPulledOutZAR: number;
+  newBondBalanceZAR: number;
+  notes?: string;
+}
+
+// Parameters for converting an active Flip to a Rental (BRRRR)
+export interface FlipToRentalConversionParams {
+  flipId: string;
+  initialGrossRentZAR: number;
+  marketValuationZAR?: number;
+  tenantName?: string;
+  tenantPhone?: string;
+  tenantEmail?: string;
+  leaseStartDate?: string;
+  leaseEndDate?: string;
+  depositHeldZAR?: number;
+  managementType?: 'Self-Managed' | 'Agency';
+  agencyName?: string;
+  agencyCommissionPercent?: number;
+  notes?: string;
+}
+
+// Parameters for refinancing a Rental property (BRRRR)
+export interface RentalRefinanceParams {
+  rentalId: string;
+  newBankValuationZAR: number;
+  newMonthlyBondPaymentZAR: number;
+  cashEquityPulledOutZAR: number;
+  newBondBalanceZAR: number;
+  refinanceDate?: string;
+  notes?: string;
 }
 
 // Global Portfolio Aggregates

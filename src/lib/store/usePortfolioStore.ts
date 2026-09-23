@@ -14,6 +14,8 @@ import {
   AnalyzerDraft,
   AiSettings,
   ExtractedRentalUnit,
+  FlipToRentalConversionParams,
+  RentalRefinanceParams,
 } from '@/types';
 import {
   INITIAL_RENTALS,
@@ -65,6 +67,7 @@ interface PortfolioState {
   addMaintenanceLog: (rentalId: string, log: Omit<RentalProperty['maintenanceHistory'][0], 'id'>) => void;
   markRentalAsSold: (rentalId: string, actualSalePrice: number, netCashProceeds: number, soldDate: string, exitNotes?: string) => void;
   reopenRental: (rentalId: string) => void;
+  refinanceRental: (params: RentalRefinanceParams) => void;
 
   // Flip Actions
   addFlip: (flip: FlipProject) => void;
@@ -76,6 +79,7 @@ interface PortfolioState {
   deleteBOQItem: (flipId: string, boqId: string) => void;
   markFlipAsCompleted: (flipId: string, actualSalePrice: number, netCashProceeds: number, soldDate: string, exitNotes?: string) => void;
   reopenFlip: (flipId: string) => void;
+  convertFlipToRental: (params: FlipToRentalConversionParams) => RentalProperty;
 
   // Funding Actions
   addFunding: (source: FundingSource) => void;
@@ -455,6 +459,44 @@ export const usePortfolioStore = create<PortfolioState>()(
             liquidCapitalReserve: deducted,
           };
         }),
+      refinanceRental: (params) =>
+        set((state) => {
+          const rental = state.rentals.find((r) => r.id === params.rentalId);
+          if (!rental) return state;
+
+          const now = new Date();
+          const dateStr = params.refinanceDate || now.toISOString().split('T')[0];
+          const effectiveMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+
+          const record = {
+            id: `refinance-${Date.now()}`,
+            refinanceDate: dateStr,
+            newBankValuationZAR: params.newBankValuationZAR,
+            newMonthlyBondPaymentZAR: params.newMonthlyBondPaymentZAR,
+            cashEquityPulledOutZAR: params.cashEquityPulledOutZAR,
+            newBondBalanceZAR: params.newBondBalanceZAR,
+            notes: params.notes,
+          };
+
+          const updatedRentals = state.rentals.map((r) => {
+            if (r.id !== params.rentalId) return r;
+            return {
+              ...r,
+              marketValueZAR: params.newBankValuationZAR,
+              monthlyBondPaymentZAR: params.newMonthlyBondPaymentZAR,
+              outstandingBondBalanceZAR: params.newBondBalanceZAR,
+              bondPaymentEffectiveDate: effectiveMonth,
+              bondRevisionNote: `BRRRR Refinance: R ${params.cashEquityPulledOutZAR.toLocaleString('en-ZA')} equity pulled out`,
+              totalEquityExtractedZAR: (r.totalEquityExtractedZAR || 0) + params.cashEquityPulledOutZAR,
+              refinanceHistory: [record, ...(r.refinanceHistory || [])],
+            };
+          });
+
+          return {
+            rentals: updatedRentals,
+            liquidCapitalReserve: state.liquidCapitalReserve + params.cashEquityPulledOutZAR,
+          };
+        }),
 
       // Flips
       addFlip: (flip) =>
@@ -576,7 +618,13 @@ export const usePortfolioStore = create<PortfolioState>()(
           const flip = state.flips.find((f) => f.id === flipId);
           if (!flip) return state;
           const deducted = Math.max(0, state.liquidCapitalReserve - (flip.netCashProceedsZAR || 0));
+          const targetRentalId = flip.convertedToRentalId;
+          const nextRentals = targetRentalId
+            ? state.rentals.filter((r) => r.id !== targetRentalId)
+            : state.rentals;
+
           return {
+            rentals: nextRentals,
             flips: state.flips.map((f) =>
               f.id === flipId
                 ? {
@@ -586,12 +634,128 @@ export const usePortfolioStore = create<PortfolioState>()(
                     netCashProceedsZAR: undefined,
                     soldDate: undefined,
                     exitNotes: undefined,
+                    exitStrategy: undefined,
+                    convertedToRentalId: undefined,
                   }
                 : f
             ),
             liquidCapitalReserve: deducted,
           };
         }),
+      convertFlipToRental: (params) => {
+        const flip = get().flips.find((f) => f.id === params.flipId);
+        if (!flip) throw new Error(`Flip with id ${params.flipId} not found`);
+
+        const totalBoqActual = (flip.boq || []).reduce(
+          (s, item) => s + (item.actualCostZAR || item.baselineTotalZAR || 0),
+          0
+        );
+        const holdingMonths = flip.estimatedDurationMonths ?? 6;
+        const monthlyHolding = flip.monthlyHoldingCostZAR ?? 0;
+        const totalHoldingCost = holdingMonths * monthlyHolding;
+        const totalCostBasis =
+          (flip.purchasePriceZAR || 0) +
+          (flip.acquisitionCostsZAR || 0) +
+          totalBoqActual +
+          totalHoldingCost;
+
+        const newRentalId = `rental-brrrr-${Date.now()}`;
+        const isHouse = flip.propertyType === 'Freehold House';
+        const initialRent = params.initialGrossRentZAR;
+        const commPercent = params.agencyCommissionPercent ?? 8.0;
+        const isAgency = params.managementType !== 'Self-Managed';
+        const agentFee = isAgency ? Math.round(initialRent * (commPercent / 100) * 1.15) : 0;
+        const marketVal = params.marketValuationZAR || flip.targetExitPriceZAR || totalCostBasis;
+
+        const newRental: RentalProperty = {
+          id: newRentalId,
+          title: flip.title.replace(/\s*\(Flip\)$/i, '') + ' (Rental)',
+          address: flip.address,
+          city: flip.city,
+          propertyType: flip.propertyType || 'Freehold House',
+          agmDate: flip.agmDate,
+          marketValueZAR: marketVal,
+          purchasePriceZAR: totalCostBasis,
+          purchaseDate: flip.purchaseDate || new Date().toISOString().split('T')[0],
+          outstandingBondBalanceZAR: flip.monthlyBondPaymentZAR ? Math.round(flip.monthlyBondPaymentZAR / 0.0108) : 0,
+          bondInterestRatePercent: 11.75,
+          monthlyBondPaymentZAR: flip.monthlyBondPaymentZAR || 0,
+          bondPaymentEffectiveDate: flip.bondPaymentEffectiveDate,
+          tenantName: params.tenantName || 'Tenant Pending Placement',
+          tenantPhone: params.tenantPhone || '+27 —',
+          tenantEmail: params.tenantEmail || 'pending@tenant.co.za',
+          leaseStartDate: params.leaseStartDate || new Date().toISOString().split('T')[0],
+          leaseEndDate:
+            params.leaseEndDate ||
+            new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+          depositHeldZAR: params.depositHeldZAR ?? initialRent * 2,
+          annualEscalationPercent: 7.0,
+          managementType: params.managementType || 'Agency',
+          agencyName: params.agencyName || 'Pam Golding Rentals',
+          agencyCommissionPercent: commPercent,
+          agencyVatApplicable: true,
+          monthlyGrossRentZAR: initialRent,
+          monthlyLeviesZAR: isHouse ? 0 : (flip.monthlyLeviesZAR || 0),
+          monthlyRatesTaxesZAR: flip.monthlyRatesTaxesZAR || 0,
+          monthlyAgentFeeZAR: agentFee,
+          monthlyMaintenanceReserveZAR: 500,
+          maintenanceHistory: [],
+          status: params.tenantName && params.tenantName !== 'Tenant Pending Placement' ? 'Occupied' : 'Vacant',
+          cocChecklist: flip.cocChecklist ? { ...flip.cocChecklist } : undefined,
+          driveVault: flip.driveVault ? { ...flip.driveVault } : undefined,
+          convertedFromFlipId: flip.id,
+          isBrrrrProperty: true,
+          totalEquityExtractedZAR: 0,
+          refinanceHistory: [],
+        };
+
+        const updatedFlips = get().flips.map((f) =>
+          f.id === flip.id
+            ? {
+                ...f,
+                status: 'Completed' as const,
+                currentPhase: 'Sold / Awaiting Transfer' as const,
+                exitStrategy: 'BRRRR' as const,
+                exitNotes: params.notes || 'Converted to Rental (BRRRR Lifecycle)',
+                convertedToRentalId: newRentalId,
+                actualSalePriceZAR: undefined,
+                netCashProceedsZAR: 0,
+                soldDate: new Date().toISOString().split('T')[0],
+              }
+            : f
+        );
+
+        const updatedFunding = get().funding.map((fnd) => {
+          if (fnd.linkedDealId === flip.id || (flip.linkedFundingIds || []).includes(fnd.id)) {
+            return {
+              ...fnd,
+              linkedDealId: newRental.id,
+              linkedDealName: newRental.title,
+            };
+          }
+          return fnd;
+        });
+
+        let updatedTasks = get().tasks;
+        if (newRental.agmDate) {
+          updatedTasks = syncAgmReminderTask(
+            updatedTasks,
+            'rental',
+            newRental.id,
+            newRental.title,
+            newRental.agmDate
+          );
+        }
+
+        set({
+          rentals: [newRental, ...get().rentals],
+          flips: updatedFlips,
+          funding: updatedFunding,
+          tasks: updatedTasks,
+        });
+
+        return newRental;
+      },
 
       // Funding
       addFunding: (source) =>
@@ -1031,8 +1195,9 @@ export function computePortfolioSummary(state: {
     return sum + profit;
   }, 0);
 
-  // Realized profit on completed/sold flips
+  // Realized profit on completed/sold flips (excludes BRRRR converted rentals)
   const totalRealizedFlipProfits = completedFlips.reduce((sum, f) => {
+    if (f.exitStrategy === 'BRRRR') return sum;
     const totalBoqActual = (f.boq || []).reduce(
       (bSum, b) => bSum + (b.actualCostZAR || b.baselineTotalZAR || 0),
       0

@@ -31,6 +31,7 @@ import {
   Coins,
   Edit3,
   FileSpreadsheet,
+  ArrowRightLeft,
 } from 'lucide-react';
 import Link from 'next/link';
 import { exportFlipBOQCSV } from '@/lib/export/csvExport';
@@ -46,6 +47,7 @@ export default function FlipsManagerPage() {
   const deleteBOQItem = usePortfolioStore((state) => state.deleteBOQItem);
   const markFlipAsCompleted = usePortfolioStore((state) => state.markFlipAsCompleted);
   const reopenFlip = usePortfolioStore((state) => state.reopenFlip);
+  const convertFlipToRental = usePortfolioStore((state) => state.convertFlipToRental);
   const suppliers = usePortfolioStore((state) => state.suppliers);
   const addSupplier = usePortfolioStore((state) => state.addSupplier);
   const deleteSupplier = usePortfolioStore((state) => state.deleteSupplier);
@@ -72,6 +74,19 @@ export default function FlipsManagerPage() {
   const [showSupplierModal, setShowSupplierModal] = useState(false);
   const [showExitModal, setShowExitModal] = useState(false);
   const [showFundingModal, setShowFundingModal] = useState(false);
+  const [showConvertModal, setShowConvertModal] = useState(false);
+
+  // Convert Flip to Rental (BRRRR) Form State
+  const [convertGrossRent, setConvertGrossRent] = useState<number>(18000);
+  const [convertMarketValue, setConvertMarketValue] = useState<number>(0);
+  const [convertTenantName, setConvertTenantName] = useState('Tenant Pending Placement');
+  const [convertTenantPhone, setConvertTenantPhone] = useState('+27 —');
+  const [convertTenantEmail, setConvertTenantEmail] = useState('pending@tenant.co.za');
+  const [convertManagementType, setConvertManagementType] = useState<'Agency' | 'Self-Managed'>('Agency');
+  const [convertAgencyName, setConvertAgencyName] = useState('Pam Golding Rentals');
+  const [convertAgencyCommission, setConvertAgencyCommission] = useState<number>(8.0);
+  const [convertNotes, setConvertNotes] = useState('');
+  const [convertedRentalId, setConvertedRentalId] = useState<string | null>(null);
 
   // Edit Flip Modal Form State
   const [editFlipTitle, setEditFlipTitle] = useState('');
@@ -348,6 +363,42 @@ export default function FlipsManagerPage() {
   const projectedNetProfit = (activeFlip?.targetExitPriceZAR || 0) - totalAllInCost;
   const projectedROI = totalAllInCost > 0 ? (projectedNetProfit / totalAllInCost) * 100 : 0;
 
+  const openConvertModal = () => {
+    if (!activeFlip) return;
+    const defaultValuation = activeFlip.targetExitPriceZAR || totalAllInCost;
+    const estimatedRent = Math.round((defaultValuation * 0.008) / 500) * 500 || 18000;
+    setConvertMarketValue(defaultValuation);
+    setConvertGrossRent(estimatedRent);
+    setConvertTenantName('Tenant Pending Placement');
+    setConvertTenantPhone('+27 —');
+    setConvertTenantEmail('pending@tenant.co.za');
+    setConvertManagementType('Agency');
+    setConvertAgencyName('Pam Golding Rentals');
+    setConvertAgencyCommission(8.0);
+    setConvertNotes(`Converted from Flip "${activeFlip.title}" via BRRRR timeline`);
+    setShowConvertModal(true);
+  };
+
+  const handleConvertFlip = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!activeFlip) return;
+    const created = convertFlipToRental({
+      flipId: activeFlip.id,
+      initialGrossRentZAR: Number(convertGrossRent),
+      marketValuationZAR: Number(convertMarketValue),
+      tenantName: convertTenantName.trim() || undefined,
+      tenantPhone: convertTenantPhone.trim() || undefined,
+      tenantEmail: convertTenantEmail.trim() || undefined,
+      managementType: convertManagementType,
+      agencyName: convertManagementType === 'Agency' ? convertAgencyName.trim() : undefined,
+      agencyCommissionPercent: convertManagementType === 'Agency' ? Number(convertAgencyCommission) : 0,
+      notes: convertNotes.trim() || undefined,
+    });
+    setShowConvertModal(false);
+    setConvertedRentalId(created.id);
+    setViewTab('archive');
+  };
+
   // Linked Funding for this flip
   const linkedFunding = funding.filter(
     (f) => f.linkedDealId === activeFlip?.id || (activeFlip?.linkedFundingIds || []).includes(f.id)
@@ -584,6 +635,16 @@ export default function FlipsManagerPage() {
                     >
                       <CheckCircle2 className="w-4 h-4 text-emerald-200" />
                       <span>Mark as Flipped / Sold</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={openConvertModal}
+                      className="inline-flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs px-3.5 py-2 rounded-lg shadow-sm transition-all cursor-pointer"
+                      title="Convert this flip project to a long-term rental property under BRRRR strategy"
+                    >
+                      <ArrowRightLeft className="w-4 h-4 text-indigo-200" />
+                      <span>Convert to Rental</span>
                     </button>
                   </div>
                 </div>
@@ -1050,12 +1111,42 @@ export default function FlipsManagerPage() {
               </span>
             </div>
 
+            {convertedRentalId && (
+              <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-4 flex items-center justify-between gap-3 animate-in fade-in">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-full bg-indigo-600 text-white flex items-center justify-center font-bold">
+                    ✓
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-bold text-indigo-950">Property Successfully Converted to Rental!</h4>
+                    <p className="text-[11px] text-indigo-700">Initial capital basis and compliance documents transferred to the Rentals module.</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Link
+                    href="/rentals"
+                    className="inline-flex items-center gap-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs px-3.5 py-1.5 rounded-lg shadow-xs transition-colors"
+                  >
+                    <span>Go to Rentals</span>
+                    <ChevronRight className="w-3.5 h-3.5" />
+                  </Link>
+                  <button
+                    type="button"
+                    onClick={() => setConvertedRentalId(null)}
+                    className="text-indigo-400 hover:text-indigo-700 text-xs px-1.5 py-1 cursor-pointer"
+                  >
+                    ✕
+                  </button>
+                </div>
+              </div>
+            )}
+
             {completedFlips.length === 0 ? (
               <div className="bg-white rounded-xl p-12 text-center border border-slate-200">
                 <Archive className="w-10 h-10 text-slate-300 mx-auto mb-3" />
                 <h4 className="text-sm font-bold text-slate-800">No completed flips archived yet</h4>
                 <p className="text-xs text-slate-400 mt-1 max-w-sm mx-auto">
-                  When you complete a renovation and sale, click &quot;Mark as Flipped / Sold&quot; to record your realized figures and archive the deal here.
+                  When you complete a renovation and sale or convert to rental, click &quot;Mark as Flipped / Sold&quot; or &quot;Convert to Rental&quot; to archive the deal here.
                 </p>
                 <button
                   type="button"
@@ -1069,6 +1160,7 @@ export default function FlipsManagerPage() {
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                 {completedFlips.map((flip) => {
+                  const isBrrrr = flip.exitStrategy === 'BRRRR';
                   const totalBoqActual = (flip.boq || []).reduce(
                     (sum, b) => sum + (b.actualCostZAR || b.baselineTotalZAR || 0),
                     0
@@ -1077,9 +1169,14 @@ export default function FlipsManagerPage() {
                     (flip.purchasePriceZAR || 0) +
                     (flip.acquisitionCostsZAR || 0) +
                     totalBoqActual;
+                  const holdingMonths = flip.estimatedDurationMonths ?? 6;
+                  const totalHoldingCost = holdingMonths * (flip.monthlyHoldingCostZAR ?? 0);
+                  const fullCostBasis = costBasis + totalHoldingCost;
                   const salePrice = flip.actualSalePriceZAR || flip.targetExitPriceZAR || 0;
                   const realizedNetProfit = salePrice - costBasis;
                   const realizedROI = costBasis > 0 ? (realizedNetProfit / costBasis) * 100 : 0;
+                  const brrrrTargetValuation = flip.targetExitPriceZAR || fullCostBasis;
+                  const brrrrEquityCreated = Math.max(0, brrrrTargetValuation - fullCostBasis);
 
                   return (
                     <div
@@ -1091,52 +1188,96 @@ export default function FlipsManagerPage() {
                           <div>
                             <div className="flex items-center gap-2 mb-1.5">
                               <PropertyTypeBadge type={flip.propertyType} />
-                              <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">
-                                <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-                                <span>FLIPPED / SOLD</span>
-                              </span>
+                              {isBrrrr ? (
+                                <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-indigo-100 text-indigo-800 border border-indigo-200">
+                                  <ArrowRightLeft className="w-3 h-3 text-indigo-600" />
+                                  <span>RETAINED AS RENTAL (BRRRR)</span>
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">
+                                  <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                                  <span>FLIPPED / SOLD</span>
+                                </span>
+                              )}
                             </div>
                             <h4 className="font-bold text-slate-900 text-base">{flip.title}</h4>
                             <p className="text-xs text-slate-500">{flip.address}, {flip.city}</p>
                           </div>
                           {flip.soldDate && (
                             <span className="text-[11px] font-semibold text-slate-500 bg-slate-100 px-2.5 py-1 rounded-lg shrink-0">
-                              Sold {formatDate(flip.soldDate)}
+                              {isBrrrr ? 'Converted' : 'Sold'} {formatDate(flip.soldDate)}
                             </span>
                           )}
                         </div>
 
-                        {/* Financial Realized Highlights */}
-                        <div className="grid grid-cols-3 gap-2 p-3 bg-slate-50 rounded-lg border border-slate-100 text-center">
-                          <div>
-                            <span className="text-[10px] text-slate-400 block uppercase font-semibold">Realized Sale</span>
-                            <strong className="text-xs font-bold text-slate-900">{formatZAR(salePrice)}</strong>
+                        {/* Financial Highlights */}
+                        {isBrrrr ? (
+                          <div className="grid grid-cols-3 gap-2 p-3 bg-indigo-50/50 rounded-lg border border-indigo-100 text-center">
+                            <div>
+                              <span className="text-[10px] text-slate-400 block uppercase font-semibold">Accumulated Basis</span>
+                              <strong className="text-xs font-bold text-slate-900">{formatZAR(fullCostBasis)}</strong>
+                            </div>
+                            <div>
+                              <span className="text-[10px] text-slate-400 block uppercase font-semibold">Target Valuation</span>
+                              <strong className="text-xs font-bold text-slate-700">{formatZAR(brrrrTargetValuation)}</strong>
+                            </div>
+                            <div>
+                              <span className="text-[10px] text-slate-400 block uppercase font-semibold">Equity Created</span>
+                              <strong className="text-xs font-extrabold text-indigo-700">+{formatZAR(brrrrEquityCreated)}</strong>
+                            </div>
                           </div>
-                          <div>
-                            <span className="text-[10px] text-slate-400 block uppercase font-semibold">Total Cost Basis</span>
-                            <strong className="text-xs font-bold text-slate-700">{formatZAR(costBasis)}</strong>
+                        ) : (
+                          <div className="grid grid-cols-3 gap-2 p-3 bg-slate-50 rounded-lg border border-slate-100 text-center">
+                            <div>
+                              <span className="text-[10px] text-slate-400 block uppercase font-semibold">Realized Sale</span>
+                              <strong className="text-xs font-bold text-slate-900">{formatZAR(salePrice)}</strong>
+                            </div>
+                            <div>
+                              <span className="text-[10px] text-slate-400 block uppercase font-semibold">Total Cost Basis</span>
+                              <strong className="text-xs font-bold text-slate-700">{formatZAR(costBasis)}</strong>
+                            </div>
+                            <div>
+                              <span className="text-[10px] text-slate-400 block uppercase font-semibold">Realized Profit</span>
+                              <strong className={`text-xs font-extrabold ${realizedNetProfit >= 0 ? 'text-emerald-700' : 'text-rose-600'}`}>
+                                {realizedNetProfit >= 0 ? `+${formatZAR(realizedNetProfit)}` : formatZAR(realizedNetProfit)}
+                              </strong>
+                            </div>
                           </div>
-                          <div>
-                            <span className="text-[10px] text-slate-400 block uppercase font-semibold">Realized Profit</span>
-                            <strong className={`text-xs font-extrabold ${realizedNetProfit >= 0 ? 'text-emerald-700' : 'text-rose-600'}`}>
-                              {realizedNetProfit >= 0 ? `+${formatZAR(realizedNetProfit)}` : formatZAR(realizedNetProfit)}
+                        )}
+
+                        {isBrrrr ? (
+                          <div className="p-3 bg-indigo-50/70 rounded-lg border border-indigo-200 flex items-center justify-between text-xs">
+                            <div>
+                              <span className="text-[10px] font-bold text-indigo-900 uppercase block">
+                                Active in Rental Portfolio
+                              </span>
+                              <span className="text-[11px] text-indigo-700">
+                                Eligible for Refinance & equity pull-out in Rentals module
+                              </span>
+                            </div>
+                            <Link
+                              href="/rentals"
+                              className="inline-flex items-center gap-1 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-bold text-xs transition-colors shrink-0 shadow-2xs"
+                            >
+                              <span>View in Rentals</span>
+                              <ChevronRight className="w-3.5 h-3.5" />
+                            </Link>
+                          </div>
+                        ) : (
+                          <div className="p-3 bg-emerald-50/70 rounded-lg border border-emerald-200 flex items-center justify-between text-xs">
+                            <div>
+                              <span className="text-[10px] font-bold text-emerald-800 uppercase block">
+                                Liquid Cash Released to Seed Capital
+                              </span>
+                              <span className="text-[11px] text-emerald-700">
+                                Credited to Reserve for next acquisition
+                              </span>
+                            </div>
+                            <strong className="text-sm font-black text-emerald-900">
+                              {formatZAR(flip.netCashProceedsZAR || 0)}
                             </strong>
                           </div>
-                        </div>
-
-                        <div className="p-3 bg-emerald-50/70 rounded-lg border border-emerald-200 flex items-center justify-between text-xs">
-                          <div>
-                            <span className="text-[10px] font-bold text-emerald-800 uppercase block">
-                              Liquid Cash Released to Seed Capital
-                            </span>
-                            <span className="text-[11px] text-emerald-700">
-                              Credited to Reserve for next acquisition
-                            </span>
-                          </div>
-                          <strong className="text-sm font-black text-emerald-900">
-                            {formatZAR(flip.netCashProceedsZAR || 0)}
-                          </strong>
-                        </div>
+                        )}
 
                         {flip.exitNotes && (
                           <div className="text-xs text-slate-600 bg-slate-50 p-2.5 rounded-lg border border-slate-200">
@@ -1148,12 +1289,19 @@ export default function FlipsManagerPage() {
 
                       <div className="p-4 bg-slate-50 border-t border-slate-100 flex items-center justify-between">
                         <div className="text-xs text-slate-500">
-                          Final Realized ROI: <strong className="text-slate-900 font-bold">{formatPercent(realizedROI)}</strong>
+                          {isBrrrr ? (
+                            <span>Strategy: <strong className="text-indigo-800 font-bold">BRRRR (Rent & Refinance)</strong></span>
+                          ) : (
+                            <span>Final Realized ROI: <strong className="text-slate-900 font-bold">{formatPercent(realizedROI)}</strong></span>
+                          )}
                         </div>
                         <button
                           type="button"
                           onClick={() => {
-                            if (confirm(`Reopen flip "${flip.title}" back to active pipeline? This will revert the credited cash of ${formatZAR(flip.netCashProceedsZAR || 0)} from Cash in Reserve.`)) {
+                            if (confirm(isBrrrr
+                              ? `Reopen flip "${flip.title}" back to active pipeline? This will remove the linked rental property from your portfolio.`
+                              : `Reopen flip "${flip.title}" back to active pipeline? This will revert the credited cash of ${formatZAR(flip.netCashProceedsZAR || 0)} from Cash in Reserve.`
+                            )) {
                               reopenFlip(flip.id);
                               setSelectedFlipId(flip.id);
                               setViewTab('active');
@@ -1295,6 +1443,226 @@ export default function FlipsManagerPage() {
                 >
                   <CheckCircle2 className="w-4 h-4" />
                   <span>Confirm Sale & Credit Reserve</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Convert Flip to Rental (BRRRR Transition) Modal */}
+      {showConvertModal && activeFlip && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 z-50 overflow-y-auto">
+          <div className="bg-white rounded-xl max-w-xl w-full p-6 shadow-xl border border-slate-200 animate-in fade-in my-8 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between pb-3 mb-4 border-b border-slate-100">
+              <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                <ArrowRightLeft className="w-5 h-5 text-indigo-600" />
+                <span>Convert to Rental (BRRRR Transition)</span>
+              </h3>
+              <button
+                type="button"
+                onClick={() => setShowConvertModal(false)}
+                className="text-slate-400 hover:text-slate-700 font-bold cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-500 mb-4">
+              Transition <strong>{activeFlip.title}</strong> into a long-term cashflowing rental asset. This marks the Flip phase as Completed, copies over all CoCs and drive documents, and passes the <strong>total accumulated cost</strong> (Purchase + BOQ + Carrying Costs) as the rental&apos;s initial capital basis.
+            </p>
+
+            <form onSubmit={handleConvertFlip} className="space-y-4 text-xs">
+              {/* Cost Basis Breakdown Card */}
+              <div className="p-3.5 bg-indigo-50/60 rounded-xl border border-indigo-100 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-bold text-indigo-900 uppercase tracking-wide">
+                    Initial Capital Basis Breakdown
+                  </span>
+                  <span className="text-[10px] bg-indigo-200/60 text-indigo-900 font-semibold px-2 py-0.5 rounded-full">
+                    BRRRR Step 3: Rent
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1 text-slate-700">
+                  <div className="bg-white p-2 rounded-lg border border-indigo-100/80">
+                    <span className="text-[10px] text-slate-400 block font-medium">Purchase + Duty</span>
+                    <strong className="text-xs text-slate-900">{formatZAR(activeFlip.purchasePriceZAR + activeFlip.acquisitionCostsZAR)}</strong>
+                  </div>
+                  <div className="bg-white p-2 rounded-lg border border-indigo-100/80">
+                    <span className="text-[10px] text-slate-400 block font-medium">BOQ Rehab Spend</span>
+                    <strong className="text-xs text-indigo-700">{formatZAR(totalBOQActual)}</strong>
+                  </div>
+                  <div className="bg-white p-2 rounded-lg border border-indigo-100/80">
+                    <span className="text-[10px] text-slate-400 block font-medium">Holding ({flipHoldingMonths} mos)</span>
+                    <strong className="text-xs text-amber-700">{formatZAR(totalHoldingCost)}</strong>
+                  </div>
+                  <div className="bg-indigo-600 text-white p-2 rounded-lg shadow-2xs">
+                    <span className="text-[10px] text-indigo-100 block font-medium">Total Capital Basis</span>
+                    <strong className="text-xs text-white font-extrabold">{formatZAR(totalAllInCost)}</strong>
+                  </div>
+                </div>
+              </div>
+
+              {/* Target Valuation & Gross Rent Inputs */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">
+                    Market Valuation on Handover (ZAR) *
+                  </label>
+                  <input
+                    type="number"
+                    required
+                    min="1"
+                    step="10000"
+                    value={convertMarketValue || ''}
+                    onChange={(e) => setConvertMarketValue(Number(e.target.value))}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg font-bold text-slate-900 text-sm focus:ring-1 focus:ring-indigo-500"
+                    placeholder="e.g. 3200000"
+                  />
+                  <span className="text-[10px] text-slate-400 mt-0.5 block">
+                    Target exit valuation from flip analysis
+                  </span>
+                </div>
+
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block font-semibold text-slate-700">
+                      Estimated Monthly Gross Rent (ZAR) *
+                    </label>
+                    {convertGrossRent > 0 && totalAllInCost > 0 && (
+                      <span className="text-[10px] font-bold text-emerald-600">
+                        {((convertGrossRent * 12 / totalAllInCost) * 100).toFixed(1)}% Gross Yield
+                      </span>
+                    )}
+                  </div>
+                  <input
+                    type="number"
+                    required
+                    min="1000"
+                    step="500"
+                    value={convertGrossRent || ''}
+                    onChange={(e) => setConvertGrossRent(Number(e.target.value))}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg font-bold text-emerald-700 text-sm focus:ring-1 focus:ring-emerald-500"
+                    placeholder="e.g. 24000"
+                  />
+                  <span className="text-[10px] text-slate-400 mt-0.5 block">
+                    Starting rental rate for incoming lease
+                  </span>
+                </div>
+              </div>
+
+              {/* Tenant Details */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Tenant Name</label>
+                  <input
+                    type="text"
+                    value={convertTenantName}
+                    onChange={(e) => setConvertTenantName(e.target.value)}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg"
+                    placeholder="Tenant Pending Placement"
+                  />
+                </div>
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Tenant Phone</label>
+                  <input
+                    type="text"
+                    value={convertTenantPhone}
+                    onChange={(e) => setConvertTenantPhone(e.target.value)}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg"
+                    placeholder="+27 82 000 0000"
+                  />
+                </div>
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Tenant Email</label>
+                  <input
+                    type="email"
+                    value={convertTenantEmail}
+                    onChange={(e) => setConvertTenantEmail(e.target.value)}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg"
+                    placeholder="tenant@email.co.za"
+                  />
+                </div>
+              </div>
+
+              {/* Management Model */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Management Type</label>
+                  <select
+                    value={convertManagementType}
+                    onChange={(e) => setConvertManagementType(e.target.value as any)}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg"
+                  >
+                    <option value="Agency">Agency Managed</option>
+                    <option value="Self-Managed">Self-Managed (0%)</option>
+                  </select>
+                </div>
+                {convertManagementType === 'Agency' && (
+                  <>
+                    <div>
+                      <label className="block font-semibold text-slate-700 mb-1">Agency Name</label>
+                      <input
+                        type="text"
+                        value={convertAgencyName}
+                        onChange={(e) => setConvertAgencyName(e.target.value)}
+                        className="w-full px-3 py-2 border border-slate-300 rounded-lg"
+                        placeholder="Pam Golding Sandton"
+                      />
+                    </div>
+                    <div>
+                      <label className="block font-semibold text-slate-700 mb-1">Commission % (excl. VAT)</label>
+                      <input
+                        type="number"
+                        step="0.5"
+                        min="0"
+                        max="20"
+                        value={convertAgencyCommission}
+                        onChange={(e) => setConvertAgencyCommission(Number(e.target.value))}
+                        className="w-full px-3 py-2 border border-slate-300 rounded-lg"
+                      />
+                    </div>
+                  </>
+                )}
+              </div>
+
+              {/* Transition Notes */}
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">Transition Notes (Optional)</label>
+                <input
+                  type="text"
+                  value={convertNotes}
+                  onChange={(e) => setConvertNotes(e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg"
+                  placeholder="e.g. Completed luxury finishes, placed executive tenant at R24k/mo"
+                />
+              </div>
+
+              <div className="p-3 bg-amber-50 rounded-lg border border-amber-200 text-amber-900 text-[11px] flex items-start gap-2">
+                <Sparkles className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                <div>
+                  <span className="font-bold">Next BRRRR Step: Refinance & Repeat</span>
+                  <p className="text-amber-800 mt-0.5">
+                    Once the tenant is placed and rental income is seasoned, go to the <strong>Rentals</strong> module and click <strong>&quot;Refinance / Pull Out Equity&quot;</strong> to recycle your capital into your Seed Capital reserve for the next property.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-200">
+                <button
+                  type="button"
+                  onClick={() => setShowConvertModal(false)}
+                  className="px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50 font-semibold cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-semibold flex items-center gap-1.5 cursor-pointer shadow-sm"
+                >
+                  <ArrowRightLeft className="w-4 h-4 text-indigo-200" />
+                  <span>Finalize Conversion to Rental</span>
                 </button>
               </div>
             </form>

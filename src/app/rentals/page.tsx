@@ -37,6 +37,9 @@ import {
   ChevronUp,
   TrendingUp,
   DollarSign,
+  ArrowUpRight,
+  ArrowRightLeft,
+  History,
 } from 'lucide-react';
 import { exportRentalsCSV } from '@/lib/export/csvExport';
 import ImportDropdown from '@/components/common/ImportDropdown';
@@ -217,6 +220,7 @@ export default function RentalPortfolioPage() {
   const addMaintenanceLog = usePortfolioStore((state) => state.addMaintenanceLog);
   const markRentalAsSold = usePortfolioStore((state) => state.markRentalAsSold);
   const reopenRental = usePortfolioStore((state) => state.reopenRental);
+  const refinanceRental = usePortfolioStore((state) => state.refinanceRental);
   const reconcileImportedRentals = usePortfolioStore((state) => state.reconcileImportedRentals);
   const rentalForecastView = usePortfolioStore((state) => state.rentalForecastView);
   const setRentalForecastView = usePortfolioStore((state) => state.setRentalForecastView);
@@ -226,6 +230,21 @@ export default function RentalPortfolioPage() {
   const [viewTab, setViewTab] = useState<'active' | 'archive'>('active');
   const activeRentals = rentals.filter((r) => r.status !== 'Sold');
   const soldRentals = rentals.filter((r) => r.status === 'Sold');
+
+  // Refinance & Pull Out Equity (BRRRR) Modal State
+  const [showRefinanceModal, setShowRefinanceModal] = useState(false);
+  const [selectedRentalForRefinance, setSelectedRentalForRefinance] = useState<RentalProperty | null>(null);
+  const [refinanceNewValuation, setRefinanceNewValuation] = useState<number>(0);
+  const [refinanceNewBondPayment, setRefinanceNewBondPayment] = useState<number>(0);
+  const [refinanceCashPulledOut, setRefinanceCashPulledOut] = useState<number>(0);
+  const [refinanceNewBondBalance, setRefinanceNewBondBalance] = useState<number>(0);
+  const [refinanceDate, setRefinanceDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [refinanceNotes, setRefinanceNotes] = useState<string>('');
+  const [refinanceSuccessBanner, setRefinanceSuccessBanner] = useState<{ amount: number; propertyTitle: string } | null>(null);
+
+  // Selected property for viewing refinance audit history modal
+  const [showAuditHistoryModal, setShowAuditHistoryModal] = useState(false);
+  const [selectedRentalForAudit, setSelectedRentalForAudit] = useState<RentalProperty | null>(null);
 
   // Per-card 20-Year forecast accordion expansion
   const [expandedForecasts, setExpandedForecasts] = useState<Record<string, boolean>>({});
@@ -337,6 +356,46 @@ export default function RentalPortfolioPage() {
       bondRevisionNote: pmtRevisionNote.trim() || undefined,
     });
     setPmtTargetProperty(null);
+  };
+
+  const handleOpenRefinance = (property: RentalProperty) => {
+    setSelectedRentalForRefinance(property);
+    const currentVal = property.marketValueZAR || property.purchasePriceZAR;
+    const estNewVal = Math.round((currentVal * 1.15) / 50000) * 50000;
+    const currentBond = property.outstandingBondBalanceZAR || 0;
+    // Target 70% LTV bond
+    const targetBond = Math.round((estNewVal * 0.7) / 10000) * 10000;
+    const defaultCashOut = Math.max(0, targetBond - currentBond);
+    const newBond = currentBond + defaultCashOut;
+    const estPmt = calculateMonthlyBondRepayment(newBond, property.bondInterestRatePercent || 11.5, 20);
+
+    setRefinanceNewValuation(estNewVal);
+    setRefinanceCashPulledOut(defaultCashOut);
+    setRefinanceNewBondBalance(newBond);
+    setRefinanceNewBondPayment(estPmt);
+    setRefinanceDate(new Date().toISOString().split('T')[0]);
+    setRefinanceNotes(`BRRRR Refinance: Released R ${defaultCashOut.toLocaleString('en-ZA')} equity at 70% LTV`);
+    setShowRefinanceModal(true);
+  };
+
+  const handleSaveRefinance = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedRentalForRefinance) return;
+    refinanceRental({
+      rentalId: selectedRentalForRefinance.id,
+      newBankValuationZAR: Number(refinanceNewValuation),
+      newMonthlyBondPaymentZAR: Number(refinanceNewBondPayment),
+      cashEquityPulledOutZAR: Number(refinanceCashPulledOut),
+      newBondBalanceZAR: Number(refinanceNewBondBalance),
+      refinanceDate,
+      notes: refinanceNotes.trim() || undefined,
+    });
+    setRefinanceSuccessBanner({
+      amount: Number(refinanceCashPulledOut),
+      propertyTitle: selectedRentalForRefinance.title,
+    });
+    setShowRefinanceModal(false);
+    setSelectedRentalForRefinance(null);
   };
 
   const handleOpenAdd = () => {
@@ -659,6 +718,31 @@ export default function RentalPortfolioPage() {
         {/* ACTIVE PORTFOLIO VIEW */}
         {viewTab === 'active' && (
           <>
+            {refinanceSuccessBanner && (
+              <div className="bg-purple-50 border border-purple-200 rounded-xl p-4 flex items-center justify-between gap-3 animate-in fade-in">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-full bg-purple-600 text-white flex items-center justify-center font-bold">
+                    ✓
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-bold text-purple-950">
+                      Equity Pulled Out & Deposited into Seed Capital!
+                    </h4>
+                    <p className="text-[11px] text-purple-700">
+                      <strong>{formatZAR(refinanceSuccessBanner.amount)}</strong> cash equity from {refinanceSuccessBanner.propertyTitle} is now instantly available in your global Liquid Capital Reserve for your next acquisition.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setRefinanceSuccessBanner(null)}
+                  className="text-purple-400 hover:text-purple-700 text-xs px-2 py-1 cursor-pointer"
+                >
+                  ✕
+                </button>
+              </div>
+            )}
+
             {activeRentals.length === 0 ? (
               <div className="bg-white rounded-xl p-12 text-center border border-slate-200">
                 <Building2 className="w-8 h-8 text-slate-400 mx-auto mb-3" />
@@ -698,6 +782,26 @@ export default function RentalPortfolioPage() {
                               <div className="flex items-center gap-1.5 flex-wrap mb-1.5">
                                 <PropertyTypeBadge type={property.propertyType} />
                                 <AgmDateChip agmDate={property.agmDate} />
+                                {property.isBrrrrProperty && (
+                                  <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-800 border border-indigo-200">
+                                    <ArrowRightLeft className="w-2.5 h-2.5 text-indigo-600" />
+                                    <span>BRRRR Asset</span>
+                                  </span>
+                                )}
+                                {(property.totalEquityExtractedZAR || 0) > 0 && (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setSelectedRentalForAudit(property);
+                                      setShowAuditHistoryModal(true);
+                                    }}
+                                    className="inline-flex items-center gap-1 text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-purple-100 text-purple-900 border border-purple-200 hover:bg-purple-200 transition-colors cursor-pointer"
+                                    title="View timestamped refinance and equity extraction history"
+                                  >
+                                    <Sparkles className="w-2.5 h-2.5 text-purple-600" />
+                                    <span>Equity Recycled: {formatZAR(property.totalEquityExtractedZAR || 0, { compact: true })}</span>
+                                  </button>
+                                )}
                               </div>
                               <h3 className="font-bold text-sm text-slate-900">{property.title}</h3>
                               <p className="text-xs text-slate-500 mt-0.5">{property.address}, {property.city}</p>
@@ -919,6 +1023,15 @@ export default function RentalPortfolioPage() {
                                     <Calculator className="w-3 h-3 text-indigo-600" />
                                     <span>SARB PMT</span>
                                   </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleOpenRefinance(property)}
+                                    className="inline-flex items-center gap-1 text-[10px] font-bold text-purple-700 hover:text-purple-900 bg-white hover:bg-purple-50 px-1.5 py-0.5 rounded border border-purple-200 shadow-2xs transition-colors cursor-pointer"
+                                    title="BRRRR: Refinance and pull out equity into seed capital"
+                                  >
+                                    <ArrowUpRight className="w-3 h-3 text-purple-600" />
+                                    <span>Refinance</span>
+                                  </button>
                                 </div>
                                 <InlineEditableAmount
                                   value={property.monthlyBondPaymentZAR}
@@ -1111,7 +1224,16 @@ export default function RentalPortfolioPage() {
                           <span>Maintenance ({property.maintenanceHistory?.length || 0})</span>
                         </button>
 
-                        <div className="flex items-center gap-1.5">
+                        <div className="flex items-center gap-1.5 flex-wrap justify-end">
+                          <button
+                            type="button"
+                            onClick={() => handleOpenRefinance(property)}
+                            className="inline-flex items-center gap-1 text-[11px] font-bold text-purple-700 hover:text-purple-900 bg-purple-50 hover:bg-purple-100 px-2.5 py-1 rounded-md border border-purple-200 transition-colors cursor-pointer"
+                            title="BRRRR: Refinance and pull out equity into seed capital pool"
+                          >
+                            <ArrowUpRight className="w-3 h-3 text-purple-600" />
+                            <span>Refinance</span>
+                          </button>
                           <button
                             type="button"
                             onClick={() => handleOpenExit(property)}
@@ -1416,6 +1538,296 @@ export default function RentalPortfolioPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Refinance & Pull Out Equity (BRRRR) Modal */}
+      {showRefinanceModal && selectedRentalForRefinance && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 z-50 overflow-y-auto">
+          <div className="bg-white rounded-xl max-w-lg w-full p-6 shadow-xl border border-slate-200 animate-in fade-in my-8 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between pb-3 mb-4 border-b border-slate-100">
+              <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                <ArrowUpRight className="w-5 h-5 text-purple-600" />
+                <span>Refinance & Pull Out Equity (BRRRR)</span>
+              </h3>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowRefinanceModal(false);
+                  setSelectedRentalForRefinance(null);
+                }}
+                className="text-slate-400 hover:text-slate-700 font-bold cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-500 mb-4">
+              Refinance <strong>{selectedRentalForRefinance.title}</strong> based on its updated bank valuation. The cash equity pulled out is immediately credited into your <strong>Liquid Capital Reserve (Seed Capital pool)</strong> to acquire your next property.
+            </p>
+
+            <form onSubmit={handleSaveRefinance} className="space-y-4 text-xs">
+              {/* Previous Financial Baseline */}
+              <div className="p-3 bg-purple-50/60 rounded-xl border border-purple-100 grid grid-cols-3 gap-2 text-center">
+                <div>
+                  <span className="text-[10px] text-slate-400 uppercase font-semibold block">Current Market Value</span>
+                  <strong className="text-xs text-slate-800">{formatZAR(selectedRentalForRefinance.marketValueZAR)}</strong>
+                </div>
+                <div>
+                  <span className="text-[10px] text-slate-400 uppercase font-semibold block">Current Bond Balance</span>
+                  <strong className="text-xs text-slate-800">{formatZAR(selectedRentalForRefinance.outstandingBondBalanceZAR || 0)}</strong>
+                </div>
+                <div>
+                  <span className="text-[10px] text-slate-400 uppercase font-semibold block">Current Bond Repayment</span>
+                  <strong className="text-xs text-slate-800">{formatZAR(selectedRentalForRefinance.monthlyBondPaymentZAR)}/m</strong>
+                </div>
+              </div>
+
+              {/* Metric 1: New Bank Valuation */}
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">
+                  1. New Bank Valuation (ZAR) *
+                </label>
+                <input
+                  type="number"
+                  required
+                  min="1"
+                  step="10000"
+                  value={refinanceNewValuation || ''}
+                  onChange={(e) => {
+                    const val = Number(e.target.value);
+                    setRefinanceNewValuation(val);
+                  }}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg font-bold text-slate-900 text-sm focus:ring-1 focus:ring-purple-500"
+                  placeholder="e.g. 2800000"
+                />
+                <span className="text-[10px] text-slate-400 mt-0.5 block">
+                  Official bank / Lightstone appraisal valuation
+                </span>
+              </div>
+
+              {/* Metric 2: New Monthly Bond Repayment */}
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">
+                  2. New Monthly Bond Repayment (ZAR) *
+                </label>
+                <input
+                  type="number"
+                  required
+                  min="0"
+                  step="100"
+                  value={refinanceNewBondPayment || ''}
+                  onChange={(e) => setRefinanceNewBondPayment(Number(e.target.value))}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg font-bold text-slate-900 text-sm focus:ring-1 focus:ring-purple-500"
+                  placeholder="e.g. 19500"
+                />
+                <span className="text-[10px] text-slate-400 mt-0.5 block">
+                  New debit order installment quoted by the financing bank
+                </span>
+              </div>
+
+              {/* Metric 3: Cash Equity Pulled Out */}
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block font-semibold text-slate-700">
+                    3. Cash Equity Pulled Out (ZAR) *
+                  </label>
+                  <span className="text-[10px] font-bold text-emerald-600">
+                    + Deposited directly to Seed Capital
+                  </span>
+                </div>
+                <input
+                  type="number"
+                  required
+                  min="0"
+                  step="5000"
+                  value={refinanceCashPulledOut || ''}
+                  onChange={(e) => {
+                    const cashOut = Number(e.target.value);
+                    setRefinanceCashPulledOut(cashOut);
+                    setRefinanceNewBondBalance((selectedRentalForRefinance.outstandingBondBalanceZAR || 0) + cashOut);
+                  }}
+                  className="w-full px-3 py-2 border border-emerald-300 rounded-lg font-bold text-emerald-700 text-base focus:ring-1 focus:ring-emerald-500 bg-emerald-50/30"
+                  placeholder="e.g. 450000"
+                />
+                <span className="text-[10px] text-slate-400 mt-0.5 block">
+                  Net liquid cash released from home loan advance
+                </span>
+              </div>
+
+              {/* Updated Outstanding Bond Balance */}
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block font-semibold text-slate-700">
+                    New Outstanding Mortgage Debt (ZAR) *
+                  </label>
+                  {refinanceNewValuation > 0 && refinanceNewBondBalance > 0 && (
+                    <span className="text-[10px] text-slate-500 font-medium">
+                      Bank LTV: {((refinanceNewBondBalance / refinanceNewValuation) * 100).toFixed(1)}%
+                    </span>
+                  )}
+                </div>
+                <input
+                  type="number"
+                  required
+                  min="0"
+                  step="5000"
+                  value={refinanceNewBondBalance || ''}
+                  onChange={(e) => setRefinanceNewBondBalance(Number(e.target.value))}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg font-bold text-slate-800 text-sm"
+                  placeholder="Auto-calculated (Previous Balance + Cash Out)"
+                />
+                <span className="text-[10px] text-slate-400 mt-0.5 block">
+                  Balance sheet liability recorded against the property
+                </span>
+              </div>
+
+              {/* Date & Facility Notes */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Refinance Date</label>
+                  <input
+                    type="date"
+                    required
+                    value={refinanceDate}
+                    onChange={(e) => setRefinanceDate(e.target.value)}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg"
+                  />
+                </div>
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Bank / Facility Notes</label>
+                  <input
+                    type="text"
+                    value={refinanceNotes}
+                    onChange={(e) => setRefinanceNotes(e.target.value)}
+                    placeholder="e.g. Standard Bank 70% LTV, Prime - 0.25%"
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg"
+                  />
+                </div>
+              </div>
+
+              {/* Impact Banner */}
+              <div className="p-3 bg-purple-50 rounded-lg border border-purple-200 flex items-center justify-between">
+                <div>
+                  <span className="text-[10px] font-bold text-purple-900 uppercase block">
+                    Capital Available for Next Deal:
+                  </span>
+                  <span className="text-[11px] text-purple-700">
+                    Seed Capital pool: {formatZAR(summary.liquidCapitalReserve)} → {formatZAR(summary.liquidCapitalReserve + (Number(refinanceCashPulledOut) || 0))}
+                  </span>
+                </div>
+                <strong className="text-sm font-black text-purple-900">
+                  +{formatZAR(Number(refinanceCashPulledOut) || 0)}
+                </strong>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-200">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowRefinanceModal(false);
+                    setSelectedRentalForRefinance(null);
+                  }}
+                  className="px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50 font-semibold cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-purple-700 hover:bg-purple-800 text-white rounded-lg font-semibold flex items-center gap-1.5 cursor-pointer shadow-sm"
+                >
+                  <ArrowUpRight className="w-4 h-4" />
+                  <span>Save Refinance & Credit Reserve</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Refinance Audit History Modal */}
+      {showAuditHistoryModal && selectedRentalForAudit && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-xl max-w-lg w-full p-6 shadow-xl border border-slate-200 animate-in fade-in max-h-[85vh] overflow-y-auto">
+            <div className="flex items-center justify-between pb-3 mb-4 border-b border-slate-100">
+              <div>
+                <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                  <History className="w-5 h-5 text-purple-600" />
+                  <span>Refinance & Equity Extraction History</span>
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">{selectedRentalForAudit.title}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowAuditHistoryModal(false);
+                  setSelectedRentalForAudit(null);
+                }}
+                className="text-slate-400 hover:text-slate-700 font-bold cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="p-3 bg-purple-50/70 rounded-xl border border-purple-200 flex items-center justify-between mb-4">
+              <div>
+                <span className="text-[10px] font-bold text-purple-900 uppercase block">Total Equity Recycled to Date</span>
+                <span className="text-xs text-purple-700">Cumulative capital extracted via BRRRR</span>
+              </div>
+              <strong className="text-lg font-extrabold text-purple-900">
+                {formatZAR(selectedRentalForAudit.totalEquityExtractedZAR || 0)}
+              </strong>
+            </div>
+
+            {(!selectedRentalForAudit.refinanceHistory || selectedRentalForAudit.refinanceHistory.length === 0) ? (
+              <p className="text-xs text-slate-400 text-center py-6">No refinance records logged for this property.</p>
+            ) : (
+              <div className="space-y-3">
+                {selectedRentalForAudit.refinanceHistory.map((rec, idx) => (
+                  <div key={rec.id || idx} className="p-3 bg-slate-50 rounded-lg border border-slate-200 text-xs space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-slate-900">{formatDate(rec.refinanceDate)}</span>
+                      <span className="font-extrabold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded">
+                        +{formatZAR(rec.cashEquityPulledOutZAR)} Pulled Out
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-3 gap-2 text-[11px] text-slate-600 pt-1 border-t border-slate-200">
+                      <div>
+                        <span className="text-[10px] text-slate-400 block">Bank Valuation</span>
+                        <strong>{formatZAR(rec.newBankValuationZAR)}</strong>
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-slate-400 block">New Bond Balance</span>
+                        <strong>{formatZAR(rec.newBondBalanceZAR)}</strong>
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-slate-400 block">New Monthly Bond</span>
+                        <strong>{formatZAR(rec.newMonthlyBondPaymentZAR)}/m</strong>
+                      </div>
+                    </div>
+                    {rec.notes && (
+                      <p className="text-[11px] text-slate-500 italic bg-white p-2 rounded border border-slate-100">
+                        {rec.notes}
+                      </p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div className="flex justify-end pt-4 mt-4 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowAuditHistoryModal(false);
+                  setSelectedRentalForAudit(null);
+                }}
+                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-lg text-xs font-semibold cursor-pointer"
+              >
+                Close
+              </button>
+            </div>
           </div>
         </div>
       )}
