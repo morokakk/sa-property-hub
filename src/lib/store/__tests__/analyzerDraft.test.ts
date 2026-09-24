@@ -7,11 +7,23 @@ describe('usePortfolioStore Analyzer Draft & Distressed Costs', () => {
     usePortfolioStore.getState().resetToDemoData();
   });
 
-  it('initializes analyzerDraft with default source and zero auction outlays', () => {
+  it('initializes analyzerDraft with default source, zero auction outlays, and default vacancy/mgmt rates', () => {
     const draft = usePortfolioStore.getState().analyzerDraft;
     expect(draft.source).toBe('High-Street Auction');
     expect(draft.auctioneerCommission).toBe(0);
     expect(draft.municipalArrears).toBe(0);
+    expect(draft.vacancyRatePercent).toBe(6.0);
+    expect(draft.managementFeePercent).toBe(8.0);
+  });
+
+  it('updates analyzerDraft with custom vacancy and management fee rates', () => {
+    usePortfolioStore.getState().updateAnalyzerDraft({
+      vacancyRatePercent: 10.0,
+      managementFeePercent: 12.0,
+    });
+    const draft = usePortfolioStore.getState().analyzerDraft;
+    expect(draft.vacancyRatePercent).toBe(10.0);
+    expect(draft.managementFeePercent).toBe(12.0);
   });
 
   it('updates analyzerDraft with distressed fees and source', () => {

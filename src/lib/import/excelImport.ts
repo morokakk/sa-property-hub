@@ -694,7 +694,7 @@ export function parsePipelineRows(rawRows: unknown[][]): ParseResult<Opportunity
         initialCapitalRequired: metrics.initialCapitalRequired,
         projectedFlipNetProfit: metrics.projectedFlipNetProfit,
         projectedFlipRoi: metrics.projectedFlipRoi,
-        status: 'Analyzing',
+        status: 'Screening',
         notes: notes || 'Imported via Excel Batch Engine',
         createdAt: todayStr,
       });

@@ -95,6 +95,15 @@ export type PropertyTitleType =
   | 'Townhouse / Cluster'
   | 'Multi-unit Commercial';
 
+export type PassReason =
+  | 'Yield Too Low'
+  | 'High Arrears / Municipal Risk'
+  | 'Seller Countered Above MAO'
+  | 'Title Deed Issues'
+  | 'Structural / Damp Report Failed'
+  | 'Funding Not Secured'
+  | 'Other';
+
 // Opportunity Analyzer Model
 export interface OpportunityDeal {
   id: string;
@@ -165,7 +174,10 @@ export interface OpportunityDeal {
   promisedReturnRatePercent?: number;
   promisedPayoutSchedule?: 'Monthly Interest' | 'Quarterly' | 'At Exit (Maturity)' | 'Bi-Annual';
   securityOffered?: string;
-  status: 'Analyzing' | 'Offer Submitted' | 'Under Due Diligence' | 'Promoted to Flip' | 'Promoted to Rental' | 'Passed';
+  status: 'Screening' | 'Offer Submitted' | 'Due Diligence' | 'Promoted to Flip' | 'Promoted to Rental' | 'Passed';
+  passReason?: PassReason;
+  passNotes?: string;
+  passedAt?: string;
   notes?: string;
   createdAt: string;
 }
@@ -451,6 +463,8 @@ export interface AnalyzerDraft {
   strategy?: DealStrategy;
   annualInsurance?: number;
   source?: DealSource;
+  vacancyRatePercent?: number;
+  managementFeePercent?: number;
 }
 
 // Client-side BYOK AI Integration Settings

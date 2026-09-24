@@ -16,6 +16,7 @@ import {
   ExtractedRentalUnit,
   FlipToRentalConversionParams,
   RentalRefinanceParams,
+  PassReason,
 } from '@/types';
 import {
   INITIAL_RENTALS,
@@ -91,6 +92,9 @@ interface PortfolioState {
   bulkAddOpportunities: (opps: OpportunityDeal[]) => { addedCount: number; duplicateCount: number };
   updateOpportunity: (id: string, updates: Partial<OpportunityDeal>) => void;
   deleteOpportunity: (id: string) => void;
+  passOpportunity: (id: string, reason: PassReason, notes?: string) => void;
+  reactivateOpportunity: (id: string) => void;
+  advanceOpportunityStage: (id: string) => void;
   promoteOpportunityToFlip: (oppId: string) => void;
   promoteOpportunityToRental: (oppId: string) => void;
 
@@ -824,6 +828,47 @@ export const usePortfolioStore = create<PortfolioState>()(
         set((state) => ({
           opportunities: state.opportunities.filter((o) => o.id !== id),
         })),
+      passOpportunity: (id, reason, notes) =>
+        set((state) => ({
+          opportunities: state.opportunities.map((opp) =>
+            opp.id === id
+              ? {
+                  ...opp,
+                  status: 'Passed' as const,
+                  passReason: reason,
+                  passNotes: notes || undefined,
+                  passedAt: new Date().toISOString().split('T')[0],
+                }
+              : opp
+          ),
+        })),
+      reactivateOpportunity: (id) =>
+        set((state) => ({
+          opportunities: state.opportunities.map((opp) =>
+            opp.id === id
+              ? {
+                  ...opp,
+                  status: 'Screening' as const,
+                  passReason: undefined,
+                  passNotes: undefined,
+                  passedAt: undefined,
+                }
+              : opp
+          ),
+        })),
+      advanceOpportunityStage: (id) =>
+        set((state) => ({
+          opportunities: state.opportunities.map((opp) => {
+            if (opp.id !== id) return opp;
+            const nextStage =
+              opp.status === 'Screening'
+                ? ('Offer Submitted' as const)
+                : opp.status === 'Offer Submitted'
+                ? ('Due Diligence' as const)
+                : null;
+            return nextStage ? { ...opp, status: nextStage } : opp;
+          }),
+        })),
       promoteOpportunityToFlip: (oppId) => {
         const opp = get().opportunities.find((o) => o.id === oppId);
         if (!opp) return;
@@ -1093,9 +1138,23 @@ export const usePortfolioStore = create<PortfolioState>()(
           rawModel.includes('2025');
         const migratedModel = isRetired ? 'claude-sonnet-5' : rawModel;
 
+        const rawOpps = pState.opportunities || currentState.opportunities;
+        const migratedOpportunities = (rawOpps || []).map((opp: any) => ({
+          ...opp,
+          status:
+            opp.status === 'Analyzing'
+              ? 'Screening'
+              : opp.status === 'Under Due Diligence'
+              ? 'Due Diligence'
+              : opp.status,
+          vacancyRatePercent: opp.vacancyRatePercent ?? 6,
+          managementFeePercent: opp.managementFeePercent ?? 8,
+        }));
+
         return {
           ...currentState,
           ...pState,
+          opportunities: migratedOpportunities,
           aiSettings: {
             ...DEFAULT_AI_SETTINGS,
             ...(pState.aiSettings || {}),

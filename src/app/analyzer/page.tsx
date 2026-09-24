@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import TopHeader from '@/components/navigation/TopHeader';
 import { usePortfolioStore } from '@/lib/store/usePortfolioStore';
 import { computeAcquisitionCosts, calculateSection13sex } from '@/lib/calculations/sarsTax';
@@ -10,9 +10,10 @@ import {
   computeAmenityScore,
   generateLongTermProjection,
 } from '@/lib/calculations/propertyMetrics';
+import { calculateFlipMao, calculateRentalMao } from '@/lib/calculations/maoSolver';
 import { formatOpportunityForWhatsApp } from '@/lib/whatsappFormatter';
 import { formatZAR, formatPercent } from '@/lib/formatters';
-import { OpportunityDeal, DealSource, AmenityDistance, AmenityScorecard, PropertyTitleType, DealStrategy } from '@/types';
+import { OpportunityDeal, DealSource, AmenityDistance, AmenityScorecard, PropertyTitleType, DealStrategy, PassReason } from '@/types';
 import { PropertyTypeBadge, AgmDateChip } from '@/components/common/PropertyTypeBadge';
 import LongTermProjectionChart from '@/components/analytics/LongTermProjectionChart';
 import {
@@ -41,6 +42,11 @@ import {
   TrendingUp,
   Edit3,
   FileSpreadsheet,
+  ArrowRight,
+  XCircle,
+  RotateCcw,
+  Target,
+  X,
 } from 'lucide-react';
 import Link from 'next/link';
 import { exportOpportunitiesCSV } from '@/lib/export/csvExport';
@@ -51,6 +57,9 @@ export default function OpportunityAnalyzerPage() {
   const addOpportunity = usePortfolioStore((state) => state.addOpportunity);
   const updateOpportunity = usePortfolioStore((state) => state.updateOpportunity);
   const deleteOpportunity = usePortfolioStore((state) => state.deleteOpportunity);
+  const passOpportunity = usePortfolioStore((state) => state.passOpportunity);
+  const reactivateOpportunity = usePortfolioStore((state) => state.reactivateOpportunity);
+  const advanceOpportunityStage = usePortfolioStore((state) => state.advanceOpportunityStage);
   const promoteOpportunityToFlip = usePortfolioStore((state) => state.promoteOpportunityToFlip);
   const promoteOpportunityToRental = usePortfolioStore((state) => state.promoteOpportunityToRental);
   const investorProfile = usePortfolioStore((state) => state.investorProfile);
@@ -77,6 +86,25 @@ export default function OpportunityAnalyzerPage() {
   const [annualInsurance, setAnnualInsurance] = useState<number>(analyzerDraft?.annualInsurance ?? (propertyType === 'Freehold House' ? 7_200 : 0));
   const [monthlyRates, setMonthlyRates] = useState<number>(analyzerDraft?.monthlyRates ?? 1_100);
   const [targetExitPrice, setTargetExitPrice] = useState<number>(analyzerDraft?.targetExitPrice ?? 2_450_000);
+
+  // Vacancy Buffer & Credit Loss + Property Management State
+  const [vacancyRate, setVacancyRate] = useState<number>(analyzerDraft?.vacancyRatePercent ?? 6.0);
+  const [managementFee, setManagementFee] = useState<number>(analyzerDraft?.managementFeePercent ?? 8.0);
+
+  // MAO Quick Solver State
+  const [showMaoSolver, setShowMaoSolver] = useState(false);
+  const [maoSolverMode, setMaoSolverMode] = useState<'Flip' | 'Rental'>(analyzerDraft?.strategy === 'Flip' ? 'Flip' : 'Rental');
+  const [maoTargetExitPrice, setMaoTargetExitPrice] = useState<number>(analyzerDraft?.targetExitPrice ?? 2_450_000);
+  const [maoDesiredRoi, setMaoDesiredRoi] = useState<number>(15);
+  const [maoTargetYield, setMaoTargetYield] = useState<number>(8.0);
+  const maoSolverRef = useRef<HTMLDivElement>(null);
+
+  // Deal Triage & Filter State
+  const [pipelineFilter, setPipelineFilter] = useState<'active' | 'passed'>('active');
+  const [showPromoted, setShowPromoted] = useState(false);
+  const [passingDealId, setPassingDealId] = useState<string | null>(null);
+  const [passReason, setPassReason] = useState<PassReason>('Yield Too Low');
+  const [passNotes, setPassNotes] = useState('');
 
   // Auction Outlays & Distressed Arrears State
   const [auctioneerCommission, setAuctioneerCommission] = useState<number>(analyzerDraft?.auctioneerCommission ?? 0);
@@ -130,8 +158,39 @@ export default function OpportunityAnalyzerPage() {
         setBondTermYears(analyzerDraft.bondTermYears);
         setLoanTermYears(analyzerDraft.bondTermYears);
       }
+      if (analyzerDraft.vacancyRatePercent !== undefined) setVacancyRate(analyzerDraft.vacancyRatePercent);
+      if (analyzerDraft.managementFeePercent !== undefined) setManagementFee(analyzerDraft.managementFeePercent);
     }
   }, [analyzerDraft]);
+
+  // Sync MAO solver mode when deal strategy changes
+  useEffect(() => {
+    if (strategy === 'Flip') {
+      setMaoSolverMode('Flip');
+    } else {
+      setMaoSolverMode('Rental');
+    }
+  }, [strategy]);
+
+  // Sync exit price if user modifies targetExitPrice
+  useEffect(() => {
+    if (targetExitPrice > 0) {
+      setMaoTargetExitPrice(targetExitPrice);
+    }
+  }, [targetExitPrice]);
+
+  // Click outside listener for MAO popover
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (maoSolverRef.current && !maoSolverRef.current.contains(e.target as Node)) {
+        setShowMaoSolver(false);
+      }
+    };
+    if (showMaoSolver) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showMaoSolver]);
 
   // Auto-dismiss fee reset toast after 3 seconds
   useEffect(() => {
@@ -282,8 +341,8 @@ export default function OpportunityAnalyzerPage() {
       monthlyLevies: propertyType === 'Freehold House' ? 0 : monthlyLevies,
       monthlyRatesTaxes: monthlyRates,
       annualInsurance: propertyType === 'Freehold House' ? annualInsurance : 0,
-      managementFeePercent: 8,
-      vacancyRatePercent: 5,
+      managementFeePercent: managementFee,
+      vacancyRatePercent: vacancyRate,
       targetExitPrice,
       holdingPeriodMonths: 6,
       loanToValuePercent: loanToValue,
@@ -302,6 +361,8 @@ export default function OpportunityAnalyzerPage() {
     monthlyLevies,
     monthlyRates,
     annualInsurance,
+    managementFee,
+    vacancyRate,
     propertyType,
     targetExitPrice,
     loanToValue,
@@ -340,8 +401,8 @@ export default function OpportunityAnalyzerPage() {
       monthlyLevies: propertyType === 'Freehold House' ? 0 : monthlyLevies,
       monthlyRatesTaxes: monthlyRates,
       annualInsurance: propertyType === 'Freehold House' ? annualInsurance : 0,
-      managementFeePercent: 8,
-      vacancyRatePercent: 5,
+      managementFeePercent: managementFee,
+      vacancyRatePercent: vacancyRate,
     });
   }, [
     purchasePrice,
@@ -357,8 +418,45 @@ export default function OpportunityAnalyzerPage() {
     monthlyLevies,
     monthlyRates,
     annualInsurance,
+    managementFee,
+    vacancyRate,
     propertyType,
   ]);
+
+  // Holding reserve estimation for Flip MAO solver (6 months holding of rates, levies, insurance + buffer)
+  const flipHoldingReserve = useMemo(() => {
+    const leviesClean = propertyType === 'Freehold House' ? 0 : monthlyLevies;
+    const insuranceClean = propertyType === 'Freehold House' ? Math.round(annualInsurance / 12) : 0;
+    return (leviesClean + monthlyRates + insuranceClean + 1500) * 6;
+  }, [propertyType, monthlyLevies, monthlyRates, annualInsurance]);
+
+  const computedFlipMao = useMemo(() => {
+    return calculateFlipMao({
+      targetExitPrice: maoTargetExitPrice,
+      desiredRoiPercent: maoDesiredRoi,
+      rehabCost,
+      holdingCost: flipHoldingReserve,
+      estimatedAcquisitionCostRate: 0.05,
+    });
+  }, [maoTargetExitPrice, maoDesiredRoi, rehabCost, flipHoldingReserve]);
+
+  const computedRentalMao = useMemo(() => {
+    return calculateRentalMao({
+      monthlyRent,
+      vacancyRatePercent: vacancyRate,
+      managementFeePercent: managementFee,
+      monthlyLevies: propertyType === 'Freehold House' ? 0 : monthlyLevies,
+      monthlyRates,
+      annualInsurance: propertyType === 'Freehold House' ? annualInsurance : 0,
+      targetNetYieldPercent: maoTargetYield,
+    });
+  }, [monthlyRent, vacancyRate, managementFee, propertyType, monthlyLevies, monthlyRates, annualInsurance, maoTargetYield]);
+
+  const handleApplyMaoBid = (bidAmount: number) => {
+    if (bidAmount <= 0) return;
+    handlePurchasePriceChange(bidAmount);
+    setShowMaoSolver(false);
+  };
 
   const handleCopyCurrentCalcWhatsApp = () => {
     const isScheme = propertyType === 'Sectional Title Apartment' || propertyType === 'Townhouse / Cluster';
@@ -389,8 +487,8 @@ export default function OpportunityAnalyzerPage() {
       monthlyLevies: finalLevies,
       monthlyRatesTaxes: monthlyRates,
       annualInsurance: finalInsurance,
-      managementFeePercent: 8,
-      vacancyRatePercent: 5,
+      managementFeePercent: managementFee,
+      vacancyRatePercent: vacancyRate,
       targetExitPrice,
       holdingPeriodMonths: 6,
       monthlyBondPaymentZAR: calculatedMetrics.monthlyBondPayment,
@@ -415,7 +513,7 @@ export default function OpportunityAnalyzerPage() {
       initialCapitalRequired: calculatedMetrics.initialCapitalRequired,
       projectedFlipNetProfit: calculatedMetrics.projectedFlipNetProfit,
       projectedFlipRoi: calculatedMetrics.projectedFlipRoi,
-      status: 'Analyzing',
+      status: 'Screening',
       section13sex: isSection13Eligible ? calculatedSection13 : undefined,
       createdAt: new Date().toISOString().split('T')[0],
     };
@@ -449,6 +547,8 @@ export default function OpportunityAnalyzerPage() {
     setAuctioneerCommission(deal.auctioneerCommissionZAR || 0);
     setMunicipalArrears(deal.municipalArrearsZAR || 0);
     setStrategy(deal.strategy ?? 'Rental');
+    setVacancyRate(deal.vacancyRatePercent ?? 6.0);
+    setManagementFee(deal.managementFeePercent ?? 8.0);
     const effectiveLtv = deal.bondLTV !== undefined ? deal.bondLTV : (deal.loanToValuePercent ?? 100);
     setLoanToValue(effectiveLtv);
     const effectiveDep = deal.depositZAR !== undefined ? deal.depositZAR : Math.max(0, Math.round(deal.purchasePrice * (1 - effectiveLtv / 100)));
@@ -487,6 +587,8 @@ export default function OpportunityAnalyzerPage() {
     setAnnualExpenseInflation(6.0);
     setBondTermYears(20);
     setLoanTermYears(20);
+    setVacancyRate(analyzerDraft?.vacancyRatePercent ?? 6.0);
+    setManagementFee(analyzerDraft?.managementFeePercent ?? 8.0);
   };
 
   const handleSaveOpportunity = (e: React.FormEvent) => {
@@ -522,6 +624,8 @@ export default function OpportunityAnalyzerPage() {
         monthlyLevies: finalLevies,
         annualInsurance: finalInsurance,
         monthlyRatesTaxes: monthlyRates,
+        vacancyRatePercent: vacancyRate,
+        managementFeePercent: managementFee,
         targetExitPrice,
         holdingPeriodMonths: 6,
         monthlyBondPaymentZAR: calculatedMetrics.monthlyBondPayment,
@@ -567,6 +671,8 @@ export default function OpportunityAnalyzerPage() {
       setAnnualExpenseInflation(6.0);
       setBondTermYears(20);
       setLoanTermYears(20);
+      setVacancyRate(analyzerDraft?.vacancyRatePercent ?? 6.0);
+      setManagementFee(analyzerDraft?.managementFeePercent ?? 8.0);
       return;
     }
 
@@ -590,8 +696,8 @@ export default function OpportunityAnalyzerPage() {
       monthlyLevies: finalLevies,
       monthlyRatesTaxes: monthlyRates,
       annualInsurance: finalInsurance,
-      managementFeePercent: 8,
-      vacancyRatePercent: 5,
+      managementFeePercent: managementFee,
+      vacancyRatePercent: vacancyRate,
       targetExitPrice,
       holdingPeriodMonths: 6,
       monthlyBondPaymentZAR: calculatedMetrics.monthlyBondPayment,
@@ -619,7 +725,7 @@ export default function OpportunityAnalyzerPage() {
       initialCapitalRequired: calculatedMetrics.initialCapitalRequired,
       projectedFlipNetProfit: calculatedMetrics.projectedFlipNetProfit,
       projectedFlipRoi: calculatedMetrics.projectedFlipRoi,
-      status: 'Analyzing',
+      status: 'Screening',
       createdAt: new Date().toISOString().split('T')[0],
     };
 
@@ -633,8 +739,25 @@ export default function OpportunityAnalyzerPage() {
     setMunicipalArrears(0);
     setLoanToValue(100);
     setDepositZAR(0);
+    setVacancyRate(analyzerDraft?.vacancyRatePercent ?? 6.0);
+    setManagementFee(analyzerDraft?.managementFeePercent ?? 8.0);
     alert(`Deal "${title}" added to Deal Pipeline!`);
   };
+
+  // Pipeline Triage computed filter sets
+  const activeDeals = useMemo(
+    () => opportunities.filter((d) => d.status === 'Screening' || d.status === 'Offer Submitted' || d.status === 'Due Diligence'),
+    [opportunities]
+  );
+  const passedDeals = useMemo(() => opportunities.filter((d) => d.status === 'Passed'), [opportunities]);
+  const promotedDeals = useMemo(
+    () => opportunities.filter((d) => d.status === 'Promoted to Flip' || d.status === 'Promoted to Rental'),
+    [opportunities]
+  );
+  const displayedOpportunities = useMemo(() => {
+    if (pipelineFilter === 'passed') return passedDeals;
+    return showPromoted ? [...activeDeals, ...promotedDeals] : activeDeals;
+  }, [pipelineFilter, activeDeals, passedDeals, promotedDeals, showPromoted]);
 
   return (
     <div className="flex-1 flex flex-col">
@@ -646,7 +769,7 @@ export default function OpportunityAnalyzerPage() {
       <main className="flex-1 p-4 sm:p-6 space-y-6 max-w-7xl w-full mx-auto">
         {/* Deal Calculator Card */}
         <div className="bg-white rounded-xl border border-slate-200 p-4 sm:p-6 shadow-xs">
-          <div className="flex items-center justify-between pb-4 mb-6 border-b border-slate-100">
+          <div className="flex items-center justify-between pb-4 mb-6 border-b border-slate-100 flex-wrap gap-3">
             <div className="flex items-center gap-2.5">
               <div className="p-2 bg-emerald-50 rounded-lg text-emerald-700">
                 <Calculator className="w-5 h-5" />
@@ -658,9 +781,170 @@ export default function OpportunityAnalyzerPage() {
                 </p>
               </div>
             </div>
-            <span className="text-xs font-semibold bg-emerald-100 text-emerald-800 px-2.5 py-1 rounded-full flex items-center gap-1">
-              <Scale className="w-3.5 h-3.5" /> SARS 2024–2026 Brackets
-            </span>
+            <div className="flex items-center gap-2">
+              {/* Solve Max Bid Popover Button */}
+              <div className="relative" ref={maoSolverRef}>
+                <button
+                  type="button"
+                  onClick={() => setShowMaoSolver(!showMaoSolver)}
+                  className="bg-violet-50 hover:bg-violet-100 text-violet-800 border border-violet-300 text-xs font-bold px-3 py-1.5 rounded-lg shadow-2xs flex items-center gap-1.5 transition-colors cursor-pointer"
+                  title="Solve Maximum Allowable Offer based on Target ROI% or Cap Rate"
+                >
+                  <Target className="w-4 h-4 text-violet-600" />
+                  <span>Solve Max Bid</span>
+                  <ChevronDown className={`w-3.5 h-3.5 transition-transform ${showMaoSolver ? 'rotate-180' : ''}`} />
+                </button>
+
+                {showMaoSolver && (
+                  <div className="absolute right-0 top-full mt-2 w-80 sm:w-96 bg-white rounded-xl border border-slate-200 shadow-2xl p-4 z-50 animate-fadeIn text-slate-900">
+                    <div className="flex items-center justify-between pb-2 mb-3 border-b border-slate-100">
+                      <div className="flex items-center gap-2">
+                        <Target className="w-4 h-4 text-violet-600" />
+                        <h4 className="text-xs font-bold text-slate-900">MAO Quick Solver</h4>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setShowMaoSolver(false)}
+                        className="text-slate-400 hover:text-slate-600 p-0.5 rounded-md text-xs cursor-pointer"
+                      >
+                        ✕
+                      </button>
+                    </div>
+
+                    {/* Mode Toggle Tabs (Defaults to current strategy) */}
+                    <div className="flex rounded-lg bg-slate-100 p-1 mb-3 text-xs">
+                      <button
+                        type="button"
+                        onClick={() => setMaoSolverMode('Flip')}
+                        className={`flex-1 py-1 px-2 font-bold rounded-md transition-all cursor-pointer ${
+                          maoSolverMode === 'Flip'
+                            ? 'bg-white text-slate-900 shadow-2xs'
+                            : 'text-slate-600 hover:text-slate-900'
+                        }`}
+                      >
+                        🔄 Flip Exit ROI
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setMaoSolverMode('Rental')}
+                        className={`flex-1 py-1 px-2 font-bold rounded-md transition-all cursor-pointer ${
+                          maoSolverMode === 'Rental'
+                            ? 'bg-white text-slate-900 shadow-2xs'
+                            : 'text-slate-600 hover:text-slate-900'
+                        }`}
+                      >
+                        🏠 Rental Net Yield
+                      </button>
+                    </div>
+
+                    {maoSolverMode === 'Flip' ? (
+                      <div className="space-y-3">
+                        <p className="text-[11px] text-slate-500">
+                          Solves the maximum bid that satisfies your target ROI after factoring in BOQ rehab, 6-month holding costs, and 5% acquisition friction.
+                        </p>
+
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <label className="block text-[10px] font-semibold text-slate-600 mb-1">Target Exit Price</label>
+                            <input
+                              type="number"
+                              step="10000"
+                              value={maoTargetExitPrice}
+                              onChange={(e) => setMaoTargetExitPrice(Number(e.target.value))}
+                              className="w-full text-xs font-semibold px-2 py-1.5 border border-slate-300 rounded-md bg-white"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[10px] font-semibold text-slate-600 mb-1">Desired ROI (%)</label>
+                            <input
+                              type="number"
+                              step="0.5"
+                              value={maoDesiredRoi}
+                              onChange={(e) => setMaoDesiredRoi(Number(e.target.value))}
+                              className="w-full text-xs font-semibold px-2 py-1.5 border border-slate-300 rounded-md bg-white"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="bg-violet-50/80 border border-violet-200 rounded-lg p-3 space-y-1.5 text-xs text-violet-950">
+                          <div className="flex justify-between text-[11px] text-slate-600">
+                            <span>Allowable Total Capital:</span>
+                            <span className="font-semibold">{formatZAR(computedFlipMao.totalAllowableOutlay)}</span>
+                          </div>
+                          <div className="flex justify-between text-[11px] text-slate-600">
+                            <span>Less BOQ + 6M Holding:</span>
+                            <span className="text-rose-600 font-semibold">-{formatZAR(computedFlipMao.nonPurchaseCosts)}</span>
+                          </div>
+                          <div className="border-t border-violet-200 pt-1.5 flex justify-between items-center">
+                            <span className="font-bold text-violet-900">Max Allowable Bid (MAO):</span>
+                            <span className="text-sm font-black text-violet-800">{formatZAR(computedFlipMao.maxAllowableBid)}</span>
+                          </div>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => handleApplyMaoBid(computedFlipMao.maxAllowableBid)}
+                          disabled={computedFlipMao.maxAllowableBid <= 0}
+                          className="w-full bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white text-xs font-bold py-2 rounded-lg transition-colors cursor-pointer shadow-xs flex items-center justify-center gap-1.5"
+                        >
+                          <Target className="w-3.5 h-3.5" />
+                          <span>Set as Target Bid ({formatZAR(computedFlipMao.maxAllowableBid)})</span>
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        <p className="text-[11px] text-slate-500">
+                          Solves the maximum purchase price based on your target net yield (Cap Rate) and stress-tested NOI (with {vacancyRate}% vacancy &amp; {managementFee}% agent fee).
+                        </p>
+
+                        <div>
+                          <div className="flex items-center justify-between mb-1">
+                            <label className="text-[10px] font-semibold text-slate-600">Target Net Yield / Cap Rate (%)</label>
+                            <span className="text-[10px] text-slate-400">SA prime corridor: 8.0%–11.0%</span>
+                          </div>
+                          <input
+                            type="number"
+                            step="0.25"
+                            value={maoTargetYield}
+                            onChange={(e) => setMaoTargetYield(Number(e.target.value))}
+                            className="w-full text-xs font-semibold px-2 py-1.5 border border-slate-300 rounded-md bg-white"
+                          />
+                        </div>
+
+                        <div className="bg-emerald-50/80 border border-emerald-200 rounded-lg p-3 space-y-1.5 text-xs text-emerald-950">
+                          <div className="flex justify-between text-[11px] text-slate-600">
+                            <span>Stress-Tested Annual NOI:</span>
+                            <span className="font-semibold text-emerald-800">{formatZAR(computedRentalMao.stressTestedNoi)}/yr</span>
+                          </div>
+                          <div className="flex justify-between text-[11px] text-slate-500">
+                            <span>Vacancy Buffer ({vacancyRate}%):</span>
+                            <span>-{formatZAR(computedRentalMao.vacancyLossAnnual)}/yr</span>
+                          </div>
+                          <div className="border-t border-emerald-200 pt-1.5 flex justify-between items-center">
+                            <span className="font-bold text-emerald-950">Max Purchase Price:</span>
+                            <span className="text-sm font-black text-emerald-800">{formatZAR(computedRentalMao.maxAllowablePrice)}</span>
+                          </div>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => handleApplyMaoBid(computedRentalMao.maxAllowablePrice)}
+                          disabled={computedRentalMao.maxAllowablePrice <= 0}
+                          className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-xs font-bold py-2 rounded-lg transition-colors cursor-pointer shadow-xs flex items-center justify-center gap-1.5"
+                        >
+                          <Target className="w-3.5 h-3.5" />
+                          <span>Set as Target Bid ({formatZAR(computedRentalMao.maxAllowablePrice)})</span>
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              <span className="text-xs font-semibold bg-emerald-100 text-emerald-800 px-2.5 py-1 rounded-full flex items-center gap-1">
+                <Scale className="w-3.5 h-3.5" /> SARS 2024–2026 Brackets
+              </span>
+            </div>
           </div>
 
           {editingDealId && (
@@ -1193,6 +1477,69 @@ export default function OpportunityAnalyzerPage() {
                     className="w-full text-xs pl-7 pr-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-emerald-500 font-semibold text-slate-900 bg-white"
                   />
                 </div>
+              </div>
+            </div>
+
+            {/* Vacancy Buffer & Credit Loss Stress-Testing */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 rounded-xl bg-slate-50 border border-slate-200">
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-[11px] font-semibold text-slate-700">
+                    Vacancy & Credit Loss Buffer (%)
+                  </label>
+                  <span className="text-[10px] font-bold text-amber-800 bg-amber-100/80 px-1.5 py-0.5 rounded">
+                    -{formatZAR(Math.round(monthlyRent * (vacancyRate / 100)))}/pm
+                  </span>
+                </div>
+                <div className="relative">
+                  <input
+                    type="number"
+                    min="0"
+                    max="30"
+                    step="0.5"
+                    value={vacancyRate}
+                    onChange={(e) => {
+                      const val = Number(e.target.value);
+                      setVacancyRate(val);
+                      updateAnalyzerDraft({ vacancyRatePercent: val });
+                    }}
+                    className="w-full text-xs px-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-emerald-500 font-semibold text-slate-900 bg-white"
+                  />
+                  <span className="absolute right-3 top-2 text-xs text-slate-400 font-bold">%</span>
+                </div>
+                <p className="text-[10px] text-slate-500 mt-1">
+                  Deducts from gross rent before computing NOI, Cap Rate, and Cash-on-Cash yields. Default: 6.0%.
+                </p>
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-[11px] font-semibold text-slate-700">
+                    Managing Agent Fee (%)
+                  </label>
+                  <span className="text-[10px] font-bold text-indigo-800 bg-indigo-100/80 px-1.5 py-0.5 rounded">
+                    -{formatZAR(Math.round(monthlyRent * (managementFee / 100)))}/pm
+                  </span>
+                </div>
+                <div className="relative">
+                  <input
+                    type="number"
+                    min="0"
+                    max="20"
+                    step="0.5"
+                    value={managementFee}
+                    onChange={(e) => {
+                      const val = Number(e.target.value);
+                      setManagementFee(val);
+                      updateAnalyzerDraft({ managementFeePercent: val });
+                    }}
+                    className="w-full text-xs px-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-emerald-500 font-semibold text-slate-900 bg-white"
+                  />
+                  <span className="absolute right-3 top-2 text-xs text-slate-400 font-bold">%</span>
+                </div>
+                <p className="text-[10px] text-slate-500 mt-1">
+                  Professional rental agent tenant placement & collection fee (iGrow / WeconnectU baseline: 8.0%).
+                </p>
               </div>
             </div>
 
@@ -1966,9 +2313,9 @@ export default function OpportunityAnalyzerPage() {
         <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-xs">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
             <div>
-              <h3 className="text-base font-bold text-slate-900">Active Deal Sourcing Pipeline</h3>
+              <h3 className="text-base font-bold text-slate-900">Deal Sourcing Pipeline</h3>
               <p className="text-xs text-slate-500">
-                Track candidates, promote them to live Flips or Rentals, or generate a lender pitch proposal.
+                Triage candidates, solve max allowable bids, promote to live Flips or Rentals, or archive passed deals.
               </p>
             </div>
             <div className="flex items-center gap-2">
@@ -1984,22 +2331,64 @@ export default function OpportunityAnalyzerPage() {
                 </button>
               )}
               <span className="text-xs font-semibold text-slate-600 bg-slate-100 px-3 py-1 rounded-full">
-                {opportunities.length} Pipeline Deals
+                {activeDeals.length} Active / {passedDeals.length} Passed
               </span>
             </div>
           </div>
 
+          {/* Pipeline Triage Filter Pills */}
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-4 pb-3 border-b border-slate-100">
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setPipelineFilter('active')}
+                className={`px-3 py-1.5 text-xs font-bold rounded-lg border transition-all cursor-pointer ${
+                  pipelineFilter === 'active'
+                    ? 'bg-slate-900 text-white border-slate-900 shadow-2xs'
+                    : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-50'
+                }`}
+              >
+                Active Deals ({activeDeals.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setPipelineFilter('passed')}
+                className={`px-3 py-1.5 text-xs font-bold rounded-lg border transition-all cursor-pointer ${
+                  pipelineFilter === 'passed'
+                    ? 'bg-rose-600 text-white border-rose-600 shadow-2xs'
+                    : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-50'
+                }`}
+              >
+                Passed Deals ({passedDeals.length})
+              </button>
+            </div>
+
+            {pipelineFilter === 'active' && promotedDeals.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setShowPromoted(!showPromoted)}
+                className="text-xs text-slate-500 hover:text-slate-800 font-medium underline cursor-pointer"
+              >
+                {showPromoted ? 'Hide' : 'Show'} {promotedDeals.length} promoted deals
+              </button>
+            )}
+          </div>
+
           <div className="space-y-4">
-            {opportunities.length === 0 ? (
+            {displayedOpportunities.length === 0 ? (
               <div className="p-8 text-center rounded-xl border border-dashed border-slate-200 bg-slate-50/60">
                 <Calculator className="w-8 h-8 text-slate-400 mx-auto mb-2" />
-                <h4 className="text-sm font-bold text-slate-800">No deals in sourcing pipeline</h4>
+                <h4 className="text-sm font-bold text-slate-800">
+                  {pipelineFilter === 'passed' ? 'No passed deals in archive' : 'No active deals in sourcing pipeline'}
+                </h4>
                 <p className="text-xs text-slate-400 mt-1 max-w-md mx-auto">
-                  Use the South African deal analyzer form above to model purchase price, bond leverage, transfer duty, and projected returns, then save candidates to your pipeline.
+                  {pipelineFilter === 'passed'
+                    ? 'Deals that fail due diligence or exceed your MAO can be passed with rejection reasons and archived here for forensic record.'
+                    : 'Use the South African deal analyzer form above to model purchase price, bond leverage, transfer duty, and projected returns, then save candidates to your pipeline.'}
                 </p>
               </div>
             ) : (
-              opportunities.map((deal) => {
+              displayedOpportunities.map((deal) => {
                 const openMarket = deal.openMarketValueZAR || Math.round(deal.purchasePrice * 1.2);
               const builtInEquity = deal.builtInEquityZAR ?? (openMarket - deal.purchasePrice);
               const builtInPercent = deal.builtInEquityPercent ?? Number(((builtInEquity / openMarket) * 100).toFixed(1));
@@ -2049,7 +2438,19 @@ export default function OpportunityAnalyzerPage() {
                       <span className="text-[10px] font-semibold bg-slate-200 text-slate-800 px-2 py-0.5 rounded">
                         {deal.source}
                       </span>
-                      <span className="text-[10px] font-semibold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded">
+                      <span className={`text-[10px] font-semibold px-2 py-0.5 rounded border ${
+                        deal.status === 'Screening'
+                          ? 'bg-sky-100 text-sky-800 border-sky-300'
+                          : deal.status === 'Offer Submitted'
+                          ? 'bg-amber-100 text-amber-800 border-amber-300'
+                          : deal.status === 'Due Diligence'
+                          ? 'bg-violet-100 text-violet-800 border-violet-300'
+                          : deal.status === 'Passed'
+                          ? 'bg-rose-100 text-rose-800 border-rose-300'
+                          : deal.status === 'Promoted to Flip'
+                          ? 'bg-indigo-100 text-indigo-800 border-indigo-300'
+                          : 'bg-teal-100 text-teal-800 border-teal-300'
+                      }`}>
                         {deal.status}
                       </span>
                       <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${
@@ -2065,6 +2466,16 @@ export default function OpportunityAnalyzerPage() {
                     <p className="text-xs text-slate-500 mt-0.5">
                       {deal.address}, {deal.city} ({deal.province})
                     </p>
+
+                    {/* Rejection / Pass Reason for Archived Deals */}
+                    {deal.status === 'Passed' && deal.passReason && (
+                      <div className="mt-2 text-[11px] bg-rose-50 border border-rose-200 text-rose-900 rounded-lg px-2.5 py-1 flex items-center gap-1.5 flex-wrap">
+                        <span className="font-bold text-rose-700">Passed:</span>
+                        <span className="font-semibold text-rose-800">{deal.passReason}</span>
+                        {deal.passNotes && <span className="text-slate-600 italic">— &ldquo;{deal.passNotes}&rdquo;</span>}
+                        {deal.passedAt && <span className="text-slate-400 text-[10px]">({deal.passedAt})</span>}
+                      </div>
+                    )}
 
                     {/* Built-in Equity & Location Grade Badges */}
                     <div className="flex flex-wrap items-center gap-1.5 mt-2">
@@ -2132,6 +2543,96 @@ export default function OpportunityAnalyzerPage() {
                       <Edit3 className="w-3.5 h-3.5" />
                       <span>Edit Deal</span>
                     </button>
+
+                    {/* Stage Advancement Button */}
+                    {(deal.status === 'Screening' || deal.status === 'Offer Submitted') && (
+                      <button
+                        type="button"
+                        onClick={() => advanceOpportunityStage(deal.id)}
+                        title={deal.status === 'Screening' ? 'Advance to Offer Submitted' : 'Advance to Due Diligence'}
+                        className="px-2.5 py-1.5 text-xs font-semibold bg-sky-50 text-sky-700 hover:bg-sky-100 border border-sky-300 rounded-lg transition-colors flex items-center gap-1 shadow-2xs cursor-pointer"
+                      >
+                        <ArrowRight className="w-3.5 h-3.5 text-sky-600" />
+                        <span>{deal.status === 'Screening' ? 'Submit Offer →' : 'Begin DD →'}</span>
+                      </button>
+                    )}
+
+                    {/* Pass Deal Button with Inline Popover */}
+                    {(deal.status === 'Screening' || deal.status === 'Offer Submitted' || deal.status === 'Due Diligence') && (
+                      <div className="relative">
+                        <button
+                          type="button"
+                          onClick={() => setPassingDealId(passingDealId === deal.id ? null : deal.id)}
+                          title="Pass on this deal"
+                          className="px-2.5 py-1.5 text-xs font-semibold bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-300 rounded-lg transition-colors flex items-center gap-1 shadow-2xs cursor-pointer"
+                        >
+                          <XCircle className="w-3.5 h-3.5 text-rose-600" />
+                          <span>Pass Deal</span>
+                        </button>
+
+                        {passingDealId === deal.id && (
+                          <div className="absolute right-0 top-full mt-1.5 w-72 bg-white rounded-xl border border-slate-200 shadow-2xl p-3.5 z-50 text-left animate-fadeIn">
+                            <div className="flex items-center justify-between pb-1.5 mb-2 border-b border-slate-100">
+                              <span className="text-xs font-bold text-slate-800">Pass Deal Reason</span>
+                              <button
+                                type="button"
+                                onClick={() => setPassingDealId(null)}
+                                className="text-slate-400 hover:text-slate-600 p-0.5 text-xs cursor-pointer"
+                              >
+                                ✕
+                              </button>
+                            </div>
+                            <label className="block text-[10px] font-semibold text-slate-600 mb-1">Reason</label>
+                            <select
+                              value={passReason}
+                              onChange={(e) => setPassReason(e.target.value as PassReason)}
+                              className="w-full text-xs font-medium px-2 py-1.5 border border-slate-300 rounded-lg mb-2.5 bg-white text-slate-900"
+                            >
+                              <option value="Yield Too Low">Yield Too Low</option>
+                              <option value="High Arrears / Municipal Risk">High Arrears / Municipal Risk</option>
+                              <option value="Seller Countered Above MAO">Seller Countered Above MAO</option>
+                              <option value="Title Deed Issues">Title Deed Issues</option>
+                              <option value="Structural / Damp Report Failed">Structural / Damp Report Failed</option>
+                              <option value="Funding Not Secured">Funding Not Secured</option>
+                              <option value="Other">Other</option>
+                            </select>
+                            <label className="block text-[10px] font-semibold text-slate-600 mb-1">Notes (Optional)</label>
+                            <textarea
+                              value={passNotes}
+                              onChange={(e) => setPassNotes(e.target.value)}
+                              placeholder="E.g. Counter-offer rejected, repairs too high..."
+                              rows={2}
+                              className="w-full text-xs p-2 border border-slate-300 rounded-lg mb-2.5 text-slate-800 resize-none"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => {
+                                passOpportunity(deal.id, passReason, passNotes);
+                                setPassingDealId(null);
+                                setPassReason('Yield Too Low');
+                                setPassNotes('');
+                              }}
+                              className="w-full bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold py-1.5 rounded-lg transition-colors cursor-pointer shadow-xs"
+                            >
+                              Confirm Pass Deal
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Reactivate Button for Passed Deals */}
+                    {deal.status === 'Passed' && (
+                      <button
+                        type="button"
+                        onClick={() => reactivateOpportunity(deal.id)}
+                        title="Reactivate deal back to Screening pipeline"
+                        className="px-2.5 py-1.5 text-xs font-semibold bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-300 rounded-lg transition-colors flex items-center gap-1 shadow-2xs cursor-pointer"
+                      >
+                        <RotateCcw className="w-3.5 h-3.5 text-emerald-600" />
+                        <span>Reactivate</span>
+                      </button>
+                    )}
 
                     <button
                       onClick={() => {

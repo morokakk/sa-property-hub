@@ -683,7 +683,7 @@ function createSampleOpportunity(
     monthlyRatesTaxes: rates,
     annualInsurance: 8_400,
     managementFeePercent: 8,
-    vacancyRatePercent: 5,
+    vacancyRatePercent: 6,
     targetExitPrice: exitPrice,
     holdingPeriodMonths: 6,
     loanToValuePercent: ltv,
@@ -726,7 +726,7 @@ function createSampleOpportunity(
     monthlyRatesTaxes: rates,
     annualInsurance: 8_400,
     managementFeePercent: 8,
-    vacancyRatePercent: 5,
+    vacancyRatePercent: 6,
     targetExitPrice: exitPrice,
     holdingPeriodMonths: 6,
     strategy,
@@ -782,7 +782,7 @@ export const INITIAL_OPPORTUNITIES: OpportunityDeal[] = [
     1_850,
     2_850_000,
     0, // Cash auction purchase
-    'Under Due Diligence',
+    'Due Diligence',
     false,
     {
       masterFolderUrl: 'https://1drv.ms/f/s!Parkhurst-Sheriff-Auction-Pack',
@@ -825,7 +825,7 @@ export const INITIAL_OPPORTUNITIES: OpportunityDeal[] = [
     650,
     1_150_000,
     90,
-    'Analyzing',
+    'Screening',
     true, // Section 13sex Eligible (Off-plan developer unit)
     {
       masterFolderUrl: 'https://drive.google.com/drive/folders/greencreek-developer-unit',
@@ -910,6 +910,8 @@ export const INITIAL_ANALYZER_DRAFT: AnalyzerDraft = {
   annualExpenseInflationPercent: 6.0,
   bondTermYears: 20,
   source: 'High-Street Auction',
+  vacancyRatePercent: 6.0,
+  managementFeePercent: 8.0,
 };
 
 export const EMPTY_ANALYZER_DRAFT: AnalyzerDraft = {
@@ -930,6 +932,8 @@ export const EMPTY_ANALYZER_DRAFT: AnalyzerDraft = {
   annualExpenseInflationPercent: 6.0,
   bondTermYears: 20,
   source: 'High-Street Auction',
+  vacancyRatePercent: 6.0,
+  managementFeePercent: 8.0,
 };
 
 export const DEFAULT_AI_SETTINGS: AiSettings = {

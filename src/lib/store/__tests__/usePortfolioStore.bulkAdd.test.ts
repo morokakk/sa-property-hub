@@ -65,7 +65,7 @@ describe('usePortfolioStore Bulk Import Actions', () => {
       monthlyCashFlow: metrics.monthlyCashFlow,
       projectedFlipNetProfit: metrics.projectedFlipNetProfit,
       projectedFlipRoi: metrics.projectedFlipRoi,
-      status: 'Analyzing',
+      status: 'Screening',
       createdAt: '2026-09-19',
     };
 
