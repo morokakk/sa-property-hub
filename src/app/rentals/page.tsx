@@ -641,11 +641,11 @@ export default function RentalPortfolioPage() {
           <div className="flex items-center gap-2">
             <button
               onClick={() => setShowAiUploadModal(true)}
-              title="Parse managing agent PDF / image statements with AI"
+              title="Upload managing agent payout statements or municipal / Eskom utility bills"
               className="inline-flex items-center gap-1.5 bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 text-xs font-semibold px-3 py-2 rounded-lg shadow-2xs transition-colors cursor-pointer"
             >
               <Sparkles className="w-3.5 h-3.5 text-purple-600" />
-              <span>AI Statement Import</span>
+              <span>Smart Document Import</span>
             </button>
             <ImportDropdown type="rentals" />
             <button
@@ -2716,6 +2716,10 @@ export default function RentalPortfolioPage() {
           setAiExtractedUnits(units);
           setShowAiUploadModal(false);
           setShowAiReviewModal(true);
+        }}
+        onOpenTenantStatement={(propertyId: string) => {
+          setShowAiUploadModal(false);
+          setStatementModalPropertyId(propertyId);
         }}
       />
 
