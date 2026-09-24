@@ -17,6 +17,8 @@ import {
   FlipToRentalConversionParams,
   RentalRefinanceParams,
   PassReason,
+  UtilityStatement,
+  MeterReading,
 } from '@/types';
 import {
   INITIAL_RENTALS,
@@ -69,6 +71,10 @@ interface PortfolioState {
   markRentalAsSold: (rentalId: string, actualSalePrice: number, netCashProceeds: number, soldDate: string, exitNotes?: string) => void;
   reopenRental: (rentalId: string) => void;
   refinanceRental: (params: RentalRefinanceParams) => void;
+  addUtilityStatement: (propertyId: string, statement: UtilityStatement) => void;
+  deleteUtilityStatement: (propertyId: string, statementId: string) => void;
+  addMeterReading: (propertyId: string, reading: Omit<MeterReading, 'id' | 'createdAt'>) => void;
+  deleteMeterReading: (propertyId: string, readingId: string) => void;
 
   // Flip Actions
   addFlip: (flip: FlipProject) => void;
@@ -501,6 +507,87 @@ export const usePortfolioStore = create<PortfolioState>()(
             liquidCapitalReserve: state.liquidCapitalReserve + params.cashEquityPulledOutZAR,
           };
         }),
+      addUtilityStatement: (propertyId, statement) =>
+        set((state) => ({
+          rentals: state.rentals.map((r) => {
+            if (r.id !== propertyId) return r;
+            const existingStatements = r.utilityStatements || [];
+            const filtered = existingStatements.filter(
+              (s) => s.id !== statement.id && s.statementDate !== statement.statementDate
+            );
+            const combined = [...filtered, statement].sort((a, b) =>
+              a.statementDate.localeCompare(b.statementDate)
+            );
+
+            // Auto-extract meter readings if present on incoming statement
+            let updatedMeterReadings = [...(r.meterReadings || [])];
+            if (statement.extractedMeterReadings && statement.extractedMeterReadings.length > 0) {
+              statement.extractedMeterReadings.forEach((extracted, idx) => {
+                const alreadyExists = updatedMeterReadings.some(
+                  (mr) =>
+                    mr.date === extracted.date &&
+                    mr.utilityType === extracted.utilityType &&
+                    mr.readingValue === extracted.readingValue
+                );
+                if (!alreadyExists) {
+                  const newReading: MeterReading = {
+                    ...extracted,
+                    id: `meter-pdf-${Date.now()}-${idx}`,
+                    createdAt: new Date().toISOString(),
+                  };
+                  updatedMeterReadings.push(newReading);
+                }
+              });
+              updatedMeterReadings.sort((a, b) => b.date.localeCompare(a.date));
+            }
+
+            return {
+              ...r,
+              utilityStatements: combined,
+              meterReadings: updatedMeterReadings,
+            };
+          }),
+        })),
+      deleteUtilityStatement: (propertyId, statementId) =>
+        set((state) => ({
+          rentals: state.rentals.map((r) => {
+            if (r.id !== propertyId) return r;
+            return {
+              ...r,
+              utilityStatements: (r.utilityStatements || []).filter(
+                (s) => s.id !== statementId
+              ),
+            };
+          }),
+        })),
+      addMeterReading: (propertyId, reading) =>
+        set((state) => ({
+          rentals: state.rentals.map((r) => {
+            if (r.id !== propertyId) return r;
+            const newReading: MeterReading = {
+              ...reading,
+              id: `meter-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+              createdAt: new Date().toISOString(),
+            };
+            const updated = [newReading, ...(r.meterReadings || [])].sort((a, b) =>
+              b.date.localeCompare(a.date)
+            );
+            return {
+              ...r,
+              meterReadings: updated,
+            };
+          }),
+        })),
+      deleteMeterReading: (propertyId, readingId) =>
+        set((state) => ({
+          rentals: state.rentals.map((r) => {
+            if (r.id !== propertyId) return r;
+            return {
+              ...r,
+              meterReadings: (r.meterReadings || []).filter((m) => m.id !== readingId),
+            };
+          }),
+        })),
 
       // Flips
       addFlip: (flip) =>
@@ -1158,9 +1245,23 @@ export const usePortfolioStore = create<PortfolioState>()(
           managementFeePercent: opp.managementFeePercent ?? 8,
         }));
 
+        const rawRentals = pState.rentals || currentState.rentals;
+        const migratedRentals = (rawRentals || []).map((rental: any) => {
+          const defaultStatements =
+            currentState.rentals.find((r) => r.id === rental.id)?.utilityStatements || [];
+          return {
+            ...rental,
+            utilityStatements:
+              rental.utilityStatements && rental.utilityStatements.length > 0
+                ? rental.utilityStatements
+                : defaultStatements,
+          };
+        });
+
         return {
           ...currentState,
           ...pState,
+          rentals: migratedRentals,
           opportunities: migratedOpportunities,
           aiSettings: {
             ...DEFAULT_AI_SETTINGS,

@@ -1,0 +1,278 @@
+import { describe, it, expect } from 'vitest';
+import {
+  UtilityStatementSchema,
+  parseCojUtilityRegex,
+  parseEskomUtilityRegex,
+  parseUtilityWithRegex,
+} from '../pdfParser';
+
+describe('Dual-Pipeline Utility Parser', () => {
+  describe('Zod Schema & Mathematical Cross-Check', () => {
+    it('validates a correct City of Johannesburg line item payload', () => {
+      const payload = {
+        statementDate: '2025-04-03',
+        billingPeriod: 'April 2025',
+        accountNumber: '553667195',
+        provider: 'City of Johannesburg',
+        electricityZAR: 0,
+        waterZAR: 0,
+        refuseZAR: 353.05,
+        sewerageZAR: 0,
+        propertyRatesZAR: 774.86,
+        totalDueZAR: 1127.91,
+      };
+
+      const result = UtilityStatementSchema.parse(payload);
+      expect(result.refuseZAR).toBe(353.05);
+      expect(result.propertyRatesZAR).toBe(774.86);
+      expect(result.totalDueZAR).toBe(1127.91);
+    });
+
+    it('rejects a payload where individual lines do not sum to totalDueZAR', () => {
+      const invalidPayload = {
+        statementDate: '2025-04-03',
+        billingPeriod: 'April 2025',
+        accountNumber: '553667195',
+        provider: 'City of Johannesburg',
+        electricityZAR: 500,
+        waterZAR: 300,
+        refuseZAR: 350,
+        sewerageZAR: 200,
+        propertyRatesZAR: 700,
+        totalDueZAR: 3500, // Actual sum is 2050 -> mismatch
+      };
+
+      expect(() => UtilityStatementSchema.parse(invalidPayload)).toThrow(
+        /Mathematical cross-check failed/
+      );
+    });
+
+    it('allows slight cent discrepancies within R1.50 rounding tolerance', () => {
+      const roundedPayload = {
+        statementDate: '2025-04-03',
+        billingPeriod: 'April 2025',
+        provider: 'City of Johannesburg',
+        electricityZAR: 500.0,
+        waterZAR: 300.0,
+        refuseZAR: 350.0,
+        sewerageZAR: 200.0,
+        propertyRatesZAR: 0,
+        totalDueZAR: 1350.45, // Difference of R0.45 from 1350.00
+      };
+
+      expect(() => UtilityStatementSchema.parse(roundedPayload)).not.toThrow();
+    });
+  });
+
+  describe('City of Johannesburg Regex Parser', () => {
+    // Exact OCR text from user's uploaded Quarrywood / Lone Hill CoJ bill
+    const mockCojRawText = `
+COPY OF TAX INVOICE
+VAT NO: CITY OF JOHANNESBURG: 4760117194 VAT NO: PIKITUP: 4790191292
+KGOMOTSO MOROKA FAMILY TRUST
+QUARRYWOOD UNIT
+32 THE STRAIGHT STREET
+LONE HILL EXT.48
+2191
+Date 2025/04/03
+Statement for April 2025
+Physical Address 32 THE STRAIGHT STREET
+Stand No./Portion 42 QUARRYWOOD
+Township LONE HILL EXT.48
+Stand Size 97 m2 Date of Valuation 2023/07/01 Portion E1 Market Value R 1,319,000.00 Region A WARD 93
+Invoice Number: 214000237577 Next Reading Date: 2025/04/22
+Account Number: 553667195 PIN CODE: xxxxxx
+Previous Account Balance 6,598.65
+Less: Incoming Payment - 8,442.00
+Sub Total - 1,843.35
+Current Charges (Excl. VAT) 1,081.86
+VAT @ 15% 46.05
+Total Due - 715.44
+Due Date 2025/04/22
+
+Account Number: 553667195
+City of Johannesburg
+Property Rates VAT 4760117194 Sub - Total Total Amount
+Category of Property: Property Rates Residential
+R 1,319,000.00 X R 0.0091250 / 12 ( Billing Period 2025/04 ) 1,002.99
+Less rates on first R300 000.00 of market value - 228.13
+VAT: 0 % 0.00 774.86
+
+City Power
+Electricity VAT 4710191182 Sub - Total Total Amount
+Unbilled Electricity: Eskom supply 0.00
+VAT: 15.00% 0.00 0.00
+
+PIKITUP
+Refuse VAT 4790191292 Sub - Total Total Amount
+Refuse Residential 307.00
+VAT: 15.00% 46.05 353.05
+
+Current Charges (Including VAT) 1,127.91
+    `;
+
+    it('extracts all line items and validates cross-check for City of Joburg bill', () => {
+      const parsed = parseCojUtilityRegex(mockCojRawText);
+
+      expect(parsed.accountNumber).toBe('553667195');
+      expect(parsed.statementDate).toBe('2025-04-03');
+      expect(parsed.billingPeriod).toBe('April 2025');
+      expect(parsed.provider).toBe('City of Johannesburg');
+      expect(parsed.propertyRatesZAR).toBe(774.86);
+      expect(parsed.refuseZAR).toBe(353.05);
+      expect(parsed.electricityZAR).toBe(0);
+      expect(parsed.waterZAR).toBe(0);
+      expect(parsed.sewerageZAR).toBe(0);
+      expect(parsed.totalDueZAR).toBe(1127.91);
+    });
+
+    it('routes CoJ text through master parseUtilityWithRegex function', () => {
+      const parsed = parseUtilityWithRegex(mockCojRawText);
+      expect(parsed.provider).toBe('City of Johannesburg');
+      expect(parsed.refuseZAR).toBe(353.05);
+      expect(parsed.totalDueZAR).toBe(1127.91);
+    });
+
+    it('correctly parses combined Johannesburg Water and Sanitation without double-counting', () => {
+      const mockSeptemberCojBill = `
+City of Johannesburg
+Property Rates VAT 4760117194 Sub - Total Total Amount
+Category of Property: Property Rates Residential
+R 3,180,000.00 X R 0.0098890 / 12 ( Billing Period 2026/09 ) 2,620.59
+Less rates on first R300 000.00 of market value - 247.23
+VAT: 0 % 0.00 2,373.36
+
+City Power
+Electricity VAT 4710191182 Sub - Total Total Amount
+Unbilled Electricity: Eskom supply 0.00
+VAT: 15.00% 0.00 0.00
+
+Johannesburg Water
+Water & Sanitation VAT 4270191077 Sub - Total Total Amount
+Category of Water: Consumption - Residential
+(Reading period = 2026/07/11 to 2026/08/07 = 28 days)
+Meter: 211001886; Register: 1; Multiply factor: 1; Start reading: 2,053.000;
+End reading: 2,083.000; Difference: 30.000; Consumption: 30.000;
+Units: KL; Type: Actual Readings.
+Daily average consumption 1.071 KL
+Charges for 30.000 KL are based on a sliding scale for a 28 day period
+Step 1 5.520 KL @ R 0.0000 ( Billing Period 2026/09 ) Step 2 3.679 KL @ R 33.570 Step 3 4.600 KL
+@ R 35.040 Step 4 4.599 KL @ R 49.130 Step 5 9.200 KL @ R 67.910 Step 6 2.402 KL @ R 74.260 1,313.77
+Extended Social Package Grant 0.00
+Demand Management Levy ( Billing Period 2026/09 ) 107.74
+Category of Sewer: Residential
+Sewer monthly charge based on Stand size 991 m2 ( Billing Period 2026/09 ) 774.48
+VAT: 15.00% 329.40 2,525.39
+
+PIKITUP
+Refuse VAT 4790191292 Sub - Total Total Amount
+Refuse Residential ( Billing Period 2026/09 ) 507.00
+VAT: 15.00% 76.05 583.05
+
+Current Charges (Including VAT) 5,481.80
+      `;
+
+      const parsed = parseCojUtilityRegex(mockSeptemberCojBill);
+
+      expect(parsed.billingPeriod).toBe('September 2026');
+      expect(parsed.propertyRatesZAR).toBe(2373.36);
+      expect(parsed.electricityZAR).toBe(0);
+      expect(parsed.refuseZAR).toBe(583.05);
+      // Sewerage: 774.48 * 1.15 = 890.65
+      expect(parsed.sewerageZAR).toBe(890.65);
+      // Water: 2525.39 - 890.65 = 1634.74
+      expect(parsed.waterZAR).toBe(1634.74);
+      // Crucial: sum of water + sewerage MUST equal Johannesburg Water total (2,525.39)
+      expect(parsed.waterZAR + parsed.sewerageZAR).toBe(2525.39);
+      // Current charges
+      expect(parsed.totalDueZAR).toBe(5481.80);
+      // Tenant utility recovery portion: water (1634.74) + sewerage (890.65) + refuse (583.05) = 3108.44
+      const tenantUtilities = Math.round((parsed.waterZAR + parsed.sewerageZAR + parsed.refuseZAR + parsed.electricityZAR) * 100) / 100;
+      expect(tenantUtilities).toBe(3108.44);
+
+      // Meter Readings Extraction
+      expect(parsed.extractedMeterReadings).toBeDefined();
+      expect(parsed.extractedMeterReadings?.length).toBe(1);
+      const waterMeter = parsed.extractedMeterReadings![0];
+      expect(waterMeter.meterNumber).toBe('211001886');
+      expect(waterMeter.utilityType).toBe('water');
+      expect(waterMeter.readingValue).toBe(2083);
+      expect(waterMeter.previousReadingValue).toBe(2053);
+      expect(waterMeter.consumption).toBe(30);
+      expect(waterMeter.readingType).toBe('Actual');
+      expect(waterMeter.source).toBe('pdf-extracted');
+    });
+  });
+
+  describe('Eskom Regex Parser', () => {
+    // Exact OCR text from user's uploaded Eskom bill
+    const mockEskomRawText = `
+ESKOM HOLDINGS SOC LTD REG NO 2002/015527/30
+VAT REG NO 4740101508
+CUSTOMER SELF SERVICE WEBSITE https://csonline.co.za
+CENTRAL REGION PO BOX 8610 Johannesburg 2000
+YOUR ACCOUNT NO 7270492027
+SECURITY HELD 0.00
+BILLING DATE 2026-06-19
+TAX INVOICE NO 727602883143
+ACCOUNT MONTH JUNE 2026
+CURRENT DUE DATE 2026-07-14
+DIRECT DEPOSIT DETAIL
+BANK: First National Bank BRANCH CODE: 255005 BANK ACC NO: 62006191077
+ACCOUNT NO / REFERENCE NO 7270492027
+NAME MOROKA,KENOSI
+CURRENT 0.00 TOTAL AMOUNT DUE 0.00
+ACCOUNT SUMMARY FOR JUNE 2026
+BALANCE BROUGHT FORWARD R -6,864.97
+TOTAL CHARGES FOR BILLING PERIOD R 0.00
+ADJUSTMENT REFUND ON CREDIT BALANCE R 6,864.97
+    `;
+
+    it('extracts Eskom account number, date, billing period, and electricity charges', () => {
+      const parsed = parseEskomUtilityRegex(mockEskomRawText);
+
+      expect(parsed.accountNumber).toBe('7270492027');
+      expect(parsed.statementDate).toBe('2026-06-19');
+      expect(parsed.billingPeriod).toBe('JUNE 2026');
+      expect(parsed.provider).toBe('Eskom');
+      expect(parsed.electricityZAR).toBe(0);
+      expect(parsed.waterZAR).toBe(0);
+      expect(parsed.refuseZAR).toBe(0);
+      expect(parsed.sewerageZAR).toBe(0);
+      expect(parsed.propertyRatesZAR).toBe(0);
+      expect(parsed.totalDueZAR).toBe(0);
+    });
+
+    it('routes Eskom text through master parseUtilityWithRegex function', () => {
+      const parsed = parseUtilityWithRegex(mockEskomRawText);
+      expect(parsed.provider).toBe('Eskom');
+      expect(parsed.accountNumber).toBe('7270492027');
+      expect(parsed.totalDueZAR).toBe(0);
+    });
+
+    it('extracts Eskom electricity meter reading from tabular statement', () => {
+      const mockEskomWithMeter = `
+ESKOM HOLDINGS SOC LTD
+YOUR ACCOUNT NO 7270492027
+BILLING DATE 2026-02-26
+ACCOUNT MONTH FEBRUARY 2026
+TOTAL CHARGES FOR BILLING PERIOD R 450.00
+READING TYPE: ACTUAL | READING DATES: 2026/02/17 - 2026/02/26 | NO OF DAYS: 9
+METER NUMBER | PREV. READING | CURR. READING | DIFFERENCE | CONSTANT | CONSUMPTION
+10003374     | 39302.0000    | 39504.0000    | 202.0000   | 1.0000   | 202.0000
+      `;
+
+      const parsed = parseEskomUtilityRegex(mockEskomWithMeter);
+      expect(parsed.extractedMeterReadings).toBeDefined();
+      expect(parsed.extractedMeterReadings?.length).toBe(1);
+      const elecMeter = parsed.extractedMeterReadings![0];
+      expect(elecMeter.meterNumber).toBe('10003374');
+      expect(elecMeter.utilityType).toBe('electricity');
+      expect(elecMeter.readingValue).toBe(39504);
+      expect(elecMeter.previousReadingValue).toBe(39302);
+      expect(elecMeter.consumption).toBe(202);
+      expect(elecMeter.readingType).toBe('Actual');
+      expect(elecMeter.source).toBe('pdf-extracted');
+    });
+  });
+});

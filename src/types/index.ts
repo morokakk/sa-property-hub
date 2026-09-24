@@ -352,6 +352,45 @@ export interface RentalProperty {
   isBrrrrProperty?: boolean;
   totalEquityExtractedZAR?: number;
   refinanceHistory?: RentalRefinanceRecord[];
+  // Historical Utility Statements & Variance Ledger
+  utilityStatements?: UtilityStatement[];
+  // Physical & Municipal Meter Readings
+  meterReadings?: MeterReading[];
+}
+
+// Physical & Municipal Meter Reading Record
+export interface MeterReading {
+  id: string;
+  date: string; // YYYY-MM-DD
+  utilityType: 'electricity' | 'water';
+  readingValue: number;
+  previousReadingValue?: number;
+  consumption?: number; // KL for water, kWh for electricity
+  meterNumber?: string;
+  readingType?: 'Actual' | 'Estimated';
+  source: 'pdf-extracted' | 'manual';
+  photoUrl?: string;
+  notes?: string;
+  createdAt: string;
+}
+
+// Municipal / Eskom Utility Statement Record
+export interface UtilityStatement {
+  id: string;
+  statementDate: string; // YYYY-MM-DD (e.g. '2025-04-03')
+  billingPeriod?: string; // e.g. 'April 2025' or 'June 2026'
+  accountNumber?: string;
+  provider: 'City of Johannesburg' | 'Eskom' | 'City Power' | 'Other' | string;
+  electricityZAR: number;
+  waterZAR: number;
+  refuseZAR: number;
+  sewerageZAR: number;
+  propertyRatesZAR?: number;
+  totalDueZAR: number; // Current charges (rates + utilities)
+  rawText?: string;
+  parsedVia: 'byok-llm' | 'regex-fallback' | 'manual';
+  extractedMeterReadings?: Omit<MeterReading, 'id' | 'createdAt'>[];
+  createdAt: string;
 }
 
 // Rental Refinance Audit Record

@@ -40,12 +40,16 @@ import {
   ArrowUpRight,
   ArrowRightLeft,
   History,
+  FileText,
+  Gauge,
 } from 'lucide-react';
 import { exportRentalsCSV } from '@/lib/export/csvExport';
 import ImportDropdown from '@/components/common/ImportDropdown';
 import { ExtractedRentalUnit } from '@/types';
 import StatementUploadModal from '@/components/rentals/StatementUploadModal';
 import StatementReviewModal from '@/components/rentals/StatementReviewModal';
+import TenantStatement from '@/components/rentals/TenantStatement';
+import MeterReadingsModal from '@/components/rentals/MeterReadingsModal';
 
 export function renderPropertyTypeBadge(type?: PropertyTitleType) {
   switch (type) {
@@ -260,6 +264,12 @@ export default function RentalPortfolioPage() {
   const [showAiUploadModal, setShowAiUploadModal] = useState(false);
   const [showAiReviewModal, setShowAiReviewModal] = useState(false);
   const [aiExtractedUnits, setAiExtractedUnits] = useState<ExtractedRentalUnit[]>([]);
+
+  // Historical Tenant Utility Variance & Statement Modal State
+  const [statementModalPropertyId, setStatementModalPropertyId] = useState<string | null>(null);
+
+  // Physical & Municipal Meter Readings Modal State
+  const [meterModalPropertyId, setMeterModalPropertyId] = useState<string | null>(null);
 
   // Per-card tab selection ('financials' | 'coc' | 'vault')
   const [cardTab, setCardTab] = useState<Record<string, 'financials' | 'coc' | 'vault'>>({});
@@ -1068,7 +1078,18 @@ export default function RentalPortfolioPage() {
                                     <span className="text-[10px] text-emerald-600 font-semibold">✓ Paid Up</span>
                                   )}
                                 </div>
-                                <span className="text-[10px] text-slate-400">Inline edit (auto-saves)</span>
+                                <div className="flex items-center gap-2">
+                                  <button
+                                    type="button"
+                                    onClick={() => setStatementModalPropertyId(property.id)}
+                                    className="text-[10px] text-teal-700 hover:text-teal-900 font-bold hover:underline inline-flex items-center gap-0.5 cursor-pointer"
+                                    title="View tenant utility recovery and month-over-month variance statement"
+                                  >
+                                    <FileText className="w-2.5 h-2.5 text-teal-600" />
+                                    <span>Statements ({(property.utilityStatements?.length || 0)})</span>
+                                  </button>
+                                  <span className="text-[10px] text-slate-400">Inline edit</span>
+                                </div>
                               </div>
                               <div className="flex items-center gap-1.5">
                                 <div className="relative flex-1">
@@ -1225,6 +1246,34 @@ export default function RentalPortfolioPage() {
                         </button>
 
                         <div className="flex items-center gap-1.5 flex-wrap justify-end">
+                          <button
+                            type="button"
+                            onClick={() => setMeterModalPropertyId(property.id)}
+                            className="inline-flex items-center gap-1 text-[11px] font-bold text-cyan-700 hover:text-cyan-900 bg-cyan-50 hover:bg-cyan-100 px-2.5 py-1 rounded-md border border-cyan-200 transition-colors cursor-pointer"
+                            title="View physical meter readings and log field inspections"
+                          >
+                            <Gauge className="w-3 h-3 text-cyan-600" />
+                            <span>Log Meter</span>
+                            {(property.meterReadings?.length || 0) > 0 && (
+                              <span className="ml-0.5 px-1.5 py-0.2 bg-cyan-200 text-cyan-900 rounded-full text-[9px] font-black">
+                                {property.meterReadings?.length}
+                              </span>
+                            )}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setStatementModalPropertyId(property.id)}
+                            className="inline-flex items-center gap-1 text-[11px] font-bold text-teal-700 hover:text-teal-900 bg-teal-50 hover:bg-teal-100 px-2.5 py-1 rounded-md border border-teal-200 transition-colors cursor-pointer"
+                            title="View tenant utility recovery and month-over-month variance statement"
+                          >
+                            <FileText className="w-3 h-3 text-teal-600" />
+                            <span>Utilities & Statement</span>
+                            {(property.utilityStatements?.length || 0) > 0 && (
+                              <span className="ml-0.5 px-1.5 py-0.2 bg-teal-200 text-teal-900 rounded-full text-[9px] font-black">
+                                {property.utilityStatements?.length}
+                              </span>
+                            )}
+                          </button>
                           <button
                             type="button"
                             onClick={() => handleOpenRefinance(property)}
@@ -2679,6 +2728,25 @@ export default function RentalPortfolioPage() {
           setShowAiReviewModal(false);
           setAiExtractedUnits([]);
         }}
+      />
+
+      {/* Historical Tenant Utility Variance & Statement Modal */}
+      <TenantStatement
+        propertyId={statementModalPropertyId}
+        isOpen={Boolean(statementModalPropertyId)}
+        onClose={() => setStatementModalPropertyId(null)}
+        onOpenMeterReadings={() => {
+          const currentId = statementModalPropertyId;
+          setStatementModalPropertyId(null);
+          setMeterModalPropertyId(currentId);
+        }}
+      />
+
+      {/* Physical & Municipal Meter Readings Modal */}
+      <MeterReadingsModal
+        propertyId={meterModalPropertyId}
+        isOpen={Boolean(meterModalPropertyId)}
+        onClose={() => setMeterModalPropertyId(null)}
       />
     </div>
   );
