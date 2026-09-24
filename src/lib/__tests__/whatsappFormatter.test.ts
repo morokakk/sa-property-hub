@@ -3,7 +3,9 @@ import {
   formatOpportunityForWhatsApp,
   formatFlipForWhatsApp,
   formatProposalPitchForWhatsApp,
+  formatPaymentStatement,
 } from '../whatsappFormatter';
+import { formatZAR, formatDate } from '../formatters';
 import { OpportunityDeal, FlipProject, InvestorProfile } from '@/types';
 
 describe('whatsappFormatter - Strategy Adaptive Formatting', () => {
@@ -360,5 +362,76 @@ describe('whatsappFormatter - Strategy Adaptive Formatting', () => {
     expect(output).toContain('Sourcing:* Distressed Bank Repo');
     expect(output).toContain('Post-Rehab ARV Valuation:');
     expect(output).toContain('Lender Capital Exit:* Phase 2 Bank Refinance @ Month 6');
+  });
+
+  describe('formatPaymentStatement - WhatsApp Payment Receipts', () => {
+    it('formats investment payment notification with entity and linked asset', () => {
+      const receipt = formatPaymentStatement({
+        funderName: 'Johan Meyer',
+        funderEntity: 'Meyer Family Trust',
+        linkedAsset: 'Berea High-Yield Fix & Flip',
+        paymentType: 'Monthly Coupon / Interest',
+        returnTerms: '14% p.a. Fixed Interest',
+        amount: 7_000,
+        date: '2026-09-24',
+      });
+
+      expect(receipt).toContain('🧾 *INVESTMENT PAYMENT NOTIFICATION*');
+      expect(receipt).toContain('• Investor: Johan Meyer (Meyer Family Trust)');
+      expect(receipt).toContain('• Linked Asset: Berea High-Yield Fix & Flip');
+      expect(receipt).toContain('• Payment Type: Monthly Coupon / Interest (14% p.a. Fixed Interest)');
+      expect(receipt).toContain(`• Amount Disbursed: ${formatZAR(7_000)}`);
+      expect(receipt).toContain(`• Date: ${formatDate('2026-09-24')}`);
+      expect(receipt).toContain('Thank you for partnering with us. Your capital remains actively deployed and performing.');
+    });
+
+    it('cleanly omits parentheses when funderEntity is empty or undefined', () => {
+      const receipt = formatPaymentStatement({
+        funderName: 'Sarah Jenkins',
+        funderEntity: '',
+        linkedAsset: 'Parkhurst Distressed Sheriff Auction',
+        paymentType: 'Principal Repayment',
+        returnTerms: '15% p.a. Fixed Interest',
+        amount: 250_000,
+        date: '2026-10-15',
+      });
+
+      expect(receipt).toContain('• Investor: Sarah Jenkins\n');
+      expect(receipt).not.toContain('Sarah Jenkins ()');
+      expect(receipt).toContain(`• Amount Disbursed: ${formatZAR(250_000)}`);
+      expect(receipt).toContain(`• Date: ${formatDate('2026-10-15')}`);
+    });
+
+    it('falls back to General Portfolio Liquidity when linkedAsset is empty or undefined', () => {
+      const receipt = formatPaymentStatement({
+        funderName: 'David Khumalo',
+        funderEntity: 'Khumalo Holdings (Pty) Ltd',
+        paymentType: 'Full Settlement',
+        returnTerms: '12% p.a. Fixed Interest',
+        amount: 500_000,
+        date: '2026-11-01',
+      });
+
+      expect(receipt).toContain('• Linked Asset: General Portfolio Liquidity');
+      expect(receipt).toContain('• Payment Type: Full Settlement (12% p.a. Fixed Interest)');
+      expect(receipt).toContain(`• Amount Disbursed: ${formatZAR(500_000)}`);
+      expect(receipt).toContain(`• Date: ${formatDate('2026-11-01')}`);
+    });
+
+    it('formats profit share distribution payment correctly', () => {
+      const receipt = formatPaymentStatement({
+        funderName: 'Standard Private Capital',
+        funderEntity: 'SPC Syndicate Fund',
+        linkedAsset: 'Kensington House Modernization',
+        paymentType: 'Profit Share Distribution',
+        returnTerms: '30% Net Profit Split',
+        amount: 82_800,
+        date: '2026-12-05',
+      });
+
+      expect(receipt).toContain('• Payment Type: Profit Share Distribution (30% Net Profit Split)');
+      expect(receipt).toContain(`• Amount Disbursed: ${formatZAR(82_800)}`);
+      expect(receipt).toContain(`• Date: ${formatDate('2026-12-05')}`);
+    });
   });
 });

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import TopHeader from '@/components/navigation/TopHeader';
 import { usePortfolioStore, usePortfolioSummary } from '@/lib/store/usePortfolioStore';
 import { formatZAR, formatPercent, formatDate } from '@/lib/formatters';
@@ -15,12 +15,14 @@ import {
   ShieldCheck,
   Building,
   CheckCircle,
+  CheckCircle2,
   Clock,
   Wallet,
   Trash2,
   FileSpreadsheet,
 } from 'lucide-react';
 import { exportFundingCSV } from '@/lib/export/csvExport';
+import { formatPaymentStatement } from '@/lib/whatsappFormatter';
 
 export default function FundingTrackerPage() {
   const funding = usePortfolioStore((state) => state.funding);
@@ -47,9 +49,20 @@ export default function FundingTrackerPage() {
   const [linkedDealId, setLinkedDealId] = useState<string>('');
   const [notes, setNotes] = useState('');
 
-  // Repayment Quick Action Modal
+  // Repayment Quick Action Modal State
   const [repaymentModalSource, setRepaymentModalSource] = useState<FundingSource | null>(null);
   const [repaymentAmount, setRepaymentAmount] = useState<number>(0);
+  const [paymentType, setPaymentType] = useState<string>('Monthly Coupon / Interest');
+  const [paymentDate, setPaymentDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [copyReceiptOnSave, setCopyReceiptOnSave] = useState<boolean>(true);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  // Auto-dismiss toast after 3.5 seconds
+  useEffect(() => {
+    if (!toastMessage) return;
+    const timer = setTimeout(() => setToastMessage(null), 3500);
+    return () => clearTimeout(timer);
+  }, [toastMessage]);
 
   const handleAddFunding = (e: React.FormEvent) => {
     e.preventDefault();
@@ -88,7 +101,7 @@ export default function FundingTrackerPage() {
     setNotes('');
   };
 
-  const handleProcessRepayment = (e: React.FormEvent) => {
+  const handleProcessRepayment = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!repaymentModalSource || repaymentAmount <= 0) return;
 
@@ -100,6 +113,38 @@ export default function FundingTrackerPage() {
       totalRepaidZAR: newTotalRepaid,
       status: isSettled ? 'Settled' : repaymentModalSource.status,
     });
+
+    if (copyReceiptOnSave) {
+      const returnTermsText = `${repaymentModalSource.returnRatePercent}% ${
+        repaymentModalSource.returnTermsType === 'Fixed Interest'
+          ? 'p.a. Fixed Interest'
+          : repaymentModalSource.returnTermsType === 'Equity Profit Split'
+          ? 'Net Profit Split'
+          : repaymentModalSource.returnTermsType
+      }`;
+
+      const receiptText = formatPaymentStatement({
+        funderName: repaymentModalSource.lenderName,
+        funderEntity: repaymentModalSource.entityOrContact,
+        linkedAsset: repaymentModalSource.linkedDealName || 'General Portfolio Liquidity',
+        paymentType,
+        returnTerms: returnTermsText,
+        amount: repaymentAmount,
+        date: paymentDate,
+      });
+
+      try {
+        if (navigator?.clipboard?.writeText) {
+          await navigator.clipboard.writeText(receiptText);
+        }
+      } catch {
+        // Silently handle headless/sandboxed browser environments
+      }
+
+      setToastMessage('Payment Logged & WhatsApp Receipt Copied!');
+    } else {
+      setToastMessage('Payment Logged Successfully');
+    }
 
     setRepaymentModalSource(null);
     setRepaymentAmount(0);
@@ -304,8 +349,17 @@ export default function FundingTrackerPage() {
                             onClick={() => {
                               setRepaymentModalSource(item);
                               setRepaymentAmount(0);
+                              setPaymentType(
+                                item.returnTermsType === 'Equity Profit Split'
+                                  ? 'Profit Share Distribution'
+                                  : item.paymentSchedule === 'At Exit (Maturity)'
+                                  ? 'Principal Repayment'
+                                  : 'Monthly Coupon / Interest'
+                              );
+                              setPaymentDate(new Date().toISOString().split('T')[0]);
+                              setCopyReceiptOnSave(true);
                             }}
-                            className="px-2 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded text-[11px] font-semibold transition-colors"
+                            className="px-2 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded text-[11px] font-semibold transition-colors cursor-pointer"
                           >
                             Log Payment
                           </button>
@@ -513,7 +567,7 @@ export default function FundingTrackerPage() {
 
             <form onSubmit={handleProcessRepayment} className="space-y-4 text-xs">
               <div>
-                <label className="block font-semibold text-slate-700 mb-1">Payment Amount (ZAR)</label>
+                <label className="block font-semibold text-slate-700 mb-1">Payment Amount (ZAR) *</label>
                 <div className="relative">
                   <span className="absolute left-2.5 top-2 text-xs font-bold text-slate-400">R</span>
                   <input
@@ -525,6 +579,33 @@ export default function FundingTrackerPage() {
                     onChange={(e) => setRepaymentAmount(Number(e.target.value))}
                     className="w-full pl-7 pr-3 py-2 border border-slate-300 rounded-lg font-bold text-slate-900"
                     placeholder="Amount paid"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Payment Type</label>
+                  <select
+                    value={paymentType}
+                    onChange={(e) => setPaymentType(e.target.value)}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white"
+                  >
+                    <option value="Monthly Coupon / Interest">Monthly Coupon / Interest</option>
+                    <option value="Principal Repayment">Principal Repayment</option>
+                    <option value="Partial Return">Partial Return</option>
+                    <option value="Full Settlement">Full Settlement</option>
+                    <option value="Profit Share Distribution">Profit Share Distribution</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Payment Date</label>
+                  <input
+                    type="date"
+                    required
+                    value={paymentDate}
+                    onChange={(e) => setPaymentDate(e.target.value)}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg"
                   />
                 </div>
               </div>
@@ -542,23 +623,43 @@ export default function FundingTrackerPage() {
                 </div>
               </div>
 
-              <div className="flex items-center justify-end gap-2 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setRepaymentModalSource(null)}
-                  className="px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50 font-semibold"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-semibold"
-                >
-                  Record Payment
-                </button>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3 border-t border-slate-200">
+                <label className="flex items-center gap-2 cursor-pointer select-none text-slate-700 font-medium text-xs">
+                  <input
+                    type="checkbox"
+                    checked={copyReceiptOnSave}
+                    onChange={(e) => setCopyReceiptOnSave(e.target.checked)}
+                    className="w-4 h-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 accent-emerald-600 cursor-pointer"
+                  />
+                  <span>Copy WhatsApp Receipt</span>
+                </label>
+
+                <div className="flex items-center justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setRepaymentModalSource(null)}
+                    className="px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50 font-semibold cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-semibold shadow-xs transition-colors cursor-pointer"
+                  >
+                    Save / Log Payment
+                  </button>
+                </div>
               </div>
             </form>
           </div>
+        </div>
+      )}
+
+      {/* Dual Action Toast Notification */}
+      {toastMessage && (
+        <div className="fixed bottom-20 md:bottom-6 right-4 sm:right-6 z-50 bg-slate-900 text-white text-xs px-4 py-2.5 rounded-lg shadow-xl border border-slate-700 flex items-center gap-2 animate-in fade-in slide-in-from-bottom-2 duration-200">
+          <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+          <span>{toastMessage}</span>
         </div>
       )}
     </div>

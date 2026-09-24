@@ -395,3 +395,51 @@ export function formatProposalPitchForWhatsApp(
 
   return text;
 }
+
+export interface PaymentStatementDetails {
+  funderName: string;
+  funderEntity?: string;
+  linkedAsset?: string;
+  paymentType: string;
+  returnTerms: string;
+  amount: number;
+  date: string;
+}
+
+/**
+ * Formats a 1-click WhatsApp payment statement receipt for private lenders or syndicate partners.
+ */
+export function formatPaymentStatement(details: PaymentStatementDetails): string {
+  const {
+    funderName,
+    funderEntity,
+    linkedAsset,
+    paymentType,
+    returnTerms,
+    amount,
+    date,
+  } = details;
+
+  const investorLine =
+    funderEntity && funderEntity.trim().length > 0
+      ? `${funderName} (${funderEntity.trim()})`
+      : funderName;
+
+  const assetLine =
+    linkedAsset && linkedAsset.trim().length > 0
+      ? linkedAsset.trim()
+      : 'General Portfolio Liquidity';
+
+  const formattedDate = date ? formatDate(date) : formatDate(new Date().toISOString().split('T')[0]);
+
+  let text = `🧾 *INVESTMENT PAYMENT NOTIFICATION*\n`;
+  text += `• Investor: ${investorLine}\n`;
+  text += `• Linked Asset: ${assetLine}\n`;
+  text += `• Payment Type: ${paymentType} (${returnTerms})\n`;
+  text += `• Amount Disbursed: ${formatZAR(amount)}\n`;
+  text += `• Date: ${formattedDate}\n\n`;
+  text += `Thank you for partnering with us. Your capital remains actively deployed and performing.`;
+
+  return text;
+}
+
