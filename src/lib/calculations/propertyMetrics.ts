@@ -96,6 +96,7 @@ export function calculateDealMetrics(params: {
   monthlyRatesTaxes: number;
   annualInsurance: number;
   managementFeePercent: number;
+  agencyVatApplicable?: boolean;
   vacancyRatePercent: number;
   targetExitPrice: number;
   holdingPeriodMonths: number;
@@ -116,6 +117,7 @@ export function calculateDealMetrics(params: {
     monthlyRatesTaxes,
     annualInsurance,
     managementFeePercent,
+    agencyVatApplicable,
     vacancyRatePercent,
     targetExitPrice,
     holdingPeriodMonths,
@@ -159,7 +161,8 @@ export function calculateDealMetrics(params: {
   const grossMonthlyRent = monthlyRentalEstimate;
   const vacancyLoss = (grossMonthlyRent * vacancyRatePercent) / 100;
   const effectiveGrossRent = grossMonthlyRent - vacancyLoss;
-  const managementFee = (grossMonthlyRent * managementFeePercent) / 100;
+  const vatMultiplier = agencyVatApplicable !== false ? 1.15 : 1.0;
+  const managementFee = (grossMonthlyRent * (managementFeePercent / 100)) * vatMultiplier;
   const monthlyInsurance = annualInsurance / 12;
   const totalMonthlyOperatingExpenses =
     monthlyLevies + monthlyRatesTaxes + managementFee + monthlyInsurance;
@@ -295,6 +298,7 @@ export function generateLongTermProjection(
     monthlyRatesTaxes?: number;
     annualInsurance?: number;
     managementFeePercent?: number;
+    agencyVatApplicable?: boolean;
     vacancyRatePercent?: number;
   }
 ): LongTermProjectionYear[] {
@@ -368,7 +372,8 @@ export function generateLongTermProjection(
   const monthlyRent = deal.monthlyRentalEstimate ?? 0;
   const vacancyRate = deal.vacancyRatePercent ?? 5;
   const vacancyLoss = (monthlyRent * vacancyRate) / 100;
-  const managementFee = (monthlyRent * (deal.managementFeePercent ?? 8)) / 100;
+  const vatMultiplier = deal.agencyVatApplicable !== false ? 1.15 : 1.0;
+  const managementFee = (monthlyRent * ((deal.managementFeePercent ?? 8) / 100)) * vatMultiplier;
   const monthlyInsurance = (deal.annualInsurance ?? 7_200) / 12;
   const monthlyLevies = deal.monthlyLevies ?? 0;
   const monthlyRates = deal.monthlyRatesTaxes ?? 0;

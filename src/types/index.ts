@@ -125,6 +125,7 @@ export interface OpportunityDeal {
   monthlyRatesTaxes: number;
   annualInsurance: number;
   managementFeePercent: number; // e.g. 8%
+  agencyVatApplicable?: boolean; // Whether 15% VAT is added on top of agency commission (defaults to true)
   vacancyRatePercent: number; // e.g. 5%
   targetExitPrice: number; // For flip exit
   holdingPeriodMonths: number;
@@ -465,6 +466,7 @@ export interface AnalyzerDraft {
   source?: DealSource;
   vacancyRatePercent?: number;
   managementFeePercent?: number;
+  agencyVatApplicable?: boolean;
 }
 
 // Client-side BYOK AI Integration Settings

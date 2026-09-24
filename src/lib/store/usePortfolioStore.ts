@@ -1006,7 +1006,14 @@ export const usePortfolioStore = create<PortfolioState>()(
           monthlyLeviesZAR: opp.propertyType === 'Freehold House' ? 0 : opp.monthlyLevies,
           annualBuildingInsuranceZAR: opp.propertyType === 'Freehold House' ? (opp.annualInsurance ?? 7_200) : 0,
           monthlyRatesTaxesZAR: opp.monthlyRatesTaxes,
-          monthlyAgentFeeZAR: Math.round(opp.monthlyRentalEstimate * (opp.managementFeePercent / 100)),
+          managementType: 'Agency',
+          agencyCommissionPercent: opp.managementFeePercent ?? 8,
+          agencyVatApplicable: opp.agencyVatApplicable !== false,
+          monthlyAgentFeeZAR: Math.round(
+            opp.monthlyRentalEstimate *
+            ((opp.managementFeePercent ?? 8) / 100) *
+            (opp.agencyVatApplicable !== false ? 1.15 : 1.0)
+          ),
           monthlyMaintenanceReserveZAR: 500,
           driveVault: opp.driveVault ? { ...opp.driveVault } : undefined,
           maintenanceHistory: [],

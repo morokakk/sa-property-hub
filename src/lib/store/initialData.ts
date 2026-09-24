@@ -683,6 +683,7 @@ function createSampleOpportunity(
     monthlyRatesTaxes: rates,
     annualInsurance: 8_400,
     managementFeePercent: 8,
+    agencyVatApplicable: true,
     vacancyRatePercent: 6,
     targetExitPrice: exitPrice,
     holdingPeriodMonths: 6,
@@ -726,6 +727,7 @@ function createSampleOpportunity(
     monthlyRatesTaxes: rates,
     annualInsurance: 8_400,
     managementFeePercent: 8,
+    agencyVatApplicable: true,
     vacancyRatePercent: 6,
     targetExitPrice: exitPrice,
     holdingPeriodMonths: 6,
@@ -912,6 +914,7 @@ export const INITIAL_ANALYZER_DRAFT: AnalyzerDraft = {
   source: 'High-Street Auction',
   vacancyRatePercent: 6.0,
   managementFeePercent: 8.0,
+  agencyVatApplicable: true,
 };
 
 export const EMPTY_ANALYZER_DRAFT: AnalyzerDraft = {
@@ -934,6 +937,7 @@ export const EMPTY_ANALYZER_DRAFT: AnalyzerDraft = {
   source: 'High-Street Auction',
   vacancyRatePercent: 6.0,
   managementFeePercent: 8.0,
+  agencyVatApplicable: true,
 };
 
 export const DEFAULT_AI_SETTINGS: AiSettings = {

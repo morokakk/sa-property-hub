@@ -90,6 +90,7 @@ export default function OpportunityAnalyzerPage() {
   // Vacancy Buffer & Credit Loss + Property Management State
   const [vacancyRate, setVacancyRate] = useState<number>(analyzerDraft?.vacancyRatePercent ?? 6.0);
   const [managementFee, setManagementFee] = useState<number>(analyzerDraft?.managementFeePercent ?? 8.0);
+  const [agencyVatApplicable, setAgencyVatApplicable] = useState<boolean>(analyzerDraft?.agencyVatApplicable ?? true);
 
   // MAO Quick Solver State
   const [showMaoSolver, setShowMaoSolver] = useState(false);
@@ -160,6 +161,7 @@ export default function OpportunityAnalyzerPage() {
       }
       if (analyzerDraft.vacancyRatePercent !== undefined) setVacancyRate(analyzerDraft.vacancyRatePercent);
       if (analyzerDraft.managementFeePercent !== undefined) setManagementFee(analyzerDraft.managementFeePercent);
+      if (analyzerDraft.agencyVatApplicable !== undefined) setAgencyVatApplicable(analyzerDraft.agencyVatApplicable);
     }
   }, [analyzerDraft]);
 
@@ -342,6 +344,7 @@ export default function OpportunityAnalyzerPage() {
       monthlyRatesTaxes: monthlyRates,
       annualInsurance: propertyType === 'Freehold House' ? annualInsurance : 0,
       managementFeePercent: managementFee,
+      agencyVatApplicable,
       vacancyRatePercent: vacancyRate,
       targetExitPrice,
       holdingPeriodMonths: 6,
@@ -362,6 +365,7 @@ export default function OpportunityAnalyzerPage() {
     monthlyRates,
     annualInsurance,
     managementFee,
+    agencyVatApplicable,
     vacancyRate,
     propertyType,
     targetExitPrice,
@@ -402,6 +406,7 @@ export default function OpportunityAnalyzerPage() {
       monthlyRatesTaxes: monthlyRates,
       annualInsurance: propertyType === 'Freehold House' ? annualInsurance : 0,
       managementFeePercent: managementFee,
+      agencyVatApplicable,
       vacancyRatePercent: vacancyRate,
     });
   }, [
@@ -419,6 +424,7 @@ export default function OpportunityAnalyzerPage() {
     monthlyRates,
     annualInsurance,
     managementFee,
+    agencyVatApplicable,
     vacancyRate,
     propertyType,
   ]);
@@ -445,12 +451,13 @@ export default function OpportunityAnalyzerPage() {
       monthlyRent,
       vacancyRatePercent: vacancyRate,
       managementFeePercent: managementFee,
+      agencyVatApplicable,
       monthlyLevies: propertyType === 'Freehold House' ? 0 : monthlyLevies,
       monthlyRates,
       annualInsurance: propertyType === 'Freehold House' ? annualInsurance : 0,
       targetNetYieldPercent: maoTargetYield,
     });
-  }, [monthlyRent, vacancyRate, managementFee, propertyType, monthlyLevies, monthlyRates, annualInsurance, maoTargetYield]);
+  }, [monthlyRent, vacancyRate, managementFee, agencyVatApplicable, propertyType, monthlyLevies, monthlyRates, annualInsurance, maoTargetYield]);
 
   const handleApplyMaoBid = (bidAmount: number) => {
     if (bidAmount <= 0) return;
@@ -488,6 +495,7 @@ export default function OpportunityAnalyzerPage() {
       monthlyRatesTaxes: monthlyRates,
       annualInsurance: finalInsurance,
       managementFeePercent: managementFee,
+      agencyVatApplicable,
       vacancyRatePercent: vacancyRate,
       targetExitPrice,
       holdingPeriodMonths: 6,
@@ -549,6 +557,7 @@ export default function OpportunityAnalyzerPage() {
     setStrategy(deal.strategy ?? 'Rental');
     setVacancyRate(deal.vacancyRatePercent ?? 6.0);
     setManagementFee(deal.managementFeePercent ?? 8.0);
+    setAgencyVatApplicable(deal.agencyVatApplicable !== false);
     const effectiveLtv = deal.bondLTV !== undefined ? deal.bondLTV : (deal.loanToValuePercent ?? 100);
     setLoanToValue(effectiveLtv);
     const effectiveDep = deal.depositZAR !== undefined ? deal.depositZAR : Math.max(0, Math.round(deal.purchasePrice * (1 - effectiveLtv / 100)));
@@ -589,6 +598,7 @@ export default function OpportunityAnalyzerPage() {
     setLoanTermYears(20);
     setVacancyRate(analyzerDraft?.vacancyRatePercent ?? 6.0);
     setManagementFee(analyzerDraft?.managementFeePercent ?? 8.0);
+    setAgencyVatApplicable(analyzerDraft?.agencyVatApplicable ?? true);
   };
 
   const handleSaveOpportunity = (e: React.FormEvent) => {
@@ -626,6 +636,7 @@ export default function OpportunityAnalyzerPage() {
         monthlyRatesTaxes: monthlyRates,
         vacancyRatePercent: vacancyRate,
         managementFeePercent: managementFee,
+        agencyVatApplicable,
         targetExitPrice,
         holdingPeriodMonths: 6,
         monthlyBondPaymentZAR: calculatedMetrics.monthlyBondPayment,
@@ -673,6 +684,7 @@ export default function OpportunityAnalyzerPage() {
       setLoanTermYears(20);
       setVacancyRate(analyzerDraft?.vacancyRatePercent ?? 6.0);
       setManagementFee(analyzerDraft?.managementFeePercent ?? 8.0);
+      setAgencyVatApplicable(analyzerDraft?.agencyVatApplicable ?? true);
       return;
     }
 
@@ -697,6 +709,7 @@ export default function OpportunityAnalyzerPage() {
       monthlyRatesTaxes: monthlyRates,
       annualInsurance: finalInsurance,
       managementFeePercent: managementFee,
+      agencyVatApplicable,
       vacancyRatePercent: vacancyRate,
       targetExitPrice,
       holdingPeriodMonths: 6,
@@ -741,6 +754,7 @@ export default function OpportunityAnalyzerPage() {
     setDepositZAR(0);
     setVacancyRate(analyzerDraft?.vacancyRatePercent ?? 6.0);
     setManagementFee(analyzerDraft?.managementFeePercent ?? 8.0);
+    setAgencyVatApplicable(analyzerDraft?.agencyVatApplicable ?? true);
     alert(`Deal "${title}" added to Deal Pipeline!`);
   };
 
@@ -894,7 +908,7 @@ export default function OpportunityAnalyzerPage() {
                     ) : (
                       <div className="space-y-3">
                         <p className="text-[11px] text-slate-500">
-                          Solves the maximum purchase price based on your target net yield (Cap Rate) and stress-tested NOI (with {vacancyRate}% vacancy &amp; {managementFee}% agent fee).
+                          Solves the maximum purchase price based on your target net yield (Cap Rate) and stress-tested NOI (with {vacancyRate}% vacancy &amp; {managementFee}%{agencyVatApplicable ? ' + 15% VAT' : ''} agent fee).
                         </p>
 
                         <div>
@@ -919,6 +933,10 @@ export default function OpportunityAnalyzerPage() {
                           <div className="flex justify-between text-[11px] text-slate-500">
                             <span>Vacancy Buffer ({vacancyRate}%):</span>
                             <span>-{formatZAR(computedRentalMao.vacancyLossAnnual)}/yr</span>
+                          </div>
+                          <div className="flex justify-between text-[11px] text-slate-500">
+                            <span>Agent Fee ({managementFee}%{agencyVatApplicable ? '+VAT' : ''}):</span>
+                            <span>-{formatZAR(computedRentalMao.managementFeeAnnual)}/yr</span>
                           </div>
                           <div className="border-t border-emerald-200 pt-1.5 flex justify-between items-center">
                             <span className="font-bold text-emerald-950">Max Purchase Price:</span>
@@ -1514,11 +1532,34 @@ export default function OpportunityAnalyzerPage() {
 
               <div>
                 <div className="flex items-center justify-between mb-1">
-                  <label className="block text-[11px] font-semibold text-slate-700">
-                    Managing Agent Fee (%)
-                  </label>
+                  <div className="flex items-center gap-2">
+                    <label className="block text-[11px] font-semibold text-slate-700">
+                      Managing Agent Fee (%)
+                    </label>
+                    <label className="inline-flex items-center gap-1 cursor-pointer text-[10px] font-semibold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 px-1.5 py-0.5 rounded transition-colors select-none">
+                      <input
+                        type="checkbox"
+                        checked={agencyVatApplicable}
+                        onChange={(e) => {
+                          const checked = e.target.checked;
+                          setAgencyVatApplicable(checked);
+                          updateAnalyzerDraft({ agencyVatApplicable: checked });
+                        }}
+                        className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 w-3 h-3 cursor-pointer"
+                      />
+                      <span>+ 15% VAT</span>
+                    </label>
+                  </div>
                   <span className="text-[10px] font-bold text-indigo-800 bg-indigo-100/80 px-1.5 py-0.5 rounded">
-                    -{formatZAR(Math.round(monthlyRent * (managementFee / 100)))}/pm
+                    {agencyVatApplicable ? (
+                      <>
+                        {managementFee}% + VAT = {(managementFee * 1.15).toFixed(1)}% &bull; -{formatZAR(Math.round(monthlyRent * (managementFee / 100) * 1.15))}/pm
+                      </>
+                    ) : (
+                      <>
+                        {managementFee.toFixed(1)}% (VAT Incl.) &bull; -{formatZAR(Math.round(monthlyRent * (managementFee / 100)))}/pm
+                      </>
+                    )}
                   </span>
                 </div>
                 <div className="relative">
@@ -1538,7 +1579,7 @@ export default function OpportunityAnalyzerPage() {
                   <span className="absolute right-3 top-2 text-xs text-slate-400 font-bold">%</span>
                 </div>
                 <p className="text-[10px] text-slate-500 mt-1">
-                  Professional rental agent tenant placement & collection fee (iGrow / WeconnectU baseline: 8.0%).
+                  Professional rental agent tenant placement & collection fee (iGrow / WeconnectU baseline: 8.0%{agencyVatApplicable ? ' + 15% VAT = 9.2%' : ''}).
                 </p>
               </div>
             </div>

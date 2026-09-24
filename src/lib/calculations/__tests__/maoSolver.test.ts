@@ -64,17 +64,32 @@ describe('MAO Solver Engine', () => {
       // Gross annual rent = 16,500 * 12 = 198,000
       // Vacancy loss = 198,000 * 0.06 = 11,880
       // Effective Gross Rent = 186,120
-      // Management fee = 198,000 * 0.08 = 15,840
+      // Management fee with 15% VAT = 198,000 * 0.08 * 1.15 = 18,216
       // Levies + Rates = (1,650 + 1,100) * 12 = 33,000
-      // Total OpEx = 33,000 + 15,840 = 48,840
-      // Stress-Tested NOI = 186,120 - 48,840 = 137,280
-      // Max price @ 8% cap rate = 137,280 / 0.08 = 1,716,000
+      // Total OpEx = 33,000 + 18,216 = 51,216
+      // Stress-Tested NOI = 186,120 - 51,216 = 134,904
+      // Max price @ 8% cap rate = 134,904 / 0.08 = 1,686,300
       expect(result.grossAnnualRent).toBe(198_000);
       expect(result.vacancyLossAnnual).toBe(11_880);
       expect(result.effectiveGrossRentAnnual).toBe(186_120);
-      expect(result.managementFeeAnnual).toBe(15_840);
-      expect(result.stressTestedNoi).toBe(137_280);
-      expect(result.maxAllowablePrice).toBe(1_716_000);
+      expect(result.managementFeeAnnual).toBe(18_216);
+      expect(result.stressTestedNoi).toBe(134_904);
+      expect(result.maxAllowablePrice).toBe(1_686_300);
+
+      // When agencyVatApplicable is explicitly false (VAT-inclusive / flat)
+      const flatResult = calculateRentalMao({
+        monthlyRent: 16_500,
+        vacancyRatePercent: 6.0,
+        managementFeePercent: 8.0,
+        agencyVatApplicable: false,
+        monthlyLevies: 1_650,
+        monthlyRates: 1_100,
+        annualInsurance: 0,
+        targetNetYieldPercent: 8.0,
+      });
+      expect(flatResult.managementFeeAnnual).toBe(15_840);
+      expect(flatResult.stressTestedNoi).toBe(137_280);
+      expect(flatResult.maxAllowablePrice).toBe(1_716_000);
     });
 
     it('returns 0 when target net yield is zero or negative', () => {

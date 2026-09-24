@@ -25,6 +25,7 @@ export interface RentalMaoParams {
   monthlyRent: number;
   vacancyRatePercent: number; // e.g. 6.0%
   managementFeePercent: number; // e.g. 8.0%
+  agencyVatApplicable?: boolean; // Whether 15% VAT is added on agency commission (defaults to true)
   monthlyLevies: number;
   monthlyRates: number;
   annualInsurance: number;
@@ -94,6 +95,7 @@ export function calculateRentalMao(params: RentalMaoParams): RentalMaoResult {
     monthlyRent,
     vacancyRatePercent,
     managementFeePercent,
+    agencyVatApplicable,
     monthlyLevies,
     monthlyRates,
     annualInsurance,
@@ -104,7 +106,8 @@ export function calculateRentalMao(params: RentalMaoParams): RentalMaoResult {
   const vacancyLossAnnual = Math.round(grossAnnualRent * (Math.max(0, vacancyRatePercent) / 100));
   const effectiveGrossRentAnnual = grossAnnualRent - vacancyLossAnnual;
 
-  const managementFeeAnnual = Math.round(grossAnnualRent * (Math.max(0, managementFeePercent) / 100));
+  const vatMultiplier = agencyVatApplicable !== false ? 1.15 : 1.0;
+  const managementFeeAnnual = Math.round(grossAnnualRent * (Math.max(0, managementFeePercent) / 100) * vatMultiplier);
   const statutoryAndLeviesAnnual = (Math.max(0, monthlyLevies) + Math.max(0, monthlyRates)) * 12;
   const annualInsuranceClean = Math.max(0, annualInsurance);
   const annualOperatingExpenses = statutoryAndLeviesAnnual + annualInsuranceClean + managementFeeAnnual;
