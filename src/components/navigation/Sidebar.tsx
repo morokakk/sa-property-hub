@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
@@ -16,8 +16,15 @@ import {
   Settings,
   Menu,
   X,
+  RotateCcw,
+  Trash2,
+  Upload,
+  FileSpreadsheet,
+  FileCode2,
+  CheckCircle2,
 } from 'lucide-react';
 import { usePortfolioStore } from '@/lib/store/usePortfolioStore';
+import { exportPortfolioToExcel } from '@/lib/export/excelExport';
 
 export default function Sidebar() {
   const pathname = usePathname();
@@ -26,10 +33,94 @@ export default function Sidebar() {
   const activeRentalsCount = usePortfolioStore((state) => state.rentals.length);
   const tasks = usePortfolioStore((state) => state.tasks);
   const pendingTasksCount = tasks.filter((t) => t.status !== 'Completed').length;
+  const resetToDemoData = usePortfolioStore((state) => state.resetToDemoData);
+  const clearAllData = usePortfolioStore((state) => state.clearAllData);
+  const importPortfolioJSON = usePortfolioStore((state) => state.importPortfolioJSON);
 
   // Mobile Drawer State
   const [isMobileDrawerOpen, setIsMobileDrawerOpen] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
+  const [drawerNotice, setDrawerNotice] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const showDrawerNotice = (msg: string) => {
+    setDrawerNotice(msg);
+    setTimeout(() => setDrawerNotice(null), 3500);
+  };
+
+  const handleReset = () => {
+    if (confirm('Reset portfolio state to South African realistic demo data? This will restore sample rentals, flips, funding and tasks.')) {
+      resetToDemoData();
+      showDrawerNotice('Portfolio reset to South African demo dataset.');
+    }
+  };
+
+  const handleClearDemo = () => {
+    if (
+      confirm(
+        'Clear all demo data and start with an empty portfolio? (You can always restore the demo dataset anytime using Reset Demo)'
+      )
+    ) {
+      clearAllData();
+      showDrawerNotice('Portfolio cleared.');
+    }
+  };
+
+  const handleExportExcel = () => {
+    const currentState = usePortfolioStore.getState();
+    exportPortfolioToExcel({
+      rentals: currentState.rentals,
+      flips: currentState.flips,
+      opportunities: currentState.opportunities,
+      funding: currentState.funding,
+      summary: currentState.getSummary(),
+      investorProfile: currentState.investorProfile,
+    });
+    showDrawerNotice('Exported to Excel (.xlsx).');
+  };
+
+  const handleExportJSON = () => {
+    const currentState = usePortfolioStore.getState();
+    const dataStr = JSON.stringify(
+      {
+        rentals: currentState.rentals,
+        flips: currentState.flips,
+        funding: currentState.funding,
+        opportunities: currentState.opportunities,
+        suppliers: currentState.suppliers,
+        tasks: currentState.tasks,
+        liquidCapitalReserve: currentState.liquidCapitalReserve,
+        investorProfile: currentState.investorProfile,
+        exportedAt: new Date().toISOString(),
+      },
+      null,
+      2
+    );
+    const blob = new Blob([dataStr], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `sa-property-portfolio-${new Date().toISOString().split('T')[0]}.json`;
+    link.click();
+    URL.revokeObjectURL(url);
+    showDrawerNotice('Exported to JSON backup.');
+  };
+
+  const handleImportJSON = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      const content = evt.target?.result as string;
+      const success = importPortfolioJSON(content);
+      if (success) {
+        showDrawerNotice('Portfolio restored from JSON.');
+      } else {
+        alert('Invalid JSON file format.');
+      }
+    };
+    reader.readAsText(file);
+  };
 
   useEffect(() => {
     setIsMounted(true);
@@ -218,9 +309,9 @@ export default function Sidebar() {
 
           {/* Drawer Content */}
           <div className="relative w-72 max-w-[85vw] bg-slate-900 text-white h-full shadow-2xl flex flex-col justify-between border-r border-slate-800 z-10 animate-in slide-in-from-left duration-200">
-            <div>
+            <div className="flex-1 overflow-y-auto">
               {/* Drawer Brand Header */}
-              <div className="p-4 border-b border-slate-800 flex items-center justify-between">
+              <div className="p-4 border-b border-slate-800 flex items-center justify-between sticky top-0 bg-slate-900/95 backdrop-blur-xs z-10">
                 <div className="flex items-center gap-2.5">
                   <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-500 to-teal-700 flex items-center justify-center text-white font-bold">
                     <Building2 className="w-4 h-4 text-white" />
@@ -233,7 +324,7 @@ export default function Sidebar() {
 
                 <button
                   onClick={() => setIsMobileDrawerOpen(false)}
-                  className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-md min-h-[40px] min-w-[40px] flex items-center justify-center"
+                  className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-md min-h-[40px] min-w-[40px] flex items-center justify-center cursor-pointer"
                   aria-label="Close menu"
                 >
                   <X className="w-5 h-5" />
@@ -241,7 +332,7 @@ export default function Sidebar() {
               </div>
 
               {/* Drawer Navigation Links */}
-              <nav className="p-3 space-y-1 overflow-y-auto max-h-[calc(100vh-180px)]">
+              <nav className="p-3 space-y-1">
                 <div className="px-3 py-1.5 text-[10px] uppercase tracking-wider font-semibold text-slate-400">
                   Navigation
                 </div>
@@ -276,10 +367,62 @@ export default function Sidebar() {
                   );
                 })}
               </nav>
+
+              {/* Portfolio Data & Backup Section */}
+              <div className="p-3 border-t border-slate-800">
+                <div className="px-3 py-1.5 text-[10px] uppercase tracking-wider font-semibold text-slate-400">
+                  Portfolio Data & Backup
+                </div>
+                <div className="space-y-1 mt-1">
+                  <button
+                    onClick={handleExportExcel}
+                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition-colors cursor-pointer text-left"
+                  >
+                    <FileSpreadsheet className="w-4 h-4 text-emerald-400 shrink-0" />
+                    <span>Export to Excel (.xlsx)</span>
+                  </button>
+
+                  <button
+                    onClick={handleExportJSON}
+                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition-colors cursor-pointer text-left"
+                  >
+                    <FileCode2 className="w-4 h-4 text-indigo-400 shrink-0" />
+                    <span>Download JSON Backup</span>
+                  </button>
+
+                  <label className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition-colors cursor-pointer text-left">
+                    <Upload className="w-4 h-4 text-teal-400 shrink-0" />
+                    <span>Restore from JSON</span>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept=".json"
+                      className="hidden"
+                      onChange={handleImportJSON}
+                    />
+                  </label>
+
+                  <button
+                    onClick={handleReset}
+                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition-colors cursor-pointer text-left"
+                  >
+                    <RotateCcw className="w-4 h-4 text-amber-400 shrink-0" />
+                    <span>Reset Demo Data</span>
+                  </button>
+
+                  <button
+                    onClick={handleClearDemo}
+                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium text-rose-300 hover:bg-rose-950/40 hover:text-rose-200 transition-colors cursor-pointer text-left"
+                  >
+                    <Trash2 className="w-4 h-4 text-rose-400 shrink-0" />
+                    <span>Clear All Portfolio Data</span>
+                  </button>
+                </div>
+              </div>
             </div>
 
             {/* Drawer Footer Status */}
-            <div className="p-4 border-t border-slate-800 bg-slate-950/60 text-xs text-slate-400">
+            <div className="p-4 border-t border-slate-800 bg-slate-950/60 text-xs text-slate-400 shrink-0">
               <div className="flex items-center justify-between mb-1.5">
                 <span className="flex items-center gap-1.5 text-slate-300 font-medium text-[11px]">
                   <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
@@ -334,6 +477,14 @@ export default function Sidebar() {
           )}
         </button>
       </nav>
+
+      {/* Mobile Toast Notification for Drawer Operations */}
+      {drawerNotice && (
+        <div className="no-print md:hidden fixed bottom-18 left-4 right-4 z-50 bg-slate-950 text-white text-xs px-3.5 py-2.5 rounded-lg shadow-2xl border border-slate-700 flex items-center gap-2 animate-in fade-in slide-in-from-bottom-2">
+          <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+          <span className="font-medium">{drawerNotice}</span>
+        </div>
+      )}
     </>
   );
 }

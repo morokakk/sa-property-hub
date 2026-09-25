@@ -132,37 +132,57 @@ export default function TopHeader({ title, subtitle, actionButton }: TopHeaderPr
   };
 
   return (
-    <header className="no-print bg-white border-b border-slate-200 px-4 sm:px-6 py-3 sm:py-4 sticky top-0 md:top-0 z-20 shadow-xs">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
-        {/* Left: Page Title */}
-        <div>
-          <h1 className="text-lg sm:text-xl font-bold text-slate-900 tracking-tight">{title}</h1>
-          {subtitle && <p className="text-xs text-slate-500 mt-0.5">{subtitle}</p>}
+    <header className="no-print bg-white border-b border-slate-200 px-4 sm:px-6 py-2.5 sm:py-3.5 sticky top-0 md:top-0 z-20 shadow-xs">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-2.5 sm:gap-4">
+        {/* Row 1 on mobile / Left on desktop: Page Title + Net Equity Pill (on mobile) */}
+        <div className="flex items-center justify-between gap-3 w-full md:w-auto">
+          <div className="min-w-0">
+            <h1 className="text-base sm:text-xl font-bold text-slate-900 tracking-tight truncate">{title}</h1>
+            {subtitle && <p className="text-[11px] sm:text-xs text-slate-500 mt-0.5 line-clamp-1 sm:line-clamp-none">{subtitle}</p>}
+          </div>
+
+          {/* Net Equity Quick Pill (Visible on mobile next to title) */}
+          <div className="md:hidden bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-lg flex items-center gap-1.5 shrink-0">
+            <Coins className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+            <div className="text-left">
+              <span className="text-[8px] uppercase font-semibold text-emerald-800 tracking-wider block leading-none">
+                Net Equity
+              </span>
+              <span className="text-xs font-bold text-emerald-950" suppressHydrationWarning>
+                {isMounted ? formatZAR(summary.netEquity) : 'R 10 735 000'}
+              </span>
+            </div>
+          </div>
         </div>
 
-        {/* Right: Net Equity Pill & Actions */}
-        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-          {/* Net Equity Quick Pill */}
-          <div className="bg-emerald-50 border border-emerald-200 px-2.5 sm:px-3.5 py-1.5 rounded-lg flex items-center gap-2">
+        {/* Row 2 on mobile / Right on desktop */}
+        <div className="flex items-center justify-between md:justify-end gap-2 sm:gap-3 w-full md:w-auto">
+          {/* Net Equity Quick Pill (Visible on desktop) */}
+          <div className="hidden md:flex bg-emerald-50 border border-emerald-200 px-3.5 py-1.5 rounded-lg items-center gap-2 shrink-0">
             <Coins className="w-4 h-4 text-emerald-600 shrink-0" />
             <div className="text-left">
-              <span className="text-[9px] sm:text-[10px] uppercase font-semibold text-emerald-800 tracking-wider block leading-none">
+              <span className="text-[10px] uppercase font-semibold text-emerald-800 tracking-wider block leading-none">
                 Net Equity (ZAR)
               </span>
-              <span className="text-xs sm:text-sm font-bold text-emerald-950" suppressHydrationWarning>
+              <span className="text-sm font-bold text-emerald-950" suppressHydrationWarning>
                 {isMounted ? formatZAR(summary.netEquity) : 'R 10 735 000'}
               </span>
             </div>
           </div>
 
-          {actionButton}
+          {/* Action Buttons Row */}
+          {actionButton && (
+            <div className="w-full md:w-auto flex flex-wrap items-center gap-2">
+              {actionButton}
+            </div>
+          )}
 
-          {/* Quick Portfolio Controls */}
-          <div className="flex items-center gap-1 border-l border-slate-200 pl-2 sm:pl-3">
+          {/* Quick Portfolio Controls (Desktop Only) */}
+          <div className="hidden md:flex items-center gap-1 border-l border-slate-200 pl-2 sm:pl-3 shrink-0">
             <button
               onClick={handleReset}
               title="Reset to realistic South African demo data"
-              className="p-1.5 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-md transition-colors flex items-center gap-1 text-xs font-medium min-h-[36px] min-w-[36px] justify-center"
+              className="p-1.5 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-md transition-colors flex items-center gap-1 text-xs font-medium min-h-[36px] min-w-[36px] justify-center cursor-pointer"
             >
               <RotateCcw className="w-3.5 h-3.5" />
               <span className="hidden lg:inline">Reset Demo</span>
@@ -171,7 +191,7 @@ export default function TopHeader({ title, subtitle, actionButton }: TopHeaderPr
             <button
               onClick={handleClearDemo}
               title="Clear all demo data to enter your own portfolio"
-              className="p-1.5 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-md transition-colors flex items-center gap-1 text-xs font-medium min-h-[36px] min-w-[36px] justify-center"
+              className="p-1.5 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-md transition-colors flex items-center gap-1 text-xs font-medium min-h-[36px] min-w-[36px] justify-center cursor-pointer"
             >
               <Trash2 className="w-3.5 h-3.5" />
               <span className="hidden lg:inline">Clear Demo Data</span>

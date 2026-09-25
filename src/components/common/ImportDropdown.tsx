@@ -199,6 +199,41 @@ export default function ImportDropdown({
       ? 'Rental Portfolio'
       : 'Buy-and-Flip';
 
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const [dropdownStyle, setDropdownStyle] = useState<React.CSSProperties>({});
+
+  const handleToggleDropdown = () => {
+    if (!isOpen && buttonRef.current) {
+      const rect = buttonRef.current.getBoundingClientRect();
+      const menuWidth = 272; // w-68
+      const padding = 12;
+      const viewportWidth = window.innerWidth;
+
+      if (viewportWidth >= 640) {
+        if (rect.right < menuWidth + padding) {
+          setDropdownStyle({ left: 0, right: 'auto' });
+        } else {
+          setDropdownStyle({ right: 0, left: 'auto' });
+        }
+      } else {
+        const idealLeft = 0;
+        const screenLeft = rect.left + idealLeft;
+        const screenRight = screenLeft + menuWidth;
+
+        if (screenRight > viewportWidth - padding) {
+          const overflow = screenRight - (viewportWidth - padding);
+          setDropdownStyle({ left: -overflow, maxWidth: `calc(100vw - ${padding * 2}px)` });
+        } else if (screenLeft < padding) {
+          const underflow = padding - screenLeft;
+          setDropdownStyle({ left: underflow, maxWidth: `calc(100vw - ${padding * 2}px)` });
+        } else {
+          setDropdownStyle({ left: 0, maxWidth: `calc(100vw - ${padding * 2}px)` });
+        }
+      }
+    }
+    setIsOpen(!isOpen);
+  };
+
   return (
     <div className={`relative inline-block ${className}`} ref={dropdownRef}>
       {/* Hidden File Input */}
@@ -222,10 +257,11 @@ export default function ImportDropdown({
 
       {/* Main Trigger Button */}
       <button
+        ref={buttonRef}
         type="button"
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={handleToggleDropdown}
         disabled={isProcessing}
-        className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 border border-slate-300 rounded-lg shadow-2xs hover:shadow-xs transition-all disabled:opacity-60 cursor-pointer"
+        className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 border border-slate-300 rounded-lg shadow-2xs hover:shadow-xs transition-all disabled:opacity-60 cursor-pointer shrink-0 whitespace-nowrap"
         title={`Import ${moduleTitle} records via Excel or CSV`}
       >
         {isProcessing ? (
@@ -239,7 +275,10 @@ export default function ImportDropdown({
 
       {/* Dropdown Menu */}
       {isOpen && (
-        <div className="absolute right-0 mt-1.5 w-68 bg-white rounded-xl shadow-xl border border-slate-200 py-1.5 z-40 animate-in fade-in zoom-in-95 duration-150">
+        <div
+          style={dropdownStyle}
+          className="absolute mt-1.5 w-68 bg-white rounded-xl shadow-xl border border-slate-200 py-1.5 z-40 animate-in fade-in zoom-in-95 duration-150"
+        >
           <div className="px-3 py-1.5 border-b border-slate-100 text-[10px] font-bold uppercase tracking-wider text-slate-400">
             {moduleTitle} Batch Import
           </div>

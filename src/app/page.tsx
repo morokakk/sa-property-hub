@@ -48,7 +48,7 @@ export default function GlobalDashboardPage() {
         actionButton={
           <Link
             href="/analyzer"
-            className="inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold px-3 py-2 rounded-lg shadow-sm transition-colors"
+            className="inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold px-3 py-2 rounded-lg shadow-sm transition-colors shrink-0 whitespace-nowrap"
           >
             <PlusCircle className="w-3.5 h-3.5" />
             Analyze New Deal

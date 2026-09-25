@@ -685,11 +685,11 @@ export default function RentalPortfolioPage() {
         title="Rental Portfolio"
         subtitle="Manage active income properties, tenant leases, trust deposits, and maintenance histories"
         actionButton={
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <button
               onClick={() => setShowAiUploadModal(true)}
               title="Upload managing agent payout statements or municipal / Eskom utility bills"
-              className="inline-flex items-center gap-1.5 bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 text-xs font-semibold px-3 py-2 rounded-lg shadow-2xs transition-colors cursor-pointer"
+              className="inline-flex items-center gap-1.5 bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 text-xs font-semibold px-3 py-2 rounded-lg shadow-2xs transition-colors cursor-pointer shrink-0 whitespace-nowrap"
             >
               <Sparkles className="w-3.5 h-3.5 text-purple-600" />
               <span>Smart Document Import</span>
@@ -701,14 +701,14 @@ export default function RentalPortfolioPage() {
             <button
               onClick={() => exportRentalsCSV(activeRentals)}
               title="Download active rentals register as CSV"
-              className="inline-flex items-center gap-1.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 text-xs font-semibold px-3 py-2 rounded-lg shadow-2xs transition-colors cursor-pointer"
+              className="inline-flex items-center gap-1.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 text-xs font-semibold px-3 py-2 rounded-lg shadow-2xs transition-colors cursor-pointer shrink-0 whitespace-nowrap"
             >
               <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
               <span>Export CSV</span>
             </button>
             <button
               onClick={handleOpenAdd}
-              className="inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold px-3 py-2 rounded-lg shadow-sm transition-colors cursor-pointer"
+              className="inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold px-3 py-2 rounded-lg shadow-sm transition-colors cursor-pointer shrink-0 whitespace-nowrap"
             >
               <PlusCircle className="w-3.5 h-3.5" />
               <span>Add Rental Property</span>

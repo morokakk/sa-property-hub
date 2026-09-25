@@ -567,18 +567,18 @@ export default function FlipsManagerPage() {
         title="Buy-and-Flip Manager"
         subtitle="Dynamic budget tracker, Bill of Quantities (BOQ), and local South African trade suppliers"
         actionButton={
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <ImportDropdown type="flips" onPdfSelected={handleFlipPdfSelected} />
             <button
               onClick={() => setShowSupplierModal(true)}
-              className="inline-flex items-center gap-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-semibold px-3 py-2 rounded-lg border border-slate-300 transition-colors"
+              className="inline-flex items-center gap-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-semibold px-3 py-2 rounded-lg border border-slate-300 transition-colors shrink-0 whitespace-nowrap cursor-pointer"
             >
               <Store className="w-3.5 h-3.5" />
               Supplier Directory ({suppliers.length})
             </button>
             <button
               onClick={() => setShowAddFlipModal(true)}
-              className="inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold px-3 py-2 rounded-lg shadow-sm transition-colors"
+              className="inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold px-3 py-2 rounded-lg shadow-sm transition-colors shrink-0 whitespace-nowrap cursor-pointer"
             >
               <PlusCircle className="w-3.5 h-3.5" />
               New Flip Project

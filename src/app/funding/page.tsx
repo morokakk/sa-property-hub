@@ -160,12 +160,12 @@ export default function FundingTrackerPage() {
         title="Funding & Capital Tracker"
         subtitle="Centralized ledger managing private debt, syndicate equity splits, and loan repayments"
         actionButton={
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 shrink-0">
             {funding.length > 0 && (
               <button
                 onClick={() => exportFundingCSV(funding)}
                 title="Download funding ledger as CSV"
-                className="inline-flex items-center gap-1.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 text-xs font-semibold px-3 py-2 rounded-lg shadow-2xs transition-colors cursor-pointer"
+                className="inline-flex items-center gap-1.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 text-xs font-semibold px-3 py-2 rounded-lg shadow-2xs transition-colors cursor-pointer shrink-0 whitespace-nowrap"
               >
                 <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
                 <span>Export CSV</span>
@@ -173,7 +173,7 @@ export default function FundingTrackerPage() {
             )}
             <button
               onClick={() => setShowAddModal(true)}
-              className="inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold px-3 py-2 rounded-lg shadow-sm transition-colors cursor-pointer"
+              className="inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold px-3 py-2 rounded-lg shadow-sm transition-colors cursor-pointer shrink-0 whitespace-nowrap"
             >
               <PlusCircle className="w-3.5 h-3.5" />
               <span>Add Capital Source</span>
