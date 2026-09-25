@@ -31,11 +31,13 @@ import {
   Coins,
   Edit3,
   FileSpreadsheet,
+  FileText,
   ArrowRightLeft,
 } from 'lucide-react';
 import Link from 'next/link';
 import { exportFlipBOQCSV } from '@/lib/export/csvExport';
 import ImportDropdown from '@/components/common/ImportDropdown';
+import { parseRentalPdfStatement } from '@/lib/utilities/pdfParser';
 
 export default function FlipsManagerPage() {
   const flips = usePortfolioStore((state) => state.flips);
@@ -226,6 +228,109 @@ export default function FlipsManagerPage() {
   const [newFlipRatesBillUrl, setNewFlipRatesBillUrl] = useState('');
   const [newFlipTitleDeedUrl, setNewFlipTitleDeedUrl] = useState('');
 
+  // PDF Statement Extraction State for New Flip
+  const [isParsingPdf, setIsParsingPdf] = useState(false);
+  const [pdfParseNotice, setPdfParseNotice] = useState<string | null>(null);
+  const [extractedValuationZAR, setExtractedValuationZAR] = useState<number | null>(null);
+
+  const handleFlipPdfSelected = async (files: File[]) => {
+    if (!files || files.length === 0) return;
+    setIsParsingPdf(true);
+    setPdfParseNotice(null);
+
+    try {
+      let combinedRates = 0;
+      let combinedLevies = 0;
+      let combinedUtilities = 0;
+      let detectedTitle = '';
+      let detectedAddress = '';
+      let detectedCity = '';
+      let detectedPropType: PropertyTitleType | undefined = undefined;
+      let detectedValuation = 0;
+
+      for (const file of files) {
+        const parsed = await parseRentalPdfStatement(file);
+        if (!parsed.success) continue;
+
+        if (parsed.docType === 'municipal_utility' && parsed.utilityStatement) {
+          const u = parsed.utilityStatement;
+          if (u.propertyName && !detectedTitle) detectedTitle = u.propertyName;
+          if (u.propertyAddress && !detectedAddress) detectedAddress = u.propertyAddress;
+          if (u.propertyRatesZAR && u.propertyRatesZAR > 0) {
+            combinedRates = Math.max(combinedRates, u.propertyRatesZAR);
+          }
+          if (u.municipalValuationZAR && u.municipalValuationZAR > 0) {
+            detectedValuation = Math.max(detectedValuation, u.municipalValuationZAR);
+          }
+          const standingUtils = (u.electricityZAR || 0) + (u.waterZAR || 0);
+          if (standingUtils > 0) {
+            combinedUtilities += standingUtils;
+          }
+          const addr = (u.propertyAddress || '').toLowerCase();
+          const pName = (u.propertyName || '').toLowerCase();
+          const isScheme =
+            addr.includes('unit') ||
+            addr.includes('ss ') ||
+            addr.includes('flat') ||
+            addr.includes('apartment') ||
+            pName.includes('unit') ||
+            pName.includes('ss ');
+          if (!isScheme && (addr.includes('stand') || pName.includes('stand') || addr.length > 5)) {
+            detectedPropType = 'Freehold House';
+          }
+        } else if (parsed.docType === 'agent_payout' && parsed.agentUnit) {
+          const a = parsed.agentUnit;
+          if (a.propertyName && !detectedTitle) detectedTitle = a.propertyName;
+          if (a.propertyAddress && !detectedAddress) detectedAddress = a.propertyAddress;
+          if (a.leviesZAR && a.leviesZAR > 0) {
+            combinedLevies = Math.max(combinedLevies, a.leviesZAR);
+          }
+          if (a.municipalRatesZAR && a.municipalRatesZAR > 0) {
+            combinedRates = Math.max(combinedRates, a.municipalRatesZAR);
+          }
+          detectedPropType = 'Sectional Title Apartment';
+        }
+      }
+
+      if (detectedAddress) {
+        const parts = detectedAddress.split(',').map((p) => p.trim());
+        if (parts.length >= 3) {
+          detectedCity = parts[2] || parts[1];
+        } else if (parts.length === 2) {
+          detectedCity = parts[1];
+        }
+      }
+      if (!detectedCity && detectedAddress.toLowerCase().includes('johannesburg')) {
+        detectedCity = 'Johannesburg';
+      }
+
+      if (detectedTitle) setNewFlipTitle(detectedTitle);
+      if (detectedAddress) setNewFlipAddress(detectedAddress);
+      if (detectedCity) setNewFlipCity(detectedCity);
+      if (detectedPropType) setNewFlipPropertyType(detectedPropType);
+      if (combinedRates > 0) setNewFlipRates(Math.round(combinedRates));
+      if (combinedLevies > 0) setNewFlipLevies(Math.round(combinedLevies));
+      if (combinedUtilities > 0) setNewFlipOtherHoldingCost(Math.round(combinedUtilities));
+      if (detectedValuation > 0) setExtractedValuationZAR(detectedValuation);
+
+      const noticeParts = [];
+      if (detectedTitle) noticeParts.push(`"${detectedTitle}"`);
+      if (combinedRates > 0) noticeParts.push(`Rates: R${combinedRates.toLocaleString()}/m`);
+      if (combinedLevies > 0) noticeParts.push(`Levies: R${combinedLevies.toLocaleString()}/m`);
+      if (combinedUtilities > 0) noticeParts.push(`Standing Utilities: R${combinedUtilities.toLocaleString()}/m`);
+      if (detectedValuation > 0) noticeParts.push(`Municipal Valuation: R${detectedValuation.toLocaleString()}`);
+
+      setPdfParseNotice(`✓ Extracted from ${files.length} statement(s): ${noticeParts.join(' • ')}`);
+      setShowAddFlipModal(true);
+    } catch (err: any) {
+      console.error('Failed to parse statement for flip:', err);
+      setPdfParseNotice('Could not extract statement details. Please check the file.');
+      setShowAddFlipModal(true);
+    } finally {
+      setIsParsingPdf(false);
+    }
+  };
+
   // New Supplier Form State
   const [supName, setSupName] = useState('');
   const [supCategory, setSupCategory] = useState<LocalSupplier['category']>('Hardware & Timber');
@@ -283,6 +388,7 @@ export default function FlipsManagerPage() {
       monthlyLeviesZAR: finalLevies,
       monthlyRatesTaxesZAR: Number(newFlipRates),
       monthlyOtherHoldingCostZAR: Number(newFlipOtherHoldingCost),
+      municipalValuationZAR: extractedValuationZAR || undefined,
       targetExitPriceZAR: newFlipTargetExit,
       targetCompletionDate: newFlipCompletionDate,
       currentPhase: 'Acquisition & Conveyancing',
@@ -306,6 +412,8 @@ export default function FlipsManagerPage() {
     addFlip(createdFlip);
     setSelectedFlipId(createdFlip.id);
     setShowAddFlipModal(false);
+    setPdfParseNotice(null);
+    setExtractedValuationZAR(null);
     setNewFlipTitle('');
     setNewFlipAddress('');
     setNewFlipPropertyType('Freehold House');
@@ -460,7 +568,7 @@ export default function FlipsManagerPage() {
         subtitle="Dynamic budget tracker, Bill of Quantities (BOQ), and local South African trade suppliers"
         actionButton={
           <div className="flex items-center gap-2">
-            <ImportDropdown type="flips" />
+            <ImportDropdown type="flips" onPdfSelected={handleFlipPdfSelected} />
             <button
               onClick={() => setShowSupplierModal(true)}
               className="inline-flex items-center gap-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-semibold px-3 py-2 rounded-lg border border-slate-300 transition-colors"
@@ -1813,11 +1921,68 @@ export default function FlipsManagerPage() {
       {/* Add Flip Modal */}
       {showAddFlipModal && (
         <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-xl max-w-lg w-full p-6 shadow-xl border border-slate-200">
-            <h3 className="text-base font-bold text-slate-900 mb-4 flex items-center gap-2">
-              <Hammer className="w-5 h-5 text-indigo-600" />
-              Scaffold New Buy-and-Flip Project
-            </h3>
+          <div className="bg-white rounded-xl max-w-lg w-full p-6 shadow-xl border border-slate-200 max-h-[92vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                <Hammer className="w-5 h-5 text-indigo-600" />
+                Scaffold New Buy-and-Flip Project
+              </h3>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowAddFlipModal(false);
+                  setPdfParseNotice(null);
+                  setExtractedValuationZAR(null);
+                }}
+                className="text-slate-400 hover:text-slate-600 p-1 rounded-lg text-sm font-bold"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Quick Auto-fill from PDF statement button / dropzone */}
+            <div className="relative mb-3">
+              <input
+                type="file"
+                id="flip-pdf-upload-modal"
+                accept=".pdf"
+                multiple
+                className="hidden"
+                disabled={isParsingPdf}
+                onChange={(e) => {
+                  const files = Array.from(e.target.files || []).slice(0, 3);
+                  if (files.length > 0) handleFlipPdfSelected(files);
+                }}
+              />
+              <label
+                htmlFor="flip-pdf-upload-modal"
+                className="flex items-center justify-between p-3 bg-purple-50/70 hover:bg-purple-100/70 border border-dashed border-purple-300 rounded-xl cursor-pointer transition-all group"
+              >
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-lg bg-purple-600 text-white flex items-center justify-center shrink-0">
+                    <FileText className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <span className="text-xs font-bold text-purple-950 block group-hover:text-purple-700">
+                      Auto-fill from Municipal or Levy Statement (PDF)
+                    </span>
+                    <span className="text-[10px] text-purple-600">
+                      Upload CoJ, Eskom, or Body Corporate bill to extract address, carrying costs & valuation
+                    </span>
+                  </div>
+                </div>
+                <span className="text-[10px] font-bold uppercase tracking-wider bg-white text-purple-700 px-2 py-1 rounded border border-purple-200 shrink-0">
+                  {isParsingPdf ? 'Parsing...' : 'Upload PDF'}
+                </span>
+              </label>
+            </div>
+
+            {pdfParseNotice && (
+              <div className="mb-3 p-2.5 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs flex items-start gap-2">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                <span className="font-medium">{pdfParseNotice}</span>
+              </div>
+            )}
 
             <form onSubmit={handleAddFlip} className="space-y-4 text-xs">
               <div>
@@ -1957,6 +2122,27 @@ export default function FlipsManagerPage() {
                   />
                 </div>
               </div>
+
+              {/* Municipal Valuation Benchmark Chip (if extracted) */}
+              {extractedValuationZAR && extractedValuationZAR > 0 ? (
+                <div className="flex items-center justify-between p-2.5 bg-purple-50 rounded-lg border border-purple-200">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="text-xs font-semibold text-purple-900">
+                      🏛️ Municipal Valuation: <strong>{formatZAR(extractedValuationZAR)}</strong>
+                    </span>
+                    <span className="text-[10px] text-purple-700 bg-purple-100 px-1.5 py-0.5 rounded border border-purple-200 font-medium">
+                      CoJ Benchmark
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setNewFlipTargetExit(extractedValuationZAR)}
+                    className="text-[11px] font-bold text-purple-700 bg-white hover:bg-purple-100 px-2 py-1 rounded border border-purple-300 shadow-2xs transition-colors cursor-pointer shrink-0"
+                  >
+                    Use as Target Exit (ARV) →
+                  </button>
+                </div>
+              ) : null}
 
               {/* Holding Period Carrying Costs Inputs (Itemized) */}
               <div className="p-3 bg-amber-50/60 rounded-lg border border-amber-200/90 space-y-2.5">

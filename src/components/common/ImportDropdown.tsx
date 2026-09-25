@@ -276,7 +276,7 @@ export default function ImportDropdown({
             </div>
           </button>
 
-          {type === 'rentals' && (
+          {(type === 'rentals' || type === 'flips') && (
             <button
               type="button"
               onClick={handleTriggerPdfUpload}
@@ -293,7 +293,9 @@ export default function ImportDropdown({
                   </span>
                 </div>
                 <div className="text-[10px] text-slate-500">
-                  Auto-detects CoJ, Eskom & iGrow bills (up to 3 PDFs at once)
+                  {type === 'flips'
+                    ? 'Auto-populates flip address, carrying costs & municipal valuation'
+                    : 'Auto-detects CoJ, Eskom & iGrow bills (up to 3 PDFs at once)'}
                 </div>
               </div>
             </button>

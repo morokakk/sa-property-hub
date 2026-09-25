@@ -255,6 +255,7 @@ export interface FlipProject {
   monthlyLeviesZAR?: number; // HOA / Body corporate levies (strictly R0 for Freehold)
   monthlyRatesTaxesZAR?: number; // City municipal rates & taxes
   monthlyOtherHoldingCostZAR?: number; // Site security, builder risk insurance, standing utilities
+  municipalValuationZAR?: number; // Official municipal property valuation from CoJ bill
   bondPaymentEffectiveDate?: string; // e.g. '2026-04'
   targetExitPriceZAR: number;
   targetCompletionDate: string;
