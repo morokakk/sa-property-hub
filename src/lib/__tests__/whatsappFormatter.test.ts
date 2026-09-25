@@ -130,7 +130,7 @@ describe('whatsappFormatter - Strategy Adaptive Formatting', () => {
 
     // Verify Strategy Header
     expect(output).toContain('BUY-AND-FLIP OPPORTUNITY');
-    expect(output).toContain('Strategy:* Buy & Flip');
+    expect(output).toContain('Strategy: Buy & Flip');
 
     // Verify Holding Cost Escrow & Breakdown
     expect(output).toContain('Holding Period Reserve:');
@@ -160,7 +160,7 @@ describe('whatsappFormatter - Strategy Adaptive Formatting', () => {
 
     // Verify Strategy Header
     expect(output).toContain('BUY-AND-HOLD RENTAL OPPORTUNITY');
-    expect(output).toContain('Strategy:* Buy & Hold Rental');
+    expect(output).toContain('Strategy: Buy & Hold Rental');
 
     // Verify Yields and Cash Flow
     expect(output).toContain('CASH FLOW & YIELD PERFORMANCE');
@@ -266,13 +266,13 @@ describe('whatsappFormatter - Strategy Adaptive Formatting', () => {
 
     expect(output).toContain('CONFIDENTIAL INVESTMENT MEMORANDUM');
     expect(output).toContain('Morningside Executive Apartment Flip');
-    expect(output).toContain('Strategy Mandate:* *🔄 Buy & Flip*');
+    expect(output).toContain('Strategy Mandate: *Buy & Flip*');
     expect(output).toContain('Holding Cost Escrow:');
     expect(output).toContain('Total Project Outlay:');
     expect(output).toContain('Facility Principal:');
     expect(output).toContain('Proposed Return: *14.5%* (p.a. Fixed Interest)');
     expect(output).toContain('Coupon Payout: Monthly in advance');
-    expect(output).toContain('*Sponsor:* Apex Capital Properties');
+    expect(output).toContain('Sponsor: Apex Capital Properties');
   });
 
   it('formats Proposal Generator pitch with High-Street Auction sourcing and distressed arrears', () => {
@@ -301,7 +301,7 @@ describe('whatsappFormatter - Strategy Adaptive Formatting', () => {
       investorProfile: mockInvestorProfile,
     });
 
-    expect(output).toContain('Sourcing:* High-Street Auction (10% Cash Guarantee Secured)');
+    expect(output).toContain('Sourcing Channel: High-Street Auction (10% Cash Guarantee Secured)');
     expect(output).toContain('Auctioneer Fee (10%+VAT):');
     expect(output).toContain('Municipal Clearance Arrears:');
   });
@@ -329,7 +329,7 @@ describe('whatsappFormatter - Strategy Adaptive Formatting', () => {
       investorProfile: mockInvestorProfile,
     });
 
-    expect(output).toContain('Sourcing:* iGrow Rentals (Turnkey • Section 13sex Tax Shield • R0 Transfer Duty)');
+    expect(output).toContain('Sourcing Channel: iGrow Rentals (Turnkey • Section 13sex Tax Shield • R0 Transfer Duty)');
     expect(output).toContain('SARS Transfer Duty: *R 0* (VAT Inclusive Developer Stock)');
     expect(output).toContain('SARS Tax Shield: *Section 13sex Eligible*');
   });
@@ -358,10 +358,10 @@ describe('whatsappFormatter - Strategy Adaptive Formatting', () => {
       investorProfile: mockInvestorProfile,
     });
 
-    expect(output).toContain('Strategy Mandate:* *⚡ Hybrid BRRRR*');
-    expect(output).toContain('Sourcing:* Distressed Bank Repo');
+    expect(output).toContain('Strategy Mandate: *Hybrid BRRRR*');
+    expect(output).toContain('Sourcing Channel: Distressed Bank Repo');
     expect(output).toContain('Post-Rehab ARV Valuation:');
-    expect(output).toContain('Lender Capital Exit:* Phase 2 Bank Refinance @ Month 6');
+    expect(output).toContain('Lender Capital Exit: Phase 2 Bank Refinance @ Month 6');
   });
 
   describe('formatPaymentStatement - WhatsApp Payment Receipts', () => {
@@ -376,7 +376,8 @@ describe('whatsappFormatter - Strategy Adaptive Formatting', () => {
         date: '2026-09-24',
       });
 
-      expect(receipt).toContain('🧾 *INVESTMENT PAYMENT NOTIFICATION*');
+      expect(receipt).toContain('*INVESTMENT PAYMENT NOTIFICATION*');
+      expect(receipt).not.toContain('🧾');
       expect(receipt).toContain('• Investor: Johan Meyer (Meyer Family Trust)');
       expect(receipt).toContain('• Linked Asset: Berea High-Yield Fix & Flip');
       expect(receipt).toContain('• Payment Type: Monthly Coupon / Interest (14% p.a. Fixed Interest)');
@@ -432,6 +433,101 @@ describe('whatsappFormatter - Strategy Adaptive Formatting', () => {
       expect(receipt).toContain('• Payment Type: Profit Share Distribution (30% Net Profit Split)');
       expect(receipt).toContain(`• Amount Disbursed: ${formatZAR(82_800)}`);
       expect(receipt).toContain(`• Date: ${formatDate('2026-12-05')}`);
+    });
+  });
+
+  describe('Zero Emojis Verification for Institutional Business Clients', () => {
+    // Regex matching all emoji unicode blocks
+    const emojiRegex = /[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{1F600}-\u{1F64F}\u{1F680}-\u{1F6FF}\u{1F1E6}-\u{1F1FF}]/u;
+
+    it('contains zero emojis in formatOpportunityForWhatsApp (Flip)', () => {
+      const output = formatOpportunityForWhatsApp(baseFlipDeal, mockInvestorProfile);
+      expect(output).not.toMatch(emojiRegex);
+    });
+
+    it('contains zero emojis in formatOpportunityForWhatsApp (Rental with Section 13sex & Amenity Scorecard)', () => {
+      const rentalWithExtras: OpportunityDeal = {
+        ...baseRentalDeal,
+        amenityScorecard: {
+          schools: '0-5km',
+          policeStation: '0-5km',
+          medicalClinic: '0-5km',
+          shoppingMall: '6-10km',
+          compositeGrade: 'A-Grade (Prime Hub)',
+          compositeScore: 11,
+        },
+        section13sex: {
+          isEligible: true,
+          buildingDeductionBaseZAR: 550_000,
+          annualAllowanceZAR: 27_500,
+          taxRatePercent: 27,
+          annualTaxSavingsZAR: 7_425,
+          twentyYearCumulativeSavingsZAR: 148_500,
+        },
+      };
+      const output = formatOpportunityForWhatsApp(rentalWithExtras, mockInvestorProfile);
+      expect(output).not.toMatch(emojiRegex);
+    });
+
+    it('contains zero emojis in formatFlipForWhatsApp', () => {
+      const flipMock: FlipProject = {
+        id: 'flip-test',
+        title: 'Executive Flip Project',
+        address: '15 West Road South',
+        city: 'Morningside',
+        purchaseDate: '2026-05-01',
+        purchasePriceZAR: 1_200_000,
+        acquisitionCostsZAR: 60_000,
+        baselineRenovationBudgetZAR: 300_000,
+        targetExitPriceZAR: 2_000_000,
+        targetCompletionDate: '2026-12-31',
+        currentPhase: 'Finishes & Tiling',
+        linkedFundingIds: [],
+        estimatedDurationMonths: 6,
+        monthlyHoldingCostZAR: 10_000,
+        status: 'Active',
+        strategy: 'Flip',
+        boq: [],
+      };
+      const output = formatFlipForWhatsApp(flipMock, mockInvestorProfile);
+      expect(output).not.toMatch(emojiRegex);
+    });
+
+    it('contains zero emojis in formatProposalPitchForWhatsApp', () => {
+      const output = formatProposalPitchForWhatsApp({
+        deal: {
+          id: 'deal-1',
+          title: 'Corporate Deal',
+          address: '100 Grayston Dr',
+          city: 'Sandton',
+          purchasePrice: 2_000_000,
+          acquisitionCosts: 100_000,
+          renovationBudget: 300_000,
+          targetExitPrice: 3_000_000,
+          strategy: 'BRRRR',
+          source: 'Distressed Sale / Repo',
+        },
+        strategy: 'BRRRR',
+        capitalRequested: 1_000_000,
+        fundingOfferType: 'Fixed Interest',
+        offeredRate: 15,
+        securityType: '1st Mortgage Bond',
+        investorProfile: mockInvestorProfile,
+      });
+      expect(output).not.toMatch(emojiRegex);
+    });
+
+    it('contains zero emojis in formatPaymentStatement', () => {
+      const output = formatPaymentStatement({
+        funderName: 'Johan Meyer',
+        funderEntity: 'Meyer Trust',
+        linkedAsset: 'Sandton Corporate Property',
+        paymentType: 'Coupon Payout',
+        returnTerms: '14% p.a.',
+        amount: 50_000,
+        date: '2026-09-25',
+      });
+      expect(output).not.toMatch(emojiRegex);
     });
   });
 });

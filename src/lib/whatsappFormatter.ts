@@ -52,7 +52,7 @@ export interface ProposalPitchParams {
 }
 
 /**
- * Formats deal metrics into clean plain text with emojis ready for WhatsApp copy/paste or wa.me link.
+ * Formats deal metrics into clean corporate plain text ready for WhatsApp copy/paste or wa.me link.
  * Adapts formatting to deal strategy: Flips emphasize holding period carrying burn rate and true net profit;
  * Rentals/BRRRR emphasize yields, net cash flow, and 10/20-year wealth compounding.
  */
@@ -66,20 +66,20 @@ export function formatOpportunityForWhatsApp(
 
   // Header and Strategy Tag
   let text = isFlip
-    ? `🇿🇦 *BUY-AND-FLIP OPPORTUNITY* 🔨\n`
+    ? `*BUY-AND-FLIP OPPORTUNITY*\n`
     : isBrrrr
-    ? `🇿🇦 *HYBRID BRRRR INVESTMENT OPPORTUNITY* ⚡\n`
-    : `🇿🇦 *BUY-AND-HOLD RENTAL OPPORTUNITY* 🏢\n`;
+    ? `*HYBRID BRRRR INVESTMENT OPPORTUNITY*\n`
+    : `*BUY-AND-HOLD RENTAL OPPORTUNITY*\n`;
 
   text += `━━━━━━━━━━━━━━━━━━━━━\n`;
-  text += `📍 *Property:* ${deal.title}\n`;
-  text += `🏙️ *Location:* ${deal.address}, ${deal.city} (${deal.province})\n`;
+  text += `• Property: *${deal.title}*\n`;
+  text += `• Location: ${deal.address}, ${deal.city} (${deal.province})\n`;
   if (deal.amenityScorecard) {
-    text += `⭐ *Location Grade:* *${deal.amenityScorecard.compositeGrade}* (${deal.amenityScorecard.compositeScore}/12 pts)\n`;
-    text += `  • 🏫 Schools: ${deal.amenityScorecard.schools} | 👮 Police: ${deal.amenityScorecard.policeStation}\n`;
-    text += `  • 🏥 Hospital: ${deal.amenityScorecard.medicalClinic} | 🛍️ Mall: ${deal.amenityScorecard.shoppingMall}\n`;
+    text += `• Location Grade: *${deal.amenityScorecard.compositeGrade}* (${deal.amenityScorecard.compositeScore}/12 pts)\n`;
+    text += `  - Schools: ${deal.amenityScorecard.schools} | Police: ${deal.amenityScorecard.policeStation}\n`;
+    text += `  - Healthcare: ${deal.amenityScorecard.medicalClinic} | Retail/Mall: ${deal.amenityScorecard.shoppingMall}\n`;
   }
-  text += `🏷️ *Strategy:* ${isFlip ? 'Buy & Flip' : isBrrrr ? 'Hybrid BRRRR' : 'Buy & Hold Rental'} • Sourcing: ${deal.source} • Status: ${deal.status}\n\n`;
+  text += `• Strategy: ${isFlip ? 'Buy & Flip' : isBrrrr ? 'Hybrid BRRRR' : 'Buy & Hold Rental'} • Sourcing: ${deal.source} • Status: ${deal.status}\n\n`;
 
   if (isFlip) {
     // BUY-AND-FLIP METRICS
@@ -100,7 +100,7 @@ export function formatOpportunityForWhatsApp(
     const depositVal = deal.depositZAR !== undefined ? deal.depositZAR : Math.round(deal.purchasePrice * (1 - ltvVal / 100));
     const initialCap = deal.initialCapitalRequired ?? (depositVal + acquisitionLegalAndDuty + deal.estimatedRehabCost);
 
-    text += `💰 *CAPITAL & ACQUISITION BREAKDOWN (ZAR)*\n`;
+    text += `*CAPITAL & ACQUISITION BREAKDOWN (ZAR)*\n`;
     if (deal.openMarketValueZAR) {
       text += `• Open Market Value: *${formatZAR(deal.openMarketValueZAR)}*\n`;
       text += `• Target Purchase / Bid: *${formatZAR(deal.purchasePrice)}*\n`;
@@ -115,7 +115,7 @@ export function formatOpportunityForWhatsApp(
     text += `• Total Project Outlay: *${formatZAR(totalProjectCost)}*\n`;
     text += `• Initial Capital Required (Day 1): *${formatZAR(initialCap)}*\n`;
 
-    text += `\n📈 *EXIT VALUATION & PROJECTED PROFIT*\n`;
+    text += `\n*EXIT VALUATION & PROJECTED PROFIT*\n`;
     text += `• Target Exit Price: *${formatZAR(deal.targetExitPrice)}*\n`;
     text += `• Projected Net Flip Profit: *${formatZAR(projectedNetProfit)}* (After capex & carrying escrow)\n`;
     text += `• Net Project ROI: *${formatPercent(projectROI)}* on total capital\n`;
@@ -125,7 +125,7 @@ export function formatOpportunityForWhatsApp(
     const depositVal = deal.depositZAR !== undefined ? deal.depositZAR : Math.round(deal.purchasePrice * (1 - ltvVal / 100));
     const initialCap = deal.initialCapitalRequired ?? (depositVal + (deal.costs.totalAcquisitionCost - deal.purchasePrice) + deal.estimatedRehabCost);
 
-    text += `💰 *FINANCIAL & ACQUISITION SUMMARY (ZAR)*\n`;
+    text += `*FINANCIAL & ACQUISITION SUMMARY (ZAR)*\n`;
     if (deal.openMarketValueZAR) {
       text += `• Open Market Value: *${formatZAR(deal.openMarketValueZAR)}*\n`;
       text += `• Target Purchase / Bid: *${formatZAR(deal.purchasePrice)}*\n`;
@@ -141,7 +141,7 @@ export function formatOpportunityForWhatsApp(
     }
     text += `• Initial Capital Required (Day 1): *${formatZAR(initialCap)}*\n`;
 
-    text += `\n📊 *CASH FLOW & YIELD PERFORMANCE*\n`;
+    text += `\n*CASH FLOW & YIELD PERFORMANCE*\n`;
     text += `• Est. Gross Rent: *${formatZAR(deal.monthlyRentalEstimate)}/m*\n`;
     text += `• Gross Yield: *${formatPercent(deal.grossYield)}* | Cap Rate: *${formatPercent(deal.capRate)}*\n`;
     text += `• Net Cash Flow: *${formatZAR(deal.monthlyCashFlow)}/m* (After bond, levies, rates)\n`;
@@ -166,14 +166,14 @@ export function formatOpportunityForWhatsApp(
     if (projections.length >= 10) {
       const p10 = projections[9];
       const pFinal = projections[projections.length - 1];
-      text += `\n🌱 *LONG-TERM WEALTH COMPOUNDING*\n`;
+      text += `\n*LONG-TERM WEALTH COMPOUNDING*\n`;
       text += `• 10-Yr Net Equity: *${formatZAR(p10.netEquity)}* (Valuation: ${formatZAR(p10.propertyValue)})\n`;
       text += `• ${pFinal.year}-Yr Net Equity (Debt-Free): *${formatZAR(pFinal.netEquity)}*\n`;
       text += `• Escalation: ${deal.annualCapitalGrowthPercent ?? 5}% Capital • ${deal.annualRentalEscalationPercent ?? 6}% Rent Escalation\n`;
     }
 
     if (isSection13 && deal.section13sex) {
-      text += `\n🏛️ *SARS SECTION 13SEX TAX SHIELD*\n`;
+      text += `\n*SARS SECTION 13SEX TAX SHIELD*\n`;
       text += `• Annual 5% Write-off: *${formatZAR(deal.section13sex.annualAllowanceZAR)}/yr*\n`;
       text += `• Annual Tax Savings: *${formatZAR(deal.section13sex.annualTaxSavingsZAR)}/yr* (${deal.section13sex.taxRatePercent}% bracket)\n`;
       text += `• 20-Yr Cumulative Benefit: *${formatZAR(deal.section13sex.twentyYearCumulativeSavingsZAR)}*\n`;
@@ -183,7 +183,7 @@ export function formatOpportunityForWhatsApp(
   // Funding Campaign (if active)
   if (deal.fundingRequiredZAR) {
     const oppRemaining = Math.max(0, (deal.fundingRequiredZAR || 0) - (deal.capitalRaisedZAR || 0));
-    text += `\n🤝 *FUNDING CAMPAIGN*\n`;
+    text += `\n*FUNDING CAMPAIGN*\n`;
     text += `• Target Facility: *${formatZAR(deal.fundingRequiredZAR)}*\n`;
     text += `• Capital Secured: *${formatZAR(deal.capitalRaisedZAR || 0)}*\n`;
     text += `• Open Syndicate Balance: *${formatZAR(oppRemaining)}*\n`;
@@ -194,12 +194,12 @@ export function formatOpportunityForWhatsApp(
   }
 
   if (deal.driveVault?.masterFolderUrl) {
-    text += `\n📁 *Document Vault:* ${deal.driveVault.masterFolderUrl}\n`;
+    text += `\n• Document Vault: ${deal.driveVault.masterFolderUrl}\n`;
   }
 
   if (investorProfile) {
-    text += `\n👤 *Sponsor:* ${investorProfile.entityName} ${investorProfile.tradingAs ? `(T/A ${investorProfile.tradingAs})` : ''}\n`;
-    text += `📞 *Tel:* ${investorProfile.contactNumber} | ✉️ ${investorProfile.email}\n`;
+    text += `\n• Sponsor: ${investorProfile.entityName} ${investorProfile.tradingAs ? `(T/A ${investorProfile.tradingAs})` : ''}\n`;
+    text += `• Tel: ${investorProfile.contactNumber} | Email: ${investorProfile.email}\n`;
   }
 
   text += `━━━━━━━━━━━━━━━━━━━━━\n`;
@@ -235,13 +235,13 @@ export function formatFlipForWhatsApp(
   const remainingReq = Math.max(0, fundingReq - capitalRaised);
   const pctFunded = fundingReq > 0 ? Math.min(100, Math.round((capitalRaised / fundingReq) * 100)) : 0;
 
-  let text = `🔨 *BUY-AND-FLIP DEAL SNAPSHOT* 🏡\n`;
+  let text = `*BUY-AND-FLIP DEAL SNAPSHOT*\n`;
   text += `━━━━━━━━━━━━━━━━━━━━━\n`;
-  text += `📍 *Project:* ${flip.title}\n`;
-  text += `🏙️ *Location:* ${flip.address}, ${flip.city}\n`;
-  text += `⏱️ *Phase:* ${flip.currentPhase} • Target Exit: ${flip.targetCompletionDate}\n\n`;
+  text += `• Project: *${flip.title}*\n`;
+  text += `• Location: ${flip.address}, ${flip.city}\n`;
+  text += `• Phase: ${flip.currentPhase} • Target Exit: ${flip.targetCompletionDate}\n\n`;
 
-  text += `💰 *CAPITAL & BUDGET BREAKDOWN (ZAR)*\n`;
+  text += `*CAPITAL & BUDGET BREAKDOWN (ZAR)*\n`;
   text += `• Purchase Price: *${formatZAR(flip.purchasePriceZAR)}*\n`;
   text += `• Acquisition Costs: ${formatZAR(flip.acquisitionCostsZAR)}\n`;
   text += `• BOQ Renovation Spend: *${formatZAR(totalBoq)}* (Budget: ${formatZAR(flip.baselineRenovationBudgetZAR)})\n`;
@@ -249,12 +249,12 @@ export function formatFlipForWhatsApp(
   text += `  ↳ Bond: ${formatZAR(monthlyBond)} | Levies: ${formatZAR(monthlyLevies)} | Rates: ${formatZAR(monthlyRates)} | Security: ${formatZAR(monthlyOther)}\n`;
   text += `• Total Capital Invested: *${formatZAR(totalCost)}*\n\n`;
 
-  text += `📈 *PROFIT & EXIT VALUATION*\n`;
+  text += `*PROFIT & EXIT VALUATION*\n`;
   text += `• Target Exit Price: *${formatZAR(flip.targetExitPriceZAR)}*\n`;
   text += `• Projected Net Profit: *${formatZAR(netProfit)}* (After capex & holding reserve)\n`;
   text += `• Annualized Net ROI: *${formatPercent(roi)}*\n`;
 
-  text += `\n🤝 *FUNDING & SYNDICATE STATUS*\n`;
+  text += `\n*FUNDING & SYNDICATE STATUS*\n`;
   text += `• Target Facility Required: *${formatZAR(fundingReq)}*\n`;
   text += `• Capital Secured: *${formatZAR(capitalRaised)}* (${pctFunded}% Funded)\n`;
   text += `• Balance Open: *${formatZAR(remainingReq)}*\n`;
@@ -267,12 +267,12 @@ export function formatFlipForWhatsApp(
   }
 
   if (flip.driveVault?.masterFolderUrl) {
-    text += `\n📁 *Cloud Deal Folder:* ${flip.driveVault.masterFolderUrl}\n`;
+    text += `\n• Cloud Deal Folder: ${flip.driveVault.masterFolderUrl}\n`;
   }
 
   if (investorProfile) {
-    text += `\n👤 *Lead Developer:* ${investorProfile.entityName}\n`;
-    text += `📞 *Contact:* ${investorProfile.contactNumber} | ${investorProfile.email}\n`;
+    text += `\n• Lead Developer: ${investorProfile.entityName}\n`;
+    text += `• Contact: ${investorProfile.contactNumber} | Email: ${investorProfile.email}\n`;
   }
 
   text += `━━━━━━━━━━━━━━━━━━━━━\n`;
@@ -316,32 +316,32 @@ export function formatProposalPitchForWhatsApp(
       ? capitalRequested + capitalRequested * (offeredRate / 100) * 0.5
       : capitalRequested + projectedNetProfit * (offeredRate / 100);
 
-  let text = `🇿🇦 *CONFIDENTIAL INVESTMENT MEMORANDUM* 📄\n`;
+  let text = `*CONFIDENTIAL INVESTMENT MEMORANDUM*\n`;
   text += `━━━━━━━━━━━━━━━━━━━━━\n`;
-  text += `📍 *Asset:* ${deal.title}\n`;
-  text += `🏙️ *Location:* ${deal.address}, ${deal.city}, South Africa\n`;
-  text += `🏷️ *Strategy Mandate:* *${isFlip ? '🔄 Buy & Flip' : strategy === 'BRRRR' ? '⚡ Hybrid BRRRR' : '🏠 Buy & Hold Rental'}*\n`;
+  text += `• Asset: *${deal.title}*\n`;
+  text += `• Location: ${deal.address}, ${deal.city}, South Africa\n`;
+  text += `• Strategy Mandate: *${isFlip ? 'Buy & Flip' : strategy === 'BRRRR' ? 'Hybrid BRRRR' : 'Buy & Hold Rental'}*\n`;
 
   if (deal.source) {
     if (deal.source === 'High-Street Auction') {
-      text += `⚡ *Sourcing:* High-Street Auction (10% Cash Guarantee Secured)\n`;
+      text += `• Sourcing Channel: High-Street Auction (10% Cash Guarantee Secured)\n`;
     } else if (deal.source === 'Distressed Sale / Repo') {
-      text += `🛡️ *Sourcing:* Distressed Bank Repo (Municipal Arrears & Clearance Tracked)\n`;
+      text += `• Sourcing Channel: Distressed Bank Repo (Municipal Arrears & Clearance Tracked)\n`;
     } else if (deal.source === 'iGrow Rentals') {
-      text += `🏢 *Sourcing:* iGrow Rentals (Turnkey • Section 13sex Tax Shield • R0 Transfer Duty)\n`;
+      text += `• Sourcing Channel: iGrow Rentals (Turnkey • Section 13sex Tax Shield • R0 Transfer Duty)\n`;
     } else if (deal.source === 'Direct Owner') {
-      text += `🤝 *Sourcing:* Direct Private Seller (Off-Market Sourced • 0% Agent Commission)\n`;
+      text += `• Sourcing Channel: Direct Private Seller (Off-Market Sourced • 0% Agent Commission)\n`;
     } else if (deal.source === 'Private Agent') {
-      text += `📋 *Sourcing:* Private Estate Agent (Compliant OTP • Verified Deeds Office CMA)\n`;
+      text += `• Sourcing Channel: Private Estate Agent (Compliant OTP • Verified Deeds Office CMA)\n`;
     }
   }
 
   if (investorProfile) {
-    text += `👤 *Sponsor:* ${investorProfile.entityName} ${investorProfile.tradingAs ? `(T/A ${investorProfile.tradingAs})` : ''}\n`;
+    text += `• Sponsor: ${investorProfile.entityName} ${investorProfile.tradingAs ? `(T/A ${investorProfile.tradingAs})` : ''}\n`;
   }
   text += `\n`;
 
-  text += `💰 *EXECUTIVE DEAL HIGHLIGHTS (ZAR)*\n`;
+  text += `*EXECUTIVE DEAL HIGHLIGHTS (ZAR)*\n`;
   text += `• Purchase Price: *${formatZAR(deal.purchasePrice)}*\n`;
   if (deal.builtInEquity && deal.builtInEquity > 0) {
     text += `• Built-in Equity: *${formatZAR(deal.builtInEquity)}* (${deal.builtInEquityPercent ? `+${formatPercent(deal.builtInEquityPercent)}` : 'Capital Upside'})\n`;
@@ -367,7 +367,7 @@ export function formatProposalPitchForWhatsApp(
   text += `• Projected Net Profit: *${formatZAR(projectedNetProfit)}*\n`;
   text += `• Project Net ROI: *${formatPercent(projectROI)}*\n\n`;
 
-  text += `🤝 *PROPOSED LENDER / PARTNER RETURN TERMS*\n`;
+  text += `*PROPOSED LENDER / PARTNER RETURN TERMS*\n`;
   text += `• Facility Principal: *${formatZAR(capitalRequested)}*\n`;
   text += `• Loan-to-Cost (LTC): *${formatPercent(loanToCost)}*\n`;
   text += `• Proposed Return: *${offeredRate}%* (${fundingOfferType === 'Fixed Interest' ? 'p.a. Fixed Interest' : 'Net Profit Split'})\n`;
@@ -380,14 +380,14 @@ export function formatProposalPitchForWhatsApp(
     const arv = deal.arvZAR || deal.targetExitPrice || Math.round(deal.purchasePrice * 1.3);
     const refiLtv = deal.refinanceLtvPercent || 75;
     const estRefiCash = Math.round(arv * (refiLtv / 100));
-    text += `🏦 *Post-Rehab ARV Valuation:* *${formatZAR(arv)}* (${refiLtv}% LTV Refi: ${formatZAR(estRefiCash)})\n`;
-    text += `🔄 *Lender Capital Exit:* Phase 2 Bank Refinance @ Month 6 (100% Principal Repaid to Investor)\n`;
+    text += `• Post-Rehab ARV Valuation: *${formatZAR(arv)}* (${refiLtv}% LTV Refi: ${formatZAR(estRefiCash)})\n`;
+    text += `• Lender Capital Exit: Phase 2 Bank Refinance @ Month 6 (100% Principal Repaid to Investor)\n`;
   }
   text += `• Projected Total Payout: *${formatZAR(projectedLenderPayout)}*\n`;
 
   if (investorProfile) {
-    text += `\n📞 *Contact Sponsor:* ${investorProfile.contactNumber} | ${investorProfile.email}\n`;
-    if (investorProfile.website) text += `🌐 *Web:* ${investorProfile.website}\n`;
+    text += `\n• Contact Sponsor: ${investorProfile.contactNumber} | Email: ${investorProfile.email}\n`;
+    if (investorProfile.website) text += `• Website: ${investorProfile.website}\n`;
   }
 
   text += `━━━━━━━━━━━━━━━━━━━━━\n`;
@@ -432,7 +432,7 @@ export function formatPaymentStatement(details: PaymentStatementDetails): string
 
   const formattedDate = date ? formatDate(date) : formatDate(new Date().toISOString().split('T')[0]);
 
-  let text = `🧾 *INVESTMENT PAYMENT NOTIFICATION*\n`;
+  let text = `*INVESTMENT PAYMENT NOTIFICATION*\n`;
   text += `• Investor: ${investorLine}\n`;
   text += `• Linked Asset: ${assetLine}\n`;
   text += `• Payment Type: ${paymentType} (${returnTerms})\n`;
