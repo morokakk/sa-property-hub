@@ -82,21 +82,31 @@ export default function TenantStatement({
           m.date.startsWith(currentStatement.statementDate.substring(0, 7)))
     ) || (rental.meterReadings || []).find((m) => m.utilityType === 'water');
 
+  const isBundled =
+    currentStatement?.billingType === 'bundled' ||
+    currentStatement?.bundledUtilitiesZAR !== undefined ||
+    Boolean(rental.agencyName?.toLowerCase().includes('igrow')) ||
+    Boolean(currentStatement?.provider?.toLowerCase().includes('igrow'));
+
   // Base rent & recoveries
-  const baseRent = rental.monthlyGrossRentZAR || 0;
+  const baseRent = currentStatement?.tenantRentBilledZAR || rental.monthlyGrossRentZAR || 0;
 
   const currentTenantUtilities = currentStatement
-    ? currentStatement.electricityZAR +
-      currentStatement.waterZAR +
-      currentStatement.refuseZAR +
-      currentStatement.sewerageZAR
+    ? isBundled
+      ? (currentStatement.bundledUtilitiesZAR ?? 0)
+      : currentStatement.electricityZAR +
+        currentStatement.waterZAR +
+        currentStatement.refuseZAR +
+        currentStatement.sewerageZAR
     : 0;
 
   const previousTenantUtilities = previousStatement
-    ? previousStatement.electricityZAR +
-      previousStatement.waterZAR +
-      previousStatement.refuseZAR +
-      previousStatement.sewerageZAR
+    ? (previousStatement.billingType === 'bundled' || previousStatement.bundledUtilitiesZAR !== undefined || isBundled)
+      ? (previousStatement.bundledUtilitiesZAR ?? 0)
+      : previousStatement.electricityZAR +
+        previousStatement.waterZAR +
+        previousStatement.refuseZAR +
+        previousStatement.sewerageZAR
     : undefined;
 
   const currentGrandTotal = baseRent + currentTenantUtilities;
@@ -178,29 +188,40 @@ export default function TenantStatement({
     text += `*FIXED CONTRACTUAL CHARGES:*\n`;
     text += `• Base Contract Rent: ${formatZAR(baseRent, { includeDecimals: true })}\n\n`;
 
-    text += `*ITEMIZED MUNICIPAL UTILITY RECOVERIES:*\n`;
-    if (currentStatement) {
-      if (currentStatement.electricityZAR > 0) {
-        text += `• Municipal Electricity: ${formatZAR(currentStatement.electricityZAR, { includeDecimals: true })}\n`;
-        if (elecMeterReading && elecMeterReading.consumption !== undefined) {
-          text += `  └ Meter #${elecMeterReading.meterNumber || '—'}: ${elecMeterReading.previousReadingValue ?? '—'} -> ${elecMeterReading.readingValue} kWh (Usage: ${elecMeterReading.consumption} kWh)\n`;
-        }
+    if (isBundled) {
+      text += `*BODY CORPORATE UTILITY RECOVERY:*\n`;
+      if (currentStatement && currentStatement.bundledUtilitiesZAR !== undefined) {
+        text += `• ${currentStatement.bundledUtilityLabel || 'Water, Sewerage, Refuse & Common'}: ${formatZAR(currentStatement.bundledUtilitiesZAR, { includeDecimals: true })}\n`;
+        text += `  └ Source: ${currentStatement.provider || 'iGrow Rentals / WeconnectU'} (Consolidated Recovery)\n`;
+        text += `• Total Variable Recoveries: ${formatZAR(currentTenantUtilities, { includeDecimals: true })}\n`;
+      } else {
+        text += `• No utility recovery currently captured.\n`;
       }
-      if (currentStatement.waterZAR > 0) {
-        text += `• Municipal Water: ${formatZAR(currentStatement.waterZAR, { includeDecimals: true })}\n`;
-        if (waterMeterReading && waterMeterReading.consumption !== undefined) {
-          text += `  └ Meter #${waterMeterReading.meterNumber || '—'}: ${waterMeterReading.previousReadingValue ?? '—'} -> ${waterMeterReading.readingValue} KL (Usage: ${waterMeterReading.consumption} KL)\n`;
-        }
-      }
-      if (currentStatement.refuseZAR > 0) {
-        text += `• Pikitup Refuse Removal: ${formatZAR(currentStatement.refuseZAR, { includeDecimals: true })}\n`;
-      }
-      if (currentStatement.sewerageZAR > 0) {
-        text += `• Municipal Sewerage & Sanitation: ${formatZAR(currentStatement.sewerageZAR, { includeDecimals: true })}\n`;
-      }
-      text += `• Total Variable Recoveries: ${formatZAR(currentTenantUtilities, { includeDecimals: true })}\n`;
     } else {
-      text += `• No municipal bill currently captured.\n`;
+      text += `*ITEMIZED MUNICIPAL UTILITY RECOVERIES:*\n`;
+      if (currentStatement) {
+        if (currentStatement.electricityZAR > 0) {
+          text += `• Municipal Electricity: ${formatZAR(currentStatement.electricityZAR, { includeDecimals: true })}\n`;
+          if (elecMeterReading && elecMeterReading.consumption !== undefined) {
+            text += `  └ Meter #${elecMeterReading.meterNumber || '—'}: ${elecMeterReading.previousReadingValue ?? '—'} -> ${elecMeterReading.readingValue} kWh (Usage: ${elecMeterReading.consumption} kWh)\n`;
+          }
+        }
+        if (currentStatement.waterZAR > 0) {
+          text += `• Municipal Water: ${formatZAR(currentStatement.waterZAR, { includeDecimals: true })}\n`;
+          if (waterMeterReading && waterMeterReading.consumption !== undefined) {
+            text += `  └ Meter #${waterMeterReading.meterNumber || '—'}: ${waterMeterReading.previousReadingValue ?? '—'} -> ${waterMeterReading.readingValue} KL (Usage: ${waterMeterReading.consumption} KL)\n`;
+          }
+        }
+        if (currentStatement.refuseZAR > 0) {
+          text += `• Pikitup Refuse Removal: ${formatZAR(currentStatement.refuseZAR, { includeDecimals: true })}\n`;
+        }
+        if (currentStatement.sewerageZAR > 0) {
+          text += `• Municipal Sewerage & Sanitation: ${formatZAR(currentStatement.sewerageZAR, { includeDecimals: true })}\n`;
+        }
+        text += `• Total Variable Recoveries: ${formatZAR(currentTenantUtilities, { includeDecimals: true })}\n`;
+      } else {
+        text += `• No municipal bill currently captured.\n`;
+      }
     }
 
     text += `\n━━━━━━━━━━━━━━━━━━━━━\n`;
@@ -208,7 +229,9 @@ export default function TenantStatement({
     text += `━━━━━━━━━━━━━━━━━━━━━\n`;
     text += `📌 *Payment Terms:* Due strictly on or before 1st of month.\n`;
     text += `🏦 *Payment Reference:* ${rental.tenantName.replace(/\s+/g, '-').toUpperCase()} - ${rental.title.substring(0, 15).replace(/\s+/g, '').toUpperCase()}\n\n`;
-    text += `_Municipal recoveries are itemized from official council/Eskom invoices. Landlord rates and taxes are excluded from tenant liability._`;
+    text += isBundled
+      ? `_Utility recoveries are based on the managing agent / body corporate statement. Landlord rates, taxes, and agency fees are excluded from tenant liability._`
+      : `_Municipal recoveries are itemized from official council/Eskom invoices. Landlord rates and taxes are excluded from tenant liability._`;
 
     try {
       if (navigator?.clipboard?.writeText) {
@@ -354,7 +377,7 @@ export default function TenantStatement({
                   <span>Delete Statement</span>
                 </button>
               )}
-              {onOpenMeterReadings && (
+              {onOpenMeterReadings && !isBundled && (
                 <button
                   type="button"
                   onClick={onOpenMeterReadings}
@@ -524,141 +547,175 @@ export default function TenantStatement({
                       </td>
                     </tr>
 
-                    {/* 2. Electricity with Embedded Meter Readings */}
-                    <tr className="hover:bg-slate-50/60 transition-colors">
-                      <td className="p-3 pl-4">
-                        <div className="font-semibold text-slate-800 flex items-center gap-1.5">
-                          <Zap className="w-3.5 h-3.5 text-amber-500" />
-                          <span>Municipal Electricity</span>
-                        </div>
-                        {elecMeterReading ? (
-                          <div className="mt-1 flex items-center gap-1.5 flex-wrap text-[10px]">
-                            {elecMeterReading.meterNumber && (
-                              <span className="font-mono font-bold text-amber-800 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded">
-                                Meter #{elecMeterReading.meterNumber}
-                              </span>
-                            )}
-                            <span className="text-slate-600 font-mono">
-                              Prev: {elecMeterReading.previousReadingValue?.toLocaleString('en-ZA') ?? '—'} kWh → Curr: {elecMeterReading.readingValue.toLocaleString('en-ZA')} kWh
-                            </span>
-                            {elecMeterReading.consumption !== undefined && (
-                              <span className="font-bold text-emerald-800 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded">
-                                Usage: {elecMeterReading.consumption.toLocaleString('en-ZA')} kWh
-                              </span>
-                            )}
-                            <span className="text-[9px] text-slate-400">
-                              • Source: {elecMeterReading.source === 'pdf-extracted' ? (currentStatement?.provider || 'Eskom / Council Bill') : 'Manual On-Site Reading'} ({elecMeterReading.readingType || 'Actual'})
-                            </span>
+                    {isBundled ? (
+                      /* Bundled Recovery Row (iGrow Rentals / Body Corporate) */
+                      <tr className="hover:bg-slate-50/60 transition-colors">
+                        <td className="p-3 pl-4">
+                          <div className="font-semibold text-slate-800 flex items-center gap-1.5">
+                            <Building className="w-3.5 h-3.5 text-teal-600" />
+                            <span>{currentStatement?.bundledUtilityLabel || 'Water, Sewerage, Refuse & Common'}</span>
                           </div>
-                        ) : (
-                          <div className="text-[10px] text-slate-400">
-                            {currentStatement?.provider === 'Eskom' ? 'Eskom direct supply' : 'City Power / Council meter'} • Unmetered or council direct debit
+                          <div className="text-[10px] text-slate-500 mt-0.5">
+                            Source: {currentStatement?.provider || 'iGrow Rentals / WeconnectU'} • Body Corporate Consolidated Recovery (Unmetered)
                           </div>
-                        )}
-                      </td>
-                      <td className="p-3 text-right font-mono text-slate-600">
-                        {previousStatement ? formatZAR(previousStatement.electricityZAR, { includeDecimals: true }) : '—'}
-                      </td>
-                      <td className="p-3 text-right font-mono font-bold text-slate-800">
-                        {currentStatement ? formatZAR(currentStatement.electricityZAR, { includeDecimals: true }) : 'R 0.00'}
-                      </td>
-                      <td className="p-3 pr-4 text-right">
-                        {currentStatement
-                          ? renderVariance(currentStatement.electricityZAR, previousStatement?.electricityZAR)
-                          : '—'}
-                      </td>
-                    </tr>
+                        </td>
+                        <td className="p-3 text-right font-mono text-slate-600">
+                          {previousStatement?.bundledUtilitiesZAR !== undefined
+                            ? formatZAR(previousStatement.bundledUtilitiesZAR, { includeDecimals: true })
+                            : '—'}
+                        </td>
+                        <td className="p-3 text-right font-mono font-bold text-slate-800">
+                          {currentStatement?.bundledUtilitiesZAR !== undefined
+                            ? formatZAR(currentStatement.bundledUtilitiesZAR, { includeDecimals: true })
+                            : 'R 0.00'}
+                        </td>
+                        <td className="p-3 pr-4 text-right">
+                          {currentStatement?.bundledUtilitiesZAR !== undefined
+                            ? renderVariance(currentStatement.bundledUtilitiesZAR, previousStatement?.bundledUtilitiesZAR)
+                            : '—'}
+                        </td>
+                      </tr>
+                    ) : (
+                      <>
+                        {/* 2. Electricity with Embedded Meter Readings */}
+                        <tr className="hover:bg-slate-50/60 transition-colors">
+                          <td className="p-3 pl-4">
+                            <div className="font-semibold text-slate-800 flex items-center gap-1.5">
+                              <Zap className="w-3.5 h-3.5 text-amber-500" />
+                              <span>Municipal Electricity</span>
+                            </div>
+                            {elecMeterReading ? (
+                              <div className="mt-1 flex items-center gap-1.5 flex-wrap text-[10px]">
+                                {elecMeterReading.meterNumber && (
+                                  <span className="font-mono font-bold text-amber-800 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded">
+                                    Meter #{elecMeterReading.meterNumber}
+                                  </span>
+                                )}
+                                <span className="text-slate-600 font-mono">
+                                  Prev: {elecMeterReading.previousReadingValue?.toLocaleString('en-ZA') ?? '—'} kWh → Curr: {elecMeterReading.readingValue.toLocaleString('en-ZA')} kWh
+                                </span>
+                                {elecMeterReading.consumption !== undefined && (
+                                  <span className="font-bold text-emerald-800 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded">
+                                    Usage: {elecMeterReading.consumption.toLocaleString('en-ZA')} kWh
+                                  </span>
+                                )}
+                                <span className="text-[9px] text-slate-400">
+                                  • Source: {elecMeterReading.source === 'pdf-extracted' ? (currentStatement?.provider || 'Eskom / Council Bill') : 'Manual On-Site Reading'} ({elecMeterReading.readingType || 'Actual'})
+                                </span>
+                              </div>
+                            ) : (
+                              <div className="text-[10px] text-slate-400">
+                                {currentStatement?.provider === 'Eskom' ? 'Eskom direct supply' : 'City Power / Council meter'} • Unmetered or council direct debit
+                              </div>
+                            )}
+                          </td>
+                          <td className="p-3 text-right font-mono text-slate-600">
+                            {previousStatement ? formatZAR(previousStatement.electricityZAR, { includeDecimals: true }) : '—'}
+                          </td>
+                          <td className="p-3 text-right font-mono font-bold text-slate-800">
+                            {currentStatement ? formatZAR(currentStatement.electricityZAR, { includeDecimals: true }) : 'R 0.00'}
+                          </td>
+                          <td className="p-3 pr-4 text-right">
+                            {currentStatement
+                              ? renderVariance(currentStatement.electricityZAR, previousStatement?.electricityZAR)
+                              : '—'}
+                          </td>
+                        </tr>
 
-                    {/* 3. Water with Embedded Meter Readings */}
-                    <tr className="hover:bg-slate-50/60 transition-colors">
-                      <td className="p-3 pl-4">
-                        <div className="font-semibold text-slate-800 flex items-center gap-1.5">
-                          <Droplets className="w-3.5 h-3.5 text-cyan-600" />
-                          <span>Municipal Water Consumption</span>
-                        </div>
-                        {waterMeterReading ? (
-                          <div className="mt-1 flex items-center gap-1.5 flex-wrap text-[10px]">
-                            {waterMeterReading.meterNumber && (
-                              <span className="font-mono font-bold text-cyan-800 bg-cyan-50 border border-cyan-200 px-1.5 py-0.5 rounded">
-                                Meter #{waterMeterReading.meterNumber}
-                              </span>
+                        {/* 3. Water with Embedded Meter Readings */}
+                        <tr className="hover:bg-slate-50/60 transition-colors">
+                          <td className="p-3 pl-4">
+                            <div className="font-semibold text-slate-800 flex items-center gap-1.5">
+                              <Droplets className="w-3.5 h-3.5 text-cyan-600" />
+                              <span>Municipal Water Consumption</span>
+                            </div>
+                            {waterMeterReading ? (
+                              <div className="mt-1 flex items-center gap-1.5 flex-wrap text-[10px]">
+                                {waterMeterReading.meterNumber && (
+                                  <span className="font-mono font-bold text-cyan-800 bg-cyan-50 border border-cyan-200 px-1.5 py-0.5 rounded">
+                                    Meter #{waterMeterReading.meterNumber}
+                                  </span>
+                                )}
+                                <span className="text-slate-600 font-mono">
+                                  Prev: {waterMeterReading.previousReadingValue?.toLocaleString('en-ZA') ?? '—'} KL → Curr: {waterMeterReading.readingValue.toLocaleString('en-ZA')} KL
+                                </span>
+                                {waterMeterReading.consumption !== undefined && (
+                                  <span className="font-bold text-emerald-800 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded">
+                                    Usage: {waterMeterReading.consumption.toLocaleString('en-ZA')} KL
+                                  </span>
+                                )}
+                                <span className="text-[9px] text-slate-400">
+                                  • Source: {waterMeterReading.source === 'pdf-extracted' ? (currentStatement?.provider || 'Johannesburg Water') : 'Manual On-Site Reading'} ({waterMeterReading.readingType || 'Actual'})
+                                </span>
+                              </div>
+                            ) : (
+                              <div className="text-[10px] text-slate-400">
+                                Johannesburg Water meter & demand management levy
+                              </div>
                             )}
-                            <span className="text-slate-600 font-mono">
-                              Prev: {waterMeterReading.previousReadingValue?.toLocaleString('en-ZA') ?? '—'} KL → Curr: {waterMeterReading.readingValue.toLocaleString('en-ZA')} KL
-                            </span>
-                            {waterMeterReading.consumption !== undefined && (
-                              <span className="font-bold text-emerald-800 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded">
-                                Usage: {waterMeterReading.consumption.toLocaleString('en-ZA')} KL
-                              </span>
-                            )}
-                            <span className="text-[9px] text-slate-400">
-                              • Source: {waterMeterReading.source === 'pdf-extracted' ? (currentStatement?.provider || 'Johannesburg Water') : 'Manual On-Site Reading'} ({waterMeterReading.readingType || 'Actual'})
-                            </span>
-                          </div>
-                        ) : (
-                          <div className="text-[10px] text-slate-400">
-                            Johannesburg Water meter & demand management levy
-                          </div>
-                        )}
-                      </td>
-                      <td className="p-3 text-right font-mono text-slate-600">
-                        {previousStatement ? formatZAR(previousStatement.waterZAR, { includeDecimals: true }) : '—'}
-                      </td>
-                      <td className="p-3 text-right font-mono font-bold text-slate-800">
-                        {currentStatement ? formatZAR(currentStatement.waterZAR, { includeDecimals: true }) : 'R 0.00'}
-                      </td>
-                      <td className="p-3 pr-4 text-right">
-                        {currentStatement
-                          ? renderVariance(currentStatement.waterZAR, previousStatement?.waterZAR)
-                          : '—'}
-                      </td>
-                    </tr>
+                          </td>
+                          <td className="p-3 text-right font-mono text-slate-600">
+                            {previousStatement ? formatZAR(previousStatement.waterZAR, { includeDecimals: true }) : '—'}
+                          </td>
+                          <td className="p-3 text-right font-mono font-bold text-slate-800">
+                            {currentStatement ? formatZAR(currentStatement.waterZAR, { includeDecimals: true }) : 'R 0.00'}
+                          </td>
+                          <td className="p-3 pr-4 text-right">
+                            {currentStatement
+                              ? renderVariance(currentStatement.waterZAR, previousStatement?.waterZAR)
+                              : '—'}
+                          </td>
+                        </tr>
 
-                    {/* 4. Refuse */}
-                    <tr className="hover:bg-slate-50/60 transition-colors">
-                      <td className="p-3 pl-4">
-                        <div className="font-semibold text-slate-800">Pikitup Refuse Removal</div>
-                        <div className="text-[10px] text-slate-500">
-                          Source: {currentStatement?.provider || 'City of Johannesburg'} (PIKITUP Refuse Residential + 15% VAT)
-                        </div>
-                      </td>
-                      <td className="p-3 text-right font-mono text-slate-600">
-                        {previousStatement ? formatZAR(previousStatement.refuseZAR, { includeDecimals: true }) : '—'}
-                      </td>
-                      <td className="p-3 text-right font-mono font-bold text-slate-800">
-                        {currentStatement ? formatZAR(currentStatement.refuseZAR, { includeDecimals: true }) : 'R 0.00'}
-                      </td>
-                      <td className="p-3 pr-4 text-right">
-                        {currentStatement
-                          ? renderVariance(currentStatement.refuseZAR, previousStatement?.refuseZAR)
-                          : '—'}
-                      </td>
-                    </tr>
+                        {/* 4. Refuse */}
+                        <tr className="hover:bg-slate-50/60 transition-colors">
+                          <td className="p-3 pl-4">
+                            <div className="font-semibold text-slate-800">Pikitup Refuse Removal</div>
+                            <div className="text-[10px] text-slate-500">
+                              Source: {currentStatement?.provider || 'City of Johannesburg'} (PIKITUP Refuse Residential + 15% VAT)
+                            </div>
+                          </td>
+                          <td className="p-3 text-right font-mono text-slate-600">
+                            {previousStatement ? formatZAR(previousStatement.refuseZAR, { includeDecimals: true }) : '—'}
+                          </td>
+                          <td className="p-3 text-right font-mono font-bold text-slate-800">
+                            {currentStatement ? formatZAR(currentStatement.refuseZAR, { includeDecimals: true }) : 'R 0.00'}
+                          </td>
+                          <td className="p-3 pr-4 text-right">
+                            {currentStatement
+                              ? renderVariance(currentStatement.refuseZAR, previousStatement?.refuseZAR)
+                              : '—'}
+                          </td>
+                        </tr>
 
-                    {/* 5. Sewerage */}
-                    <tr className="hover:bg-slate-50/60 transition-colors">
-                      <td className="p-3 pl-4">
-                        <div className="font-semibold text-slate-800">Municipal Sewerage & Sanitation</div>
-                        <div className="text-[10px] text-slate-500">
-                          Source: {currentStatement?.provider || 'City of Johannesburg'} (Stand Size Sanitation Charge + 15% VAT)
-                        </div>
-                      </td>
-                      <td className="p-3 text-right font-mono text-slate-600">
-                        {previousStatement ? formatZAR(previousStatement.sewerageZAR, { includeDecimals: true }) : '—'}
-                      </td>
-                      <td className="p-3 text-right font-mono font-bold text-slate-800">
-                        {currentStatement ? formatZAR(currentStatement.sewerageZAR, { includeDecimals: true }) : 'R 0.00'}
-                      </td>
-                      <td className="p-3 pr-4 text-right">
-                        {currentStatement
-                          ? renderVariance(currentStatement.sewerageZAR, previousStatement?.sewerageZAR)
-                          : '—'}
-                      </td>
-                    </tr>
+                        {/* 5. Sewerage */}
+                        <tr className="hover:bg-slate-50/60 transition-colors">
+                          <td className="p-3 pl-4">
+                            <div className="font-semibold text-slate-800">Municipal Sewerage & Sanitation</div>
+                            <div className="text-[10px] text-slate-500">
+                              Source: {currentStatement?.provider || 'City of Johannesburg'} (Stand Size Sanitation Charge + 15% VAT)
+                            </div>
+                          </td>
+                          <td className="p-3 text-right font-mono text-slate-600">
+                            {previousStatement ? formatZAR(previousStatement.sewerageZAR, { includeDecimals: true }) : '—'}
+                          </td>
+                          <td className="p-3 text-right font-mono font-bold text-slate-800">
+                            {currentStatement ? formatZAR(currentStatement.sewerageZAR, { includeDecimals: true }) : 'R 0.00'}
+                          </td>
+                          <td className="p-3 pr-4 text-right">
+                            {currentStatement
+                              ? renderVariance(currentStatement.sewerageZAR, previousStatement?.sewerageZAR)
+                              : '—'}
+                          </td>
+                        </tr>
+                      </>
+                    )}
 
                     {/* Subtotal Tenant Recoveries */}
                     <tr className="bg-slate-50/80 font-bold border-t border-slate-200">
-                      <td className="p-3 pl-4 text-slate-900">Total Municipal Utility Recoveries</td>
+                      <td className="p-3 pl-4 text-slate-900">
+                        {isBundled ? 'Total Body Corporate Utility Recoveries' : 'Total Municipal Utility Recoveries'}
+                      </td>
                       <td className="p-3 text-right font-mono text-slate-700">
                         {previousTenantUtilities !== undefined ? formatZAR(previousTenantUtilities, { includeDecimals: true }) : '—'}
                       </td>

@@ -10,6 +10,7 @@ import {
   CheckCircle2,
   AlertCircle,
   FileSpreadsheet,
+  FileText,
 } from 'lucide-react';
 import {
   downloadPipelineTemplate,
@@ -25,12 +26,14 @@ interface ImportDropdownProps {
   type: 'pipeline' | 'rentals' | 'flips';
   className?: string;
   onImportSuccess?: () => void;
+  onPdfSelected?: (file: File) => void;
 }
 
 export default function ImportDropdown({
   type,
   className = '',
   onImportSuccess,
+  onPdfSelected,
 }: ImportDropdownProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -41,6 +44,7 @@ export default function ImportDropdown({
 
   const dropdownRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const pdfInputRef = useRef<HTMLInputElement>(null);
 
   const bulkAddOpportunities = usePortfolioStore((state) => state.bulkAddOpportunities);
   const bulkAddRentals = usePortfolioStore((state) => state.bulkAddRentals);
@@ -89,6 +93,20 @@ export default function ImportDropdown({
       fileInputRef.current.value = '';
       fileInputRef.current.click();
     }
+  };
+
+  const handleTriggerPdfUpload = () => {
+    setIsOpen(false);
+    if (pdfInputRef.current) {
+      pdfInputRef.current.value = '';
+      pdfInputRef.current.click();
+    }
+  };
+
+  const handlePdfSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    onPdfSelected?.(file);
   };
 
   const handleFileSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -184,6 +202,15 @@ export default function ImportDropdown({
         onChange={handleFileSelected}
       />
 
+      {/* Hidden PDF File Input */}
+      <input
+        ref={pdfInputRef}
+        type="file"
+        accept=".pdf"
+        className="hidden"
+        onChange={handlePdfSelected}
+      />
+
       {/* Main Trigger Button */}
       <button
         type="button"
@@ -203,7 +230,7 @@ export default function ImportDropdown({
 
       {/* Dropdown Menu */}
       {isOpen && (
-        <div className="absolute right-0 mt-1.5 w-64 bg-white rounded-xl shadow-xl border border-slate-200 py-1.5 z-40 animate-in fade-in zoom-in-95 duration-150">
+        <div className="absolute right-0 mt-1.5 w-68 bg-white rounded-xl shadow-xl border border-slate-200 py-1.5 z-40 animate-in fade-in zoom-in-95 duration-150">
           <div className="px-3 py-1.5 border-b border-slate-100 text-[10px] font-bold uppercase tracking-wider text-slate-400">
             {moduleTitle} Batch Import
           </div>
@@ -239,6 +266,29 @@ export default function ImportDropdown({
               </div>
             </div>
           </button>
+
+          {type === 'rentals' && (
+            <button
+              type="button"
+              onClick={handleTriggerPdfUpload}
+              className="w-full px-3 py-2 text-left text-xs text-slate-700 hover:bg-purple-50 hover:text-purple-950 flex items-start gap-2.5 transition-colors cursor-pointer border-t border-slate-100"
+            >
+              <div className="p-1 rounded bg-purple-100 text-purple-700 mt-0.5 shrink-0">
+                <FileText className="w-3.5 h-3.5" />
+              </div>
+              <div>
+                <div className="font-semibold text-slate-900 flex items-center gap-1.5">
+                  <span>Upload PDF Statement</span>
+                  <span className="text-[9px] font-bold uppercase tracking-wider bg-purple-100 text-purple-700 px-1 py-0.2 rounded">
+                    Smart
+                  </span>
+                </div>
+                <div className="text-[10px] text-slate-500">
+                  Auto-reads iGrow, CoJ, Eskom, or any managing agent statement (.pdf)
+                </div>
+              </div>
+            </button>
+          )}
         </div>
       )}
 

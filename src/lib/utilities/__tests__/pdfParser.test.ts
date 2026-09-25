@@ -1,10 +1,14 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import {
   UtilityStatementSchema,
   parseCojUtilityRegex,
   parseEskomUtilityRegex,
+  parseIgrowUtilityRegex,
   parseUtilityWithRegex,
+  parseRentalPdfStatement,
+  extractTextFromPdf,
 } from '../pdfParser';
+import * as pdfParserModule from '../pdfParser';
 
 describe('Dual-Pipeline Utility Parser', () => {
   describe('Zod Schema & Mathematical Cross-Check', () => {
@@ -118,12 +122,45 @@ Current Charges (Including VAT) 1,127.91
       expect(parsed.statementDate).toBe('2025-04-03');
       expect(parsed.billingPeriod).toBe('April 2025');
       expect(parsed.provider).toBe('City of Johannesburg');
+      expect(parsed.propertyName).toBe('32 The Straight Street, Lone Hill Ext.48');
+      expect(parsed.propertyAddress).toBe('32 The Straight Street, Lone Hill Ext.48 (Stand 42 QUARRYWOOD)');
       expect(parsed.propertyRatesZAR).toBe(774.86);
       expect(parsed.refuseZAR).toBe(353.05);
       expect(parsed.electricityZAR).toBe(0);
       expect(parsed.waterZAR).toBe(0);
       expect(parsed.sewerageZAR).toBe(0);
       expect(parsed.totalDueZAR).toBe(1127.91);
+    });
+
+    it('extracts property address and stand number from Parkmore CoJ table', () => {
+      const parkmoreCojRaw = `
+Date 2026/08/14
+Statement for August 2026
+Physical Address: 100 SEVENTH STREET
+Stand No./Portion: 00000840 - 00000 - 00
+Township: PARKMORE
+Account Number: 555021234
+Current Charges (Including VAT) 1,500.00
+Property Rates Residential 1,500.00 VAT: 0 %
+      `;
+      const parsed = parseCojUtilityRegex(parkmoreCojRaw);
+      expect(parsed.propertyName).toBe('100 Seventh Street, Parkmore');
+      expect(parsed.propertyAddress).toBe('100 Seventh Street, Parkmore (Stand 00000840 - 00000 - 00)');
+      expect(parsed.accountNumber).toBe('555021234');
+      expect(parsed.propertyRatesZAR).toBe(1500.00);
+      expect(parsed.totalDueZAR).toBe(1500.00);
+    });
+
+    it('correctly handles continuous inline stream OCR for CoJ table without bleeding adjacent columns into address', () => {
+      const cojSingleStream = `
+Physical Address: 100 SEVENTH STREET Stand No./portion 00000840 - 00000 - 00 Township Parkmore Stand Size 991 M2 Number Of Dwellings 1 Date Of Valuation 2023/07/01 Portion B1 Municipal Valuation Market Value R 3,180,000.00 Region Region B Ward 90 Invoice Number: 106006508113 Next Reading Date: 2026/05/20 Client Vat Number: Deposit: R 2,746.76 Account Number: 559235779 Pin Code: 233615 Total Due Due Date - 167.68 2026/05/20
+Current Charges (Including VAT) 4,297.43
+Property Rates Residential 4,297.43 VAT: 0 %
+      `;
+      const parsed = parseCojUtilityRegex(cojSingleStream);
+      expect(parsed.propertyName).toBe('100 Seventh Street, Parkmore');
+      expect(parsed.propertyAddress).toBe('100 Seventh Street, Parkmore (Stand 00000840 - 00000 - 00)');
+      expect(parsed.accountNumber).toBe('559235779');
     });
 
     it('routes CoJ text through master parseUtilityWithRegex function', () => {
@@ -202,6 +239,18 @@ Current Charges (Including VAT) 5,481.80
       expect(waterMeter.readingType).toBe('Actual');
       expect(waterMeter.source).toBe('pdf-extracted');
     });
+
+    it('auto-detects and extracts City of Johannesburg municipal bills via parseRentalPdfStatement', async () => {
+      const result = await parseRentalPdfStatement(mockCojRawText);
+
+      expect(result.success).toBe(true);
+      expect(result.docType).toBe('municipal_utility');
+      expect(result.provider).toBe('City of Johannesburg');
+      expect(result.utilityStatement).toBeDefined();
+      expect(result.utilityStatement?.propertyRatesZAR).toBe(774.86);
+      expect(result.utilityStatement?.refuseZAR).toBe(353.05);
+      expect(result.utilityStatement?.totalDueZAR).toBe(1127.91);
+    });
   });
 
   describe('Eskom Regex Parser', () => {
@@ -273,6 +322,237 @@ METER NUMBER | PREV. READING | CURR. READING | DIFFERENCE | CONSTANT | CONSUMPTI
       expect(elecMeter.consumption).toBe(202);
       expect(elecMeter.readingType).toBe('Actual');
       expect(elecMeter.source).toBe('pdf-extracted');
+    });
+
+    it('extracts Eskom property address and stand number from statement', () => {
+      const mockEskomWithStand = `
+ESKOM HOLDINGS SOC LTD
+YOUR ACCOUNT NO 7270492027
+BILLING DATE 2026-06-19
+NAME MOROKA, KENOSI
+STAND 000840, 100 7TH ST PARKMORE
+CURRENT 250.00 TOTAL AMOUNT DUE 250.00
+TOTAL CHARGES FOR BILLING PERIOD R 250.00
+      `;
+
+      const parsed = parseEskomUtilityRegex(mockEskomWithStand);
+      expect(parsed.propertyName).toBe('100 7th St Parkmore');
+      expect(parsed.propertyAddress).toBe('100 7th St Parkmore (Stand 000840)');
+      expect(parsed.electricityZAR).toBe(250.00);
+      expect(parsed.accountNumber).toBe('7270492027');
+    });
+
+    it('auto-detects and extracts Eskom bills with address via parseRentalPdfStatement', async () => {
+      const mockEskomWithStand = `
+ESKOM HOLDINGS SOC LTD
+YOUR ACCOUNT NO 7270492027
+BILLING DATE 2026-06-19
+NAME MOROKA, KENOSI
+STAND 000840, 100 7TH ST PARKMORE
+CURRENT 250.00 TOTAL AMOUNT DUE 250.00
+TOTAL CHARGES FOR BILLING PERIOD R 250.00
+      `;
+
+      const result = await parseRentalPdfStatement(mockEskomWithStand);
+
+      expect(result.success).toBe(true);
+      expect(result.docType).toBe('municipal_utility');
+      expect(result.provider).toBe('Eskom');
+      expect(result.utilityStatement?.accountNumber).toBe('7270492027');
+      expect(result.utilityStatement?.propertyName).toBe('100 7th St Parkmore');
+      expect(result.utilityStatement?.propertyAddress).toBe('100 7th St Parkmore (Stand 000840)');
+    });
+
+    it('correctly handles continuous inline stream OCR for Eskom without bleeding contact centre or charges into address', () => {
+      const eskomSingleStream = `
+ESKOM HOLDINGS SOC LTD
+YOUR ACCOUNT NO 7270492027
+BILLING DATE 2026-02-26
+STAND 000840, 100 7TH ST PARKMORE Cont Act Cent Re: (0860) 037566shareca Fax No: 0862 437 566 E-mail: Gauteng@eskom.co.za Web: Www.eskom.co.za
+TOTAL CHARGES FOR BILLING PERIOD R 705.85
+      `;
+      const parsed = parseEskomUtilityRegex(eskomSingleStream);
+      expect(parsed.propertyName).toBe('100 7th St Parkmore');
+      expect(parsed.propertyAddress).toBe('100 7th St Parkmore (Stand 000840)');
+      expect(parsed.electricityZAR).toBe(705.85);
+    });
+
+    it('correctly extracts Eskom address when formatted as Stand 000840,100 7th St Parkmore Service And Admin Charge', () => {
+      const eskomPremiseStream = `
+ESKOM HOLDINGS SOC LTD
+YOUR ACCOUNT NO 7270492027
+BILLING DATE 2026-02-26
+Premise Id Number 4406500000 Tariff Name: Homepower Standard Stand 000840,100 7th St Parkmore Service And Admin Charge @ R3.27 Per Day For 9 Days R 29.43
+TOTAL CHARGES FOR BILLING PERIOD R 29.43
+      `;
+      const parsed = parseEskomUtilityRegex(eskomPremiseStream);
+      expect(parsed.propertyName).toBe('100 7th St Parkmore');
+      expect(parsed.propertyAddress).toBe('100 7th St Parkmore (Stand 000840)');
+    });
+  });
+
+  describe('iGrow Rentals / WeconnectU Regex Parser', () => {
+    // Exact OCR text from user's uploaded Clearwater Village 128 statement
+    const mockIgrowRawText = `
+IGrow Rentals 2014/186623/07 Powered by WeconnectU Page 1 of 3
+OWNER STATEMENT
+Clearwater Village 128
+CREATED ON: 19 September 2026
+Prabhat Gokul IGrow Rentals
+128 Clearwater Village
+Atlasville
+Boksburg
+Gauteng
+1401
+38 Oxford Street
+Durbanville
+Cape Town
+Western Cape
+7550
+021 206 0850
+10 AUGUST 2026 — 09 SEPTEMBER 2026
+7 377.07
+INCOME DUE
+7 396.57
+INCOME RECEIVED
+1 871.54
+EXPENSES INVOICED
+1 871.54
+EXPENSES PAID
+PAID TO OWNER IN PERIOD 5 525.03
+DUE BY TENANT
+At the end of period — 09 September 2026
+7 403.85
+DUE BY OWNER
+At the end of period — 09 September 2026
+0.00
+INCOME & EXPENSES SUMMARY
+INCOME DUE 7 377.07
+Body Corporate 477.07
+Rent 6 900.00
+INCOME RECEIVED 7 396.57
+Rent 7 396.57
+EXPENSES INVOICED 1 871.54
+Commission - Rent 850.54
+Municipal 1 021.00
+
+--- Page 2 ---
+EXPENSES PAID 1 871.54
+Municipal 1 021.00
+Commission - Rent 850.54
+Net Operating Income ("income received" minus "expenses paid") 5 525.03
+INCOME DUE VS. INCOME RECEIVED
+Due by Tenant at the start of period 7 423.35
+DATE DESCRIPTION VAT BILLED RECEIVED
+01/09/2026 Water,Sewerage,Refuse & Common(2026-07-20 to 2026-08-19) 0.00 477.07
+01/09/2026 Rent for September 2026 0.00 6 900.00
+18/08/2026 Rent Received 7 396.57
+7 377.07 7 396.57
+Due by Tenant at the end of period 7 403.85
+EXPENSES INVOICED VS. EXPENSES PAID
+Due by Owner at the start of period 0.00
+DATE REFERENCE DESCRIPTION VAT INVOICED PAID
+18/08/2026 invoice Commission - rent 110.94 850.54
+18/08/2026 Monthly Rates & Taxes 0.00 1 021.00
+18/08/2026 Municipal 1 021.00
+25/08/2026 Commission - Rent 850.54
+1 871.54 1 871.54
+Due by Owner at the end of period 0.00
+OWNER INVOICES
+DATE REFERENCE DESCRIPTION AMOUNT VAT TOTAL
+18/08/2026 invoice Commission - rent 739.60 110.94 850.54
+18/08/2026 Monthly Rates & Taxes 1 021.00 0.00 1 021.00
+1 760.60 110.94 1 871.54
+
+--- Page 3 ---
+CURRENT POSITION SUMMARY
+LEASE SUMMARY
+Bongani June Mwale FIXED TERM
+1 Jul '26 - 30 Jun '27 284 days to go
+6 900.00
+rent amount
+6 965.17
+deposit held
+DUE BY OWNER
+Account is up to date
+TOTAL 0.00
+IGROW RENTALS - BANK ACCOUNT
+Account Name SA INVESTOR RENTALS (PTY) LTD
+Bank First National Bank
+Branch code / SWIFT 250655
+Account number 63181912411
+Payment reference IGRW11386
+    `;
+
+    it('extracts iGrow bundled utilities, rates, rent, commission, and deposit without meter readings', () => {
+      const parsed = parseIgrowUtilityRegex(mockIgrowRawText);
+
+      expect(parsed.provider).toBe('iGrow Rentals');
+      expect(parsed.propertyName).toBe('Clearwater Village 128');
+      expect(parsed.propertyAddress).toBe('128 Clearwater Village, Atlasville, Boksburg, Gauteng, 1401');
+      expect(parsed.billingType).toBe('bundled');
+      expect(parsed.bundledUtilitiesZAR).toBe(477.07);
+      expect(parsed.propertyRatesZAR).toBe(1021.00);
+      expect(parsed.totalDueZAR).toBe(1498.07); // 477.07 + 1021.00
+      expect(parsed.statementDate).toBe('2026-09-19');
+      expect(parsed.billingPeriod).toBe('10 AUGUST 2026 — 09 SEPTEMBER 2026');
+      expect(parsed.accountNumber).toBe('IGRW11386');
+      expect(parsed.tenantRentBilledZAR).toBe(6900.00);
+      expect(parsed.tenantName).toBe('Bongani June Mwale');
+      expect(parsed.depositHeldZAR).toBe(6965.17);
+      expect(parsed.netDisbursementZAR).toBe(5525.03);
+      expect(parsed.extractedMeterReadings).toBeUndefined();
+    });
+
+    it('routes iGrow statement via master parseUtilityWithRegex function', () => {
+      const parsed = parseUtilityWithRegex(mockIgrowRawText);
+      expect(parsed.provider).toBe('iGrow Rentals');
+      expect(parsed.propertyName).toBe('Clearwater Village 128');
+      expect(parsed.propertyAddress).toBe('128 Clearwater Village, Atlasville, Boksburg, Gauteng, 1401');
+      expect(parsed.billingType).toBe('bundled');
+      expect(parsed.bundledUtilitiesZAR).toBe(477.07);
+    });
+
+    it('validates bundled UtilityStatementSchema cross-check (bundled + rates = totalDue)', () => {
+      const payload = {
+        statementDate: '2026-09-19',
+        billingPeriod: '10 Aug 2026 - 09 Sep 2026',
+        provider: 'iGrow Rentals',
+        billingType: 'bundled' as const,
+        bundledUtilitiesZAR: 477.07,
+        propertyRatesZAR: 1021.00,
+        totalDueZAR: 1498.07,
+      };
+
+      expect(() => UtilityStatementSchema.parse(payload)).not.toThrow();
+    });
+
+    it('auto-detects and extracts iGrow managing agent statements as agent_payout via parseRentalPdfStatement', async () => {
+      const result = await parseRentalPdfStatement(mockIgrowRawText);
+
+      expect(result.success).toBe(true);
+      expect(result.docType).toBe('agent_payout');
+      expect(result.provider).toBe('iGrow Rentals');
+      expect(result.agentUnit).toBeDefined();
+      expect(result.agentUnit?.propertyName).toBe('Clearwater Village 128');
+      expect(result.agentUnit?.propertyAddress).toBe('128 Clearwater Village, Atlasville, Boksburg, Gauteng, 1401');
+      expect(result.agentUnit?.grossRentZAR).toBe(6900);
+      expect(result.agentUnit?.municipalRatesZAR).toBe(1021.00);
+      expect(result.agentUnit?.leviesZAR).toBe(477.07);
+      expect(result.agentUnit?.tenantName).toBe('Bongani June Mwale');
+      expect(result.utilityStatement?.bundledUtilitiesZAR).toBe(477.07);
+    });
+
+    it('extracts iGrow property details from single-line flat stream OCR without newlines', () => {
+      const flatIgrowRaw = `
+IGrow Rentals 2014/186623/07 Powered by WeconnectU Page 1 of 3 OWNER STATEMENT Clearwater Village 128 CREATED ON: 19 September 2026 Prabhat Gokul IGrow Rentals 128 Clearwater Village Atlasville Boksburg Gauteng 1401 38 Oxford Street Durbanville Cape Town Western Cape 7550 021 206 0850 10 AUGUST 2026 — 09 SEPTEMBER 2026 LEASE SUMMARY Bongani June Mwale FIXED TERM 1 Jul '26 - 30 Jun '27 6 900.00 rent amount 6 965.17 deposit held Water,Sewerage,Refuse & Common 477.07 Monthly Rates & Taxes 1 021.00 Payment reference IGRW11386
+      `;
+      const parsed = parseIgrowUtilityRegex(flatIgrowRaw);
+      expect(parsed.propertyName).toBe('Clearwater Village 128');
+      expect(parsed.propertyAddress).toBe('128 Clearwater Village, Atlasville, Boksburg, Gauteng, 1401');
+      expect(parsed.tenantName).toBe('Bongani June Mwale');
+      expect(parsed.bundledUtilitiesZAR).toBe(477.07);
+      expect(parsed.propertyRatesZAR).toBe(1021.00);
     });
   });
 });

@@ -20,7 +20,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { usePortfolioStore } from '@/lib/store/usePortfolioStore';
-import { ExtractedRentalUnit, UtilityStatement } from '@/types';
+import { ExtractedRentalUnit, UtilityStatement, RentalProperty } from '@/types';
 import {
   parseStatementWithAnthropic,
   getDemoStatementData,
@@ -46,6 +46,8 @@ export default function StatementUploadModal({
   const aiSettings = usePortfolioStore((state) => state.aiSettings);
   const rentals = usePortfolioStore((state) => state.rentals);
   const addUtilityStatement = usePortfolioStore((state) => state.addUtilityStatement);
+  const updateRental = usePortfolioStore((state) => state.updateRental);
+  const addRental = usePortfolioStore((state) => state.addRental);
 
   const activeRentals = rentals.filter((r) => r.status !== 'Sold');
 
@@ -134,19 +136,41 @@ export default function StatementUploadModal({
         const stmt = result.statement;
         setParsedUtility(stmt);
 
-        // Smart Auto-match Property
+        // Smart Dynamic Auto-match Property
         const matched = activeRentals.find((r) => {
           if (stmt.accountNumber && r.utilityStatements?.some((s) => s.accountNumber === stmt.accountNumber)) {
             return true;
           }
-          if (result.rawText && r.address) {
-            const cleanAddr = r.address.toLowerCase().replace(/[^a-z0-9\s]/g, ' ');
-            const words = cleanAddr.split(/\s+/).filter(
-              (w) => w.length > 3 && !['street', 'road', 'avenue', 'drive', 'crescent', 'ext'].includes(w)
-            );
-            const rawLower = result.rawText.toLowerCase();
-            if (words.some((w) => rawLower.includes(w))) {
+          if (stmt.propertyName) {
+            const propNameLower = stmt.propertyName.toLowerCase().trim();
+            const rTitleLower = r.title.toLowerCase().trim();
+            if (rTitleLower.includes(propNameLower) || propNameLower.includes(rTitleLower)) {
               return true;
+            }
+            if (r.address) {
+              const rAddrLower = r.address.toLowerCase().trim();
+              if (rAddrLower.includes(propNameLower) || propNameLower.includes(rAddrLower)) {
+                return true;
+              }
+            }
+          }
+          if (result.rawText) {
+            const rawLower = result.rawText.toLowerCase();
+            if (r.title) {
+              const cleanTitle = r.title.toLowerCase().replace(/[^a-z0-9\s]/g, ' ');
+              const titleWords = cleanTitle.split(/\s+/).filter((w) => w.length > 3);
+              if (titleWords.length > 0 && titleWords.some((w) => rawLower.includes(w))) {
+                return true;
+              }
+            }
+            if (r.address) {
+              const cleanAddr = r.address.toLowerCase().replace(/[^a-z0-9\s]/g, ' ');
+              const words = cleanAddr.split(/\s+/).filter(
+                (w) => w.length > 3 && !['street', 'road', 'avenue', 'drive', 'crescent', 'ext'].includes(w)
+              );
+              if (words.some((w) => rawLower.includes(w))) {
+                return true;
+              }
             }
           }
           return false;
@@ -154,6 +178,9 @@ export default function StatementUploadModal({
 
         if (matched) {
           setTargetPropertyId(matched.id);
+        } else if (stmt.propertyName) {
+          // If statement extracted a property name not found in portfolio, offer to create it
+          setTargetPropertyId('__NEW__');
         } else if (activeRentals.length > 0 && !targetPropertyId) {
           setTargetPropertyId(activeRentals[0].id);
         }
@@ -165,13 +192,120 @@ export default function StatementUploadModal({
     }
   };
 
+  const handleLoadDemoIgrowUtility = () => {
+    const demoStmt: UtilityStatement = {
+      id: `util-igrow-demo-${Date.now()}`,
+      statementDate: '2026-09-19',
+      billingPeriod: '10 Aug 2026 - 09 Sep 2026',
+      accountNumber: 'IGRW11386',
+      provider: 'iGrow Rentals',
+      propertyName: 'Clearwater Village 128',
+      propertyAddress: '128 Clearwater Village, Atlas Road, Boksburg',
+      billingType: 'bundled',
+      bundledUtilitiesZAR: 477.07,
+      bundledUtilityLabel: 'Water, Sewerage, Refuse & Common',
+      electricityZAR: 0,
+      waterZAR: 0,
+      refuseZAR: 0,
+      sewerageZAR: 0,
+      propertyRatesZAR: 1021.00,
+      totalDueZAR: 1498.07,
+      tenantRentBilledZAR: 6900.00,
+      bodyCorporateLeviesZAR: 477.07,
+      netDisbursementZAR: 5525.03,
+      depositHeldZAR: 6965.17,
+      tenantName: 'Bongani June Mwale',
+      parsedVia: 'regex-fallback',
+      createdAt: new Date().toISOString(),
+    };
+    setParsedUtility(demoStmt);
+    const matched = activeRentals.find(
+      (r) =>
+        Boolean(demoStmt.propertyName) &&
+        (r.title.toLowerCase().includes(demoStmt.propertyName!.toLowerCase()) ||
+          Boolean(r.address && r.address.toLowerCase().includes(demoStmt.propertyName!.toLowerCase())))
+    );
+    if (matched) {
+      setTargetPropertyId(matched.id);
+    } else {
+      setTargetPropertyId('__NEW__');
+    }
+  };
+
   const handleSaveUtilityStatement = () => {
     if (!parsedUtility || !targetPropertyId) return;
-    addUtilityStatement(targetPropertyId, parsedUtility);
+
+    if (targetPropertyId === '__NEW__') {
+      const newPropId = `rental-${Date.now()}`;
+      const newRental: RentalProperty = {
+        id: newPropId,
+        title: parsedUtility.propertyName || 'New Rental Property',
+        address: parsedUtility.propertyAddress || parsedUtility.propertyName || 'Address Pending',
+        city: 'Gauteng',
+        propertyType: 'Sectional Title Apartment',
+        source: 'iGrow Rentals',
+        marketValueZAR: (parsedUtility.tenantRentBilledZAR || 7000) * 120,
+        purchasePriceZAR: (parsedUtility.tenantRentBilledZAR || 7000) * 110,
+        purchaseDate: new Date().toISOString().split('T')[0],
+        outstandingBondBalanceZAR: 0,
+        bondInterestRatePercent: 11.5,
+        monthlyBondPaymentZAR: 0,
+        tenantName: parsedUtility.tenantName || 'Tenant',
+        tenantPhone: '',
+        tenantEmail: '',
+        leaseStartDate: new Date().toISOString().split('T')[0],
+        leaseEndDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+        depositHeldZAR: parsedUtility.depositHeldZAR || 0,
+        annualEscalationPercent: 6,
+        managementType: 'Agency',
+        agencyName: parsedUtility.provider || 'iGrow Rentals',
+        agencyCommissionPercent: 8,
+        agencyVatApplicable: true,
+        monthlyGrossRentZAR: parsedUtility.tenantRentBilledZAR || 0,
+        monthlyLeviesZAR: parsedUtility.bodyCorporateLeviesZAR || 0,
+        monthlyRatesTaxesZAR: parsedUtility.propertyRatesZAR || 0,
+        monthlyAgentFeeZAR: Math.round((parsedUtility.tenantRentBilledZAR || 0) * 0.08 * 1.15),
+        monthlyMaintenanceReserveZAR: Math.round((parsedUtility.tenantRentBilledZAR || 0) * 0.05),
+        status: 'Occupied',
+        maintenanceHistory: [],
+        utilityStatements: [parsedUtility],
+      };
+      addRental(newRental);
+      setTargetPropertyId(newPropId);
+    } else {
+      addUtilityStatement(targetPropertyId, parsedUtility);
+
+      // Simultaneous Landlord Sync: If iGrow statement contains contract metrics, sync property fields!
+      if (parsedUtility.billingType === 'bundled' || parsedUtility.provider === 'iGrow Rentals') {
+        const updates: Partial<RentalProperty> = {};
+        if (parsedUtility.tenantRentBilledZAR && parsedUtility.tenantRentBilledZAR > 0) {
+          updates.monthlyGrossRentZAR = parsedUtility.tenantRentBilledZAR;
+        }
+        if (parsedUtility.propertyRatesZAR && parsedUtility.propertyRatesZAR > 0) {
+          updates.monthlyRatesTaxesZAR = parsedUtility.propertyRatesZAR;
+        }
+        if (parsedUtility.bodyCorporateLeviesZAR && parsedUtility.bodyCorporateLeviesZAR > 0) {
+          updates.monthlyLeviesZAR = parsedUtility.bodyCorporateLeviesZAR;
+        }
+        if (parsedUtility.tenantName) {
+          updates.tenantName = parsedUtility.tenantName;
+        }
+        if (parsedUtility.depositHeldZAR && parsedUtility.depositHeldZAR > 0) {
+          updates.depositHeldZAR = parsedUtility.depositHeldZAR;
+        }
+        if (Object.keys(updates).length > 0) {
+          updateRental(targetPropertyId, updates);
+        }
+      }
+    }
+
     setUtilitySavedSuccess(true);
   };
 
-  const targetRentalObj = activeRentals.find((r) => r.id === targetPropertyId);
+  const targetRentalObj =
+    targetPropertyId === '__NEW__'
+      ? { title: parsedUtility?.propertyName || 'New Rental Property' }
+      : activeRentals.find((r) => r.id === targetPropertyId);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-150">
@@ -351,7 +485,7 @@ export default function StatementUploadModal({
                     Test without API tokens?
                   </span>
                   <p className="text-slate-500 text-[11px]">
-                    Load verified Clearwater Village iGrow statement ledger data.
+                    Load sample iGrow statement ledger data to preview managing agent payout extraction.
                   </p>
                 </div>
                 <button
@@ -454,11 +588,33 @@ export default function StatementUploadModal({
                           Click to browse or drop municipal/Eskom statement PDF
                         </p>
                         <p className="text-[11px] text-slate-400 mt-0.5">
-                          Works with City of Johannesburg (CoJ) and Eskom tax invoices (.pdf)
+                          Works with City of Johannesburg (CoJ), Eskom, and iGrow / WeconnectU statements (.pdf)
                         </p>
                       </div>
                     </div>
                   )}
+                </div>
+              )}
+
+              {/* Demo iGrow Statement Shortcut */}
+              {!parsedUtility && (
+                <div className="flex items-center justify-between p-3 bg-teal-50/50 rounded-xl border border-teal-100">
+                  <div className="flex items-center gap-2.5">
+                    <Sparkles className="w-4 h-4 text-teal-600 shrink-0" />
+                    <div className="text-xs">
+                      <span className="font-semibold text-slate-800">Test iGrow bundled statement?</span>
+                      <p className="text-slate-500 text-[11px]">
+                        Load sample iGrow statement to preview unmetered bundled recoveries (R477.07 Water, Sewerage, Refuse & Common).
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleLoadDemoIgrowUtility}
+                    className="px-3 py-1.5 bg-white hover:bg-teal-50 text-teal-700 text-xs font-bold rounded-lg border border-teal-200 transition-colors shadow-2xs cursor-pointer"
+                  >
+                    Load Sample Statement
+                  </button>
                 </div>
               )}
 
@@ -486,33 +642,80 @@ export default function StatementUploadModal({
                     </div>
                   </div>
 
-                  {/* Extracted Line Items Preview */}
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center bg-white p-3 rounded-lg border border-slate-200">
-                    <div>
-                      <span className="text-[10px] text-slate-400 uppercase font-semibold block">Electricity</span>
-                      <strong className="text-xs font-mono text-slate-800">
-                        {formatZAR(parsedUtility.electricityZAR, { includeDecimals: true })}
-                      </strong>
+                  {/* Extracted Line Items Preview: Bundled vs Itemized */}
+                  {parsedUtility.billingType === 'bundled' || parsedUtility.bundledUtilitiesZAR !== undefined ? (
+                    <div className="space-y-2 bg-white p-3 rounded-lg border border-slate-200">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <span className="text-[10px] text-slate-400 uppercase font-semibold block">
+                            Tenant Utility Recovery (Unmetered)
+                          </span>
+                          <strong className="text-xs font-bold text-slate-800">
+                            {parsedUtility.bundledUtilityLabel || 'Water, Sewerage, Refuse & Common'}
+                          </strong>
+                        </div>
+                        <strong className="text-sm font-mono text-emerald-800">
+                          {formatZAR(parsedUtility.bundledUtilitiesZAR || 0, { includeDecimals: true })}
+                        </strong>
+                      </div>
+
+                      {(parsedUtility.propertyRatesZAR || parsedUtility.tenantRentBilledZAR || parsedUtility.depositHeldZAR) && (
+                        <div className="pt-2 border-t border-slate-100 grid grid-cols-2 sm:grid-cols-4 gap-2 text-center text-[10px]">
+                          {parsedUtility.tenantRentBilledZAR ? (
+                            <div>
+                              <span className="text-slate-400 block">Gross Rent</span>
+                              <strong className="font-mono text-slate-700">{formatZAR(parsedUtility.tenantRentBilledZAR)}</strong>
+                            </div>
+                          ) : null}
+                          {parsedUtility.propertyRatesZAR ? (
+                            <div>
+                              <span className="text-slate-400 block">Rates & Taxes (Owner)</span>
+                              <strong className="font-mono text-slate-700">{formatZAR(parsedUtility.propertyRatesZAR)}</strong>
+                            </div>
+                          ) : null}
+                          {parsedUtility.depositHeldZAR ? (
+                            <div>
+                              <span className="text-slate-400 block">Deposit Held</span>
+                              <strong className="font-mono text-slate-700">{formatZAR(parsedUtility.depositHeldZAR)}</strong>
+                            </div>
+                          ) : null}
+                          {parsedUtility.netDisbursementZAR ? (
+                            <div>
+                              <span className="text-slate-400 block">Net Owner Payout</span>
+                              <strong className="font-mono text-emerald-700">{formatZAR(parsedUtility.netDisbursementZAR)}</strong>
+                            </div>
+                          ) : null}
+                        </div>
+                      )}
                     </div>
-                    <div>
-                      <span className="text-[10px] text-slate-400 uppercase font-semibold block">Water</span>
-                      <strong className="text-xs font-mono text-slate-800">
-                        {formatZAR(parsedUtility.waterZAR, { includeDecimals: true })}
-                      </strong>
+                  ) : (
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center bg-white p-3 rounded-lg border border-slate-200">
+                      <div>
+                        <span className="text-[10px] text-slate-400 uppercase font-semibold block">Electricity</span>
+                        <strong className="text-xs font-mono text-slate-800">
+                          {formatZAR(parsedUtility.electricityZAR, { includeDecimals: true })}
+                        </strong>
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-slate-400 uppercase font-semibold block">Water</span>
+                        <strong className="text-xs font-mono text-slate-800">
+                          {formatZAR(parsedUtility.waterZAR, { includeDecimals: true })}
+                        </strong>
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-slate-400 uppercase font-semibold block">Refuse</span>
+                        <strong className="text-xs font-mono text-slate-800">
+                          {formatZAR(parsedUtility.refuseZAR, { includeDecimals: true })}
+                        </strong>
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-slate-400 uppercase font-semibold block">Sewerage</span>
+                        <strong className="text-xs font-mono text-slate-800">
+                          {formatZAR(parsedUtility.sewerageZAR, { includeDecimals: true })}
+                        </strong>
+                      </div>
                     </div>
-                    <div>
-                      <span className="text-[10px] text-slate-400 uppercase font-semibold block">Refuse</span>
-                      <strong className="text-xs font-mono text-slate-800">
-                        {formatZAR(parsedUtility.refuseZAR, { includeDecimals: true })}
-                      </strong>
-                    </div>
-                    <div>
-                      <span className="text-[10px] text-slate-400 uppercase font-semibold block">Sewerage</span>
-                      <strong className="text-xs font-mono text-slate-800">
-                        {formatZAR(parsedUtility.sewerageZAR, { includeDecimals: true })}
-                      </strong>
-                    </div>
-                  </div>
+                  )}
 
                   {/* Meter Readings Preview if Extracted */}
                   {parsedUtility.extractedMeterReadings && parsedUtility.extractedMeterReadings.length > 0 && (
@@ -545,6 +748,15 @@ export default function StatementUploadModal({
                       onChange={(e) => setTargetPropertyId(e.target.value)}
                       className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs bg-white text-slate-900 font-bold focus:ring-1 focus:ring-teal-500 focus:outline-none"
                     >
+                      {parsedUtility?.propertyName &&
+                        !activeRentals.some(
+                          (r) =>
+                            r.title.toLowerCase().trim() === parsedUtility.propertyName?.toLowerCase().trim()
+                        ) && (
+                          <option value="__NEW__" className="text-teal-700 font-bold">
+                            ✨ + Create New Rental Property: &quot;{parsedUtility.propertyName}&quot;
+                          </option>
+                        )}
                       {activeRentals.map((r) => (
                         <option key={r.id} value={r.id}>
                           {r.title} — {r.address}

@@ -42,6 +42,7 @@ import {
   History,
   FileText,
   Gauge,
+  Loader2,
 } from 'lucide-react';
 import { exportRentalsCSV } from '@/lib/export/csvExport';
 import ImportDropdown from '@/components/common/ImportDropdown';
@@ -50,6 +51,8 @@ import StatementUploadModal from '@/components/rentals/StatementUploadModal';
 import StatementReviewModal from '@/components/rentals/StatementReviewModal';
 import TenantStatement from '@/components/rentals/TenantStatement';
 import MeterReadingsModal from '@/components/rentals/MeterReadingsModal';
+import UnifiedPdfVerificationModal from '@/components/rentals/UnifiedPdfVerificationModal';
+import { parseRentalPdfStatement, UnifiedParsedStatementResult } from '@/lib/utilities/pdfParser';
 
 export function renderPropertyTypeBadge(type?: PropertyTitleType) {
   switch (type) {
@@ -228,12 +231,33 @@ export default function RentalPortfolioPage() {
   const reconcileImportedRentals = usePortfolioStore((state) => state.reconcileImportedRentals);
   const rentalForecastView = usePortfolioStore((state) => state.rentalForecastView);
   const setRentalForecastView = usePortfolioStore((state) => state.setRentalForecastView);
+  const aiSettings = usePortfolioStore((state) => state.aiSettings);
   const summary = usePortfolioSummary();
 
   // Active vs Sold Archive View Tab
   const [viewTab, setViewTab] = useState<'active' | 'archive'>('active');
   const activeRentals = rentals.filter((r) => r.status !== 'Sold');
   const soldRentals = rentals.filter((r) => r.status === 'Sold');
+
+  // Direct PDF Import & Unified Verification State
+  const [unifiedPdfData, setUnifiedPdfData] = useState<UnifiedParsedStatementResult | null>(null);
+  const [isParsingDirectPdf, setIsParsingDirectPdf] = useState(false);
+
+  const handleDirectPdfUpload = async (file: File) => {
+    setIsParsingDirectPdf(true);
+    try {
+      const result = await parseRentalPdfStatement(file, aiSettings);
+      if (!result.success) {
+        alert(result.error || 'Failed to extract statement details.');
+      } else {
+        setUnifiedPdfData(result);
+      }
+    } catch (err: any) {
+      alert(err?.message || 'An error occurred while parsing the PDF.');
+    } finally {
+      setIsParsingDirectPdf(false);
+    }
+  };
 
   // Refinance & Pull Out Equity (BRRRR) Modal State
   const [showRefinanceModal, setShowRefinanceModal] = useState(false);
@@ -647,7 +671,10 @@ export default function RentalPortfolioPage() {
               <Sparkles className="w-3.5 h-3.5 text-purple-600" />
               <span>Smart Document Import</span>
             </button>
-            <ImportDropdown type="rentals" />
+            <ImportDropdown
+              type="rentals"
+              onPdfSelected={handleDirectPdfUpload}
+            />
             <button
               onClick={() => exportRentalsCSV(activeRentals)}
               title="Download active rentals register as CSV"
@@ -2733,6 +2760,30 @@ export default function RentalPortfolioPage() {
           setAiExtractedUnits([]);
         }}
       />
+
+      {/* Direct PDF Import Unified Verification Modal */}
+      <UnifiedPdfVerificationModal
+        isOpen={Boolean(unifiedPdfData)}
+        onClose={() => setUnifiedPdfData(null)}
+        data={unifiedPdfData}
+        onOpenTenantStatement={(propertyId: string) => {
+          setUnifiedPdfData(null);
+          setStatementModalPropertyId(propertyId);
+        }}
+      />
+
+      {/* Floating Processing Toast for Direct PDF Import */}
+      {isParsingDirectPdf && (
+        <div className="fixed bottom-6 right-6 z-50 bg-slate-900 text-white text-xs px-4 py-3 rounded-xl shadow-2xl border border-purple-500/30 flex items-center gap-3 animate-in fade-in slide-in-from-bottom-2">
+          <Loader2 className="w-4 h-4 text-purple-400 animate-spin shrink-0" />
+          <div>
+            <div className="font-bold">Analyzing PDF Statement...</div>
+            <div className="text-[10px] text-slate-400">
+              Running auto-detection for iGrow, CoJ, Eskom, or managing agent
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Historical Tenant Utility Variance & Statement Modal */}
       <TenantStatement
