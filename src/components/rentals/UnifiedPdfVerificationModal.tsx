@@ -24,8 +24,9 @@ import {
   UtilityStatement,
   ExtractedRentalUnit,
   MeterReading,
+  PropertyTitleType,
 } from '@/types';
-import { UnifiedParsedStatementResult } from '@/lib/utilities/pdfParser';
+import { UnifiedParsedStatementResult, findMatchingRental } from '@/lib/utilities/pdfParser';
 import { formatZAR, formatDate } from '@/lib/formatters';
 
 export type VerificationStatementItem = UnifiedParsedStatementResult & { fileName?: string };
@@ -50,7 +51,7 @@ export default function UnifiedPdfVerificationModal({
   const updateRental = usePortfolioStore((state) => state.updateRental);
   const addUtilityStatement = usePortfolioStore((state) => state.addUtilityStatement);
 
-  const activeRentals = rentals.filter((r) => r.status !== 'Sold');
+  const activeRentals = useMemo(() => rentals.filter((r) => r.status !== 'Sold'), [rentals]);
 
   const items: VerificationStatementItem[] = useMemo(() => {
     if (queue && queue.length > 0) return queue;
@@ -61,11 +62,25 @@ export default function UnifiedPdfVerificationModal({
   const [currentIndex, setCurrentIndex] = useState(0);
   const [itemStatuses, setItemStatuses] = useState<Record<number, 'pending' | 'saved' | 'skipped'>>({});
 
+  // Form State
+  const [targetPropertyId, setTargetPropertyId] = useState<string>('__NEW__');
+  const [propertyType, setPropertyType] = useState<PropertyTitleType>('Freehold House');
+  const [manualPropertyAssignments, setManualPropertyAssignments] = useState<Record<number, string>>({});
+  const [manualPropertyTypes, setManualPropertyTypes] = useState<Record<number, PropertyTitleType>>({});
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveSuccess, setSaveSuccess] = useState(false);
+  const [savedPropId, setSavedPropId] = useState<string>('');
+
   // Reset index and statuses when modal opens
   useEffect(() => {
     if (isOpen) {
       setCurrentIndex(0);
       setItemStatuses({});
+      setManualPropertyAssignments({});
+      setManualPropertyTypes({});
+      setManualFinancials({});
+      setMarketValueZAR(0);
+      setPurchasePriceZAR(0);
       setSaveSuccess(false);
       setIsSaving(false);
     }
@@ -73,11 +88,10 @@ export default function UnifiedPdfVerificationModal({
 
   const data = items[currentIndex] || null;
 
-  // Form State
-  const [targetPropertyId, setTargetPropertyId] = useState<string>('__NEW__');
-  const [isSaving, setIsSaving] = useState(false);
-  const [saveSuccess, setSaveSuccess] = useState(false);
-  const [savedPropId, setSavedPropId] = useState<string>('');
+  // Editable Financial & Valuation Fields (cross-statement)
+  const [marketValueZAR, setMarketValueZAR] = useState(0);
+  const [purchasePriceZAR, setPurchasePriceZAR] = useState(0);
+  const [manualFinancials, setManualFinancials] = useState<Record<number, { rent?: number; marketValue?: number; purchasePrice?: number }>>({});
 
   // Editable Agent Payout Fields
   const [propertyName, setPropertyName] = useState('');
@@ -110,35 +124,65 @@ export default function UnifiedPdfVerificationModal({
 
     const docType = data.docType;
 
+    // 1. Initial property type detection heuristic
+    let defaultType: PropertyTitleType = 'Sectional Title Apartment';
+    if (docType === 'municipal_utility') {
+      const s = data.utilityStatement;
+      const addr = (s?.propertyAddress || '').toLowerCase();
+      const pName = (s?.propertyName || '').toLowerCase();
+      const raw = (data.rawText || '').toLowerCase();
+
+      // Signals of Sectional Scheme vs Freehold
+      const isScheme =
+        addr.includes('unit') ||
+        addr.includes('ss ') ||
+        addr.includes('sectional') ||
+        addr.includes('flat') ||
+        addr.includes('apartment') ||
+        pName.includes('unit') ||
+        pName.includes('ss ') ||
+        (s?.bundledUtilitiesZAR !== undefined && s.bundledUtilitiesZAR > 0) ||
+        raw.includes('sectional title') ||
+        raw.includes('body corporate');
+
+      const hasStand =
+        addr.includes('stand') ||
+        pName.includes('stand') ||
+        raw.includes('category of property: property rates residential');
+
+      if (!isScheme && (hasStand || addr.length > 5)) {
+        defaultType = 'Freehold House';
+      }
+    } else if (docType === 'agent_payout') {
+      defaultType = 'Sectional Title Apartment';
+    }
+
+    if (manualPropertyTypes[currentIndex]) {
+      setPropertyType(manualPropertyTypes[currentIndex]);
+    } else {
+      setPropertyType(defaultType);
+    }
+
+    // 2. Set parsed statement line items
     if (docType === 'agent_payout' && data.agentUnit) {
       const u = data.agentUnit;
       setPropertyName(u.propertyName || '');
       setPropertyAddress(u.propertyAddress || u.address || '');
       setTenantName(u.tenantName || '');
-      setGrossRentZAR(u.grossRentZAR || 0);
+      const rent = manualFinancials[currentIndex]?.rent ?? (u.grossRentZAR || 0);
+      setGrossRentZAR(rent);
       setLeviesZAR(u.leviesZAR || 0);
       setMunicipalRatesZAR(u.municipalRatesZAR || 0);
       setAgencyCommissionZAR(u.agencyCommissionZAR || 0);
       setDepositHeldZAR(u.depositHeldZAR || 0);
+      const estMarket = Math.round((u.grossRentZAR || 7000) * 120);
+      const estPurchase = Math.round((u.grossRentZAR || 7000) * 110);
+      setMarketValueZAR(manualFinancials[currentIndex]?.marketValue ?? estMarket);
+      setPurchasePriceZAR(manualFinancials[currentIndex]?.purchasePrice ?? estPurchase);
       if (data.utilityStatement?.bundledUtilitiesZAR !== undefined) {
         setBundledUtilitiesZAR(data.utilityStatement.bundledUtilitiesZAR);
       } else {
         setBundledUtilitiesZAR(undefined);
-      }
-
-      // Match property
-      const pName = (u.propertyName || '').toLowerCase().trim();
-      const pAddr = (u.propertyAddress || u.address || '').toLowerCase().trim();
-      const matched = activeRentals.find(
-        (r) =>
-          (pName && (r.title.toLowerCase().includes(pName) || pName.includes(r.title.toLowerCase()))) ||
-          (pAddr && (r.address.toLowerCase().includes(pAddr) || pAddr.includes(r.address.toLowerCase())))
-      );
-
-      if (matched) {
-        setTargetPropertyId(matched.id);
-      } else {
-        setTargetPropertyId('__NEW__');
       }
     } else if (docType === 'municipal_utility' && data.utilityStatement) {
       const s = data.utilityStatement;
@@ -153,38 +197,71 @@ export default function UnifiedPdfVerificationModal({
       setTotalDueZAR(s.totalDueZAR || 0);
       setPropertyName(s.propertyName || '');
       setPropertyAddress(s.propertyAddress || '');
+      setGrossRentZAR(manualFinancials[currentIndex]?.rent ?? 0);
+      setMarketValueZAR(manualFinancials[currentIndex]?.marketValue ?? (s.municipalValuationZAR || 0));
+      setPurchasePriceZAR(manualFinancials[currentIndex]?.purchasePrice ?? 0);
+    }
 
-      // Match property by account number, stand number, title, or address
-      const pName = (s.propertyName || '').toLowerCase().trim();
-      const pAddr = (s.propertyAddress || '').toLowerCase().trim();
-      const sStand = s.propertyAddress?.match(/Stand\s*([0-9A-Za-z-]+)/i)?.[1]?.toLowerCase();
-
-      const matched = activeRentals.find((r) => {
-        const rTitle = r.title.toLowerCase().trim();
-        const rAddr = r.address.toLowerCase().trim();
-
-        if (s.accountNumber && r.utilityStatements?.some((st) => st.accountNumber === s.accountNumber)) {
-          return true;
-        }
-        if (sStand && (rAddr.includes(sStand) || rTitle.includes(sStand))) {
-          return true;
-        }
-        if (pName && (rTitle.includes(pName) || pName.includes(rTitle) || rAddr.includes(pName) || pName.includes(rAddr))) {
-          return true;
-        }
-        if (pAddr && (rAddr.includes(pAddr) || pAddr.includes(rAddr))) {
-          return true;
-        }
-        return false;
-      });
-
+    // 3. Match Target Property
+    if (manualPropertyAssignments[currentIndex]) {
+      setTargetPropertyId(manualPropertyAssignments[currentIndex]);
+      const manuallySelected = activeRentals.find((r) => r.id === manualPropertyAssignments[currentIndex]);
+      if (manuallySelected?.propertyType && !manualPropertyTypes[currentIndex]) {
+        setPropertyType(manuallySelected.propertyType);
+      }
+    } else {
+      const matched = findMatchingRental(data, activeRentals);
       if (matched) {
         setTargetPropertyId(matched.id);
+        if (matched.propertyType) {
+          setPropertyType(matched.propertyType);
+        }
       } else {
         setTargetPropertyId('__NEW__');
       }
     }
-  }, [data, isOpen, activeRentals]);
+  }, [data, isOpen, activeRentals, currentIndex, manualPropertyAssignments, manualPropertyTypes, manualFinancials, itemStatuses]);
+
+  const handleTargetPropertyChange = (newTargetId: string) => {
+    setTargetPropertyId(newTargetId);
+    setManualPropertyAssignments((prev) => ({ ...prev, [currentIndex]: newTargetId }));
+    if (newTargetId !== '__NEW__') {
+      const selected = activeRentals.find((r) => r.id === newTargetId);
+      if (selected?.propertyType) {
+        setPropertyType(selected.propertyType);
+        setManualPropertyTypes((prev) => ({ ...prev, [currentIndex]: selected.propertyType! }));
+      }
+    }
+  };
+
+  const handlePropertyTypeChange = (pt: PropertyTitleType) => {
+    setPropertyType(pt);
+    setManualPropertyTypes((prev) => ({ ...prev, [currentIndex]: pt }));
+  };
+
+  const handleRentChange = (val: number) => {
+    setGrossRentZAR(val);
+    setManualFinancials((prev) => ({
+      ...prev,
+      [currentIndex]: { ...prev[currentIndex], rent: val },
+    }));
+  };
+
+  const handleMarketValueChange = (val: number) => {
+    setMarketValueZAR(val);
+    setManualFinancials((prev) => ({
+      ...prev,
+      [currentIndex]: { ...prev[currentIndex], marketValue: val },
+    }));
+  };
+
+  const handlePurchasePriceChange = (val: number) => {
+    setPurchasePriceZAR(val);
+    setManualFinancials((prev) => ({
+      ...prev,
+      [currentIndex]: { ...prev[currentIndex], purchasePrice: val },
+    }));
+  };
 
   if (!isOpen || !data) return null;
 
@@ -216,10 +293,10 @@ export default function UnifiedPdfVerificationModal({
             title: propertyName || 'New Rental Property',
             address: propertyAddress || `${propertyName}, South Africa`,
             city: detectedCity,
-            propertyType: 'Sectional Title Apartment',
+            propertyType,
             source: data.provider === 'iGrow Rentals' ? 'iGrow Rentals' : 'Private Agent',
-            marketValueZAR: Math.round((grossRentZAR || 7000) * 120),
-            purchasePriceZAR: Math.round((grossRentZAR || 7000) * 110),
+            marketValueZAR: marketValueZAR > 0 ? marketValueZAR : Math.round((grossRentZAR || 7000) * 120),
+            purchasePriceZAR: purchasePriceZAR > 0 ? purchasePriceZAR : Math.round((grossRentZAR || 7000) * 110),
             purchaseDate: new Date().toISOString().split('T')[0],
             outstandingBondBalanceZAR: 0,
             bondInterestRatePercent: 11.5,
@@ -234,7 +311,7 @@ export default function UnifiedPdfVerificationModal({
             managementType: 'Agency',
             agencyName: data.provider || 'Managing Agent',
             agencyCommissionPercent: grossRentZAR > 0 ? Number(((agencyCommissionZAR / grossRentZAR) * 100).toFixed(1)) : 8,
-            agencyVatApplicable: true,
+            agencyVatApplicable: data.provider === 'iGrow Rentals' || Boolean(data.agentUnit?.isCommissionInclusiveOfVat) ? false : true,
             monthlyGrossRentZAR: grossRentZAR || 0,
             monthlyLeviesZAR: leviesZAR || 0,
             monthlyRatesTaxesZAR: municipalRatesZAR || 0,
@@ -253,6 +330,12 @@ export default function UnifiedPdfVerificationModal({
             monthlyRatesTaxesZAR: municipalRatesZAR,
             monthlyAgentFeeZAR: Math.round(agencyCommissionZAR),
           };
+          if (grossRentZAR > 0 && agencyCommissionZAR > 0) {
+            updates.agencyCommissionPercent = Number(((agencyCommissionZAR / grossRentZAR) * 100).toFixed(1));
+          }
+          if (data.provider === 'iGrow Rentals' || Boolean(data.agentUnit?.isCommissionInclusiveOfVat)) {
+            updates.agencyVatApplicable = false;
+          }
           if (tenantName) updates.tenantName = tenantName;
           if (depositHeldZAR > 0) updates.depositHeldZAR = depositHeldZAR;
           if (data.provider) updates.agencyName = data.provider;
@@ -297,21 +380,33 @@ export default function UnifiedPdfVerificationModal({
           totalDueZAR,
           propertyName,
           propertyAddress,
+          municipalValuationZAR: data.utilityStatement?.municipalValuationZAR || (marketValueZAR > 0 ? marketValueZAR : undefined),
           parsedVia: fallbackParsedVia,
         };
 
         if (isNewProperty) {
           const newId = `rental-util-${Date.now()}`;
           finalPropId = newId;
+
+          let detectedCity = 'Johannesburg';
+          if (propertyAddress) {
+            const parts = propertyAddress.split(',').map((p) => p.trim());
+            if (parts.length >= 3) {
+              detectedCity = parts[2] || parts[1] || 'Gauteng';
+            } else if (parts.length === 2) {
+              detectedCity = parts[1];
+            }
+          }
+
           const newRental: RentalProperty = {
             id: newId,
             title: propertyName || `${data.provider} Property`,
             address: propertyAddress || `${data.provider} Location, South Africa`,
-            city: 'Johannesburg',
-            propertyType: 'Sectional Title Apartment',
+            city: detectedCity,
+            propertyType,
             source: 'Private Agent',
-            marketValueZAR: 900000,
-            purchasePriceZAR: 800000,
+            marketValueZAR: marketValueZAR || 0,
+            purchasePriceZAR: purchasePriceZAR || 0,
             purchaseDate: new Date().toISOString().split('T')[0],
             outstandingBondBalanceZAR: 0,
             bondInterestRatePercent: 11.5,
@@ -323,11 +418,11 @@ export default function UnifiedPdfVerificationModal({
             leaseEndDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
             depositHeldZAR: 0,
             annualEscalationPercent: 6,
-            monthlyGrossRentZAR: 7500,
+            monthlyGrossRentZAR: grossRentZAR || 0,
             monthlyLeviesZAR: 0,
             monthlyRatesTaxesZAR: utilRatesZAR,
             monthlyAgentFeeZAR: 0,
-            monthlyMaintenanceReserveZAR: 375,
+            monthlyMaintenanceReserveZAR: Math.round((grossRentZAR || 0) * 0.05),
             status: 'Occupied',
             maintenanceHistory: [],
             utilityStatements: [updatedUtilStatement],
@@ -347,9 +442,19 @@ export default function UnifiedPdfVerificationModal({
           addRental(newRental);
         } else {
           // Update existing rental rates and append statement + meter readings
-          updateRental(targetPropertyId, {
-            monthlyRatesTaxesZAR: utilRatesZAR > 0 ? utilRatesZAR : undefined,
-          });
+          const updates: Partial<RentalProperty> = {};
+          if (utilRatesZAR > 0) {
+            updates.monthlyRatesTaxesZAR = utilRatesZAR;
+          }
+          if (updatedUtilStatement.municipalValuationZAR && updatedUtilStatement.municipalValuationZAR > 0) {
+            const matched = activeRentals.find((r) => r.id === targetPropertyId);
+            if (matched && (!matched.marketValueZAR || matched.marketValueZAR === 0 || matched.marketValueZAR === 900000)) {
+              updates.marketValueZAR = updatedUtilStatement.municipalValuationZAR;
+            }
+          }
+          if (Object.keys(updates).length > 0) {
+            updateRental(targetPropertyId, updates);
+          }
           addUtilityStatement(targetPropertyId, updatedUtilStatement);
         }
       }
@@ -399,13 +504,13 @@ export default function UnifiedPdfVerificationModal({
         aria-modal="true"
       >
         {/* Header */}
-        <div className="bg-slate-900 text-white px-6 py-4 flex items-center justify-between">
+        <div className="bg-slate-900 text-white px-4 sm:px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-purple-500/20 text-purple-400 flex items-center justify-center border border-purple-500/30 shrink-0">
               <Sparkles className="w-5 h-5" />
             </div>
             <div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <h3 className="text-base font-bold tracking-tight">
                   Verify PDF Statement Details
                 </h3>
@@ -436,7 +541,7 @@ export default function UnifiedPdfVerificationModal({
 
         {/* Batch Queue Tabs (rendered when multiple PDFs in queue) */}
         {items.length > 1 && (
-          <div className="bg-slate-950 px-6 py-2.5 border-b border-slate-800 flex items-center justify-between gap-3 overflow-x-auto">
+          <div className="bg-slate-950 px-3 sm:px-6 py-2.5 border-b border-slate-800 flex items-center justify-between gap-3 overflow-x-auto">
             <div className="flex items-center gap-2">
               {items.map((item, idx) => {
                 const status = itemStatuses[idx] || 'pending';
@@ -487,13 +592,14 @@ export default function UnifiedPdfVerificationModal({
         )}
 
         {/* Modal Body */}
-        <div className="p-6 overflow-y-auto space-y-5 flex-1">
+        <div className="p-4 sm:p-6 overflow-y-auto space-y-5 flex-1">
           {/* Property Target & Match Status Banner */}
-          <div className={`p-3.5 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
+          <div className={`p-3.5 rounded-xl border space-y-3 ${
             isNewProperty
               ? 'bg-amber-50/70 border-amber-200 text-amber-900'
               : 'bg-emerald-50/70 border-emerald-200 text-emerald-900'
           }`}>
+            {/* Status text */}
             <div className="flex items-start gap-2.5">
               {isNewProperty ? (
                 <Sparkles className="w-4 h-4 text-amber-600 mt-0.5 shrink-0" />
@@ -514,25 +620,53 @@ export default function UnifiedPdfVerificationModal({
               </div>
             </div>
 
-            {/* Target Property Select Override */}
-            <div className="sm:w-60 shrink-0">
-              <label className="text-[10px] uppercase font-bold text-slate-500 block mb-1">
-                Assign to Rental
-              </label>
-              <select
-                value={targetPropertyId}
-                onChange={(e) => setTargetPropertyId(e.target.value)}
-                className="w-full text-xs font-bold px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-slate-900 focus:ring-1 focus:ring-purple-500 focus:outline-none"
-              >
-                <option value="__NEW__" className="text-purple-700 font-bold">
-                  ✨ + Create New Rental Property
-                </option>
-                {activeRentals.map((r) => (
-                  <option key={r.id} value={r.id}>
-                    {r.title}
+            {/* Controls row — stacks on mobile, side-by-side on sm+ */}
+            <div className="flex flex-col sm:flex-row gap-3">
+              {/* Target Property Select Override */}
+              <div className="flex-1 min-w-0">
+                <label className="text-[10px] uppercase font-bold text-slate-500 block mb-1">
+                  Assign to Rental
+                </label>
+                <select
+                  value={targetPropertyId}
+                  onChange={(e) => handleTargetPropertyChange(e.target.value)}
+                  className="w-full text-xs font-bold px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-slate-900 focus:ring-1 focus:ring-purple-500 focus:outline-none"
+                >
+                  <option value="__NEW__" className="text-purple-700 font-bold">
+                    ✨ + Create New Rental Property
                   </option>
-                ))}
-              </select>
+                  {activeRentals.map((r) => (
+                    <option key={r.id} value={r.id}>
+                      {r.title}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Property Type Selector — shown only for new properties */}
+              {isNewProperty && (
+                <div className="sm:w-64 shrink-0">
+                  <label className="text-[10px] uppercase font-bold text-slate-500 block mb-1">
+                    Property Type
+                  </label>
+                  <div className="flex gap-1">
+                    {(['Freehold House', 'Sectional Title Apartment', 'Townhouse / Cluster'] as const).map((pt) => (
+                      <button
+                        key={pt}
+                        type="button"
+                        onClick={() => handlePropertyTypeChange(pt)}
+                        className={`flex-1 text-[10px] font-bold px-2 py-1.5 rounded-lg border transition-all ${
+                          propertyType === pt
+                            ? 'bg-purple-600 text-white border-purple-600 shadow-sm'
+                            : 'bg-white text-slate-600 border-slate-300 hover:border-purple-400'
+                        }`}
+                      >
+                        {pt === 'Freehold House' ? '🏠 Freehold' : pt === 'Sectional Title Apartment' ? '🏢 Sectional' : '🏘️ Townhouse'}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
@@ -748,11 +882,72 @@ export default function UnifiedPdfVerificationModal({
                 </div>
               </div>
 
+              {/* New Property Financials — shown when creating from utility bill */}
+              {isNewProperty && (
+                <div className="bg-purple-50/70 rounded-xl p-4 border border-purple-200 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-purple-700 block">
+                      New Property Financials
+                    </span>
+                    {data.utilityStatement?.municipalValuationZAR ? (
+                      <span className="text-[10px] font-semibold text-purple-600 bg-purple-100 px-2 py-0.5 rounded-full border border-purple-200">
+                        ✓ Municipal Valuation Extracted (R {data.utilityStatement.municipalValuationZAR.toLocaleString()})
+                      </span>
+                    ) : null}
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div>
+                      <label className="block text-[10px] font-semibold text-slate-700 mb-1">
+                        Gross Monthly Rent (ZAR)
+                      </label>
+                      <input
+                        type="number"
+                        value={grossRentZAR}
+                        onChange={(e) => handleRentChange(Number(e.target.value) || 0)}
+                        className="w-full text-xs font-mono font-bold px-2.5 py-1.5 border border-purple-300 rounded-lg bg-white text-slate-900 focus:ring-1 focus:ring-purple-500 focus:outline-none"
+                        placeholder="0"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-semibold text-slate-700 mb-1">
+                        Market Value (ZAR)
+                      </label>
+                      <input
+                        type="number"
+                        value={marketValueZAR}
+                        onChange={(e) => handleMarketValueChange(Number(e.target.value) || 0)}
+                        className="w-full text-xs font-mono font-bold px-2.5 py-1.5 border border-purple-300 rounded-lg bg-white text-slate-900 focus:ring-1 focus:ring-purple-500 focus:outline-none"
+                        placeholder="0"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-semibold text-slate-700 mb-1">
+                        Purchase Price (ZAR)
+                      </label>
+                      <input
+                        type="number"
+                        value={purchasePriceZAR}
+                        onChange={(e) => handlePurchasePriceChange(Number(e.target.value) || 0)}
+                        className="w-full text-xs font-mono font-bold px-2.5 py-1.5 border border-purple-300 rounded-lg bg-white text-slate-900 focus:ring-1 focus:ring-purple-500 focus:outline-none"
+                        placeholder="0"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Utility Line Items Grid */}
               <div className="bg-slate-50 rounded-xl p-4 border border-slate-200 space-y-3">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block">
-                  Municipal Line Item Charges (ZAR)
-                </span>
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block">
+                    Municipal Line Item Charges (ZAR)
+                  </span>
+                  {!isNewProperty && data.utilityStatement?.municipalValuationZAR ? (
+                    <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-100/80 px-2 py-0.5 rounded-full border border-emerald-200">
+                      CoJ Municipal Valuation: R {data.utilityStatement.municipalValuationZAR.toLocaleString()}
+                    </span>
+                  ) : null}
+                </div>
 
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                   <div>
@@ -878,7 +1073,7 @@ export default function UnifiedPdfVerificationModal({
         </div>
 
         {/* Footer Actions */}
-        <div className="px-6 py-4 bg-slate-50 border-t border-slate-200 flex items-center justify-between gap-3">
+        <div className="px-4 sm:px-6 py-3 sm:py-4 bg-slate-50 border-t border-slate-200 flex flex-wrap items-center justify-between gap-2 sm:gap-3">
           <div className="flex items-center gap-2">
             <button
               type="button"

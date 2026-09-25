@@ -394,10 +394,13 @@ export interface UtilityStatement {
   propertyName?: string; // Scheme or complex title extracted from statement (e.g. "Clearwater Village 128", "The Blyde 402")
   propertyAddress?: string;
   bodyCorporateLeviesZAR?: number;
+  agencyCommissionZAR?: number;
+  agencyCommissionVatZAR?: number;
   netDisbursementZAR?: number;
   tenantRentBilledZAR?: number;
   depositHeldZAR?: number;
   tenantName?: string;
+  municipalValuationZAR?: number; // Extracted municipal property valuation (e.g. CoJ "Market Value R 3,180,000.00")
   rawText?: string;
   parsedVia: 'byok-llm' | 'regex-fallback' | 'manual';
   extractedMeterReadings?: Omit<MeterReading, 'id' | 'createdAt'>[];

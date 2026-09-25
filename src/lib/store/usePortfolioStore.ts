@@ -1249,8 +1249,29 @@ export const usePortfolioStore = create<PortfolioState>()(
         const migratedRentals = (rawRentals || []).map((rental: any) => {
           const defaultStatements =
             currentState.rentals.find((r) => r.id === rental.id)?.utilityStatements || [];
+
+          let monthlyAgentFeeZAR = rental.monthlyAgentFeeZAR;
+          let agencyVatApplicable = rental.agencyVatApplicable;
+          let agencyCommissionPercent = rental.agencyCommissionPercent;
+
+          // Auto-heal legacy iGrow import with artificial R635 estimate to actual R851 invoiced deduction
+          if (
+            (rental.agencyName === 'iGrow Rentals' || String(rental.title || '').toLowerCase().includes('clearwater')) &&
+            (monthlyAgentFeeZAR === 635 || monthlyAgentFeeZAR === 634.8 || Math.round(monthlyAgentFeeZAR || 0) === 635)
+          ) {
+            monthlyAgentFeeZAR = 851;
+            agencyVatApplicable = false;
+            agencyCommissionPercent =
+              rental.monthlyGrossRentZAR > 0
+                ? Number(((850.54 / rental.monthlyGrossRentZAR) * 100).toFixed(1))
+                : 12.3;
+          }
+
           return {
             ...rental,
+            monthlyAgentFeeZAR,
+            agencyVatApplicable,
+            agencyCommissionPercent,
             utilityStatements:
               rental.utilityStatements && rental.utilityStatements.length > 0
                 ? rental.utilityStatements

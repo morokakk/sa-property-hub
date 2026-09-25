@@ -161,6 +161,7 @@ Property Rates Residential 4,297.43 VAT: 0 %
       expect(parsed.propertyName).toBe('100 Seventh Street, Parkmore');
       expect(parsed.propertyAddress).toBe('100 Seventh Street, Parkmore (Stand 00000840 - 00000 - 00)');
       expect(parsed.accountNumber).toBe('559235779');
+      expect(parsed.municipalValuationZAR).toBe(3180000);
     });
 
     it('routes CoJ text through master parseUtilityWithRegex function', () => {
@@ -223,6 +224,7 @@ Current Charges (Including VAT) 5,481.80
       expect(parsed.waterZAR + parsed.sewerageZAR).toBe(2525.39);
       // Current charges
       expect(parsed.totalDueZAR).toBe(5481.80);
+      expect(parsed.municipalValuationZAR).toBe(3180000);
       // Tenant utility recovery portion: water (1634.74) + sewerage (890.65) + refuse (583.05) = 3108.44
       const tenantUtilities = Math.round((parsed.waterZAR + parsed.sewerageZAR + parsed.refuseZAR + parsed.electricityZAR) * 100) / 100;
       expect(tenantUtilities).toBe(3108.44);
@@ -501,6 +503,8 @@ Payment reference IGRW11386
       expect(parsed.tenantName).toBe('Bongani June Mwale');
       expect(parsed.depositHeldZAR).toBe(6965.17);
       expect(parsed.netDisbursementZAR).toBe(5525.03);
+      expect(parsed.agencyCommissionZAR).toBe(850.54);
+      expect(parsed.agencyCommissionVatZAR).toBe(110.94);
       expect(parsed.extractedMeterReadings).toBeUndefined();
     });
 
@@ -511,6 +515,7 @@ Payment reference IGRW11386
       expect(parsed.propertyAddress).toBe('128 Clearwater Village, Atlasville, Boksburg, Gauteng, 1401');
       expect(parsed.billingType).toBe('bundled');
       expect(parsed.bundledUtilitiesZAR).toBe(477.07);
+      expect(parsed.agencyCommissionZAR).toBe(850.54);
     });
 
     it('validates bundled UtilityStatementSchema cross-check (bundled + rates = totalDue)', () => {
@@ -522,6 +527,8 @@ Payment reference IGRW11386
         bundledUtilitiesZAR: 477.07,
         propertyRatesZAR: 1021.00,
         totalDueZAR: 1498.07,
+        agencyCommissionZAR: 850.54,
+        agencyCommissionVatZAR: 110.94,
       };
 
       expect(() => UtilityStatementSchema.parse(payload)).not.toThrow();
@@ -539,8 +546,12 @@ Payment reference IGRW11386
       expect(result.agentUnit?.grossRentZAR).toBe(6900);
       expect(result.agentUnit?.municipalRatesZAR).toBe(1021.00);
       expect(result.agentUnit?.leviesZAR).toBe(477.07);
+      expect(result.agentUnit?.agencyCommissionZAR).toBe(850.54);
+      expect(result.agentUnit?.agencyCommissionVatZAR).toBe(110.94);
+      expect(result.agentUnit?.isCommissionInclusiveOfVat).toBe(true);
       expect(result.agentUnit?.tenantName).toBe('Bongani June Mwale');
       expect(result.utilityStatement?.bundledUtilitiesZAR).toBe(477.07);
+      expect(result.utilityStatement?.agencyCommissionZAR).toBe(850.54);
     });
 
     it('extracts iGrow property details from single-line flat stream OCR without newlines', () => {

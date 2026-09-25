@@ -8,7 +8,7 @@
  */
 
 import { z } from 'zod';
-import { UtilityStatement, AiSettings, ExtractedRentalUnit } from '@/types';
+import { UtilityStatement, AiSettings, ExtractedRentalUnit, RentalProperty } from '@/types';
 import { parseStatementWithAnthropic } from '@/lib/ai/anthropicParser';
 
 // ============================================================================
@@ -43,6 +43,9 @@ export const UtilityStatementSchema = z
     propertyRatesZAR: z.number().nonnegative().default(0),
     totalDueZAR: z.number().nonnegative(),
     bodyCorporateLeviesZAR: z.number().nonnegative().optional(),
+    agencyCommissionZAR: z.number().nonnegative().optional(),
+    agencyCommissionVatZAR: z.number().nonnegative().optional(),
+    municipalValuationZAR: z.number().nonnegative().optional(),
     netDisbursementZAR: z.number().optional(),
     tenantRentBilledZAR: z.number().nonnegative().optional(),
     depositHeldZAR: z.number().nonnegative().optional(),
@@ -271,6 +274,21 @@ export function parseCojUtilityRegex(rawText: string): ValidatedUtilityStatement
     propertyRatesZAR = cleanNumeric(ratesMatch[1]);
   }
 
+  // 1b. Municipal Valuation / Market Value (e.g. "Municipal Valuation Market Value R 3,180,000.00" or rates calculation line)
+  let municipalValuationZAR: number | undefined;
+  const valuationMatch =
+    rawText.match(/Municipal\s*Valuation[\s\S]{0,120}?Market\s*Value\s*(?:R\s*)?([\d,]+(?:\.\d{2})?)/i) ||
+    rawText.match(/Category\s*of\s*Property:\s*Property\s*Rates\s*Residential[\s\S]{0,100}?R\s*([\d,]+(?:\.\d{2})?)\s*X/i) ||
+    rawText.match(/Municipal\s*Valuation[\s\S]{0,60}?(?:R\s*)?([\d,]+(?:\.\d{2})?)/i) ||
+    rawText.match(/Market\s*Value\s*(?:R\s*)?([\d,]+(?:\.\d{2})?)/i);
+
+  if (valuationMatch) {
+    const val = cleanNumeric(valuationMatch[1]);
+    if (val > 0) {
+      municipalValuationZAR = val;
+    }
+  }
+
   // 2. City Power / Electricity
   let electricityZAR = 0;
   const elecMatch =
@@ -423,6 +441,7 @@ export function parseCojUtilityRegex(rawText: string): ValidatedUtilityStatement
     totalDueZAR,
     propertyName,
     propertyAddress,
+    municipalValuationZAR,
     extractedMeterReadings: extractedMeterReadings.length > 0 ? extractedMeterReadings : undefined,
   });
 }
@@ -756,7 +775,31 @@ export function parseIgrowUtilityRegex(rawText: string): ValidatedUtilityStateme
     netDisbursementZAR = cleanNumeric(netMatch[1]);
   }
 
-  // 9. Total Due ZAR (Total current municipal / recovery charges: bundled + rates)
+  // 10. Agency Commission & Invoiced Management Fee (incl 15% VAT)
+  // e.g. "EXPENSES INVOICED ... Commission - Rent 850.54" or "18/08/2026 invoice Commission - rent 110.94 850.54"
+  let agencyCommissionZAR: number | undefined;
+  let agencyCommissionVatZAR: number | undefined;
+  const commMatch =
+    rawText.match(/EXPENSES\s+(?:INVOICED|PAID)[\s\S]*?Commission\s*[-–]\s*Rent\s+(?:R\s*)?([\d\s,]+\.\d{2})/i) ||
+    rawText.match(/Commission\s*[-–]\s*Rent\s+(?:R\s*)?([\d\s,]+\.\d{2})/i) ||
+    rawText.match(/Commission\s*[-–]\s*Rent.*?\s+(?:R\s*)?([\d\s,]+\.\d{2})\s*$/m) ||
+    rawText.match(/Commission\s+(?:R\s*)?([\d\s,]+\.\d{2})/i);
+
+  if (commMatch) {
+    agencyCommissionZAR = cleanNumeric(commMatch[1]);
+  }
+
+  const vatMatch =
+    rawText.match(/invoice\s+Commission\s*[-–]\s*Rent\s+(?:[\d\s,]+\.\d{2}\s+)?([\d\s,]+\.\d{2})\s+[\d\s,]+\.\d{2}/i) ||
+    rawText.match(/Commission\s*[-–]\s*Rent\s+([\d\s,]+\.\d{2})\s+[\d\s,]+\.\d{2}/i);
+
+  if (vatMatch) {
+    agencyCommissionVatZAR = cleanNumeric(vatMatch[1]);
+  } else if (agencyCommissionZAR) {
+    agencyCommissionVatZAR = Math.round(((agencyCommissionZAR * 0.15) / 1.15) * 100) / 100;
+  }
+
+  // 11. Total Due ZAR (Total current municipal / recovery charges: bundled + rates)
   const totalDueZAR = Math.round((bundledUtilitiesZAR + propertyRatesZAR) * 100) / 100;
 
   return UtilityStatementSchema.parse({
@@ -780,6 +823,8 @@ export function parseIgrowUtilityRegex(rawText: string): ValidatedUtilityStateme
     depositHeldZAR,
     tenantName,
     netDisbursementZAR,
+    agencyCommissionZAR,
+    agencyCommissionVatZAR,
     extractedMeterReadings: undefined, // Explicitly no meter readings for iGrow
   });
 }
@@ -839,6 +884,7 @@ Strict extraction guidelines:
 11. "accountNumber": The municipal, Eskom, or iGrow payment reference number.
 12. "provider": "City of Johannesburg", "Eskom", or "iGrow Rentals".
 13. "extractedMeterReadings": Optional list of meter readings found on the statement (leave undefined for iGrow statements).
+14. "municipalValuationZAR": Optional municipal property valuation / market value (e.g. "Market Value R 3,180,000.00" on City of Johannesburg bills).
 
 IMPORTANT FOR IGROW RENTALS / WECONNECTU:
 iGrow statements do NOT contain meter readings. They bundle recoveries into "Water,Sewerage,Refuse & Common". Set provider: "iGrow Rentals", billingType: "bundled", and do NOT require meter readings.
@@ -903,6 +949,7 @@ Output pure JSON matching the schema without markdown or commentary.`;
       sewerageZAR: cleanNumeric(parsedJson.sewerageZAR),
       propertyRatesZAR: cleanNumeric(parsedJson.propertyRatesZAR),
       totalDueZAR: cleanNumeric(parsedJson.totalDueZAR),
+      municipalValuationZAR: parsedJson.municipalValuationZAR !== undefined ? cleanNumeric(parsedJson.municipalValuationZAR) : undefined,
       extractedMeterReadings: Array.isArray(parsedJson.extractedMeterReadings)
         ? parsedJson.extractedMeterReadings.map((r: any) => ({
             ...r,
@@ -1023,6 +1070,7 @@ Output pure JSON matching the schema without markdown or commentary.`;
       sewerageZAR: cleanNumeric(input.sewerageZAR),
       propertyRatesZAR: cleanNumeric(input.propertyRatesZAR),
       totalDueZAR: cleanNumeric(input.totalDueZAR),
+      municipalValuationZAR: input.municipalValuationZAR !== undefined ? cleanNumeric(input.municipalValuationZAR) : undefined,
       extractedMeterReadings: Array.isArray(input.extractedMeterReadings)
         ? input.extractedMeterReadings.map((r: any) => ({
             ...r,
@@ -1147,8 +1195,14 @@ export async function parseRentalPdfStatement(
       };
 
       const rent = stmt.tenantRentBilledZAR || 0;
-      const agencyCommissionZAR = Math.round(rent * 0.08 * 1.15 * 100) / 100;
-      const agencyCommissionVatZAR = Math.round(((agencyCommissionZAR * 0.15) / 1.15) * 100) / 100;
+      const agencyCommissionZAR =
+        stmt.agencyCommissionZAR !== undefined && stmt.agencyCommissionZAR > 0
+          ? stmt.agencyCommissionZAR
+          : Math.round(rent * 0.08 * 1.15 * 100) / 100;
+      const agencyCommissionVatZAR =
+        stmt.agencyCommissionVatZAR !== undefined && stmt.agencyCommissionVatZAR > 0
+          ? stmt.agencyCommissionVatZAR
+          : Math.round(((agencyCommissionZAR * 0.15) / 1.15) * 100) / 100;
 
       const agentUnit: ExtractedRentalUnit = {
         propertyName: stmt.propertyName || 'iGrow Rental Unit',
@@ -1283,5 +1337,129 @@ export async function parseRentalPdfStatement(
       error: err?.message || 'Failed to extract PDF text.',
     };
   }
+}
+
+// ============================================================================
+// 8. Cross-Statement Property & Stand Number Normalization & Matching
+// ============================================================================
+
+/**
+ * Normalizes a South African property stand number by stripping leading zeros and portion suffixes.
+ * e.g., "Stand 00000840 - 00000 - 00" => "840"
+ *       "Stand 000840" => "840"
+ *       "Portion 42 QUARRYWOOD" => "42"
+ */
+export function normalizeStandNumber(text?: string): string | undefined {
+  if (!text) return undefined;
+  const match = text.match(/(?:Stand(?:\s*No\.?)?|Portion)\s*(?:[A-Za-z0-9\s]*?)?0*([1-9]\d*)/i);
+  return match ? match[1] : undefined;
+}
+
+/**
+ * Normalizes South African street addresses for robust cross-statement matching.
+ * e.g., "100 Seventh Street, Parkmore" => "100 7th st parkmore"
+ *       "100 7th St Parkmore" => "100 7th st parkmore"
+ */
+export function normalizeAddressForMatching(text?: string): string {
+  if (!text) return '';
+  return text
+    .toLowerCase()
+    .replace(/\bfirst\b/g, '1st')
+    .replace(/\bsecond\b/g, '2nd')
+    .replace(/\bthird\b/g, '3rd')
+    .replace(/\bfourth\b/g, '4th')
+    .replace(/\bfifth\b/g, '5th')
+    .replace(/\bsixth\b/g, '6th')
+    .replace(/\bseventh\b/g, '7th')
+    .replace(/\beighth\b/g, '8th')
+    .replace(/\bninth\b/g, '9th')
+    .replace(/\btenth\b/g, '10th')
+    .replace(/\bstreet\b/g, 'st')
+    .replace(/\broad\b/g, 'rd')
+    .replace(/\bavenue\b/g, 'ave')
+    .replace(/\bdrive\b/g, 'dr')
+    .replace(/[^a-z0-9]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/**
+ * Intelligent cross-statement matcher to correlate municipal, Eskom, and managing agent statements
+ * to existing active rental properties.
+ */
+export function findMatchingRental(
+  data: UnifiedParsedStatementResult,
+  activeRentals: RentalProperty[]
+): RentalProperty | undefined {
+  if (data.docType === 'agent_payout' && data.agentUnit) {
+    const u = data.agentUnit;
+    const pName = (u.propertyName || '').toLowerCase().trim();
+    const pAddr = (u.propertyAddress || u.address || '').toLowerCase().trim();
+    const stand = normalizeStandNumber(pAddr) || normalizeStandNumber(pName);
+    const normPName = normalizeAddressForMatching(pName);
+    const normPAddr = normalizeAddressForMatching(pAddr);
+
+    return activeRentals.find((r) => {
+      const rTitle = r.title.toLowerCase().trim();
+      const rAddr = r.address.toLowerCase().trim();
+      const rStand = normalizeStandNumber(rAddr) || normalizeStandNumber(rTitle);
+      const normRTitle = normalizeAddressForMatching(rTitle);
+      const normRAddr = normalizeAddressForMatching(rAddr);
+
+      if (stand && rStand && stand === rStand) return true;
+      if (normPAddr && (normRAddr.includes(normPAddr) || normPAddr.includes(normRAddr))) return true;
+      if (normPName && (normRTitle.includes(normPName) || normPName.includes(normRTitle) || normRAddr.includes(normPName) || normPAddr.includes(normRTitle))) return true;
+      if (pName && (rTitle.includes(pName) || pName.includes(rTitle))) return true;
+      if (pAddr && (rAddr.includes(pAddr) || pAddr.includes(rAddr))) return true;
+      return false;
+    });
+  }
+
+  if (data.docType === 'municipal_utility' && data.utilityStatement) {
+    const s = data.utilityStatement;
+    const pName = (s.propertyName || '').toLowerCase().trim();
+    const pAddr = (s.propertyAddress || '').toLowerCase().trim();
+    const sStand = normalizeStandNumber(pAddr) || normalizeStandNumber(pName);
+    const normPName = normalizeAddressForMatching(pName);
+    const normPAddr = normalizeAddressForMatching(pAddr);
+
+    return activeRentals.find((r) => {
+      const rTitle = r.title.toLowerCase().trim();
+      const rAddr = r.address.toLowerCase().trim();
+      const rStand = normalizeStandNumber(rAddr) || normalizeStandNumber(rTitle);
+      const normRTitle = normalizeAddressForMatching(rTitle);
+      const normRAddr = normalizeAddressForMatching(rAddr);
+
+      // 1. Account number match in historical utility statements
+      if (s.accountNumber && r.utilityStatements?.some((st) => st.accountNumber === s.accountNumber)) {
+        return true;
+      }
+
+      // 2. Stand number match (e.g. 840 === 840)
+      if (sStand && rStand && sStand === rStand) {
+        return true;
+      }
+
+      // 3. Normalized street address match (e.g. "100 7th st parkmore" === "100 seventh street parkmore")
+      if (normPAddr && (normRAddr.includes(normPAddr) || normPAddr.includes(normRAddr))) {
+        return true;
+      }
+      if (normPName && (normRTitle.includes(normPName) || normPName.includes(normRTitle) || normRAddr.includes(normPName) || normRAddr.includes(normRTitle))) {
+        return true;
+      }
+
+      // 4. Substring fallback match
+      if (pName && (rTitle.includes(pName) || pName.includes(rTitle) || rAddr.includes(pName) || pName.includes(rAddr))) {
+        return true;
+      }
+      if (pAddr && (rAddr.includes(pAddr) || pAddr.includes(rAddr))) {
+        return true;
+      }
+
+      return false;
+    });
+  }
+
+  return undefined;
 }
 

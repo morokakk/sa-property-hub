@@ -152,6 +152,7 @@ function InlineEditableAmount({
   disabled = false,
   disabledLabel,
   title,
+  className,
 }: {
   value?: number | null;
   onSave: (val: number) => void;
@@ -159,6 +160,7 @@ function InlineEditableAmount({
   disabled?: boolean;
   disabledLabel?: string;
   title?: string;
+  className?: string;
 }) {
   const safeVal = value ?? 0;
   const [isEditing, setIsEditing] = useState(false);
@@ -211,7 +213,7 @@ function InlineEditableAmount({
     <button
       type="button"
       onClick={() => setIsEditing(true)}
-      className="group inline-flex items-center gap-1 text-slate-700 hover:text-indigo-600 font-medium transition-colors cursor-pointer"
+      className={`group inline-flex items-center gap-1 hover:text-indigo-600 transition-colors cursor-pointer ${className || 'text-slate-700 font-medium'}`}
       title={title || 'Click to edit amount inline (auto-saves on blur or Enter)'}
     >
       <span>{prefix}{formatZAR(safeVal)}</span>
@@ -1007,7 +1009,13 @@ export default function RentalPortfolioPage() {
                             <div className="p-4 text-xs space-y-2 text-slate-600">
                               <div className="flex justify-between items-center">
                                 <span className="font-medium">Gross Monthly Rent:</span>
-                                <strong className="text-slate-900 font-bold">{formatZAR(property.monthlyGrossRentZAR)}</strong>
+                                <InlineEditableAmount
+                                  value={property.monthlyGrossRentZAR || 0}
+                                  onSave={(val) => updateRental(property.id, { monthlyGrossRentZAR: val })}
+                                  title="Click to edit gross monthly rent inline"
+                                  prefix=""
+                                  className="text-slate-900 font-bold"
+                                />
                               </div>
 
                               {property.propertyType === 'Freehold House' ? (
@@ -1045,7 +1053,19 @@ export default function RentalPortfolioPage() {
                                     <Building2 className="w-3 h-3 text-indigo-600" />
                                     Agency Fee ({property.agencyCommissionPercent || 8}%{property.agencyVatApplicable !== false ? ' + 15% VAT' : ''} - {property.agencyName || 'Agent'}):
                                   </span>
-                                  <span className="text-rose-600 font-semibold">- {formatZAR(agencyCommissionZAR)}</span>
+                                  <InlineEditableAmount
+                                    value={agencyCommissionZAR}
+                                    onSave={(val) => {
+                                      const gross = property.monthlyGrossRentZAR || 0;
+                                      const newPercent = gross > 0 ? Number(((val / gross) * 100).toFixed(1)) : (property.agencyCommissionPercent || 8);
+                                      updateRental(property.id, {
+                                        monthlyAgentFeeZAR: val,
+                                        agencyCommissionPercent: newPercent,
+                                        ...(property.agencyName === 'iGrow Rentals' ? { agencyVatApplicable: false } : {}),
+                                      });
+                                    }}
+                                    title="Click to edit agency fee inline"
+                                  />
                                 </div>
                               ) : (
                                 <div className="flex justify-between items-center text-slate-500 bg-slate-50 px-2 py-1 rounded border border-slate-100 text-[11px]">
