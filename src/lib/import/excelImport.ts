@@ -6,6 +6,7 @@ import {
   PropertyTitleType,
   DealSource,
   AmenityScorecard,
+  UtilityStatement,
 } from '@/types';
 import { computeAcquisitionCosts } from '@/lib/calculations/sarsTax';
 import { calculateDealMetrics } from '@/lib/calculations/propertyMetrics';
@@ -188,6 +189,7 @@ export function downloadRentalsTemplate() {
     'Address *',
     'City *',
     'Property Type',
+    'Source',
     'Market Value (ZAR) *',
     'Purchase Price (ZAR) *',
     'Purchase Date (YYYY-MM-DD)',
@@ -197,6 +199,7 @@ export function downloadRentalsTemplate() {
     'Monthly Gross Rent (ZAR) *',
     'Monthly Levies (ZAR)',
     'Monthly Rates & Taxes (ZAR)',
+    'Municipal/Eskom Account No',
     'Management Type',
     'Agency Name',
     'Agency Commission (%)',
@@ -222,6 +225,7 @@ export function downloadRentalsTemplate() {
       '157 Jan Smuts Ave, Rosebank',
       'Johannesburg',
       'Sectional Title Apartment',
+      'Private Agent',
       1650000,
       1450000,
       '2024-02-01',
@@ -231,6 +235,7 @@ export function downloadRentalsTemplate() {
       13500,
       1950,
       1100,
+      '559235779',
       'Agency',
       'Pam Golding Rosebank',
       8.0,
@@ -254,6 +259,7 @@ export function downloadRentalsTemplate() {
       '22 Herschel Road, Claremont',
       'Cape Town',
       'Freehold House',
+      'Direct Owner',
       3200000,
       2850000,
       '2023-08-15',
@@ -263,6 +269,7 @@ export function downloadRentalsTemplate() {
       25000,
       0, // Freehold levies strictly R0
       2400,
+      '',
       'Self-Managed',
       '',
       0,
@@ -282,32 +289,34 @@ export function downloadRentalsTemplate() {
       'Occupied',
     ],
     [
-      'Durban North Townhouse',
-      '45 Adelaide Tambo Drive',
-      'Durban',
-      'Townhouse / Cluster',
-      1850000,
-      1600000,
+      'Clearwater Village 128',
+      '128 Clearwater Village, Atlasville',
+      'Boksburg',
+      'Sectional Title Apartment',
+      'iGrow Rentals',
+      1150000,
+      980000,
       '2024-06-10',
-      1100000,
+      750000,
       11.75,
-      11880,
-      15000,
-      1650,
-      1250,
+      8100,
+      9500,
+      1450,
+      850,
+      '559235779',
       'Agency',
-      'Wakefields Umhlanga',
-      7.5,
+      'iGrow Rentals',
+      8.5,
       'Yes',
-      1293.75,
-      '+27 31 561 1234',
-      700,
-      'Brandon Pillay',
+      928,
+      'rentals@igrow.co.za',
+      500,
+      'Bongani June Mwale',
       '+27 71 234 5678',
-      'brandon.p@logistics.co.za',
+      'bongani.m@gmail.com',
       '2024-07-01',
       '2027-06-30',
-      30000,
+      19000,
       7.0,
       '',
       '',
@@ -317,34 +326,38 @@ export function downloadRentalsTemplate() {
 
   const ws = XLSX.utils.aoa_to_sheet([headers, ...sampleRows]);
   ws['!cols'] = [
-    { wch: 26 },
-    { wch: 30 },
-    { wch: 18 },
-    { wch: 24 },
-    { wch: 20 },
-    { wch: 20 },
-    { wch: 24 },
-    { wch: 22 },
-    { wch: 22 },
-    { wch: 26 },
-    { wch: 24 },
-    { wch: 20 },
-    { wch: 24 },
-    { wch: 18 },
-    { wch: 24 },
-    { wch: 22 },
-    { wch: 22 },
-    { wch: 26 },
-    { wch: 32 },
-    { wch: 22 },
-    { wch: 18 },
-    { wch: 28 },
-    { wch: 26 },
-    { wch: 24 },
-    { wch: 18 },
-    { wch: 20 },
-    { wch: 22 },
-    { wch: 14 },
+    { wch: 26 }, // Property Title
+    { wch: 32 }, // Address
+    { wch: 18 }, // City
+    { wch: 24 }, // Property Type
+    { wch: 20 }, // Source
+    { wch: 20 }, // Market Value
+    { wch: 20 }, // Purchase Price
+    { wch: 24 }, // Purchase Date
+    { wch: 22 }, // Outstanding Bond
+    { wch: 20 }, // Bond Interest Rate
+    { wch: 26 }, // Monthly Bond Repayment
+    { wch: 24 }, // Monthly Gross Rent
+    { wch: 20 }, // Monthly Levies
+    { wch: 24 }, // Monthly Rates & Taxes
+    { wch: 26 }, // Municipal/Eskom Account No
+    { wch: 18 }, // Management Type
+    { wch: 24 }, // Agency Name
+    { wch: 22 }, // Agency Commission
+    { wch: 22 }, // Agency VAT Applicable
+    { wch: 26 }, // Monthly Agency Fee
+    { wch: 28 }, // Agency Contact
+    { wch: 24 }, // Monthly Maintenance Reserve
+    { wch: 22 }, // Tenant Name
+    { wch: 18 }, // Tenant Phone
+    { wch: 28 }, // Tenant Email
+    { wch: 26 }, // Lease Start Date
+    { wch: 26 }, // Lease End Date
+    { wch: 18 }, // Deposit Held
+    { wch: 20 }, // Annual Escalation
+    { wch: 22 }, // Bond Effective Month
+    { wch: 22 }, // AGM Date
+    { wch: 14 }, // Status
   ];
 
   XLSX.utils.book_append_sheet(wb, ws, 'Rentals_Import');
@@ -770,6 +783,7 @@ export function parseRentalsRows(rawRows: unknown[][]): ParseResult<RentalProper
     const address = getColVal(row, 'address')?.toString().trim();
     const city = getColVal(row, 'city')?.toString().trim() || 'Johannesburg';
     const propertyTypeRaw = getColVal(row, 'property type');
+    const sourceRaw = getColVal(row, 'source')?.toString().trim();
     const rawMarketValue = getColVal(row, 'market value');
     const rawPurchasePrice = getColVal(row, 'purchase price');
     const purchaseDate = getColVal(row, 'purchase date')?.toString().trim() || todayStr;
@@ -779,6 +793,13 @@ export function parseRentalsRows(rawRows: unknown[][]): ParseResult<RentalProper
     const rawGrossRent = getColVal(row, 'monthly gross rent');
     const rawLevies = getColVal(row, 'monthly levies');
     const rawRates = getColVal(row, 'monthly rates & taxes') ?? getColVal(row, 'monthly rates');
+    const municipalAccountNo = (
+      getColVal(row, 'municipal/eskom account no') ??
+      getColVal(row, 'municipal account no') ??
+      getColVal(row, 'eskom account no') ??
+      getColVal(row, 'account no') ??
+      getColVal(row, 'account number')
+    )?.toString().trim();
     const managementTypeRaw = getColVal(row, 'management type')?.toString().trim();
     const agencyName = getColVal(row, 'agency name')?.toString().trim() || '';
     const rawAgencyComm = getColVal(row, 'agency commission');
@@ -877,6 +898,54 @@ export function parseRentalsRows(rawRows: unknown[][]): ParseResult<RentalProper
     const validStatuses = ['Occupied', 'Vacant', 'Notice Given', 'Sold'] as const;
     const status = validStatuses.includes(statusRaw as any) ? (statusRaw as any) : 'Occupied';
 
+    const validSources: DealSource[] = [
+      'iGrow Rentals',
+      'Private Agent',
+      'Direct Owner',
+      'High-Street Auction',
+      'Distressed Sale / Repo',
+    ];
+
+    let source: DealSource | undefined;
+    if (sourceRaw) {
+      const lower = sourceRaw.toLowerCase();
+      if (lower.includes('igrow')) {
+        source = 'iGrow Rentals';
+      } else if (lower.includes('auction')) {
+        source = 'High-Street Auction';
+      } else if (lower.includes('distress') || lower.includes('repo')) {
+        source = 'Distressed Sale / Repo';
+      } else if (lower.includes('direct') || lower.includes('owner')) {
+        source = 'Direct Owner';
+      } else if (lower.includes('agent')) {
+        source = 'Private Agent';
+      } else {
+        source = validSources.find((s) => s.toLowerCase() === lower) || 'Private Agent';
+      }
+    } else if (agencyName.toLowerCase().includes('igrow')) {
+      source = 'iGrow Rentals';
+    }
+
+    let initialUtilityStatements: UtilityStatement[] | undefined;
+    if (municipalAccountNo) {
+      initialUtilityStatements = [
+        {
+          id: `util-initial-${Date.now()}-${r}`,
+          statementDate: purchaseDate,
+          accountNumber: municipalAccountNo,
+          provider: 'Municipal / Eskom',
+          electricityZAR: 0,
+          waterZAR: 0,
+          refuseZAR: 0,
+          sewerageZAR: 0,
+          propertyRatesZAR: rates,
+          totalDueZAR: rates,
+          parsedVia: 'manual',
+          createdAt: todayStr,
+        },
+      ];
+    }
+
     if (title && address && marketValue && purchasePrice && grossRent) {
       rentals.push({
         id: `rental-import-${Date.now()}-${r}`,
@@ -884,6 +953,7 @@ export function parseRentalsRows(rawRows: unknown[][]): ParseResult<RentalProper
         address,
         city,
         propertyType,
+        source,
         agmDate,
         marketValueZAR: marketValue,
         purchasePriceZAR: purchasePrice,
@@ -912,6 +982,7 @@ export function parseRentalsRows(rawRows: unknown[][]): ParseResult<RentalProper
         unpaidUtilityArrearsZAR: 0,
         maintenanceHistory: [],
         status,
+        utilityStatements: initialUtilityStatements,
       });
     }
   }

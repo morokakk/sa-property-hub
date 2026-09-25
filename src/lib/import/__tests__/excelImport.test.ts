@@ -237,6 +237,82 @@ describe('Excel Import Engine Unit Tests', () => {
       expect(rental.monthlyBondPaymentZAR).toBe(28500);
       expect(rental.bondPaymentEffectiveDate).toBe('2026-10');
     });
+
+    it('correctly parses Source and Municipal/Eskom Account No and seeds initial utility statement for auto-matching', () => {
+      const headers = [
+        'Property Title *',
+        'Address *',
+        'City *',
+        'Property Type',
+        'Source',
+        'Market Value (ZAR) *',
+        'Purchase Price (ZAR) *',
+        'Monthly Gross Rent (ZAR) *',
+        'Monthly Rates & Taxes (ZAR)',
+        'Municipal/Eskom Account No',
+        'Management Type',
+        'Agency Name',
+      ];
+
+      const dataRow = [
+        'Clearwater Village 128',
+        '128 Clearwater Village, Atlasville',
+        'Boksburg',
+        'Sectional Title Apartment',
+        'iGrow Rentals',
+        1150000,
+        980000,
+        9500,
+        850,
+        '559235779',
+        'Agency',
+        'iGrow Rentals',
+      ];
+
+      const result = parseRentalsRows([headers, dataRow]);
+      expect(result.success).toBe(true);
+      expect(result.data.length).toBe(1);
+
+      const rental = result.data[0];
+      expect(rental.source).toBe('iGrow Rentals');
+      expect(rental.monthlyRatesTaxesZAR).toBe(850);
+      expect(rental.utilityStatements).toBeDefined();
+      expect(rental.utilityStatements?.length).toBe(1);
+
+      const stmt = rental.utilityStatements![0];
+      expect(stmt.accountNumber).toBe('559235779');
+      expect(stmt.propertyRatesZAR).toBe(850);
+      expect(stmt.totalDueZAR).toBe(850);
+      expect(stmt.provider).toBe('Municipal / Eskom');
+      expect(stmt.parsedVia).toBe('manual');
+    });
+
+    it('infers iGrow Rentals source from agency name if source column is absent', () => {
+      const headers = [
+        'Property Title *',
+        'Address *',
+        'City *',
+        'Market Value (ZAR) *',
+        'Purchase Price (ZAR) *',
+        'Monthly Gross Rent (ZAR) *',
+        'Agency Name',
+      ];
+
+      const dataRow = [
+        'The Blyde Unit 302',
+        'Bronkhorstspruit Rd',
+        'Pretoria',
+        1200000,
+        1050000,
+        8900,
+        'iGrow Rentals Gauteng',
+      ];
+
+      const result = parseRentalsRows([headers, dataRow]);
+      expect(result.success).toBe(true);
+      expect(result.data[0].source).toBe('iGrow Rentals');
+      expect(result.data[0].utilityStatements).toBeUndefined();
+    });
   });
 
   describe('Flips Parser & Auto-Estimations', () => {
