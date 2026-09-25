@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   X,
   CheckCircle2,
@@ -28,17 +28,21 @@ import {
 import { UnifiedParsedStatementResult } from '@/lib/utilities/pdfParser';
 import { formatZAR, formatDate } from '@/lib/formatters';
 
+export type VerificationStatementItem = UnifiedParsedStatementResult & { fileName?: string };
+
 interface UnifiedPdfVerificationModalProps {
   isOpen: boolean;
   onClose: () => void;
-  data: UnifiedParsedStatementResult | null;
+  queue?: VerificationStatementItem[];
+  data?: VerificationStatementItem | null;
   onOpenTenantStatement?: (propertyId: string) => void;
 }
 
 export default function UnifiedPdfVerificationModal({
   isOpen,
   onClose,
-  data,
+  queue,
+  data: singleData,
   onOpenTenantStatement,
 }: UnifiedPdfVerificationModalProps) {
   const rentals = usePortfolioStore((state) => state.rentals);
@@ -47,6 +51,27 @@ export default function UnifiedPdfVerificationModal({
   const addUtilityStatement = usePortfolioStore((state) => state.addUtilityStatement);
 
   const activeRentals = rentals.filter((r) => r.status !== 'Sold');
+
+  const items: VerificationStatementItem[] = useMemo(() => {
+    if (queue && queue.length > 0) return queue;
+    if (singleData) return [singleData];
+    return [];
+  }, [queue, singleData]);
+
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [itemStatuses, setItemStatuses] = useState<Record<number, 'pending' | 'saved' | 'skipped'>>({});
+
+  // Reset index and statuses when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      setCurrentIndex(0);
+      setItemStatuses({});
+      setSaveSuccess(false);
+      setIsSaving(false);
+    }
+  }, [isOpen]);
+
+  const data = items[currentIndex] || null;
 
   // Form State
   const [targetPropertyId, setTargetPropertyId] = useState<string>('__NEW__');
@@ -80,7 +105,7 @@ export default function UnifiedPdfVerificationModal({
   useEffect(() => {
     if (!data || !isOpen) return;
 
-    setSaveSuccess(false);
+    setSaveSuccess(itemStatuses[currentIndex] === 'saved');
     setIsSaving(false);
 
     const docType = data.docType;
@@ -167,7 +192,7 @@ export default function UnifiedPdfVerificationModal({
   const matchedRental = activeRentals.find((r) => r.id === targetPropertyId);
   const isNewProperty = targetPropertyId === '__NEW__';
 
-  const handleConfirmAndSync = () => {
+  const handleConfirmAndSync = (advanceAfterSave: boolean = false) => {
     setIsSaving(true);
     let finalPropId = targetPropertyId;
 
@@ -331,12 +356,36 @@ export default function UnifiedPdfVerificationModal({
 
       setSavedPropId(finalPropId);
       setSaveSuccess(true);
+      setItemStatuses((prev) => ({ ...prev, [currentIndex]: 'saved' }));
+
+      if (advanceAfterSave) {
+        if (currentIndex < items.length - 1) {
+          setCurrentIndex((prev) => prev + 1);
+        } else {
+          setTimeout(() => {
+            onClose();
+          }, 500);
+        }
+      }
     } catch (err) {
       console.error('Save failed:', err);
     } finally {
       setIsSaving(false);
     }
   };
+
+  const handleSkip = () => {
+    setItemStatuses((prev) => ({ ...prev, [currentIndex]: 'skipped' }));
+    if (currentIndex < items.length - 1) {
+      setCurrentIndex((prev) => prev + 1);
+    }
+  };
+
+  const isCurrentSaved = itemStatuses[currentIndex] === 'saved';
+  const savedCount = Object.values(itemStatuses).filter((s) => s === 'saved').length;
+  const allDone =
+    items.length > 0 &&
+    items.every((_, idx) => itemStatuses[idx] !== undefined && itemStatuses[idx] !== 'pending');
 
   const displayName = isNewProperty
     ? propertyName || 'New Property'
@@ -363,8 +412,14 @@ export default function UnifiedPdfVerificationModal({
                 <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/30">
                   {data.provider}
                 </span>
+                {items.length > 1 && (
+                  <span className="text-[11px] font-semibold bg-purple-500/30 text-purple-200 px-2 py-0.5 rounded-full border border-purple-400/30">
+                    {currentIndex + 1} of {items.length}
+                  </span>
+                )}
               </div>
               <p className="text-xs text-slate-400 mt-0.5">
+                {items.length > 1 && data.fileName ? `${data.fileName} • ` : ''}
                 {isAgentPayout
                   ? 'Managing Agent Statement: Review rent, levies, rates, and tenant details.'
                   : 'Municipal Utility Bill: Review charges and extracted meter readings.'}
@@ -378,6 +433,58 @@ export default function UnifiedPdfVerificationModal({
             <X className="w-5 h-5" />
           </button>
         </div>
+
+        {/* Batch Queue Tabs (rendered when multiple PDFs in queue) */}
+        {items.length > 1 && (
+          <div className="bg-slate-950 px-6 py-2.5 border-b border-slate-800 flex items-center justify-between gap-3 overflow-x-auto">
+            <div className="flex items-center gap-2">
+              {items.map((item, idx) => {
+                const status = itemStatuses[idx] || 'pending';
+                const isCurrent = idx === currentIndex;
+                const tabTitle =
+                  item.fileName ||
+                  item.utilityStatement?.propertyName ||
+                  item.agentUnit?.propertyName ||
+                  item.provider ||
+                  `Statement ${idx + 1}`;
+
+                return (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => setCurrentIndex(idx)}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer border ${
+                      isCurrent
+                        ? 'bg-purple-600 text-white border-purple-500 shadow-sm'
+                        : 'bg-slate-900 text-slate-300 border-slate-800 hover:bg-slate-800 hover:text-white'
+                    }`}
+                  >
+                    <span className="opacity-70 text-[10px]">#{idx + 1}</span>
+                    <span className="max-w-[130px] truncate" title={tabTitle}>
+                      {tabTitle}
+                    </span>
+                    {status === 'saved' && (
+                      <span className="inline-flex items-center gap-0.5 text-[10px] text-emerald-300 font-bold bg-emerald-950/80 px-1.5 py-0.5 rounded border border-emerald-500/40">
+                        <CheckCircle2 className="w-2.5 h-2.5" /> Saved
+                      </span>
+                    )}
+                    {status === 'skipped' && (
+                      <span className="text-[10px] text-slate-400 bg-slate-800 px-1.5 py-0.5 rounded">
+                        Skipped
+                      </span>
+                    )}
+                    {status === 'pending' && (
+                      <span className="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0" title="Pending" />
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+            <div className="text-[11px] font-semibold text-slate-400 shrink-0">
+              Batch: {savedCount}/{items.length} saved
+            </div>
+          </div>
+        )}
 
         {/* Modal Body */}
         <div className="p-6 overflow-y-auto space-y-5 flex-1">
@@ -771,41 +878,94 @@ export default function UnifiedPdfVerificationModal({
         </div>
 
         {/* Footer Actions */}
-        <div className="px-6 py-4 bg-slate-50 border-t border-slate-200 flex items-center justify-between">
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-4 py-2 text-xs font-semibold text-slate-600 hover:text-slate-900 transition-colors cursor-pointer"
-          >
-            {saveSuccess ? 'Done' : 'Cancel'}
-          </button>
-
-          {!saveSuccess ? (
-            <button
-              type="button"
-              onClick={handleConfirmAndSync}
-              disabled={isSaving}
-              className="px-5 py-2 bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold rounded-lg shadow-sm transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50"
-            >
-              <CheckCircle2 className="w-4 h-4" />
-              <span>
-                {isSaving
-                  ? 'Syncing to Portfolio...'
-                  : isNewProperty
-                  ? 'Confirm & Create New Rental'
-                  : 'Confirm & Update Property'}
-              </span>
-            </button>
-          ) : (
+        <div className="px-6 py-4 bg-slate-50 border-t border-slate-200 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
             <button
               type="button"
               onClick={onClose}
-              className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg shadow-sm transition-all flex items-center gap-2 cursor-pointer"
+              className="px-3.5 py-2 text-xs font-semibold text-slate-600 hover:text-slate-900 transition-colors cursor-pointer"
             >
-              <CheckCircle2 className="w-4 h-4" />
-              <span>Close Verification</span>
+              {allDone ? 'Close' : 'Cancel All'}
             </button>
-          )}
+
+            {items.length > 1 && !isCurrentSaved && (
+              <button
+                type="button"
+                onClick={handleSkip}
+                disabled={isSaving}
+                className="px-3 py-2 text-xs font-semibold text-slate-500 hover:text-slate-800 hover:bg-slate-200/60 rounded-lg transition-colors cursor-pointer"
+              >
+                Skip This Statement
+              </button>
+            )}
+          </div>
+
+          <div className="flex items-center gap-2">
+            {items.length > 1 ? (
+              isCurrentSaved ? (
+                currentIndex < items.length - 1 ? (
+                  <button
+                    type="button"
+                    onClick={() => setCurrentIndex((prev) => prev + 1)}
+                    className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-lg shadow-sm transition-all flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <span>Next Statement</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={onClose}
+                    className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg shadow-sm transition-all flex items-center gap-2 cursor-pointer"
+                  >
+                    <CheckCircle2 className="w-4 h-4" />
+                    <span>Finish ({savedCount}/{items.length} Saved)</span>
+                  </button>
+                )
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => handleConfirmAndSync(true)}
+                  disabled={isSaving}
+                  className="px-5 py-2 bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold rounded-lg shadow-sm transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50"
+                >
+                  <CheckCircle2 className="w-4 h-4" />
+                  <span>
+                    {isSaving
+                      ? 'Syncing...'
+                      : currentIndex < items.length - 1
+                      ? `Save & Next (${currentIndex + 1}/${items.length})`
+                      : 'Save & Finish'}
+                  </span>
+                </button>
+              )
+            ) : !saveSuccess ? (
+              <button
+                type="button"
+                onClick={() => handleConfirmAndSync(false)}
+                disabled={isSaving}
+                className="px-5 py-2 bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold rounded-lg shadow-sm transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50"
+              >
+                <CheckCircle2 className="w-4 h-4" />
+                <span>
+                  {isSaving
+                    ? 'Syncing to Portfolio...'
+                    : isNewProperty
+                    ? 'Confirm & Create New Rental'
+                    : 'Confirm & Update Property'}
+                </span>
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={onClose}
+                className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg shadow-sm transition-all flex items-center gap-2 cursor-pointer"
+              >
+                <CheckCircle2 className="w-4 h-4" />
+                <span>Close Verification</span>
+              </button>
+            )}
+          </div>
         </div>
       </div>
     </div>

@@ -153,18 +153,19 @@ function InlineEditableAmount({
   disabledLabel,
   title,
 }: {
-  value: number;
+  value?: number | null;
   onSave: (val: number) => void;
   prefix?: string;
   disabled?: boolean;
   disabledLabel?: string;
   title?: string;
 }) {
+  const safeVal = value ?? 0;
   const [isEditing, setIsEditing] = useState(false);
-  const [inputVal, setInputVal] = useState(value.toString());
+  const [inputVal, setInputVal] = useState(safeVal.toString());
 
   useEffect(() => {
-    setInputVal(value.toString());
+    setInputVal((value ?? 0).toString());
   }, [value]);
 
   if (disabled) {
@@ -187,16 +188,16 @@ function InlineEditableAmount({
           onChange={(e) => setInputVal(e.target.value)}
           onBlur={() => {
             const num = Math.max(0, Number(inputVal) || 0);
-            if (num !== value) onSave(num);
+            if (num !== safeVal) onSave(num);
             setIsEditing(false);
           }}
           onKeyDown={(e) => {
             if (e.key === 'Enter') {
               const num = Math.max(0, Number(inputVal) || 0);
-              if (num !== value) onSave(num);
+              if (num !== safeVal) onSave(num);
               setIsEditing(false);
             } else if (e.key === 'Escape') {
-              setInputVal(value.toString());
+              setInputVal(safeVal.toString());
               setIsEditing(false);
             }
           }}
@@ -213,7 +214,7 @@ function InlineEditableAmount({
       className="group inline-flex items-center gap-1 text-slate-700 hover:text-indigo-600 font-medium transition-colors cursor-pointer"
       title={title || 'Click to edit amount inline (auto-saves on blur or Enter)'}
     >
-      <span>{prefix}{formatZAR(value)}</span>
+      <span>{prefix}{formatZAR(safeVal)}</span>
       <Edit3 className="w-3 h-3 text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity" />
     </button>
   );
@@ -240,22 +241,42 @@ export default function RentalPortfolioPage() {
   const soldRentals = rentals.filter((r) => r.status === 'Sold');
 
   // Direct PDF Import & Unified Verification State
-  const [unifiedPdfData, setUnifiedPdfData] = useState<UnifiedParsedStatementResult | null>(null);
+  const [unifiedPdfQueue, setUnifiedPdfQueue] = useState<(UnifiedParsedStatementResult & { fileName?: string })[]>([]);
   const [isParsingDirectPdf, setIsParsingDirectPdf] = useState(false);
+  const [parsingProgress, setParsingProgress] = useState<{ current: number; total: number; filename: string } | null>(null);
 
-  const handleDirectPdfUpload = async (file: File) => {
+  const handleDirectPdfUpload = async (files: File[]) => {
+    if (!files || files.length === 0) return;
     setIsParsingDirectPdf(true);
+    const parsedResults: (UnifiedParsedStatementResult & { fileName?: string })[] = [];
+
     try {
-      const result = await parseRentalPdfStatement(file, aiSettings);
-      if (!result.success) {
-        alert(result.error || 'Failed to extract statement details.');
-      } else {
-        setUnifiedPdfData(result);
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        setParsingProgress({ current: i + 1, total: files.length, filename: file.name });
+        const result = await parseRentalPdfStatement(file, aiSettings);
+
+        if (!result.success) {
+          // Strict failure policy: block modal from opening and display detailed alert
+          setParsingProgress(null);
+          setIsParsingDirectPdf(false);
+          alert(
+            `Failed to parse "${file.name}":\n\n${result.error || 'Unrecognized document structure'}\n\nPlease check this file and re-upload.`
+          );
+          return;
+        }
+
+        // Attach original file name for tabs and tracking
+        (result as any).fileName = file.name;
+        parsedResults.push(result as any);
       }
+
+      setUnifiedPdfQueue(parsedResults);
     } catch (err: any) {
-      alert(err?.message || 'An error occurred while parsing the PDF.');
+      alert(`Error processing PDF upload:\n\n${err?.message || 'Unknown error'}`);
     } finally {
       setIsParsingDirectPdf(false);
+      setParsingProgress(null);
     }
   };
 
@@ -2763,11 +2784,11 @@ export default function RentalPortfolioPage() {
 
       {/* Direct PDF Import Unified Verification Modal */}
       <UnifiedPdfVerificationModal
-        isOpen={Boolean(unifiedPdfData)}
-        onClose={() => setUnifiedPdfData(null)}
-        data={unifiedPdfData}
+        isOpen={unifiedPdfQueue.length > 0}
+        onClose={() => setUnifiedPdfQueue([])}
+        queue={unifiedPdfQueue}
         onOpenTenantStatement={(propertyId: string) => {
-          setUnifiedPdfData(null);
+          setUnifiedPdfQueue([]);
           setStatementModalPropertyId(propertyId);
         }}
       />
@@ -2777,9 +2798,15 @@ export default function RentalPortfolioPage() {
         <div className="fixed bottom-6 right-6 z-50 bg-slate-900 text-white text-xs px-4 py-3 rounded-xl shadow-2xl border border-purple-500/30 flex items-center gap-3 animate-in fade-in slide-in-from-bottom-2">
           <Loader2 className="w-4 h-4 text-purple-400 animate-spin shrink-0" />
           <div>
-            <div className="font-bold">Analyzing PDF Statement...</div>
+            <div className="font-bold">
+              {parsingProgress
+                ? `Analyzing Statement (${parsingProgress.current} of ${parsingProgress.total})...`
+                : 'Analyzing PDF Statement...'}
+            </div>
             <div className="text-[10px] text-slate-400">
-              Running auto-detection for iGrow, CoJ, Eskom, or managing agent
+              {parsingProgress
+                ? parsingProgress.filename
+                : 'Running auto-detection for iGrow, CoJ, Eskom, or managing agent'}
             </div>
           </div>
         </div>

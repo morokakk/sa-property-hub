@@ -26,7 +26,7 @@ interface ImportDropdownProps {
   type: 'pipeline' | 'rentals' | 'flips';
   className?: string;
   onImportSuccess?: () => void;
-  onPdfSelected?: (file: File) => void;
+  onPdfSelected?: (files: File[]) => void;
 }
 
 export default function ImportDropdown({
@@ -104,9 +104,17 @@ export default function ImportDropdown({
   };
 
   const handlePdfSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    onPdfSelected?.(file);
+    const rawFiles = Array.from(e.target.files || []);
+    if (rawFiles.length === 0) return;
+
+    let filesToProcess = rawFiles;
+    if (rawFiles.length > 3) {
+      filesToProcess = rawFiles.slice(0, 3);
+      const names = filesToProcess.map((f) => f.name).join(', ');
+      showToast(`Batch limit: 3 files. Uploading the first 3: ${names}`, true);
+    }
+
+    onPdfSelected?.(filesToProcess);
   };
 
   const handleFileSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -207,6 +215,7 @@ export default function ImportDropdown({
         ref={pdfInputRef}
         type="file"
         accept=".pdf"
+        multiple
         className="hidden"
         onChange={handlePdfSelected}
       />
@@ -278,13 +287,13 @@ export default function ImportDropdown({
               </div>
               <div>
                 <div className="font-semibold text-slate-900 flex items-center gap-1.5">
-                  <span>Upload PDF Statement</span>
+                  <span>Upload PDF Statement(s)</span>
                   <span className="text-[9px] font-bold uppercase tracking-wider bg-purple-100 text-purple-700 px-1 py-0.2 rounded">
-                    Smart
+                    Max 3
                   </span>
                 </div>
                 <div className="text-[10px] text-slate-500">
-                  Auto-reads iGrow, CoJ, Eskom, or any managing agent statement (.pdf)
+                  Auto-detects CoJ, Eskom & iGrow bills (up to 3 PDFs at once)
                 </div>
               </div>
             </button>
