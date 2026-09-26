@@ -797,7 +797,7 @@ export default function OpportunityAnalyzerPage() {
             </div>
             <div className="flex items-center gap-2">
               {/* Solve Max Bid Popover Button */}
-              <div className="relative" ref={maoSolverRef}>
+              <div className="relative">
                 <button
                   type="button"
                   onClick={() => setShowMaoSolver(!showMaoSolver)}
@@ -810,160 +810,174 @@ export default function OpportunityAnalyzerPage() {
                 </button>
 
                 {showMaoSolver && (
-                  <div className="absolute right-0 top-full mt-2 w-80 sm:w-96 bg-white rounded-xl border border-slate-200 shadow-2xl p-4 z-50 animate-fadeIn text-slate-900">
-                    <div className="flex items-center justify-between pb-2 mb-3 border-b border-slate-100">
-                      <div className="flex items-center gap-2">
-                        <Target className="w-4 h-4 text-violet-600" />
-                        <h4 className="text-xs font-bold text-slate-900">MAO Quick Solver</h4>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => setShowMaoSolver(false)}
-                        className="text-slate-400 hover:text-slate-600 p-0.5 rounded-md text-xs cursor-pointer"
-                      >
-                        ✕
-                      </button>
-                    </div>
+                  <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-150">
+                    <div className="fixed inset-0" onClick={() => setShowMaoSolver(false)} />
+                    <div
+                      ref={maoSolverRef}
+                      className="relative bg-white rounded-t-3xl sm:rounded-2xl max-w-md w-full p-5 sm:p-6 shadow-2xl border border-slate-200 max-h-[90vh] overflow-y-auto z-10 animate-in slide-in-from-bottom duration-200 sm:duration-150 sm:zoom-in-95 text-slate-900"
+                    >
+                      {/* Mobile Drag Indicator */}
+                      <div className="w-12 h-1.5 bg-slate-300 rounded-full mx-auto mb-3 sm:hidden" />
 
-                    {/* Mode Toggle Tabs (Defaults to current strategy) */}
-                    <div className="flex rounded-lg bg-slate-100 p-1 mb-3 text-xs">
-                      <button
-                        type="button"
-                        onClick={() => setMaoSolverMode('Flip')}
-                        className={`flex-1 py-1 px-2 font-bold rounded-md transition-all cursor-pointer ${
-                          maoSolverMode === 'Flip'
-                            ? 'bg-white text-slate-900 shadow-2xs'
-                            : 'text-slate-600 hover:text-slate-900'
-                        }`}
-                      >
-                        🔄 Flip Exit ROI
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setMaoSolverMode('Rental')}
-                        className={`flex-1 py-1 px-2 font-bold rounded-md transition-all cursor-pointer ${
-                          maoSolverMode === 'Rental'
-                            ? 'bg-white text-slate-900 shadow-2xs'
-                            : 'text-slate-600 hover:text-slate-900'
-                        }`}
-                      >
-                        🏠 Rental Net Yield
-                      </button>
-                    </div>
-
-                    {maoSolverMode === 'Flip' ? (
-                      <div className="space-y-3">
-                        <p className="text-[11px] text-slate-500">
-                          Solves the maximum bid that satisfies your target ROI after factoring in BOQ rehab, 6-month holding costs, and 5% acquisition friction.
-                        </p>
-
-                        <div className="grid grid-cols-2 gap-2">
+                      <div className="flex items-center justify-between pb-3 mb-4 border-b border-slate-100">
+                        <div className="flex items-center gap-2.5">
+                          <div className="p-2 bg-violet-100 text-violet-700 rounded-xl">
+                            <Target className="w-4 h-4" />
+                          </div>
                           <div>
-                            <label className="block text-[10px] font-semibold text-slate-600 mb-1">Target Exit Price</label>
+                            <h4 className="text-sm font-bold text-slate-900">MAO Quick Solver</h4>
+                            <p className="text-[11px] text-slate-500">Maximum Allowable Offer Calculator</p>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setShowMaoSolver(false)}
+                          className="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-100 text-sm cursor-pointer min-h-[32px] min-w-[32px] flex items-center justify-center"
+                        >
+                          ✕
+                        </button>
+                      </div>
+
+                      {/* Mode Toggle Tabs (Defaults to current strategy) */}
+                      <div className="flex rounded-lg bg-slate-100 p-1 mb-4 text-xs">
+                        <button
+                          type="button"
+                          onClick={() => setMaoSolverMode('Flip')}
+                          className={`flex-1 py-1.5 px-3 font-bold rounded-md transition-all cursor-pointer ${
+                            maoSolverMode === 'Flip'
+                              ? 'bg-white text-slate-900 shadow-2xs'
+                              : 'text-slate-600 hover:text-slate-900'
+                          }`}
+                        >
+                          🔄 Flip Exit ROI
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setMaoSolverMode('Rental')}
+                          className={`flex-1 py-1.5 px-3 font-bold rounded-md transition-all cursor-pointer ${
+                            maoSolverMode === 'Rental'
+                              ? 'bg-white text-slate-900 shadow-2xs'
+                              : 'text-slate-600 hover:text-slate-900'
+                          }`}
+                        >
+                          🏠 Rental Net Yield
+                        </button>
+                      </div>
+
+                      {maoSolverMode === 'Flip' ? (
+                        <div className="space-y-4">
+                          <p className="text-xs text-slate-500 leading-relaxed">
+                            Solves the maximum bid that satisfies your target ROI after factoring in BOQ rehab, 6-month holding costs, and 5% acquisition friction.
+                          </p>
+
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div>
+                              <label className="block text-[11px] font-semibold text-slate-600 mb-1">Target Exit Price (ZAR)</label>
+                              <input
+                                type="number"
+                                name="maoTargetExitPriceZAR"
+                                autoComplete="off"
+                                min="0"
+                                step="any"
+                                value={maoTargetExitPrice}
+                                onChange={(e) => setMaoTargetExitPrice(Number(e.target.value))}
+                                className="w-full text-xs font-semibold px-3 py-2 border border-slate-300 rounded-lg bg-white focus:ring-1 focus:ring-violet-500 focus:border-violet-500"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-[11px] font-semibold text-slate-600 mb-1">Desired ROI (%)</label>
+                              <input
+                                type="number"
+                                name="maoDesiredRoiPercent"
+                                autoComplete="off"
+                                min="0"
+                                step="any"
+                                value={maoDesiredRoi}
+                                onChange={(e) => setMaoDesiredRoi(Number(e.target.value))}
+                                className="w-full text-xs font-semibold px-3 py-2 border border-slate-300 rounded-lg bg-white focus:ring-1 focus:ring-violet-500 focus:border-violet-500"
+                              />
+                            </div>
+                          </div>
+
+                          <div className="bg-violet-50/80 border border-violet-200 rounded-xl p-3.5 space-y-2 text-xs text-violet-950">
+                            <div className="flex justify-between text-xs text-slate-600">
+                              <span>Allowable Total Capital:</span>
+                              <span className="font-semibold text-slate-800">{formatZAR(computedFlipMao.totalAllowableOutlay)}</span>
+                            </div>
+                            <div className="flex justify-between text-xs text-slate-600">
+                              <span>Less BOQ + 6M Holding:</span>
+                              <span className="text-rose-600 font-semibold">-{formatZAR(computedFlipMao.nonPurchaseCosts)}</span>
+                            </div>
+                            <div className="border-t border-violet-200 pt-2 flex justify-between items-center">
+                              <span className="font-bold text-violet-900">Max Allowable Bid (MAO):</span>
+                              <span className="text-base font-black text-violet-800">{formatZAR(computedFlipMao.maxAllowableBid)}</span>
+                            </div>
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={() => handleApplyMaoBid(computedFlipMao.maxAllowableBid)}
+                            disabled={computedFlipMao.maxAllowableBid <= 0}
+                            className="w-full bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white text-xs font-bold py-2.5 rounded-xl transition-colors cursor-pointer shadow-xs flex items-center justify-center gap-1.5"
+                          >
+                            <Target className="w-4 h-4" />
+                            <span>Set as Target Bid ({formatZAR(computedFlipMao.maxAllowableBid)})</span>
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="space-y-4">
+                          <p className="text-xs text-slate-500 leading-relaxed">
+                            Solves the maximum purchase price based on your target net yield (Cap Rate) and stress-tested NOI (with {vacancyRate}% vacancy &amp; {managementFee}%{agencyVatApplicable ? ' + 15% VAT' : ''} agent fee).
+                          </p>
+
+                          <div>
+                            <div className="flex items-center justify-between mb-1">
+                              <label className="text-[11px] font-semibold text-slate-600">Target Net Yield / Cap Rate (%)</label>
+                              <span className="text-[10px] text-slate-400">SA prime corridor: 8.0%–11.0%</span>
+                            </div>
                             <input
                               type="number"
-                              name="maoTargetExitPriceZAR"
+                              name="maoTargetYieldPercent"
                               autoComplete="off"
                               min="0"
                               step="any"
-                              value={maoTargetExitPrice}
-                              onChange={(e) => setMaoTargetExitPrice(Number(e.target.value))}
-                              className="w-full text-xs font-semibold px-2 py-1.5 border border-slate-300 rounded-md bg-white"
+                              value={maoTargetYield}
+                              onChange={(e) => setMaoTargetYield(Number(e.target.value))}
+                              className="w-full text-xs font-semibold px-3 py-2 border border-slate-300 rounded-lg bg-white focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500"
                             />
                           </div>
-                          <div>
-                            <label className="block text-[10px] font-semibold text-slate-600 mb-1">Desired ROI (%)</label>
-                            <input
-                              type="number"
-                              name="maoDesiredRoiPercent"
-                              autoComplete="off"
-                              min="0"
-                              step="any"
-                              value={maoDesiredRoi}
-                              onChange={(e) => setMaoDesiredRoi(Number(e.target.value))}
-                              className="w-full text-xs font-semibold px-2 py-1.5 border border-slate-300 rounded-md bg-white"
-                            />
+
+                          <div className="bg-emerald-50/80 border border-emerald-200 rounded-xl p-3.5 space-y-2 text-xs text-emerald-950">
+                            <div className="flex justify-between text-xs text-slate-600">
+                              <span>Stress-Tested Annual NOI:</span>
+                              <span className="font-semibold text-emerald-800">{formatZAR(computedRentalMao.stressTestedNoi)}/yr</span>
+                            </div>
+                            <div className="flex justify-between text-xs text-slate-500">
+                              <span>Vacancy Buffer ({vacancyRate}%):</span>
+                              <span>-{formatZAR(computedRentalMao.vacancyLossAnnual)}/yr</span>
+                            </div>
+                            <div className="flex justify-between text-xs text-slate-500">
+                              <span>Agent Fee ({managementFee}%{agencyVatApplicable ? '+VAT' : ''}):</span>
+                              <span>-{formatZAR(computedRentalMao.managementFeeAnnual)}/yr</span>
+                            </div>
+                            <div className="border-t border-emerald-200 pt-2 flex justify-between items-center">
+                              <span className="font-bold text-emerald-950">Max Purchase Price:</span>
+                              <span className="text-base font-black text-emerald-800">{formatZAR(computedRentalMao.maxAllowablePrice)}</span>
+                            </div>
                           </div>
+
+                          <button
+                            type="button"
+                            onClick={() => handleApplyMaoBid(computedRentalMao.maxAllowablePrice)}
+                            disabled={computedRentalMao.maxAllowablePrice <= 0}
+                            className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-xs font-bold py-2.5 rounded-xl transition-colors cursor-pointer shadow-xs flex items-center justify-center gap-1.5"
+                          >
+                            <Target className="w-4 h-4" />
+                            <span>Set as Target Bid ({formatZAR(computedRentalMao.maxAllowablePrice)})</span>
+                          </button>
                         </div>
-
-                        <div className="bg-violet-50/80 border border-violet-200 rounded-lg p-3 space-y-1.5 text-xs text-violet-950">
-                          <div className="flex justify-between text-[11px] text-slate-600">
-                            <span>Allowable Total Capital:</span>
-                            <span className="font-semibold">{formatZAR(computedFlipMao.totalAllowableOutlay)}</span>
-                          </div>
-                          <div className="flex justify-between text-[11px] text-slate-600">
-                            <span>Less BOQ + 6M Holding:</span>
-                            <span className="text-rose-600 font-semibold">-{formatZAR(computedFlipMao.nonPurchaseCosts)}</span>
-                          </div>
-                          <div className="border-t border-violet-200 pt-1.5 flex justify-between items-center">
-                            <span className="font-bold text-violet-900">Max Allowable Bid (MAO):</span>
-                            <span className="text-sm font-black text-violet-800">{formatZAR(computedFlipMao.maxAllowableBid)}</span>
-                          </div>
-                        </div>
-
-                        <button
-                          type="button"
-                          onClick={() => handleApplyMaoBid(computedFlipMao.maxAllowableBid)}
-                          disabled={computedFlipMao.maxAllowableBid <= 0}
-                          className="w-full bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white text-xs font-bold py-2 rounded-lg transition-colors cursor-pointer shadow-xs flex items-center justify-center gap-1.5"
-                        >
-                          <Target className="w-3.5 h-3.5" />
-                          <span>Set as Target Bid ({formatZAR(computedFlipMao.maxAllowableBid)})</span>
-                        </button>
-                      </div>
-                    ) : (
-                      <div className="space-y-3">
-                        <p className="text-[11px] text-slate-500">
-                          Solves the maximum purchase price based on your target net yield (Cap Rate) and stress-tested NOI (with {vacancyRate}% vacancy &amp; {managementFee}%{agencyVatApplicable ? ' + 15% VAT' : ''} agent fee).
-                        </p>
-
-                        <div>
-                          <div className="flex items-center justify-between mb-1">
-                            <label className="text-[10px] font-semibold text-slate-600">Target Net Yield / Cap Rate (%)</label>
-                            <span className="text-[10px] text-slate-400">SA prime corridor: 8.0%–11.0%</span>
-                          </div>
-                          <input
-                            type="number"
-                            name="maoTargetYieldPercent"
-                            autoComplete="off"
-                            min="0"
-                            step="any"
-                            value={maoTargetYield}
-                            onChange={(e) => setMaoTargetYield(Number(e.target.value))}
-                            className="w-full text-xs font-semibold px-2 py-1.5 border border-slate-300 rounded-md bg-white"
-                          />
-                        </div>
-
-                        <div className="bg-emerald-50/80 border border-emerald-200 rounded-lg p-3 space-y-1.5 text-xs text-emerald-950">
-                          <div className="flex justify-between text-[11px] text-slate-600">
-                            <span>Stress-Tested Annual NOI:</span>
-                            <span className="font-semibold text-emerald-800">{formatZAR(computedRentalMao.stressTestedNoi)}/yr</span>
-                          </div>
-                          <div className="flex justify-between text-[11px] text-slate-500">
-                            <span>Vacancy Buffer ({vacancyRate}%):</span>
-                            <span>-{formatZAR(computedRentalMao.vacancyLossAnnual)}/yr</span>
-                          </div>
-                          <div className="flex justify-between text-[11px] text-slate-500">
-                            <span>Agent Fee ({managementFee}%{agencyVatApplicable ? '+VAT' : ''}):</span>
-                            <span>-{formatZAR(computedRentalMao.managementFeeAnnual)}/yr</span>
-                          </div>
-                          <div className="border-t border-emerald-200 pt-1.5 flex justify-between items-center">
-                            <span className="font-bold text-emerald-950">Max Purchase Price:</span>
-                            <span className="text-sm font-black text-emerald-800">{formatZAR(computedRentalMao.maxAllowablePrice)}</span>
-                          </div>
-                        </div>
-
-                        <button
-                          type="button"
-                          onClick={() => handleApplyMaoBid(computedRentalMao.maxAllowablePrice)}
-                          disabled={computedRentalMao.maxAllowablePrice <= 0}
-                          className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-xs font-bold py-2 rounded-lg transition-colors cursor-pointer shadow-xs flex items-center justify-center gap-1.5"
-                        >
-                          <Target className="w-3.5 h-3.5" />
-                          <span>Set as Target Bid ({formatZAR(computedRentalMao.maxAllowablePrice)})</span>
-                        </button>
-                      </div>
-                    )}
+                      )}
+                    </div>
                   </div>
                 )}
               </div>
@@ -2673,51 +2687,60 @@ export default function OpportunityAnalyzerPage() {
                         </button>
 
                         {passingDealId === deal.id && (
-                          <div className="absolute right-0 top-full mt-1.5 w-72 bg-white rounded-xl border border-slate-200 shadow-2xl p-3.5 z-50 text-left animate-fadeIn">
-                            <div className="flex items-center justify-between pb-1.5 mb-2 border-b border-slate-100">
-                              <span className="text-xs font-bold text-slate-800">Pass Deal Reason</span>
+                          <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-150">
+                            <div className="fixed inset-0" onClick={() => setPassingDealId(null)} />
+                            <div className="relative bg-white rounded-t-3xl sm:rounded-2xl max-w-sm w-full p-5 sm:p-6 shadow-2xl border border-slate-200 max-h-[90vh] overflow-y-auto z-10 animate-in slide-in-from-bottom duration-200 text-left">
+                              <div className="w-12 h-1.5 bg-slate-300 rounded-full mx-auto mb-3 sm:hidden" />
+                              <div className="flex items-center justify-between pb-2 mb-3 border-b border-slate-100">
+                                <div className="flex items-center gap-2">
+                                  <div className="p-1 rounded-lg bg-rose-100 text-rose-700">
+                                    <XCircle className="w-4 h-4" />
+                                  </div>
+                                  <span className="text-sm font-bold text-slate-800">Pass Deal Reason</span>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => setPassingDealId(null)}
+                                  className="text-slate-400 hover:text-slate-600 p-1 text-sm cursor-pointer min-h-[32px] min-w-[32px] flex items-center justify-center"
+                                >
+                                  ✕
+                                </button>
+                              </div>
+                              <label className="block text-xs font-semibold text-slate-600 mb-1">Reason</label>
+                              <select
+                                value={passReason}
+                                onChange={(e) => setPassReason(e.target.value as PassReason)}
+                                className="w-full text-xs font-medium px-3 py-2 border border-slate-300 rounded-lg mb-3 bg-white text-slate-900"
+                              >
+                                <option value="Yield Too Low">Yield Too Low</option>
+                                <option value="High Arrears / Municipal Risk">High Arrears / Municipal Risk</option>
+                                <option value="Seller Countered Above MAO">Seller Countered Above MAO</option>
+                                <option value="Title Deed Issues">Title Deed Issues</option>
+                                <option value="Structural / Damp Report Failed">Structural / Damp Report Failed</option>
+                                <option value="Funding Not Secured">Funding Not Secured</option>
+                                <option value="Other">Other</option>
+                              </select>
+                              <label className="block text-xs font-semibold text-slate-600 mb-1">Notes (Optional)</label>
+                              <textarea
+                                value={passNotes}
+                                onChange={(e) => setPassNotes(e.target.value)}
+                                placeholder="E.g. Counter-offer rejected, repairs too high..."
+                                rows={2}
+                                className="w-full text-xs p-2.5 border border-slate-300 rounded-lg mb-3 text-slate-800 resize-none"
+                              />
                               <button
                                 type="button"
-                                onClick={() => setPassingDealId(null)}
-                                className="text-slate-400 hover:text-slate-600 p-0.5 text-xs cursor-pointer"
+                                onClick={() => {
+                                  passOpportunity(deal.id, passReason, passNotes);
+                                  setPassingDealId(null);
+                                  setPassReason('Yield Too Low');
+                                  setPassNotes('');
+                                }}
+                                className="w-full bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold py-2.5 rounded-xl transition-colors cursor-pointer shadow-xs"
                               >
-                                ✕
+                                Confirm Pass Deal
                               </button>
                             </div>
-                            <label className="block text-[10px] font-semibold text-slate-600 mb-1">Reason</label>
-                            <select
-                              value={passReason}
-                              onChange={(e) => setPassReason(e.target.value as PassReason)}
-                              className="w-full text-xs font-medium px-2 py-1.5 border border-slate-300 rounded-lg mb-2.5 bg-white text-slate-900"
-                            >
-                              <option value="Yield Too Low">Yield Too Low</option>
-                              <option value="High Arrears / Municipal Risk">High Arrears / Municipal Risk</option>
-                              <option value="Seller Countered Above MAO">Seller Countered Above MAO</option>
-                              <option value="Title Deed Issues">Title Deed Issues</option>
-                              <option value="Structural / Damp Report Failed">Structural / Damp Report Failed</option>
-                              <option value="Funding Not Secured">Funding Not Secured</option>
-                              <option value="Other">Other</option>
-                            </select>
-                            <label className="block text-[10px] font-semibold text-slate-600 mb-1">Notes (Optional)</label>
-                            <textarea
-                              value={passNotes}
-                              onChange={(e) => setPassNotes(e.target.value)}
-                              placeholder="E.g. Counter-offer rejected, repairs too high..."
-                              rows={2}
-                              className="w-full text-xs p-2 border border-slate-300 rounded-lg mb-2.5 text-slate-800 resize-none"
-                            />
-                            <button
-                              type="button"
-                              onClick={() => {
-                                passOpportunity(deal.id, passReason, passNotes);
-                                setPassingDealId(null);
-                                setPassReason('Yield Too Low');
-                                setPassNotes('');
-                              }}
-                              className="w-full bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold py-1.5 rounded-lg transition-colors cursor-pointer shadow-xs"
-                            >
-                              Confirm Pass Deal
-                            </button>
                           </div>
                         )}
                       </div>
