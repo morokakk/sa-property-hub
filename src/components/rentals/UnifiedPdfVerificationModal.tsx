@@ -248,6 +248,9 @@ export default function UnifiedPdfVerificationModal({
         if (matched.propertyType) {
           setPropertyType(matched.propertyType);
         }
+        if (manualFinancials[currentIndex]?.marketValue === undefined) {
+          setMarketValueZAR(matched.marketValueZAR || 0);
+        }
       } else {
         setTargetPropertyId('__NEW__');
       }
@@ -262,6 +265,15 @@ export default function UnifiedPdfVerificationModal({
       if (selected?.propertyType) {
         setPropertyType(selected.propertyType);
         setManualPropertyTypes((prev) => ({ ...prev, [currentIndex]: selected.propertyType! }));
+      }
+      if (selected && manualFinancials[currentIndex]?.marketValue === undefined) {
+        setMarketValueZAR(selected.marketValueZAR || 0);
+      }
+    } else {
+      if (manualFinancials[currentIndex]?.marketValue === undefined) {
+        const estMarket = data?.utilityStatement?.municipalValuationZAR || 0;
+        setMarketValueZAR(estMarket);
+        setPurchasePriceZAR(estMarket > 0 ? Math.round(estMarket * 0.9) : 0);
       }
     }
   };
@@ -500,13 +512,10 @@ export default function UnifiedPdfVerificationModal({
           if (utilRatesZAR > 0) {
             updates.monthlyRatesTaxesZAR = utilRatesZAR;
           }
-          if (marketValueZAR > 0) {
+          if (marketValueZAR > 0 && marketValueZAR !== matchedRental?.marketValueZAR) {
             updates.marketValueZAR = marketValueZAR;
-          } else if (updatedUtilStatement.municipalValuationZAR && updatedUtilStatement.municipalValuationZAR > 0) {
-            const matched = activeRentals.find((r) => r.id === targetPropertyId);
-            if (matched && (!matched.marketValueZAR || matched.marketValueZAR === 0 || matched.marketValueZAR === 900000)) {
-              updates.marketValueZAR = updatedUtilStatement.municipalValuationZAR;
-            }
+          } else if (!matchedRental?.marketValueZAR && updatedUtilStatement.municipalValuationZAR && updatedUtilStatement.municipalValuationZAR > 0) {
+            updates.marketValueZAR = updatedUtilStatement.municipalValuationZAR;
           }
           if (purchasePriceZAR > 0) {
             updates.purchasePriceZAR = purchasePriceZAR;
@@ -1107,6 +1116,46 @@ export default function UnifiedPdfVerificationModal({
                         placeholder="YYYY-MM"
                       />
                     </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Existing Property Market Valuation Card */}
+              {!isNewProperty && (
+                <div className="bg-slate-50 rounded-xl p-4 border border-slate-200 flex flex-col md:flex-row md:items-center justify-between gap-3">
+                  <div className="space-y-1">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block">
+                      Property Market Valuation
+                    </span>
+                    <div className="text-xs text-slate-700 flex flex-wrap items-center gap-x-2 gap-y-1">
+                      <span>Current Portfolio Value: <strong className="text-slate-900">{formatZAR(matchedRental?.marketValueZAR || 0)}</strong></span>
+                      {data.utilityStatement?.municipalValuationZAR ? (
+                        <span className="text-purple-700 font-semibold bg-purple-50 px-2 py-0.5 rounded border border-purple-200">
+                          CoJ Municipal Valuation: <strong>{formatZAR(data.utilityStatement.municipalValuationZAR)}</strong>
+                        </span>
+                      ) : null}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+                    <div className="relative">
+                      <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400">R</span>
+                      <input
+                        type="number"
+                        value={marketValueZAR}
+                        onChange={(e) => handleMarketValueChange(Number(e.target.value) || 0)}
+                        className="w-36 pl-6 pr-2.5 py-1.5 text-xs font-mono font-bold border border-slate-300 rounded-lg bg-white text-slate-900 focus:ring-1 focus:ring-purple-500 focus:outline-none"
+                        placeholder="Market Value"
+                      />
+                    </div>
+                    {data.utilityStatement?.municipalValuationZAR && data.utilityStatement.municipalValuationZAR !== marketValueZAR ? (
+                      <button
+                        type="button"
+                        onClick={() => handleMarketValueChange(data.utilityStatement!.municipalValuationZAR!)}
+                        className="text-[11px] font-bold text-purple-700 bg-purple-100 hover:bg-purple-200 px-3 py-1.5 rounded-lg border border-purple-300 transition-colors cursor-pointer shrink-0 whitespace-nowrap"
+                      >
+                        Apply CoJ Valuation
+                      </button>
+                    ) : null}
                   </div>
                 </div>
               )}

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import TopHeader from '@/components/navigation/TopHeader';
 import { usePortfolioStore, usePortfolioSummary } from '@/lib/store/usePortfolioStore';
 import { formatZAR, formatPercent, formatDate } from '@/lib/formatters';
@@ -46,9 +46,6 @@ import {
 } from 'lucide-react';
 import { exportRentalsCSV } from '@/lib/export/csvExport';
 import ImportDropdown from '@/components/common/ImportDropdown';
-import { ExtractedRentalUnit } from '@/types';
-import StatementUploadModal from '@/components/rentals/StatementUploadModal';
-import StatementReviewModal from '@/components/rentals/StatementReviewModal';
 import TenantStatement from '@/components/rentals/TenantStatement';
 import MeterReadingsModal from '@/components/rentals/MeterReadingsModal';
 import UnifiedPdfVerificationModal from '@/components/rentals/UnifiedPdfVerificationModal';
@@ -231,7 +228,6 @@ export default function RentalPortfolioPage() {
   const markRentalAsSold = usePortfolioStore((state) => state.markRentalAsSold);
   const reopenRental = usePortfolioStore((state) => state.reopenRental);
   const refinanceRental = usePortfolioStore((state) => state.refinanceRental);
-  const reconcileImportedRentals = usePortfolioStore((state) => state.reconcileImportedRentals);
   const rentalForecastView = usePortfolioStore((state) => state.rentalForecastView);
   const setRentalForecastView = usePortfolioStore((state) => state.setRentalForecastView);
   const aiSettings = usePortfolioStore((state) => state.aiSettings);
@@ -243,6 +239,7 @@ export default function RentalPortfolioPage() {
   const soldRentals = rentals.filter((r) => r.status === 'Sold');
 
   // Direct PDF Import & Unified Verification State
+  const smartPdfInputRef = useRef<HTMLInputElement>(null);
   const [unifiedPdfQueue, setUnifiedPdfQueue] = useState<(UnifiedParsedStatementResult & { fileName?: string })[]>([]);
   const [isParsingDirectPdf, setIsParsingDirectPdf] = useState(false);
   const [parsingProgress, setParsingProgress] = useState<{ current: number; total: number; filename: string } | null>(null);
@@ -306,11 +303,6 @@ export default function RentalPortfolioPage() {
       [rentalId]: !prev[rentalId],
     }));
   };
-
-  // AI Statement BYOK Parser State
-  const [showAiUploadModal, setShowAiUploadModal] = useState(false);
-  const [showAiReviewModal, setShowAiReviewModal] = useState(false);
-  const [aiExtractedUnits, setAiExtractedUnits] = useState<ExtractedRentalUnit[]>([]);
 
   // Historical Tenant Utility Variance & Statement Modal State
   const [statementModalPropertyId, setStatementModalPropertyId] = useState<string | null>(null);
@@ -686,9 +678,24 @@ export default function RentalPortfolioPage() {
         subtitle="Manage active income properties, tenant leases, trust deposits, and maintenance histories"
         actionButton={
           <div className="flex flex-wrap items-center gap-2">
+            <input
+              ref={smartPdfInputRef}
+              type="file"
+              accept=".pdf"
+              multiple
+              className="hidden"
+              onChange={(e) => {
+                const files = Array.from(e.target.files || []);
+                if (files.length > 0) {
+                  handleDirectPdfUpload(files.slice(0, 3));
+                }
+                e.target.value = '';
+              }}
+            />
             <button
-              onClick={() => setShowAiUploadModal(true)}
-              title="Upload managing agent payout statements or municipal / Eskom utility bills"
+              type="button"
+              onClick={() => smartPdfInputRef.current?.click()}
+              title="Upload managing agent payout statements or municipal / Eskom utility bills (PDF)"
               className="inline-flex items-center gap-1.5 bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 text-xs font-semibold px-3 py-2 rounded-lg shadow-2xs transition-colors cursor-pointer shrink-0 whitespace-nowrap"
             >
               <Sparkles className="w-3.5 h-3.5 text-purple-600" />
@@ -2853,32 +2860,6 @@ export default function RentalPortfolioPage() {
           </div>
         </div>
       )}
-
-      {/* BYOK AI Statement Parser Modals */}
-      <StatementUploadModal
-        isOpen={showAiUploadModal}
-        onClose={() => setShowAiUploadModal(false)}
-        onExtracted={(units: ExtractedRentalUnit[]) => {
-          setAiExtractedUnits(units);
-          setShowAiUploadModal(false);
-          setShowAiReviewModal(true);
-        }}
-        onOpenTenantStatement={(propertyId: string) => {
-          setShowAiUploadModal(false);
-          setStatementModalPropertyId(propertyId);
-        }}
-      />
-
-      <StatementReviewModal
-        isOpen={showAiReviewModal}
-        onClose={() => setShowAiReviewModal(false)}
-        extractedUnits={aiExtractedUnits}
-        onConfirmSync={(finalUnits: ExtractedRentalUnit[]) => {
-          reconcileImportedRentals(finalUnits);
-          setShowAiReviewModal(false);
-          setAiExtractedUnits([]);
-        }}
-      />
 
       {/* Direct PDF Import Unified Verification Modal */}
       <UnifiedPdfVerificationModal

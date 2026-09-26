@@ -244,8 +244,12 @@ export default function StatementUploadModal({
         city: 'Gauteng',
         propertyType: 'Sectional Title Apartment',
         source: 'iGrow Rentals',
-        marketValueZAR: (parsedUtility.tenantRentBilledZAR || 7000) * 120,
-        purchasePriceZAR: (parsedUtility.tenantRentBilledZAR || 7000) * 110,
+        marketValueZAR: parsedUtility.municipalValuationZAR && parsedUtility.municipalValuationZAR > 0
+          ? parsedUtility.municipalValuationZAR
+          : (parsedUtility.tenantRentBilledZAR || 7000) * 120,
+        purchasePriceZAR: parsedUtility.municipalValuationZAR && parsedUtility.municipalValuationZAR > 0
+          ? Math.round(parsedUtility.municipalValuationZAR * 0.9)
+          : (parsedUtility.tenantRentBilledZAR || 7000) * 110,
         purchaseDate: new Date().toISOString().split('T')[0],
         outstandingBondBalanceZAR: 0,
         bondInterestRatePercent: 11.5,
