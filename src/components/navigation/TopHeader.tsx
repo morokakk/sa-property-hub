@@ -156,9 +156,9 @@ export default function TopHeader({ title, subtitle, actionButton }: TopHeaderPr
         </div>
 
         {/* Row 2 on mobile / Right on desktop */}
-        <div className="flex items-center justify-between md:justify-end gap-2 sm:gap-3 w-full md:w-auto">
-          {/* Net Equity Quick Pill (Visible on desktop) */}
-          <div className="hidden md:flex bg-emerald-50 border border-emerald-200 px-3.5 py-1.5 rounded-lg items-center gap-2 shrink-0">
+        <div className="flex flex-wrap items-center justify-between md:justify-end gap-2 sm:gap-2.5 w-full md:w-auto min-w-0">
+          {/* Net Equity Quick Pill (Visible on large desktop) */}
+          <div className="hidden xl:flex bg-emerald-50 border border-emerald-200 px-3.5 py-1.5 rounded-lg items-center gap-2 shrink-0">
             <Coins className="w-4 h-4 text-emerald-600 shrink-0" />
             <div className="text-left">
               <span className="text-[10px] uppercase font-semibold text-emerald-800 tracking-wider block leading-none">
@@ -172,20 +172,20 @@ export default function TopHeader({ title, subtitle, actionButton }: TopHeaderPr
 
           {/* Action Buttons Row */}
           {actionButton && (
-            <div className="w-full md:w-auto flex flex-wrap items-center gap-2">
+            <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 max-w-full">
               {actionButton}
             </div>
           )}
 
-          {/* Quick Portfolio Controls (Desktop Only) */}
-          <div className="hidden md:flex items-center gap-1 border-l border-slate-200 pl-2 sm:pl-3 shrink-0">
+          {/* Quick Portfolio Controls (Large Desktop Full Buttons) */}
+          <div className="hidden xl:flex items-center gap-1 border-l border-slate-200 pl-2 sm:pl-3 shrink-0">
             <button
               onClick={handleReset}
               title="Reset to realistic South African demo data"
               className="p-1.5 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-md transition-colors flex items-center gap-1 text-xs font-medium min-h-[36px] min-w-[36px] justify-center cursor-pointer"
             >
               <RotateCcw className="w-3.5 h-3.5" />
-              <span className="hidden lg:inline">Reset Demo</span>
+              <span>Reset Demo</span>
             </button>
 
             <button
@@ -194,7 +194,7 @@ export default function TopHeader({ title, subtitle, actionButton }: TopHeaderPr
               className="p-1.5 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-md transition-colors flex items-center gap-1 text-xs font-medium min-h-[36px] min-w-[36px] justify-center cursor-pointer"
             >
               <Trash2 className="w-3.5 h-3.5" />
-              <span className="hidden lg:inline">Clear Demo Data</span>
+              <span>Clear Demo</span>
             </button>
 
             {/* Export Dropdown Menu */}
@@ -205,7 +205,7 @@ export default function TopHeader({ title, subtitle, actionButton }: TopHeaderPr
                 className="p-1.5 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-md transition-colors flex items-center gap-1 text-xs font-medium min-h-[36px] min-w-[36px] justify-center cursor-pointer"
               >
                 <Download className="w-3.5 h-3.5" />
-                <span className="hidden lg:inline">Export</span>
+                <span>Export</span>
                 <ChevronDown className="w-3 h-3 text-slate-400" />
               </button>
 
@@ -248,9 +248,46 @@ export default function TopHeader({ title, subtitle, actionButton }: TopHeaderPr
               className="p-1.5 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-md transition-colors cursor-pointer flex items-center gap-1 text-xs font-medium min-h-[36px] min-w-[36px] justify-center"
             >
               <Upload className="w-3.5 h-3.5" />
-              <span className="hidden lg:inline">Import</span>
+              <span>Import</span>
               <input
                 ref={fileInputRef}
+                type="file"
+                accept=".json"
+                className="hidden"
+                onChange={handleImport}
+              />
+            </label>
+          </div>
+
+          {/* Tablet Icon-Only / Compact Controls (md to xl) */}
+          <div className="hidden md:flex xl:hidden items-center gap-1 border-l border-slate-200 pl-2 shrink-0">
+            <button
+              onClick={handleReset}
+              title="Reset Demo Data"
+              className="p-2 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-md transition-colors min-h-[36px] min-w-[36px] flex items-center justify-center cursor-pointer"
+            >
+              <RotateCcw className="w-4 h-4" />
+            </button>
+            <button
+              onClick={handleClearDemo}
+              title="Clear Demo Data"
+              className="p-2 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-md transition-colors min-h-[36px] min-w-[36px] flex items-center justify-center cursor-pointer"
+            >
+              <Trash2 className="w-4 h-4" />
+            </button>
+            <button
+              onClick={handleExportExcel}
+              title="Export to Excel"
+              className="p-2 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-md transition-colors min-h-[36px] min-w-[36px] flex items-center justify-center cursor-pointer"
+            >
+              <Download className="w-4 h-4" />
+            </button>
+            <label
+              title="Import JSON"
+              className="p-2 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-md transition-colors min-h-[36px] min-w-[36px] flex items-center justify-center cursor-pointer"
+            >
+              <Upload className="w-4 h-4" />
+              <input
                 type="file"
                 accept=".json"
                 className="hidden"

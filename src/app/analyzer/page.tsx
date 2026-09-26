@@ -2530,9 +2530,9 @@ export default function OpportunityAnalyzerPage() {
                 key={deal.id}
                 className="p-4 rounded-xl border border-slate-200 hover:border-slate-300 bg-slate-50/50 transition-all"
               >
-                <div className="flex flex-col md:flex-row md:items-start justify-between gap-3">
+                <div className="flex flex-col xl:flex-row xl:items-start justify-between gap-3">
                   {/* Property Header */}
-                  <div>
+                  <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-1.5 flex-wrap mb-1">
                       <PropertyTypeBadge type={deal.propertyType} />
                       <AgmDateChip agmDate={deal.agmDate} />
@@ -2608,7 +2608,7 @@ export default function OpportunityAnalyzerPage() {
                   </div>
 
                   {/* 1-Click Operational Actions */}
-                  <div className="flex flex-wrap items-center gap-1.5 shrink-0 self-start">
+                  <div className="flex flex-wrap items-center gap-1.5 w-full xl:w-auto xl:justify-end self-start">
                     <button
                       onClick={() => {
                         const text = formatOpportunityForWhatsApp(displayDeal, investorProfile);

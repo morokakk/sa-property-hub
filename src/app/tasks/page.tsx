@@ -288,10 +288,11 @@ export default function TaskEnginePage() {
         </div>
       </main>
 
-      {/* Create Task Modal */}
+      {/* Create Task Modal (Mobile Bottom Sheet / Desktop Centered Dialog) */}
       {showAddModal && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-xl max-w-md w-full p-6 shadow-xl border border-slate-200">
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 z-50">
+          <div className="bg-white rounded-t-3xl sm:rounded-xl max-w-md w-full p-5 sm:p-6 shadow-xl border border-slate-200 max-h-[92vh] sm:max-h-none overflow-y-auto">
+            <div className="w-12 h-1.5 bg-slate-300 rounded-full mx-auto mb-3 sm:hidden" />
             <h3 className="text-base font-bold text-slate-900 mb-4 flex items-center gap-2">
               <CheckSquare className="w-5 h-5 text-emerald-600" />
               Create Operational Task & Reminder
@@ -308,7 +309,7 @@ export default function TaskEnginePage() {
                   placeholder="e.g. Lodge Deeds transfer papers with STBB"
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg"
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg min-h-[40px]"
                 />
               </div>
 
@@ -325,7 +326,7 @@ export default function TaskEnginePage() {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">Due Date</label>
                   <input
@@ -334,7 +335,7 @@ export default function TaskEnginePage() {
                     autoComplete="off"
                     value={dueDate}
                     onChange={(e) => setDueDate(e.target.value)}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg"
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg min-h-[40px]"
                   />
                 </div>
                 <div>
@@ -342,7 +343,7 @@ export default function TaskEnginePage() {
                   <select
                     value={priority}
                     onChange={(e) => setPriority(e.target.value as TaskPriority)}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white font-semibold"
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white font-semibold min-h-[40px]"
                   >
                     <option value="Urgent">Urgent</option>
                     <option value="High">High</option>
@@ -352,7 +353,7 @@ export default function TaskEnginePage() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">Link to Module</label>
                   <select

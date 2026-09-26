@@ -386,17 +386,18 @@ export default function FundingTrackerPage() {
         </div>
       </main>
 
-      {/* Add Funding Source Modal */}
+      {/* Add Funding Source Modal (Mobile Bottom Sheet / Desktop Centered Dialog) */}
       {showAddModal && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-xl max-w-xl w-full p-6 shadow-xl border border-slate-200">
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 z-50">
+          <div className="bg-white rounded-t-3xl sm:rounded-xl max-w-xl w-full p-5 sm:p-6 shadow-xl border border-slate-200 max-h-[92vh] sm:max-h-none overflow-y-auto">
+            <div className="w-12 h-1.5 bg-slate-300 rounded-full mx-auto mb-3 sm:hidden" />
             <h3 className="text-base font-bold text-slate-900 mb-4 flex items-center gap-2">
               <Coins className="w-5 h-5 text-emerald-600" />
               Add Financing / Capital Source
             </h3>
 
             <form onSubmit={handleAddFunding} noValidate className="space-y-4 text-xs">
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">Lender / Investor Name *</label>
                   <input
@@ -424,7 +425,7 @@ export default function FundingTrackerPage() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">Funding Category</label>
                   <select
@@ -453,7 +454,7 @@ export default function FundingTrackerPage() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">Return Structure</label>
                   <select
@@ -482,7 +483,7 @@ export default function FundingTrackerPage() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">Payment Schedule</label>
                   <select
@@ -513,7 +514,7 @@ export default function FundingTrackerPage() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">Disbursement Date</label>
                   <input
@@ -571,10 +572,11 @@ export default function FundingTrackerPage() {
         </div>
       )}
 
-      {/* Log Repayment Modal */}
+      {/* Log Repayment Modal (Mobile Bottom Sheet / Desktop Centered Dialog) */}
       {repaymentModalSource && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-xl max-w-md w-full p-6 shadow-xl border border-slate-200">
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 z-50">
+          <div className="bg-white rounded-t-3xl sm:rounded-xl max-w-md w-full p-5 sm:p-6 shadow-xl border border-slate-200 max-h-[92vh] sm:max-h-none overflow-y-auto">
+            <div className="w-12 h-1.5 bg-slate-300 rounded-full mx-auto mb-3 sm:hidden" />
             <h3 className="text-base font-bold text-slate-900 mb-2">Log Payment to Lender</h3>
             <p className="text-xs text-slate-500 mb-4">
               Record coupon payment or principal settlement for <strong>{repaymentModalSource.lenderName}</strong>.
@@ -600,7 +602,7 @@ export default function FundingTrackerPage() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">Payment Type</label>
                   <select

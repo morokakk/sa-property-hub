@@ -195,10 +195,10 @@ export default function Sidebar() {
 
   // Mobile Bottom Quick Navigation Tabs (4 Core Modules + More Drawer Trigger)
   const bottomTabs = [
-    { name: 'Portfolio', href: '/', icon: LayoutDashboard },
-    { name: 'Sourcing', href: '/analyzer', icon: Calculator },
-    { name: 'Flips', href: '/flips', icon: Hammer },
+    { name: 'Dashboard', href: '/', icon: LayoutDashboard },
     { name: 'Rentals', href: '/rentals', icon: Building2 },
+    { name: 'Analyzer', href: '/analyzer', icon: Calculator },
+    { name: 'Flips', href: '/flips', icon: Hammer },
   ];
 
   return (

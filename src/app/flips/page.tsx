@@ -1427,10 +1427,11 @@ export default function FlipsManagerPage() {
         )}
       </main>
 
-      {/* Mark as Flipped / Sold Exit Modal */}
+      {/* Mark as Flipped / Sold Exit Modal (Mobile Bottom-Sheet / Desktop Centered Dialog) */}
       {showExitModal && activeFlip && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-xl max-w-lg w-full p-6 shadow-xl border border-slate-200 animate-in fade-in">
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 z-50">
+          <div className="bg-white rounded-t-3xl sm:rounded-xl max-w-lg w-full p-5 sm:p-6 shadow-xl border border-slate-200 animate-in fade-in max-h-[92vh] sm:max-h-none overflow-y-auto">
+            <div className="w-12 h-1.5 bg-slate-300 rounded-full mx-auto mb-3 sm:hidden" />
             <div className="flex items-center justify-between pb-3 mb-4 border-b border-slate-100">
               <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
                 <CheckCircle2 className="w-5 h-5 text-emerald-600" />
@@ -1555,10 +1556,11 @@ export default function FlipsManagerPage() {
         </div>
       )}
 
-      {/* Convert Flip to Rental (BRRRR Transition) Modal */}
+      {/* Convert Flip to Rental (BRRRR Transition) Modal (Mobile Bottom-Sheet / Desktop Centered Dialog) */}
       {showConvertModal && activeFlip && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 z-50 overflow-y-auto">
-          <div className="bg-white rounded-xl max-w-xl w-full p-6 shadow-xl border border-slate-200 animate-in fade-in my-8 max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 z-50 overflow-y-auto">
+          <div className="bg-white rounded-t-3xl sm:rounded-xl max-w-xl w-full p-5 sm:p-6 shadow-xl border border-slate-200 animate-in fade-in sm:my-8 max-h-[92vh] sm:max-h-[90vh] overflow-y-auto">
+            <div className="w-12 h-1.5 bg-slate-300 rounded-full mx-auto mb-3 sm:hidden" />
             <div className="flex items-center justify-between pb-3 mb-4 border-b border-slate-100">
               <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
                 <ArrowRightLeft className="w-5 h-5 text-indigo-600" />
@@ -1775,17 +1777,18 @@ export default function FlipsManagerPage() {
         </div>
       )}
 
-      {/* Add BOQ Item Modal */}
+      {/* Add BOQ Item Modal (Mobile Bottom-Sheet / Desktop Centered Dialog) */}
       {showAddBOQModal && activeFlip && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-xl max-w-lg w-full p-6 shadow-xl border border-slate-200">
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 z-50">
+          <div className="bg-white rounded-t-3xl sm:rounded-xl max-w-lg w-full p-5 sm:p-6 shadow-xl border border-slate-200 max-h-[92vh] sm:max-h-none overflow-y-auto">
+            <div className="w-12 h-1.5 bg-slate-300 rounded-full mx-auto mb-3 sm:hidden" />
             <h3 className="text-base font-bold text-slate-900 mb-4 flex items-center gap-2">
               <PlusCircle className="w-5 h-5 text-emerald-600" />
               Add Bill of Quantities (BOQ) Line Item
             </h3>
 
             <form onSubmit={handleAddBOQ} noValidate className="space-y-4 text-xs">
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">Trade Category</label>
                   <select
@@ -1916,10 +1919,11 @@ export default function FlipsManagerPage() {
         </div>
       )}
 
-      {/* Unified Flip Project Modal (Add & Edit) */}
+      {/* Unified Flip Project Modal (Add & Edit) (Mobile Bottom-Sheet / Desktop Centered Dialog) */}
       {showFlipModal && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-xl max-w-lg w-full p-6 shadow-xl border border-slate-200 max-h-[92vh] overflow-y-auto">
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 z-50">
+          <div className="bg-white rounded-t-3xl sm:rounded-xl max-w-lg w-full p-5 sm:p-6 shadow-xl border border-slate-200 max-h-[92vh] overflow-y-auto">
+            <div className="w-12 h-1.5 bg-slate-300 rounded-full mx-auto mb-3 sm:hidden" />
             <div className="flex items-center justify-between mb-3">
               <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
                 {editingFlipId ? (
@@ -2358,10 +2362,11 @@ export default function FlipsManagerPage() {
         </div>
       )}
 
-      {/* Supplier Directory Modal */}
+      {/* Supplier Directory Modal (Mobile Bottom-Sheet / Desktop Centered Dialog) */}
       {showSupplierModal && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-xl max-w-2xl w-full p-6 shadow-xl border border-slate-200 max-h-[85vh] overflow-y-auto">
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 z-50">
+          <div className="bg-white rounded-t-3xl sm:rounded-xl max-w-2xl w-full p-5 sm:p-6 shadow-xl border border-slate-200 max-h-[92vh] sm:max-h-[85vh] overflow-y-auto">
+            <div className="w-12 h-1.5 bg-slate-300 rounded-full mx-auto mb-3 sm:hidden" />
             <div className="flex items-center justify-between mb-4 border-b border-slate-200 pb-3">
               <div>
                 <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
@@ -2516,17 +2521,18 @@ export default function FlipsManagerPage() {
           </div>
         </div>
       )}
-      {/* Edit Funding Campaign Modal */}
+      {/* Edit Funding Campaign Modal (Mobile Bottom-Sheet / Desktop Centered Dialog) */}
       {showFundingModal && activeFlip && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-xl max-w-lg w-full p-6 shadow-xl border border-slate-200">
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 z-50">
+          <div className="bg-white rounded-t-3xl sm:rounded-xl max-w-lg w-full p-5 sm:p-6 shadow-xl border border-slate-200 max-h-[92vh] sm:max-h-none overflow-y-auto">
+            <div className="w-12 h-1.5 bg-slate-300 rounded-full mx-auto mb-3 sm:hidden" />
             <h3 className="text-base font-bold text-slate-900 mb-4 flex items-center gap-2">
               <Coins className="w-5 h-5 text-emerald-600" />
               Edit Deal Funding Campaign & Investor Terms
             </h3>
 
             <form onSubmit={handleSaveFunding} noValidate className="space-y-4 text-xs">
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">Target Facility (ZAR) *</label>
                   <input

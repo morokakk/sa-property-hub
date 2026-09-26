@@ -36,7 +36,7 @@ export default function AssetAllocationChart({ summary }: AssetAllocationChartPr
           <span className="text-xs text-slate-500 font-medium">Gross Asset Basis</span>
         </div>
 
-        <div className="flex flex-col sm:flex-row items-center gap-6 my-2">
+        <div className="flex flex-col xl:flex-row items-center gap-4 sm:gap-6 my-2">
           {/* SVG Donut Chart */}
           <div className="relative w-44 h-44 flex items-center justify-center shrink-0">
             <svg className="w-44 h-44 -rotate-90 transform" viewBox="0 0 160 160">
