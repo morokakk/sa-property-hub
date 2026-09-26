@@ -395,12 +395,14 @@ export default function FundingTrackerPage() {
               Add Financing / Capital Source
             </h3>
 
-            <form onSubmit={handleAddFunding} className="space-y-4 text-xs">
+            <form onSubmit={handleAddFunding} noValidate className="space-y-4 text-xs">
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">Lender / Investor Name *</label>
                   <input
                     type="text"
+                    name="lenderName"
+                    autoComplete="organization"
                     required
                     placeholder="e.g. Johan Meyer"
                     value={lenderName}
@@ -412,6 +414,8 @@ export default function FundingTrackerPage() {
                   <label className="block font-semibold text-slate-700 mb-1">Entity / Trust (Optional)</label>
                   <input
                     type="text"
+                    name="contactPerson"
+                    autoComplete="name"
                     placeholder="e.g. Meyer Family Trust"
                     value={entityOrContact}
                     onChange={(e) => setEntityOrContact(e.target.value)}
@@ -438,8 +442,10 @@ export default function FundingTrackerPage() {
                   <label className="block font-semibold text-slate-700 mb-1">Principal Amount (ZAR)</label>
                   <input
                     type="number"
-                    min="10000"
-                    step="10000"
+                    name="capitalAmountZAR"
+                    autoComplete="off"
+                    min="0"
+                    step="any"
                     value={capitalAmountZAR}
                     onChange={(e) => setCapitalAmountZAR(Number(e.target.value))}
                     className="w-full px-3 py-2 border border-slate-300 rounded-lg font-bold"
@@ -465,7 +471,10 @@ export default function FundingTrackerPage() {
                   <label className="block font-semibold text-slate-700 mb-1">Rate / Split (%)</label>
                   <input
                     type="number"
-                    step="0.5"
+                    name="returnRatePercent"
+                    autoComplete="off"
+                    min="0"
+                    step="any"
                     value={returnRatePercent}
                     onChange={(e) => setReturnRatePercent(Number(e.target.value))}
                     className="w-full px-3 py-2 border border-slate-300 rounded-lg font-bold"
@@ -509,6 +518,8 @@ export default function FundingTrackerPage() {
                   <label className="block font-semibold text-slate-700 mb-1">Disbursement Date</label>
                   <input
                     type="date"
+                    name="disbursementDate"
+                    autoComplete="off"
                     value={disbursementDate}
                     onChange={(e) => setDisbursementDate(e.target.value)}
                     className="w-full px-3 py-2 border border-slate-300 rounded-lg"
@@ -518,6 +529,8 @@ export default function FundingTrackerPage() {
                   <label className="block font-semibold text-slate-700 mb-1">Maturity / Due Date</label>
                   <input
                     type="date"
+                    name="maturityDate"
+                    autoComplete="off"
                     value={maturityDate}
                     onChange={(e) => setMaturityDate(e.target.value)}
                     className="w-full px-3 py-2 border border-slate-300 rounded-lg"
@@ -529,6 +542,8 @@ export default function FundingTrackerPage() {
                 <label className="block font-semibold text-slate-700 mb-1">Contact Email / Phone / Notes</label>
                 <input
                   type="text"
+                  name="fundingNotes"
+                  autoComplete="off"
                   placeholder="e.g. +27 82 123 4567 • Security: 2nd Mortgage Bond"
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
@@ -565,15 +580,17 @@ export default function FundingTrackerPage() {
               Record coupon payment or principal settlement for <strong>{repaymentModalSource.lenderName}</strong>.
             </p>
 
-            <form onSubmit={handleProcessRepayment} className="space-y-4 text-xs">
+            <form onSubmit={handleProcessRepayment} noValidate className="space-y-4 text-xs">
               <div>
                 <label className="block font-semibold text-slate-700 mb-1">Payment Amount (ZAR) *</label>
                 <div className="relative">
                   <span className="absolute left-2.5 top-2 text-xs font-bold text-slate-400">R</span>
                   <input
                     type="number"
-                    min="100"
-                    step="100"
+                    name="repaymentAmountZAR"
+                    autoComplete="off"
+                    min="0"
+                    step="any"
                     required
                     value={repaymentAmount || ''}
                     onChange={(e) => setRepaymentAmount(Number(e.target.value))}
@@ -602,6 +619,8 @@ export default function FundingTrackerPage() {
                   <label className="block font-semibold text-slate-700 mb-1">Payment Date</label>
                   <input
                     type="date"
+                    name="paymentDate"
+                    autoComplete="off"
                     required
                     value={paymentDate}
                     onChange={(e) => setPaymentDate(e.target.value)}

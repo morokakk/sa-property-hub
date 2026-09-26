@@ -73,8 +73,8 @@ export default function FlipsManagerPage() {
 
   // Modals
   const [showAddBOQModal, setShowAddBOQModal] = useState(false);
-  const [showAddFlipModal, setShowAddFlipModal] = useState(false);
-  const [showEditFlipModal, setShowEditFlipModal] = useState(false);
+  const [showFlipModal, setShowFlipModal] = useState(false);
+  const [editingFlipId, setEditingFlipId] = useState<string | null>(null);
   const [showSupplierModal, setShowSupplierModal] = useState(false);
   const [showExitModal, setShowExitModal] = useState(false);
   const [showFundingModal, setShowFundingModal] = useState(false);
@@ -92,92 +92,6 @@ export default function FlipsManagerPage() {
   const [convertNotes, setConvertNotes] = useState('');
   const [convertedRentalId, setConvertedRentalId] = useState<string | null>(null);
 
-  // Edit Flip Modal Form State
-  const [editFlipTitle, setEditFlipTitle] = useState('');
-  const [editFlipAddress, setEditFlipAddress] = useState('');
-  const [editFlipCity, setEditFlipCity] = useState('');
-  const [editFlipPurchasePrice, setEditFlipPurchasePrice] = useState(0);
-  const [editFlipAcquisitionCosts, setEditFlipAcquisitionCosts] = useState(0);
-  const [editFlipRenovationBudget, setEditFlipRenovationBudget] = useState(0);
-  const [editFlipEstimatedDuration, setEditFlipEstimatedDuration] = useState(6);
-  const [editFlipBondPayment, setEditFlipBondPayment] = useState(0);
-  const [editFlipLevies, setEditFlipLevies] = useState(0);
-  const [editFlipRates, setEditFlipRates] = useState(0);
-  const [editFlipOtherHoldingCost, setEditFlipOtherHoldingCost] = useState(0);
-  const [editFlipTargetExit, setEditFlipTargetExit] = useState(0);
-  const [editFlipCompletionDate, setEditFlipCompletionDate] = useState('');
-  const [editFlipPropertyType, setEditFlipPropertyType] = useState<PropertyTitleType>('Freehold House');
-  const [editFlipAgmDate, setEditFlipAgmDate] = useState('');
-  const [editFlipMasterFolderUrl, setEditFlipMasterFolderUrl] = useState('');
-  const [editFlipOtpUrl, setEditFlipOtpUrl] = useState('');
-  const [editFlipRatesBillUrl, setEditFlipRatesBillUrl] = useState('');
-  const [editFlipTitleDeedUrl, setEditFlipTitleDeedUrl] = useState('');
-
-  const openEditFlipModal = () => {
-    if (!activeFlip) return;
-    setEditFlipTitle(activeFlip.title);
-    setEditFlipAddress(activeFlip.address);
-    setEditFlipCity(activeFlip.city);
-    setEditFlipPurchasePrice(activeFlip.purchasePriceZAR);
-    setEditFlipAcquisitionCosts(activeFlip.acquisitionCostsZAR);
-    setEditFlipRenovationBudget(activeFlip.baselineRenovationBudgetZAR);
-    setEditFlipEstimatedDuration(activeFlip.estimatedDurationMonths ?? 6);
-
-    const existingHolding = activeFlip.monthlyHoldingCostZAR ?? 15000;
-    const bond = activeFlip.monthlyBondPaymentZAR !== undefined ? activeFlip.monthlyBondPaymentZAR : Math.round(existingHolding * 0.6);
-    const levies = activeFlip.propertyType === 'Freehold House' ? 0 : (activeFlip.monthlyLeviesZAR !== undefined ? activeFlip.monthlyLeviesZAR : Math.round(existingHolding * 0.15));
-    const rates = activeFlip.monthlyRatesTaxesZAR !== undefined ? activeFlip.monthlyRatesTaxesZAR : Math.round(existingHolding * 0.15);
-    const other = activeFlip.monthlyOtherHoldingCostZAR !== undefined ? activeFlip.monthlyOtherHoldingCostZAR : Math.max(0, existingHolding - (bond + levies + rates));
-
-    setEditFlipBondPayment(bond);
-    setEditFlipLevies(levies);
-    setEditFlipRates(rates);
-    setEditFlipOtherHoldingCost(other);
-    setEditFlipTargetExit(activeFlip.targetExitPriceZAR);
-    setEditFlipCompletionDate(activeFlip.targetCompletionDate);
-    setEditFlipPropertyType(activeFlip.propertyType || 'Freehold House');
-    setEditFlipAgmDate(activeFlip.agmDate || '');
-    setEditFlipMasterFolderUrl(activeFlip.driveVault?.masterFolderUrl || '');
-    setEditFlipOtpUrl(activeFlip.driveVault?.otpDocumentUrl || '');
-    setEditFlipRatesBillUrl(activeFlip.driveVault?.ratesBillUrl || '');
-    setEditFlipTitleDeedUrl(activeFlip.driveVault?.titleDeedUrl || '');
-    setShowEditFlipModal(true);
-  };
-
-  const handleSaveEditFlip = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!activeFlip) return;
-    const isScheme = editFlipPropertyType === 'Sectional Title Apartment' || editFlipPropertyType === 'Townhouse / Cluster';
-    const updatedDriveVault: CloudDriveVault = {
-      masterFolderUrl: editFlipMasterFolderUrl.trim() || undefined,
-      otpDocumentUrl: editFlipOtpUrl.trim() || undefined,
-      ratesBillUrl: editFlipRatesBillUrl.trim() || undefined,
-      titleDeedUrl: editFlipTitleDeedUrl.trim() || undefined,
-    };
-    const finalLevies = editFlipPropertyType === 'Freehold House' ? 0 : Number(editFlipLevies);
-    const totalMonthlyHolding = Number(editFlipBondPayment) + finalLevies + Number(editFlipRates) + Number(editFlipOtherHoldingCost);
-
-    updateFlip(activeFlip.id, {
-      title: editFlipTitle,
-      address: editFlipAddress,
-      city: editFlipCity,
-      propertyType: editFlipPropertyType,
-      agmDate: isScheme && editFlipAgmDate ? editFlipAgmDate : undefined,
-      purchasePriceZAR: Number(editFlipPurchasePrice),
-      acquisitionCostsZAR: Number(editFlipAcquisitionCosts),
-      baselineRenovationBudgetZAR: Number(editFlipRenovationBudget),
-      estimatedDurationMonths: Number(editFlipEstimatedDuration),
-      monthlyHoldingCostZAR: totalMonthlyHolding,
-      monthlyBondPaymentZAR: Number(editFlipBondPayment),
-      monthlyLeviesZAR: finalLevies,
-      monthlyRatesTaxesZAR: Number(editFlipRates),
-      monthlyOtherHoldingCostZAR: Number(editFlipOtherHoldingCost),
-      targetExitPriceZAR: Number(editFlipTargetExit),
-      targetCompletionDate: editFlipCompletionDate,
-      driveVault: updatedDriveVault,
-    });
-    setShowEditFlipModal(false);
-  };
 
   // Funding Campaign Modal State
   const [fundingRequired, setFundingRequired] = useState<number>(0);
@@ -207,28 +121,28 @@ export default function FlipsManagerPage() {
   const [boqSupplier, setBoqSupplier] = useState('Builders Warehouse Sandton');
   const [boqStatus, setBoqStatus] = useState<BOQItem['status']>('Quoted');
 
-  // New Flip Project Form State
-  const [newFlipTitle, setNewFlipTitle] = useState('');
-  const [newFlipAddress, setNewFlipAddress] = useState('');
-  const [newFlipCity, setNewFlipCity] = useState('Cape Town');
-  const [newFlipPurchasePrice, setNewFlipPurchasePrice] = useState(2500000);
-  const [newFlipAcquisitionCosts, setNewFlipAcquisitionCosts] = useState(185000);
-  const [newFlipRenovationBudget, setNewFlipRenovationBudget] = useState(450000);
-  const [newFlipEstimatedDuration, setNewFlipEstimatedDuration] = useState(6);
-  const [newFlipBondPayment, setNewFlipBondPayment] = useState(9500);
-  const [newFlipLevies, setNewFlipLevies] = useState(0);
-  const [newFlipRates, setNewFlipRates] = useState(3500);
-  const [newFlipOtherHoldingCost, setNewFlipOtherHoldingCost] = useState(2000);
-  const [newFlipTargetExit, setNewFlipTargetExit] = useState(3800000);
-  const [newFlipCompletionDate, setNewFlipCompletionDate] = useState(
+  // Flip Project Modal Form State (Unified Add & Edit)
+  const [flipTitle, setFlipTitle] = useState('');
+  const [flipAddress, setFlipAddress] = useState('');
+  const [flipCity, setFlipCity] = useState('Cape Town');
+  const [flipPurchasePrice, setFlipPurchasePrice] = useState(2500000);
+  const [flipAcquisitionCosts, setFlipAcquisitionCosts] = useState(185000);
+  const [flipRenovationBudget, setFlipRenovationBudget] = useState(450000);
+  const [flipEstimatedDuration, setFlipEstimatedDuration] = useState(6);
+  const [flipBondPayment, setFlipBondPayment] = useState(9500);
+  const [flipLevies, setFlipLevies] = useState(0);
+  const [flipRates, setFlipRates] = useState(3500);
+  const [flipOtherHoldingCost, setFlipOtherHoldingCost] = useState(2000);
+  const [flipTargetExit, setFlipTargetExit] = useState(3800000);
+  const [flipCompletionDate, setFlipCompletionDate] = useState(
     new Date(Date.now() + 180 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
   );
-  const [newFlipPropertyType, setNewFlipPropertyType] = useState<PropertyTitleType>('Freehold House');
-  const [newFlipAgmDate, setNewFlipAgmDate] = useState<string>('');
-  const [newFlipMasterFolderUrl, setNewFlipMasterFolderUrl] = useState('');
-  const [newFlipOtpUrl, setNewFlipOtpUrl] = useState('');
-  const [newFlipRatesBillUrl, setNewFlipRatesBillUrl] = useState('');
-  const [newFlipTitleDeedUrl, setNewFlipTitleDeedUrl] = useState('');
+  const [flipPropertyType, setFlipPropertyType] = useState<PropertyTitleType>('Freehold House');
+  const [flipAgmDate, setFlipAgmDate] = useState<string>('');
+  const [flipMasterFolderUrl, setFlipMasterFolderUrl] = useState('');
+  const [flipOtpUrl, setFlipOtpUrl] = useState('');
+  const [flipRatesBillUrl, setFlipRatesBillUrl] = useState('');
+  const [flipTitleDeedUrl, setFlipTitleDeedUrl] = useState('');
 
   // PDF Statement Extraction State for New Flip
   const [isParsingPdf, setIsParsingPdf] = useState(false);
@@ -306,13 +220,13 @@ export default function FlipsManagerPage() {
         detectedCity = 'Johannesburg';
       }
 
-      if (detectedTitle) setNewFlipTitle(detectedTitle);
-      if (detectedAddress) setNewFlipAddress(detectedAddress);
-      if (detectedCity) setNewFlipCity(detectedCity);
-      if (detectedPropType) setNewFlipPropertyType(detectedPropType);
-      if (combinedRates > 0) setNewFlipRates(Math.round(combinedRates));
-      if (combinedLevies > 0) setNewFlipLevies(Math.round(combinedLevies));
-      if (combinedUtilities > 0) setNewFlipOtherHoldingCost(Math.round(combinedUtilities));
+      if (detectedTitle) setFlipTitle(detectedTitle);
+      if (detectedAddress) setFlipAddress(detectedAddress);
+      if (detectedCity) setFlipCity(detectedCity);
+      if (detectedPropType) setFlipPropertyType(detectedPropType);
+      if (combinedRates > 0) setFlipRates(Math.round(combinedRates));
+      if (combinedLevies > 0) setFlipLevies(Math.round(combinedLevies));
+      if (combinedUtilities > 0) setFlipOtherHoldingCost(Math.round(combinedUtilities));
       if (detectedValuation > 0) setExtractedValuationZAR(detectedValuation);
 
       const noticeParts = [];
@@ -323,11 +237,11 @@ export default function FlipsManagerPage() {
       if (detectedValuation > 0) noticeParts.push(`Municipal Valuation: R${detectedValuation.toLocaleString()}`);
 
       setPdfParseNotice(`✓ Extracted from ${files.length} statement(s): ${noticeParts.join(' • ')}`);
-      setShowAddFlipModal(true);
+      setShowFlipModal(true);
     } catch (err: any) {
       console.error('Failed to parse statement for flip:', err);
       setPdfParseNotice('Could not extract statement details. Please check the file.');
-      setShowAddFlipModal(true);
+      setShowFlipModal(true);
     } finally {
       setIsParsingPdf(false);
     }
@@ -365,61 +279,142 @@ export default function FlipsManagerPage() {
     setBoqActualCost(0);
   };
 
-  const handleAddFlip = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newFlipTitle) return;
-
-    const isScheme = newFlipPropertyType === 'Sectional Title Apartment' || newFlipPropertyType === 'Townhouse / Cluster';
-    const finalLevies = newFlipPropertyType === 'Freehold House' ? 0 : Number(newFlipLevies);
-    const totalMonthlyHolding = Number(newFlipBondPayment) + finalLevies + Number(newFlipRates) + Number(newFlipOtherHoldingCost);
-
-    const createdFlip: FlipProject = {
-      id: `flip-${Date.now()}`,
-      title: newFlipTitle,
-      address: newFlipAddress || `${newFlipCity} Project`,
-      city: newFlipCity,
-      propertyType: newFlipPropertyType,
-      agmDate: isScheme && newFlipAgmDate ? newFlipAgmDate : undefined,
-      purchaseDate: new Date().toISOString().split('T')[0],
-      purchasePriceZAR: newFlipPurchasePrice,
-      acquisitionCostsZAR: newFlipAcquisitionCosts,
-      baselineRenovationBudgetZAR: newFlipRenovationBudget,
-      estimatedDurationMonths: newFlipEstimatedDuration,
-      monthlyHoldingCostZAR: totalMonthlyHolding,
-      monthlyBondPaymentZAR: Number(newFlipBondPayment),
-      monthlyLeviesZAR: finalLevies,
-      monthlyRatesTaxesZAR: Number(newFlipRates),
-      monthlyOtherHoldingCostZAR: Number(newFlipOtherHoldingCost),
-      municipalValuationZAR: extractedValuationZAR || undefined,
-      targetExitPriceZAR: newFlipTargetExit,
-      targetCompletionDate: newFlipCompletionDate,
-      currentPhase: 'Acquisition & Conveyancing',
-      linkedFundingIds: [],
-      fundingRequiredZAR: Math.round((newFlipPurchasePrice + newFlipAcquisitionCosts + newFlipRenovationBudget) * 0.7),
-      capitalRaisedZAR: 0,
-      promisedReturnType: 'Fixed Interest',
-      promisedReturnRatePercent: 14.0,
-      promisedPayoutSchedule: 'Monthly Interest',
-      securityOffered: '2nd Mortgage Bond registered over title deed',
-      status: 'Active',
-      driveVault: {
-        masterFolderUrl: newFlipMasterFolderUrl.trim() || undefined,
-        otpDocumentUrl: newFlipOtpUrl.trim() || undefined,
-        ratesBillUrl: newFlipRatesBillUrl.trim() || undefined,
-        titleDeedUrl: newFlipTitleDeedUrl.trim() || undefined,
-      },
-      boq: [],
-    };
-
-    addFlip(createdFlip);
-    setSelectedFlipId(createdFlip.id);
-    setShowAddFlipModal(false);
+  const openAddFlipModal = () => {
+    setEditingFlipId(null);
+    setFlipTitle('');
+    setFlipAddress('');
+    setFlipCity('Cape Town');
+    setFlipPurchasePrice(2500000);
+    setFlipAcquisitionCosts(185000);
+    setFlipRenovationBudget(450000);
+    setFlipEstimatedDuration(6);
+    setFlipBondPayment(9500);
+    setFlipLevies(0);
+    setFlipRates(3500);
+    setFlipOtherHoldingCost(2000);
+    setFlipTargetExit(3800000);
+    setFlipCompletionDate(new Date(Date.now() + 180 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]);
+    setFlipPropertyType('Freehold House');
+    setFlipAgmDate('');
+    setFlipMasterFolderUrl('');
+    setFlipOtpUrl('');
+    setFlipRatesBillUrl('');
+    setFlipTitleDeedUrl('');
     setPdfParseNotice(null);
     setExtractedValuationZAR(null);
-    setNewFlipTitle('');
-    setNewFlipAddress('');
-    setNewFlipPropertyType('Freehold House');
-    setNewFlipAgmDate('');
+    setShowFlipModal(true);
+  };
+
+  const openEditFlipModal = () => {
+    if (!activeFlip) return;
+    setEditingFlipId(activeFlip.id);
+    setFlipTitle(activeFlip.title);
+    setFlipAddress(activeFlip.address);
+    setFlipCity(activeFlip.city);
+    setFlipPurchasePrice(activeFlip.purchasePriceZAR);
+    setFlipAcquisitionCosts(activeFlip.acquisitionCostsZAR);
+    setFlipRenovationBudget(activeFlip.baselineRenovationBudgetZAR);
+    setFlipEstimatedDuration(activeFlip.estimatedDurationMonths ?? 6);
+
+    const existingHolding = activeFlip.monthlyHoldingCostZAR ?? 15000;
+    const bond = activeFlip.monthlyBondPaymentZAR !== undefined ? activeFlip.monthlyBondPaymentZAR : Math.round(existingHolding * 0.6);
+    const levies = activeFlip.propertyType === 'Freehold House' ? 0 : (activeFlip.monthlyLeviesZAR !== undefined ? activeFlip.monthlyLeviesZAR : Math.round(existingHolding * 0.15));
+    const rates = activeFlip.monthlyRatesTaxesZAR !== undefined ? activeFlip.monthlyRatesTaxesZAR : Math.round(existingHolding * 0.15);
+    const other = activeFlip.monthlyOtherHoldingCostZAR !== undefined ? activeFlip.monthlyOtherHoldingCostZAR : Math.max(0, existingHolding - (bond + levies + rates));
+
+    setFlipBondPayment(bond);
+    setFlipLevies(levies);
+    setFlipRates(rates);
+    setFlipOtherHoldingCost(other);
+    setFlipTargetExit(activeFlip.targetExitPriceZAR);
+    setFlipCompletionDate(activeFlip.targetCompletionDate);
+    setFlipPropertyType(activeFlip.propertyType || 'Freehold House');
+    setFlipAgmDate(activeFlip.agmDate || '');
+    setFlipMasterFolderUrl(activeFlip.driveVault?.masterFolderUrl || '');
+    setFlipOtpUrl(activeFlip.driveVault?.otpDocumentUrl || '');
+    setFlipRatesBillUrl(activeFlip.driveVault?.ratesBillUrl || '');
+    setFlipTitleDeedUrl(activeFlip.driveVault?.titleDeedUrl || '');
+    setPdfParseNotice(null);
+    setExtractedValuationZAR(null);
+    setShowFlipModal(true);
+  };
+
+  const handleSaveFlip = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!flipTitle) return;
+
+    const isScheme = flipPropertyType === 'Sectional Title Apartment' || flipPropertyType === 'Townhouse / Cluster';
+    const finalLevies = flipPropertyType === 'Freehold House' ? 0 : Number(flipLevies);
+    const totalMonthlyHolding = Number(flipBondPayment) + finalLevies + Number(flipRates) + Number(flipOtherHoldingCost);
+    const updatedDriveVault: CloudDriveVault = {
+      masterFolderUrl: flipMasterFolderUrl.trim() || undefined,
+      otpDocumentUrl: flipOtpUrl.trim() || undefined,
+      ratesBillUrl: flipRatesBillUrl.trim() || undefined,
+      titleDeedUrl: flipTitleDeedUrl.trim() || undefined,
+    };
+
+    if (editingFlipId) {
+      updateFlip(editingFlipId, {
+        title: flipTitle,
+        address: flipAddress,
+        city: flipCity,
+        propertyType: flipPropertyType,
+        agmDate: isScheme && flipAgmDate ? flipAgmDate : undefined,
+        purchasePriceZAR: Number(flipPurchasePrice),
+        acquisitionCostsZAR: Number(flipAcquisitionCosts),
+        baselineRenovationBudgetZAR: Number(flipRenovationBudget),
+        estimatedDurationMonths: Number(flipEstimatedDuration),
+        monthlyHoldingCostZAR: totalMonthlyHolding,
+        monthlyBondPaymentZAR: Number(flipBondPayment),
+        monthlyLeviesZAR: finalLevies,
+        monthlyRatesTaxesZAR: Number(flipRates),
+        monthlyOtherHoldingCostZAR: Number(flipOtherHoldingCost),
+        targetExitPriceZAR: Number(flipTargetExit),
+        targetCompletionDate: flipCompletionDate,
+        driveVault: updatedDriveVault,
+      });
+    } else {
+      const createdFlip: FlipProject = {
+        id: `flip-${Date.now()}`,
+        title: flipTitle,
+        address: flipAddress || `${flipCity} Project`,
+        city: flipCity,
+        propertyType: flipPropertyType,
+        agmDate: isScheme && flipAgmDate ? flipAgmDate : undefined,
+        purchaseDate: new Date().toISOString().split('T')[0],
+        purchasePriceZAR: Number(flipPurchasePrice),
+        acquisitionCostsZAR: Number(flipAcquisitionCosts),
+        baselineRenovationBudgetZAR: Number(flipRenovationBudget),
+        estimatedDurationMonths: Number(flipEstimatedDuration),
+        monthlyHoldingCostZAR: totalMonthlyHolding,
+        monthlyBondPaymentZAR: Number(flipBondPayment),
+        monthlyLeviesZAR: finalLevies,
+        monthlyRatesTaxesZAR: Number(flipRates),
+        monthlyOtherHoldingCostZAR: Number(flipOtherHoldingCost),
+        municipalValuationZAR: extractedValuationZAR || undefined,
+        targetExitPriceZAR: Number(flipTargetExit),
+        targetCompletionDate: flipCompletionDate,
+        currentPhase: 'Acquisition & Conveyancing',
+        linkedFundingIds: [],
+        fundingRequiredZAR: Math.round((Number(flipPurchasePrice) + Number(flipAcquisitionCosts) + Number(flipRenovationBudget)) * 0.7),
+        capitalRaisedZAR: 0,
+        promisedReturnType: 'Fixed Interest',
+        promisedReturnRatePercent: 14.0,
+        promisedPayoutSchedule: 'Monthly Interest',
+        securityOffered: '2nd Mortgage Bond registered over title deed',
+        status: 'Active',
+        driveVault: updatedDriveVault,
+        boq: [],
+      };
+
+      addFlip(createdFlip);
+      setSelectedFlipId(createdFlip.id);
+    }
+
+    setShowFlipModal(false);
+    setEditingFlipId(null);
+    setPdfParseNotice(null);
+    setExtractedValuationZAR(null);
   };
 
   const handleAddSupplier = (e: React.FormEvent) => {
@@ -579,7 +574,7 @@ export default function FlipsManagerPage() {
               Supplier Directory ({suppliers.length})
             </button>
             <button
-              onClick={() => setShowAddFlipModal(true)}
+              onClick={openAddFlipModal}
               className="inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold px-3 py-2 rounded-lg shadow-sm transition-colors shrink-0 whitespace-nowrap cursor-pointer"
             >
               <PlusCircle className="w-3.5 h-3.5" />
@@ -1454,7 +1449,7 @@ export default function FlipsManagerPage() {
               Finalize <strong>{activeFlip.title}</strong>. This records your realized sale price, archives the flip into historical records, and automatically deposits the net cash proceeds directly into your <strong>Liquid Cash Reserve / Seed Capital</strong> for your next deal.
             </p>
 
-            <form onSubmit={handleCompleteFlip} className="space-y-4 text-xs">
+            <form onSubmit={handleCompleteFlip} noValidate className="space-y-4 text-xs">
               <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 grid grid-cols-2 gap-3">
                 <div>
                   <span className="text-[10px] text-slate-400 uppercase font-semibold block">Total Cost Basis</span>
@@ -1476,7 +1471,7 @@ export default function FlipsManagerPage() {
                   type="number"
                   required
                   min="0"
-                  step="10000"
+                  step="any"
                   value={exitSalePrice || ''}
                   onChange={(e) => {
                     const price = Number(e.target.value);
@@ -1501,7 +1496,7 @@ export default function FlipsManagerPage() {
                   type="number"
                   required
                   min="0"
-                  step="5000"
+                  step="any"
                   value={exitNetProceeds || ''}
                   onChange={(e) => setExitNetProceeds(Number(e.target.value))}
                   className="w-full px-3 py-2 border border-slate-300 rounded-lg font-bold text-slate-900 text-sm"
@@ -1582,7 +1577,7 @@ export default function FlipsManagerPage() {
               Transition <strong>{activeFlip.title}</strong> into a long-term cashflowing rental asset. This marks the Flip phase as Completed, copies over all CoCs and drive documents, and passes the <strong>total accumulated cost</strong> (Purchase + BOQ + Carrying Costs) as the rental&apos;s initial capital basis.
             </p>
 
-            <form onSubmit={handleConvertFlip} className="space-y-4 text-xs">
+            <form onSubmit={handleConvertFlip} noValidate className="space-y-4 text-xs">
               {/* Cost Basis Breakdown Card */}
               <div className="p-3.5 bg-indigo-50/60 rounded-xl border border-indigo-100 space-y-2">
                 <div className="flex items-center justify-between">
@@ -1725,7 +1720,7 @@ export default function FlipsManagerPage() {
                       <label className="block font-semibold text-slate-700 mb-1">Commission % (excl. VAT)</label>
                       <input
                         type="number"
-                        step="0.5"
+                        step="any"
                         min="0"
                         max="20"
                         value={convertAgencyCommission}
@@ -1789,7 +1784,7 @@ export default function FlipsManagerPage() {
               Add Bill of Quantities (BOQ) Line Item
             </h3>
 
-            <form onSubmit={handleAddBOQ} className="space-y-4 text-xs">
+            <form onSubmit={handleAddBOQ} noValidate className="space-y-4 text-xs">
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">Trade Category</label>
@@ -1852,7 +1847,8 @@ export default function FlipsManagerPage() {
                   <label className="block font-semibold text-slate-700 mb-1">Quantity</label>
                   <input
                     type="number"
-                    min="1"
+                    min="0"
+                    step="any"
                     value={boqQuantity}
                     onChange={(e) => setBoqQuantity(Number(e.target.value))}
                     className="w-full px-3 py-2 border border-slate-300 rounded-lg"
@@ -1863,7 +1859,7 @@ export default function FlipsManagerPage() {
                   <input
                     type="number"
                     min="0"
-                    step="500"
+                    step="any"
                     value={boqBaselineUnitCost}
                     onChange={(e) => setBoqBaselineUnitCost(Number(e.target.value))}
                     className="w-full px-3 py-2 border border-slate-300 rounded-lg"
@@ -1877,7 +1873,7 @@ export default function FlipsManagerPage() {
                   <input
                     type="number"
                     min="0"
-                    step="500"
+                    step="any"
                     value={boqActualCost}
                     onChange={(e) => setBoqActualCost(Number(e.target.value))}
                     className="w-full px-3 py-2 border border-slate-300 rounded-lg font-bold"
@@ -1920,23 +1916,33 @@ export default function FlipsManagerPage() {
         </div>
       )}
 
-      {/* Add Flip Modal */}
-      {showAddFlipModal && (
+      {/* Unified Flip Project Modal (Add & Edit) */}
+      {showFlipModal && (
         <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-xl max-w-lg w-full p-6 shadow-xl border border-slate-200 max-h-[92vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-3">
               <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
-                <Hammer className="w-5 h-5 text-indigo-600" />
-                Scaffold New Buy-and-Flip Project
+                {editingFlipId ? (
+                  <>
+                    <Edit3 className="w-5 h-5 text-indigo-600" />
+                    <span>Edit Buy-and-Flip Parameters</span>
+                  </>
+                ) : (
+                  <>
+                    <Hammer className="w-5 h-5 text-indigo-600" />
+                    <span>Scaffold New Buy-and-Flip Project</span>
+                  </>
+                )}
               </h3>
               <button
                 type="button"
                 onClick={() => {
-                  setShowAddFlipModal(false);
+                  setShowFlipModal(false);
+                  setEditingFlipId(null);
                   setPdfParseNotice(null);
                   setExtractedValuationZAR(null);
                 }}
-                className="text-slate-400 hover:text-slate-600 p-1 rounded-lg text-sm font-bold"
+                className="text-slate-400 hover:text-slate-600 p-1 rounded-lg text-sm font-bold cursor-pointer"
               >
                 ✕
               </button>
@@ -1986,16 +1992,18 @@ export default function FlipsManagerPage() {
               </div>
             )}
 
-            <form onSubmit={handleAddFlip} className="space-y-4 text-xs">
+            <form onSubmit={handleSaveFlip} noValidate className="space-y-4 text-xs">
               <div>
                 <label className="block font-semibold text-slate-700 mb-1">Project Name *</label>
                 <input
                   type="text"
+                  name="projectName"
+                  autoComplete="off"
                   required
                   placeholder="e.g. Camps Bay Sunset Redesign"
-                  value={newFlipTitle}
-                  onChange={(e) => setNewFlipTitle(e.target.value)}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg"
+                  value={flipTitle}
+                  onChange={(e) => setFlipTitle(e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg font-bold text-slate-900"
                 />
               </div>
 
@@ -2004,9 +2012,11 @@ export default function FlipsManagerPage() {
                   <label className="block font-semibold text-slate-700 mb-1">Street Address</label>
                   <input
                     type="text"
+                    name="propertyAddress"
+                    autoComplete="off"
                     placeholder="e.g. 18 Victoria Road"
-                    value={newFlipAddress}
-                    onChange={(e) => setNewFlipAddress(e.target.value)}
+                    value={flipAddress}
+                    onChange={(e) => setFlipAddress(e.target.value)}
                     className="w-full px-3 py-2 border border-slate-300 rounded-lg"
                   />
                 </div>
@@ -2014,8 +2024,10 @@ export default function FlipsManagerPage() {
                   <label className="block font-semibold text-slate-700 mb-1">City</label>
                   <input
                     type="text"
-                    value={newFlipCity}
-                    onChange={(e) => setNewFlipCity(e.target.value)}
+                    name="propertyCity"
+                    autoComplete="off"
+                    value={flipCity}
+                    onChange={(e) => setFlipCity(e.target.value)}
                     className="w-full px-3 py-2 border border-slate-300 rounded-lg"
                   />
                 </div>
@@ -2042,9 +2054,9 @@ export default function FlipsManagerPage() {
                       <button
                         key={pt.id}
                         type="button"
-                        onClick={() => setNewFlipPropertyType(pt.id)}
+                        onClick={() => setFlipPropertyType(pt.id)}
                         className={`py-1.5 px-2 rounded-lg text-[11px] font-semibold transition-all text-center border ${
-                          newFlipPropertyType === pt.id
+                          flipPropertyType === pt.id
                             ? 'bg-slate-900 text-white border-slate-900 shadow-2xs font-bold'
                             : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100'
                         }`}
@@ -2055,7 +2067,7 @@ export default function FlipsManagerPage() {
                   </div>
                 </div>
 
-                {(newFlipPropertyType === 'Sectional Title Apartment' || newFlipPropertyType === 'Townhouse / Cluster') && (
+                {(flipPropertyType === 'Sectional Title Apartment' || flipPropertyType === 'Townhouse / Cluster') && (
                   <div className="pt-2 border-t border-slate-200">
                     <div className="flex items-center justify-between mb-1">
                       <label className="block font-semibold text-slate-700 text-xs">
@@ -2067,8 +2079,8 @@ export default function FlipsManagerPage() {
                     </div>
                     <input
                       type="date"
-                      value={newFlipAgmDate}
-                      onChange={(e) => setNewFlipAgmDate(e.target.value)}
+                      value={flipAgmDate}
+                      onChange={(e) => setFlipAgmDate(e.target.value)}
                       className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg bg-white text-xs"
                     />
                   </div>
@@ -2080,10 +2092,12 @@ export default function FlipsManagerPage() {
                   <label className="block font-semibold text-slate-700 mb-1">Purchase Price (ZAR)</label>
                   <input
                     type="number"
-                    min="100000"
-                    step="50000"
-                    value={newFlipPurchasePrice}
-                    onChange={(e) => setNewFlipPurchasePrice(Number(e.target.value))}
+                    name="purchasePriceZAR"
+                    autoComplete="off"
+                    min="0"
+                    step="any"
+                    value={flipPurchasePrice}
+                    onChange={(e) => setFlipPurchasePrice(Number(e.target.value))}
                     className="w-full px-3 py-2 border border-slate-300 rounded-lg font-semibold"
                   />
                 </div>
@@ -2091,10 +2105,12 @@ export default function FlipsManagerPage() {
                   <label className="block font-semibold text-slate-700 mb-1">Acquisition Costs (Duty + Fees)</label>
                   <input
                     type="number"
+                    name="acquisitionCostsZAR"
+                    autoComplete="off"
                     min="0"
-                    step="10000"
-                    value={newFlipAcquisitionCosts}
-                    onChange={(e) => setNewFlipAcquisitionCosts(Number(e.target.value))}
+                    step="any"
+                    value={flipAcquisitionCosts}
+                    onChange={(e) => setFlipAcquisitionCosts(Number(e.target.value))}
                     className="w-full px-3 py-2 border border-slate-300 rounded-lg font-semibold"
                   />
                 </div>
@@ -2105,10 +2121,12 @@ export default function FlipsManagerPage() {
                   <label className="block font-semibold text-slate-700 mb-1">Baseline Renovation Budget (ZAR)</label>
                   <input
                     type="number"
+                    name="renovationBudgetZAR"
+                    autoComplete="off"
                     min="0"
-                    step="25000"
-                    value={newFlipRenovationBudget}
-                    onChange={(e) => setNewFlipRenovationBudget(Number(e.target.value))}
+                    step="any"
+                    value={flipRenovationBudget}
+                    onChange={(e) => setFlipRenovationBudget(Number(e.target.value))}
                     className="w-full px-3 py-2 border border-slate-300 rounded-lg font-semibold"
                   />
                 </div>
@@ -2116,10 +2134,12 @@ export default function FlipsManagerPage() {
                   <label className="block font-semibold text-slate-700 mb-1">Target Exit Price (ZAR)</label>
                   <input
                     type="number"
-                    min="100000"
-                    step="50000"
-                    value={newFlipTargetExit}
-                    onChange={(e) => setNewFlipTargetExit(Number(e.target.value))}
+                    name="targetExitPriceZAR"
+                    autoComplete="off"
+                    min="0"
+                    step="any"
+                    value={flipTargetExit}
+                    onChange={(e) => setFlipTargetExit(Number(e.target.value))}
                     className="w-full px-3 py-2 border border-slate-300 rounded-lg font-bold text-emerald-700"
                   />
                 </div>
@@ -2139,7 +2159,7 @@ export default function FlipsManagerPage() {
                   </div>
                   <button
                     type="button"
-                    onClick={() => setNewFlipTargetExit(extractedValuationZAR)}
+                    onClick={() => setFlipTargetExit(extractedValuationZAR)}
                     className="text-[11px] font-bold text-purple-700 bg-white hover:bg-purple-100 px-2 py-1 rounded border border-purple-300 shadow-2xs transition-colors cursor-pointer shrink-0"
                   >
                     Use as Target Exit (ARV) →
@@ -2154,7 +2174,7 @@ export default function FlipsManagerPage() {
                     Holding Period Carrying Costs (Itemized)
                   </span>
                   <span className="text-xs font-bold text-amber-800 bg-amber-100 px-2 py-0.5 rounded border border-amber-300">
-                    Total: {formatZAR(newFlipEstimatedDuration * (Number(newFlipBondPayment) + (newFlipPropertyType === 'Freehold House' ? 0 : Number(newFlipLevies)) + Number(newFlipRates) + Number(newFlipOtherHoldingCost)))}
+                    Total: {formatZAR(flipEstimatedDuration * (Number(flipBondPayment) + (flipPropertyType === 'Freehold House' ? 0 : Number(flipLevies)) + Number(flipRates) + Number(flipOtherHoldingCost)))}
                   </span>
                 </div>
 
@@ -2162,10 +2182,12 @@ export default function FlipsManagerPage() {
                   <label className="block font-semibold text-slate-700 mb-1 text-xs">Estimated Duration (Months)</label>
                   <input
                     type="number"
+                    name="durationMonths"
+                    autoComplete="off"
                     min="1"
                     max="36"
-                    value={newFlipEstimatedDuration}
-                    onChange={(e) => setNewFlipEstimatedDuration(Number(e.target.value))}
+                    value={flipEstimatedDuration}
+                    onChange={(e) => setFlipEstimatedDuration(Number(e.target.value))}
                     className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg bg-white font-medium text-xs"
                   />
                 </div>
@@ -2175,31 +2197,35 @@ export default function FlipsManagerPage() {
                     <label className="block font-semibold text-slate-700 mb-1 text-[11px]">Interim Bond (ZAR/m)</label>
                     <input
                       type="number"
+                      name="interimBondPaymentZAR"
+                      autoComplete="off"
                       min="0"
-                      step="500"
-                      value={newFlipBondPayment}
-                      onChange={(e) => setNewFlipBondPayment(Number(e.target.value))}
-                      className="w-full px-2 py-1.5 border border-slate-300 rounded-lg bg-white font-medium text-xs"
+                      step="any"
+                      value={flipBondPayment}
+                      onChange={(e) => setFlipBondPayment(Number(e.target.value))}
+                      className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg bg-white font-medium text-xs"
                     />
                   </div>
                   <div>
                     <div className="flex items-center justify-between mb-1">
                       <label className="block font-semibold text-slate-700 text-[11px]">
-                        {newFlipPropertyType === 'Freehold House' ? 'Levies (N/A)' : 'Levies (ZAR/m)'}
+                        {flipPropertyType === 'Freehold House' ? 'Levies (N/A)' : 'Levies (ZAR/m)'}
                       </label>
-                      {newFlipPropertyType === 'Freehold House' && (
+                      {flipPropertyType === 'Freehold House' && (
                         <span className="text-[9px] font-bold text-emerald-700 bg-emerald-100 px-1 rounded">R0</span>
                       )}
                     </div>
                     <input
                       type="number"
+                      name="holdingLeviesZAR"
+                      autoComplete="off"
                       min="0"
-                      step="100"
-                      disabled={newFlipPropertyType === 'Freehold House'}
-                      value={newFlipPropertyType === 'Freehold House' ? 0 : newFlipLevies}
-                      onChange={(e) => setNewFlipLevies(Number(e.target.value))}
-                      className={`w-full px-2 py-1.5 border rounded-lg text-xs font-medium ${
-                        newFlipPropertyType === 'Freehold House'
+                      step="any"
+                      disabled={flipPropertyType === 'Freehold House'}
+                      value={flipPropertyType === 'Freehold House' ? 0 : flipLevies}
+                      onChange={(e) => setFlipLevies(Number(e.target.value))}
+                      className={`w-full px-2.5 py-1.5 border rounded-lg text-xs font-medium ${
+                        flipPropertyType === 'Freehold House'
                           ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'
                           : 'bg-white border-slate-300'
                       }`}
@@ -2209,23 +2235,27 @@ export default function FlipsManagerPage() {
                     <label className="block font-semibold text-slate-700 mb-1 text-[11px]">Rates & Taxes (ZAR/m)</label>
                     <input
                       type="number"
+                      name="holdingRatesZAR"
+                      autoComplete="off"
                       min="0"
-                      step="100"
-                      value={newFlipRates}
-                      onChange={(e) => setNewFlipRates(Number(e.target.value))}
-                      className="w-full px-2 py-1.5 border border-slate-300 rounded-lg bg-white font-medium text-xs"
+                      step="any"
+                      value={flipRates}
+                      onChange={(e) => setFlipRates(Number(e.target.value))}
+                      className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg bg-white font-medium text-xs"
                     />
                   </div>
                   <div>
                     <label className="block font-semibold text-slate-700 mb-1 text-[11px]">Other Costs (ZAR/m)</label>
                     <input
                       type="number"
+                      name="holdingOtherCostsZAR"
+                      autoComplete="off"
                       min="0"
-                      step="100"
-                      value={newFlipOtherHoldingCost}
-                      onChange={(e) => setNewFlipOtherHoldingCost(Number(e.target.value))}
+                      step="any"
+                      value={flipOtherHoldingCost}
+                      onChange={(e) => setFlipOtherHoldingCost(Number(e.target.value))}
                       placeholder="Security, ins."
-                      className="w-full px-2 py-1.5 border border-slate-300 rounded-lg bg-white font-medium text-xs"
+                      className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg bg-white font-medium text-xs"
                     />
                   </div>
                 </div>
@@ -2233,7 +2263,7 @@ export default function FlipsManagerPage() {
                 <div className="p-2 bg-amber-100/70 rounded-lg flex items-center justify-between text-xs text-amber-950 font-semibold">
                   <span>Total Monthly Carrying Burn:</span>
                   <span className="font-bold text-sm text-amber-800">
-                    {formatZAR(Number(newFlipBondPayment) + (newFlipPropertyType === 'Freehold House' ? 0 : Number(newFlipLevies)) + Number(newFlipRates) + Number(newFlipOtherHoldingCost))}/mo
+                    {formatZAR(Number(flipBondPayment) + (flipPropertyType === 'Freehold House' ? 0 : Number(flipLevies)) + Number(flipRates) + Number(flipOtherHoldingCost))}/mo
                   </span>
                 </div>
               </div>
@@ -2252,8 +2282,8 @@ export default function FlipsManagerPage() {
                     <input
                       type="url"
                       placeholder="https://1drv.ms/... or drive.google.com/..."
-                      value={newFlipMasterFolderUrl}
-                      onChange={(e) => setNewFlipMasterFolderUrl(e.target.value)}
+                      value={flipMasterFolderUrl}
+                      onChange={(e) => setFlipMasterFolderUrl(e.target.value)}
                       className="w-full px-2 py-1 text-[11px] border border-slate-300 rounded-lg bg-white"
                     />
                   </div>
@@ -2262,8 +2292,8 @@ export default function FlipsManagerPage() {
                     <input
                       type="url"
                       placeholder="https://..."
-                      value={newFlipOtpUrl}
-                      onChange={(e) => setNewFlipOtpUrl(e.target.value)}
+                      value={flipOtpUrl}
+                      onChange={(e) => setFlipOtpUrl(e.target.value)}
                       className="w-full px-2 py-1 text-[11px] border border-slate-300 rounded-lg bg-white"
                     />
                   </div>
@@ -2272,8 +2302,8 @@ export default function FlipsManagerPage() {
                     <input
                       type="url"
                       placeholder="https://..."
-                      value={newFlipRatesBillUrl}
-                      onChange={(e) => setNewFlipRatesBillUrl(e.target.value)}
+                      value={flipRatesBillUrl}
+                      onChange={(e) => setFlipRatesBillUrl(e.target.value)}
                       className="w-full px-2 py-1 text-[11px] border border-slate-300 rounded-lg bg-white"
                     />
                   </div>
@@ -2282,8 +2312,8 @@ export default function FlipsManagerPage() {
                     <input
                       type="url"
                       placeholder="https://..."
-                      value={newFlipTitleDeedUrl}
-                      onChange={(e) => setNewFlipTitleDeedUrl(e.target.value)}
+                      value={flipTitleDeedUrl}
+                      onChange={(e) => setFlipTitleDeedUrl(e.target.value)}
                       className="w-full px-2 py-1 text-[11px] border border-slate-300 rounded-lg bg-white"
                     />
                   </div>
@@ -2294,8 +2324,8 @@ export default function FlipsManagerPage() {
                 <label className="block font-semibold text-slate-700 mb-1">Target Completion Date</label>
                 <input
                   type="date"
-                  value={newFlipCompletionDate}
-                  onChange={(e) => setNewFlipCompletionDate(e.target.value)}
+                  value={flipCompletionDate}
+                  onChange={(e) => setFlipCompletionDate(e.target.value)}
                   className="w-full px-3 py-2 border border-slate-300 rounded-lg"
                 />
               </div>
@@ -2303,16 +2333,24 @@ export default function FlipsManagerPage() {
               <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-200">
                 <button
                   type="button"
-                  onClick={() => setShowAddFlipModal(false)}
-                  className="px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50 font-semibold"
+                  onClick={() => {
+                    setShowFlipModal(false);
+                    setEditingFlipId(null);
+                    setPdfParseNotice(null);
+                    setExtractedValuationZAR(null);
+                  }}
+                  className="px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50 font-semibold cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-semibold"
+                  className={`px-4 py-2 ${
+                    editingFlipId ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-emerald-600 hover:bg-emerald-700'
+                  } text-white rounded-lg font-semibold cursor-pointer flex items-center gap-1.5`}
                 >
-                  Create Flip
+                  {editingFlipId && <CheckCircle2 className="w-4 h-4" />}
+                  <span>{editingFlipId ? 'Update Flip Project' : 'Create Flip'}</span>
                 </button>
               </div>
             </form>
@@ -2385,12 +2423,14 @@ export default function FlipsManagerPage() {
             {/* Add New Supplier Form */}
             <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/50">
               <h4 className="font-bold text-xs text-slate-800 mb-3">Add Local Supplier / Contractor</h4>
-              <form onSubmit={handleAddSupplier} className="space-y-3 text-xs">
+              <form onSubmit={handleAddSupplier} noValidate className="space-y-3 text-xs">
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="block text-[11px] font-semibold text-slate-600 mb-1">Supplier / Contractor Name *</label>
                     <input
                       type="text"
+                      name="supplierCompany"
+                      autoComplete="organization"
                       required
                       placeholder="e.g. Buco Menlyn"
                       value={supName}
@@ -2420,6 +2460,8 @@ export default function FlipsManagerPage() {
                     <label className="block text-[11px] font-semibold text-slate-600 mb-1">Branch / Location</label>
                     <input
                       type="text"
+                      name="supplierBranch"
+                      autoComplete="off"
                       placeholder="e.g. Paarden Eiland"
                       value={supBranch}
                       onChange={(e) => setSupBranch(e.target.value)}
@@ -2429,7 +2471,9 @@ export default function FlipsManagerPage() {
                   <div>
                     <label className="block text-[11px] font-semibold text-slate-600 mb-1">Contact Phone</label>
                     <input
-                      type="text"
+                      type="tel"
+                      name="phone"
+                      autoComplete="tel"
                       placeholder="+27 11 000 0000"
                       value={supPhone}
                       onChange={(e) => setSupPhone(e.target.value)}
@@ -2440,6 +2484,8 @@ export default function FlipsManagerPage() {
                     <label className="block text-[11px] font-semibold text-slate-600 mb-1">Trade Discount Terms</label>
                     <input
                       type="text"
+                      name="tradeDiscount"
+                      autoComplete="off"
                       placeholder="e.g. 5% Cash Discount"
                       value={supDiscount}
                       onChange={(e) => setSupDiscount(e.target.value)}
@@ -2479,14 +2525,16 @@ export default function FlipsManagerPage() {
               Edit Deal Funding Campaign & Investor Terms
             </h3>
 
-            <form onSubmit={handleSaveFunding} className="space-y-4 text-xs">
+            <form onSubmit={handleSaveFunding} noValidate className="space-y-4 text-xs">
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">Target Facility (ZAR) *</label>
                   <input
                     type="number"
+                    name="targetFacilityZAR"
+                    autoComplete="off"
                     min="0"
-                    step="50000"
+                    step="any"
                     required
                     value={fundingRequired}
                     onChange={(e) => setFundingRequired(Number(e.target.value))}
@@ -2498,8 +2546,10 @@ export default function FlipsManagerPage() {
                   <label className="block font-semibold text-slate-700 mb-1">Capital Raised to Date (ZAR)</label>
                   <input
                     type="number"
+                    name="capitalRaisedZAR"
+                    autoComplete="off"
                     min="0"
-                    step="50000"
+                    step="any"
                     value={capitalRaised}
                     onChange={(e) => setCapitalRaised(Number(e.target.value))}
                     className="w-full px-3 py-2 border border-slate-300 rounded-lg font-bold text-emerald-700"
@@ -2513,6 +2563,8 @@ export default function FlipsManagerPage() {
                   <label className="block font-semibold text-slate-700 mb-1">Primary Funder Name</label>
                   <input
                     type="text"
+                    name="contactPerson"
+                    autoComplete="name"
                     placeholder="e.g. Johan Meyer"
                     value={primaryFunderName}
                     onChange={(e) => setPrimaryFunderName(e.target.value)}
@@ -2538,6 +2590,8 @@ export default function FlipsManagerPage() {
                 <label className="block font-semibold text-slate-700 mb-1">Funder Contact / Trust Info</label>
                 <input
                   type="text"
+                  name="funderContact"
+                  autoComplete="off"
                   placeholder="e.g. Meyer Family Trust / +27 82 555 1234"
                   value={primaryFunderContact}
                   onChange={(e) => setPrimaryFunderContact(e.target.value)}
@@ -2563,7 +2617,10 @@ export default function FlipsManagerPage() {
                   <label className="block font-semibold text-slate-700 mb-1">Promised Rate / Split (%)</label>
                   <input
                     type="number"
-                    step="0.5"
+                    name="returnRatePercent"
+                    autoComplete="off"
+                    min="0"
+                    step="any"
                     value={promisedReturnRatePercent}
                     onChange={(e) => setPromisedReturnRatePercent(Number(e.target.value))}
                     className="w-full px-3 py-2 border border-slate-300 rounded-lg font-bold text-emerald-700"
@@ -2628,330 +2685,6 @@ export default function FlipsManagerPage() {
         </div>
       )}
 
-      {/* Edit Flip Project Modal */}
-      {showEditFlipModal && activeFlip && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-xl max-w-lg w-full p-6 shadow-xl border border-slate-200 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between pb-3 mb-4 border-b border-slate-100">
-              <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
-                <Edit3 className="w-5 h-5 text-indigo-600" />
-                <span>Edit Buy-and-Flip Parameters</span>
-              </h3>
-              <button
-                type="button"
-                onClick={() => setShowEditFlipModal(false)}
-                className="text-slate-400 hover:text-slate-700 font-bold cursor-pointer"
-              >
-                ✕
-              </button>
-            </div>
-
-            <form onSubmit={handleSaveEditFlip} className="space-y-4 text-xs">
-              <div>
-                <label className="block font-semibold text-slate-700 mb-1">Project Name *</label>
-                <input
-                  type="text"
-                  required
-                  value={editFlipTitle}
-                  onChange={(e) => setEditFlipTitle(e.target.value)}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg font-bold text-slate-900"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Street Address</label>
-                  <input
-                    type="text"
-                    value={editFlipAddress}
-                    onChange={(e) => setEditFlipAddress(e.target.value)}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg"
-                  />
-                </div>
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">City</label>
-                  <input
-                    type="text"
-                    value={editFlipCity}
-                    onChange={(e) => setEditFlipCity(e.target.value)}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg"
-                  />
-                </div>
-              </div>
-
-              {/* Property Title Type */}
-              <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 space-y-2">
-                <label className="block font-bold text-slate-800 text-[11px] uppercase tracking-wider">
-                  Property Title Type
-                </label>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
-                  {(
-                    [
-                      { id: 'Freehold House', label: '🏡 Freehold House' },
-                      { id: 'Townhouse / Cluster', label: '🏘️ Townhouse / Cluster' },
-                      { id: 'Sectional Title Apartment', label: '🏢 Sectional Title' },
-                      { id: 'Multi-unit Commercial', label: '🏬 Commercial' },
-                    ] as const
-                  ).map((pt) => (
-                    <button
-                      key={pt.id}
-                      type="button"
-                      onClick={() => setEditFlipPropertyType(pt.id)}
-                      className={`py-1.5 px-2 rounded-lg text-[11px] font-semibold transition-all text-center border ${
-                        editFlipPropertyType === pt.id
-                          ? 'bg-slate-900 text-white border-slate-900 shadow-2xs font-bold'
-                          : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100'
-                      }`}
-                    >
-                      {pt.label}
-                    </button>
-                  ))}
-                </div>
-
-                {(editFlipPropertyType === 'Sectional Title Apartment' || editFlipPropertyType === 'Townhouse / Cluster') && (
-                  <div className="pt-2 border-t border-slate-200">
-                    <label className="block font-semibold text-slate-700 text-xs mb-1">
-                      📅 Scheduled Body Corporate AGM Date
-                    </label>
-                    <input
-                      type="date"
-                      value={editFlipAgmDate}
-                      onChange={(e) => setEditFlipAgmDate(e.target.value)}
-                      className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg bg-white text-xs"
-                    />
-                  </div>
-                )}
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Purchase Price (ZAR)</label>
-                  <input
-                    type="number"
-                    min="100000"
-                    step="50000"
-                    value={editFlipPurchasePrice}
-                    onChange={(e) => setEditFlipPurchasePrice(Number(e.target.value))}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg font-semibold"
-                  />
-                </div>
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Acquisition Costs (Duty + Fees)</label>
-                  <input
-                    type="number"
-                    min="0"
-                    step="5000"
-                    value={editFlipAcquisitionCosts}
-                    onChange={(e) => setEditFlipAcquisitionCosts(Number(e.target.value))}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg font-semibold"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Baseline Renovation Budget (ZAR)</label>
-                  <input
-                    type="number"
-                    min="0"
-                    step="10000"
-                    value={editFlipRenovationBudget}
-                    onChange={(e) => setEditFlipRenovationBudget(Number(e.target.value))}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg font-semibold"
-                  />
-                </div>
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Target Exit Price (ZAR)</label>
-                  <input
-                    type="number"
-                    min="100000"
-                    step="50000"
-                    value={editFlipTargetExit}
-                    onChange={(e) => setEditFlipTargetExit(Number(e.target.value))}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg font-bold text-emerald-700"
-                  />
-                </div>
-              </div>
-
-              {/* Holding Period Carrying Costs Inputs */}
-              {/* Holding Period Carrying Costs Inputs (Itemized) */}
-              <div className="p-3 bg-amber-50/80 rounded-lg border border-amber-200 space-y-2.5">
-                <div className="flex items-center justify-between">
-                  <span className="font-bold text-[11px] text-amber-900 uppercase tracking-wider flex items-center gap-1.5">
-                    <span>Holding Period Carrying Costs (Itemized)</span>
-                  </span>
-                  <span className="text-xs font-bold text-amber-800 bg-amber-100 px-2 py-0.5 rounded border border-amber-300">
-                    Total: {formatZAR(editFlipEstimatedDuration * (Number(editFlipBondPayment) + (editFlipPropertyType === 'Freehold House' ? 0 : Number(editFlipLevies)) + Number(editFlipRates) + Number(editFlipOtherHoldingCost)))}
-                  </span>
-                </div>
-
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1 text-xs">Estimated Duration (Months)</label>
-                  <input
-                    type="number"
-                    min="1"
-                    max="36"
-                    required
-                    value={editFlipEstimatedDuration}
-                    onChange={(e) => setEditFlipEstimatedDuration(Number(e.target.value))}
-                    className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg bg-white font-bold text-slate-900 text-xs"
-                  />
-                  <span className="text-[10px] text-slate-400">Total flip lifecycle</span>
-                </div>
-
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-xs">
-                  <div>
-                    <label className="block font-semibold text-slate-700 mb-1 text-[11px]">Interim Bond (ZAR/m)</label>
-                    <input
-                      type="number"
-                      min="0"
-                      step="500"
-                      value={editFlipBondPayment}
-                      onChange={(e) => setEditFlipBondPayment(Number(e.target.value))}
-                      className="w-full px-2 py-1.5 border border-slate-300 rounded-lg bg-white font-medium text-xs"
-                    />
-                  </div>
-                  <div>
-                    <div className="flex items-center justify-between mb-1">
-                      <label className="block font-semibold text-slate-700 text-[11px]">
-                        {editFlipPropertyType === 'Freehold House' ? 'Levies (N/A)' : 'Levies (ZAR/m)'}
-                      </label>
-                      {editFlipPropertyType === 'Freehold House' && (
-                        <span className="text-[9px] font-bold text-emerald-700 bg-emerald-100 px-1 rounded">R0</span>
-                      )}
-                    </div>
-                    <input
-                      type="number"
-                      min="0"
-                      step="100"
-                      disabled={editFlipPropertyType === 'Freehold House'}
-                      value={editFlipPropertyType === 'Freehold House' ? 0 : editFlipLevies}
-                      onChange={(e) => setEditFlipLevies(Number(e.target.value))}
-                      className={`w-full px-2 py-1.5 border rounded-lg text-xs font-medium ${
-                        editFlipPropertyType === 'Freehold House'
-                          ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'
-                          : 'bg-white border-slate-300'
-                      }`}
-                    />
-                  </div>
-                  <div>
-                    <label className="block font-semibold text-slate-700 mb-1 text-[11px]">Rates & Taxes (ZAR/m)</label>
-                    <input
-                      type="number"
-                      min="0"
-                      step="100"
-                      value={editFlipRates}
-                      onChange={(e) => setEditFlipRates(Number(e.target.value))}
-                      className="w-full px-2 py-1.5 border border-slate-300 rounded-lg bg-white font-medium text-xs"
-                    />
-                  </div>
-                  <div>
-                    <label className="block font-semibold text-slate-700 mb-1 text-[11px]">Other Costs (ZAR/m)</label>
-                    <input
-                      type="number"
-                      min="0"
-                      step="100"
-                      value={editFlipOtherHoldingCost}
-                      onChange={(e) => setEditFlipOtherHoldingCost(Number(e.target.value))}
-                      placeholder="Security, ins."
-                      className="w-full px-2 py-1.5 border border-slate-300 rounded-lg bg-white font-medium text-xs"
-                    />
-                  </div>
-                </div>
-
-                <div className="p-2 bg-amber-100/70 rounded-lg flex items-center justify-between text-xs text-amber-950 font-semibold">
-                  <span>Total Monthly Carrying Burn:</span>
-                  <span className="font-bold text-sm text-amber-800">
-                    {formatZAR(Number(editFlipBondPayment) + (editFlipPropertyType === 'Freehold House' ? 0 : Number(editFlipLevies)) + Number(editFlipRates) + Number(editFlipOtherHoldingCost))}/mo
-                  </span>
-                </div>
-                <p className="text-[10px] text-slate-600 italic">
-                  Deducted automatically from Projected Net Upside to capture true operational cash burn during renovations.
-                </p>
-              </div>
-
-              {/* Cloud & Web Document Vault Section */}
-              <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 space-y-2.5">
-                <div className="flex items-center justify-between">
-                  <span className="font-bold text-[11px] text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
-                    <span>☁️ Cloud & Web Document Vault</span>
-                  </span>
-                  <span className="text-[10px] text-slate-500">OneDrive • GDrive • Dropbox</span>
-                </div>
-                <div className="grid grid-cols-2 gap-2 text-xs">
-                  <div>
-                    <label className="block text-[11px] font-semibold text-slate-600 mb-1">Deal Folder URL</label>
-                    <input
-                      type="url"
-                      placeholder="https://1drv.ms/... or drive.google.com/..."
-                      value={editFlipMasterFolderUrl}
-                      onChange={(e) => setEditFlipMasterFolderUrl(e.target.value)}
-                      className="w-full px-2 py-1 text-[11px] border border-slate-300 rounded-lg bg-white"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[11px] font-semibold text-slate-600 mb-1">Signed OTP PDF URL</label>
-                    <input
-                      type="url"
-                      placeholder="https://..."
-                      value={editFlipOtpUrl}
-                      onChange={(e) => setEditFlipOtpUrl(e.target.value)}
-                      className="w-full px-2 py-1 text-[11px] border border-slate-300 rounded-lg bg-white"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[11px] font-semibold text-slate-600 mb-1">Rates & Levies Statement</label>
-                    <input
-                      type="url"
-                      placeholder="https://..."
-                      value={editFlipRatesBillUrl}
-                      onChange={(e) => setEditFlipRatesBillUrl(e.target.value)}
-                      className="w-full px-2 py-1 text-[11px] border border-slate-300 rounded-lg bg-white"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[11px] font-semibold text-slate-600 mb-1">Title Deed / SG Diagram</label>
-                    <input
-                      type="url"
-                      placeholder="https://..."
-                      value={editFlipTitleDeedUrl}
-                      onChange={(e) => setEditFlipTitleDeedUrl(e.target.value)}
-                      className="w-full px-2 py-1 text-[11px] border border-slate-300 rounded-lg bg-white"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div>
-                <label className="block font-semibold text-slate-700 mb-1">Target Completion Date</label>
-                <input
-                  type="date"
-                  value={editFlipCompletionDate}
-                  onChange={(e) => setEditFlipCompletionDate(e.target.value)}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg"
-                />
-              </div>
-
-              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-200">
-                <button
-                  type="button"
-                  onClick={() => setShowEditFlipModal(false)}
-                  className="px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50 font-semibold cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-semibold cursor-pointer flex items-center gap-1.5"
-                >
-                  <CheckCircle2 className="w-4 h-4" />
-                  <span>Update Flip Project</span>
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

@@ -862,7 +862,10 @@ export default function OpportunityAnalyzerPage() {
                             <label className="block text-[10px] font-semibold text-slate-600 mb-1">Target Exit Price</label>
                             <input
                               type="number"
-                              step="10000"
+                              name="maoTargetExitPriceZAR"
+                              autoComplete="off"
+                              min="0"
+                              step="any"
                               value={maoTargetExitPrice}
                               onChange={(e) => setMaoTargetExitPrice(Number(e.target.value))}
                               className="w-full text-xs font-semibold px-2 py-1.5 border border-slate-300 rounded-md bg-white"
@@ -872,7 +875,10 @@ export default function OpportunityAnalyzerPage() {
                             <label className="block text-[10px] font-semibold text-slate-600 mb-1">Desired ROI (%)</label>
                             <input
                               type="number"
-                              step="0.5"
+                              name="maoDesiredRoiPercent"
+                              autoComplete="off"
+                              min="0"
+                              step="any"
                               value={maoDesiredRoi}
                               onChange={(e) => setMaoDesiredRoi(Number(e.target.value))}
                               className="w-full text-xs font-semibold px-2 py-1.5 border border-slate-300 rounded-md bg-white"
@@ -918,7 +924,10 @@ export default function OpportunityAnalyzerPage() {
                           </div>
                           <input
                             type="number"
-                            step="0.25"
+                            name="maoTargetYieldPercent"
+                            autoComplete="off"
+                            min="0"
+                            step="any"
                             value={maoTargetYield}
                             onChange={(e) => setMaoTargetYield(Number(e.target.value))}
                             className="w-full text-xs font-semibold px-2 py-1.5 border border-slate-300 rounded-md bg-white"
@@ -983,13 +992,15 @@ export default function OpportunityAnalyzerPage() {
             </div>
           )}
 
-          <form onSubmit={handleSaveOpportunity} className="space-y-6">
+          <form onSubmit={handleSaveOpportunity} noValidate className="space-y-6">
             {/* General Property Info */}
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">Deal / Property Name *</label>
                 <input
                   type="text"
+                  name="opportunityTitle"
+                  autoComplete="off"
                   required
                   placeholder="e.g. Green Point 2-Bed Repo"
                   value={title}
@@ -1002,6 +1013,8 @@ export default function OpportunityAnalyzerPage() {
                 <label className="block text-xs font-semibold text-slate-700 mb-1">Street Address</label>
                 <input
                   type="text"
+                  name="propertyAddress"
+                  autoComplete="off"
                   placeholder="e.g. 14 Somerset Road"
                   value={address}
                   onChange={(e) => setAddress(e.target.value)}
@@ -1012,6 +1025,7 @@ export default function OpportunityAnalyzerPage() {
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">City / Region</label>
                 <select
+                  name="propertyCity"
                   value={city}
                   onChange={(e) => setCity(e.target.value)}
                   className="w-full text-xs px-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 bg-white"
@@ -1142,6 +1156,8 @@ export default function OpportunityAnalyzerPage() {
                   </div>
                   <input
                     type="date"
+                    name="agmDate"
+                    autoComplete="off"
                     value={agmDate}
                     onChange={(e) => setAgmDate(e.target.value)}
                     className="w-full text-xs px-3 py-2 border border-slate-300 rounded-lg bg-white focus:ring-1 focus:ring-emerald-500"
@@ -1303,8 +1319,10 @@ export default function OpportunityAnalyzerPage() {
                     <span className="absolute left-2.5 top-2 text-xs text-slate-400 font-bold">R</span>
                     <input
                       type="number"
+                      name="openMarketValueZAR"
+                      autoComplete="off"
                       min="0"
-                      step="10000"
+                      step="any"
                       value={openMarketValue}
                       onChange={(e) => {
                         const val = Number(e.target.value);
@@ -1326,8 +1344,10 @@ export default function OpportunityAnalyzerPage() {
                     <span className="absolute left-2.5 top-2 text-xs text-slate-400 font-bold">R</span>
                     <input
                       type="number"
+                      name="purchasePriceZAR"
+                      autoComplete="off"
                       min="0"
-                      step="10000"
+                      step="any"
                       value={purchasePrice}
                       onChange={(e) => handlePurchasePriceChange(Number(e.target.value))}
                       className="w-full text-xs pl-7 pr-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-emerald-500 font-semibold text-slate-900 bg-white"
@@ -1380,8 +1400,10 @@ export default function OpportunityAnalyzerPage() {
                   <span className="absolute left-2.5 top-2 text-xs text-slate-400 font-bold">R</span>
                   <input
                     type="number"
+                    name="rehabCostZAR"
+                    autoComplete="off"
                     min="0"
-                    step="5000"
+                    step="any"
                     value={rehabCost}
                     onChange={(e) => {
                       const val = Number(e.target.value);
@@ -1399,8 +1421,10 @@ export default function OpportunityAnalyzerPage() {
                   <span className="absolute left-2.5 top-2 text-xs text-slate-400 font-bold">R</span>
                   <input
                     type="number"
+                    name="monthlyRentZAR"
+                    autoComplete="off"
                     min="0"
-                    step="500"
+                    step="any"
                     value={monthlyRent}
                     onChange={(e) => {
                       const val = Number(e.target.value);
@@ -1426,8 +1450,10 @@ export default function OpportunityAnalyzerPage() {
                     <span className="absolute left-2.5 top-2 text-xs text-slate-400 font-bold">R</span>
                     <input
                       type="number"
+                      name="annualInsuranceZAR"
+                      autoComplete="off"
                       min="0"
-                      step="100"
+                      step="any"
                       value={annualInsurance}
                       onChange={(e) => {
                         const val = Number(e.target.value);
@@ -1445,8 +1471,10 @@ export default function OpportunityAnalyzerPage() {
                     <span className="absolute left-2.5 top-2 text-xs text-slate-400 font-bold">R</span>
                     <input
                       type="number"
+                      name="monthlyLeviesZAR"
+                      autoComplete="off"
                       min="0"
-                      step="100"
+                      step="any"
                       value={monthlyLevies}
                       onChange={(e) => {
                         const val = Number(e.target.value);
@@ -1465,8 +1493,10 @@ export default function OpportunityAnalyzerPage() {
                   <span className="absolute left-2.5 top-2 text-xs text-slate-400 font-bold">R</span>
                   <input
                     type="number"
+                    name="monthlyRatesZAR"
+                    autoComplete="off"
                     min="0"
-                    step="50"
+                    step="any"
                     value={monthlyRates}
                     onChange={(e) => {
                       const val = Number(e.target.value);
@@ -1484,8 +1514,10 @@ export default function OpportunityAnalyzerPage() {
                   <span className="absolute left-2.5 top-2 text-xs text-slate-400 font-bold">R</span>
                   <input
                     type="number"
+                    name="targetExitPriceZAR"
+                    autoComplete="off"
                     min="0"
-                    step="10000"
+                    step="any"
                     value={targetExitPrice}
                     onChange={(e) => {
                       const val = Number(e.target.value);
@@ -1512,9 +1544,11 @@ export default function OpportunityAnalyzerPage() {
                 <div className="relative">
                   <input
                     type="number"
+                    name="vacancyRatePercent"
+                    autoComplete="off"
                     min="0"
                     max="30"
-                    step="0.5"
+                    step="any"
                     value={vacancyRate}
                     onChange={(e) => {
                       const val = Number(e.target.value);
@@ -1565,9 +1599,11 @@ export default function OpportunityAnalyzerPage() {
                 <div className="relative">
                   <input
                     type="number"
+                    name="managementFeePercent"
+                    autoComplete="off"
                     min="0"
                     max="20"
-                    step="0.5"
+                    step="any"
                     value={managementFee}
                     onChange={(e) => {
                       const val = Number(e.target.value);
@@ -1631,8 +1667,10 @@ export default function OpportunityAnalyzerPage() {
                       <span className="absolute left-2.5 top-2 text-xs text-slate-400 font-bold">R</span>
                       <input
                         type="number"
+                        name="auctioneerCommissionZAR"
+                        autoComplete="off"
                         min="0"
-                        step="5000"
+                        step="any"
                         value={auctioneerCommission || ''}
                         onChange={(e) => {
                           const val = Number(e.target.value);
@@ -1662,8 +1700,10 @@ export default function OpportunityAnalyzerPage() {
                       <span className="absolute left-2.5 top-2 text-xs text-slate-400 font-bold">R</span>
                       <input
                         type="number"
+                        name="municipalArrearsZAR"
+                        autoComplete="off"
                         min="0"
-                        step="5000"
+                        step="any"
                         value={municipalArrears || ''}
                         onChange={(e) => {
                           const val = Number(e.target.value);
@@ -1727,9 +1767,11 @@ export default function OpportunityAnalyzerPage() {
                     <span className="absolute left-3 top-2 text-xs text-slate-400 font-bold">R</span>
                     <input
                       type="number"
+                      name="depositZAR"
+                      autoComplete="off"
                       min="0"
                       max={purchasePrice}
-                      step="10000"
+                      step="any"
                       value={depositZAR}
                       onChange={(e) => handleDepositChange(Number(e.target.value))}
                       className="w-full text-xs pl-7 pr-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-emerald-500 font-bold text-slate-900 bg-white"
@@ -1758,6 +1800,8 @@ export default function OpportunityAnalyzerPage() {
                   <div className="pt-1">
                     <input
                       type="range"
+                      name="loanToValuePercent"
+                      autoComplete="off"
                       min="0"
                       max="100"
                       step="1"
@@ -1806,7 +1850,10 @@ export default function OpportunityAnalyzerPage() {
                       <div className="flex items-center">
                         <input
                           type="number"
-                          step="0.25"
+                          name="interestRatePercent"
+                          autoComplete="off"
+                          min="0"
+                          step="any"
                           value={interestRate}
                           onChange={(e) => setInterestRate(Number(e.target.value))}
                           className="w-full text-xs px-2 py-1.5 border border-slate-300 rounded-lg font-semibold bg-white"
@@ -1819,6 +1866,8 @@ export default function OpportunityAnalyzerPage() {
                       <div className="flex items-center">
                         <input
                           type="number"
+                          name="loanTermYears"
+                          autoComplete="off"
                           min="5"
                           max="30"
                           value={loanTermYears}
@@ -1899,7 +1948,9 @@ export default function OpportunityAnalyzerPage() {
                       <div className="flex items-center">
                         <input
                           type="number"
-                          step="0.5"
+                          name="annualCapitalGrowthPercent"
+                          autoComplete="off"
+                          step="any"
                           min="0"
                           max="25"
                           value={annualCapitalGrowth}
@@ -1922,7 +1973,9 @@ export default function OpportunityAnalyzerPage() {
                       <div className="flex items-center">
                         <input
                           type="number"
-                          step="0.5"
+                          name="annualRentalEscalationPercent"
+                          autoComplete="off"
+                          step="any"
                           min="0"
                           max="25"
                           value={annualRentalEscalation}
@@ -1945,7 +1998,9 @@ export default function OpportunityAnalyzerPage() {
                       <div className="flex items-center">
                         <input
                           type="number"
-                          step="0.5"
+                          name="annualExpenseInflationPercent"
+                          autoComplete="off"
+                          step="any"
                           min="0"
                           max="25"
                           value={annualExpenseInflation}
@@ -1991,6 +2046,8 @@ export default function OpportunityAnalyzerPage() {
                       <div className="flex items-center">
                         <input
                           type="number"
+                          name="bondTermYears"
+                          autoComplete="off"
                           min="5"
                           max="35"
                           value={bondTermYears}
@@ -2049,6 +2106,8 @@ export default function OpportunityAnalyzerPage() {
                     {overrideTax ? (
                       <input
                         type="number"
+                        name="customTransferDutyZAR"
+                        autoComplete="off"
                         placeholder="R Amount"
                         value={customTransferDuty}
                         onChange={(e) => setCustomTransferDuty(Number(e.target.value))}
@@ -2074,6 +2133,8 @@ export default function OpportunityAnalyzerPage() {
                     {overrideLegal ? (
                       <input
                         type="number"
+                        name="customConveyancingZAR"
+                        autoComplete="off"
                         placeholder="R Amount"
                         value={customConveyancing}
                         onChange={(e) => setCustomConveyancing(Number(e.target.value))}

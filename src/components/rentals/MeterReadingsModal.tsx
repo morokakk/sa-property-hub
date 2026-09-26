@@ -146,24 +146,24 @@ export default function MeterReadingsModal({
   const latestWater = allReadings.find((r) => r.utilityType === 'water');
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs overflow-y-auto">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-900/60 backdrop-blur-xs overflow-y-auto">
       <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[92vh] flex flex-col border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
         {/* Header */}
-        <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between bg-slate-50/80">
-          <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-xl bg-cyan-100 text-cyan-700">
-              <Gauge className="w-5 h-5" />
+        <div className="px-4 py-3 sm:px-6 sm:py-4 border-b border-slate-200 flex items-center justify-between bg-slate-50/80">
+          <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+            <div className="p-2 sm:p-2.5 rounded-xl bg-cyan-100 text-cyan-700 shrink-0">
+              <Gauge className="w-4 h-4 sm:w-5 sm:h-5" />
             </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h3 className="text-base font-bold text-slate-900">
+            <div className="min-w-0">
+              <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+                <h3 className="text-sm sm:text-base font-bold text-slate-900 truncate">
                   Physical & Municipal Meter Readings
                 </h3>
-                <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-cyan-100 text-cyan-800 border border-cyan-200">
+                <span className="text-[10px] sm:text-[11px] font-bold px-2 py-0.5 rounded-full bg-cyan-100 text-cyan-800 border border-cyan-200 shrink-0">
                   {allReadings.length} {allReadings.length === 1 ? 'Reading' : 'Readings'}
                 </span>
               </div>
-              <p className="text-xs text-slate-500 font-medium">
+              <p className="text-[11px] sm:text-xs text-slate-500 font-medium truncate">
                 {rental.title} • {rental.address}
               </p>
             </div>
@@ -172,14 +172,14 @@ export default function MeterReadingsModal({
           <button
             type="button"
             onClick={onClose}
-            className="p-2 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-200/60 transition-colors cursor-pointer"
+            className="p-1.5 sm:p-2 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-200/60 transition-colors cursor-pointer shrink-0 ml-2"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Content Body */}
-        <div className="p-6 overflow-y-auto space-y-6 flex-1 text-xs">
+        <div className="p-3.5 sm:p-6 overflow-y-auto space-y-4 sm:space-y-6 flex-1 text-xs">
           {/* Quick Metrics Cards */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 flex items-center gap-3">
@@ -266,7 +266,7 @@ export default function MeterReadingsModal({
               </span>
             </div>
 
-            <form onSubmit={handleSaveReading} className="space-y-3.5">
+            <form onSubmit={handleSaveReading} noValidate className="space-y-3.5">
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
                 {/* 1. Utility Type Toggle */}
                 <div>
@@ -308,6 +308,8 @@ export default function MeterReadingsModal({
                   </label>
                   <input
                     type="date"
+                    name="readingDate"
+                    autoComplete="off"
                     required
                     value={readingDate}
                     onChange={(e) => setReadingDate(e.target.value)}
@@ -322,6 +324,8 @@ export default function MeterReadingsModal({
                   </label>
                   <input
                     type="text"
+                    name="meterNumber"
+                    autoComplete="off"
                     value={meterNumber}
                     onChange={(e) => setMeterNumber(e.target.value)}
                     placeholder={utilityType === 'electricity' ? 'e.g. 10003374' : 'e.g. 211001886'}
@@ -337,6 +341,8 @@ export default function MeterReadingsModal({
                   <div className="relative">
                     <input
                       type="number"
+                      name="readingValue"
+                      autoComplete="off"
                       step="any"
                       required
                       min="0"
@@ -434,6 +440,8 @@ export default function MeterReadingsModal({
                   </label>
                   <input
                     type="url"
+                    name="photoUrl"
+                    autoComplete="off"
                     value={photoUrl}
                     onChange={(e) => setPhotoUrl(e.target.value)}
                     placeholder="https://photos.app.goo.gl/... or OneDrive"
@@ -448,6 +456,8 @@ export default function MeterReadingsModal({
                   </label>
                   <input
                     type="text"
+                    name="readingNotes"
+                    autoComplete="off"
                     value={notes}
                     onChange={(e) => setNotes(e.target.value)}
                     placeholder="e.g. Quarterly physical inspection"
@@ -482,7 +492,7 @@ export default function MeterReadingsModal({
               </div>
 
               {/* Filter Tabs */}
-              <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg border border-slate-200">
+              <div className="flex items-center flex-wrap gap-1 bg-slate-100 p-1 rounded-lg border border-slate-200">
                 <button
                   type="button"
                   onClick={() => setActiveTab('all')}
@@ -531,176 +541,181 @@ export default function MeterReadingsModal({
                 </p>
               </div>
             ) : (
-              <div className="border border-slate-200 rounded-xl overflow-hidden shadow-2xs">
-                <table className="w-full text-left border-collapse">
-                  <thead>
-                    <tr className="bg-slate-50 border-b border-slate-200 text-[10px] font-bold uppercase tracking-wider text-slate-500">
-                      <th className="p-3 pl-4">Date</th>
-                      <th className="p-3">Utility & Meter</th>
-                      <th className="p-3 text-right">Reading Value</th>
-                      <th className="p-3 text-right">Consumption</th>
-                      <th className="p-3">Type & Source</th>
-                      <th className="p-3">Evidence / Notes</th>
-                      <th className="p-3 pr-4 text-right">Action</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100 font-medium">
-                    {displayedReadings.map((reading) => {
-                      const isElec = reading.utilityType === 'electricity';
-                      const uLabel = isElec ? 'kWh' : 'KL';
+              <div className="space-y-1.5">
+                <div className="border border-slate-200 rounded-xl overflow-x-auto shadow-2xs">
+                  <table className="w-full text-left border-collapse min-w-[620px]">
+                    <thead>
+                      <tr className="bg-slate-50 border-b border-slate-200 text-[10px] font-bold uppercase tracking-wider text-slate-500 whitespace-nowrap">
+                        <th className="p-3 pl-4">Date</th>
+                        <th className="p-3">Utility & Meter</th>
+                        <th className="p-3 text-right">Reading Value</th>
+                        <th className="p-3 text-right">Consumption</th>
+                        <th className="p-3">Type & Source</th>
+                        <th className="p-3">Evidence / Notes</th>
+                        <th className="p-3 pr-4 text-right">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 font-medium">
+                      {displayedReadings.map((reading) => {
+                        const isElec = reading.utilityType === 'electricity';
+                        const uLabel = isElec ? 'kWh' : 'KL';
 
-                      return (
-                        <tr
-                          key={reading.id}
-                          className="hover:bg-slate-50/70 transition-colors"
-                        >
-                          {/* Date */}
-                          <td className="p-3 pl-4">
-                            <span className="font-bold text-slate-900 block">
-                              {formatDate(reading.date)}
-                            </span>
-                            <span className="text-[10px] text-slate-400 font-mono">
-                              {reading.date}
-                            </span>
-                          </td>
+                        return (
+                          <tr
+                            key={reading.id}
+                            className="hover:bg-slate-50/70 transition-colors"
+                          >
+                            {/* Date */}
+                            <td className="p-3 pl-4 whitespace-nowrap">
+                              <span className="font-bold text-slate-900 block">
+                                {formatDate(reading.date)}
+                              </span>
+                              <span className="text-[10px] text-slate-400 font-mono">
+                                {reading.date}
+                              </span>
+                            </td>
 
-                          {/* Utility & Meter */}
-                          <td className="p-3">
-                            <div className="flex items-center gap-1.5">
-                              {isElec ? (
-                                <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
-                                  <Zap className="w-3 h-3 text-amber-500" />
-                                  <span>Electricity</span>
+                            {/* Utility & Meter */}
+                            <td className="p-3 whitespace-nowrap">
+                              <div className="flex items-center gap-1.5">
+                                {isElec ? (
+                                  <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
+                                    <Zap className="w-3 h-3 text-amber-500" />
+                                    <span>Electricity</span>
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center gap-1 text-[11px] font-bold text-cyan-700 bg-cyan-50 px-2 py-0.5 rounded border border-cyan-200">
+                                    <Droplets className="w-3 h-3 text-cyan-500" />
+                                    <span>Water</span>
+                                  </span>
+                                )}
+                                {reading.meterNumber && (
+                                  <span className="text-[10px] text-slate-500 font-mono bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200">
+                                    #{reading.meterNumber}
+                                  </span>
+                                )}
+                              </div>
+                            </td>
+
+                            {/* Reading Value */}
+                            <td className="p-3 text-right font-mono font-bold text-slate-900 whitespace-nowrap">
+                              {reading.readingValue.toLocaleString('en-ZA', {
+                                minimumFractionDigits: 1,
+                                maximumFractionDigits: 3,
+                              })}{' '}
+                              <span className="text-[10px] font-normal text-slate-400">{uLabel}</span>
+                            </td>
+
+                            {/* Consumption Delta */}
+                            <td className="p-3 text-right whitespace-nowrap">
+                              {reading.consumption !== undefined ? (
+                                <span className="inline-flex items-center gap-1 text-[11px] font-bold font-mono text-emerald-800 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded">
+                                  +{reading.consumption.toLocaleString('en-ZA', {
+                                    minimumFractionDigits: 1,
+                                    maximumFractionDigits: 3,
+                                  })}{' '}
+                                  <span className="text-[9px] font-normal">{uLabel}</span>
+                                </span>
+                              ) : reading.previousReadingValue !== undefined ? (
+                                <span className="inline-flex items-center gap-1 text-[11px] font-bold font-mono text-slate-700 bg-slate-100 px-2 py-0.5 rounded">
+                                  {(reading.readingValue - reading.previousReadingValue).toLocaleString('en-ZA', {
+                                    minimumFractionDigits: 1,
+                                    maximumFractionDigits: 3,
+                                  })}{' '}
+                                  <span className="text-[9px] font-normal">{uLabel}</span>
                                 </span>
                               ) : (
-                                <span className="inline-flex items-center gap-1 text-[11px] font-bold text-cyan-700 bg-cyan-50 px-2 py-0.5 rounded border border-cyan-200">
-                                  <Droplets className="w-3 h-3 text-cyan-500" />
-                                  <span>Water</span>
-                                </span>
+                                <span className="text-slate-400 text-[10px]">Baseline</span>
                               )}
-                              {reading.meterNumber && (
-                                <span className="text-[10px] text-slate-500 font-mono bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200">
-                                  #{reading.meterNumber}
-                                </span>
-                              )}
-                            </div>
-                          </td>
+                            </td>
 
-                          {/* Reading Value */}
-                          <td className="p-3 text-right font-mono font-bold text-slate-900">
-                            {reading.readingValue.toLocaleString('en-ZA', {
-                              minimumFractionDigits: 1,
-                              maximumFractionDigits: 3,
-                            })}{' '}
-                            <span className="text-[10px] font-normal text-slate-400">{uLabel}</span>
-                          </td>
-
-                          {/* Consumption Delta */}
-                          <td className="p-3 text-right">
-                            {reading.consumption !== undefined ? (
-                              <span className="inline-flex items-center gap-1 text-[11px] font-bold font-mono text-emerald-800 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded">
-                                +{reading.consumption.toLocaleString('en-ZA', {
-                                  minimumFractionDigits: 1,
-                                  maximumFractionDigits: 3,
-                                })}{' '}
-                                <span className="text-[9px] font-normal">{uLabel}</span>
-                              </span>
-                            ) : reading.previousReadingValue !== undefined ? (
-                              <span className="inline-flex items-center gap-1 text-[11px] font-bold font-mono text-slate-700 bg-slate-100 px-2 py-0.5 rounded">
-                                {(reading.readingValue - reading.previousReadingValue).toLocaleString('en-ZA', {
-                                  minimumFractionDigits: 1,
-                                  maximumFractionDigits: 3,
-                                })}{' '}
-                                <span className="text-[9px] font-normal">{uLabel}</span>
-                              </span>
-                            ) : (
-                              <span className="text-slate-400 text-[10px]">Baseline</span>
-                            )}
-                          </td>
-
-                          {/* Type & Source */}
-                          <td className="p-3">
-                            <div className="flex items-center gap-1.5 flex-wrap">
-                              <span
-                                className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${
-                                  reading.readingType === 'Estimated'
-                                    ? 'bg-amber-50 text-amber-800 border-amber-200'
-                                    : 'bg-slate-100 text-slate-700 border-slate-200'
-                                }`}
-                              >
-                                {reading.readingType || 'Actual'}
-                              </span>
-                              <span
-                                className={`text-[10px] font-semibold px-1.5 py-0.5 rounded border ${
-                                  reading.source === 'pdf-extracted'
-                                    ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
-                                    : 'bg-teal-50 text-teal-800 border-teal-200'
-                                }`}
-                              >
-                                {reading.source === 'pdf-extracted' ? 'PDF Extracted' : 'Field Log'}
-                              </span>
-                            </div>
-                          </td>
-
-                          {/* Evidence / Notes */}
-                          <td className="p-3 max-w-xs">
-                            <div className="space-y-0.5">
-                              {reading.photoUrl && (
-                                <a
-                                  href={reading.photoUrl}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="inline-flex items-center gap-1 text-[10px] font-bold text-cyan-700 hover:text-cyan-900 hover:underline"
-                                  title="View meter photo in vault"
+                            {/* Type & Source */}
+                            <td className="p-3 whitespace-nowrap">
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <span
+                                  className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${
+                                    reading.readingType === 'Estimated'
+                                      ? 'bg-amber-50 text-amber-800 border-amber-200'
+                                      : 'bg-slate-100 text-slate-700 border-slate-200'
+                                  }`}
                                 >
-                                  <Camera className="w-3 h-3 text-cyan-600" />
-                                  <span>Photo Vault</span>
-                                  <ExternalLink className="w-2.5 h-2.5" />
-                                </a>
-                              )}
-                              {reading.notes && (
-                                <p className="text-[10px] text-slate-500 truncate" title={reading.notes}>
-                                  {reading.notes}
-                                </p>
-                              )}
-                              {!reading.photoUrl && !reading.notes && (
-                                <span className="text-slate-300 text-[11px]">—</span>
-                              )}
-                            </div>
-                          </td>
+                                  {reading.readingType || 'Actual'}
+                                </span>
+                                <span
+                                  className={`text-[10px] font-semibold px-1.5 py-0.5 rounded border ${
+                                    reading.source === 'pdf-extracted'
+                                      ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
+                                      : 'bg-teal-50 text-teal-800 border-teal-200'
+                                  }`}
+                                >
+                                  {reading.source === 'pdf-extracted' ? 'PDF Extracted' : 'Field Log'}
+                                </span>
+                              </div>
+                            </td>
 
-                          {/* Action */}
-                          <td className="p-3 pr-4 text-right">
-                            <button
-                              type="button"
-                              onClick={() => handleDelete(reading.id)}
-                              className="p-1 text-slate-400 hover:text-rose-600 transition-colors rounded hover:bg-rose-50 cursor-pointer"
-                              title="Delete meter reading"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+                            {/* Evidence / Notes */}
+                            <td className="p-3 min-w-[160px] max-w-xs">
+                              <div className="space-y-0.5">
+                                {reading.photoUrl && (
+                                  <a
+                                    href={reading.photoUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="inline-flex items-center gap-1 text-[10px] font-bold text-cyan-700 hover:text-cyan-900 hover:underline"
+                                    title="View meter photo in vault"
+                                  >
+                                    <Camera className="w-3 h-3 text-cyan-600" />
+                                    <span>Photo Vault</span>
+                                    <ExternalLink className="w-2.5 h-2.5" />
+                                  </a>
+                                )}
+                                {reading.notes && (
+                                  <p className="text-[10px] text-slate-500 truncate" title={reading.notes}>
+                                    {reading.notes}
+                                  </p>
+                                )}
+                                {!reading.photoUrl && !reading.notes && (
+                                  <span className="text-slate-300 text-[11px]">—</span>
+                                )}
+                              </div>
+                            </td>
+
+                            {/* Action */}
+                            <td className="p-3 pr-4 text-right whitespace-nowrap">
+                              <button
+                                type="button"
+                                onClick={() => handleDelete(reading.id)}
+                                className="p-1 text-slate-400 hover:text-rose-600 transition-colors rounded hover:bg-rose-50 cursor-pointer"
+                                title="Delete meter reading"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+                <p className="text-[10px] text-slate-400 sm:hidden">
+                  Scroll horizontally to view full ledger details →
+                </p>
               </div>
             )}
           </div>
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-3 border-t border-slate-200 bg-slate-50 flex items-center justify-between text-xs text-slate-500">
+        <div className="px-4 py-2.5 sm:px-6 sm:py-3 border-t border-slate-200 bg-slate-50 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs text-slate-500">
           <div className="flex items-center gap-2">
-            <Gauge className="w-3.5 h-3.5 text-slate-400" />
-            <span>Readings directly correlate with CoJ & Eskom utility cost recoveries</span>
+            <Gauge className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+            <span className="text-[11px] sm:text-xs">Readings directly correlate with CoJ & Eskom utility cost recoveries</span>
           </div>
 
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-1.5 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-100 font-semibold cursor-pointer"
+            className="w-full sm:w-auto px-4 py-1.5 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-100 font-semibold cursor-pointer text-center"
           >
             Close
           </button>

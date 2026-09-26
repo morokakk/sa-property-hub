@@ -346,22 +346,36 @@ export default function TenantStatement({
           aria-modal="true"
         >
           {/* Header - Hidden on Print */}
-          <div className="bg-slate-900 text-white px-6 py-4 flex items-center justify-between print-hidden-element">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center border border-emerald-500/30 shrink-0">
-                <FileText className="w-5 h-5" />
+          <div className="bg-slate-900 text-white px-4 py-3.5 sm:px-6 sm:py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 print-hidden-element border-b border-slate-800">
+            {/* Top Tier: Icon + Title + Mobile Close Button */}
+            <div className="flex items-center justify-between gap-3 w-full sm:w-auto">
+              <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+                <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center border border-emerald-500/30 shrink-0">
+                  <FileText className="w-4 h-4 sm:w-5 sm:h-5" />
+                </div>
+                <div className="min-w-0">
+                  <h3 className="text-sm sm:text-base font-bold tracking-tight truncate">
+                    Tenant Utility Recovery & Variance
+                  </h3>
+                  <p className="text-[11px] sm:text-xs text-slate-400 truncate">
+                    {rental.title} • {rental.tenantName}
+                  </p>
+                </div>
               </div>
-              <div>
-                <h3 className="text-base font-bold tracking-tight">
-                  Tenant Utility Recovery & Variance Statement
-                </h3>
-                <p className="text-xs text-slate-400">
-                  {rental.title} • {rental.tenantName}
-                </p>
-              </div>
+
+              {/* Close Button on Mobile */}
+              <button
+                type="button"
+                onClick={onClose}
+                className="sm:hidden text-slate-400 hover:text-white hover:bg-slate-800 p-1.5 rounded-lg transition-colors cursor-pointer shrink-0"
+                aria-label="Close dialog"
+              >
+                <X className="w-5 h-5" />
+              </button>
             </div>
 
-            <div className="flex items-center gap-2">
+            {/* Bottom Tier: Action Buttons toolbar */}
+            <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap sm:flex-nowrap w-full sm:w-auto justify-start sm:justify-end">
               {currentStatement && (
                 <button
                   type="button"
@@ -370,22 +384,22 @@ export default function TenantStatement({
                       deleteUtilityStatement(rental.id, currentStatement.id);
                     }
                   }}
-                  className="inline-flex items-center gap-1.5 bg-rose-950/70 hover:bg-rose-900 text-rose-300 hover:text-white text-xs font-semibold px-2.5 py-1.5 rounded-lg border border-rose-800/70 transition-colors cursor-pointer"
+                  className="inline-flex items-center gap-1 bg-rose-950/70 hover:bg-rose-900 text-rose-300 hover:text-white text-[11px] sm:text-xs font-semibold px-2 py-1.5 sm:px-2.5 sm:py-1.5 rounded-lg border border-rose-800/70 transition-colors cursor-pointer shrink-0"
                   title="Delete this parsed statement"
                 >
-                  <Trash2 className="w-3.5 h-3.5 text-rose-400" />
-                  <span>Delete Statement</span>
+                  <Trash2 className="w-3.5 h-3.5 text-rose-400 shrink-0" />
+                  <span>Delete</span>
                 </button>
               )}
               {onOpenMeterReadings && !isBundled && (
                 <button
                   type="button"
                   onClick={onOpenMeterReadings}
-                  className="inline-flex items-center gap-1.5 bg-cyan-950/70 hover:bg-cyan-900 text-cyan-300 hover:text-white text-xs font-semibold px-2.5 py-1.5 rounded-lg border border-cyan-800/70 transition-colors cursor-pointer"
+                  className="inline-flex items-center gap-1 bg-cyan-950/70 hover:bg-cyan-900 text-cyan-300 hover:text-white text-[11px] sm:text-xs font-semibold px-2 py-1.5 sm:px-2.5 sm:py-1.5 rounded-lg border border-cyan-800/70 transition-colors cursor-pointer shrink-0"
                   title="View physical and municipal meter readings"
                 >
-                  <Gauge className="w-3.5 h-3.5 text-cyan-400" />
-                  <span>Meter Readings</span>
+                  <Gauge className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+                  <span>Meters</span>
                   {(rental.meterReadings?.length || 0) > 0 && (
                     <span className="ml-0.5 px-1.5 py-0.2 bg-cyan-500 text-slate-950 rounded-full text-[9px] font-black">
                       {rental.meterReadings?.length}
@@ -396,25 +410,27 @@ export default function TenantStatement({
               <button
                 type="button"
                 onClick={handleCopyWhatsApp}
-                className="inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold px-3 py-1.5 rounded-lg shadow-sm transition-colors cursor-pointer"
+                className="inline-flex items-center gap-1 bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] sm:text-xs font-semibold px-2.5 py-1.5 sm:px-3 sm:py-1.5 rounded-lg shadow-sm transition-colors cursor-pointer shrink-0"
                 title="Copy WhatsApp statement to clipboard"
               >
-                <Share2 className="w-3.5 h-3.5" />
+                <Share2 className="w-3.5 h-3.5 shrink-0" />
                 <span>Copy WhatsApp</span>
               </button>
               <button
                 type="button"
                 onClick={handlePrint}
-                className="inline-flex items-center gap-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold px-3 py-1.5 rounded-lg border border-slate-700 transition-colors cursor-pointer"
+                className="inline-flex items-center gap-1 bg-slate-800 hover:bg-slate-700 text-slate-200 text-[11px] sm:text-xs font-semibold px-2 py-1.5 sm:px-3 sm:py-1.5 rounded-lg border border-slate-700 transition-colors cursor-pointer shrink-0"
                 title="Print or export as PDF"
               >
-                <Printer className="w-3.5 h-3.5" />
-                <span>Print / PDF</span>
+                <Printer className="w-3.5 h-3.5 shrink-0" />
+                <span>Print</span>
               </button>
+              {/* Close Button on Desktop */}
               <button
                 type="button"
                 onClick={onClose}
-                className="text-slate-400 hover:text-white hover:bg-slate-800 p-1.5 rounded-lg transition-colors cursor-pointer ml-1"
+                className="hidden sm:inline-flex text-slate-400 hover:text-white hover:bg-slate-800 p-1.5 rounded-lg transition-colors cursor-pointer ml-1 shrink-0"
+                aria-label="Close dialog"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -422,7 +438,7 @@ export default function TenantStatement({
           </div>
 
           {/* Statement Content */}
-          <div className="p-6 space-y-5 overflow-y-auto flex-1 text-slate-800">
+          <div className="p-3.5 sm:p-6 space-y-4 sm:space-y-5 overflow-y-auto flex-1 text-slate-800">
             {/* Status Message / Toast */}
             {statusMessage && (
               <div
@@ -503,30 +519,35 @@ export default function TenantStatement({
 
             {/* Comparative Ledger Table */}
             <div className="space-y-3">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
                 <h4 className="text-xs font-bold uppercase tracking-wider text-slate-600">
                   Itemized Tenant Recovery & Rent Breakdown
                 </h4>
-                {previousStatement && (
-                  <span className="text-[11px] font-medium text-slate-500">
-                    Comparing {previousStatement.billingPeriod || formatDate(previousStatement.statementDate)} vs{' '}
-                    {currentStatement?.billingPeriod || formatDate(currentStatement?.statementDate)}
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] text-slate-400 font-medium sm:hidden">
+                    Scroll horizontally for variance →
                   </span>
-                )}
+                  {previousStatement && (
+                    <span className="text-[11px] font-medium text-slate-500">
+                      Comparing {previousStatement.billingPeriod || formatDate(previousStatement.statementDate)} vs{' '}
+                      {currentStatement?.billingPeriod || formatDate(currentStatement?.statementDate)}
+                    </span>
+                  )}
+                </div>
               </div>
 
               <div className="overflow-x-auto rounded-xl border border-slate-200">
-                <table className="w-full text-left text-xs border-collapse">
+                <table className="w-full min-w-[560px] text-left text-xs border-collapse">
                   <thead>
                     <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase font-semibold text-[10px] tracking-wider">
                       <th className="p-3 pl-4">Billing Item / Municipal Line</th>
-                      <th className="p-3 text-right">
+                      <th className="p-3 text-right whitespace-nowrap">
                         {previousStatement?.billingPeriod || 'Previous Month'}
                       </th>
-                      <th className="p-3 text-right">
+                      <th className="p-3 text-right whitespace-nowrap">
                         {currentStatement?.billingPeriod || 'Current Month'}
                       </th>
-                      <th className="p-3 pr-4 text-right">Month-over-Month Variance</th>
+                      <th className="p-3 pr-4 text-right whitespace-nowrap">Month-over-Month Variance</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 text-slate-700">
@@ -536,13 +557,13 @@ export default function TenantStatement({
                         <div className="font-bold text-slate-900">Base Contract Rent</div>
                         <div className="text-[11px] text-slate-400">Monthly fixed residential lease fee</div>
                       </td>
-                      <td className="p-3 text-right font-mono text-slate-700">
+                      <td className="p-3 text-right font-mono text-slate-700 whitespace-nowrap">
                         {formatZAR(baseRent, { includeDecimals: true })}
                       </td>
-                      <td className="p-3 text-right font-mono font-bold text-slate-900">
+                      <td className="p-3 text-right font-mono font-bold text-slate-900 whitespace-nowrap">
                         {formatZAR(baseRent, { includeDecimals: true })}
                       </td>
-                      <td className="p-3 pr-4 text-right text-slate-400 font-mono text-xs">
+                      <td className="p-3 pr-4 text-right text-slate-400 font-mono text-xs whitespace-nowrap">
                         — (Contract Fixed)
                       </td>
                     </tr>
@@ -559,17 +580,17 @@ export default function TenantStatement({
                             Source: {currentStatement?.provider || 'iGrow Rentals / WeconnectU'} • Body Corporate Consolidated Recovery (Unmetered)
                           </div>
                         </td>
-                        <td className="p-3 text-right font-mono text-slate-600">
+                        <td className="p-3 text-right font-mono text-slate-600 whitespace-nowrap">
                           {previousStatement?.bundledUtilitiesZAR !== undefined
                             ? formatZAR(previousStatement.bundledUtilitiesZAR, { includeDecimals: true })
                             : '—'}
                         </td>
-                        <td className="p-3 text-right font-mono font-bold text-slate-800">
+                        <td className="p-3 text-right font-mono font-bold text-slate-800 whitespace-nowrap">
                           {currentStatement?.bundledUtilitiesZAR !== undefined
                             ? formatZAR(currentStatement.bundledUtilitiesZAR, { includeDecimals: true })
                             : 'R 0.00'}
                         </td>
-                        <td className="p-3 pr-4 text-right">
+                        <td className="p-3 pr-4 text-right whitespace-nowrap">
                           {currentStatement?.bundledUtilitiesZAR !== undefined
                             ? renderVariance(currentStatement.bundledUtilitiesZAR, previousStatement?.bundledUtilitiesZAR)
                             : '—'}
@@ -609,13 +630,13 @@ export default function TenantStatement({
                               </div>
                             )}
                           </td>
-                          <td className="p-3 text-right font-mono text-slate-600">
+                          <td className="p-3 text-right font-mono text-slate-600 whitespace-nowrap">
                             {previousStatement ? formatZAR(previousStatement.electricityZAR, { includeDecimals: true }) : '—'}
                           </td>
-                          <td className="p-3 text-right font-mono font-bold text-slate-800">
+                          <td className="p-3 text-right font-mono font-bold text-slate-800 whitespace-nowrap">
                             {currentStatement ? formatZAR(currentStatement.electricityZAR, { includeDecimals: true }) : 'R 0.00'}
                           </td>
-                          <td className="p-3 pr-4 text-right">
+                          <td className="p-3 pr-4 text-right whitespace-nowrap">
                             {currentStatement
                               ? renderVariance(currentStatement.electricityZAR, previousStatement?.electricityZAR)
                               : '—'}
@@ -654,13 +675,13 @@ export default function TenantStatement({
                               </div>
                             )}
                           </td>
-                          <td className="p-3 text-right font-mono text-slate-600">
+                          <td className="p-3 text-right font-mono text-slate-600 whitespace-nowrap">
                             {previousStatement ? formatZAR(previousStatement.waterZAR, { includeDecimals: true }) : '—'}
                           </td>
-                          <td className="p-3 text-right font-mono font-bold text-slate-800">
+                          <td className="p-3 text-right font-mono font-bold text-slate-800 whitespace-nowrap">
                             {currentStatement ? formatZAR(currentStatement.waterZAR, { includeDecimals: true }) : 'R 0.00'}
                           </td>
-                          <td className="p-3 pr-4 text-right">
+                          <td className="p-3 pr-4 text-right whitespace-nowrap">
                             {currentStatement
                               ? renderVariance(currentStatement.waterZAR, previousStatement?.waterZAR)
                               : '—'}
@@ -675,13 +696,13 @@ export default function TenantStatement({
                               Source: {currentStatement?.provider || 'City of Johannesburg'} (PIKITUP Refuse Residential + 15% VAT)
                             </div>
                           </td>
-                          <td className="p-3 text-right font-mono text-slate-600">
+                          <td className="p-3 text-right font-mono text-slate-600 whitespace-nowrap">
                             {previousStatement ? formatZAR(previousStatement.refuseZAR, { includeDecimals: true }) : '—'}
                           </td>
-                          <td className="p-3 text-right font-mono font-bold text-slate-800">
+                          <td className="p-3 text-right font-mono font-bold text-slate-800 whitespace-nowrap">
                             {currentStatement ? formatZAR(currentStatement.refuseZAR, { includeDecimals: true }) : 'R 0.00'}
                           </td>
-                          <td className="p-3 pr-4 text-right">
+                          <td className="p-3 pr-4 text-right whitespace-nowrap">
                             {currentStatement
                               ? renderVariance(currentStatement.refuseZAR, previousStatement?.refuseZAR)
                               : '—'}
@@ -696,13 +717,13 @@ export default function TenantStatement({
                               Source: {currentStatement?.provider || 'City of Johannesburg'} (Stand Size Sanitation Charge + 15% VAT)
                             </div>
                           </td>
-                          <td className="p-3 text-right font-mono text-slate-600">
+                          <td className="p-3 text-right font-mono text-slate-600 whitespace-nowrap">
                             {previousStatement ? formatZAR(previousStatement.sewerageZAR, { includeDecimals: true }) : '—'}
                           </td>
-                          <td className="p-3 text-right font-mono font-bold text-slate-800">
+                          <td className="p-3 text-right font-mono font-bold text-slate-800 whitespace-nowrap">
                             {currentStatement ? formatZAR(currentStatement.sewerageZAR, { includeDecimals: true }) : 'R 0.00'}
                           </td>
-                          <td className="p-3 pr-4 text-right">
+                          <td className="p-3 pr-4 text-right whitespace-nowrap">
                             {currentStatement
                               ? renderVariance(currentStatement.sewerageZAR, previousStatement?.sewerageZAR)
                               : '—'}
@@ -716,13 +737,13 @@ export default function TenantStatement({
                       <td className="p-3 pl-4 text-slate-900">
                         {isBundled ? 'Total Body Corporate Utility Recoveries' : 'Total Municipal Utility Recoveries'}
                       </td>
-                      <td className="p-3 text-right font-mono text-slate-700">
+                      <td className="p-3 text-right font-mono text-slate-700 whitespace-nowrap">
                         {previousTenantUtilities !== undefined ? formatZAR(previousTenantUtilities, { includeDecimals: true }) : '—'}
                       </td>
-                      <td className="p-3 text-right font-mono text-emerald-800">
+                      <td className="p-3 text-right font-mono text-emerald-800 whitespace-nowrap">
                         {formatZAR(currentTenantUtilities, { includeDecimals: true })}
                       </td>
-                      <td className="p-3 pr-4 text-right">
+                      <td className="p-3 pr-4 text-right whitespace-nowrap">
                         {currentStatement
                           ? renderVariance(currentTenantUtilities, previousTenantUtilities)
                           : '—'}
@@ -737,13 +758,13 @@ export default function TenantStatement({
                           Base Rent + Itemized Utility Recoveries
                         </div>
                       </td>
-                      <td className="p-3.5 text-right font-mono text-sm text-slate-700">
+                      <td className="p-3.5 text-right font-mono text-sm text-slate-700 whitespace-nowrap">
                         {previousGrandTotal !== undefined ? formatZAR(previousGrandTotal, { includeDecimals: true }) : '—'}
                       </td>
-                      <td className="p-3.5 text-right font-mono text-base text-emerald-950 font-black">
+                      <td className="p-3.5 text-right font-mono text-base text-emerald-950 font-black whitespace-nowrap">
                         {formatZAR(currentGrandTotal, { includeDecimals: true })}
                       </td>
-                      <td className="p-3.5 pr-4 text-right">
+                      <td className="p-3.5 pr-4 text-right whitespace-nowrap">
                         {currentStatement
                           ? renderVariance(currentGrandTotal, previousGrandTotal)
                           : '—'}
@@ -756,12 +777,12 @@ export default function TenantStatement({
 
             {/* Landlord Audit Transparency Note */}
             {currentStatement?.propertyRatesZAR !== undefined && currentStatement.propertyRatesZAR > 0 && (
-              <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 text-[11px] text-slate-600 flex items-center justify-between">
+              <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 text-[11px] text-slate-600 flex flex-col sm:flex-row sm:items-center justify-between gap-1.5">
                 <div>
                   <span className="font-bold text-slate-700">Municipal Audit Transparency:</span> Landlord Property Rates for this period were{' '}
                   <strong>{formatZAR(currentStatement.propertyRatesZAR, { includeDecimals: true })}</strong> (paid directly by landlord, excluded from tenant balance).
                 </div>
-                <span className="text-[10px] text-slate-400 font-mono">
+                <span className="text-[10px] text-slate-400 font-mono shrink-0">
                   {currentStatement.provider} Current Charges: {formatZAR(currentStatement.totalDueZAR, { includeDecimals: true })}
                 </span>
               </div>

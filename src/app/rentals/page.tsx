@@ -184,7 +184,7 @@ function InlineEditableAmount({
         <span className="text-slate-400 text-[11px] font-bold">R</span>
         <input
           type="number"
-          step="10"
+          step="any"
           autoFocus
           value={inputVal}
           onChange={(e) => setInputVal(e.target.value)}
@@ -516,11 +516,11 @@ export default function RentalPortfolioPage() {
     setMonthlyBondPayment(estEditBond);
     setBondPaymentEffectiveDate(property.bondPaymentEffectiveDate || '');
     setBondRevisionNote(property.bondRevisionNote || '');
-    setTenantName(property.tenantName);
-    setTenantPhone(property.tenantPhone);
-    setTenantEmail(property.tenantEmail);
-    setLeaseEnd(property.leaseEndDate);
-    setDepositHeld(property.depositHeldZAR);
+    setTenantName(property.tenantName || '');
+    setTenantPhone(property.tenantPhone || '');
+    setTenantEmail(property.tenantEmail || '');
+    setLeaseEnd(property.leaseEndDate || '');
+    setDepositHeld(property.depositHeldZAR || 0);
     setUnpaidUtilityArrears(property.unpaidUtilityArrearsZAR || 0);
     setRentalMasterFolderUrl(property.driveVault?.masterFolderUrl || '');
     setRentalOtpUrl(property.driveVault?.otpDocumentUrl || '');
@@ -1165,7 +1165,7 @@ export default function RentalPortfolioPage() {
                                   <input
                                     type="number"
                                     min={0}
-                                    step={100}
+                                    step="any"
                                     key={`${property.id}-${property.unpaidUtilityArrearsZAR || 0}`}
                                     defaultValue={property.unpaidUtilityArrearsZAR || 0}
                                     onBlur={(e) => {
@@ -1550,7 +1550,7 @@ export default function RentalPortfolioPage() {
               Disposal of <strong>{selectedRentalForExit.title}</strong>. This records your realized exit price, removes the unit and its bond from active portfolio liabilities, and automatically deposits the net cash proceeds directly into your <strong>Liquid Cash Reserve / Seed Capital</strong>.
             </p>
 
-            <form onSubmit={handleCompleteRentalSale} className="space-y-4 text-xs">
+            <form onSubmit={handleCompleteRentalSale} noValidate className="space-y-4 text-xs">
               <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 grid grid-cols-2 gap-3">
                 <div>
                   <span className="text-[10px] text-slate-400 uppercase font-semibold block">Original Purchase Price</span>
@@ -1570,9 +1570,11 @@ export default function RentalPortfolioPage() {
                 </label>
                 <input
                   type="number"
+                  name="exitSalePriceZAR"
+                  autoComplete="off"
                   required
                   min="0"
-                  step="10000"
+                  step="any"
                   value={exitSalePrice || ''}
                   onChange={(e) => {
                     const price = Number(e.target.value);
@@ -1595,9 +1597,11 @@ export default function RentalPortfolioPage() {
                 </div>
                 <input
                   type="number"
+                  name="exitNetProceedsZAR"
+                  autoComplete="off"
                   required
                   min="0"
-                  step="5000"
+                  step="any"
                   value={exitNetProceeds || ''}
                   onChange={(e) => setExitNetProceeds(Number(e.target.value))}
                   className="w-full px-3 py-2 border border-slate-300 rounded-lg font-bold text-slate-900 text-sm"
@@ -1610,6 +1614,8 @@ export default function RentalPortfolioPage() {
                   <label className="block font-semibold text-slate-700 mb-1">Sale / Registration Date *</label>
                   <input
                     type="date"
+                    name="exitSoldDate"
+                    autoComplete="off"
                     required
                     value={exitSoldDate}
                     onChange={(e) => setExitSoldDate(e.target.value)}
@@ -1628,6 +1634,8 @@ export default function RentalPortfolioPage() {
                 <label className="block font-semibold text-slate-700 mb-1">Disposal Notes (Optional)</label>
                 <input
                   type="text"
+                  name="exitNotes"
+                  autoComplete="off"
                   placeholder="e.g. Sold with sitting tenant, conveyanced by STBB"
                   value={exitNotes}
                   onChange={(e) => setExitNotes(e.target.value)}
@@ -1684,7 +1692,7 @@ export default function RentalPortfolioPage() {
               Refinance <strong>{selectedRentalForRefinance.title}</strong> based on its updated bank valuation. The cash equity pulled out is immediately credited into your <strong>Liquid Capital Reserve (Seed Capital pool)</strong> to acquire your next property.
             </p>
 
-            <form onSubmit={handleSaveRefinance} className="space-y-4 text-xs">
+            <form onSubmit={handleSaveRefinance} noValidate className="space-y-4 text-xs">
               {/* Previous Financial Baseline */}
               <div className="p-3 bg-purple-50/60 rounded-xl border border-purple-100 grid grid-cols-3 gap-2 text-center">
                 <div>
@@ -1708,6 +1716,8 @@ export default function RentalPortfolioPage() {
                 </label>
                 <input
                   type="number"
+                  name="refinanceNewValuationZAR"
+                  autoComplete="off"
                   required
                   min="0"
                   step="any"
@@ -1731,6 +1741,8 @@ export default function RentalPortfolioPage() {
                 </label>
                 <input
                   type="number"
+                  name="refinanceNewBondPaymentZAR"
+                  autoComplete="off"
                   required
                   min="0"
                   step="any"
@@ -1756,6 +1768,8 @@ export default function RentalPortfolioPage() {
                 </div>
                 <input
                   type="number"
+                  name="refinanceCashPulledOutZAR"
+                  autoComplete="off"
                   required
                   min="0"
                   step="any"
@@ -1787,6 +1801,8 @@ export default function RentalPortfolioPage() {
                 </div>
                 <input
                   type="number"
+                  name="refinanceNewBondBalanceZAR"
+                  autoComplete="off"
                   required
                   min="0"
                   step="any"
@@ -2002,12 +2018,14 @@ export default function RentalPortfolioPage() {
             </div>
 
             {/* Log New Maintenance Form */}
-            <form onSubmit={handleAddMaintenance} className="p-4 rounded-xl border border-slate-200 bg-slate-50/50 space-y-3 text-xs">
+            <form onSubmit={handleAddMaintenance} noValidate className="p-4 rounded-xl border border-slate-200 bg-slate-50/50 space-y-3 text-xs">
               <h4 className="font-bold text-xs text-slate-800">Log New Work Order / Expense</h4>
               <div>
                 <label className="block text-[11px] font-semibold text-slate-600 mb-1">Issue Description *</label>
                 <input
                   type="text"
+                  name="maintenanceDescription"
+                  autoComplete="off"
                   required
                   placeholder="e.g. Inverter battery firmware inspection & cable replacement"
                   value={maintIssue}
@@ -2035,8 +2053,10 @@ export default function RentalPortfolioPage() {
                   <label className="block text-[11px] font-semibold text-slate-600 mb-1">Cost (ZAR)</label>
                   <input
                     type="number"
+                    name="maintenanceCostZAR"
+                    autoComplete="off"
                     min="0"
-                    step="100"
+                    step="any"
                     value={maintCost}
                     onChange={(e) => setMaintCost(Number(e.target.value))}
                     className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg bg-white font-bold"
@@ -2046,6 +2066,8 @@ export default function RentalPortfolioPage() {
                   <label className="block text-[11px] font-semibold text-slate-600 mb-1">Contractor</label>
                   <input
                     type="text"
+                    name="contractorName"
+                    autoComplete="name"
                     value={maintContractor}
                     onChange={(e) => setMaintContractor(e.target.value)}
                     className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg bg-white"
@@ -2082,12 +2104,14 @@ export default function RentalPortfolioPage() {
               )}
             </div>
 
-            <form onSubmit={handleSaveRental} className="space-y-4 text-xs">
+            <form onSubmit={handleSaveRental} noValidate className="space-y-4 text-xs">
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">Property Name *</label>
                   <input
                     type="text"
+                    name="rentalTitle"
+                    autoComplete="off"
                     required
                     placeholder="e.g. Melrose Arch Luxury Loft"
                     value={title}
@@ -2099,6 +2123,8 @@ export default function RentalPortfolioPage() {
                   <label className="block font-semibold text-slate-700 mb-1">City</label>
                   <input
                     type="text"
+                    name="propertyCity"
+                    autoComplete="off"
                     value={city}
                     onChange={(e) => setCity(e.target.value)}
                     className="w-full px-3 py-2 border border-slate-300 rounded-lg"
@@ -2110,6 +2136,8 @@ export default function RentalPortfolioPage() {
                 <label className="block font-semibold text-slate-700 mb-1">Address</label>
                 <input
                   type="text"
+                  name="propertyAddress"
+                  autoComplete="off"
                   placeholder="e.g. 10 High Street, Melrose"
                   value={address}
                   onChange={(e) => setAddress(e.target.value)}
@@ -2262,9 +2290,11 @@ export default function RentalPortfolioPage() {
                         </div>
                         <input
                           type="number"
+                          name="agencyCommissionPercent"
+                          autoComplete="off"
                           min="0"
                           max="30"
-                          step="0.5"
+                          step="any"
                           value={agencyCommissionPercent}
                           onChange={(e) => setAgencyCommissionPercent(Number(e.target.value))}
                           className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg bg-white font-bold"
@@ -2319,8 +2349,10 @@ export default function RentalPortfolioPage() {
                   <label className="block font-semibold text-slate-700 mb-1">Market Value (ZAR)</label>
                   <input
                     type="number"
-                    min="100000"
-                    step="50000"
+                    name="marketValueZAR"
+                    autoComplete="off"
+                    min="0"
+                    step="any"
                     value={marketValue}
                     onChange={(e) => setMarketValue(Number(e.target.value))}
                     className="w-full px-3 py-2 border border-slate-300 rounded-lg"
@@ -2330,8 +2362,10 @@ export default function RentalPortfolioPage() {
                   <label className="block font-semibold text-slate-700 mb-1">Purchase Price (ZAR)</label>
                   <input
                     type="number"
-                    min="100000"
-                    step="50000"
+                    name="purchasePriceZAR"
+                    autoComplete="off"
+                    min="0"
+                    step="any"
                     value={purchasePrice}
                     onChange={(e) => setPurchasePrice(Number(e.target.value))}
                     className="w-full px-3 py-2 border border-slate-300 rounded-lg"
@@ -2341,8 +2375,10 @@ export default function RentalPortfolioPage() {
                   <label className="block font-semibold text-slate-700 mb-1">Bond Balance (ZAR)</label>
                   <input
                     type="number"
+                    name="bondBalanceZAR"
+                    autoComplete="off"
                     min="0"
-                    step="50000"
+                    step="any"
                     value={bondBalance}
                     onChange={(e) => setBondBalance(Number(e.target.value))}
                     className="w-full px-3 py-2 border border-slate-300 rounded-lg"
@@ -2355,8 +2391,10 @@ export default function RentalPortfolioPage() {
                   <label className="block font-semibold text-slate-700 mb-1">Gross Monthly Rent (ZAR)</label>
                   <input
                     type="number"
-                    min="1000"
-                    step="500"
+                    name="grossRentZAR"
+                    autoComplete="off"
+                    min="0"
+                    step="any"
                     value={monthlyGrossRent}
                     onChange={(e) => setMonthlyGrossRent(Number(e.target.value))}
                     className="w-full px-3 py-2 border border-slate-300 rounded-lg font-bold"
@@ -2374,8 +2412,10 @@ export default function RentalPortfolioPage() {
                     </div>
                     <input
                       type="number"
+                      name="annualInsuranceZAR"
+                      autoComplete="off"
                       min="0"
-                      step="50"
+                      step="any"
                       value={annualBuildingInsurance}
                       onChange={(e) => setAnnualBuildingInsurance(Number(e.target.value))}
                       className="w-full px-3 py-2 border border-slate-300 rounded-lg font-semibold"
@@ -2390,8 +2430,10 @@ export default function RentalPortfolioPage() {
                     </div>
                     <input
                       type="number"
+                      name="monthlyLeviesZAR"
+                      autoComplete="off"
                       min="0"
-                      step="50"
+                      step="any"
                       value={monthlyLevies}
                       onChange={(e) => setMonthlyLevies(Number(e.target.value))}
                       className="w-full px-3 py-2 border border-slate-300 rounded-lg"
@@ -2402,8 +2444,10 @@ export default function RentalPortfolioPage() {
                   <label className="block font-semibold text-slate-700 mb-1">Rates & Taxes</label>
                   <input
                     type="number"
+                    name="monthlyRatesZAR"
+                    autoComplete="off"
                     min="0"
-                    step="50"
+                    step="any"
                     value={monthlyRates}
                     onChange={(e) => setMonthlyRates(Number(e.target.value))}
                     className="w-full px-3 py-2 border border-slate-300 rounded-lg"
@@ -2429,8 +2473,10 @@ export default function RentalPortfolioPage() {
                   </div>
                   <input
                     type="number"
+                    name="monthlyBondPaymentZAR"
+                    autoComplete="off"
                     min="0"
-                    step="100"
+                    step="any"
                     value={monthlyBondPayment || ''}
                     onChange={(e) => setMonthlyBondPayment(Number(e.target.value))}
                     placeholder="e.g. 11800"
@@ -2443,6 +2489,8 @@ export default function RentalPortfolioPage() {
                   <label className="block font-semibold text-slate-700 mb-1 text-xs">Bond Effective Month (Forward-Only)</label>
                   <input
                     type="text"
+                    name="bondPaymentEffectiveDate"
+                    autoComplete="off"
                     placeholder="e.g. Apr 2026 or 2026-04"
                     value={bondPaymentEffectiveDate}
                     onChange={(e) => setBondPaymentEffectiveDate(e.target.value)}
@@ -2476,8 +2524,10 @@ export default function RentalPortfolioPage() {
                     <span className="absolute left-3 top-2 text-slate-400 font-bold text-xs">R</span>
                     <input
                       type="number"
+                      name="unpaidUtilityArrearsZAR"
+                      autoComplete="off"
                       min="0"
-                      step="100"
+                      step="any"
                       value={unpaidUtilityArrears}
                       onChange={(e) => setUnpaidUtilityArrears(Math.max(0, Number(e.target.value)))}
                       className={`w-full pl-7 pr-3 py-1.5 border rounded-lg font-bold text-xs bg-white ${
@@ -2510,6 +2560,8 @@ export default function RentalPortfolioPage() {
                     <label className="block font-semibold text-slate-700 mb-1">Tenant Name</label>
                     <input
                       type="text"
+                      name="tenantName"
+                      autoComplete="name"
                       placeholder="e.g. Sipho Dlamini"
                       value={tenantName}
                       onChange={(e) => setTenantName(e.target.value)}
@@ -2520,6 +2572,8 @@ export default function RentalPortfolioPage() {
                     <label className="block font-semibold text-slate-700 mb-1">Lease Expiry Date</label>
                     <input
                       type="date"
+                      name="leaseEnd"
+                      autoComplete="off"
                       value={leaseEnd}
                       onChange={(e) => setLeaseEnd(e.target.value)}
                       className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg bg-white"
@@ -2527,11 +2581,13 @@ export default function RentalPortfolioPage() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div>
                     <label className="block font-semibold text-slate-700 mb-1">Tenant Phone</label>
                     <input
-                      type="text"
+                      type="tel"
+                      name="tenantPhone"
+                      autoComplete="tel"
                       placeholder="+27 82 000 0000"
                       value={tenantPhone}
                       onChange={(e) => setTenantPhone(e.target.value)}
@@ -2539,9 +2595,25 @@ export default function RentalPortfolioPage() {
                     />
                   </div>
                   <div>
+                    <label className="block font-semibold text-slate-700 mb-1">Tenant Email</label>
+                    <input
+                      type="email"
+                      name="tenantEmail"
+                      autoComplete="email"
+                      placeholder="e.g. tenant@domain.co.za"
+                      value={tenantEmail}
+                      onChange={(e) => setTenantEmail(e.target.value)}
+                      className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg bg-white"
+                    />
+                  </div>
+                  <div>
                     <label className="block font-semibold text-slate-700 mb-1">Deposit in Trust (ZAR)</label>
                     <input
                       type="number"
+                      name="depositHeldZAR"
+                      autoComplete="off"
+                      min="0"
+                      step="any"
                       value={depositHeld}
                       onChange={(e) => setDepositHeld(Number(e.target.value))}
                       className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg bg-white font-semibold"
@@ -2651,7 +2723,7 @@ export default function RentalPortfolioPage() {
               </button>
             </div>
 
-            <form onSubmit={handleApplyPmt} className="space-y-4 text-xs">
+            <form onSubmit={handleApplyPmt} noValidate className="space-y-4 text-xs">
               <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-amber-900 text-[11px] leading-relaxed">
                 💡 <strong>Forward-Only Guarantee:</strong> Modifying the bond repayment takes effect from the selected <strong>Effective Month</strong> for upcoming bank debit orders. Historical performance and past months remain uncorrupted.
               </div>
@@ -2662,7 +2734,7 @@ export default function RentalPortfolioPage() {
                   <input
                     type="number"
                     min="0"
-                    step="10000"
+                    step="any"
                     required
                     value={pmtLoanBalance}
                     onChange={(e) => setPmtLoanBalance(Number(e.target.value))}
@@ -2674,7 +2746,7 @@ export default function RentalPortfolioPage() {
                   <div className="relative">
                     <input
                       type="number"
-                      step="0.05"
+                      step="any"
                       min="0"
                       max="30"
                       required

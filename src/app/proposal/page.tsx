@@ -475,7 +475,7 @@ function ProposalGeneratorContent() {
 
       <main className="flex-1 p-4 sm:p-6 space-y-6 max-w-5xl w-full mx-auto">
         {/* Deal Selector & Terms Customizer (Hidden on Print) */}
-        <div className="no-print bg-white rounded-xl border border-slate-200 p-5 shadow-xs space-y-4">
+        <div className="no-print bg-white rounded-xl border border-slate-200 p-4 sm:p-5 shadow-xs space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
               <h3 className="font-bold text-sm text-slate-900">Select Deal & Tailor Pitch Terms</h3>
@@ -483,8 +483,8 @@ function ProposalGeneratorContent() {
                 Choose an opportunity, flip project, or portfolio rental to render the executive pitch tear-sheet.
               </p>
             </div>
-            <div className="flex items-center gap-2">
-              <label className="text-xs font-semibold text-slate-700">Active Pitch Deal:</label>
+            <div className="flex flex-col sm:flex-row sm:items-center gap-1.5 sm:gap-2 w-full sm:w-auto min-w-0">
+              <label className="text-xs font-semibold text-slate-700 shrink-0">Active Pitch Deal:</label>
               <select
                 value={selectedDealId}
                 onChange={(e) => {
@@ -500,7 +500,7 @@ function ProposalGeneratorContent() {
                     );
                   }
                 }}
-                className="text-xs font-bold px-3 py-2 border border-slate-300 rounded-lg bg-white shadow-xs text-slate-900"
+                className="w-full sm:w-auto max-w-full min-w-0 text-xs font-bold px-3 py-2 border border-slate-300 rounded-lg bg-white shadow-xs text-slate-900 truncate"
               >
                 {allDeals.map((d) => {
                   let badge = '';
@@ -526,7 +526,10 @@ function ProposalGeneratorContent() {
               <label className="block text-[11px] font-semibold text-slate-600 mb-1">Capital Facility Requested</label>
               <input
                 type="number"
-                step="50000"
+                name="capitalRequestedZAR"
+                autoComplete="off"
+                min="0"
+                step="any"
                 value={capitalRequested}
                 onChange={(e) => setCapitalRequested(Number(e.target.value))}
                 className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg font-bold text-slate-900"
@@ -535,6 +538,7 @@ function ProposalGeneratorContent() {
             <div>
               <label className="block text-[11px] font-semibold text-slate-600 mb-1">Return Structure</label>
               <select
+                name="fundingOfferType"
                 value={fundingOfferType}
                 onChange={(e) => setFundingOfferType(e.target.value as any)}
                 className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg bg-white"
@@ -547,7 +551,10 @@ function ProposalGeneratorContent() {
               <label className="block text-[11px] font-semibold text-slate-600 mb-1">Offered Return Rate (%)</label>
               <input
                 type="number"
-                step="0.5"
+                name="offeredReturnRatePercent"
+                autoComplete="off"
+                min="0"
+                step="any"
                 value={offeredRate}
                 onChange={(e) => setOfferedRate(Number(e.target.value))}
                 className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg font-bold text-emerald-700"
@@ -557,6 +564,8 @@ function ProposalGeneratorContent() {
               <label className="block text-[11px] font-semibold text-slate-600 mb-1">Security Offered</label>
               <input
                 type="text"
+                name="securityType"
+                autoComplete="off"
                 value={securityType}
                 onChange={(e) => setSecurityType(e.target.value)}
                 className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg"
@@ -565,48 +574,48 @@ function ProposalGeneratorContent() {
           </div>
 
           {/* Strategy Selector */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3 border-t border-slate-100">
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-semibold text-slate-700">Pitch Strategy:</span>
-              <div className="inline-flex p-0.5 bg-slate-100 rounded-lg border border-slate-200">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3 pt-3 border-t border-slate-100">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-1.5 sm:gap-2 w-full sm:w-auto">
+              <span className="text-xs font-semibold text-slate-700 shrink-0">Pitch Strategy:</span>
+              <div className="grid grid-cols-3 sm:flex p-0.5 bg-slate-100 rounded-lg border border-slate-200 w-full sm:w-auto">
                 <button
                   type="button"
                   onClick={() => setPitchStrategy('Flip')}
-                  className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all flex items-center gap-1.5 ${
+                  className={`px-2 sm:px-3 py-1.5 rounded-md text-xs font-bold transition-all flex items-center justify-center gap-1 text-center min-w-0 ${
                     pitchStrategy === 'Flip'
                       ? 'bg-white text-emerald-800 shadow-xs border border-slate-200/60'
                       : 'text-slate-600 hover:text-slate-900'
                   }`}
                 >
                   <span>🔄</span>
-                  <span>Buy & Flip</span>
-                  {pitchStrategy === 'Flip' && <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>}
+                  <span className="truncate">Buy & Flip</span>
+                  {pitchStrategy === 'Flip' && <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0"></span>}
                 </button>
                 <button
                   type="button"
                   onClick={() => setPitchStrategy('Rental')}
-                  className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all flex items-center gap-1.5 ${
+                  className={`px-2 sm:px-3 py-1.5 rounded-md text-xs font-bold transition-all flex items-center justify-center gap-1 text-center min-w-0 ${
                     pitchStrategy === 'Rental'
                       ? 'bg-white text-indigo-800 shadow-xs border border-slate-200/60'
                       : 'text-slate-600 hover:text-slate-900'
                   }`}
                 >
                   <span>🏠</span>
-                  <span>Buy & Hold Rental</span>
-                  {pitchStrategy === 'Rental' && <span className="w-1.5 h-1.5 rounded-full bg-indigo-500"></span>}
+                  <span className="truncate">Buy & Hold</span>
+                  {pitchStrategy === 'Rental' && <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 shrink-0"></span>}
                 </button>
                 <button
                   type="button"
                   onClick={() => setPitchStrategy('BRRRR')}
-                  className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all flex items-center gap-1.5 ${
+                  className={`px-2 sm:px-3 py-1.5 rounded-md text-xs font-bold transition-all flex items-center justify-center gap-1 text-center min-w-0 ${
                     pitchStrategy === 'BRRRR'
                       ? 'bg-white text-purple-800 shadow-xs border border-slate-200/60'
                       : 'text-slate-600 hover:text-slate-900'
                   }`}
                 >
                   <span>⚡</span>
-                  <span>Hybrid BRRRR</span>
-                  {pitchStrategy === 'BRRRR' && <span className="w-1.5 h-1.5 rounded-full bg-purple-500"></span>}
+                  <span className="truncate">BRRRR</span>
+                  {pitchStrategy === 'BRRRR' && <span className="w-1.5 h-1.5 rounded-full bg-purple-500 shrink-0"></span>}
                 </button>
               </div>
             </div>
@@ -617,7 +626,7 @@ function ProposalGeneratorContent() {
             </span>
           </div>
 
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between pt-3 border-t border-slate-100 gap-2">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between pt-3 border-t border-slate-100 gap-2.5">
             <div className="text-[11px] text-slate-500">
               {deal.primaryFunderName ? (
                 <span>
@@ -632,7 +641,7 @@ function ProposalGeneratorContent() {
             <button
               type="button"
               onClick={handleSaveTermsToDeal}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold shadow-2xs transition-colors cursor-pointer self-start sm:self-auto"
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold shadow-2xs transition-colors cursor-pointer"
             >
               {isSavedFeedback ? (
                 <>

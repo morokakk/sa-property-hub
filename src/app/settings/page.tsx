@@ -159,7 +159,7 @@ export default function SettingsPage() {
           </div>
         )}
 
-        <form onSubmit={handleSave} className="space-y-6">
+        <form onSubmit={handleSave} noValidate className="space-y-6">
           {/* Section 1: Entity & Contact Details */}
           <div className="bg-white rounded-xl border border-slate-200 p-4 sm:p-6 shadow-xs space-y-4">
             <div className="flex items-center gap-2.5 pb-3 border-b border-slate-100">
@@ -181,6 +181,8 @@ export default function SettingsPage() {
                 </label>
                 <input
                   type="text"
+                  name="organization"
+                  autoComplete="organization"
                   required
                   placeholder="e.g. L&M Property Investments (Pty) Ltd"
                   value={entityName}
@@ -195,6 +197,8 @@ export default function SettingsPage() {
                 </label>
                 <input
                   type="text"
+                  name="tradingAs"
+                  autoComplete="organization"
                   placeholder="e.g. L&M Trading & Capital"
                   value={tradingAs}
                   onChange={(e) => setTradingAs(e.target.value)}
@@ -208,6 +212,8 @@ export default function SettingsPage() {
                 </label>
                 <input
                   type="text"
+                  name="cipcOrId"
+                  autoComplete="off"
                   required
                   placeholder="e.g. 2022/498211/07 or 8501015021088"
                   value={registrationOrId}
@@ -221,7 +227,9 @@ export default function SettingsPage() {
                   Contact Phone Number *
                 </label>
                 <input
-                  type="text"
+                  type="tel"
+                  name="tel"
+                  autoComplete="tel"
                   required
                   placeholder="e.g. +27 82 890 4321"
                   value={contactNumber}
@@ -236,6 +244,8 @@ export default function SettingsPage() {
                 </label>
                 <input
                   type="email"
+                  name="email"
+                  autoComplete="email"
                   required
                   placeholder="e.g. invest@lmtrading.co.za"
                   value={email}
@@ -249,8 +259,10 @@ export default function SettingsPage() {
                   Website / Investor Portal URL
                 </label>
                 <input
-                  type="text"
-                  placeholder="e.g. www.lmtrading.co.za"
+                  type="url"
+                  name="url"
+                  autoComplete="url"
+                  placeholder="e.g. https://www.lmtrading.co.za"
                   value={website}
                   onChange={(e) => setWebsite(e.target.value)}
                   className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-emerald-500 text-slate-900"
@@ -264,6 +276,8 @@ export default function SettingsPage() {
               </label>
               <input
                 type="text"
+                name="street-address"
+                autoComplete="street-address"
                 placeholder="e.g. Suite 402, The Boulevard Office Park, Searle St, Woodstock, Cape Town"
                 value={physicalAddress}
                 onChange={(e) => setPhysicalAddress(e.target.value)}
@@ -381,7 +395,10 @@ export default function SettingsPage() {
                 <div className="flex items-center">
                   <input
                     type="number"
-                    step="0.25"
+                    name="defaultPrimeRate"
+                    autoComplete="off"
+                    min="0"
+                    step="any"
                     value={defaultPrimeRate}
                     onChange={(e) => setDefaultPrimeRate(Number(e.target.value))}
                     className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg font-bold text-slate-900 bg-white"
@@ -398,7 +415,10 @@ export default function SettingsPage() {
                 <div className="flex items-center">
                   <input
                     type="number"
-                    step="0.5"
+                    name="baselineHurdleYield"
+                    autoComplete="off"
+                    min="0"
+                    step="any"
                     value={baselineHurdleYield}
                     onChange={(e) => setBaselineHurdleYield(Number(e.target.value))}
                     className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg font-bold text-emerald-700 bg-white"
@@ -415,7 +435,10 @@ export default function SettingsPage() {
                 <div className="flex items-center">
                   <input
                     type="number"
-                    step="0.5"
+                    name="defaultCommission"
+                    autoComplete="off"
+                    min="0"
+                    step="any"
                     value={defaultCommission}
                     onChange={(e) => setDefaultCommission(Number(e.target.value))}
                     className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg font-bold text-slate-900 bg-white"
@@ -508,6 +531,10 @@ export default function SettingsPage() {
                 </div>
                 <input
                   type={showApiKey ? 'text' : 'password'}
+                  name="aiApiKey"
+                  autoComplete="off"
+                  spellCheck={false}
+                  data-1p-ignore
                   value={aiApiKey}
                   onChange={(e) => setAiApiKey(e.target.value)}
                   placeholder="sk-ant-api03-..."

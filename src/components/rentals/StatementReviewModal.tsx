@@ -255,7 +255,10 @@ export default function StatementReviewModal({
                       <span className="font-bold text-slate-400 mr-1">R</span>
                       <input
                         type="number"
-                        step="1000"
+                        name="estimatedMarketValueZAR"
+                        autoComplete="off"
+                        min="0"
+                        step="any"
                         value={unit.estimatedMarketValueZAR || ''}
                         onChange={(e) => handleFieldChange(idx, 'estimatedMarketValueZAR', Number(e.target.value))}
                         placeholder="828000"
@@ -289,7 +292,10 @@ export default function StatementReviewModal({
                         <span className="font-bold text-slate-400 mr-1">R</span>
                         <input
                           type="number"
-                          step="0.01"
+                          name="grossRentZAR"
+                          autoComplete="off"
+                          min="0"
+                          step="any"
                           value={unit.grossRentZAR}
                           onChange={(e) => handleFieldChange(idx, 'grossRentZAR', Number(e.target.value))}
                           className="w-full font-bold text-slate-900 bg-white border border-slate-300 rounded px-2 py-1 text-xs"
@@ -308,7 +314,10 @@ export default function StatementReviewModal({
                         <span className="font-bold text-slate-400 mr-1">R</span>
                         <input
                           type="number"
-                          step="0.01"
+                          name="leviesZAR"
+                          autoComplete="off"
+                          min="0"
+                          step="any"
                           value={unit.leviesZAR}
                           onChange={(e) => handleFieldChange(idx, 'leviesZAR', Number(e.target.value))}
                           className="w-full font-bold text-slate-900 bg-white border border-slate-300 rounded px-2 py-1 text-xs"
@@ -327,7 +336,10 @@ export default function StatementReviewModal({
                         <span className="font-bold text-slate-400 mr-1">R</span>
                         <input
                           type="number"
-                          step="0.01"
+                          name="municipalRatesZAR"
+                          autoComplete="off"
+                          min="0"
+                          step="any"
                           value={unit.municipalRatesZAR}
                           onChange={(e) => handleFieldChange(idx, 'municipalRatesZAR', Number(e.target.value))}
                           className="w-full font-bold text-slate-900 bg-white border border-slate-300 rounded px-2 py-1 text-xs"
@@ -353,7 +365,10 @@ export default function StatementReviewModal({
                         <span className="font-bold text-slate-400 mr-1">R</span>
                         <input
                           type="number"
-                          step="0.01"
+                          name="agencyCommissionZAR"
+                          autoComplete="off"
+                          min="0"
+                          step="any"
                           value={unit.agencyCommissionZAR ?? 0}
                           onChange={(e) => handleFieldChange(idx, 'agencyCommissionZAR', Number(e.target.value))}
                           className="w-full font-bold text-slate-900 bg-white border border-slate-300 rounded px-2 py-1 text-xs"
@@ -404,7 +419,10 @@ export default function StatementReviewModal({
                         <span className="font-bold text-slate-400 mr-1">R</span>
                         <input
                           type="number"
-                          step="0.01"
+                          name="monthlyBondPaymentZAR"
+                          autoComplete="off"
+                          min="0"
+                          step="any"
                           value={unit.monthlyBondPaymentZAR ?? 0}
                           onChange={(e) => handleFieldChange(idx, 'monthlyBondPaymentZAR', Number(e.target.value))}
                           placeholder="0"
@@ -424,7 +442,9 @@ export default function StatementReviewModal({
                         <span className="font-bold text-indigo-400 mr-1">R</span>
                         <input
                           type="number"
-                          step="0.01"
+                          name="netOperatingIncomeZAR"
+                          autoComplete="off"
+                          step="any"
                           value={unit.netOperatingIncomeZAR}
                           onChange={(e) => handleFieldChange(idx, 'netOperatingIncomeZAR', Number(e.target.value))}
                           className="w-full font-bold text-indigo-950 bg-white border border-indigo-300 rounded px-2 py-1 text-xs"

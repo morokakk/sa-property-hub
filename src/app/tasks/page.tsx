@@ -297,11 +297,13 @@ export default function TaskEnginePage() {
               Create Operational Task & Reminder
             </h3>
 
-            <form onSubmit={handleCreateTask} className="space-y-4 text-xs">
+            <form onSubmit={handleCreateTask} noValidate className="space-y-4 text-xs">
               <div>
                 <label className="block font-semibold text-slate-700 mb-1">Task Title *</label>
                 <input
                   type="text"
+                  name="taskTitle"
+                  autoComplete="off"
                   required
                   placeholder="e.g. Lodge Deeds transfer papers with STBB"
                   value={title}
@@ -314,6 +316,8 @@ export default function TaskEnginePage() {
                 <label className="block font-semibold text-slate-700 mb-1">Description / Notes</label>
                 <textarea
                   rows={3}
+                  name="taskDescription"
+                  autoComplete="off"
                   placeholder="Additional context, attorney reference, invoice details..."
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
@@ -326,6 +330,8 @@ export default function TaskEnginePage() {
                   <label className="block font-semibold text-slate-700 mb-1">Due Date</label>
                   <input
                     type="date"
+                    name="taskDueDate"
+                    autoComplete="off"
                     value={dueDate}
                     onChange={(e) => setDueDate(e.target.value)}
                     className="w-full px-3 py-2 border border-slate-300 rounded-lg"

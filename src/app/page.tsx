@@ -520,6 +520,10 @@ export default function GlobalDashboardPage() {
                     <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm font-semibold text-slate-400">R</span>
                     <input
                       type="number"
+                      name="liquidCashReserveZAR"
+                      autoComplete="off"
+                      min="0"
+                      step="any"
                       value={seedAmount}
                       onChange={(e) => setSeedAmount(Number(e.target.value))}
                       className="w-full pl-8 pr-4 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-slate-900 font-bold text-lg focus:ring-2 focus:ring-emerald-500 focus:bg-white transition-all"
