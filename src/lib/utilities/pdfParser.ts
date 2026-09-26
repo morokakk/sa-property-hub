@@ -885,6 +885,15 @@ Strict extraction guidelines:
 12. "provider": "City of Johannesburg", "Eskom", or "iGrow Rentals".
 13. "extractedMeterReadings": Optional list of meter readings found on the statement (leave undefined for iGrow statements).
 14. "municipalValuationZAR": Optional municipal property valuation / market value (e.g. "Market Value R 3,180,000.00" on City of Johannesburg bills).
+15. "propertyName": Scheme, complex, or property name if visible.
+16. "propertyAddress": Physical street address or stand description if visible.
+17. "bodyCorporateLeviesZAR": Body Corporate / HOA levies if itemized.
+18. "agencyCommissionZAR": Managing agent commission if deducted.
+19. "agencyCommissionVatZAR": VAT on managing agent commission if itemized.
+20. "tenantName": Full name of tenant if listed on statement.
+21. "tenantRentBilledZAR": Gross rent billed to tenant if listed.
+22. "depositHeldZAR": Deposit held in trust if listed.
+23. "netDisbursementZAR": Net owner payout if listed.
 
 IMPORTANT FOR IGROW RENTALS / WECONNECTU:
 iGrow statements do NOT contain meter readings. They bundle recoveries into "Water,Sewerage,Refuse & Common". Set provider: "iGrow Rentals", billingType: "bundled", and do NOT require meter readings.
@@ -940,6 +949,8 @@ Output pure JSON matching the schema without markdown or commentary.`;
     const parsedJson = JSON.parse(rawJson);
     return UtilityStatementSchema.parse({
       ...parsedJson,
+      propertyName: parsedJson.propertyName ? String(parsedJson.propertyName).trim() : undefined,
+      propertyAddress: parsedJson.propertyAddress ? String(parsedJson.propertyAddress).trim() : undefined,
       billingType: parsedJson.billingType || (parsedJson.bundledUtilitiesZAR ? 'bundled' : 'itemized'),
       bundledUtilitiesZAR: parsedJson.bundledUtilitiesZAR !== undefined ? cleanNumeric(parsedJson.bundledUtilitiesZAR) : undefined,
       bundledUtilityLabel: parsedJson.bundledUtilityLabel || (parsedJson.bundledUtilitiesZAR ? 'Water, Sewerage, Refuse & Common' : undefined),
@@ -950,6 +961,13 @@ Output pure JSON matching the schema without markdown or commentary.`;
       propertyRatesZAR: cleanNumeric(parsedJson.propertyRatesZAR),
       totalDueZAR: cleanNumeric(parsedJson.totalDueZAR),
       municipalValuationZAR: parsedJson.municipalValuationZAR !== undefined ? cleanNumeric(parsedJson.municipalValuationZAR) : undefined,
+      bodyCorporateLeviesZAR: parsedJson.bodyCorporateLeviesZAR !== undefined ? cleanNumeric(parsedJson.bodyCorporateLeviesZAR) : undefined,
+      agencyCommissionZAR: parsedJson.agencyCommissionZAR !== undefined ? cleanNumeric(parsedJson.agencyCommissionZAR) : undefined,
+      agencyCommissionVatZAR: parsedJson.agencyCommissionVatZAR !== undefined ? cleanNumeric(parsedJson.agencyCommissionVatZAR) : undefined,
+      tenantName: parsedJson.tenantName ? String(parsedJson.tenantName).trim() : undefined,
+      tenantRentBilledZAR: parsedJson.tenantRentBilledZAR !== undefined ? cleanNumeric(parsedJson.tenantRentBilledZAR) : undefined,
+      depositHeldZAR: parsedJson.depositHeldZAR !== undefined ? cleanNumeric(parsedJson.depositHeldZAR) : undefined,
+      netDisbursementZAR: parsedJson.netDisbursementZAR !== undefined ? cleanNumeric(parsedJson.netDisbursementZAR) : undefined,
       extractedMeterReadings: Array.isArray(parsedJson.extractedMeterReadings)
         ? parsedJson.extractedMeterReadings.map((r: any) => ({
             ...r,
@@ -993,6 +1011,8 @@ Output pure JSON matching the schema without markdown or commentary.`;
                 billingPeriod: { type: 'string', description: 'e.g. April 2025 or 10 Aug 2026 - 09 Sep 2026' },
                 accountNumber: { type: 'string', description: 'Account number' },
                 provider: { type: 'string', enum: ['City of Johannesburg', 'Eskom', 'iGrow Rentals'] },
+                propertyName: { type: 'string', description: 'Scheme, complex or property name if visible on statement' },
+                propertyAddress: { type: 'string', description: 'Full physical address or stand description' },
                 billingType: { type: 'string', enum: ['itemized', 'bundled'] },
                 bundledUtilitiesZAR: { type: 'number', description: 'Bundled Water, Sewerage, Refuse & Common amount' },
                 bundledUtilityLabel: { type: 'string', description: 'e.g. Water, Sewerage, Refuse & Common' },
@@ -1002,6 +1022,14 @@ Output pure JSON matching the schema without markdown or commentary.`;
                 sewerageZAR: { type: 'number', description: 'Sewerage in ZAR' },
                 propertyRatesZAR: { type: 'number', description: 'Property rates in ZAR' },
                 totalDueZAR: { type: 'number', description: 'Current charges total in ZAR' },
+                municipalValuationZAR: { type: 'number', description: 'Municipal property valuation / market value (e.g. Market Value R 3,180,000.00)' },
+                bodyCorporateLeviesZAR: { type: 'number', description: 'Body corporate or HOA monthly levies deducted in ZAR' },
+                agencyCommissionZAR: { type: 'number', description: 'Managing agent commission in ZAR' },
+                agencyCommissionVatZAR: { type: 'number', description: 'VAT on managing agent commission in ZAR' },
+                tenantName: { type: 'string', description: 'Tenant name if visible' },
+                tenantRentBilledZAR: { type: 'number', description: 'Tenant rent billed in ZAR' },
+                depositHeldZAR: { type: 'number', description: 'Tenant deposit held in ZAR' },
+                netDisbursementZAR: { type: 'number', description: 'Net owner payout in ZAR' },
                 extractedMeterReadings: {
                   type: 'array',
                   items: {
@@ -1061,6 +1089,8 @@ Output pure JSON matching the schema without markdown or commentary.`;
     const input = toolCall.input;
     return UtilityStatementSchema.parse({
       ...input,
+      propertyName: input.propertyName ? String(input.propertyName).trim() : undefined,
+      propertyAddress: input.propertyAddress ? String(input.propertyAddress).trim() : undefined,
       billingType: input.billingType || (input.bundledUtilitiesZAR ? 'bundled' : 'itemized'),
       bundledUtilitiesZAR: input.bundledUtilitiesZAR !== undefined ? cleanNumeric(input.bundledUtilitiesZAR) : undefined,
       bundledUtilityLabel: input.bundledUtilityLabel || (input.bundledUtilitiesZAR ? 'Water, Sewerage, Refuse & Common' : undefined),
@@ -1071,6 +1101,13 @@ Output pure JSON matching the schema without markdown or commentary.`;
       propertyRatesZAR: cleanNumeric(input.propertyRatesZAR),
       totalDueZAR: cleanNumeric(input.totalDueZAR),
       municipalValuationZAR: input.municipalValuationZAR !== undefined ? cleanNumeric(input.municipalValuationZAR) : undefined,
+      bodyCorporateLeviesZAR: input.bodyCorporateLeviesZAR !== undefined ? cleanNumeric(input.bodyCorporateLeviesZAR) : undefined,
+      agencyCommissionZAR: input.agencyCommissionZAR !== undefined ? cleanNumeric(input.agencyCommissionZAR) : undefined,
+      agencyCommissionVatZAR: input.agencyCommissionVatZAR !== undefined ? cleanNumeric(input.agencyCommissionVatZAR) : undefined,
+      tenantName: input.tenantName ? String(input.tenantName).trim() : undefined,
+      tenantRentBilledZAR: input.tenantRentBilledZAR !== undefined ? cleanNumeric(input.tenantRentBilledZAR) : undefined,
+      depositHeldZAR: input.depositHeldZAR !== undefined ? cleanNumeric(input.depositHeldZAR) : undefined,
+      netDisbursementZAR: input.netDisbursementZAR !== undefined ? cleanNumeric(input.netDisbursementZAR) : undefined,
       extractedMeterReadings: Array.isArray(input.extractedMeterReadings)
         ? input.extractedMeterReadings.map((r: any) => ({
             ...r,

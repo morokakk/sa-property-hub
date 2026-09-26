@@ -81,6 +81,8 @@ export default function UnifiedPdfVerificationModal({
       setManualFinancials({});
       setMarketValueZAR(0);
       setPurchasePriceZAR(0);
+      setMonthlyBondPaymentZAR(0);
+      setBondPaymentEffectiveDate('');
       setSaveSuccess(false);
       setIsSaving(false);
     }
@@ -91,7 +93,20 @@ export default function UnifiedPdfVerificationModal({
   // Editable Financial & Valuation Fields (cross-statement)
   const [marketValueZAR, setMarketValueZAR] = useState(0);
   const [purchasePriceZAR, setPurchasePriceZAR] = useState(0);
-  const [manualFinancials, setManualFinancials] = useState<Record<number, { rent?: number; marketValue?: number; purchasePrice?: number }>>({});
+  const [monthlyBondPaymentZAR, setMonthlyBondPaymentZAR] = useState(0);
+  const [bondPaymentEffectiveDate, setBondPaymentEffectiveDate] = useState('');
+  const [manualFinancials, setManualFinancials] = useState<
+    Record<
+      number,
+      {
+        rent?: number;
+        marketValue?: number;
+        purchasePrice?: number;
+        bondPayment?: number;
+        bondEffectiveDate?: string;
+      }
+    >
+  >({});
 
   // Editable Agent Payout Fields
   const [propertyName, setPropertyName] = useState('');
@@ -175,10 +190,22 @@ export default function UnifiedPdfVerificationModal({
       setMunicipalRatesZAR(u.municipalRatesZAR || 0);
       setAgencyCommissionZAR(u.agencyCommissionZAR || 0);
       setDepositHeldZAR(u.depositHeldZAR || 0);
-      const estMarket = Math.round((u.grossRentZAR || 7000) * 120);
-      const estPurchase = Math.round((u.grossRentZAR || 7000) * 110);
+      const estMarket =
+        u.estimatedMarketValueZAR && u.estimatedMarketValueZAR > 0
+          ? u.estimatedMarketValueZAR
+          : Math.round((u.grossRentZAR || 7000) * 120);
+      const estPurchase =
+        u.purchasePriceZAR && u.purchasePriceZAR > 0
+          ? u.purchasePriceZAR
+          : Math.round((u.grossRentZAR || 7000) * 110);
       setMarketValueZAR(manualFinancials[currentIndex]?.marketValue ?? estMarket);
       setPurchasePriceZAR(manualFinancials[currentIndex]?.purchasePrice ?? estPurchase);
+      setMonthlyBondPaymentZAR(
+        manualFinancials[currentIndex]?.bondPayment ?? (u.monthlyBondPaymentZAR || 0)
+      );
+      setBondPaymentEffectiveDate(
+        manualFinancials[currentIndex]?.bondEffectiveDate ?? (u.bondPaymentEffectiveDate || '')
+      );
       if (data.utilityStatement?.bundledUtilitiesZAR !== undefined) {
         setBundledUtilitiesZAR(data.utilityStatement.bundledUtilitiesZAR);
       } else {
@@ -198,8 +225,13 @@ export default function UnifiedPdfVerificationModal({
       setPropertyName(s.propertyName || '');
       setPropertyAddress(s.propertyAddress || '');
       setGrossRentZAR(manualFinancials[currentIndex]?.rent ?? 0);
-      setMarketValueZAR(manualFinancials[currentIndex]?.marketValue ?? (s.municipalValuationZAR || 0));
-      setPurchasePriceZAR(manualFinancials[currentIndex]?.purchasePrice ?? 0);
+      const estMarket = s.municipalValuationZAR && s.municipalValuationZAR > 0 ? s.municipalValuationZAR : 0;
+      setMarketValueZAR(manualFinancials[currentIndex]?.marketValue ?? estMarket);
+      setPurchasePriceZAR(
+        manualFinancials[currentIndex]?.purchasePrice ?? (estMarket > 0 ? Math.round(estMarket * 0.9) : 0)
+      );
+      setMonthlyBondPaymentZAR(manualFinancials[currentIndex]?.bondPayment ?? 0);
+      setBondPaymentEffectiveDate(manualFinancials[currentIndex]?.bondEffectiveDate ?? '');
     }
 
     // 3. Match Target Property
@@ -259,7 +291,23 @@ export default function UnifiedPdfVerificationModal({
     setPurchasePriceZAR(val);
     setManualFinancials((prev) => ({
       ...prev,
-      [currentIndex]: { ...prev[currentIndex], purchasePrice: val },
+      [currentIndex]: { ...(prev[currentIndex] || {}), purchasePrice: val },
+    }));
+  };
+
+  const handleBondPaymentChange = (val: number) => {
+    setMonthlyBondPaymentZAR(val);
+    setManualFinancials((prev) => ({
+      ...prev,
+      [currentIndex]: { ...(prev[currentIndex] || {}), bondPayment: val },
+    }));
+  };
+
+  const handleBondEffectiveDateChange = (val: string) => {
+    setBondPaymentEffectiveDate(val);
+    setManualFinancials((prev) => ({
+      ...prev,
+      [currentIndex]: { ...(prev[currentIndex] || {}), bondEffectiveDate: val },
     }));
   };
 
@@ -300,7 +348,8 @@ export default function UnifiedPdfVerificationModal({
             purchaseDate: new Date().toISOString().split('T')[0],
             outstandingBondBalanceZAR: 0,
             bondInterestRatePercent: 11.5,
-            monthlyBondPaymentZAR: 0,
+            monthlyBondPaymentZAR: monthlyBondPaymentZAR || 0,
+            bondPaymentEffectiveDate: bondPaymentEffectiveDate || undefined,
             tenantName: tenantName || 'Tenant Unassigned',
             tenantPhone: '+27 —',
             tenantEmail: 'pending@tenant.co.za',
@@ -313,7 +362,7 @@ export default function UnifiedPdfVerificationModal({
             agencyCommissionPercent: grossRentZAR > 0 ? Number(((agencyCommissionZAR / grossRentZAR) * 100).toFixed(1)) : 8,
             agencyVatApplicable: data.provider === 'iGrow Rentals' || Boolean(data.agentUnit?.isCommissionInclusiveOfVat) ? false : true,
             monthlyGrossRentZAR: grossRentZAR || 0,
-            monthlyLeviesZAR: leviesZAR || 0,
+            monthlyLeviesZAR: propertyType === 'Freehold House' ? 0 : (leviesZAR || 0),
             monthlyRatesTaxesZAR: municipalRatesZAR || 0,
             monthlyAgentFeeZAR: Math.round(agencyCommissionZAR || 0),
             monthlyMaintenanceReserveZAR: Math.round((grossRentZAR || 0) * 0.05),
@@ -326,10 +375,14 @@ export default function UnifiedPdfVerificationModal({
           // Update existing rental
           const updates: Partial<RentalProperty> = {
             monthlyGrossRentZAR: grossRentZAR,
-            monthlyLeviesZAR: leviesZAR,
+            monthlyLeviesZAR: propertyType === 'Freehold House' ? 0 : leviesZAR,
             monthlyRatesTaxesZAR: municipalRatesZAR,
             monthlyAgentFeeZAR: Math.round(agencyCommissionZAR),
           };
+          if (marketValueZAR > 0) updates.marketValueZAR = marketValueZAR;
+          if (purchasePriceZAR > 0) updates.purchasePriceZAR = purchasePriceZAR;
+          if (monthlyBondPaymentZAR > 0) updates.monthlyBondPaymentZAR = monthlyBondPaymentZAR;
+          if (bondPaymentEffectiveDate) updates.bondPaymentEffectiveDate = bondPaymentEffectiveDate;
           if (grossRentZAR > 0 && agencyCommissionZAR > 0) {
             updates.agencyCommissionPercent = Number(((agencyCommissionZAR / grossRentZAR) * 100).toFixed(1));
           }
@@ -410,7 +463,8 @@ export default function UnifiedPdfVerificationModal({
             purchaseDate: new Date().toISOString().split('T')[0],
             outstandingBondBalanceZAR: 0,
             bondInterestRatePercent: 11.5,
-            monthlyBondPaymentZAR: 0,
+            monthlyBondPaymentZAR: monthlyBondPaymentZAR || 0,
+            bondPaymentEffectiveDate: bondPaymentEffectiveDate || undefined,
             tenantName: 'Tenant Unassigned',
             tenantPhone: '+27 —',
             tenantEmail: 'pending@tenant.co.za',
@@ -446,11 +500,22 @@ export default function UnifiedPdfVerificationModal({
           if (utilRatesZAR > 0) {
             updates.monthlyRatesTaxesZAR = utilRatesZAR;
           }
-          if (updatedUtilStatement.municipalValuationZAR && updatedUtilStatement.municipalValuationZAR > 0) {
+          if (marketValueZAR > 0) {
+            updates.marketValueZAR = marketValueZAR;
+          } else if (updatedUtilStatement.municipalValuationZAR && updatedUtilStatement.municipalValuationZAR > 0) {
             const matched = activeRentals.find((r) => r.id === targetPropertyId);
             if (matched && (!matched.marketValueZAR || matched.marketValueZAR === 0 || matched.marketValueZAR === 900000)) {
               updates.marketValueZAR = updatedUtilStatement.municipalValuationZAR;
             }
+          }
+          if (purchasePriceZAR > 0) {
+            updates.purchasePriceZAR = purchasePriceZAR;
+          }
+          if (monthlyBondPaymentZAR > 0) {
+            updates.monthlyBondPaymentZAR = monthlyBondPaymentZAR;
+          }
+          if (bondPaymentEffectiveDate) {
+            updates.bondPaymentEffectiveDate = bondPaymentEffectiveDate;
           }
           if (Object.keys(updates).length > 0) {
             updateRental(targetPropertyId, updates);
@@ -755,6 +820,13 @@ export default function UnifiedPdfVerificationModal({
                       className="w-full text-xs font-mono font-bold px-2.5 py-1.5 border border-slate-300 rounded-lg bg-white text-slate-900 focus:ring-1 focus:ring-purple-500 focus:outline-none"
                     />
                   </div>
+
+                  {propertyType === 'Freehold House' && leviesZAR > 0 && (
+                    <div className="col-span-2 sm:col-span-4 bg-amber-50 border border-amber-200 text-amber-900 text-[10px] p-2 rounded-lg flex items-center gap-1.5">
+                      <AlertCircle className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                      <span>Freehold House Title: Body Corporate levies are not applicable to freehold properties and will be saved as R0.</span>
+                    </div>
+                  )}
                 </div>
 
                 {/* Bundled Utilities row if present (iGrow statements) */}
@@ -778,6 +850,76 @@ export default function UnifiedPdfVerificationModal({
                     </div>
                   </div>
                 )}
+              </div>
+
+              {/* Capital Valuation & Financing (Market Value, Purchase Price, Bond) */}
+              <div className="bg-purple-50/60 rounded-xl p-4 border border-purple-200/80 space-y-3">
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-purple-900 flex items-center gap-1.5">
+                    <TrendingUp className="w-3.5 h-3.5 text-purple-700" />
+                    <span>Capital Valuation & Financing (ZAR)</span>
+                  </span>
+                  {purchasePriceZAR === 0 && (
+                    <span className="text-[10px] font-bold text-amber-800 bg-amber-100 px-2 py-0.5 rounded-full border border-amber-300 flex items-center gap-1">
+                      <AlertCircle className="w-3 h-3 text-amber-600" />
+                      <span>Purchase Price Recommended</span>
+                    </span>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+                  <div>
+                    <label className="block text-[10px] font-semibold text-slate-700 mb-1">
+                      Market Valuation (ZAR)
+                    </label>
+                    <input
+                      type="number"
+                      value={marketValueZAR}
+                      onChange={(e) => handleMarketValueChange(Number(e.target.value) || 0)}
+                      className="w-full text-xs font-mono font-bold px-2.5 py-1.5 border border-purple-300 rounded-lg bg-white text-slate-900 focus:ring-1 focus:ring-purple-500 focus:outline-none"
+                      placeholder="0"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-semibold text-slate-700 mb-1">
+                      Purchase Price (ZAR)
+                    </label>
+                    <input
+                      type="number"
+                      value={purchasePriceZAR}
+                      onChange={(e) => handlePurchasePriceChange(Number(e.target.value) || 0)}
+                      className="w-full text-xs font-mono font-bold px-2.5 py-1.5 border border-purple-300 rounded-lg bg-white text-slate-900 focus:ring-1 focus:ring-purple-500 focus:outline-none"
+                      placeholder="0"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-semibold text-slate-700 mb-1">
+                      Monthly Bond Payment (ZAR)
+                    </label>
+                    <input
+                      type="number"
+                      value={monthlyBondPaymentZAR}
+                      onChange={(e) => handleBondPaymentChange(Number(e.target.value) || 0)}
+                      className="w-full text-xs font-mono font-bold px-2.5 py-1.5 border border-purple-300 rounded-lg bg-white text-slate-900 focus:ring-1 focus:ring-purple-500 focus:outline-none"
+                      placeholder="0"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-semibold text-slate-700 mb-1">
+                      Bond Effective Month
+                    </label>
+                    <input
+                      type="text"
+                      value={bondPaymentEffectiveDate}
+                      onChange={(e) => handleBondEffectiveDateChange(e.target.value)}
+                      className="w-full text-xs font-mono font-bold px-2.5 py-1.5 border border-purple-300 rounded-lg bg-white text-slate-900 focus:ring-1 focus:ring-purple-500 focus:outline-none"
+                      placeholder="YYYY-MM (e.g. 2026-05)"
+                    />
+                  </div>
+                </div>
               </div>
 
               {/* Tenant Details & Deposit */}
@@ -882,20 +1024,29 @@ export default function UnifiedPdfVerificationModal({
                 </div>
               </div>
 
-              {/* New Property Financials — shown when creating from utility bill */}
+              {/* New Property Financials & Capital Valuation — shown when creating from utility bill */}
               {isNewProperty && (
                 <div className="bg-purple-50/70 rounded-xl p-4 border border-purple-200 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-purple-700 block">
-                      New Property Financials
+                  <div className="flex items-center justify-between flex-wrap gap-2">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-purple-900 flex items-center gap-1.5">
+                      <TrendingUp className="w-3.5 h-3.5 text-purple-700" />
+                      <span>New Property Financials & Financing</span>
                     </span>
-                    {data.utilityStatement?.municipalValuationZAR ? (
-                      <span className="text-[10px] font-semibold text-purple-600 bg-purple-100 px-2 py-0.5 rounded-full border border-purple-200">
-                        ✓ Municipal Valuation Extracted (R {data.utilityStatement.municipalValuationZAR.toLocaleString()})
-                      </span>
-                    ) : null}
+                    <div className="flex items-center gap-2 flex-wrap">
+                      {data.utilityStatement?.municipalValuationZAR ? (
+                        <span className="text-[10px] font-semibold text-purple-700 bg-purple-100 px-2 py-0.5 rounded-full border border-purple-200">
+                          ✓ Municipal Valuation Extracted (R {data.utilityStatement.municipalValuationZAR.toLocaleString()})
+                        </span>
+                      ) : null}
+                      {purchasePriceZAR === 0 && (
+                        <span className="text-[10px] font-bold text-amber-800 bg-amber-100 px-2 py-0.5 rounded-full border border-amber-300 flex items-center gap-1">
+                          <AlertCircle className="w-3 h-3 text-amber-600" />
+                          <span>Purchase Price Recommended</span>
+                        </span>
+                      )}
+                    </div>
                   </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3">
                     <div>
                       <label className="block text-[10px] font-semibold text-slate-700 mb-1">
                         Gross Monthly Rent (ZAR)
@@ -930,6 +1081,30 @@ export default function UnifiedPdfVerificationModal({
                         onChange={(e) => handlePurchasePriceChange(Number(e.target.value) || 0)}
                         className="w-full text-xs font-mono font-bold px-2.5 py-1.5 border border-purple-300 rounded-lg bg-white text-slate-900 focus:ring-1 focus:ring-purple-500 focus:outline-none"
                         placeholder="0"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-semibold text-slate-700 mb-1">
+                        Monthly Bond (ZAR)
+                      </label>
+                      <input
+                        type="number"
+                        value={monthlyBondPaymentZAR}
+                        onChange={(e) => handleBondPaymentChange(Number(e.target.value) || 0)}
+                        className="w-full text-xs font-mono font-bold px-2.5 py-1.5 border border-purple-300 rounded-lg bg-white text-slate-900 focus:ring-1 focus:ring-purple-500 focus:outline-none"
+                        placeholder="0"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-semibold text-slate-700 mb-1">
+                        Bond Effective Month
+                      </label>
+                      <input
+                        type="text"
+                        value={bondPaymentEffectiveDate}
+                        onChange={(e) => handleBondEffectiveDateChange(e.target.value)}
+                        className="w-full text-xs font-mono font-bold px-2.5 py-1.5 border border-purple-300 rounded-lg bg-white text-slate-900 focus:ring-1 focus:ring-purple-500 focus:outline-none"
+                        placeholder="YYYY-MM"
                       />
                     </div>
                   </div>

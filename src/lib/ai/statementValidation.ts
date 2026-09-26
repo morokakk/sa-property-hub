@@ -26,6 +26,7 @@ export const ExtractedRentalUnitSchema = z.object({
   purchasePriceZAR: z.number().positive().optional(),
   monthlyBondPaymentZAR: z.number().min(0).optional(),
   bondPaymentEffectiveDate: z.string().optional(),
+  propertyType: z.enum(['Sectional Title Apartment', 'Freehold House', 'Townhouse / Cluster', 'Multi-unit Commercial']).optional(),
   depositHeldZAR: z.number().optional(),
   netOperatingIncomeZAR: z.number().optional().default(0),
   netPayoutZAR: z.number().optional(),

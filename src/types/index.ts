@@ -553,6 +553,7 @@ export interface ExtractedRentalUnit {
   netPayoutZAR?: number; // alias for netOperatingIncomeZAR
   managingAgent?: string;
   statementDate?: string;
+  propertyType?: PropertyTitleType;
 }
 
 

@@ -171,6 +171,32 @@ export async function parseStatementWithAnthropic(
                   description:
                     'Estimated property market value in ZAR if explicitly mentioned on statement, otherwise omit.',
                 },
+                purchasePriceZAR: {
+                  type: 'number',
+                  description:
+                    'Original property purchase price in ZAR if explicitly mentioned on statement, otherwise omit.',
+                },
+                monthlyBondPaymentZAR: {
+                  type: 'number',
+                  description:
+                    'Monthly bond repayment / mortgage debit order amount in ZAR if itemized on statement, otherwise omit.',
+                },
+                bondPaymentEffectiveDate: {
+                  type: 'string',
+                  description:
+                    'Effective date or month of bond payment in YYYY-MM or YYYY-MM-DD format if mentioned, otherwise omit.',
+                },
+                propertyType: {
+                  type: 'string',
+                  enum: [
+                    'Sectional Title Apartment',
+                    'Freehold House',
+                    'Townhouse / Cluster',
+                    'Multi-unit Commercial',
+                  ],
+                  description:
+                    'South African property title type if identifiable from scheme name or address.',
+                },
                 depositHeldZAR: {
                   type: 'number',
                   description: 'Tenant security deposit held in trust account.',
@@ -208,7 +234,7 @@ export async function parseStatementWithAnthropic(
         model: effectiveModel,
         max_tokens: 4096,
         system:
-          'You are an expert South African real estate forensic accountant analyzing visual managing agent statements (specifically iGrow Rentals / WeconnectU). Parse all rental ledger entries, fee deductions, and net owner payouts with exact mathematical fidelity. Pay special attention to agent commission: check if the deducted commission invoice is inclusive of 15% VAT (e.g. Invoiced fee R850.54 including R110.94 VAT), and set agencyCommissionVatZAR and isCommissionInclusiveOfVat: true accordingly so that VAT is not double-charged in downstream calculations. Always call the extract_rental_statements tool.',
+          'You are an expert South African real estate forensic accountant analyzing visual managing agent statements (specifically iGrow Rentals / WeconnectU). Parse all rental ledger entries, fee deductions, and net owner payouts with exact mathematical fidelity. Pay special attention to agent commission: check if the deducted commission invoice is inclusive of 15% VAT (e.g. Invoiced fee R850.54 including R110.94 VAT), and set agencyCommissionVatZAR and isCommissionInclusiveOfVat: true accordingly so that VAT is not double-charged in downstream calculations. If purchase price, bond repayments, or property valuation are noted on the statement, extract them into purchasePriceZAR, monthlyBondPaymentZAR, and estimatedMarketValueZAR. Always call the extract_rental_statements tool.',
         messages: [
           {
             role: 'user',

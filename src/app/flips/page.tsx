@@ -33,6 +33,7 @@ import {
   FileSpreadsheet,
   FileText,
   ArrowRightLeft,
+  Landmark,
 } from 'lucide-react';
 import Link from 'next/link';
 import { exportFlipBOQCSV } from '@/lib/export/csvExport';
@@ -55,6 +56,7 @@ export default function FlipsManagerPage() {
   const deleteSupplier = usePortfolioStore((state) => state.deleteSupplier);
   const funding = usePortfolioStore((state) => state.funding);
   const investorProfile = usePortfolioStore((state) => state.investorProfile);
+  const aiSettings = usePortfolioStore((state) => state.aiSettings);
 
   // Active vs. Sold Archive Tab
   const [viewTab, setViewTab] = useState<'active' | 'archive'>('active');
@@ -249,7 +251,7 @@ export default function FlipsManagerPage() {
       let detectedValuation = 0;
 
       for (const file of files) {
-        const parsed = await parseRentalPdfStatement(file);
+        const parsed = await parseRentalPdfStatement(file, aiSettings);
         if (!parsed.success) continue;
 
         if (parsed.docType === 'municipal_utility' && parsed.utilityStatement) {
@@ -2127,8 +2129,9 @@ export default function FlipsManagerPage() {
               {extractedValuationZAR && extractedValuationZAR > 0 ? (
                 <div className="flex items-center justify-between p-2.5 bg-purple-50 rounded-lg border border-purple-200">
                   <div className="flex items-center gap-1.5 flex-wrap">
-                    <span className="text-xs font-semibold text-purple-900">
-                      🏛️ Municipal Valuation: <strong>{formatZAR(extractedValuationZAR)}</strong>
+                    <span className="text-xs font-semibold text-purple-900 inline-flex items-center gap-1.5">
+                      <Landmark className="w-3.5 h-3.5 text-purple-700" />
+                      <span>Municipal Valuation: <strong>{formatZAR(extractedValuationZAR)}</strong></span>
                     </span>
                     <span className="text-[10px] text-purple-700 bg-purple-100 px-1.5 py-0.5 rounded border border-purple-200 font-medium">
                       CoJ Benchmark
