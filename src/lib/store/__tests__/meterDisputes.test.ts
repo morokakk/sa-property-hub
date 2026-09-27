@@ -116,4 +116,35 @@ describe('usePortfolioStore - Municipal Meter Reading Disputes', () => {
       ?.utilityStatements?.find((s) => s.id === statement!.id);
     expect(updatedStatement?.tenantBillingMethod).toBe('municipal_statement');
   });
+
+  it('correctly associates extracted readings from statement for dispute pre-population', () => {
+    const store = usePortfolioStore.getState();
+    const rentalId = 'rental-2';
+    const rental = store.rentals.find((r) => r.id === rentalId);
+    expect(rental).toBeDefined();
+
+    const aprilStatement = rental?.utilityStatements?.find((s) => s.billingPeriod === 'April 2026');
+    expect(aprilStatement).toBeDefined();
+
+    // Check that rental.meterReadings contains pdf-extracted readings corresponding to this statement
+    const matchingExtractedElec = rental?.meterReadings?.find(
+      (m) =>
+        m.source === 'pdf-extracted' &&
+        m.utilityType === 'electricity' &&
+        m.date.startsWith('2026-04')
+    );
+    expect(matchingExtractedElec).toBeDefined();
+    expect(matchingExtractedElec?.readingValue).toBe(28410);
+    expect(matchingExtractedElec?.meterNumber).toBe('ETH-E-33019');
+
+    const matchingExtractedWater = rental?.meterReadings?.find(
+      (m) =>
+        m.source === 'pdf-extracted' &&
+        m.utilityType === 'water' &&
+        m.date.startsWith('2026-04')
+    );
+    expect(matchingExtractedWater).toBeDefined();
+    expect(matchingExtractedWater?.readingValue).toBe(1485);
+    expect(matchingExtractedWater?.meterNumber).toBe('ETH-W-77491');
+  });
 });

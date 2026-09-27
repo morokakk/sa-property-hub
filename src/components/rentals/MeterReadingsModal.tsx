@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import {
   X,
   Gauge,
@@ -23,6 +23,7 @@ import {
 import { usePortfolioStore } from '@/lib/store/usePortfolioStore';
 import { MeterReading, MeterDisputeStatus, MeterDisputeReason } from '@/types';
 import { formatDate, formatZAR } from '@/lib/formatters';
+import { calculateMunicipalDisputeImpact } from '@/lib/calculations/municipalTariffs';
 
 interface MeterReadingsModalProps {
   propertyId: string | null;
@@ -103,6 +104,56 @@ export default function MeterReadingsModal({
     );
   }, [availableStatements, disputedStatementId]);
 
+  const formTopRef = useRef<HTMLDivElement>(null);
+
+  // Matching council reading extracted from the selected statement
+  const statementExtractedReading = useMemo(() => {
+    if (!selectedStatement) return null;
+    const fromStmt = (selectedStatement.extractedMeterReadings || []).find(
+      (r) => r.utilityType === utilityType
+    );
+    if (fromStmt) return fromStmt;
+
+    const fromRental = (rental?.meterReadings || []).find(
+      (r) =>
+        r.source === 'pdf-extracted' &&
+        r.utilityType === utilityType &&
+        (r.date === selectedStatement.statementDate ||
+          r.date.startsWith(selectedStatement.statementDate.substring(0, 7)))
+    );
+    return fromRental || null;
+  }, [selectedStatement, utilityType, rental?.meterReadings]);
+
+  // Auto-populate council reading and meter number from statement when dispute mode is active
+  useEffect(() => {
+    if (isDisputed && statementExtractedReading) {
+      setDisputedMunicipalReadingValue(statementExtractedReading.readingValue.toString());
+      if (!meterNumber.trim() && statementExtractedReading.meterNumber) {
+        setMeterNumber(statementExtractedReading.meterNumber);
+      }
+    }
+  }, [isDisputed, selectedStatement?.id, utilityType, statementExtractedReading]);
+
+  // 1-Click dispute action from chronological ledger table
+  const handleInitiateDisputeFromRow = (reading: MeterReading) => {
+    setUtilityType(reading.utilityType);
+    setIsDisputed(true);
+    setDisputedMunicipalReadingValue(reading.readingValue.toString());
+    if (reading.meterNumber) {
+      setMeterNumber(reading.meterNumber);
+    }
+    const matchingStmt = availableStatements.find(
+      (s) =>
+        s.statementDate === reading.date ||
+        (reading.date && s.statementDate.startsWith(reading.date.substring(0, 7)))
+    );
+    if (matchingStmt) {
+      setDisputedStatementId(matchingStmt.id);
+    }
+    setReadingValue('');
+    formTopRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
   // Find latest prior reading for the selected utilityType & meterNumber
   const latestPriorReading = useMemo(() => {
     if (!rental?.meterReadings) return null;
@@ -118,10 +169,19 @@ export default function MeterReadingsModal({
     return filtered[0] || null;
   }, [rental?.meterReadings, utilityType, meterNumber]);
 
+  // Baseline starting index
+  // In dispute mode, prioritize the statement's starting meter reading (e.g. 1468)
+  const effectiveBaseline =
+    isDisputed && statementExtractedReading?.previousReadingValue !== undefined
+      ? statementExtractedReading.previousReadingValue
+      : latestPriorReading
+      ? latestPriorReading.readingValue
+      : undefined;
+
   // Live consumption calculation
   const parsedValue = parseFloat(readingValue);
   const hasValidValue = !isNaN(parsedValue) && parsedValue >= 0;
-  const previousValue = latestPriorReading ? latestPriorReading.readingValue : undefined;
+  const previousValue = effectiveBaseline;
   const calculatedConsumption =
     hasValidValue && previousValue !== undefined
       ? Math.round((parsedValue - previousValue) * 1000) / 1000
@@ -129,20 +189,9 @@ export default function MeterReadingsModal({
 
   const unitLabel = utilityType === 'electricity' ? 'kWh' : 'KL';
 
-  // Live dispute discrepancy & effective tariff derivation
+  // Live dispute discrepancy & municipal tariff calculation
   const parsedMuniReading = parseFloat(disputedMunicipalReadingValue);
   const hasValidMuniReading = !isNaN(parsedMuniReading) && parsedMuniReading >= 0;
-  const muniConsumption =
-    hasValidMuniReading && previousValue !== undefined
-      ? Math.round((parsedMuniReading - previousValue) * 1000) / 1000
-      : undefined;
-
-  const liveConsumptionDiscrepancy =
-    muniConsumption !== undefined && calculatedConsumption !== undefined
-      ? Math.round((muniConsumption - calculatedConsumption) * 1000) / 1000
-      : hasValidMuniReading && hasValidValue
-      ? Math.round((parsedMuniReading - parsedValue) * 1000) / 1000
-      : undefined;
 
   const statementCost = selectedStatement
     ? utilityType === 'electricity'
@@ -150,15 +199,72 @@ export default function MeterReadingsModal({
       : selectedStatement.waterZAR
     : 0;
 
+  const disputeImpact = useMemo(() => {
+    if (!isDisputed) return null;
+    const councilReadingNum = hasValidMuniReading
+      ? parsedMuniReading
+      : statementExtractedReading?.readingValue || 0;
+    const councilPrevReadingNum =
+      statementExtractedReading?.previousReadingValue ??
+      (latestPriorReading ? latestPriorReading.readingValue : undefined);
+    const councilBilledUnitsNum = statementExtractedReading?.consumption;
+    const providerOrCity =
+      selectedStatement?.provider || rental?.city || rental?.address || '';
+
+    return calculateMunicipalDisputeImpact({
+      utilityType,
+      councilReading: councilReadingNum,
+      councilPreviousReading: councilPrevReadingNum,
+      councilBilledUnits: councilBilledUnitsNum,
+      statementCostZAR: statementCost,
+      physicalReading: hasValidValue ? parsedValue : 0,
+      physicalPreviousReading: councilPrevReadingNum,
+      providerOrCity,
+    });
+  }, [
+    isDisputed,
+    hasValidMuniReading,
+    parsedMuniReading,
+    statementExtractedReading,
+    latestPriorReading,
+    utilityType,
+    statementCost,
+    hasValidValue,
+    parsedValue,
+    selectedStatement?.provider,
+    rental?.city,
+    rental?.address,
+  ]);
+
+  const muniConsumption =
+    disputeImpact
+      ? disputeImpact.councilConsumption
+      : hasValidMuniReading && previousValue !== undefined
+      ? Math.round((parsedMuniReading - previousValue) * 1000) / 1000
+      : undefined;
+
+  const liveConsumptionDiscrepancy =
+    disputeImpact && hasValidValue
+      ? disputeImpact.unitsDiscrepancy
+      : muniConsumption !== undefined && calculatedConsumption !== undefined
+      ? Math.round((muniConsumption - calculatedConsumption) * 1000) / 1000
+      : hasValidMuniReading && hasValidValue
+      ? Math.round((parsedMuniReading - parsedValue) * 1000) / 1000
+      : undefined;
+
   const effectiveTariff =
-    statementCost > 0 && muniConsumption && muniConsumption > 0
+    disputeImpact
+      ? disputeImpact.effectiveRatePerUnit
+      : statementCost > 0 && muniConsumption && muniConsumption > 0
       ? statementCost / muniConsumption
       : utilityType === 'electricity'
       ? 3.06
       : 24.12;
 
   const autoDerivedRandImpact =
-    liveConsumptionDiscrepancy !== undefined && liveConsumptionDiscrepancy > 0
+    disputeImpact && hasValidValue
+      ? disputeImpact.cappedDisputeCostZAR
+      : liveConsumptionDiscrepancy !== undefined && liveConsumptionDiscrepancy > 0
       ? Math.round(liveConsumptionDiscrepancy * effectiveTariff * 100) / 100
       : undefined;
 
@@ -182,9 +288,11 @@ export default function MeterReadingsModal({
       date: readingDate,
       utilityType,
       readingValue: parsedValue,
-      previousReadingValue: previousValue,
+      previousReadingValue: effectiveBaseline,
       consumption:
-        calculatedConsumption !== undefined && calculatedConsumption >= 0
+        isDisputed && disputeImpact
+          ? disputeImpact.physicalConsumption
+          : calculatedConsumption !== undefined && calculatedConsumption >= 0
           ? calculatedConsumption
           : undefined,
       meterNumber: meterNumber.trim() || undefined,
@@ -201,11 +309,15 @@ export default function MeterReadingsModal({
             disputedStatementId: disputedStatementId || selectedStatement?.id || undefined,
             disputedMunicipalReadingValue: hasValidMuniReading ? parsedMuniReading : undefined,
             disputeDifferenceConsumption:
-              liveConsumptionDiscrepancy !== undefined ? liveConsumptionDiscrepancy : undefined,
+              disputeImpact && hasValidValue
+                ? disputeImpact.unitsDiscrepancy
+                : liveConsumptionDiscrepancy !== undefined
+                ? liveConsumptionDiscrepancy
+                : undefined,
             disputeEffectiveTariffPerUnit: Math.round(effectiveTariff * 10000) / 10000,
             disputeEstimatedRandImpactZAR: manualEstimatedRand
               ? parseFloat(manualEstimatedRand)
-              : autoDerivedRandImpact,
+              : disputeImpact?.cappedDisputeCostZAR ?? autoDerivedRandImpact,
             disputeLodgedDate: disputeLodgedDate || undefined,
             disputeResolutionNotes: disputeResolutionNotes.trim() || undefined,
           }
@@ -405,251 +517,478 @@ export default function MeterReadingsModal({
             </div>
           )}
 
-          {/* SECTION 1: Log Manual Reading Form */}
-          <div className="bg-slate-50/70 border border-slate-200 rounded-xl p-4.5 space-y-4">
-            <div className="flex items-center justify-between">
-              <h4 className="font-bold text-slate-800 flex items-center gap-2 text-xs uppercase tracking-wider">
-                <PlusCircle className="w-4 h-4 text-cyan-600" />
-                <span>Log New Field / On-Site Meter Reading</span>
-              </h4>
-              <span className="text-[11px] text-slate-400">
-                Current - Previous = Auto-Calculated Consumption
-              </span>
-            </div>
-
-            <form onSubmit={handleSaveReading} noValidate className="space-y-3.5">
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
-                {/* 1. Utility Type Toggle */}
-                <div>
-                  <label className="block text-[11px] font-bold text-slate-600 mb-1">
-                    Utility Type *
-                  </label>
-                  <div className="grid grid-cols-2 gap-1.5 p-1 bg-white border border-slate-200 rounded-lg">
-                    <button
-                      type="button"
-                      onClick={() => setUtilityType('electricity')}
-                      className={`flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-md font-bold text-xs transition-all cursor-pointer ${
-                        utilityType === 'electricity'
-                          ? 'bg-amber-500 text-white shadow-xs'
-                          : 'text-slate-600 hover:text-slate-900'
-                      }`}
-                    >
-                      <Zap className="w-3.5 h-3.5" />
-                      <span>Electricity</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setUtilityType('water')}
-                      className={`flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-md font-bold text-xs transition-all cursor-pointer ${
-                        utilityType === 'water'
-                          ? 'bg-cyan-600 text-white shadow-xs'
-                          : 'text-slate-600 hover:text-slate-900'
-                      }`}
-                    >
-                      <Droplets className="w-3.5 h-3.5" />
-                      <span>Water</span>
-                    </button>
-                  </div>
-                </div>
-
-                {/* 2. Reading Date */}
-                <div>
-                  <label className="block text-[11px] font-bold text-slate-600 mb-1">
-                    Reading Date *
-                  </label>
-                  <input
-                    type="date"
-                    name="readingDate"
-                    autoComplete="off"
-                    required
-                    value={readingDate}
-                    onChange={(e) => setReadingDate(e.target.value)}
-                    className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg text-xs bg-white text-slate-900 font-semibold focus:ring-1 focus:ring-cyan-500 focus:outline-none"
-                  />
-                </div>
-
-                {/* 3. Meter Number */}
-                <div>
-                  <label className="block text-[11px] font-bold text-slate-600 mb-1">
-                    Meter Number / Tag (Optional)
-                  </label>
-                  <input
-                    type="text"
-                    name="meterNumber"
-                    autoComplete="off"
-                    value={meterNumber}
-                    onChange={(e) => setMeterNumber(e.target.value)}
-                    placeholder={utilityType === 'electricity' ? 'e.g. 10003374' : 'e.g. 211001886'}
-                    className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg text-xs bg-white text-slate-900 focus:ring-1 focus:ring-cyan-500 focus:outline-none font-mono"
-                  />
-                </div>
-
-                {/* 4. Reading Value */}
-                <div>
-                  <label className="block text-[11px] font-bold text-slate-600 mb-1">
-                    Reading Value ({unitLabel}) *
-                  </label>
-                  <div className="relative">
-                    <input
-                      type="number"
-                      name="readingValue"
-                      autoComplete="off"
-                      step="any"
-                      required
-                      min="0"
-                      value={readingValue}
-                      onChange={(e) => setReadingValue(e.target.value)}
-                      placeholder="e.g. 1977.00"
-                      className="w-full pl-2.5 pr-10 py-1.5 border border-slate-300 rounded-lg text-xs bg-white text-slate-900 font-mono font-bold focus:ring-1 focus:ring-cyan-500 focus:outline-none"
-                    />
-                    <span className="absolute right-2.5 top-1.5 text-[11px] font-bold text-slate-400 font-mono">
-                      {unitLabel}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Dynamic Auto-Calculated Consumption Preview Box */}
-              <div className="p-3 rounded-lg border bg-white flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-slate-200">
-                <div className="space-y-0.5">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
-                    Dynamic Consumption Calculation ({unitLabel})
+          {/* SECTION 1: Log Manual Reading Form / Side-by-Side Dispute Comparison */}
+          <div ref={formTopRef} className={`rounded-xl transition-all ${
+            isDisputed
+              ? 'bg-amber-50/40 border-2 border-amber-300 p-4 sm:p-5 shadow-xs'
+              : 'bg-slate-50/70 border border-slate-200 p-4.5'
+          } space-y-4`}>
+            {!isDisputed ? (
+              /* Standard Single Reading Entry Form */
+              <>
+                <div className="flex items-center justify-between">
+                  <h4 className="font-bold text-slate-800 flex items-center gap-2 text-xs uppercase tracking-wider">
+                    <PlusCircle className="w-4 h-4 text-cyan-600" />
+                    <span>Log New Field / On-Site Meter Reading</span>
+                  </h4>
+                  <span className="text-[11px] text-slate-400">
+                    Current - Previous = Auto-Calculated Consumption
                   </span>
-                  {latestPriorReading ? (
-                    <div className="text-xs text-slate-600">
-                      Previous baseline: <strong className="font-mono text-slate-800">{latestPriorReading.readingValue.toLocaleString('en-ZA')} {unitLabel}</strong>{' '}
-                      <span className="text-[10px] text-slate-400">({formatDate(latestPriorReading.date)})</span>
-                    </div>
-                  ) : (
-                    <div className="text-xs text-slate-500 italic">
-                      No prior reading recorded for this utility. This entry will establish the baseline.
-                    </div>
-                  )}
                 </div>
 
-                {calculatedConsumption !== undefined ? (
-                  calculatedConsumption >= 0 ? (
-                    <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-200 px-3 py-1.5 rounded-lg text-emerald-800">
-                      <span className="text-[10px] font-bold uppercase">Delta:</span>
-                      <strong className="text-sm font-black font-mono">
-                        +{calculatedConsumption.toLocaleString('en-ZA')} {unitLabel}
-                      </strong>
+                <form onSubmit={handleSaveReading} noValidate className="space-y-3.5">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+                    {/* 1. Utility Type Toggle */}
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-600 mb-1">
+                        Utility Type *
+                      </label>
+                      <div className="grid grid-cols-2 gap-1.5 p-1 bg-white border border-slate-200 rounded-lg">
+                        <button
+                          type="button"
+                          onClick={() => setUtilityType('electricity')}
+                          className={`flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-md font-bold text-xs transition-all cursor-pointer ${
+                            utilityType === 'electricity'
+                              ? 'bg-amber-500 text-white shadow-xs'
+                              : 'text-slate-600 hover:text-slate-900'
+                          }`}
+                        >
+                          <Zap className="w-3.5 h-3.5" />
+                          <span>Electricity</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setUtilityType('water')}
+                          className={`flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-md font-bold text-xs transition-all cursor-pointer ${
+                            utilityType === 'water'
+                              ? 'bg-cyan-600 text-white shadow-xs'
+                              : 'text-slate-600 hover:text-slate-900'
+                          }`}
+                        >
+                          <Droplets className="w-3.5 h-3.5" />
+                          <span>Water</span>
+                        </button>
+                      </div>
                     </div>
-                  ) : (
-                    <div className="flex items-center gap-1.5 bg-amber-50 border border-amber-200 px-3 py-1.5 rounded-lg text-amber-800 text-[11px]">
-                      <AlertCircle className="w-3.5 h-3.5 text-amber-600 shrink-0" />
-                      <span>
-                        Lower than previous ({latestPriorReading?.readingValue}). Verify meter reset/rollover.
+
+                    {/* 2. Reading Date */}
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-600 mb-1">
+                        Reading Date *
+                      </label>
+                      <input
+                        type="date"
+                        name="readingDate"
+                        autoComplete="off"
+                        required
+                        value={readingDate}
+                        onChange={(e) => setReadingDate(e.target.value)}
+                        className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg text-xs bg-white text-slate-900 font-semibold focus:ring-1 focus:ring-cyan-500 focus:outline-none"
+                      />
+                    </div>
+
+                    {/* 3. Meter Number */}
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-600 mb-1">
+                        Meter Number / Tag (Optional)
+                      </label>
+                      <input
+                        type="text"
+                        name="meterNumber"
+                        autoComplete="off"
+                        value={meterNumber}
+                        onChange={(e) => setMeterNumber(e.target.value)}
+                        placeholder={utilityType === 'electricity' ? 'e.g. 10003374' : 'e.g. 211001886'}
+                        className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg text-xs bg-white text-slate-900 focus:ring-1 focus:ring-cyan-500 focus:outline-none font-mono"
+                      />
+                    </div>
+
+                    {/* 4. Reading Value */}
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-600 mb-1">
+                        Reading Value ({unitLabel}) *
+                      </label>
+                      <div className="relative">
+                        <input
+                          type="number"
+                          name="readingValue"
+                          autoComplete="off"
+                          step="any"
+                          required
+                          min="0"
+                          value={readingValue}
+                          onChange={(e) => setReadingValue(e.target.value)}
+                          placeholder="e.g. 1977.00"
+                          className="w-full pl-2.5 pr-10 py-1.5 border border-slate-300 rounded-lg text-xs bg-white text-slate-900 font-mono font-bold focus:ring-1 focus:ring-cyan-500 focus:outline-none"
+                        />
+                        <span className="absolute right-2.5 top-1.5 text-[11px] font-bold text-slate-400 font-mono">
+                          {unitLabel}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Dynamic Auto-Calculated Consumption Preview Box */}
+                  <div className="p-3 rounded-lg border bg-white flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-slate-200">
+                    <div className="space-y-0.5">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+                        Dynamic Consumption Calculation ({unitLabel})
+                      </span>
+                      {latestPriorReading ? (
+                        <div className="text-xs text-slate-600">
+                          Previous baseline: <strong className="font-mono text-slate-800">{latestPriorReading.readingValue.toLocaleString('en-ZA')} {unitLabel}</strong>{' '}
+                          <span className="text-[10px] text-slate-400">({formatDate(latestPriorReading.date)})</span>
+                        </div>
+                      ) : (
+                        <div className="text-xs text-slate-500 italic">
+                          No prior reading recorded for this utility. This entry will establish the baseline.
+                        </div>
+                      )}
+                    </div>
+
+                    {calculatedConsumption !== undefined ? (
+                      calculatedConsumption >= 0 ? (
+                        <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-200 px-3 py-1.5 rounded-lg text-emerald-800">
+                          <span className="text-[10px] font-bold uppercase">Delta:</span>
+                          <strong className="text-sm font-black font-mono">
+                            +{calculatedConsumption.toLocaleString('en-ZA')} {unitLabel}
+                          </strong>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-1.5 bg-amber-50 border border-amber-200 px-3 py-1.5 rounded-lg text-amber-800 text-[11px]">
+                          <AlertCircle className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                          <span>
+                            Lower than previous ({latestPriorReading?.readingValue}). Verify meter reset/rollover.
+                          </span>
+                        </div>
+                      )
+                    ) : (
+                      <span className="text-[11px] text-slate-400">
+                        Enter reading value to calculate delta
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Secondary Form Inputs */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    {/* Reading Type */}
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-600 mb-1">
+                        Reading Type
+                      </label>
+                      <div className="grid grid-cols-2 gap-1.5 p-1 bg-white border border-slate-200 rounded-lg">
+                        <button
+                          type="button"
+                          onClick={() => setReadingType('Actual')}
+                          className={`py-1 text-center font-bold text-[11px] rounded transition-colors cursor-pointer ${
+                            readingType === 'Actual'
+                              ? 'bg-slate-800 text-white'
+                              : 'text-slate-600 hover:text-slate-900'
+                          }`}
+                        >
+                          Actual
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setReadingType('Estimated')}
+                          className={`py-1 text-center font-bold text-[11px] rounded transition-colors cursor-pointer ${
+                            readingType === 'Estimated'
+                              ? 'bg-amber-600 text-white'
+                              : 'text-slate-600 hover:text-slate-900'
+                          }`}
+                        >
+                          Estimated
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Photo Vault Link */}
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-600 mb-1 flex items-center gap-1">
+                        <Camera className="w-3 h-3 text-slate-400" />
+                        <span>Photo Vault / Cloud Drive URL</span>
+                      </label>
+                      <input
+                        type="url"
+                        name="photoUrl"
+                        autoComplete="off"
+                        value={photoUrl}
+                        onChange={(e) => setPhotoUrl(e.target.value)}
+                        placeholder="https://photos.app.goo.gl/... or OneDrive"
+                        className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg text-xs bg-white text-slate-900 focus:ring-1 focus:ring-cyan-500 focus:outline-none"
+                      />
+                    </div>
+
+                    {/* Notes */}
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-600 mb-1">
+                        Notes / Inspection Context
+                      </label>
+                      <input
+                        type="text"
+                        name="readingNotes"
+                        autoComplete="off"
+                        value={notes}
+                        onChange={(e) => setNotes(e.target.value)}
+                        placeholder="e.g. Quarterly physical inspection"
+                        className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg text-xs bg-white text-slate-900 focus:ring-1 focus:ring-cyan-500 focus:outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Dispute Toggle Checkbox */}
+                  <div className="pt-2 border-t border-slate-200">
+                    <label className="flex items-center gap-2 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={isDisputed}
+                        onChange={(e) => setIsDisputed(e.target.checked)}
+                        className="w-4 h-4 rounded text-amber-600 focus:ring-amber-500 border-slate-300 cursor-pointer"
+                      />
+                      <span className="font-bold text-xs text-amber-900 flex items-center gap-1.5">
+                        <AlertCircle className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                        <span>Flag as Municipal Reading Dispute (Contest Council Estimate / Dial Error)</span>
+                      </span>
+                    </label>
+                  </div>
+
+                  {/* Submit Button */}
+                  <div className="flex justify-end pt-1">
+                    <button
+                      type="submit"
+                      className="px-4 py-2 text-white rounded-lg font-bold text-xs flex items-center gap-1.5 shadow-sm transition-colors cursor-pointer bg-cyan-600 hover:bg-cyan-700"
+                    >
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      <span>Save Reading to Ledger</span>
+                    </button>
+                  </div>
+                </form>
+              </>
+            ) : (
+              /* Redesigned Side-by-Side Comparative Dispute Form */
+              <form onSubmit={handleSaveReading} noValidate className="space-y-4">
+                {/* Dispute Mode Header */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 bg-amber-100/80 border border-amber-300 rounded-xl">
+                  <div className="flex items-start gap-2.5">
+                    <div className="p-2 bg-amber-500 text-white rounded-lg shrink-0 mt-0.5 shadow-2xs">
+                      <FileWarning className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h4 className="font-bold text-xs text-amber-950 uppercase tracking-wide flex items-center gap-1.5">
+                        <span>Municipal Dispute Side-by-Side Comparison</span>
+                        <span className="text-[10px] font-bold px-2 py-0.2 rounded-full bg-amber-200 text-amber-900 border border-amber-300">
+                          Active
+                        </span>
+                      </h4>
+                      <p className="text-[11px] text-amber-900 mt-0.5">
+                        Cross-reference your verified on-site physical meter dials directly against the council statement claim.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 self-start sm:self-auto shrink-0">
+                    {/* Utility Type Picker */}
+                    <div className="flex items-center gap-1 p-1 bg-white border border-amber-300 rounded-lg">
+                      <button
+                        type="button"
+                        onClick={() => setUtilityType('electricity')}
+                        className={`flex items-center gap-1 py-1 px-2.5 rounded font-bold text-xs transition-all cursor-pointer ${
+                          utilityType === 'electricity'
+                            ? 'bg-amber-500 text-white shadow-2xs'
+                            : 'text-slate-600 hover:text-slate-900'
+                        }`}
+                      >
+                        <Zap className="w-3 h-3" />
+                        <span>Electricity</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setUtilityType('water')}
+                        className={`flex items-center gap-1 py-1 px-2.5 rounded font-bold text-xs transition-all cursor-pointer ${
+                          utilityType === 'water'
+                            ? 'bg-cyan-600 text-white shadow-2xs'
+                            : 'text-slate-600 hover:text-slate-900'
+                        }`}
+                      >
+                        <Droplets className="w-3 h-3" />
+                        <span>Water</span>
+                      </button>
+                    </div>
+
+                    {/* Exit Dispute Button */}
+                    <button
+                      type="button"
+                      onClick={() => setIsDisputed(false)}
+                      className="px-2.5 py-1.5 text-[11px] font-bold text-amber-900 hover:text-amber-950 bg-white hover:bg-amber-50 border border-amber-300 rounded-lg transition-colors cursor-pointer"
+                    >
+                      Exit Dispute
+                    </button>
+                  </div>
+                </div>
+
+                {/* The 2-Column Side-by-Side Card Comparison */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* COLUMN 1: Your Verified On-Site Reading */}
+                  <div className="p-4 bg-white border-2 border-emerald-400 rounded-xl space-y-3 shadow-xs">
+                    <div className="flex items-center justify-between pb-2 border-b border-emerald-100">
+                      <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-950 uppercase tracking-wide">
+                        <Gauge className="w-4 h-4 text-emerald-600" />
+                        <span>1. Your Physical Reading (On-Site)</span>
+                      </div>
+                      <span className="text-[10px] font-bold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-full">
+                        Physical Dials
                       </span>
                     </div>
-                  )
-                ) : (
-                  <span className="text-[11px] text-slate-400">
-                    Enter reading value to calculate delta
-                  </span>
-                )}
-              </div>
 
-              {/* Secondary Form Inputs */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                {/* Reading Type */}
-                <div>
-                  <label className="block text-[11px] font-bold text-slate-600 mb-1">
-                    Reading Type
-                  </label>
-                  <div className="grid grid-cols-2 gap-1.5 p-1 bg-white border border-slate-200 rounded-lg">
-                    <button
-                      type="button"
-                      onClick={() => setReadingType('Actual')}
-                      className={`py-1 text-center font-bold text-[11px] rounded transition-colors cursor-pointer ${
-                        readingType === 'Actual'
-                          ? 'bg-slate-800 text-white'
-                          : 'text-slate-600 hover:text-slate-900'
-                      }`}
-                    >
-                      Actual
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setReadingType('Estimated')}
-                      className={`py-1 text-center font-bold text-[11px] rounded transition-colors cursor-pointer ${
-                        readingType === 'Estimated'
-                          ? 'bg-amber-600 text-white'
-                          : 'text-slate-600 hover:text-slate-900'
-                      }`}
-                    >
-                      Estimated
-                    </button>
+                    {/* Primary Physical Dial Reading Input */}
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-800 mb-1">
+                        Your Physical Dial Reading ({unitLabel}) *
+                      </label>
+                      <div className="relative">
+                        <input
+                          type="number"
+                          step="any"
+                          required
+                          value={readingValue}
+                          onChange={(e) => setReadingValue(e.target.value)}
+                          placeholder="e.g. 28260"
+                          className="w-full pl-3 pr-14 py-2 border-2 border-emerald-500 rounded-lg text-sm bg-emerald-50/20 text-slate-950 font-mono font-black focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                        />
+                        <span className="absolute right-3 top-2.5 text-xs font-black text-emerald-800 font-mono">
+                          {unitLabel}
+                        </span>
+                      </div>
+                      <p className="text-[10px] text-slate-500 mt-1">
+                        The numeric counter/index physically observed on the meter enclosure dials.
+                      </p>
+                    </div>
+
+                    {/* Meter Serial # & Inspection Date */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                          Meter Serial # / Tag
+                        </label>
+                        <input
+                          type="text"
+                          value={meterNumber}
+                          onChange={(e) => setMeterNumber(e.target.value)}
+                          placeholder={utilityType === 'electricity' ? 'e.g. 10003374' : 'e.g. 211001886'}
+                          className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg text-xs bg-white text-slate-900 font-mono focus:ring-1 focus:ring-emerald-500 focus:outline-none"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                          Physical Inspection Date *
+                        </label>
+                        <input
+                          type="date"
+                          required
+                          value={readingDate}
+                          onChange={(e) => setReadingDate(e.target.value)}
+                          className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg text-xs bg-white text-slate-900 font-semibold focus:ring-1 focus:ring-emerald-500 focus:outline-none"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Photo Evidence URL & Reading Type */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-700 mb-1 flex items-center gap-1">
+                          <Camera className="w-3 h-3 text-slate-500" />
+                          <span>Photo Vault URL</span>
+                        </label>
+                        <input
+                          type="url"
+                          value={photoUrl}
+                          onChange={(e) => setPhotoUrl(e.target.value)}
+                          placeholder="https://photos.app.goo.gl/..."
+                          className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg text-xs bg-white text-slate-900 focus:ring-1 focus:ring-emerald-500 focus:outline-none"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                          Reading Type
+                        </label>
+                        <div className="grid grid-cols-2 gap-1 p-0.5 bg-slate-100 border border-slate-200 rounded-lg">
+                          <button
+                            type="button"
+                            onClick={() => setReadingType('Actual')}
+                            className={`py-1 text-center font-bold text-[10px] rounded transition-colors ${
+                              readingType === 'Actual'
+                                ? 'bg-emerald-700 text-white'
+                                : 'text-slate-600 hover:text-slate-900'
+                            }`}
+                          >
+                            Actual (Dials)
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setReadingType('Estimated')}
+                            className={`py-1 text-center font-bold text-[10px] rounded transition-colors ${
+                              readingType === 'Estimated'
+                                ? 'bg-amber-600 text-white'
+                                : 'text-slate-600 hover:text-slate-900'
+                            }`}
+                          >
+                            Estimate
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Physical Consumption Preview */}
+                    <div className="p-2.5 rounded-lg bg-emerald-50/70 border border-emerald-200 text-xs">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-bold uppercase text-emerald-800">
+                          Physical Usage Delta:
+                        </span>
+                        {disputeImpact?.isRolloverOrInverted ? (
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[10px] font-bold text-amber-800 bg-amber-100 px-1.5 py-0.5 rounded border border-amber-200">
+                              Dials &lt; Baseline
+                            </span>
+                            <strong className="font-mono text-amber-950 font-black">
+                              0 {unitLabel}
+                            </strong>
+                          </div>
+                        ) : calculatedConsumption !== undefined ? (
+                          <strong className="font-mono text-emerald-950 font-black">
+                            {calculatedConsumption >= 0 ? `+${calculatedConsumption.toLocaleString('en-ZA')}` : calculatedConsumption.toLocaleString('en-ZA')} {unitLabel}
+                          </strong>
+                        ) : (
+                          <span className="text-[10px] text-slate-400">Enter reading to compute</span>
+                        )}
+                      </div>
+                      {effectiveBaseline !== undefined && (
+                        <div className="text-[10px] text-slate-500 mt-0.5">
+                          Baseline: {effectiveBaseline.toLocaleString('en-ZA')} {unitLabel}{' '}
+                          {statementExtractedReading
+                            ? '(Statement Previous Index)'
+                            : latestPriorReading
+                            ? `(${formatDate(latestPriorReading.date)})`
+                            : ''}
+                        </div>
+                      )}
+                    </div>
                   </div>
-                </div>
 
-                {/* Photo Vault Link */}
-                <div>
-                  <label className="block text-[11px] font-bold text-slate-600 mb-1 flex items-center gap-1">
-                    <Camera className="w-3 h-3 text-slate-400" />
-                    <span>Photo Vault / Cloud Drive URL</span>
-                  </label>
-                  <input
-                    type="url"
-                    name="photoUrl"
-                    autoComplete="off"
-                    value={photoUrl}
-                    onChange={(e) => setPhotoUrl(e.target.value)}
-                    placeholder="https://photos.app.goo.gl/... or OneDrive"
-                    className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg text-xs bg-white text-slate-900 focus:ring-1 focus:ring-cyan-500 focus:outline-none"
-                  />
-                </div>
+                  {/* COLUMN 2: Contested Municipal Statement (Council Billed) */}
+                  <div className="p-4 bg-amber-50/60 border-2 border-amber-300 rounded-xl space-y-3 shadow-xs">
+                    <div className="flex items-center justify-between pb-2 border-b border-amber-200">
+                      <div className="flex items-center gap-1.5 text-xs font-bold text-amber-950 uppercase tracking-wide">
+                        <FileWarning className="w-4 h-4 text-amber-600" />
+                        <span>2. Contested Municipal Bill (Council)</span>
+                      </div>
+                      <span className="text-[10px] font-bold text-amber-900 bg-amber-200 px-2 py-0.5 rounded-full">
+                        Council Claim
+                      </span>
+                    </div>
 
-                {/* Notes */}
-                <div>
-                  <label className="block text-[11px] font-bold text-slate-600 mb-1">
-                    Notes / Inspection Context
-                  </label>
-                  <input
-                    type="text"
-                    name="readingNotes"
-                    autoComplete="off"
-                    value={notes}
-                    onChange={(e) => setNotes(e.target.value)}
-                    placeholder="e.g. Quarterly physical inspection"
-                    className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg text-xs bg-white text-slate-900 focus:ring-1 focus:ring-cyan-500 focus:outline-none"
-                  />
-                </div>
-              </div>
-
-              {/* Dispute Toggle Checkbox */}
-              <div className="pt-2 border-t border-slate-200">
-                <label className="flex items-center gap-2 cursor-pointer select-none">
-                  <input
-                    type="checkbox"
-                    checked={isDisputed}
-                    onChange={(e) => setIsDisputed(e.target.checked)}
-                    className="w-4 h-4 rounded text-amber-600 focus:ring-amber-500 border-slate-300"
-                  />
-                  <span className="font-bold text-xs text-amber-900 flex items-center gap-1.5">
-                    <AlertCircle className="w-3.5 h-3.5 text-amber-600 shrink-0" />
-                    <span>Flag as Municipal Reading Dispute (Contest Council Estimate / Dial Error)</span>
-                  </span>
-                </label>
-              </div>
-
-              {/* Collapsible Dispute Fields */}
-              {isDisputed && (
-                <div className="p-3.5 bg-amber-50/80 border border-amber-300 rounded-xl space-y-3 animate-in fade-in">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-bold uppercase tracking-wider text-amber-900 flex items-center gap-1.5">
-                      <FileWarning className="w-3.5 h-3.5 text-amber-600" />
-                      <span>Municipal Dispute Details</span>
-                    </span>
-                    <span className="text-[10px] text-amber-700">
-                      Cross-reference against municipal statement
-                    </span>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
                     {/* Contested Statement Picker */}
                     <div>
-                      <label className="block text-[11px] font-bold text-amber-900 mb-1">
+                      <label className="block text-[11px] font-bold text-amber-950 mb-1">
                         Contested Statement Period *
                       </label>
                       <select
@@ -665,22 +1004,125 @@ export default function MeterReadingsModal({
                       </select>
                     </div>
 
-                    {/* Municipal Claimed Reading Value */}
+                    {/* Council Claimed Reading Input */}
                     <div>
-                      <label className="block text-[11px] font-bold text-amber-900 mb-1">
-                        Council Statement Reading ({unitLabel})
-                      </label>
-                      <input
-                        type="number"
-                        step="any"
-                        value={disputedMunicipalReadingValue}
-                        onChange={(e) => setDisputedMunicipalReadingValue(e.target.value)}
-                        placeholder="What council statement showed"
-                        className="w-full px-2.5 py-1.5 border border-amber-300 rounded-lg text-xs bg-white text-slate-900 font-mono font-bold focus:ring-1 focus:ring-amber-500 focus:outline-none"
-                      />
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="block text-[11px] font-bold text-amber-950">
+                          Council Statement Reading ({unitLabel}) *
+                        </label>
+                        {statementExtractedReading ? (
+                          <span className="text-[9px] font-bold text-emerald-800 bg-emerald-100 border border-emerald-300 px-1.5 py-0.2 rounded flex items-center gap-1">
+                            <CheckCircle2 className="w-2.5 h-2.5" />
+                            Auto-pulled from PDF
+                          </span>
+                        ) : (
+                          <span className="text-[9px] text-amber-700 italic">
+                            No dials on bill - manual
+                          </span>
+                        )}
+                      </div>
+                      <div className="relative">
+                        <input
+                          type="number"
+                          step="any"
+                          required
+                          value={disputedMunicipalReadingValue}
+                          onChange={(e) => setDisputedMunicipalReadingValue(e.target.value)}
+                          placeholder="What council statement showed"
+                          className="w-full pl-3 pr-14 py-2 border-2 border-amber-400 rounded-lg text-sm bg-white text-slate-950 font-mono font-black focus:ring-2 focus:ring-amber-500 focus:outline-none"
+                        />
+                        <span className="absolute right-3 top-2.5 text-xs font-black text-amber-800 font-mono">
+                          {unitLabel}
+                        </span>
+                      </div>
+                      <p className="text-[10px] text-amber-900 mt-1">
+                        The reading figure claimed on the council/Eskom invoice for this billing cycle.
+                      </p>
                     </div>
 
-                    {/* Council Reference Number */}
+                    {/* Statement Details Summary */}
+                    {selectedStatement && (
+                      <div className="p-2.5 rounded-lg bg-white border border-amber-200 text-xs space-y-1">
+                        <div className="flex items-center justify-between text-[11px]">
+                          <span className="text-slate-500">Provider:</span>
+                          <strong className="text-slate-800">{selectedStatement.provider}</strong>
+                        </div>
+                        <div className="flex items-center justify-between text-[11px]">
+                          <span className="text-slate-500">Invoice Date:</span>
+                          <strong className="text-slate-800">{formatDate(selectedStatement.statementDate)}</strong>
+                        </div>
+                        <div className="flex items-center justify-between text-[11px]">
+                          <span className="text-slate-500">Billed Utility Line Cost:</span>
+                          <strong className="font-mono text-slate-900">{formatZAR(statementCost, { includeDecimals: true })}</strong>
+                        </div>
+                        {muniConsumption !== undefined && (
+                          <div className="flex items-center justify-between text-[11px] pt-1 border-t border-slate-100">
+                            <span className="text-amber-800 font-bold">Council Billed Usage:</span>
+                            <strong className="font-mono text-amber-950 font-bold">+{muniConsumption} {unitLabel}</strong>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Bottom Dispute Discrepancy & Tracking Panel */}
+                <div className="p-4 bg-amber-50/80 border border-amber-300 rounded-xl space-y-3">
+                  {/* Live Discrepancy Calculation Banner */}
+                  {liveConsumptionDiscrepancy !== undefined && (
+                    <div className="p-3 bg-white rounded-xl border border-amber-300 flex flex-col sm:flex-row sm:items-center justify-between gap-2 shadow-2xs">
+                      <div>
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-amber-800 block">
+                          Discrepancy Analysis (Council Claim vs Physical Actuals)
+                        </span>
+                        <div className="text-sm font-black font-mono text-amber-950">
+                          {liveConsumptionDiscrepancy >= 0 ? `+${liveConsumptionDiscrepancy}` : liveConsumptionDiscrepancy} {unitLabel}{' '}
+                          <span className="text-xs font-bold text-amber-800 font-sans">
+                            ({liveConsumptionDiscrepancy >= 0 ? 'Council Over-Estimate' : 'Council Under-Estimate'})
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="text-left sm:text-right">
+                        <div className="flex items-center sm:justify-end gap-1.5">
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block">
+                            Disputed Rand Amount
+                          </span>
+                          {disputeImpact?.isCapped && (
+                            <span className="text-[9px] font-black uppercase px-1.5 py-0.5 rounded bg-amber-100 text-amber-900 border border-amber-300">
+                              Capped at Statement Total
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-base font-black font-mono text-emerald-800">
+                          {formatZAR(manualEstimatedRand ? parseFloat(manualEstimatedRand) : autoDerivedRandImpact || 0, { includeDecimals: true })}
+                        </div>
+                        <span className="text-[10px] text-slate-400">
+                          {disputeImpact?.isCapped
+                            ? `Capped at statement line cost (${formatZAR(statementCost, { includeDecimals: true })})`
+                            : `Derived at effective tariff R ${effectiveTariff.toFixed(2)}/${unitLabel}`}
+                        </span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Rollover / Inverted Warning Callout */}
+                  {disputeImpact?.isRolloverOrInverted && disputeImpact.warning && (
+                    <div className="p-3 bg-amber-100/70 border border-amber-300 rounded-xl flex items-start gap-2.5 text-amber-950 text-xs">
+                      <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                      <div className="space-y-0.5">
+                        <span className="font-bold block text-amber-900">
+                          Meter Reading Alert: Dials Lower Than Baseline
+                        </span>
+                        <p className="text-[11px] text-amber-800 leading-relaxed">
+                          {disputeImpact.warning}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Ticket Reference, Status & Reason */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     <div>
                       <label className="block text-[11px] font-bold text-amber-900 mb-1">
                         Council Reference / Ticket #
@@ -693,8 +1135,6 @@ export default function MeterReadingsModal({
                         className="w-full px-2.5 py-1.5 border border-amber-300 rounded-lg text-xs bg-white text-slate-900 font-mono focus:ring-1 focus:ring-amber-500 focus:outline-none"
                       />
                     </div>
-
-                    {/* Dispute Status */}
                     <div>
                       <label className="block text-[11px] font-bold text-amber-900 mb-1">
                         Dispute Status
@@ -710,8 +1150,6 @@ export default function MeterReadingsModal({
                         <option value="Resolved">Resolved</option>
                       </select>
                     </div>
-
-                    {/* Dispute Reason */}
                     <div>
                       <label className="block text-[11px] font-bold text-amber-900 mb-1">
                         Dispute Reason
@@ -729,51 +1167,10 @@ export default function MeterReadingsModal({
                         <option value="other">Other Query</option>
                       </select>
                     </div>
-
-                    {/* Estimated Rand Impact */}
-                    <div>
-                      <label className="block text-[11px] font-bold text-amber-900 mb-1">
-                        Estimated Disputed Impact (ZAR)
-                      </label>
-                      <div className="relative">
-                        <input
-                          type="number"
-                          step="any"
-                          value={manualEstimatedRand}
-                          onChange={(e) => setManualEstimatedRand(e.target.value)}
-                          placeholder={autoDerivedRandImpact !== undefined ? `~R ${autoDerivedRandImpact.toFixed(2)}` : 'e.g. 450.00'}
-                          className="w-full pl-6 pr-2.5 py-1.5 border border-amber-300 rounded-lg text-xs bg-white text-slate-900 font-mono font-bold focus:ring-1 focus:ring-amber-500 focus:outline-none"
-                        />
-                        <span className="absolute left-2.5 top-1.5 text-xs text-slate-400 font-bold">R</span>
-                      </div>
-                    </div>
                   </div>
 
-                  {/* Live Discrepancy & Tariff Preview */}
-                  {liveConsumptionDiscrepancy !== undefined && (
-                    <div className="p-2.5 bg-white rounded-lg border border-amber-300 flex items-center justify-between flex-wrap gap-2 text-xs">
-                      <div className="flex items-center gap-2">
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-amber-800">
-                          Discrepancy:
-                        </span>
-                        <strong className="font-mono text-amber-950 font-black">
-                          {liveConsumptionDiscrepancy >= 0 ? `+${liveConsumptionDiscrepancy}` : liveConsumptionDiscrepancy} {unitLabel}{' '}
-                          <span className="text-[10px] font-semibold text-amber-800">
-                            ({liveConsumptionDiscrepancy >= 0 ? 'Council Over-Billed' : 'Council Under-Billed'})
-                          </span>
-                        </strong>
-                      </div>
-                      <div className="text-slate-600 font-medium text-[11px]">
-                        Effective Tariff: <strong className="font-mono text-slate-800">R {effectiveTariff.toFixed(2)}/{unitLabel}</strong> • Estimated Value:{' '}
-                        <strong className="font-mono text-emerald-700">
-                          {formatZAR(manualEstimatedRand ? parseFloat(manualEstimatedRand) : autoDerivedRandImpact || 0, { includeDecimals: true })}
-                        </strong>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Lodged Date & Resolution Notes */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                  {/* Lodged Date & Manual Rand Override */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
                       <label className="block text-[11px] font-bold text-amber-900 mb-1">
                         Dispute Lodged Date
@@ -787,35 +1184,56 @@ export default function MeterReadingsModal({
                     </div>
                     <div>
                       <label className="block text-[11px] font-bold text-amber-900 mb-1">
-                        Dispute & Council Notes
+                        Manual Rand Impact Override (ZAR)
                       </label>
-                      <input
-                        type="text"
-                        value={disputeResolutionNotes}
-                        onChange={(e) => setDisputeResolutionNotes(e.target.value)}
-                        placeholder="e.g. Lodged ticket via eThekwini Smart Services. Technician inspection requested."
-                        className="w-full px-2.5 py-1.5 border border-amber-300 rounded-lg text-xs bg-white text-slate-900 focus:ring-1 focus:ring-amber-500 focus:outline-none"
-                      />
+                      <div className="relative">
+                        <input
+                          type="number"
+                          step="any"
+                          value={manualEstimatedRand}
+                          onChange={(e) => setManualEstimatedRand(e.target.value)}
+                          placeholder={autoDerivedRandImpact !== undefined ? `Auto: ~R ${autoDerivedRandImpact.toFixed(2)}` : 'e.g. 450.00'}
+                          className="w-full pl-6 pr-2.5 py-1.5 border border-amber-300 rounded-lg text-xs bg-white text-slate-900 font-mono font-bold focus:ring-1 focus:ring-amber-500 focus:outline-none"
+                        />
+                        <span className="absolute left-2.5 top-1.5 text-xs text-slate-400 font-bold">R</span>
+                      </div>
                     </div>
                   </div>
-                </div>
-              )}
 
-              {/* Submit Button */}
-              <div className="flex justify-end pt-1">
-                <button
-                  type="submit"
-                  className={`px-4 py-2 text-white rounded-lg font-bold text-xs flex items-center gap-1.5 shadow-sm transition-colors cursor-pointer ${
-                    isDisputed
-                      ? 'bg-amber-600 hover:bg-amber-700'
-                      : 'bg-cyan-600 hover:bg-cyan-700'
-                  }`}
-                >
-                  <CheckCircle2 className="w-3.5 h-3.5" />
-                  <span>{isDisputed ? 'Save & Flag Municipal Dispute' : 'Save Reading to Ledger'}</span>
-                </button>
-              </div>
-            </form>
+                  {/* Dispute Notes */}
+                  <div>
+                    <label className="block text-[11px] font-bold text-amber-900 mb-1">
+                      Dispute & Council Notes
+                    </label>
+                    <input
+                      type="text"
+                      value={disputeResolutionNotes}
+                      onChange={(e) => setDisputeResolutionNotes(e.target.value)}
+                      placeholder="e.g. Lodged ticket via eThekwini Smart Services. Technician inspection requested."
+                      className="w-full px-2.5 py-1.5 border border-amber-300 rounded-lg text-xs bg-white text-slate-900 focus:ring-1 focus:ring-amber-500 focus:outline-none"
+                    />
+                  </div>
+                </div>
+
+                {/* Submit Buttons */}
+                <div className="flex items-center justify-between pt-1">
+                  <button
+                    type="button"
+                    onClick={() => setIsDisputed(false)}
+                    className="px-3 py-2 text-xs font-semibold text-slate-600 hover:text-slate-900 transition-colors cursor-pointer"
+                  >
+                    Cancel Dispute Mode
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-5 py-2 text-white rounded-lg font-bold text-xs flex items-center gap-1.5 shadow-sm transition-colors cursor-pointer bg-amber-600 hover:bg-amber-700"
+                  >
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    <span>Save & Flag Municipal Dispute</span>
+                  </button>
+                </div>
+              </form>
+            )}
           </div>
 
           {/* SECTION 2: Historical Ledger */}
@@ -1078,6 +1496,17 @@ export default function MeterReadingsModal({
                             {/* Action */}
                             <td className="p-3 pr-4 text-right whitespace-nowrap">
                               <div className="flex items-center justify-end gap-1">
+                                {!reading.isDisputed && reading.source === 'pdf-extracted' && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleInitiateDisputeFromRow(reading)}
+                                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold text-amber-800 bg-amber-50 hover:bg-amber-100 border border-amber-300 transition-colors cursor-pointer mr-0.5"
+                                    title="Contest this council reading with verified physical dials"
+                                  >
+                                    <AlertCircle className="w-3 h-3 text-amber-600" />
+                                    <span>Dispute</span>
+                                  </button>
+                                )}
                                 {reading.isDisputed && (
                                   <button
                                     type="button"
