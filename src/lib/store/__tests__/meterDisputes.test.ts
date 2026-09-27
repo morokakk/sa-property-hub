@@ -147,4 +147,33 @@ describe('usePortfolioStore - Municipal Meter Reading Disputes', () => {
     expect(matchingExtractedWater?.readingValue).toBe(1485);
     expect(matchingExtractedWater?.meterNumber).toBe('ETH-W-77491');
   });
+
+  it('correctly populates Sandhurst Executive Suite utility statements with non-zero line items and extracted readings', () => {
+    const store = usePortfolioStore.getState();
+    const rentalId = 'rental-1'; // Sandhurst Executive Suite
+    const rental = store.rentals.find((r) => r.id === rentalId);
+    expect(rental).toBeDefined();
+
+    expect(rental?.utilityStatements).toHaveLength(3);
+
+    const aprilStatement = rental?.utilityStatements?.find((s) => s.billingPeriod === 'April 2026');
+    expect(aprilStatement).toBeDefined();
+    expect(aprilStatement?.electricityZAR).toBe(540.0);
+    expect(aprilStatement?.waterZAR).toBe(330.0);
+    expect(aprilStatement?.totalDueZAR).toBe(2317.91);
+    expect(aprilStatement?.extractedMeterReadings).toBeDefined();
+    expect(aprilStatement?.extractedMeterReadings).toHaveLength(2);
+
+    const aprilElec = aprilStatement?.extractedMeterReadings?.find((r) => r.utilityType === 'electricity');
+    expect(aprilElec?.readingValue).toBe(39910.0);
+    expect(aprilElec?.consumption).toBe(210.0);
+
+    const febStatement = rental?.utilityStatements?.find((s) => s.billingPeriod === 'February 2026');
+    expect(febStatement).toBeDefined();
+    expect(febStatement?.electricityZAR).toBe(480.0);
+    expect(febStatement?.waterZAR).toBe(290.0);
+    const febElec = febStatement?.extractedMeterReadings?.find((r) => r.utilityType === 'electricity');
+    expect(febElec?.readingValue).toBe(39504.0);
+    expect(febElec?.consumption).toBe(202.0);
+  });
 });

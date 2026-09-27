@@ -1311,19 +1311,53 @@ export const usePortfolioStore = create<PortfolioState>()(
                 : 12.3;
           }
 
+          // Auto-heal legacy 2025 statements or statements with missing/zero utility values
+          const hasLegacy2025Statements = (rental.utilityStatements || []).some(
+            (s: any) =>
+              s.statementDate?.startsWith('2025') ||
+              s.billingPeriod?.includes('2025') ||
+              (s.electricityZAR === 0 && s.waterZAR === 0)
+          );
+
+          const needsStatementMigration =
+            !rental.utilityStatements ||
+            rental.utilityStatements.length === 0 ||
+            hasLegacy2025Statements;
+
+          const healedStatements = needsStatementMigration
+            ? defaultStatements
+            : rental.utilityStatements.map((stmt: any) => {
+                const defaultMatch = defaultStatements.find((ds) => ds.id === stmt.id);
+                return {
+                  ...stmt,
+                  extractedMeterReadings:
+                    stmt.extractedMeterReadings && stmt.extractedMeterReadings.length > 0
+                      ? stmt.extractedMeterReadings
+                      : defaultMatch?.extractedMeterReadings || [],
+                };
+              });
+
+          const needsReadingsMigration =
+            !rental.meterReadings ||
+            rental.meterReadings.length === 0 ||
+            hasLegacy2025Statements;
+
+          const healedMeterReadings = needsReadingsMigration
+            ? defaultMeterReadings
+            : [
+                ...defaultMeterReadings,
+                ...(rental.meterReadings || []).filter(
+                  (mr: any) => !defaultMeterReadings.some((dmr) => dmr.id === mr.id)
+                ),
+              ];
+
           return {
             ...rental,
             monthlyAgentFeeZAR,
             agencyVatApplicable,
             agencyCommissionPercent,
-            utilityStatements:
-              rental.utilityStatements && rental.utilityStatements.length > 0
-                ? rental.utilityStatements
-                : defaultStatements,
-            meterReadings:
-              rental.meterReadings && rental.meterReadings.length > 0
-                ? rental.meterReadings
-                : defaultMeterReadings,
+            utilityStatements: healedStatements,
+            meterReadings: healedMeterReadings,
           };
         });
 

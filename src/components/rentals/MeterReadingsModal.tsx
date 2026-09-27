@@ -114,12 +114,20 @@ export default function MeterReadingsModal({
     );
     if (fromStmt) return fromStmt;
 
+    const stmtDatePrefix = selectedStatement.statementDate ? selectedStatement.statementDate.substring(0, 7) : '';
+    const stmtMonthName = selectedStatement.billingPeriod
+      ? selectedStatement.billingPeriod.split(' ')[0].toLowerCase()
+      : '';
+
     const fromRental = (rental?.meterReadings || []).find(
       (r) =>
         r.source === 'pdf-extracted' &&
         r.utilityType === utilityType &&
         (r.date === selectedStatement.statementDate ||
-          r.date.startsWith(selectedStatement.statementDate.substring(0, 7)))
+          (stmtDatePrefix && r.date.startsWith(stmtDatePrefix)) ||
+          (stmtMonthName &&
+            r.date &&
+            new Date(r.date).toLocaleString('en-US', { month: 'long' }).toLowerCase() === stmtMonthName))
     );
     return fromRental || null;
   }, [selectedStatement, utilityType, rental?.meterReadings]);
@@ -142,10 +150,19 @@ export default function MeterReadingsModal({
     if (reading.meterNumber) {
       setMeterNumber(reading.meterNumber);
     }
+    const readingMonth = reading.date
+      ? new Date(reading.date).toLocaleString('en-US', { month: 'long' }).toLowerCase()
+      : '';
+
     const matchingStmt = availableStatements.find(
       (s) =>
+        s.id === reading.disputedStatementId ||
+        (s.extractedMeterReadings || []).some(
+          (em) => em.readingValue === reading.readingValue && em.utilityType === reading.utilityType
+        ) ||
         s.statementDate === reading.date ||
-        (reading.date && s.statementDate.startsWith(reading.date.substring(0, 7)))
+        (reading.date && s.statementDate.startsWith(reading.date.substring(0, 7))) ||
+        (readingMonth && s.billingPeriod && s.billingPeriod.toLowerCase().includes(readingMonth))
     );
     if (matchingStmt) {
       setDisputedStatementId(matchingStmt.id);
