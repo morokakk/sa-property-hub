@@ -274,7 +274,7 @@ export default function TenantStatement({
           text += `• Municipal Electricity: ${formatZAR(effectiveElecZAR, { includeDecimals: true })}\n`;
           if (isElecResolved && activeElecDispute) {
             if (activeElecDispute.disputeResolutionOutcome === 'dispute_rejected') {
-              text += `  └ Council Dispute Dismissed: Original assessment stands (${formatZAR(rawElecZAR, { includeDecimals: true })}).\n`;
+              text += `  └ Council Dispute Rejected: Original assessment stands (${formatZAR(rawElecZAR, { includeDecimals: true })}).\n`;
             } else {
               text += `  └ ✓ Council Dispute Resolved: Credit note of ${formatZAR(elecSettledCredit, { includeDecimals: true })} applied (Net Billed).\n`;
             }
@@ -293,7 +293,7 @@ export default function TenantStatement({
           text += `• Municipal Water: ${formatZAR(effectiveWaterZAR, { includeDecimals: true })}\n`;
           if (isWaterResolved && activeWaterDispute) {
             if (activeWaterDispute.disputeResolutionOutcome === 'dispute_rejected') {
-              text += `  └ Council Dispute Dismissed: Original assessment stands (${formatZAR(rawWaterZAR, { includeDecimals: true })}).\n`;
+              text += `  └ Council Dispute Rejected: Original assessment stands (${formatZAR(rawWaterZAR, { includeDecimals: true })}).\n`;
             } else {
               text += `  └ ✓ Council Dispute Resolved: Credit note of ${formatZAR(waterSettledCredit, { includeDecimals: true })} applied (Net Billed).\n`;
             }
@@ -870,7 +870,7 @@ export default function TenantStatement({
                                   )}
                                   <span>
                                     {activeElecDispute.disputeResolutionOutcome === 'dispute_rejected'
-                                      ? 'Council Dismissed Dispute'
+                                      ? 'Dispute Rejected by Council (Original Bill Upheld)'
                                       : `✓ Dispute Resolved (-${formatZAR(elecSettledCredit)})`}
                                   </span>
                                 </span>
@@ -964,7 +964,7 @@ export default function TenantStatement({
                                   )}
                                   <span>
                                     {activeWaterDispute.disputeResolutionOutcome === 'dispute_rejected'
-                                      ? 'Council Dismissed Dispute'
+                                      ? 'Dispute Rejected by Council (Original Bill Upheld)'
                                       : `✓ Dispute Resolved (-${formatZAR(waterSettledCredit)})`}
                                   </span>
                                 </span>

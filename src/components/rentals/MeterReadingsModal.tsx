@@ -487,7 +487,15 @@ export default function MeterReadingsModal({
     updateMeterReadingDispute(rental.id, editingDisputeReading.id, updates);
     setSuccessToast(
       editDisputeStatus === 'Resolved'
-        ? `Dispute successfully resolved (${editResolutionOutcome.replace('_', ' ')})`
+        ? `Dispute successfully resolved (${
+            editResolutionOutcome === 'accepted_actuals'
+              ? 'Council Accepted Physical Reading'
+              : editResolutionOutcome === 'credit_note_issued'
+              ? 'Credit Note Settled'
+              : editResolutionOutcome === 'compromise_reading'
+              ? 'Compromise Reading Settled'
+              : 'Dispute Rejected by Council'
+          })`
         : `Dispute record updated to '${editDisputeStatus}'`
     );
     setEditingDisputeReading(null);
@@ -1618,12 +1626,14 @@ export default function MeterReadingsModal({
                                         <span>
                                           {reading.disputeStatus === 'Resolved'
                                             ? reading.disputeResolutionOutcome === 'accepted_actuals'
-                                              ? 'Conceded by Council'
+                                              ? 'Council Accepted Physical Reading'
                                               : reading.disputeResolutionOutcome === 'credit_note_issued'
                                               ? 'Credit Note Settled'
                                               : reading.disputeResolutionOutcome === 'compromise_reading'
                                               ? 'Compromise Settled'
-                                              : 'Dispute Dismissed'
+                                              : reading.disputeResolutionOutcome === 'dispute_rejected'
+                                              ? 'Dispute Rejected by Council (Original Bill Upheld)'
+                                              : 'Council Accepted Physical Reading'
                                             : `Council: ${reading.disputedMunicipalReadingValue?.toLocaleString('en-ZA') ?? '—'} ${uLabel}`}
                                         </span>
                                       </span>
@@ -1869,10 +1879,10 @@ export default function MeterReadingsModal({
                     >
                       <div className="flex items-center gap-1.5 font-bold text-xs text-slate-900 mb-0.5">
                         <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                        <span>1. Accepted Actuals</span>
+                        <span>1. Council Accepted Physical Reading</span>
                       </div>
                       <p className="text-[10px] text-slate-500 leading-tight">
-                        Council conceded error. Adopts your reading ({editingDisputeReading.readingValue}{' '}
+                        Council conceded error and adopted your physical reading ({editingDisputeReading.readingValue}{' '}
                         {editingDisputeReading.utilityType === 'electricity' ? 'kWh' : 'KL'}) & full credit.
                       </p>
                     </button>
@@ -1938,10 +1948,10 @@ export default function MeterReadingsModal({
                     >
                       <div className="flex items-center gap-1.5 font-bold text-xs text-slate-900 mb-0.5">
                         <Ban className="w-3.5 h-3.5 text-rose-600 shrink-0" />
-                        <span>4. Dispute Dismissed</span>
+                        <span>4. Dispute Rejected by Council</span>
                       </div>
                       <p className="text-[10px] text-slate-500 leading-tight">
-                        Council rejected dispute. R 0.00 credit, original statement stands.
+                        Council rejected dispute & upheld original bill. R 0.00 credit.
                       </p>
                     </button>
                   </div>
