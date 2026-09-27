@@ -75,6 +75,16 @@ interface PortfolioState {
   deleteUtilityStatement: (propertyId: string, statementId: string) => void;
   addMeterReading: (propertyId: string, reading: Omit<MeterReading, 'id' | 'createdAt'>) => void;
   deleteMeterReading: (propertyId: string, readingId: string) => void;
+  updateMeterReadingDispute: (
+    propertyId: string,
+    readingId: string,
+    disputeData: Partial<MeterReading>
+  ) => void;
+  setStatementTenantBillingMethod: (
+    propertyId: string,
+    statementId: string,
+    method: 'municipal_statement' | 'independent_actuals'
+  ) => void;
 
   // Flip Actions
   addFlip: (flip: FlipProject) => void;
@@ -585,6 +595,38 @@ export const usePortfolioStore = create<PortfolioState>()(
             return {
               ...r,
               meterReadings: (r.meterReadings || []).filter((m) => m.id !== readingId),
+            };
+          }),
+        })),
+      updateMeterReadingDispute: (propertyId, readingId, disputeData) =>
+        set((state) => ({
+          rentals: state.rentals.map((r) => {
+            if (r.id !== propertyId) return r;
+            return {
+              ...r,
+              meterReadings: (r.meterReadings || []).map((m) => {
+                if (m.id !== readingId) return m;
+                return {
+                  ...m,
+                  ...disputeData,
+                };
+              }),
+            };
+          }),
+        })),
+      setStatementTenantBillingMethod: (propertyId, statementId, method) =>
+        set((state) => ({
+          rentals: state.rentals.map((r) => {
+            if (r.id !== propertyId) return r;
+            return {
+              ...r,
+              utilityStatements: (r.utilityStatements || []).map((s) => {
+                if (s.id !== statementId) return s;
+                return {
+                  ...s,
+                  tenantBillingMethod: method,
+                };
+              }),
             };
           }),
         })),
@@ -1249,6 +1291,8 @@ export const usePortfolioStore = create<PortfolioState>()(
         const migratedRentals = (rawRentals || []).map((rental: any) => {
           const defaultStatements =
             currentState.rentals.find((r) => r.id === rental.id)?.utilityStatements || [];
+          const defaultMeterReadings =
+            currentState.rentals.find((r) => r.id === rental.id)?.meterReadings || [];
 
           let monthlyAgentFeeZAR = rental.monthlyAgentFeeZAR;
           let agencyVatApplicable = rental.agencyVatApplicable;
@@ -1276,6 +1320,10 @@ export const usePortfolioStore = create<PortfolioState>()(
               rental.utilityStatements && rental.utilityStatements.length > 0
                 ? rental.utilityStatements
                 : defaultStatements,
+            meterReadings:
+              rental.meterReadings && rental.meterReadings.length > 0
+                ? rental.meterReadings
+                : defaultMeterReadings,
           };
         });
 

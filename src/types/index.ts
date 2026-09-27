@@ -359,6 +359,21 @@ export interface RentalProperty {
   meterReadings?: MeterReading[];
 }
 
+// Municipal Meter Dispute Status & Reason Types
+export type MeterDisputeStatus =
+  | 'Open / Lodged'
+  | 'Under Investigation'
+  | 'Credit Note Pending'
+  | 'Resolved';
+
+export type MeterDisputeReason =
+  | 'council_over_estimate'
+  | 'meter_fault'
+  | 'incorrect_meter_number'
+  | 'dials_reversed'
+  | 'unexplained_spike'
+  | 'other';
+
 // Physical & Municipal Meter Reading Record
 export interface MeterReading {
   id: string;
@@ -373,6 +388,19 @@ export interface MeterReading {
   photoUrl?: string;
   notes?: string;
   createdAt: string;
+
+  // Municipal Dispute Extension
+  isDisputed?: boolean;
+  disputeStatus?: MeterDisputeStatus;
+  disputeReason?: MeterDisputeReason;
+  disputeReferenceNumber?: string; // Council ticket / C-Ref (e.g. "ETH-2026-88192" or "CoJ 80019284")
+  disputedStatementId?: string; // ID of the contested UtilityStatement
+  disputedMunicipalReadingValue?: number; // What the municipality claimed on their statement
+  disputeDifferenceConsumption?: number; // Municipal - Independent (positive = council over-billed)
+  disputeEffectiveTariffPerUnit?: number; // Derived or overridden rate (ZAR / kWh or ZAR / KL)
+  disputeEstimatedRandImpactZAR?: number; // Estimated financial impact of the discrepancy
+  disputeLodgedDate?: string;
+  disputeResolutionNotes?: string;
 }
 
 // Municipal / Eskom Utility Statement Record
@@ -405,6 +433,7 @@ export interface UtilityStatement {
   rawText?: string;
   parsedVia: 'byok-llm' | 'regex-fallback' | 'manual';
   extractedMeterReadings?: Omit<MeterReading, 'id' | 'createdAt'>[];
+  tenantBillingMethod?: 'municipal_statement' | 'independent_actuals';
   createdAt: string;
 }
 

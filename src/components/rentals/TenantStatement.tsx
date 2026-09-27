@@ -16,6 +16,7 @@ import {
   Gauge,
   ShieldCheck,
   Building,
+  AlertTriangle,
 } from 'lucide-react';
 import { usePortfolioStore } from '@/lib/store/usePortfolioStore';
 import { formatZAR, formatDate } from '@/lib/formatters';
@@ -41,6 +42,9 @@ export default function TenantStatement({
   const investorProfile = usePortfolioStore((state) => state.investorProfile);
   const addUtilityStatement = usePortfolioStore((state) => state.addUtilityStatement);
   const deleteUtilityStatement = usePortfolioStore((state) => state.deleteUtilityStatement);
+  const setStatementTenantBillingMethod = usePortfolioStore(
+    (state) => state.setStatementTenantBillingMethod
+  );
   const aiSettings = usePortfolioStore((state) => state.aiSettings);
 
   const [isUploading, setIsUploading] = useState(false);
@@ -62,6 +66,48 @@ export default function TenantStatement({
 
   const currentStatement = statements[0] as UtilityStatement | undefined;
   const previousStatement = statements[1] as UtilityStatement | undefined;
+
+  // Active Municipal Meter Disputes for this Statement Period
+  const activeElecDispute = (rental.meterReadings || []).find(
+    (m) =>
+      m.utilityType === 'electricity' &&
+      m.isDisputed &&
+      (m.disputedStatementId === currentStatement?.id ||
+        (currentStatement?.statementDate &&
+          m.date.startsWith(currentStatement.statementDate.substring(0, 7))))
+  );
+
+  const activeWaterDispute = (rental.meterReadings || []).find(
+    (m) =>
+      m.utilityType === 'water' &&
+      m.isDisputed &&
+      (m.disputedStatementId === currentStatement?.id ||
+        (currentStatement?.statementDate &&
+          m.date.startsWith(currentStatement.statementDate.substring(0, 7))))
+  );
+
+  const hasActiveDispute = Boolean(activeElecDispute || activeWaterDispute);
+
+  // Landlord Recovery Preference: 'independent_actuals' (default during dispute) vs 'municipal_statement'
+  const effectiveBillingMethod =
+    currentStatement?.tenantBillingMethod ||
+    (hasActiveDispute ? 'independent_actuals' : 'municipal_statement');
+
+  const isBilledOnActuals = effectiveBillingMethod === 'independent_actuals';
+
+  // Effective Electricity charge billed to tenant
+  const rawElecZAR = currentStatement?.electricityZAR ?? 0;
+  const effectiveElecZAR =
+    isBilledOnActuals && activeElecDispute
+      ? Math.max(0, rawElecZAR - (activeElecDispute.disputeEstimatedRandImpactZAR || 0))
+      : rawElecZAR;
+
+  // Effective Water charge billed to tenant
+  const rawWaterZAR = currentStatement?.waterZAR ?? 0;
+  const effectiveWaterZAR =
+    isBilledOnActuals && activeWaterDispute
+      ? Math.max(0, rawWaterZAR - (activeWaterDispute.disputeEstimatedRandImpactZAR || 0))
+      : rawWaterZAR;
 
   // Find matching or latest meter readings for this statement
   const elecMeterReading = (rental.meterReadings || [])
@@ -94,8 +140,8 @@ export default function TenantStatement({
   const currentTenantUtilities = currentStatement
     ? isBundled
       ? (currentStatement.bundledUtilitiesZAR ?? 0)
-      : currentStatement.electricityZAR +
-        currentStatement.waterZAR +
+      : effectiveElecZAR +
+        effectiveWaterZAR +
         currentStatement.refuseZAR +
         currentStatement.sewerageZAR
     : 0;
@@ -200,15 +246,29 @@ export default function TenantStatement({
     } else {
       text += `*ITEMIZED MUNICIPAL UTILITY RECOVERIES:*\n`;
       if (currentStatement) {
-        if (currentStatement.electricityZAR > 0) {
-          text += `• Municipal Electricity: ${formatZAR(currentStatement.electricityZAR, { includeDecimals: true })}\n`;
-          if (elecMeterReading && elecMeterReading.consumption !== undefined) {
+        if (effectiveElecZAR > 0) {
+          text += `• Municipal Electricity: ${formatZAR(effectiveElecZAR, { includeDecimals: true })}\n`;
+          if (activeElecDispute) {
+            text += `  ⚠️ Council Dispute Ref #${activeElecDispute.disputeReferenceNumber || 'Pending'} (${activeElecDispute.disputeStatus || 'Open'})\n`;
+            if (isBilledOnActuals) {
+              text += `  └ Billed on verified physical reading (${activeElecDispute.readingValue} kWh vs council estimate ${activeElecDispute.disputedMunicipalReadingValue} kWh). ${formatZAR(activeElecDispute.disputeEstimatedRandImpactZAR, { includeDecimals: true })} held in council query.\n`;
+            } else {
+              text += `  └ Billed council estimate. Council credit will be passed to tenant upon query resolution.\n`;
+            }
+          } else if (elecMeterReading && elecMeterReading.consumption !== undefined) {
             text += `  └ Meter #${elecMeterReading.meterNumber || '—'}: ${elecMeterReading.previousReadingValue ?? '—'} -> ${elecMeterReading.readingValue} kWh (Usage: ${elecMeterReading.consumption} kWh)\n`;
           }
         }
-        if (currentStatement.waterZAR > 0) {
-          text += `• Municipal Water: ${formatZAR(currentStatement.waterZAR, { includeDecimals: true })}\n`;
-          if (waterMeterReading && waterMeterReading.consumption !== undefined) {
+        if (effectiveWaterZAR > 0) {
+          text += `• Municipal Water: ${formatZAR(effectiveWaterZAR, { includeDecimals: true })}\n`;
+          if (activeWaterDispute) {
+            text += `  ⚠️ Council Dispute Ref #${activeWaterDispute.disputeReferenceNumber || 'Pending'} (${activeWaterDispute.disputeStatus || 'Open'})\n`;
+            if (isBilledOnActuals) {
+              text += `  └ Billed on verified physical reading (${activeWaterDispute.readingValue} KL vs council estimate ${activeWaterDispute.disputedMunicipalReadingValue} KL). ${formatZAR(activeWaterDispute.disputeEstimatedRandImpactZAR, { includeDecimals: true })} held in council query.\n`;
+            } else {
+              text += `  └ Billed council estimate. Council credit will be passed to tenant upon query resolution.\n`;
+            }
+          } else if (waterMeterReading && waterMeterReading.consumption !== undefined) {
             text += `  └ Meter #${waterMeterReading.meterNumber || '—'}: ${waterMeterReading.previousReadingValue ?? '—'} -> ${waterMeterReading.readingValue} KL (Usage: ${waterMeterReading.consumption} KL)\n`;
           }
         }
@@ -517,6 +577,105 @@ export default function TenantStatement({
               </div>
             </div>
 
+            {/* Active Municipal Meter Dispute Alert Banner & Landlord Recovery Mode Toggle */}
+            {hasActiveDispute && currentStatement && (
+              <div className="rounded-xl border border-amber-300 bg-amber-50/80 p-4 shadow-xs space-y-3 print-dispute-banner">
+                <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+                  <div className="flex items-start gap-2.5">
+                    <div className="p-2 rounded-lg bg-amber-100 border border-amber-300 text-amber-800 shrink-0 mt-0.5">
+                      <AlertTriangle className="w-5 h-5 text-amber-700" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h4 className="text-xs font-bold text-amber-950 uppercase tracking-wide">
+                          Active Municipal Meter Reading Dispute
+                        </h4>
+                        {activeElecDispute && (
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-200 text-amber-900 border border-amber-300">
+                            Electricity: {activeElecDispute.disputeStatus || 'Open / Lodged'}
+                            {activeElecDispute.disputeReferenceNumber && ` (Ref: ${activeElecDispute.disputeReferenceNumber})`}
+                          </span>
+                        )}
+                        {activeWaterDispute && (
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-cyan-100 text-cyan-900 border border-cyan-300">
+                            Water: {activeWaterDispute.disputeStatus || 'Open / Lodged'}
+                            {activeWaterDispute.disputeReferenceNumber && ` (Ref: ${activeWaterDispute.disputeReferenceNumber})`}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[11px] text-amber-900 mt-1 leading-relaxed">
+                        Physical dials recorded on site differ from council billed estimates.
+                        {activeElecDispute && (
+                          <span>
+                            {' '}Council billed <strong>{activeElecDispute.disputedMunicipalReadingValue?.toLocaleString('en-ZA') ?? '—'} kWh</strong> vs verified actual <strong>{activeElecDispute.readingValue?.toLocaleString('en-ZA')} kWh</strong> (discrepancy: {activeElecDispute.disputeDifferenceConsumption?.toLocaleString('en-ZA')} kWh • <strong>{formatZAR(activeElecDispute.disputeEstimatedRandImpactZAR, { includeDecimals: true })}</strong>).
+                          </span>
+                        )}
+                        {activeWaterDispute && (
+                          <span>
+                            {' '}Council billed <strong>{activeWaterDispute.disputedMunicipalReadingValue?.toLocaleString('en-ZA') ?? '—'} KL</strong> vs verified actual <strong>{activeWaterDispute.readingValue?.toLocaleString('en-ZA')} KL</strong> (discrepancy: {activeWaterDispute.disputeDifferenceConsumption?.toLocaleString('en-ZA')} KL • <strong>{formatZAR(activeWaterDispute.disputeEstimatedRandImpactZAR, { includeDecimals: true })}</strong>).
+                          </span>
+                        )}
+                      </p>
+                    </div>
+                  </div>
+
+                  {onOpenMeterReadings && (
+                    <button
+                      type="button"
+                      onClick={onOpenMeterReadings}
+                      className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-amber-300 bg-white hover:bg-amber-100/50 text-[11px] font-semibold text-amber-900 transition-colors shadow-2xs shrink-0 self-start sm:self-auto print-hidden-element"
+                    >
+                      <Gauge className="w-3.5 h-3.5 text-amber-700" />
+                      Manage Dispute
+                    </button>
+                  )}
+                </div>
+
+                {/* Landlord Tenant Recovery Selection */}
+                <div className="pt-2 border-t border-amber-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-2 print-hidden-element">
+                  <div>
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-amber-800 block">
+                      Tenant Billing Recovery Method
+                    </span>
+                    <span className="text-[11px] text-amber-900">
+                      Choose whether to bill the tenant on verified physical actuals or pass through the full council invoice.
+                    </span>
+                  </div>
+                  <div className="flex items-center p-1 bg-amber-100/80 rounded-lg border border-amber-300 shrink-0 self-start sm:self-auto">
+                    <button
+                      type="button"
+                      onClick={() => setStatementTenantBillingMethod(rental.id, currentStatement.id, 'independent_actuals')}
+                      className={`px-2.5 py-1 text-[11px] font-bold rounded-md transition-all ${
+                        isBilledOnActuals
+                          ? 'bg-emerald-600 text-white shadow-2xs'
+                          : 'text-amber-900 hover:text-amber-950'
+                      }`}
+                    >
+                      ✓ Bill Verified Actuals (Recommended)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setStatementTenantBillingMethod(rental.id, currentStatement.id, 'municipal_statement')}
+                      className={`px-2.5 py-1 text-[11px] font-bold rounded-md transition-all ${
+                        !isBilledOnActuals
+                          ? 'bg-amber-700 text-white shadow-2xs'
+                          : 'text-amber-900 hover:text-amber-950'
+                      }`}
+                    >
+                      Bill Council Invoice
+                    </button>
+                  </div>
+                </div>
+
+                {/* Print Notice for Tenant */}
+                <div className="hidden print:block text-[10px] text-amber-900 italic pt-1 border-t border-amber-200">
+                  {isBilledOnActuals
+                    ? `* Note to Tenant: Charges for this period have been adjusted to reflect on-site verified meter readings. A dispute has been lodged with the municipality (Ref: ${activeElecDispute?.disputeReferenceNumber || activeWaterDispute?.disputeReferenceNumber || 'Lodged'}).`
+                    : `* Note to Tenant: Charges reflect the official municipal bill. An active dispute (Ref: ${activeElecDispute?.disputeReferenceNumber || activeWaterDispute?.disputeReferenceNumber || 'Lodged'}) has been lodged with council; any resulting credit will be credited to your account.`}
+                </div>
+              </div>
+            )}
+
             {/* Comparative Ledger Table */}
             <div className="space-y-3">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
@@ -601,9 +760,14 @@ export default function TenantStatement({
                         {/* 2. Electricity with Embedded Meter Readings */}
                         <tr className="hover:bg-slate-50/60 transition-colors">
                           <td className="p-3 pl-4">
-                            <div className="font-semibold text-slate-800 flex items-center gap-1.5">
-                              <Zap className="w-3.5 h-3.5 text-amber-500" />
+                            <div className="font-semibold text-slate-800 flex items-center gap-1.5 flex-wrap">
+                              <Zap className="w-3.5 h-3.5 text-amber-500 shrink-0" />
                               <span>Municipal Electricity</span>
+                              {activeElecDispute && (
+                                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-300">
+                                  Disputed ({activeElecDispute.disputeStatus || 'Open'})
+                                </span>
+                              )}
                             </div>
                             {elecMeterReading ? (
                               <div className="mt-1 flex items-center gap-1.5 flex-wrap text-[10px]">
@@ -623,6 +787,11 @@ export default function TenantStatement({
                                 <span className="text-[9px] text-slate-400">
                                   • Source: {elecMeterReading.source === 'pdf-extracted' ? (currentStatement?.provider || 'Eskom / Council Bill') : 'Manual On-Site Reading'} ({elecMeterReading.readingType || 'Actual'})
                                 </span>
+                                {activeElecDispute && isBilledOnActuals && (
+                                  <span className="text-[10px] text-emerald-800 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded font-medium">
+                                    Adjusted to Verified Actuals (-{formatZAR(activeElecDispute.disputeEstimatedRandImpactZAR, { includeDecimals: true })} held in council query)
+                                  </span>
+                                )}
                               </div>
                             ) : (
                               <div className="text-[10px] text-slate-400">
@@ -634,11 +803,22 @@ export default function TenantStatement({
                             {previousStatement ? formatZAR(previousStatement.electricityZAR, { includeDecimals: true }) : '—'}
                           </td>
                           <td className="p-3 text-right font-mono font-bold text-slate-800 whitespace-nowrap">
-                            {currentStatement ? formatZAR(currentStatement.electricityZAR, { includeDecimals: true }) : 'R 0.00'}
+                            {currentStatement ? (
+                              <div>
+                                <span>{formatZAR(effectiveElecZAR, { includeDecimals: true })}</span>
+                                {isBilledOnActuals && activeElecDispute && (
+                                  <div className="text-[10px] text-slate-400 line-through font-normal">
+                                    {formatZAR(rawElecZAR, { includeDecimals: true })}
+                                  </div>
+                                )}
+                              </div>
+                            ) : (
+                              'R 0.00'
+                            )}
                           </td>
                           <td className="p-3 pr-4 text-right whitespace-nowrap">
                             {currentStatement
-                              ? renderVariance(currentStatement.electricityZAR, previousStatement?.electricityZAR)
+                              ? renderVariance(effectiveElecZAR, previousStatement?.electricityZAR)
                               : '—'}
                           </td>
                         </tr>
@@ -646,9 +826,14 @@ export default function TenantStatement({
                         {/* 3. Water with Embedded Meter Readings */}
                         <tr className="hover:bg-slate-50/60 transition-colors">
                           <td className="p-3 pl-4">
-                            <div className="font-semibold text-slate-800 flex items-center gap-1.5">
-                              <Droplets className="w-3.5 h-3.5 text-cyan-600" />
+                            <div className="font-semibold text-slate-800 flex items-center gap-1.5 flex-wrap">
+                              <Droplets className="w-3.5 h-3.5 text-cyan-600 shrink-0" />
                               <span>Municipal Water Consumption</span>
+                              {activeWaterDispute && (
+                                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-cyan-100 text-cyan-900 border border-cyan-300">
+                                  Disputed ({activeWaterDispute.disputeStatus || 'Open'})
+                                </span>
+                              )}
                             </div>
                             {waterMeterReading ? (
                               <div className="mt-1 flex items-center gap-1.5 flex-wrap text-[10px]">
@@ -668,6 +853,11 @@ export default function TenantStatement({
                                 <span className="text-[9px] text-slate-400">
                                   • Source: {waterMeterReading.source === 'pdf-extracted' ? (currentStatement?.provider || 'Johannesburg Water') : 'Manual On-Site Reading'} ({waterMeterReading.readingType || 'Actual'})
                                 </span>
+                                {activeWaterDispute && isBilledOnActuals && (
+                                  <span className="text-[10px] text-emerald-800 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded font-medium">
+                                    Adjusted to Verified Actuals (-{formatZAR(activeWaterDispute.disputeEstimatedRandImpactZAR, { includeDecimals: true })} held in council query)
+                                  </span>
+                                )}
                               </div>
                             ) : (
                               <div className="text-[10px] text-slate-400">
@@ -679,11 +869,22 @@ export default function TenantStatement({
                             {previousStatement ? formatZAR(previousStatement.waterZAR, { includeDecimals: true }) : '—'}
                           </td>
                           <td className="p-3 text-right font-mono font-bold text-slate-800 whitespace-nowrap">
-                            {currentStatement ? formatZAR(currentStatement.waterZAR, { includeDecimals: true }) : 'R 0.00'}
+                            {currentStatement ? (
+                              <div>
+                                <span>{formatZAR(effectiveWaterZAR, { includeDecimals: true })}</span>
+                                {isBilledOnActuals && activeWaterDispute && (
+                                  <div className="text-[10px] text-slate-400 line-through font-normal">
+                                    {formatZAR(rawWaterZAR, { includeDecimals: true })}
+                                  </div>
+                                )}
+                              </div>
+                            ) : (
+                              'R 0.00'
+                            )}
                           </td>
                           <td className="p-3 pr-4 text-right whitespace-nowrap">
                             {currentStatement
-                              ? renderVariance(currentStatement.waterZAR, previousStatement?.waterZAR)
+                              ? renderVariance(effectiveWaterZAR, previousStatement?.waterZAR)
                               : '—'}
                           </td>
                         </tr>
