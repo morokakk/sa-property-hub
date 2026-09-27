@@ -401,7 +401,21 @@ export interface MeterReading {
   disputeEstimatedRandImpactZAR?: number; // Estimated financial impact of the discrepancy
   disputeLodgedDate?: string;
   disputeResolutionNotes?: string;
+
+  // Municipal Dispute Resolution Extension
+  disputeResolutionOutcome?: MeterDisputeResolutionOutcome;
+  disputeResolutionDate?: string; // YYYY-MM-DD
+  disputeAgreedReadingValue?: number; // Final agreed dial reading
+  disputeAgreedConsumption?: number; // Final agreed consumption (units)
+  disputeSettledCreditZAR?: number; // Final credited amount in Rand (0 if rejected)
+  disputeCreditNoteNumber?: string; // Council credit note invoice / reversal #
 }
+
+export type MeterDisputeResolutionOutcome =
+  | 'accepted_actuals'
+  | 'credit_note_issued'
+  | 'compromise_reading'
+  | 'dispute_rejected';
 
 // Municipal / Eskom Utility Statement Record
 export interface UtilityStatement {

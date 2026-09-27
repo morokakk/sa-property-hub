@@ -19,9 +19,18 @@ import {
   FileWarning,
   ShieldAlert,
   Edit3,
+  Scale,
+  Receipt,
+  Check,
+  Ban,
 } from 'lucide-react';
 import { usePortfolioStore } from '@/lib/store/usePortfolioStore';
-import { MeterReading, MeterDisputeStatus, MeterDisputeReason } from '@/types';
+import {
+  MeterReading,
+  MeterDisputeStatus,
+  MeterDisputeReason,
+  MeterDisputeResolutionOutcome,
+} from '@/types';
 import { formatDate, formatZAR } from '@/lib/formatters';
 import { calculateMunicipalDisputeImpact } from '@/lib/calculations/municipalTariffs';
 
@@ -77,6 +86,13 @@ export default function MeterReadingsModal({
   const [editDisputeStatus, setEditDisputeStatus] = useState<MeterDisputeStatus>('Open / Lodged');
   const [editDisputeRef, setEditDisputeRef] = useState<string>('');
   const [editDisputeNotes, setEditDisputeNotes] = useState<string>('');
+  const [editResolutionOutcome, setEditResolutionOutcome] = useState<MeterDisputeResolutionOutcome>('accepted_actuals');
+  const [editResolutionDate, setEditResolutionDate] = useState<string>(
+    new Date().toISOString().split('T')[0]
+  );
+  const [editSettledCreditZAR, setEditSettledCreditZAR] = useState<string>('');
+  const [editAgreedReadingValue, setEditAgreedReadingValue] = useState<string>('');
+  const [editCreditNoteNumber, setEditCreditNoteNumber] = useState<string>('');
 
   // Filtered readings
   const allReadings = useMemo(() => {
@@ -192,7 +208,7 @@ export default function MeterReadingsModal({
     isDisputed && statementExtractedReading?.previousReadingValue !== undefined
       ? statementExtractedReading.previousReadingValue
       : latestPriorReading
-      ? latestPriorReading.readingValue
+      ? (latestPriorReading.disputeAgreedReadingValue ?? latestPriorReading.readingValue)
       : undefined;
 
   // Live consumption calculation
@@ -285,6 +301,49 @@ export default function MeterReadingsModal({
       ? Math.round(liveConsumptionDiscrepancy * effectiveTariff * 100) / 100
       : undefined;
 
+  // Live recalculation when compromise reading index is entered
+  const compromiseRecalculation = useMemo(() => {
+    if (
+      editDisputeStatus !== 'Resolved' ||
+      editResolutionOutcome !== 'compromise_reading' ||
+      !editingDisputeReading
+    ) {
+      return null;
+    }
+    const parsedAgreed = parseFloat(editAgreedReadingValue);
+    if (isNaN(parsedAgreed) || parsedAgreed < 0) return null;
+
+    const stmt =
+      availableStatements.find((s) => s.id === editingDisputeReading.disputedStatementId) ||
+      selectedStatement;
+    const stmtCost = stmt
+      ? editingDisputeReading.utilityType === 'electricity'
+        ? stmt.electricityZAR
+        : stmt.waterZAR
+      : 0;
+    const councilReading = editingDisputeReading.disputedMunicipalReadingValue || 0;
+    const baseline = editingDisputeReading.previousReadingValue;
+    const providerOrCity = stmt?.provider || rental?.city || '';
+
+    return calculateMunicipalDisputeImpact({
+      utilityType: editingDisputeReading.utilityType,
+      councilReading,
+      councilPreviousReading: baseline,
+      statementCostZAR: stmtCost,
+      physicalReading: parsedAgreed,
+      physicalPreviousReading: baseline,
+      providerOrCity,
+    });
+  }, [
+    editDisputeStatus,
+    editResolutionOutcome,
+    editAgreedReadingValue,
+    editingDisputeReading,
+    availableStatements,
+    selectedStatement,
+    rental?.city,
+  ]);
+
   if (!isOpen || !rental) return null;
 
   const handleSaveReading = (e: React.FormEvent) => {
@@ -362,15 +421,75 @@ export default function MeterReadingsModal({
     setTimeout(() => setSuccessToast(null), 4000);
   };
 
+  const openDisputeEditor = (reading: MeterReading, defaultToResolved = false) => {
+    setEditingDisputeReading(reading);
+    setEditDisputeStatus(defaultToResolved ? 'Resolved' : (reading.disputeStatus || 'Open / Lodged'));
+    setEditDisputeRef(reading.disputeReferenceNumber || '');
+    setEditDisputeNotes(reading.disputeResolutionNotes || '');
+    setEditResolutionOutcome(reading.disputeResolutionOutcome || 'accepted_actuals');
+    setEditResolutionDate(reading.disputeResolutionDate || new Date().toISOString().split('T')[0]);
+    setEditCreditNoteNumber(reading.disputeCreditNoteNumber || '');
+
+    if (reading.disputeSettledCreditZAR !== undefined) {
+      setEditSettledCreditZAR(reading.disputeSettledCreditZAR.toString());
+    } else if (reading.disputeEstimatedRandImpactZAR !== undefined) {
+      setEditSettledCreditZAR(reading.disputeEstimatedRandImpactZAR.toString());
+    } else {
+      setEditSettledCreditZAR('');
+    }
+
+    if (reading.disputeAgreedReadingValue !== undefined) {
+      setEditAgreedReadingValue(reading.disputeAgreedReadingValue.toString());
+    } else {
+      setEditAgreedReadingValue(reading.readingValue.toString());
+    }
+  };
+
   const handleUpdateDispute = (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingDisputeReading) return;
-    updateMeterReadingDispute(rental.id, editingDisputeReading.id, {
+
+    const updates: Partial<MeterReading> = {
       disputeStatus: editDisputeStatus,
       disputeReferenceNumber: editDisputeRef.trim() || undefined,
       disputeResolutionNotes: editDisputeNotes.trim() || undefined,
-    });
-    setSuccessToast(`Dispute record updated to '${editDisputeStatus}'`);
+    };
+
+    if (editDisputeStatus === 'Resolved') {
+      updates.disputeResolutionOutcome = editResolutionOutcome;
+      updates.disputeResolutionDate = editResolutionDate || new Date().toISOString().split('T')[0];
+
+      if (editResolutionOutcome === 'accepted_actuals') {
+        updates.disputeAgreedReadingValue = editingDisputeReading.readingValue;
+        updates.disputeAgreedConsumption = editingDisputeReading.consumption;
+        updates.disputeSettledCreditZAR =
+          parseFloat(editSettledCreditZAR) || editingDisputeReading.disputeEstimatedRandImpactZAR || 0;
+        updates.disputeCreditNoteNumber = editCreditNoteNumber.trim() || undefined;
+      } else if (editResolutionOutcome === 'credit_note_issued') {
+        updates.disputeSettledCreditZAR = parseFloat(editSettledCreditZAR) || 0;
+        updates.disputeCreditNoteNumber = editCreditNoteNumber.trim() || undefined;
+        updates.disputeAgreedReadingValue = editingDisputeReading.readingValue;
+      } else if (editResolutionOutcome === 'compromise_reading') {
+        const parsedAgreed = parseFloat(editAgreedReadingValue);
+        updates.disputeAgreedReadingValue = !isNaN(parsedAgreed) ? parsedAgreed : editingDisputeReading.readingValue;
+        updates.disputeSettledCreditZAR =
+          parseFloat(editSettledCreditZAR) ||
+          compromiseRecalculation?.cappedDisputeCostZAR ||
+          0;
+        updates.disputeAgreedConsumption = compromiseRecalculation?.physicalConsumption;
+        updates.disputeCreditNoteNumber = editCreditNoteNumber.trim() || undefined;
+      } else if (editResolutionOutcome === 'dispute_rejected') {
+        updates.disputeSettledCreditZAR = 0;
+        updates.disputeAgreedReadingValue = editingDisputeReading.disputedMunicipalReadingValue;
+      }
+    }
+
+    updateMeterReadingDispute(rental.id, editingDisputeReading.id, updates);
+    setSuccessToast(
+      editDisputeStatus === 'Resolved'
+        ? `Dispute successfully resolved (${editResolutionOutcome.replace('_', ' ')})`
+        : `Dispute record updated to '${editDisputeStatus}'`
+    );
     setEditingDisputeReading(null);
     setTimeout(() => setSuccessToast(null), 3500);
   };
@@ -1484,18 +1603,55 @@ export default function MeterReadingsModal({
                                   </p>
                                 )}
                                 {reading.isDisputed && (
-                                  <div className="mt-1 p-1.5 bg-amber-100/70 rounded-md border border-amber-200 text-[10px] text-amber-950 space-y-0.5">
+                                  <div
+                                    className={`mt-1 p-1.5 rounded-md border text-[10px] space-y-0.5 ${
+                                      reading.disputeStatus === 'Resolved'
+                                        ? 'bg-emerald-50/90 border-emerald-300 text-emerald-950'
+                                        : 'bg-amber-100/70 border-amber-200 text-amber-950'
+                                    }`}
+                                  >
                                     <div className="font-bold flex items-center justify-between gap-1">
-                                      <span>Council: {reading.disputedMunicipalReadingValue?.toLocaleString('en-ZA') ?? '—'} {uLabel}</span>
-                                      {reading.disputeEstimatedRandImpactZAR !== undefined && (
+                                      <span className="flex items-center gap-1">
+                                        {reading.disputeStatus === 'Resolved' && (
+                                          <CheckCircle2 className="w-3 h-3 text-emerald-600 shrink-0" />
+                                        )}
+                                        <span>
+                                          {reading.disputeStatus === 'Resolved'
+                                            ? reading.disputeResolutionOutcome === 'accepted_actuals'
+                                              ? 'Conceded by Council'
+                                              : reading.disputeResolutionOutcome === 'credit_note_issued'
+                                              ? 'Credit Note Settled'
+                                              : reading.disputeResolutionOutcome === 'compromise_reading'
+                                              ? 'Compromise Settled'
+                                              : 'Dispute Dismissed'
+                                            : `Council: ${reading.disputedMunicipalReadingValue?.toLocaleString('en-ZA') ?? '—'} ${uLabel}`}
+                                        </span>
+                                      </span>
+                                      {reading.disputeStatus === 'Resolved' ? (
+                                        <span className="font-mono text-emerald-800 font-black">
+                                          {reading.disputeResolutionOutcome === 'dispute_rejected'
+                                            ? 'R 0.00'
+                                            : `-${formatZAR(reading.disputeSettledCreditZAR ?? reading.disputeEstimatedRandImpactZAR ?? 0, { includeDecimals: true })}`}
+                                        </span>
+                                      ) : reading.disputeEstimatedRandImpactZAR !== undefined ? (
                                         <span className="font-mono text-emerald-800 font-black">
                                           ~{formatZAR(reading.disputeEstimatedRandImpactZAR, { includeDecimals: true })}
                                         </span>
-                                      )}
+                                      ) : null}
                                     </div>
-                                    <div className="text-[9px] text-amber-800">
-                                      Delta: {reading.disputeDifferenceConsumption !== undefined ? `${reading.disputeDifferenceConsumption > 0 ? '+' : ''}${reading.disputeDifferenceConsumption} ${uLabel}` : 'Contested'}
-                                      {reading.disputeLodgedDate ? ` • Lodged ${formatDate(reading.disputeLodgedDate)}` : ''}
+                                    <div className="text-[9px] text-slate-600">
+                                      {reading.disputeStatus === 'Resolved' ? (
+                                        <span>
+                                          {reading.disputeAgreedReadingValue !== undefined && `Agreed: ${reading.disputeAgreedReadingValue.toLocaleString('en-ZA')} ${uLabel}`}
+                                          {reading.disputeCreditNoteNumber && ` • CN #${reading.disputeCreditNoteNumber}`}
+                                          {reading.disputeResolutionDate && ` • ${formatDate(reading.disputeResolutionDate)}`}
+                                        </span>
+                                      ) : (
+                                        <span>
+                                          Delta: {reading.disputeDifferenceConsumption !== undefined ? `${reading.disputeDifferenceConsumption > 0 ? '+' : ''}${reading.disputeDifferenceConsumption} ${uLabel}` : 'Contested'}
+                                          {reading.disputeLodgedDate ? ` • Lodged ${formatDate(reading.disputeLodgedDate)}` : ''}
+                                        </span>
+                                      )}
                                     </div>
                                     {reading.disputeResolutionNotes && (
                                       <p className="text-[9px] text-slate-600 italic truncate" title={reading.disputeResolutionNotes}>
@@ -1525,19 +1681,27 @@ export default function MeterReadingsModal({
                                   </button>
                                 )}
                                 {reading.isDisputed && (
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      setEditingDisputeReading(reading);
-                                      setEditDisputeStatus(reading.disputeStatus || 'Open / Lodged');
-                                      setEditDisputeRef(reading.disputeReferenceNumber || '');
-                                      setEditDisputeNotes(reading.disputeResolutionNotes || '');
-                                    }}
-                                    className="p-1 text-slate-400 hover:text-amber-600 transition-colors rounded hover:bg-amber-50 cursor-pointer"
-                                    title="Update dispute status & council ticket"
-                                  >
-                                    <Edit3 className="w-3.5 h-3.5" />
-                                  </button>
+                                  <>
+                                    {reading.disputeStatus !== 'Resolved' && (
+                                      <button
+                                        type="button"
+                                        onClick={() => openDisputeEditor(reading, true)}
+                                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 transition-colors cursor-pointer mr-0.5"
+                                        title="Record dispute resolution & council settlement"
+                                      >
+                                        <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                                        <span>Resolve</span>
+                                      </button>
+                                    )}
+                                    <button
+                                      type="button"
+                                      onClick={() => openDisputeEditor(reading, false)}
+                                      className="p-1 text-slate-400 hover:text-amber-600 transition-colors rounded hover:bg-amber-50 cursor-pointer"
+                                      title="Update dispute details / settlement"
+                                    >
+                                      <Edit3 className="w-3.5 h-3.5" />
+                                    </button>
+                                  </>
                                 )}
                                 <button
                                   type="button"
@@ -1580,47 +1744,366 @@ export default function MeterReadingsModal({
         </div>
       </div>
 
-      {/* Edit Dispute Modal Popover */}
+      {/* Edit / Resolve Dispute Modal Popover */}
       {editingDisputeReading && (
-        <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-in fade-in">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full border border-slate-200 overflow-hidden animate-in zoom-in-95">
-            <div className="px-5 py-3.5 bg-amber-50 border-b border-amber-200 flex items-center justify-between">
+        <div className="fixed inset-0 z-60 flex items-center justify-center p-3 sm:p-4 bg-slate-950/60 backdrop-blur-xs animate-in fade-in overflow-y-auto">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-xl w-full border border-slate-200 overflow-hidden animate-in zoom-in-95 my-auto max-h-[92vh] flex flex-col">
+            <div
+              className={`px-5 py-3.5 border-b flex items-center justify-between shrink-0 ${
+                editDisputeStatus === 'Resolved'
+                  ? 'bg-emerald-50 border-emerald-200'
+                  : 'bg-amber-50 border-amber-200'
+              }`}
+            >
               <div className="flex items-center gap-2">
-                <FileWarning className="w-4 h-4 text-amber-600" />
-                <h4 className="font-bold text-slate-900 text-sm">
-                  Update Municipal Dispute
-                </h4>
+                {editDisputeStatus === 'Resolved' ? (
+                  <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+                ) : (
+                  <FileWarning className="w-5 h-5 text-amber-600" />
+                )}
+                <div>
+                  <h4 className="font-bold text-slate-900 text-sm">
+                    {editDisputeStatus === 'Resolved'
+                      ? 'Record Municipal Dispute Resolution & Settlement'
+                      : 'Update Municipal Dispute'}
+                  </h4>
+                  <p className="text-[11px] text-slate-500">
+                    {editDisputeStatus === 'Resolved'
+                      ? 'Reconcile agreed meter index and financial credit note'
+                      : 'Manage query status and municipal council ticket'}
+                  </p>
+                </div>
               </div>
               <button
                 type="button"
                 onClick={() => setEditingDisputeReading(null)}
-                className="text-slate-400 hover:text-slate-600 p-1 rounded-md"
+                className="text-slate-400 hover:text-slate-600 p-1 rounded-md cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            <form onSubmit={handleUpdateDispute} className="p-5 space-y-3.5 text-xs">
-              <div className="text-[11px] text-slate-600 bg-slate-50 p-2.5 rounded-lg border border-slate-200">
-                Date: <strong>{formatDate(editingDisputeReading.date)}</strong> • Reading: <strong>{editingDisputeReading.readingValue} {editingDisputeReading.utilityType === 'electricity' ? 'kWh' : 'KL'}</strong>
+            <form onSubmit={handleUpdateDispute} className="p-4 sm:p-5 space-y-4 text-xs overflow-y-auto flex-1">
+              {/* Context Summary */}
+              <div className="text-[11px] text-slate-700 bg-slate-50 p-3 rounded-xl border border-slate-200 flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <span className="text-slate-400">Date:</span> <strong>{formatDate(editingDisputeReading.date)}</strong>
+                  <span className="mx-2 text-slate-300">•</span>
+                  <span className="text-slate-400">Physical Dials:</span>{' '}
+                  <strong className="font-mono text-emerald-700">
+                    {editingDisputeReading.readingValue.toLocaleString('en-ZA')}{' '}
+                    {editingDisputeReading.utilityType === 'electricity' ? 'kWh' : 'KL'}
+                  </strong>
+                </div>
+                {editingDisputeReading.disputedMunicipalReadingValue !== undefined && (
+                  <div>
+                    <span className="text-slate-400">Council Claim:</span>{' '}
+                    <strong className="font-mono text-amber-800">
+                      {editingDisputeReading.disputedMunicipalReadingValue.toLocaleString('en-ZA')}{' '}
+                      {editingDisputeReading.utilityType === 'electricity' ? 'kWh' : 'KL'}
+                    </strong>
+                    {editingDisputeReading.disputeEstimatedRandImpactZAR !== undefined && (
+                      <span className="ml-1 text-[10px] font-bold text-emerald-800 font-mono">
+                        (~{formatZAR(editingDisputeReading.disputeEstimatedRandImpactZAR, { includeDecimals: true })})
+                      </span>
+                    )}
+                  </div>
+                )}
               </div>
 
+              {/* Status Picker */}
               <div>
                 <label className="block text-[11px] font-bold text-slate-700 mb-1">
                   Dispute Lifecycle Status *
                 </label>
                 <select
                   value={editDisputeStatus}
-                  onChange={(e) => setEditDisputeStatus(e.target.value as MeterDisputeStatus)}
-                  className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg text-xs bg-white text-slate-900 font-semibold focus:ring-1 focus:ring-amber-500 focus:outline-none"
+                  onChange={(e) => {
+                    const newStatus = e.target.value as MeterDisputeStatus;
+                    setEditDisputeStatus(newStatus);
+                    if (newStatus === 'Resolved' && !editSettledCreditZAR) {
+                      setEditSettledCreditZAR(
+                        (editingDisputeReading.disputeEstimatedRandImpactZAR ?? '').toString()
+                      );
+                    }
+                  }}
+                  className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg text-xs bg-white text-slate-900 font-semibold focus:ring-1 focus:ring-emerald-500 focus:outline-none"
                 >
-                  <option value="Open / Lodged">Open / Lodged</option>
-                  <option value="Under Investigation">Under Investigation</option>
-                  <option value="Credit Note Pending">Credit Note Pending</option>
-                  <option value="Resolved">Resolved</option>
+                  <option value="Open / Lodged">Open / Lodged (Awaiting Council Action)</option>
+                  <option value="Under Investigation">Under Investigation (Technician Dispatched)</option>
+                  <option value="Credit Note Pending">Credit Note Pending (Council Approved Adjustment)</option>
+                  <option value="Resolved">Resolved (Settlement Agreed & Applied)</option>
                 </select>
               </div>
 
+              {/* RESOLUTION SECTION: Only active when Status === 'Resolved' */}
+              {editDisputeStatus === 'Resolved' && (
+                <div className="p-3.5 bg-emerald-50/70 border border-emerald-300 rounded-xl space-y-3.5 animate-in fade-in duration-200">
+                  <div className="flex items-center justify-between pb-1.5 border-b border-emerald-200">
+                    <span className="text-[11px] font-bold text-emerald-950 uppercase tracking-wide flex items-center gap-1.5">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                      <span>Settlement Outcome Type</span>
+                    </span>
+                    <span className="text-[10px] font-bold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-full">
+                      Choose Resolution
+                    </span>
+                  </div>
+
+                  {/* 4 Outcome Selection Cards */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {/* 1. Accepted Actuals */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditResolutionOutcome('accepted_actuals');
+                        setEditSettledCreditZAR(
+                          (editingDisputeReading.disputeEstimatedRandImpactZAR ?? 0).toString()
+                        );
+                        setEditAgreedReadingValue(editingDisputeReading.readingValue.toString());
+                      }}
+                      className={`p-2.5 rounded-lg border text-left transition-all cursor-pointer ${
+                        editResolutionOutcome === 'accepted_actuals'
+                          ? 'bg-white border-emerald-500 ring-2 ring-emerald-500 shadow-xs'
+                          : 'bg-white/70 border-slate-200 hover:border-emerald-300'
+                      }`}
+                    >
+                      <div className="flex items-center gap-1.5 font-bold text-xs text-slate-900 mb-0.5">
+                        <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                        <span>1. Accepted Actuals</span>
+                      </div>
+                      <p className="text-[10px] text-slate-500 leading-tight">
+                        Council conceded error. Adopts your reading ({editingDisputeReading.readingValue}{' '}
+                        {editingDisputeReading.utilityType === 'electricity' ? 'kWh' : 'KL'}) & full credit.
+                      </p>
+                    </button>
+
+                    {/* 2. Lump-Sum Credit Note */}
+                    <button
+                      type="button"
+                      onClick={() => setEditResolutionOutcome('credit_note_issued')}
+                      className={`p-2.5 rounded-lg border text-left transition-all cursor-pointer ${
+                        editResolutionOutcome === 'credit_note_issued'
+                          ? 'bg-white border-emerald-500 ring-2 ring-emerald-500 shadow-xs'
+                          : 'bg-white/70 border-slate-200 hover:border-emerald-300'
+                      }`}
+                    >
+                      <div className="flex items-center gap-1.5 font-bold text-xs text-slate-900 mb-0.5">
+                        <Receipt className="w-3.5 h-3.5 text-cyan-600 shrink-0" />
+                        <span>2. Lump-Sum Credit Note</span>
+                      </div>
+                      <p className="text-[10px] text-slate-500 leading-tight">
+                        Council granted a monetary credit against the account without altering meter dials.
+                      </p>
+                    </button>
+
+                    {/* 3. Compromise Reading */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditResolutionOutcome('compromise_reading');
+                        if (compromiseRecalculation) {
+                          setEditSettledCreditZAR(compromiseRecalculation.cappedDisputeCostZAR.toString());
+                        }
+                      }}
+                      className={`p-2.5 rounded-lg border text-left transition-all cursor-pointer ${
+                        editResolutionOutcome === 'compromise_reading'
+                          ? 'bg-white border-emerald-500 ring-2 ring-emerald-500 shadow-xs'
+                          : 'bg-white/70 border-slate-200 hover:border-emerald-300'
+                      }`}
+                    >
+                      <div className="flex items-center gap-1.5 font-bold text-xs text-slate-900 mb-0.5">
+                        <Scale className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+                        <span>3. Compromise Reading</span>
+                      </div>
+                      <p className="text-[10px] text-slate-500 leading-tight">
+                        Agreed on a revised reading index. System auto-recalculates usage & credit.
+                      </p>
+                    </button>
+
+                    {/* 4. Dispute Rejected */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditResolutionOutcome('dispute_rejected');
+                        setEditSettledCreditZAR('0');
+                        setEditAgreedReadingValue(
+                          (editingDisputeReading.disputedMunicipalReadingValue ?? '').toString()
+                        );
+                      }}
+                      className={`p-2.5 rounded-lg border text-left transition-all cursor-pointer ${
+                        editResolutionOutcome === 'dispute_rejected'
+                          ? 'bg-white border-rose-500 ring-2 ring-rose-500 shadow-xs'
+                          : 'bg-white/70 border-slate-200 hover:border-rose-300'
+                      }`}
+                    >
+                      <div className="flex items-center gap-1.5 font-bold text-xs text-slate-900 mb-0.5">
+                        <Ban className="w-3.5 h-3.5 text-rose-600 shrink-0" />
+                        <span>4. Dispute Dismissed</span>
+                      </div>
+                      <p className="text-[10px] text-slate-500 leading-tight">
+                        Council rejected dispute. R 0.00 credit, original statement stands.
+                      </p>
+                    </button>
+                  </div>
+
+                  {/* Outcome Inputs & Live Recalculations */}
+                  {editResolutionOutcome === 'accepted_actuals' && (
+                    <div className="p-3 bg-white rounded-lg border border-emerald-200 space-y-2">
+                      <div className="flex items-center justify-between text-[11px]">
+                        <span className="text-slate-600">Settled Reading Index:</span>
+                        <strong className="font-mono text-emerald-900">
+                          {editingDisputeReading.readingValue.toLocaleString('en-ZA')}{' '}
+                          {editingDisputeReading.utilityType === 'electricity' ? 'kWh' : 'KL'} (Your Physical Log)
+                        </strong>
+                      </div>
+                      <div className="flex items-center justify-between text-[11px] pt-1 border-t border-slate-100">
+                        <span className="text-slate-600">Settled Rand Credit from Council:</span>
+                        <strong className="font-mono text-emerald-900 font-black">
+                          {formatZAR(
+                            parseFloat(editSettledCreditZAR) ||
+                              editingDisputeReading.disputeEstimatedRandImpactZAR ||
+                              0,
+                            { includeDecimals: true }
+                          )}
+                        </strong>
+                      </div>
+                    </div>
+                  )}
+
+                  {editResolutionOutcome === 'credit_note_issued' && (
+                    <div className="p-3 bg-white rounded-lg border border-cyan-200 space-y-2">
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                          Credit Note Amount (ZAR) *
+                        </label>
+                        <div className="relative">
+                          <span className="absolute left-2.5 top-1.5 text-xs font-bold text-slate-400">R</span>
+                          <input
+                            type="number"
+                            step="any"
+                            required
+                            min="0"
+                            value={editSettledCreditZAR}
+                            onChange={(e) => setEditSettledCreditZAR(e.target.value)}
+                            placeholder="e.g. 410.00"
+                            className="w-full pl-6 pr-2.5 py-1.5 border border-slate-300 rounded-lg text-xs bg-white text-slate-900 font-mono font-bold focus:ring-1 focus:ring-cyan-500 focus:outline-none"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {editResolutionOutcome === 'compromise_reading' && (
+                    <div className="p-3 bg-white rounded-lg border border-indigo-200 space-y-3">
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                          Agreed Dial Reading ({editingDisputeReading.utilityType === 'electricity' ? 'kWh' : 'KL'}) *
+                        </label>
+                        <input
+                          type="number"
+                          step="any"
+                          required
+                          min="0"
+                          value={editAgreedReadingValue}
+                          onChange={(e) => {
+                            setEditAgreedReadingValue(e.target.value);
+                          }}
+                          placeholder="e.g. 1420"
+                          className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg text-xs bg-white text-slate-900 font-mono font-bold focus:ring-1 focus:ring-indigo-500 focus:outline-none"
+                        />
+                      </div>
+
+                      {compromiseRecalculation && (
+                        <div className="p-2.5 rounded-lg bg-indigo-50/70 border border-indigo-200 text-indigo-950 space-y-1">
+                          <div className="flex items-center justify-between text-[11px]">
+                            <span className="text-slate-600">Agreed Consumption:</span>
+                            <strong className="font-mono text-indigo-900 font-bold">
+                              +{compromiseRecalculation.physicalConsumption}{' '}
+                              {editingDisputeReading.utilityType === 'electricity' ? 'kWh' : 'KL'}
+                            </strong>
+                          </div>
+                          <div className="flex items-center justify-between text-[11px]">
+                            <span className="text-slate-600">Council Over-billed:</span>
+                            <strong className="font-mono text-amber-800">
+                              +{compromiseRecalculation.unitsDiscrepancy}{' '}
+                              {editingDisputeReading.utilityType === 'electricity' ? 'kWh' : 'KL'}
+                            </strong>
+                          </div>
+                          <div className="flex items-center justify-between text-[11px] pt-1 border-t border-indigo-200">
+                            <span className="font-bold text-emerald-800">Recalculated Rand Credit:</span>
+                            <strong className="font-mono text-emerald-900 font-black">
+                              {formatZAR(compromiseRecalculation.cappedDisputeCostZAR, { includeDecimals: true })}
+                            </strong>
+                          </div>
+                        </div>
+                      )}
+
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                          Settled Credit Amount (ZAR)
+                        </label>
+                        <div className="relative">
+                          <span className="absolute left-2.5 top-1.5 text-xs font-bold text-slate-400">R</span>
+                          <input
+                            type="number"
+                            step="any"
+                            value={editSettledCreditZAR}
+                            onChange={(e) => setEditSettledCreditZAR(e.target.value)}
+                            placeholder={
+                              compromiseRecalculation
+                                ? compromiseRecalculation.cappedDisputeCostZAR.toString()
+                                : '0.00'
+                            }
+                            className="w-full pl-6 pr-2.5 py-1.5 border border-slate-300 rounded-lg text-xs bg-white text-slate-900 font-mono font-bold focus:ring-1 focus:ring-indigo-500 focus:outline-none"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {editResolutionOutcome === 'dispute_rejected' && (
+                    <div className="p-3 bg-rose-50 rounded-lg border border-rose-200 text-rose-900 text-[11px] space-y-1">
+                      <div className="font-bold flex items-center gap-1.5">
+                        <AlertCircle className="w-3.5 h-3.5 text-rose-600 shrink-0" />
+                        <span>Council Upheld Original Assessment</span>
+                      </div>
+                      <p className="text-[10px] text-rose-800 leading-relaxed">
+                        Original municipal charge remains in full on tenant statement and owner ledger. Credit applied: R 0.00.
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Resolution Details: Credit Note Ref & Resolution Date */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                        Council Credit Note / Reversal #
+                      </label>
+                      <input
+                        type="text"
+                        value={editCreditNoteNumber}
+                        onChange={(e) => setEditCreditNoteNumber(e.target.value)}
+                        placeholder="e.g. CN-ETH-2026-881"
+                        className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg text-xs bg-white text-slate-900 font-mono focus:ring-1 focus:ring-emerald-500 focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                        Resolution Date *
+                      </label>
+                      <input
+                        type="date"
+                        required
+                        value={editResolutionDate}
+                        onChange={(e) => setEditResolutionDate(e.target.value)}
+                        className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg text-xs bg-white text-slate-900 font-semibold focus:ring-1 focus:ring-emerald-500 focus:outline-none"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Council Reference / Ticket # */}
               <div>
                 <label className="block text-[11px] font-bold text-slate-700 mb-1">
                   Council Reference / Ticket #
@@ -1634,12 +2117,13 @@ export default function MeterReadingsModal({
                 />
               </div>
 
+              {/* Resolution & Council Notes */}
               <div>
                 <label className="block text-[11px] font-bold text-slate-700 mb-1">
                   Resolution & Council Notes
                 </label>
                 <textarea
-                  rows={3}
+                  rows={2}
                   value={editDisputeNotes}
                   onChange={(e) => setEditDisputeNotes(e.target.value)}
                   placeholder="e.g. Council technician confirmed meter reading. Credit note issued."
@@ -1647,19 +2131,24 @@ export default function MeterReadingsModal({
                 />
               </div>
 
+              {/* Action Buttons */}
               <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
                 <button
                   type="button"
                   onClick={() => setEditingDisputeReading(null)}
-                  className="px-3 py-1.5 border border-slate-300 rounded-lg text-slate-600 hover:bg-slate-50 font-bold"
+                  className="px-3 py-1.5 border border-slate-300 rounded-lg text-slate-600 hover:bg-slate-50 font-bold cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg font-bold shadow-xs cursor-pointer"
+                  className={`px-4 py-1.5 text-white rounded-lg font-bold shadow-xs cursor-pointer transition-colors ${
+                    editDisputeStatus === 'Resolved'
+                      ? 'bg-emerald-600 hover:bg-emerald-700'
+                      : 'bg-amber-600 hover:bg-amber-700'
+                  }`}
                 >
-                  Save Updates
+                  {editDisputeStatus === 'Resolved' ? 'Confirm Resolution' : 'Save Updates'}
                 </button>
               </div>
             </form>

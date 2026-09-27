@@ -176,4 +176,158 @@ describe('usePortfolioStore - Municipal Meter Reading Disputes', () => {
     expect(febElec?.readingValue).toBe(39504.0);
     expect(febElec?.consumption).toBe(202.0);
   });
+
+  describe('Municipal Dispute 4-State Resolution Engine', () => {
+    it('resolves dispute with accepted_actuals: locks reading to user dials and credits full calculated amount', () => {
+      const store = usePortfolioStore.getState();
+      const rentalId = 'rental-2';
+      const rental = store.rentals.find((r) => r.id === rentalId);
+      const disputeReading = rental?.meterReadings?.find((m) => m.isDisputed);
+      expect(disputeReading).toBeDefined();
+
+      store.updateMeterReadingDispute(rentalId, disputeReading!.id, {
+        disputeStatus: 'Resolved',
+        disputeResolutionOutcome: 'accepted_actuals',
+        disputeAgreedReadingValue: disputeReading!.readingValue,
+        disputeAgreedConsumption: disputeReading!.consumption,
+        disputeSettledCreditZAR: disputeReading!.disputeEstimatedRandImpactZAR,
+        disputeResolutionDate: '2026-09-27',
+        disputeResolutionNotes: 'Council conceded reading error. Credit note issued.',
+      });
+
+      const updated = usePortfolioStore
+        .getState()
+        .rentals.find((r) => r.id === rentalId)
+        ?.meterReadings?.find((m) => m.id === disputeReading!.id);
+
+      expect(updated?.disputeStatus).toBe('Resolved');
+      expect(updated?.disputeResolutionOutcome).toBe('accepted_actuals');
+      expect(updated?.disputeAgreedReadingValue).toBe(28260);
+      expect(updated?.disputeSettledCreditZAR).toBe(459.38);
+      expect(updated?.disputeResolutionDate).toBe('2026-09-27');
+    });
+
+    it('resolves dispute with credit_note_issued: captures custom credit ZAR and credit note number', () => {
+      const store = usePortfolioStore.getState();
+      const rentalId = 'rental-2';
+      const rental = store.rentals.find((r) => r.id === rentalId);
+      const disputeReading = rental?.meterReadings?.find((m) => m.isDisputed);
+      expect(disputeReading).toBeDefined();
+
+      store.updateMeterReadingDispute(rentalId, disputeReading!.id, {
+        disputeStatus: 'Resolved',
+        disputeResolutionOutcome: 'credit_note_issued',
+        disputeSettledCreditZAR: 400.0,
+        disputeCreditNoteNumber: 'CN-ETH-2026-8819',
+        disputeResolutionDate: '2026-09-27',
+        disputeResolutionNotes: 'Council granted R 400 lump-sum credit adjustment.',
+      });
+
+      const updated = usePortfolioStore
+        .getState()
+        .rentals.find((r) => r.id === rentalId)
+        ?.meterReadings?.find((m) => m.id === disputeReading!.id);
+
+      expect(updated?.disputeStatus).toBe('Resolved');
+      expect(updated?.disputeResolutionOutcome).toBe('credit_note_issued');
+      expect(updated?.disputeSettledCreditZAR).toBe(400.0);
+      expect(updated?.disputeCreditNoteNumber).toBe('CN-ETH-2026-8819');
+    });
+
+    it('resolves dispute with compromise_reading: updates agreed reading index and recalculated credit', () => {
+      const store = usePortfolioStore.getState();
+      const rentalId = 'rental-2';
+      const rental = store.rentals.find((r) => r.id === rentalId);
+      const disputeReading = rental?.meterReadings?.find((m) => m.isDisputed);
+      expect(disputeReading).toBeDefined();
+
+      store.updateMeterReadingDispute(rentalId, disputeReading!.id, {
+        disputeStatus: 'Resolved',
+        disputeResolutionOutcome: 'compromise_reading',
+        disputeAgreedReadingValue: 28350,
+        disputeAgreedConsumption: 90,
+        disputeSettledCreditZAR: 275.5,
+        disputeCreditNoteNumber: 'CN-ETH-COMP-01',
+        disputeResolutionDate: '2026-09-27',
+        disputeResolutionNotes: 'Agreed on dial compromise index of 28350 kWh.',
+      });
+
+      const updated = usePortfolioStore
+        .getState()
+        .rentals.find((r) => r.id === rentalId)
+        ?.meterReadings?.find((m) => m.id === disputeReading!.id);
+
+      expect(updated?.disputeStatus).toBe('Resolved');
+      expect(updated?.disputeResolutionOutcome).toBe('compromise_reading');
+      expect(updated?.disputeAgreedReadingValue).toBe(28350);
+      expect(updated?.disputeAgreedConsumption).toBe(90);
+      expect(updated?.disputeSettledCreditZAR).toBe(275.5);
+    });
+
+    it('resolves dispute with dispute_rejected: sets settled credit to R 0.00 and records council findings', () => {
+      const store = usePortfolioStore.getState();
+      const rentalId = 'rental-2';
+      const rental = store.rentals.find((r) => r.id === rentalId);
+      const disputeReading = rental?.meterReadings?.find((m) => m.isDisputed);
+      expect(disputeReading).toBeDefined();
+
+      store.updateMeterReadingDispute(rentalId, disputeReading!.id, {
+        disputeStatus: 'Resolved',
+        disputeResolutionOutcome: 'dispute_rejected',
+        disputeSettledCreditZAR: 0,
+        disputeAgreedReadingValue: disputeReading!.disputedMunicipalReadingValue,
+        disputeResolutionDate: '2026-09-27',
+        disputeResolutionNotes: 'Council lab test confirmed meter calibrated accurately within 2.5% tolerance.',
+      });
+
+      const updated = usePortfolioStore
+        .getState()
+        .rentals.find((r) => r.id === rentalId)
+        ?.meterReadings?.find((m) => m.id === disputeReading!.id);
+
+      expect(updated?.disputeStatus).toBe('Resolved');
+      expect(updated?.disputeResolutionOutcome).toBe('dispute_rejected');
+      expect(updated?.disputeSettledCreditZAR).toBe(0);
+      expect(updated?.disputeAgreedReadingValue).toBe(28410);
+      expect(updated?.disputeResolutionNotes).toContain('within 2.5% tolerance');
+    });
+
+    it('benchmarks subsequent month baseline to disputeAgreedReadingValue', () => {
+      const store = usePortfolioStore.getState();
+      const rentalId = 'rental-2';
+
+      // 1. Resolve prior dispute with agreed reading index
+      const rental = store.rentals.find((r) => r.id === rentalId);
+      const disputeReading = rental?.meterReadings?.find((m) => m.isDisputed);
+      expect(disputeReading).toBeDefined();
+
+      store.updateMeterReadingDispute(rentalId, disputeReading!.id, {
+        disputeStatus: 'Resolved',
+        disputeResolutionOutcome: 'compromise_reading',
+        disputeAgreedReadingValue: 28350,
+      });
+
+      // 2. Add a new subsequent reading next month
+      store.addMeterReading(rentalId, {
+        date: '2026-05-15',
+        utilityType: 'electricity',
+        readingValue: 28600,
+        readingType: 'Actual',
+        source: 'manual',
+      });
+
+      const updatedRental = usePortfolioStore.getState().rentals.find((r) => r.id === rentalId);
+      const newReading = updatedRental?.meterReadings?.find((m) => m.date === '2026-05-15');
+      expect(newReading).toBeDefined();
+
+      // The baseline from the prior reading's disputeAgreedReadingValue is 28350
+      const priorReading = updatedRental?.meterReadings?.find((m) => m.id === disputeReading!.id);
+      const baseline = priorReading?.disputeAgreedReadingValue ?? priorReading?.readingValue;
+      expect(baseline).toBe(28350);
+
+      // Usage from benchmarked baseline: 28600 - 28350 = 250 kWh
+      const calculatedUsage = newReading!.readingValue - baseline!;
+      expect(calculatedUsage).toBe(250);
+    });
+  });
 });
