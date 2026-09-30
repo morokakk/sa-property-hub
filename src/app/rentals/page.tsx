@@ -23,6 +23,7 @@ import {
   Mail,
   Trash2,
   AlertCircle,
+  AlertTriangle,
   FileCheck2,
   Edit3,
   MessageCircle,
@@ -232,6 +233,7 @@ export default function RentalPortfolioPage() {
   const setRentalForecastView = usePortfolioStore((state) => state.setRentalForecastView);
   const aiSettings = usePortfolioStore((state) => state.aiSettings);
   const summary = usePortfolioSummary();
+  const investorProfile = usePortfolioStore((state) => state.investorProfile);
 
   // Active vs Sold Archive View Tab
   const [viewTab, setViewTab] = useState<'active' | 'archive'>('active');
@@ -771,7 +773,7 @@ export default function RentalPortfolioPage() {
 
       <main className="flex-1 p-4 sm:p-6 space-y-6 max-w-7xl w-full mx-auto">
         {/* Top Summary Bar */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
           <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-xs">
             <span className="text-[11px] font-semibold text-slate-500 uppercase">Total Rental Asset Value</span>
             <div className="text-xl font-bold text-slate-900 mt-1">{formatZAR(summary.totalRentalValue)}</div>
@@ -789,13 +791,27 @@ export default function RentalPortfolioPage() {
             <div className={`text-xl font-bold mt-1 ${totalNetMonthlyRent >= 0 ? 'text-emerald-700' : 'text-rose-600'}`}>
               {formatZAR(totalNetMonthlyRent)}/m
             </div>
-            <p className="text-[11px] text-slate-400 mt-0.5">After bonds, levies, agency & taxes</p>
+            <p className="text-[11px] text-slate-400 mt-0.5">Operational pre-tax cash flow</p>
           </div>
 
           <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-xs">
             <span className="text-[11px] font-semibold text-slate-500 uppercase">Rental Bonds Outstanding</span>
             <div className="text-xl font-bold text-slate-900 mt-1">{formatZAR(summary.totalBondLiabilities)}</div>
             <p className="text-[11px] text-slate-400 mt-0.5">Active mortgage debt</p>
+          </div>
+
+          <div className="bg-amber-50/70 rounded-xl p-4 border border-amber-200 shadow-xs">
+            <div className="flex items-center justify-between text-amber-800 mb-1">
+              <span className="text-[11px] font-semibold uppercase tracking-wider">Rental Tax Reserve</span>
+              <AlertTriangle className="w-4 h-4 text-amber-600" />
+            </div>
+            <div className="text-xl font-bold text-amber-900 mt-1">
+              {formatZAR(summary.annualRentalTaxReserve)}
+              <span className="text-xs font-normal text-amber-600">/yr</span>
+            </div>
+            <p className="text-[11px] text-amber-700 mt-0.5">
+              {formatZAR(summary.monthlyRentalTaxReserve)}/m • SARS Liability Reserve
+            </p>
           </div>
         </div>
 
@@ -880,6 +896,18 @@ export default function RentalPortfolioPage() {
                     property.marketValueZAR > 0
                       ? ((property.monthlyGrossRentZAR * 12) / property.marketValueZAR) * 100
                       : 0;
+
+                  const entityType = property.taxEntityTypeOverride || investorProfile?.defaultTaxEntityType || 'Company (27%)';
+                  const taxRate = entityType === 'Individual (45%)' ? 0.45 : entityType === 'Pre-Tax' ? 0 : 0.27;
+                  const taxRateLabel = entityType === 'Individual (45%)' ? 'Individual 45%' : entityType === 'Pre-Tax' ? 'Pre-Tax 0%' : 'Company 27%';
+                  const annualCashflow = Math.max(0, netCashflow * 12);
+                  const sec13Shield = property.section13sexAnnualShieldZAR || 0;
+                  const taxableIncome = Math.max(0, annualCashflow - sec13Shield);
+                  const annualTaxZAR = Math.round(taxableIncome * taxRate);
+                  const monthlyTaxZAR = Math.round(annualTaxZAR / 12);
+                  const taxSavingsZAR = sec13Shield > 0 ? Math.round(Math.min(annualCashflow, sec13Shield) * taxRate) : 0;
+                  const postTaxCashflow = netCashflow - monthlyTaxZAR;
+                  const yieldPostTax = property.marketValueZAR > 0 ? ((postTaxCashflow * 12) / property.marketValueZAR) * 100 : 0;
 
                   return (
                     <div
@@ -978,6 +1006,9 @@ export default function RentalPortfolioPage() {
                             <strong className={netCashflow >= 0 ? 'text-emerald-700' : 'text-rose-600'}>
                               {formatZAR(netCashflow)}/m
                             </strong>
+                            <span className="text-[9px] text-slate-400 block font-normal">
+                              Post-tax: {formatZAR(postTaxCashflow)}/m
+                            </span>
                           </div>
                         </div>
 
@@ -1218,6 +1249,54 @@ export default function RentalPortfolioPage() {
                                   <span>- {formatZAR(property.unpaidUtilityArrearsZAR || 0)}</span>
                                 </div>
                               )}
+
+                              {/* SARS Income Tax Provision */}
+                              <div className="pt-2 border-t border-slate-200 space-y-1.5">
+                                <div className="flex justify-between items-center text-slate-700 bg-amber-50/60 px-2.5 py-1.5 rounded-lg border border-amber-200">
+                                  <div>
+                                    <div className="flex items-center gap-1.5 flex-wrap">
+                                      <span className="font-semibold text-amber-950 text-[11px]">
+                                        Est. SARS Tax Provision:
+                                      </span>
+                                      <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-amber-100 text-amber-800 border border-amber-200">
+                                        {taxRateLabel}
+                                      </span>
+                                      {sec13Shield > 0 && (
+                                        <span
+                                          className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-emerald-100 text-emerald-800 border border-emerald-300 flex items-center gap-0.5"
+                                          title={`Section 13sex Tax Shield: ${formatZAR(sec13Shield)}/yr allowance saves ${formatZAR(taxSavingsZAR)}/yr in SARS income tax`}
+                                        >
+                                          ✓ Sec 13sex Shield Active (-{formatZAR(taxSavingsZAR)}/yr)
+                                        </span>
+                                      )}
+                                    </div>
+                                    <span className="text-[10px] text-amber-700">
+                                      {taxRate === 0
+                                        ? 'Pre-Tax entity structure (0% tax liability)'
+                                        : netCashflow <= 0
+                                        ? 'Assessed operational loss (R 0 tax liability)'
+                                        : `${formatZAR(annualTaxZAR)}/yr tax reserve liability`}
+                                    </span>
+                                  </div>
+                                  <span className="font-mono font-bold text-amber-900 text-xs">
+                                    {monthlyTaxZAR > 0 ? `- ${formatZAR(monthlyTaxZAR)}` : 'R 0'}
+                                  </span>
+                                </div>
+
+                                <div className="flex justify-between items-center text-slate-900 bg-emerald-50/70 px-2.5 py-2 rounded-lg border border-emerald-200">
+                                  <div>
+                                    <span className="font-bold text-emerald-950 text-xs block">
+                                      Net Post-Tax Cash Flow:
+                                    </span>
+                                    <span className="text-[10px] text-emerald-700">
+                                      Post-tax yield: {formatPercent(yieldPostTax)}
+                                    </span>
+                                  </div>
+                                  <span className={`font-mono font-black text-sm ${postTaxCashflow >= 0 ? 'text-emerald-900' : 'text-rose-700'}`}>
+                                    {formatZAR(postTaxCashflow)}/m
+                                  </span>
+                                </div>
+                              </div>
                             </div>
 
                             {/* Inline Editable Utility Arrears Box */}
