@@ -1522,7 +1522,7 @@ export function computePortfolioSummary(state: {
     )
     .reduce((sum, f) => sum + Math.max(0, (f.capitalAmountZAR || 0) - (f.totalRepaidZAR || 0)), 0);
 
-  const totalAvailablePurchasingPower = liquidCapitalReserve + unallocatedFundingReserve;
+  // totalAvailablePurchasingPower computed after freeUnallocatedCash below
 
   const totalPrivateFundingLiability = (state.funding || [])
     .filter((f) => f.status === 'Active' || f.status === 'Accruing')
@@ -1592,6 +1592,9 @@ export function computePortfolioSummary(state: {
 
   // 2. Free Unallocated Cash:
   const freeUnallocatedCash = Math.max(0, liquidCapitalReserve - ringFencedWorkingCapital);
+
+  // Deployable purchasing power = free cash (after ring-fencing) + unallocated funding facilities
+  const totalAvailablePurchasingPower = freeUnallocatedCash + unallocatedFundingReserve;
 
   // 3. Projected Flip Profits & SARS Provisional Tax Reserve:
   let totalGrossProjectedFlipProfits = 0;
