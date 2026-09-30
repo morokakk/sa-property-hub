@@ -23,6 +23,8 @@ import {
   ArrowRight,
   Check,
   Sparkles,
+  AlertTriangle,
+  Landmark,
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -78,45 +80,55 @@ export default function GlobalDashboardPage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 border-t lg:border-t-0 lg:border-l border-slate-800 pt-3 lg:pt-0 lg:pl-6">
+            <div className="grid grid-cols-2 xl:grid-cols-4 gap-3 border-t lg:border-t-0 lg:border-l border-slate-800 pt-3 lg:pt-0 lg:pl-6">
               <div className="bg-slate-800/60 rounded-xl p-3 border border-slate-700/60">
                 <div className="flex items-center justify-between text-[11px] text-slate-400 mb-0.5">
-                  <span>Liquid Cash Reserve</span>
+                  <span className="font-medium text-emerald-400">Free Unallocated Cash</span>
                   <button
                     onClick={() => {
                       setSeedAmount(summary.liquidCapitalReserve);
                       setShowEditSeedModal(true);
                     }}
-                    className="text-emerald-400 hover:text-emerald-300 p-0.5 rounded hover:bg-emerald-950 transition-colors"
+                    className="text-emerald-400 hover:text-emerald-300 p-0.5 rounded hover:bg-emerald-950 transition-colors cursor-pointer"
                     title="Edit Seed Capital Reserve"
                   >
                     <Edit3 className="w-3 h-3" />
                   </button>
                 </div>
-                <div className="text-base font-bold text-emerald-300">
-                  {formatZAR(summary.liquidCapitalReserve)}
+                <div className="text-base font-black text-emerald-300">
+                  {formatZAR(summary.freeUnallocatedCash)}
                 </div>
-                <div className="text-[10px] text-slate-400 mt-0.5">
-                  Direct cash in reserve
+                <div className="text-[10px] text-slate-400 mt-0.5 truncate">
+                  Of {formatZAR(summary.liquidCapitalReserve)} total reserve
                 </div>
               </div>
 
               <div className="bg-slate-800/60 rounded-xl p-3 border border-slate-700/60">
-                <div className="text-[11px] text-slate-400 mb-0.5">Unallocated Debt/Facilities</div>
-                <div className="text-base font-bold text-indigo-300">
-                  {formatZAR(summary.unallocatedFundingReserve)}
+                <div className="text-[11px] text-amber-400 font-medium mb-0.5">Ring-Fenced Capital</div>
+                <div className="text-base font-bold text-amber-300">
+                  {formatZAR(summary.ringFencedWorkingCapital)}
                 </div>
-                <div className="text-[10px] text-slate-400 mt-0.5">
-                  Pre-approved lender facilities
+                <div className="text-[10px] text-slate-400 mt-0.5 truncate" title="Retentions, pending milestone draws, and municipal rates deposits">
+                  Retentions & Council Deposits
                 </div>
               </div>
 
-              <div className="bg-slate-800/60 rounded-xl p-3 border border-slate-700/60 col-span-2 sm:col-span-1">
-                <div className="text-[11px] text-slate-400 mb-0.5">Realized Flip Profits</div>
-                <div className="text-base font-bold text-amber-300">
+              <div className="bg-slate-800/60 rounded-xl p-3 border border-slate-700/60">
+                <div className="text-[11px] text-slate-400 mb-0.5">Unallocated Debt</div>
+                <div className="text-base font-bold text-indigo-300">
+                  {formatZAR(summary.unallocatedFundingReserve)}
+                </div>
+                <div className="text-[10px] text-slate-400 mt-0.5 truncate">
+                  Pre-approved facilities
+                </div>
+              </div>
+
+              <div className="bg-slate-800/60 rounded-xl p-3 border border-slate-700/60">
+                <div className="text-[11px] text-slate-400 mb-0.5">Realized Profits</div>
+                <div className="text-base font-bold text-slate-200">
                   {formatZAR(summary.totalRealizedFlipProfits)}
                 </div>
-                <div className="text-[10px] text-slate-400 mt-0.5">
+                <div className="text-[10px] text-slate-400 mt-0.5 truncate">
                   From {summary.completedFlipsCount} completed exits
                 </div>
               </div>
@@ -274,20 +286,121 @@ export default function GlobalDashboardPage() {
           </div>
 
           {/* Flip Pipeline Upside */}
-          <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-xs">
-            <div className="flex items-center justify-between text-slate-500 mb-1">
-              <span className="text-[11px] font-semibold uppercase tracking-wider">Projected Flip Profits</span>
-              <Hammer className="w-4 h-4 text-indigo-600" />
+          <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-xs flex flex-col justify-between">
+            <div>
+              <div className="flex items-center justify-between text-slate-500 mb-1">
+                <span className="text-[11px] font-semibold uppercase tracking-wider">Projected Flip Profits</span>
+                <Hammer className="w-4 h-4 text-indigo-600" />
+              </div>
+              <div className="flex items-baseline justify-between mt-1">
+                <div className="text-xl font-bold text-slate-900">
+                  {formatZAR(summary.totalGrossProjectedFlipProfits)}
+                </div>
+                <span className="text-[10px] font-semibold bg-indigo-50 text-indigo-700 px-1.5 py-0.5 rounded border border-indigo-100">
+                  Gross Pre-Tax
+                </span>
+              </div>
+              <div className="mt-2 pt-2 border-t border-slate-100 space-y-1">
+                <div className="text-[11px] text-slate-500 flex items-center justify-between">
+                  <span className="text-rose-600 font-medium">− {formatZAR(summary.totalSarsProvisionalTaxReserve)}</span>
+                  <span className="text-slate-400 text-[10px]">SARS 27% Prov. Tax</span>
+                </div>
+                <div className="text-[11px] flex items-center justify-between font-bold text-emerald-800 bg-emerald-50 px-2 py-1 rounded border border-emerald-100/80">
+                  <span>Net Realizable:</span>
+                  <span>{formatZAR(summary.totalNetProjectedFlipProfits)}</span>
+                </div>
+              </div>
             </div>
-            <div className="text-xl font-bold text-slate-900 mt-1">
-              {formatZAR(summary.totalProjectedFlipProfits)}
-            </div>
-            <div className="text-[11px] text-slate-500 mt-1 flex items-center justify-between">
-              <span>Active Flips Upside</span>
+            <div className="text-[10px] text-slate-400 mt-2 flex items-center justify-between">
+              <span>Pipeline Realizable Equity</span>
               <span className="text-indigo-600 font-medium">{summary.activeFlipsCount} in progress</span>
             </div>
           </div>
         </div>
+
+        {/* Rental Tax Reserve & SARS Flip Tax Side-by-Side */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {/* Rental Tax Reserve */}
+          <div className="bg-amber-50 rounded-xl p-4 border border-amber-200 shadow-xs">
+            <div className="flex items-center justify-between text-amber-800 mb-1">
+              <span className="text-[11px] font-semibold uppercase tracking-wider">Rental Tax Reserve</span>
+              <AlertTriangle className="w-4 h-4 text-amber-500" />
+            </div>
+            <div className="text-xl font-bold text-amber-900 mt-1">
+              {formatZAR(summary.annualRentalTaxReserve)}
+              <span className="text-xs font-normal text-amber-600">/yr</span>
+            </div>
+            <div className="text-[11px] text-amber-700 mt-1 flex items-center justify-between">
+              <span>{formatZAR(summary.monthlyRentalTaxReserve)}/m</span>
+              <span className="text-amber-600 font-medium">Liability Reserve</span>
+            </div>
+          </div>
+
+          {/* SARS Flip Provisional Tax */}
+          <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-xs">
+            <div className="flex items-center justify-between text-slate-500 mb-1">
+              <span className="text-[11px] font-semibold uppercase tracking-wider">SARS Provisional Tax (Flips)</span>
+              <Coins className="w-4 h-4 text-rose-500" />
+            </div>
+            <div className="text-xl font-bold text-slate-900 mt-1">
+              {formatZAR(summary.totalSarsProvisionalTaxReserve)}
+            </div>
+            <div className="text-[11px] text-slate-500 mt-1 flex items-center justify-between">
+              <span>Combined pipeline reserve</span>
+              <span className="text-rose-600 font-medium">Flip + Rental Tax</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Equity Extraction Opportunities */}
+        {summary.equityAlerts.length > 0 && (
+          <div className="bg-gradient-to-r from-emerald-50 to-teal-50 rounded-2xl p-5 border border-emerald-200 shadow-sm">
+            <div className="flex items-center gap-2.5 mb-4">
+              <div className="w-9 h-9 rounded-xl bg-emerald-100 border border-emerald-200 flex items-center justify-center text-emerald-700">
+                <Landmark className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-emerald-950">🏦 Equity Extraction Opportunities</h3>
+                <p className="text-[11px] text-emerald-700">{summary.equityAlerts.length} {summary.equityAlerts.length === 1 ? 'property' : 'properties'} may qualify for refinance equity release</p>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {summary.equityAlerts.map((alert) => (
+                <div
+                  key={alert.propertyId}
+                  className={`p-3.5 rounded-xl border transition-all ${
+                    alert.isRipe
+                      ? 'bg-white border-emerald-300 shadow-md shadow-emerald-100/50 ring-1 ring-emerald-200/50'
+                      : 'bg-white/80 border-slate-200'
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-2 mb-2">
+                    <h4 className="text-xs font-bold text-slate-900 leading-tight">{alert.propertyTitle}</h4>
+                    {alert.isRipe && (
+                      <span className="text-[9px] font-extrabold bg-emerald-600 text-white px-2 py-0.5 rounded-full uppercase tracking-wider shrink-0 animate-pulse">
+                        Ripe
+                      </span>
+                    )}
+                  </div>
+                  <div className="space-y-1.5 text-xs">
+                    <div className="flex items-center justify-between text-slate-600">
+                      <span>Current LTV:</span>
+                      <strong className={alert.currentLTV < 0.60 ? 'text-emerald-700' : 'text-amber-700'}>{formatPercent(alert.currentLTV * 100)}</strong>
+                    </div>
+                    <div className="flex items-center justify-between text-slate-600">
+                      <span>Extractable Equity:</span>
+                      <strong className="text-emerald-800">{formatZAR(alert.extractableEquityZAR)}</strong>
+                    </div>
+                    <div className="flex items-center justify-between text-slate-600">
+                      <span>Months Stabilized:</span>
+                      <strong className="text-slate-800">{alert.monthsStabilized}</strong>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Middle Operational Section: Allocation Chart + Deadlines + Priority Tasks */}
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
@@ -423,7 +536,13 @@ export default function GlobalDashboardPage() {
                         <div>
                           <h4 className="text-xs font-bold text-slate-900">{rental.title}</h4>
                           <p className="text-[11px] text-slate-500">
-                            Tenant: <span className="font-medium text-slate-700">{rental.tenantName}</span> (Lease to {formatDate(rental.leaseEndDate)})
+                            {(rental.leases?.length || 0) > 1 ? (
+                              <span className="font-medium text-slate-700">
+                                {rental.leases.length} Units • {rental.leases.filter(l => l.status === 'Occupied').length} Occupied • {formatZAR(rental.leases.filter(l => l.status === 'Occupied').reduce((s, l) => s + l.monthlyRentZAR, 0))}/m
+                              </span>
+                            ) : (
+                              <>Tenant: <span className="font-medium text-slate-700">{rental.leases?.[0]?.tenantName}</span> (Lease to {formatDate(rental.leases?.[0]?.leaseEndDate || '')})</>
+                            )}
                           </p>
                         </div>
                         <div className="flex items-center gap-1">

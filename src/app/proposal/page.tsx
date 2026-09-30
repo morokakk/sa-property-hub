@@ -128,6 +128,7 @@ function ProposalGeneratorContent() {
       annualRentalEscalationPercent: 6.0,
       annualExpenseInflationPercent: 6.0,
       bondTermYears: 20,
+      ancillaryIncomes: [],
     })),
     ...opportunities.map((o) => {
       const openMarket = o.openMarketValueZAR || Math.round(o.purchasePrice * 1.2);
@@ -199,6 +200,7 @@ function ProposalGeneratorContent() {
         annualRentalEscalationPercent: o.annualRentalEscalationPercent ?? 6.0,
         annualExpenseInflationPercent: o.annualExpenseInflationPercent ?? 6.0,
         bondTermYears: o.bondTermYears ?? o.loanTermYears ?? 20,
+        ancillaryIncomes: o.ancillaryIncomes || [],
       };
     }),
     ...rentals.map((r) => {
@@ -238,9 +240,9 @@ function ProposalGeneratorContent() {
         monthlyOtherHolding: (r.monthlyAgentFeeZAR || 0) + (r.monthlyMaintenanceReserveZAR || 0),
         monthlyHoldingCost: (r.monthlyBondPaymentZAR || 0) + (r.monthlyLeviesZAR || 0) + (r.monthlyRatesTaxesZAR || 0),
         targetExitPrice: openMarket,
-        completionDate: r.leaseEndDate || new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+        completionDate: r.leases?.[0]?.leaseEndDate || new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
         boq: [],
-        notes: `Seasoned portfolio asset. Tenant: ${r.tenantName || 'In-place'}. Gross Rent: ${formatZAR(r.monthlyGrossRentZAR)}/mo. Bond balance: ${formatZAR(r.outstandingBondBalanceZAR || 0)}.`,
+        notes: `Seasoned portfolio asset. Tenant: ${r.leases?.[0]?.tenantName || 'In-place'}. Gross Rent: ${formatZAR(r.monthlyGrossRentZAR)}/mo. Bond balance: ${formatZAR(r.outstandingBondBalanceZAR || 0)}.`,
         fundingRequiredZAR: Math.round(openMarket * 0.3),
         capitalRaisedZAR: 0,
         primaryFunderName: undefined,
@@ -259,9 +261,10 @@ function ProposalGeneratorContent() {
         interestRatePercent: r.bondInterestRatePercent || 11.75,
         loanTermYears: 20,
         annualCapitalGrowthPercent: 5.0,
-        annualRentalEscalationPercent: r.annualEscalationPercent || 6.0,
+        annualRentalEscalationPercent: r.leases?.[0]?.annualEscalationPercent || 6.0,
         annualExpenseInflationPercent: 6.0,
         bondTermYears: 20,
+        ancillaryIncomes: r.ancillaryIncomes || [],
       };
     }),
   ];
@@ -1113,6 +1116,32 @@ function ProposalGeneratorContent() {
                 )}
               </div>
             </div>
+
+            {/* Ancillary Commercial Covenants */}
+            {deal.ancillaryIncomes && deal.ancillaryIncomes.length > 0 && (
+              <div className="space-y-3">
+                <h2 className="text-sm uppercase tracking-wider font-extrabold text-slate-900 border-b border-slate-200 pb-1">
+                  Ancillary Commercial Covenants
+                </h2>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {deal.ancillaryIncomes.map((anc: any) => (
+                    <div key={anc.id} className="p-3 rounded-lg bg-emerald-50/50 border border-emerald-200 flex justify-between items-center text-xs">
+                      <div>
+                        <span className="font-bold text-slate-900 block">{anc.tenantName}</span>
+                        <span className="text-[10px] text-slate-600">{anc.type.replace(/_/g, ' ').toUpperCase()} • Expires {anc.contractEndDate}</span>
+                      </div>
+                      <div className="text-right">
+                        <span className="font-bold text-emerald-800 block">{formatZAR(anc.monthlyRentZAR)}/mo</span>
+                        <span className="text-[10px] text-emerald-700 font-semibold">{anc.annualEscalationPercent}% Esc {anc.vatApplicable ? '+VAT' : ''}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <div className="text-right text-[11px] font-extrabold text-slate-900">
+                  Combined Gross Income: {formatZAR((deal.monthlyRent || 0) + deal.ancillaryIncomes.reduce((acc: number, curr: any) => acc + curr.monthlyRentZAR, 0))}/mo
+                </div>
+              </div>
+            )}
 
             {/* Proposed Lender / JV Partner Financing Terms */}
             <div className="space-y-3">

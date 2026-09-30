@@ -450,7 +450,7 @@ export function generateRentalLongTermProjection(property: RentalProperty): Long
     interestRatePercent: property.bondInterestRatePercent || 11.75,
     bondTermYears: 20,
     annualCapitalGrowthPercent: 5.0,
-    annualRentalEscalationPercent: property.annualEscalationPercent || 6.0,
+    annualRentalEscalationPercent: property.leases?.[0]?.annualEscalationPercent || 6.0,
     annualExpenseInflationPercent: 6.0,
     monthlyRentalEstimate: grossRent,
     monthlyLevies,

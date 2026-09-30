@@ -254,13 +254,19 @@ export default function StatementUploadModal({
         outstandingBondBalanceZAR: 0,
         bondInterestRatePercent: 11.5,
         monthlyBondPaymentZAR: 0,
-        tenantName: parsedUtility.tenantName || 'Tenant',
-        tenantPhone: '',
-        tenantEmail: '',
-        leaseStartDate: new Date().toISOString().split('T')[0],
-        leaseEndDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-        depositHeldZAR: parsedUtility.depositHeldZAR || 0,
-        annualEscalationPercent: 6,
+        leases: [{
+          id: crypto.randomUUID(),
+          unitName: 'Main Unit',
+          tenantName: parsedUtility.tenantName || 'Tenant',
+          tenantPhone: '',
+          tenantEmail: '',
+          leaseStartDate: new Date().toISOString().split('T')[0],
+          leaseEndDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+          depositHeldZAR: parsedUtility.depositHeldZAR || 0,
+          annualEscalationPercent: 6,
+          monthlyRentZAR: parsedUtility.tenantRentBilledZAR || 0,
+          status: 'Occupied'
+        }],
         managementType: 'Agency',
         agencyName: parsedUtility.provider || 'iGrow Rentals',
         agencyCommissionPercent: 8,
@@ -291,11 +297,16 @@ export default function StatementUploadModal({
         if (parsedUtility.bodyCorporateLeviesZAR && parsedUtility.bodyCorporateLeviesZAR > 0) {
           updates.monthlyLeviesZAR = parsedUtility.bodyCorporateLeviesZAR;
         }
-        if (parsedUtility.tenantName) {
-          updates.tenantName = parsedUtility.tenantName;
-        }
-        if (parsedUtility.depositHeldZAR && parsedUtility.depositHeldZAR > 0) {
-          updates.depositHeldZAR = parsedUtility.depositHeldZAR;
+        if (parsedUtility.tenantName || (parsedUtility.depositHeldZAR && parsedUtility.depositHeldZAR > 0)) {
+          const target = activeRentals.find(r => r.id === targetPropertyId);
+          if (target) {
+            const currentLease = target.leases?.[0] || { id: crypto.randomUUID(), unitName: 'Main Unit', tenantName: 'Tenant', leaseStartDate: '', leaseEndDate: '', monthlyRentZAR: 0, depositHeldZAR: 0, annualEscalationPercent: 0, status: 'Occupied' };
+            updates.leases = [{
+              ...currentLease,
+              tenantName: parsedUtility.tenantName || currentLease.tenantName,
+              depositHeldZAR: (parsedUtility.depositHeldZAR && parsedUtility.depositHeldZAR > 0) ? parsedUtility.depositHeldZAR : currentLease.depositHeldZAR,
+            }];
+          }
         }
         if (Object.keys(updates).length > 0) {
           updateRental(targetPropertyId, updates);

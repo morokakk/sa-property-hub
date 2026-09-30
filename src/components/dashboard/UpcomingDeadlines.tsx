@@ -2,8 +2,8 @@
 
 import React from 'react';
 import { usePortfolioStore } from '@/lib/store/usePortfolioStore';
-import { formatDate } from '@/lib/formatters';
-import { Calendar, Clock, AlertTriangle, Building, Coins, Hammer } from 'lucide-react';
+import { formatDate, formatZAR } from '@/lib/formatters';
+import { Calendar, Clock, AlertTriangle, Building, Coins, Hammer, ShieldAlert } from 'lucide-react';
 import Link from 'next/link';
 
 export default function UpcomingDeadlines() {
@@ -21,6 +21,7 @@ export default function UpcomingDeadlines() {
     badge: string;
     badgeColor: string;
     detail: string;
+    isUrgentDispute?: boolean;
   }
 
   const deadlines: DeadlineItem[] = [];
@@ -45,7 +46,42 @@ export default function UpcomingDeadlines() {
       });
     });
 
-  // 2. Flip target completion dates
+  // 2. Section 118 Municipal Rates Clearance & Billing Disputes
+  flips
+    .filter((f) => f.status === 'Active' || f.status === 'Delayed')
+    .forEach((f) => {
+      const mc = f.municipalClearance;
+      if (!mc) return;
+
+      if (mc.rccStatus === 'Disputed') {
+        deadlines.push({
+          id: `rcc-dispute-${f.id}`,
+          title: `⚠️ Sec 118 Dispute: ${f.title}`,
+          date: mc.rccApplicationDate || new Date().toISOString().split('T')[0],
+          type: 'conveyancing',
+          badge: 'Municipal Dispute',
+          badgeColor: 'bg-rose-100 text-rose-800 border-rose-300 font-bold',
+          detail: mc.disputeNotes || `Contested municipal arrears of ${formatZAR(mc.sec118ArrearsZAR)} blocking clearance`,
+          isUrgentDispute: true,
+        });
+      } else if (
+        mc.rccStatus === 'Pending Application' ||
+        mc.rccStatus === 'Figures Issued' ||
+        mc.rccStatus === 'Paid & Awaiting Certificate'
+      ) {
+        deadlines.push({
+          id: `rcc-milestone-${f.id}`,
+          title: `Sec 118 RCC: ${f.title}`,
+          date: mc.rccApplicationDate || f.targetCompletionDate,
+          type: 'conveyancing',
+          badge: mc.rccStatus === 'Figures Issued' ? 'Figures Ready' : mc.rccStatus,
+          badgeColor: 'bg-amber-100 text-amber-800 border-amber-300 font-semibold',
+          detail: `Advance Deposit: ${formatZAR(mc.advanceCouncilDepositZAR)} • Arrears: ${formatZAR(mc.sec118ArrearsZAR)}`,
+        });
+      }
+    });
+
+  // 3. Flip target completion dates
   flips
     .filter((f) => f.status === 'Active')
     .forEach((f) => {
@@ -60,25 +96,30 @@ export default function UpcomingDeadlines() {
       });
     });
 
-  // 3. Funding maturity dates
+  // 4. Funding maturity dates
   funding
     .filter((f) => f.status === 'Active')
     .forEach((f) => {
+      const delayBadge = f.delayExtensionDays && f.delayExtensionDays > 0 ? ` (+${f.delayExtensionDays}d)` : '';
       deadlines.push({
         id: `fund-${f.id}`,
-        title: `Loan Maturity: ${f.lenderName}`,
+        title: `Loan Maturity: ${f.lenderName}${delayBadge}`,
         date: f.maturityDate,
         type: 'coupon',
         badge: 'Capital Repayment',
         badgeColor: 'bg-emerald-100 text-emerald-800 border-emerald-200',
-        detail: `${f.returnTermsType} • ${f.fundingType}`,
+        detail: `${f.returnTermsType} • ${f.fundingType}${f.delayNotes ? ` • ${f.delayNotes}` : ''}`,
       });
     });
 
-  // Sort by earliest date
+  // Sort: Active disputes first, then chronological by earliest date
   const sortedDeadlines = deadlines
-    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
-    .slice(0, 5);
+    .sort((a, b) => {
+      if (a.isUrgentDispute && !b.isUrgentDispute) return -1;
+      if (!a.isUrgentDispute && b.isUrgentDispute) return 1;
+      return new Date(a.date).getTime() - new Date(b.date).getTime();
+    })
+    .slice(0, 6);
 
   return (
     <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-xs flex flex-col justify-between">

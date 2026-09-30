@@ -54,6 +54,9 @@ export default function SettingsPage() {
   const [defaultCommission, setDefaultCommission] = useState<number>(
     investorProfile.defaultAgentCommissionPercent || 5.0
   );
+  const [defaultTaxEntity, setDefaultTaxEntity] = useState<'Company (27%)' | 'Individual (45%)' | 'Pre-Tax' | undefined>(
+    investorProfile.defaultTaxEntityType
+  );
 
   // Client-Side BYOK AI Settings
   const [aiProvider, setAiProvider] = useState<'anthropic' | 'google'>(
@@ -114,6 +117,7 @@ export default function SettingsPage() {
       defaultPrimeRatePercent: defaultPrimeRate,
       baselineHurdleYieldPercent: baselineHurdleYield,
       defaultAgentCommissionPercent: defaultCommission,
+      defaultTaxEntityType: defaultTaxEntity,
     });
 
     updateAiSettings({
@@ -386,7 +390,7 @@ export default function SettingsPage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
+            <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 text-xs">
               <div className="p-3.5 rounded-lg bg-slate-50 border border-slate-200">
                 <label className="block font-semibold text-slate-700 mb-1">
                   Default SA Prime Lending Rate
@@ -445,6 +449,25 @@ export default function SettingsPage() {
                   />
                   <span className="ml-1.5 font-bold text-slate-600">%</span>
                 </div>
+              </div>
+
+              <div className="p-3.5 rounded-lg bg-slate-50 border border-slate-200">
+                <label className="block font-semibold text-slate-700 mb-1">
+                  Default Tax Entity
+                </label>
+                <p className="text-[10px] text-slate-400 mb-2">SARS tax treatment for rental &amp; flip profits</p>
+                <select
+                  value={defaultTaxEntity || 'Pre-Tax'}
+                  onChange={(e) => {
+                    const val = e.target.value as 'Company (27%)' | 'Individual (45%)' | 'Pre-Tax';
+                    setDefaultTaxEntity(val);
+                  }}
+                  className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg font-bold text-slate-900 bg-white"
+                >
+                  <option value="Company (27%)">Company (27%)</option>
+                  <option value="Individual (45%)">Individual (45%)</option>
+                  <option value="Pre-Tax">Pre-Tax</option>
+                </select>
               </div>
             </div>
           </div>

@@ -6,7 +6,7 @@ import { usePortfolioStore, usePortfolioSummary } from '@/lib/store/usePortfolio
 import { formatZAR, formatPercent, formatDate } from '@/lib/formatters';
 import ComplianceChecklist from '@/components/common/ComplianceChecklist';
 import CloudDriveLinkVault from '@/components/common/CloudDriveLinkVault';
-import { RentalProperty, MaintenanceLog, PropertyTitleType, CloudDriveVault } from '@/types';
+import { RentalProperty, MaintenanceLog, PropertyTitleType, CloudDriveVault, Lease, AncillaryIncome } from '@/types';
 import { PropertyTypeBadge, AgmDateChip, isAgmUpcoming } from '@/components/common/PropertyTypeBadge';
 import { calculateRentalCashflow, calculateMonthlyBondRepayment, generateRentalLongTermProjection } from '@/lib/calculations/propertyMetrics';
 import LongTermProjectionChart from '@/components/analytics/LongTermProjectionChart';
@@ -370,6 +370,32 @@ export default function RentalPortfolioPage() {
   const [agencyVatApplicable, setAgencyVatApplicable] = useState(true);
   const [agencyContact, setAgencyContact] = useState('+27 82 555 1234');
 
+  // Multi-Let Lease Management State
+  const [formLeases, setFormLeases] = useState<Lease[]>([{
+    id: crypto.randomUUID(),
+    unitName: 'Main Unit',
+    tenantName: '',
+    tenantPhone: '',
+    tenantEmail: '',
+    leaseStartDate: new Date().toISOString().split('T')[0],
+    leaseEndDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+    monthlyRentZAR: 15000,
+    depositHeldZAR: 30000,
+    annualEscalationPercent: 7,
+    status: 'Occupied',
+  }]);
+
+  // Utility Type State
+  const [utilityType, setUtilityType] = useState<'postpaid' | 'prepaid_submeter' | 'hybrid'>('postpaid');
+  const [prepaidVendorName, setPrepaidVendorName] = useState('');
+  const [monthlyPrepaidVendingFee, setMonthlyPrepaidVendingFee] = useState(0);
+
+  // Per-Rental Tax Entity Override State
+  const [taxEntityOverride, setTaxEntityOverride] = useState<'Company (27%)' | 'Individual (45%)' | 'Pre-Tax' | undefined>(undefined);
+
+  // Ancillary Income State
+  const [formAncillaryIncomes, setFormAncillaryIncomes] = useState<AncillaryIncome[]>([]);
+
   // SARB Repo Rate PMT Calculator State
   const [pmtTargetProperty, setPmtTargetProperty] = useState<RentalProperty | null>(null);
   const [pmtInterestRate, setPmtInterestRate] = useState<number>(11.5);
@@ -479,6 +505,24 @@ export default function RentalPortfolioPage() {
     setAgencyCommissionPercent(8.0);
     setAgencyVatApplicable(true);
     setAgencyContact('+27 82 555 1234');
+    setFormLeases([{
+      id: crypto.randomUUID(),
+      unitName: 'Main Unit',
+      tenantName: '',
+      tenantPhone: '',
+      tenantEmail: '',
+      leaseStartDate: new Date().toISOString().split('T')[0],
+      leaseEndDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+      monthlyRentZAR: 15000,
+      depositHeldZAR: 30000,
+      annualEscalationPercent: 7,
+      status: 'Occupied',
+    }]);
+    setUtilityType('postpaid');
+    setPrepaidVendorName('');
+    setMonthlyPrepaidVendingFee(0);
+    setTaxEntityOverride(undefined);
+    setFormAncillaryIncomes([]);
     setShowRentalModal(true);
   };
 
@@ -508,11 +552,11 @@ export default function RentalPortfolioPage() {
     setMonthlyBondPayment(estEditBond);
     setBondPaymentEffectiveDate(property.bondPaymentEffectiveDate || '');
     setBondRevisionNote(property.bondRevisionNote || '');
-    setTenantName(property.tenantName || '');
-    setTenantPhone(property.tenantPhone || '');
-    setTenantEmail(property.tenantEmail || '');
-    setLeaseEnd(property.leaseEndDate || '');
-    setDepositHeld(property.depositHeldZAR || 0);
+    setTenantName(property.leases?.[0]?.tenantName || '');
+    setTenantPhone(property.leases?.[0]?.tenantPhone || '');
+    setTenantEmail(property.leases?.[0]?.tenantEmail || '');
+    setLeaseEnd(property.leases?.[0]?.leaseEndDate || '');
+    setDepositHeld(property.leases?.[0]?.depositHeldZAR || 0);
     setUnpaidUtilityArrears(property.unpaidUtilityArrearsZAR || 0);
     setRentalMasterFolderUrl(property.driveVault?.masterFolderUrl || '');
     setRentalOtpUrl(property.driveVault?.otpDocumentUrl || '');
@@ -523,6 +567,24 @@ export default function RentalPortfolioPage() {
     setAgencyCommissionPercent(property.agencyCommissionPercent ?? 8.0);
     setAgencyVatApplicable(property.agencyVatApplicable !== false);
     setAgencyContact(property.agencyContact || '');
+    setFormLeases(property.leases?.length > 0 ? property.leases.map(l => ({ ...l })) : [{
+      id: crypto.randomUUID(),
+      unitName: 'Main Unit',
+      tenantName: '',
+      tenantPhone: '',
+      tenantEmail: '',
+      leaseStartDate: new Date().toISOString().split('T')[0],
+      leaseEndDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+      monthlyRentZAR: property.monthlyGrossRentZAR,
+      depositHeldZAR: 0,
+      annualEscalationPercent: 7,
+      status: 'Occupied',
+    }]);
+    setUtilityType(property.utilityType || 'postpaid');
+    setPrepaidVendorName(property.prepaidVendorName || '');
+    setMonthlyPrepaidVendingFee(property.monthlyPrepaidVendingFeeZAR || 0);
+    setTaxEntityOverride(property.taxEntityTypeOverride);
+    setFormAncillaryIncomes(property.ancillaryIncomes?.map(a => ({ ...a })) || []);
     setShowRentalModal(true);
   };
 
@@ -553,7 +615,14 @@ export default function RentalPortfolioPage() {
     // Calculate monthly bond payment (or use user-specified debit order)
     const calcBond = bondBalance > 0 ? calculateMonthlyBondRepayment(bondBalance, 11.75, 20) : 0;
     const finalBondPayment = monthlyBondPayment > 0 ? monthlyBondPayment : calcBond;
-    const baseComm = managementType === 'Agency' ? monthlyGrossRent * (agencyCommissionPercent / 100) : 0;
+
+    // Compute gross rent from sum of occupied leases
+    const computedGrossRent = formLeases
+      .filter(l => l.status === 'Occupied')
+      .reduce((sum, l) => sum + (l.monthlyRentZAR || 0), 0);
+    const finalGrossRent = computedGrossRent > 0 ? computedGrossRent : monthlyGrossRent;
+
+    const baseComm = managementType === 'Agency' ? finalGrossRent * (agencyCommissionPercent / 100) : 0;
     const agentFee = Math.round(baseComm * (agencyVatApplicable !== false ? 1.15 : 1.0));
 
     const finalLevies = propertyType === 'Freehold House' ? 0 : monthlyLevies;
@@ -561,85 +630,61 @@ export default function RentalPortfolioPage() {
     const isScheme = propertyType === 'Sectional Title Apartment' || propertyType === 'Townhouse / Cluster';
     const finalAgmDate = isScheme && agmDate ? agmDate : undefined;
 
+    // Prepare leases with defaults
+    const finalLeases = formLeases.map(l => ({
+      ...l,
+      tenantName: l.tenantName || 'Tenant Unassigned',
+    }));
+
+    // Common fields for both create and update
+    const commonFields = {
+      title,
+      address: address || `${city} Property`,
+      city,
+      propertyType,
+      agmDate: finalAgmDate,
+      marketValueZAR: marketValue,
+      purchasePriceZAR: purchasePrice,
+      outstandingBondBalanceZAR: bondBalance,
+      monthlyBondPaymentZAR: finalBondPayment,
+      bondPaymentEffectiveDate: bondPaymentEffectiveDate.trim() || undefined,
+      bondRevisionNote: bondRevisionNote.trim() || undefined,
+      leases: finalLeases,
+      unpaidUtilityArrearsZAR: unpaidUtilityArrears,
+      monthlyGrossRentZAR: finalGrossRent,
+      monthlyLeviesZAR: finalLevies,
+      annualBuildingInsuranceZAR: finalInsurance,
+      monthlyRatesTaxesZAR: monthlyRates,
+      managementType,
+      agencyName: managementType === 'Agency' ? agencyName : undefined,
+      agencyCommissionPercent: managementType === 'Agency' ? agencyCommissionPercent : 0,
+      agencyVatApplicable: managementType === 'Agency' ? agencyVatApplicable : false,
+      agencyContact: managementType === 'Agency' ? agencyContact : undefined,
+      monthlyAgentFeeZAR: agentFee,
+      driveVault: {
+        masterFolderUrl: rentalMasterFolderUrl.trim() || undefined,
+        otpDocumentUrl: rentalOtpUrl.trim() || undefined,
+        ratesBillUrl: rentalRatesBillUrl.trim() || undefined,
+        titleDeedUrl: rentalTitleDeedUrl.trim() || undefined,
+      },
+      utilityType,
+      prepaidVendorName: (utilityType === 'prepaid_submeter' || utilityType === 'hybrid') ? prepaidVendorName.trim() || undefined : undefined,
+      monthlyPrepaidVendingFeeZAR: (utilityType === 'prepaid_submeter' || utilityType === 'hybrid') ? monthlyPrepaidVendingFee : undefined,
+      taxEntityTypeOverride: taxEntityOverride,
+      ancillaryIncomes: formAncillaryIncomes.length > 0 ? formAncillaryIncomes : undefined,
+    };
+
     if (editingRentalId) {
-      updateRental(editingRentalId, {
-        title,
-        address: address || `${city} Property`,
-        city,
-        propertyType,
-        agmDate: finalAgmDate,
-        marketValueZAR: marketValue,
-        purchasePriceZAR: purchasePrice,
-        outstandingBondBalanceZAR: bondBalance,
-        monthlyBondPaymentZAR: finalBondPayment,
-        bondPaymentEffectiveDate: bondPaymentEffectiveDate.trim() || undefined,
-        bondRevisionNote: bondRevisionNote.trim() || undefined,
-        tenantName: tenantName || 'Tenant Unassigned',
-        tenantPhone: tenantPhone || '+27 —',
-        tenantEmail: tenantEmail || 'tenant@email.co.za',
-        leaseEndDate: leaseEnd,
-        depositHeldZAR: depositHeld,
-        unpaidUtilityArrearsZAR: unpaidUtilityArrears,
-        monthlyGrossRentZAR: monthlyGrossRent,
-        monthlyLeviesZAR: finalLevies,
-        annualBuildingInsuranceZAR: finalInsurance,
-        monthlyRatesTaxesZAR: monthlyRates,
-        managementType,
-        agencyName: managementType === 'Agency' ? agencyName : undefined,
-        agencyCommissionPercent: managementType === 'Agency' ? agencyCommissionPercent : 0,
-        agencyVatApplicable: managementType === 'Agency' ? agencyVatApplicable : false,
-        agencyContact: managementType === 'Agency' ? agencyContact : undefined,
-        monthlyAgentFeeZAR: agentFee,
-        driveVault: {
-          masterFolderUrl: rentalMasterFolderUrl.trim() || undefined,
-          otpDocumentUrl: rentalOtpUrl.trim() || undefined,
-          ratesBillUrl: rentalRatesBillUrl.trim() || undefined,
-          titleDeedUrl: rentalTitleDeedUrl.trim() || undefined,
-        },
-      });
+      updateRental(editingRentalId, commonFields);
     } else {
       const newUnit: RentalProperty = {
         id: `rental-${Date.now()}`,
-        title,
-        address: address || `${city} Property`,
-        city,
-        propertyType,
-        agmDate: finalAgmDate,
-        marketValueZAR: marketValue,
-        purchasePriceZAR: purchasePrice,
+        ...commonFields,
         purchaseDate: new Date().toISOString().split('T')[0],
-        outstandingBondBalanceZAR: bondBalance,
         bondInterestRatePercent: 11.75,
-        monthlyBondPaymentZAR: finalBondPayment,
-        bondPaymentEffectiveDate: bondPaymentEffectiveDate.trim() || undefined,
-        bondRevisionNote: bondRevisionNote.trim() || undefined,
-        tenantName: tenantName || 'Tenant Unassigned',
-        tenantPhone: tenantPhone || '+27 —',
-        tenantEmail: tenantEmail || 'tenant@email.co.za',
-        leaseStartDate: new Date().toISOString().split('T')[0],
-        leaseEndDate: leaseEnd,
-        depositHeldZAR: depositHeld,
-        unpaidUtilityArrearsZAR: unpaidUtilityArrears,
-        annualEscalationPercent: 7.0,
-        managementType,
-        agencyName: managementType === 'Agency' ? agencyName : undefined,
-        agencyCommissionPercent: managementType === 'Agency' ? agencyCommissionPercent : 0,
-        agencyVatApplicable: managementType === 'Agency' ? agencyVatApplicable : false,
-        agencyContact: managementType === 'Agency' ? agencyContact : undefined,
-        monthlyGrossRentZAR: monthlyGrossRent,
-        monthlyLeviesZAR: finalLevies,
-        annualBuildingInsuranceZAR: finalInsurance,
-        monthlyRatesTaxesZAR: monthlyRates,
-        monthlyAgentFeeZAR: agentFee,
         monthlyMaintenanceReserveZAR: 600,
-        driveVault: {
-          masterFolderUrl: rentalMasterFolderUrl.trim() || undefined,
-          otpDocumentUrl: rentalOtpUrl.trim() || undefined,
-          ratesBillUrl: rentalRatesBillUrl.trim() || undefined,
-          titleDeedUrl: rentalTitleDeedUrl.trim() || undefined,
-        },
         maintenanceHistory: [],
-        status: tenantName ? 'Occupied' : 'Vacant',
+        status: finalLeases.some(l => l.status === 'Occupied') ? 'Occupied' : 'Vacant',
       };
       addRental(newUnit);
     }
@@ -982,34 +1027,73 @@ export default function RentalPortfolioPage() {
                           <>
                             {/* Tenant Lease Details */}
                             <div className="p-4 space-y-2 text-xs border-b border-slate-100">
-                              <div className="flex items-center justify-between text-slate-600">
-                                <span className="flex items-center gap-1.5 font-medium">
-                                  <UserCheck className="w-3.5 h-3.5 text-slate-400" />
-                                  Tenant:
-                                </span>
-                                <strong className="text-slate-900">{property.tenantName}</strong>
-                              </div>
+                              {(property.leases?.length || 0) > 1 ? (
+                                <>
+                                  <div className="flex items-center justify-between text-slate-600">
+                                    <span className="flex items-center gap-1.5 font-medium">
+                                      <UserCheck className="w-3.5 h-3.5 text-slate-400" />
+                                      Units:
+                                    </span>
+                                    <strong className="text-slate-900">
+                                      {property.leases.length} Units • {property.leases.filter(l => l.status === 'Occupied').length} Occupied • {formatZAR(property.leases.filter(l => l.status === 'Occupied').reduce((s, l) => s + l.monthlyRentZAR, 0))}/m
+                                    </strong>
+                                  </div>
+                                  <div className="space-y-1 pl-5">
+                                    {property.leases.map(l => (
+                                      <div key={l.id} className="flex items-center justify-between text-[11px]">
+                                        <span className={l.status === 'Occupied' ? 'text-slate-700' : 'text-slate-400'}>
+                                          {l.unitName}: {l.tenantName} ({l.status})
+                                        </span>
+                                        <span className="font-medium">{formatZAR(l.monthlyRentZAR)}/m</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </>
+                              ) : (
+                                <>
+                                  <div className="flex items-center justify-between text-slate-600">
+                                    <span className="flex items-center gap-1.5 font-medium">
+                                      <UserCheck className="w-3.5 h-3.5 text-slate-400" />
+                                      Tenant:
+                                    </span>
+                                    <strong className="text-slate-900">{property.leases?.[0]?.tenantName}</strong>
+                                  </div>
 
-                              <div className="flex items-center justify-between text-slate-600">
-                                <span className="flex items-center gap-1.5 font-medium">
-                                  <Calendar className="w-3.5 h-3.5 text-slate-400" />
-                                  Lease Expiry:
-                                </span>
-                                <span>{formatDate(property.leaseEndDate)}</span>
-                              </div>
+                                  <div className="flex items-center justify-between text-slate-600">
+                                    <span className="flex items-center gap-1.5 font-medium">
+                                      <Calendar className="w-3.5 h-3.5 text-slate-400" />
+                                      Lease Expiry:
+                                    </span>
+                                    <span>{formatDate(property.leases?.[0]?.leaseEndDate || '')}</span>
+                                  </div>
 
-                              <div className="flex items-center justify-between text-slate-600">
-                                <span className="flex items-center gap-1.5 font-medium">
-                                  <ShieldCheck className="w-3.5 h-3.5 text-slate-400" />
-                                  Deposit Held in Trust:
-                                </span>
-                                <strong className="text-slate-800">{formatZAR(property.depositHeldZAR)}</strong>
-                              </div>
+                                  <div className="flex items-center justify-between text-slate-600">
+                                    <span className="flex items-center gap-1.5 font-medium">
+                                      <ShieldCheck className="w-3.5 h-3.5 text-slate-400" />
+                                      Deposit Held in Trust:
+                                    </span>
+                                    <strong className="text-slate-800">{formatZAR(property.leases?.[0]?.depositHeldZAR || 0)}</strong>
+                                  </div>
 
-                              <div className="flex items-center justify-between text-slate-600">
-                                <span className="text-slate-500">Annual Escalation:</span>
-                                <strong className="text-emerald-700">{property.annualEscalationPercent}% p.a.</strong>
-                              </div>
+                                  <div className="flex items-center justify-between text-slate-600">
+                                    <span className="text-slate-500">Annual Escalation:</span>
+                                    <strong className="text-emerald-700">{property.leases?.[0]?.annualEscalationPercent || 0}% p.a.</strong>
+                                  </div>
+                                </>
+                              )}
+
+                              {/* Ancillary Income Summary */}
+                              {(property.ancillaryIncomes?.length || 0) > 0 && (
+                                <div className="flex items-center justify-between text-slate-600 pt-1 border-t border-slate-100">
+                                  <span className="text-[10px] font-medium text-teal-700">+ Ancillary Income:</span>
+                                  <span className="text-[10px] font-bold text-teal-800">
+                                    + {formatZAR(property.ancillaryIncomes!.reduce((s, a) => s + a.monthlyRentZAR, 0))}/m ({property.ancillaryIncomes!.map(a => {
+                                      const typeLabels: Record<string, string> = { cell_tower: 'Tower', billboard: 'Billboard', parking: 'Parking', storage: 'Storage', other: 'Other' };
+                                      return `${a.tenantName} ${typeLabels[a.type] || a.type}`;
+                                    }).join(', ')})
+                                  </span>
+                                </div>
+                              )}
                             </div>
 
                             {/* Monthly Expenses Breakdown */}
@@ -2565,73 +2649,348 @@ export default function RentalPortfolioPage() {
                 </p>
               </div>
 
+              {/* Multi-Let Lease Management */}
               <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 space-y-3">
-                <span className="font-bold text-slate-800 block text-[11px]">Tenant & Lease Info</span>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block font-semibold text-slate-700 mb-1">Tenant Name</label>
-                    <input
-                      type="text"
-                      name="tenantName"
-                      autoComplete="name"
-                      placeholder="e.g. Sipho Dlamini"
-                      value={tenantName}
-                      onChange={(e) => setTenantName(e.target.value)}
-                      className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg bg-white"
-                    />
-                  </div>
-                  <div>
-                    <label className="block font-semibold text-slate-700 mb-1">Lease Expiry Date</label>
-                    <input
-                      type="date"
-                      name="leaseEnd"
-                      autoComplete="off"
-                      value={leaseEnd}
-                      onChange={(e) => setLeaseEnd(e.target.value)}
-                      className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg bg-white"
-                    />
-                  </div>
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-slate-800 block text-[11px] uppercase tracking-wider">Lease Units ({formLeases.length})</span>
+                  <button
+                    type="button"
+                    onClick={() => setFormLeases(prev => [...prev, {
+                      id: crypto.randomUUID(),
+                      unitName: `Unit ${prev.length + 1}`,
+                      tenantName: '',
+                      tenantPhone: '',
+                      tenantEmail: '',
+                      leaseStartDate: new Date().toISOString().split('T')[0],
+                      leaseEndDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+                      monthlyRentZAR: 0,
+                      depositHeldZAR: 0,
+                      annualEscalationPercent: 7,
+                      status: 'Vacant',
+                    }])}
+                    className="text-[10px] font-bold text-emerald-700 hover:text-emerald-900 bg-emerald-50 hover:bg-emerald-100 px-2 py-1 rounded border border-emerald-200 cursor-pointer transition-colors"
+                  >
+                    + Add Unit
+                  </button>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  <div>
-                    <label className="block font-semibold text-slate-700 mb-1">Tenant Phone</label>
-                    <input
-                      type="tel"
-                      name="tenantPhone"
-                      autoComplete="tel"
-                      placeholder="+27 82 000 0000"
-                      value={tenantPhone}
-                      onChange={(e) => setTenantPhone(e.target.value)}
-                      className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg bg-white"
-                    />
+                {formLeases.map((lease, idx) => (
+                  <div key={lease.id} className="p-2.5 bg-white rounded-lg border border-slate-200 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-bold text-slate-600 uppercase">
+                        {lease.unitName || `Unit ${idx + 1}`}
+                      </span>
+                      {formLeases.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => setFormLeases(prev => prev.filter(l => l.id !== lease.id))}
+                          className="text-[10px] text-rose-600 hover:text-rose-800 font-semibold cursor-pointer"
+                        >
+                          Remove
+                        </button>
+                      )}
+                    </div>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                      <div>
+                        <label className="block text-[10px] font-semibold text-slate-600 mb-0.5">Unit Name</label>
+                        <input
+                          type="text"
+                          placeholder="e.g. Unit A"
+                          value={lease.unitName}
+                          onChange={(e) => setFormLeases(prev => prev.map(l => l.id === lease.id ? { ...l, unitName: e.target.value } : l))}
+                          className="w-full px-2 py-1 text-[11px] border border-slate-300 rounded-lg bg-white"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-semibold text-slate-600 mb-0.5">Tenant Name</label>
+                        <input
+                          type="text"
+                          placeholder="e.g. Sipho Dlamini"
+                          value={lease.tenantName}
+                          onChange={(e) => setFormLeases(prev => prev.map(l => l.id === lease.id ? { ...l, tenantName: e.target.value } : l))}
+                          className="w-full px-2 py-1 text-[11px] border border-slate-300 rounded-lg bg-white"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-semibold text-slate-600 mb-0.5">Status</label>
+                        <select
+                          value={lease.status}
+                          onChange={(e) => setFormLeases(prev => prev.map(l => l.id === lease.id ? { ...l, status: e.target.value as Lease['status'] } : l))}
+                          className="w-full px-2 py-1 text-[11px] border border-slate-300 rounded-lg bg-white"
+                        >
+                          <option value="Occupied">Occupied</option>
+                          <option value="Vacant">Vacant</option>
+                          <option value="Notice Given">Notice Given</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                      <div>
+                        <label className="block text-[10px] font-semibold text-slate-600 mb-0.5">Monthly Rent (ZAR)</label>
+                        <input
+                          type="number"
+                          min="0"
+                          step="any"
+                          value={lease.monthlyRentZAR}
+                          onChange={(e) => setFormLeases(prev => prev.map(l => l.id === lease.id ? { ...l, monthlyRentZAR: Number(e.target.value) } : l))}
+                          className="w-full px-2 py-1 text-[11px] border border-slate-300 rounded-lg bg-white font-bold"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-semibold text-slate-600 mb-0.5">Deposit (ZAR)</label>
+                        <input
+                          type="number"
+                          min="0"
+                          step="any"
+                          value={lease.depositHeldZAR}
+                          onChange={(e) => setFormLeases(prev => prev.map(l => l.id === lease.id ? { ...l, depositHeldZAR: Number(e.target.value) } : l))}
+                          className="w-full px-2 py-1 text-[11px] border border-slate-300 rounded-lg bg-white"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-semibold text-slate-600 mb-0.5">Lease Start</label>
+                        <input
+                          type="date"
+                          value={lease.leaseStartDate}
+                          onChange={(e) => setFormLeases(prev => prev.map(l => l.id === lease.id ? { ...l, leaseStartDate: e.target.value } : l))}
+                          className="w-full px-2 py-1 text-[11px] border border-slate-300 rounded-lg bg-white"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-semibold text-slate-600 mb-0.5">Lease End</label>
+                        <input
+                          type="date"
+                          value={lease.leaseEndDate}
+                          onChange={(e) => setFormLeases(prev => prev.map(l => l.id === lease.id ? { ...l, leaseEndDate: e.target.value } : l))}
+                          className="w-full px-2 py-1 text-[11px] border border-slate-300 rounded-lg bg-white"
+                        />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                      <div>
+                        <label className="block text-[10px] font-semibold text-slate-600 mb-0.5">Phone</label>
+                        <input
+                          type="tel"
+                          placeholder="+27 82 000 0000"
+                          value={lease.tenantPhone || ''}
+                          onChange={(e) => setFormLeases(prev => prev.map(l => l.id === lease.id ? { ...l, tenantPhone: e.target.value } : l))}
+                          className="w-full px-2 py-1 text-[11px] border border-slate-300 rounded-lg bg-white"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-semibold text-slate-600 mb-0.5">Email</label>
+                        <input
+                          type="email"
+                          placeholder="tenant@email.co.za"
+                          value={lease.tenantEmail || ''}
+                          onChange={(e) => setFormLeases(prev => prev.map(l => l.id === lease.id ? { ...l, tenantEmail: e.target.value } : l))}
+                          className="w-full px-2 py-1 text-[11px] border border-slate-300 rounded-lg bg-white"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-semibold text-slate-600 mb-0.5">Annual Escalation %</label>
+                        <input
+                          type="number"
+                          min="0"
+                          max="30"
+                          step="any"
+                          value={lease.annualEscalationPercent}
+                          onChange={(e) => setFormLeases(prev => prev.map(l => l.id === lease.id ? { ...l, annualEscalationPercent: Number(e.target.value) } : l))}
+                          className="w-full px-2 py-1 text-[11px] border border-slate-300 rounded-lg bg-white"
+                        />
+                      </div>
+                    </div>
                   </div>
-                  <div>
-                    <label className="block font-semibold text-slate-700 mb-1">Tenant Email</label>
-                    <input
-                      type="email"
-                      name="tenantEmail"
-                      autoComplete="email"
-                      placeholder="e.g. tenant@domain.co.za"
-                      value={tenantEmail}
-                      onChange={(e) => setTenantEmail(e.target.value)}
-                      className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg bg-white"
-                    />
+                ))}
+              </div>
+
+              {/* Utility Type Selector */}
+              <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 space-y-3">
+                <span className="font-bold text-slate-800 block text-[11px] uppercase tracking-wider">Utility Type</span>
+                <select
+                  value={utilityType}
+                  onChange={(e) => setUtilityType(e.target.value as 'postpaid' | 'prepaid_submeter' | 'hybrid')}
+                  className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg bg-white text-xs font-semibold"
+                >
+                  <option value="postpaid">Post-Paid Municipal</option>
+                  <option value="prepaid_submeter">Prepaid Sub-Meter</option>
+                  <option value="hybrid">Hybrid</option>
+                </select>
+
+                {(utilityType === 'prepaid_submeter' || utilityType === 'hybrid') && (
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[10px] font-semibold text-slate-600 mb-0.5">Prepaid Vendor Name</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. Citiq, Recharger"
+                        value={prepaidVendorName}
+                        onChange={(e) => setPrepaidVendorName(e.target.value)}
+                        className="w-full px-2 py-1 text-[11px] border border-slate-300 rounded-lg bg-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-semibold text-slate-600 mb-0.5">Monthly Vending Fee (ZAR)</label>
+                      <input
+                        type="number"
+                        min="0"
+                        step="any"
+                        value={monthlyPrepaidVendingFee}
+                        onChange={(e) => setMonthlyPrepaidVendingFee(Number(e.target.value))}
+                        className="w-full px-2 py-1 text-[11px] border border-slate-300 rounded-lg bg-white font-semibold"
+                      />
+                    </div>
                   </div>
-                  <div>
-                    <label className="block font-semibold text-slate-700 mb-1">Deposit in Trust (ZAR)</label>
-                    <input
-                      type="number"
-                      name="depositHeldZAR"
-                      autoComplete="off"
-                      min="0"
-                      step="any"
-                      value={depositHeld}
-                      onChange={(e) => setDepositHeld(Number(e.target.value))}
-                      className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg bg-white font-semibold"
-                    />
-                  </div>
+                )}
+              </div>
+
+              {/* Tax Entity Override */}
+              <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-slate-800 text-[11px] uppercase tracking-wider">Tax Entity (override)</span>
+                  <span className="text-[10px] text-slate-400">Inherits from Settings if not set</span>
                 </div>
+                <select
+                  value={taxEntityOverride || ''}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setTaxEntityOverride(val === '' ? undefined : val as 'Company (27%)' | 'Individual (45%)' | 'Pre-Tax');
+                  }}
+                  className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg bg-white text-xs font-semibold"
+                >
+                  <option value="">Use Default</option>
+                  <option value="Company (27%)">Company (27%)</option>
+                  <option value="Individual (45%)">Individual (45%)</option>
+                  <option value="Pre-Tax">Pre-Tax</option>
+                </select>
+              </div>
+
+              {/* Ancillary Income Management */}
+              <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-slate-800 text-[11px] uppercase tracking-wider">Ancillary Income ({formAncillaryIncomes.length})</span>
+                  <button
+                    type="button"
+                    onClick={() => setFormAncillaryIncomes(prev => [...prev, {
+                      id: crypto.randomUUID(),
+                      type: 'cell_tower',
+                      tenantName: '',
+                      monthlyRentZAR: 0,
+                      annualEscalationPercent: 7,
+                      contractStartDate: new Date().toISOString().split('T')[0],
+                      contractEndDate: new Date(Date.now() + 5 * 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+                      vatApplicable: false,
+                    }])}
+                    className="text-[10px] font-bold text-teal-700 hover:text-teal-900 bg-teal-50 hover:bg-teal-100 px-2 py-1 rounded border border-teal-200 cursor-pointer transition-colors"
+                  >
+                    + Add Ancillary Income
+                  </button>
+                </div>
+
+                {formAncillaryIncomes.map((ai, idx) => (
+                  <div key={ai.id} className="p-2.5 bg-white rounded-lg border border-slate-200 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-bold text-slate-600 uppercase">Ancillary #{idx + 1}</span>
+                      <button
+                        type="button"
+                        onClick={() => setFormAncillaryIncomes(prev => prev.filter(a => a.id !== ai.id))}
+                        className="text-[10px] text-rose-600 hover:text-rose-800 font-semibold cursor-pointer"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                      <div>
+                        <label className="block text-[10px] font-semibold text-slate-600 mb-0.5">Type</label>
+                        <select
+                          value={ai.type}
+                          onChange={(e) => setFormAncillaryIncomes(prev => prev.map(a => a.id === ai.id ? { ...a, type: e.target.value as AncillaryIncome['type'] } : a))}
+                          className="w-full px-2 py-1 text-[11px] border border-slate-300 rounded-lg bg-white"
+                        >
+                          <option value="cell_tower">Cell Tower</option>
+                          <option value="billboard">Billboard</option>
+                          <option value="parking">Parking</option>
+                          <option value="storage">Storage</option>
+                          <option value="other">Other</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-semibold text-slate-600 mb-0.5">Tenant Name</label>
+                        <input
+                          type="text"
+                          placeholder="e.g. Vodacom, Primedia"
+                          value={ai.tenantName}
+                          onChange={(e) => setFormAncillaryIncomes(prev => prev.map(a => a.id === ai.id ? { ...a, tenantName: e.target.value } : a))}
+                          className="w-full px-2 py-1 text-[11px] border border-slate-300 rounded-lg bg-white"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-semibold text-slate-600 mb-0.5">Monthly Rent (ZAR)</label>
+                        <input
+                          type="number"
+                          min="0"
+                          step="any"
+                          value={ai.monthlyRentZAR}
+                          onChange={(e) => setFormAncillaryIncomes(prev => prev.map(a => a.id === ai.id ? { ...a, monthlyRentZAR: Number(e.target.value) } : a))}
+                          className="w-full px-2 py-1 text-[11px] border border-slate-300 rounded-lg bg-white font-bold"
+                        />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                      <div>
+                        <label className="block text-[10px] font-semibold text-slate-600 mb-0.5">Escalation %</label>
+                        <input
+                          type="number"
+                          min="0"
+                          max="30"
+                          step="any"
+                          value={ai.annualEscalationPercent}
+                          onChange={(e) => setFormAncillaryIncomes(prev => prev.map(a => a.id === ai.id ? { ...a, annualEscalationPercent: Number(e.target.value) } : a))}
+                          className="w-full px-2 py-1 text-[11px] border border-slate-300 rounded-lg bg-white"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-semibold text-slate-600 mb-0.5">Contract Start</label>
+                        <input
+                          type="date"
+                          value={ai.contractStartDate}
+                          onChange={(e) => setFormAncillaryIncomes(prev => prev.map(a => a.id === ai.id ? { ...a, contractStartDate: e.target.value } : a))}
+                          className="w-full px-2 py-1 text-[11px] border border-slate-300 rounded-lg bg-white"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-semibold text-slate-600 mb-0.5">Contract End</label>
+                        <input
+                          type="date"
+                          value={ai.contractEndDate}
+                          onChange={(e) => setFormAncillaryIncomes(prev => prev.map(a => a.id === ai.id ? { ...a, contractEndDate: e.target.value } : a))}
+                          className="w-full px-2 py-1 text-[11px] border border-slate-300 rounded-lg bg-white"
+                        />
+                      </div>
+                      <div className="flex items-end pb-0.5">
+                        <label className="flex items-center gap-1.5 cursor-pointer select-none">
+                          <input
+                            type="checkbox"
+                            checked={ai.vatApplicable}
+                            onChange={(e) => setFormAncillaryIncomes(prev => prev.map(a => a.id === ai.id ? { ...a, vatApplicable: e.target.checked } : a))}
+                            className="rounded border-slate-300 text-teal-600 focus:ring-teal-500 w-3.5 h-3.5"
+                          />
+                          <span className="text-[10px] text-slate-700 font-medium">15% VAT</span>
+                        </label>
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-semibold text-slate-600 mb-0.5">Notes (optional)</label>
+                      <input
+                        type="text"
+                        placeholder="Additional details..."
+                        value={ai.notes || ''}
+                        onChange={(e) => setFormAncillaryIncomes(prev => prev.map(a => a.id === ai.id ? { ...a, notes: e.target.value || undefined } : a))}
+                        className="w-full px-2 py-1 text-[11px] border border-slate-300 rounded-lg bg-white"
+                      />
+                    </div>
+                  </div>
+                ))}
               </div>
 
               {/* Cloud & Web Document Vault Section */}

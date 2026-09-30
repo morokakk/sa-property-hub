@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { useShallow } from 'zustand/react/shallow';
@@ -19,6 +20,7 @@ import {
   PassReason,
   UtilityStatement,
   MeterReading,
+  EquityExtractionAlert,
 } from '@/types';
 import {
   INITIAL_RENTALS,
@@ -102,6 +104,7 @@ interface PortfolioState {
   addFunding: (source: FundingSource) => void;
   updateFunding: (id: string, updates: Partial<FundingSource>) => void;
   deleteFunding: (id: string) => void;
+  syncFundingWithDealDelay: (fundingId: string, delayDays: number, reason: string) => void;
 
   // Opportunity Actions
   addOpportunity: (opp: OpportunityDeal) => void;
@@ -337,9 +340,23 @@ export const usePortfolioStore = create<PortfolioState>()(
                   : existing.monthlyBondPaymentZAR,
               bondPaymentEffectiveDate:
                 unit.bondPaymentEffectiveDate || existing.bondPaymentEffectiveDate,
-              tenantName: unit.tenantName || existing.tenantName,
-              leaseEndDate: unit.leaseExpiryDate || unit.leaseEndDate || existing.leaseEndDate,
-              depositHeldZAR: unit.depositHeldZAR ?? existing.depositHeldZAR,
+              leases: existing.leases?.length ? existing.leases.map((l, i) => i === 0 ? {
+                ...l,
+                tenantName: unit.tenantName || l.tenantName,
+                leaseEndDate: unit.leaseExpiryDate || unit.leaseEndDate || l.leaseEndDate,
+                depositHeldZAR: unit.depositHeldZAR ?? l.depositHeldZAR,
+                monthlyRentZAR: unit.grossRentZAR || l.monthlyRentZAR,
+              } : l) : [{
+                id: `lease-${Date.now()}`,
+                unitName: 'Main Unit',
+                tenantName: unit.tenantName || 'Tenant Unassigned',
+                leaseStartDate: new Date().toISOString().split('T')[0],
+                leaseEndDate: unit.leaseExpiryDate || unit.leaseEndDate || new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+                monthlyRentZAR: unit.grossRentZAR,
+                depositHeldZAR: unit.depositHeldZAR ?? unit.grossRentZAR * 2,
+                annualEscalationPercent: 7.0,
+                status: 'Occupied'
+              }],
             };
             updatedCount++;
           } else {
@@ -372,18 +389,24 @@ export const usePortfolioStore = create<PortfolioState>()(
               bondInterestRatePercent: 11.75,
               monthlyBondPaymentZAR: bondPayment,
               bondPaymentEffectiveDate: unit.bondPaymentEffectiveDate,
-              tenantName: unit.tenantName || 'Tenant Unassigned',
-              tenantPhone: '+27 —',
-              tenantEmail: 'pending@tenant.co.za',
-              leaseStartDate: new Date().toISOString().split('T')[0],
-              leaseEndDate:
-                unit.leaseExpiryDate ||
-                unit.leaseEndDate ||
-                new Date(Date.now() + 365 * 24 * 60 * 60 * 1000)
-                  .toISOString()
-                  .split('T')[0],
-              depositHeldZAR: unit.depositHeldZAR ?? unit.grossRentZAR * 2,
-              annualEscalationPercent: 7.0,
+              leases: [{
+                id: `lease-${Date.now()}-${idx}`,
+                unitName: 'Main Unit',
+                tenantName: unit.tenantName || 'Tenant Unassigned',
+                tenantPhone: '+27 —',
+                tenantEmail: 'pending@tenant.co.za',
+                leaseStartDate: new Date().toISOString().split('T')[0],
+                leaseEndDate:
+                  unit.leaseExpiryDate ||
+                  unit.leaseEndDate ||
+                  new Date(Date.now() + 365 * 24 * 60 * 60 * 1000)
+                    .toISOString()
+                    .split('T')[0],
+                monthlyRentZAR: unit.grossRentZAR,
+                depositHeldZAR: unit.depositHeldZAR ?? unit.grossRentZAR * 2,
+                annualEscalationPercent: 7.0,
+                status: 'Occupied',
+              }],
               managementType: 'Agency',
               agencyName: unit.managingAgent || 'iGrow Rentals / WeconnectU',
               agencyCommissionPercent: baseCommissionPercent,
@@ -814,15 +837,21 @@ export const usePortfolioStore = create<PortfolioState>()(
           bondInterestRatePercent: 11.75,
           monthlyBondPaymentZAR: flip.monthlyBondPaymentZAR || 0,
           bondPaymentEffectiveDate: flip.bondPaymentEffectiveDate,
-          tenantName: params.tenantName || 'Tenant Pending Placement',
-          tenantPhone: params.tenantPhone || '+27 —',
-          tenantEmail: params.tenantEmail || 'pending@tenant.co.za',
-          leaseStartDate: params.leaseStartDate || new Date().toISOString().split('T')[0],
-          leaseEndDate:
-            params.leaseEndDate ||
-            new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-          depositHeldZAR: params.depositHeldZAR ?? initialRent * 2,
-          annualEscalationPercent: 7.0,
+          leases: [{
+            id: `lease-${Date.now()}`,
+            unitName: 'Main Unit',
+            tenantName: params.tenantName || 'Tenant Pending Placement',
+            tenantPhone: params.tenantPhone || '+27 —',
+            tenantEmail: params.tenantEmail || 'pending@tenant.co.za',
+            leaseStartDate: params.leaseStartDate || new Date().toISOString().split('T')[0],
+            leaseEndDate:
+              params.leaseEndDate ||
+              new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+            monthlyRentZAR: initialRent,
+            depositHeldZAR: params.depositHeldZAR ?? initialRent * 2,
+            annualEscalationPercent: 7.0,
+            status: params.tenantName && params.tenantName !== 'Tenant Pending Placement' ? 'Occupied' : 'Vacant',
+          }],
           managementType: params.managementType || 'Agency',
           agencyName: params.agencyName || 'Pam Golding Rentals',
           agencyCommissionPercent: commPercent,
@@ -902,6 +931,31 @@ export const usePortfolioStore = create<PortfolioState>()(
       deleteFunding: (id) =>
         set((state) => ({
           funding: state.funding.filter((f) => f.id !== id),
+        })),
+      syncFundingWithDealDelay: (fundingId, delayDays, reason) =>
+        set((state) => ({
+          funding: state.funding.map((f) => {
+            if (f.id !== fundingId) return f;
+            const originalMaturity = f.originalMaturityDate || f.maturityDate;
+            const currentDelay = f.delayExtensionDays || 0;
+            const newTotalDelay = currentDelay + delayDays;
+
+            const baseDate = new Date(originalMaturity);
+            baseDate.setDate(baseDate.getDate() + newTotalDelay);
+            const newMaturityStr = baseDate.toISOString().split('T')[0];
+
+            const newNotes = f.delayNotes
+              ? `${f.delayNotes}; +${delayDays}d: ${reason}`
+              : `+${delayDays}d: ${reason}`;
+
+            return {
+              ...f,
+              originalMaturityDate: originalMaturity,
+              maturityDate: newMaturityStr,
+              delayExtensionDays: newTotalDelay,
+              delayNotes: newNotes,
+            };
+          }),
         })),
 
       // Opportunities
@@ -1122,15 +1176,21 @@ export const usePortfolioStore = create<PortfolioState>()(
           outstandingBondBalanceZAR: bondAmount,
           bondInterestRatePercent: opp.interestRatePercent || 11.75,
           monthlyBondPaymentZAR: opp.costs ? Math.round((bondAmount * 0.0108)) : 0,
-          tenantName: 'Tenant Pending Placement',
-          tenantPhone: '+27 —',
-          tenantEmail: 'pending@tenant.co.za',
-          leaseStartDate: new Date().toISOString().split('T')[0],
-          leaseEndDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000)
-            .toISOString()
-            .split('T')[0],
-          depositHeldZAR: opp.monthlyRentalEstimate * 2,
-          annualEscalationPercent: 7.0,
+          leases: [{
+            id: `lease-${Date.now()}`,
+            unitName: 'Main Unit',
+            tenantName: 'Tenant Pending Placement',
+            tenantPhone: '+27 —',
+            tenantEmail: 'pending@tenant.co.za',
+            leaseStartDate: new Date().toISOString().split('T')[0],
+            leaseEndDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000)
+              .toISOString()
+              .split('T')[0],
+            monthlyRentZAR: opp.monthlyRentalEstimate,
+            depositHeldZAR: opp.monthlyRentalEstimate * 2,
+            annualEscalationPercent: 7.0,
+            status: 'Vacant',
+          }],
           monthlyGrossRentZAR: opp.monthlyRentalEstimate,
           monthlyLeviesZAR: opp.propertyType === 'Freehold House' ? 0 : opp.monthlyLevies,
           annualBuildingInsuranceZAR: opp.propertyType === 'Freehold House' ? (opp.annualInsurance ?? 7_200) : 0,
@@ -1351,14 +1411,41 @@ export const usePortfolioStore = create<PortfolioState>()(
                 ),
               ];
 
-          return {
+          let leases = rental.leases;
+          if (!leases || !Array.isArray(leases) || leases.length === 0) {
+            leases = [{
+              id: rental.id ? `lease-${rental.id}-${Date.now()}` : `lease-${Date.now()}`,
+              unitName: 'Main Unit',
+              tenantName: rental.tenantName || 'Tenant Unassigned',
+              tenantPhone: rental.tenantPhone,
+              tenantEmail: rental.tenantEmail,
+              leaseStartDate: rental.leaseStartDate || new Date().toISOString().split('T')[0],
+              leaseEndDate: rental.leaseEndDate || new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+              monthlyRentZAR: rental.monthlyGrossRentZAR || 0,
+              depositHeldZAR: rental.depositHeldZAR || 0,
+              annualEscalationPercent: rental.annualEscalationPercent || 7.0,
+              status: rental.status === 'Occupied' ? 'Occupied' : 'Vacant'
+            }];
+          }
+
+          const migrated = {
             ...rental,
             monthlyAgentFeeZAR,
             agencyVatApplicable,
             agencyCommissionPercent,
             utilityStatements: healedStatements,
             meterReadings: healedMeterReadings,
+            leases
           };
+          delete migrated.tenantName;
+          delete migrated.tenantPhone;
+          delete migrated.tenantEmail;
+          delete migrated.leaseStartDate;
+          delete migrated.leaseEndDate;
+          delete migrated.depositHeldZAR;
+          delete migrated.annualEscalationPercent;
+
+          return migrated;
         });
 
         return {
@@ -1377,11 +1464,33 @@ export const usePortfolioStore = create<PortfolioState>()(
   )
 );
 
+function computeEquityAlerts(rentals: RentalProperty[]): EquityExtractionAlert[] {
+  const now = new Date();
+  return rentals
+    .filter(r => r.status !== 'Sold' && r.isBrrrrProperty)
+    .map(r => {
+      const ltv = (r.outstandingBondBalanceZAR || 0) / (r.marketValueZAR || 1);
+      const purchaseDate = new Date(r.purchaseDate);
+      const months = (now.getFullYear() - purchaseDate.getFullYear()) * 12 + (now.getMonth() - purchaseDate.getMonth());
+      const extractable = Math.max(0, (r.marketValueZAR * 0.80) - (r.outstandingBondBalanceZAR || 0));
+      return {
+        propertyId: r.id,
+        propertyTitle: r.title,
+        currentLTV: ltv,
+        extractableEquityZAR: extractable,
+        monthsStabilized: months,
+        isRipe: ltv < 0.70 && months >= 6,
+      };
+    })
+    .filter(a => a.isRipe);
+}
+
 export function computePortfolioSummary(state: {
   rentals: RentalProperty[];
   flips: FlipProject[];
   funding: FundingSource[];
   liquidCapitalReserve: number;
+  investorProfile?: InvestorProfile;
   opportunities?: OpportunityDeal[];
 }): PortfolioSummary {
   const activeRentals = (state.rentals || []).filter((r) => r.status !== 'Sold');
@@ -1424,11 +1533,13 @@ export function computePortfolioSummary(state: {
 
   // Monthly rental cash flow only counts active tenancies (not sold properties)
   const monthlyNetRentalCashflow = activeRentals.reduce((sum, r) => {
-    const gross = r.monthlyGrossRentZAR || 0;
+    const gross = r.leases?.filter(l => l.status !== 'Vacant').reduce((s, l) => s + (l.monthlyRentZAR || 0), 0) || r.monthlyGrossRentZAR || 0;
+    const ancillaryTotal = (r.ancillaryIncomes || []).reduce((sum, a) => sum + a.monthlyRentZAR, 0);
+    const totalGross = gross + ancillaryTotal;
     let agentFee = 0;
     if (r.managementType === 'Agency') {
       if (typeof r.agencyCommissionPercent === 'number' && r.agencyCommissionPercent > 0) {
-        const base = gross * (r.agencyCommissionPercent / 100);
+        const base = totalGross * (r.agencyCommissionPercent / 100);
         const vat = r.agencyVatApplicable !== false ? 1.15 : 1.0;
         agentFee = Math.round(base * vat);
       } else {
@@ -1444,26 +1555,88 @@ export function computePortfolioSummary(state: {
       (r.monthlyRatesTaxesZAR || 0) +
       agentFee +
       (r.monthlyMaintenanceReserveZAR || 0) +
-      (r.monthlyBondPaymentZAR || 0);
+      (r.monthlyBondPaymentZAR || 0) +
+      (r.monthlyPrepaidVendingFeeZAR || 0);
     const arrears = r.unpaidUtilityArrearsZAR || 0;
-    return sum + (gross - expenses - arrears);
+    return sum + (totalGross - expenses - arrears);
   }, 0);
 
-  // Projected profit on active pipeline flips
-  const totalProjectedFlipProfits = activeFlips.reduce((sum, f) => {
+  // 1. Ring-Fenced Project Working Capital:
+  // Sum of active retention pools, committed pending contractor milestone draws, and advance council deposits
+  const ringFencedWorkingCapital = activeFlips.reduce((sum, f) => {
+    const advanceCouncil = f.municipalClearance?.advanceCouncilDepositZAR || 0;
+    const isRetentionReleased = f.drawSchedule?.retentionReleased === true;
+
+    let retentionPool = 0;
+    let pendingMilestoneDraws = 0;
+
+    (f.boq || []).forEach((b) => {
+      const itemCost = b.actualCostZAR || b.baselineTotalZAR || 0;
+      const retentionPct = b.retentionPercent || 0;
+      const retentionAmount = Math.round(itemCost * (retentionPct / 100));
+
+      if (!isRetentionReleased && retentionAmount > 0) {
+        if (b.status === 'Completed' || b.status === 'In Progress') {
+          retentionPool += retentionAmount;
+        }
+      }
+
+      if (b.status === 'In Progress') {
+        // Committed contractor draw payable upon milestone sign-off (excluding retention portion)
+        pendingMilestoneDraws += (itemCost - retentionAmount);
+      }
+    });
+
+    return sum + advanceCouncil + retentionPool + pendingMilestoneDraws;
+  }, 0);
+
+  // 2. Free Unallocated Cash:
+  const freeUnallocatedCash = Math.max(0, liquidCapitalReserve - ringFencedWorkingCapital);
+
+  // 3. Projected Flip Profits & SARS Provisional Tax Reserve:
+  let totalGrossProjectedFlipProfits = 0;
+  let totalSarsProvisionalTaxReserve = 0;
+
+  activeFlips.forEach((f) => {
     const totalBoqActual = (f.boq || []).reduce(
       (bSum, b) => bSum + (b.actualCostZAR || b.baselineTotalZAR || 0),
       0
     );
     const totalHoldingCost = (f.estimatedDurationMonths || 0) * (f.monthlyHoldingCostZAR || 0);
+    const sec118Cost =
+      (f.municipalClearance?.sec118ArrearsZAR || 0) +
+      (f.municipalClearance?.advanceCouncilDepositZAR || 0);
     const totalCost =
       (f.purchasePriceZAR || 0) +
       (f.acquisitionCostsZAR || 0) +
       totalBoqActual +
-      totalHoldingCost;
-    const profit = (f.targetExitPriceZAR || 0) - totalCost;
-    return sum + profit;
-  }, 0);
+      totalHoldingCost +
+      sec118Cost;
+    const grossProfit = (f.targetExitPriceZAR || 0) - totalCost;
+    totalGrossProjectedFlipProfits += grossProfit;
+
+    if (grossProfit > 0) {
+      // 27% corporate tax on company flips or 45% on individual flips
+      const taxRate =
+        f.taxEntityType === 'Individual (45%)'
+          ? 0.45
+          : f.taxEntityType === 'Pre-Tax'
+          ? 0
+          : 0.27; // Default 27% Corporate Income Tax
+      totalSarsProvisionalTaxReserve += Math.round(grossProfit * taxRate);
+    }
+  });
+
+  const defaultTaxRate = state.investorProfile?.defaultTaxEntityType === 'Individual (45%)' ? 0.45
+    : state.investorProfile?.defaultTaxEntityType === 'Pre-Tax' ? 0 : 0.27;
+  const annualRentalNetIncome = monthlyNetRentalCashflow * 12;
+  const totalSection13sexShield = activeRentals.reduce((sum, r) => sum + (r.section13sexAnnualShieldZAR || 0), 0);
+  const rentalTaxableIncome = Math.max(0, annualRentalNetIncome - totalSection13sexShield);
+  const annualRentalTaxReserve = Math.round(rentalTaxableIncome * defaultTaxRate);
+  totalSarsProvisionalTaxReserve += annualRentalTaxReserve;
+
+  const totalNetProjectedFlipProfits = totalGrossProjectedFlipProfits - (totalSarsProvisionalTaxReserve - annualRentalTaxReserve);
+  const totalProjectedFlipProfits = totalGrossProjectedFlipProfits;
 
   // Realized profit on completed/sold flips (excludes BRRRR converted rentals)
   const totalRealizedFlipProfits = completedFlips.reduce((sum, f) => {
@@ -1482,11 +1655,15 @@ export function computePortfolioSummary(state: {
     return sum + (exitPrice - totalCost);
   }, 0);
 
+  const equityAlerts = computeEquityAlerts(activeRentals);
+
   return {
     totalGrossAssetValue,
     totalRentalValue,
     totalFlipValue,
     liquidCapitalReserve,
+    ringFencedWorkingCapital,
+    freeUnallocatedCash,
     unallocatedFundingReserve,
     totalAvailablePurchasingPower,
     totalFundingLiabilities,
@@ -1495,17 +1672,40 @@ export function computePortfolioSummary(state: {
     netEquity,
     monthlyNetRentalCashflow,
     totalProjectedFlipProfits,
+    totalGrossProjectedFlipProfits,
+    totalSarsProvisionalTaxReserve,
+    totalNetProjectedFlipProfits,
     totalRealizedFlipProfits,
     activeRentalsCount: activeRentals.length,
     soldRentalsCount: soldRentals.length,
     activeFlipsCount: activeFlips.length,
     completedFlipsCount: completedFlips.length,
     pendingOpportunitiesCount: (state.opportunities || []).length,
+    annualRentalTaxReserve,
+    monthlyRentalTaxReserve: Math.round(annualRentalTaxReserve / 12),
+    equityAlerts,
   };
 }
 
 export function usePortfolioSummary(): PortfolioSummary {
-  return usePortfolioStore(
-    useShallow((state) => computePortfolioSummary(state))
+  // Extract all scalar (primitive) fields via useShallow — stable comparison
+  const scalars = usePortfolioStore(
+    useShallow((state) => {
+      const summary = computePortfolioSummary(state);
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { equityAlerts, ...rest } = summary;
+      return rest;
+    })
   );
+
+  // Compute equityAlerts with JSON-based referential stability
+  const alertsJson = usePortfolioStore(
+    (state) => {
+      const activeRentals = (state.rentals || []).filter((r) => r.status !== 'Sold');
+      return JSON.stringify(computeEquityAlerts(activeRentals));
+    }
+  );
+  const equityAlerts: EquityExtractionAlert[] = useMemo(() => JSON.parse(alertsJson), [alertsJson]);
+
+  return useMemo(() => ({ ...scalars, equityAlerts }), [scalars, equityAlerts]);
 }

@@ -362,13 +362,19 @@ export default function UnifiedPdfVerificationModal({
             bondInterestRatePercent: 11.5,
             monthlyBondPaymentZAR: monthlyBondPaymentZAR || 0,
             bondPaymentEffectiveDate: bondPaymentEffectiveDate || undefined,
-            tenantName: tenantName || 'Tenant Unassigned',
-            tenantPhone: '+27 —',
-            tenantEmail: 'pending@tenant.co.za',
-            leaseStartDate: new Date().toISOString().split('T')[0],
-            leaseEndDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-            depositHeldZAR: depositHeldZAR || 0,
-            annualEscalationPercent: 6,
+            leases: [{
+              id: crypto.randomUUID(),
+              unitName: 'Main Unit',
+              tenantName: tenantName || 'Tenant Unassigned',
+              tenantPhone: '+27 —',
+              tenantEmail: 'pending@tenant.co.za',
+              leaseStartDate: new Date().toISOString().split('T')[0],
+              leaseEndDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+              depositHeldZAR: depositHeldZAR || 0,
+              monthlyRentZAR: grossRentZAR || 0,
+              annualEscalationPercent: 6,
+              status: 'Occupied'
+            }],
             managementType: 'Agency',
             agencyName: data.provider || 'Managing Agent',
             agencyCommissionPercent: grossRentZAR > 0 ? Number(((agencyCommissionZAR / grossRentZAR) * 100).toFixed(1)) : 8,
@@ -401,8 +407,17 @@ export default function UnifiedPdfVerificationModal({
           if (data.provider === 'iGrow Rentals' || Boolean(data.agentUnit?.isCommissionInclusiveOfVat)) {
             updates.agencyVatApplicable = false;
           }
-          if (tenantName) updates.tenantName = tenantName;
-          if (depositHeldZAR > 0) updates.depositHeldZAR = depositHeldZAR;
+          if (tenantName || depositHeldZAR > 0) {
+            const target = activeRentals.find(r => r.id === targetPropertyId);
+            if (target) {
+              const currentLease = target.leases?.[0] || { id: crypto.randomUUID(), unitName: 'Main Unit', tenantName: 'Tenant', leaseStartDate: '', leaseEndDate: '', monthlyRentZAR: 0, depositHeldZAR: 0, annualEscalationPercent: 0, status: 'Occupied' };
+              updates.leases = [{
+                ...currentLease,
+                tenantName: tenantName || currentLease.tenantName,
+                depositHeldZAR: depositHeldZAR > 0 ? depositHeldZAR : currentLease.depositHeldZAR,
+              }];
+            }
+          }
           if (data.provider) updates.agencyName = data.provider;
 
           updateRental(targetPropertyId, updates);
@@ -477,13 +492,19 @@ export default function UnifiedPdfVerificationModal({
             bondInterestRatePercent: 11.5,
             monthlyBondPaymentZAR: monthlyBondPaymentZAR || 0,
             bondPaymentEffectiveDate: bondPaymentEffectiveDate || undefined,
-            tenantName: 'Tenant Unassigned',
-            tenantPhone: '+27 —',
-            tenantEmail: 'pending@tenant.co.za',
-            leaseStartDate: new Date().toISOString().split('T')[0],
-            leaseEndDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-            depositHeldZAR: 0,
-            annualEscalationPercent: 6,
+            leases: [{
+              id: crypto.randomUUID(),
+              unitName: 'Main Unit',
+              tenantName: 'Tenant Unassigned',
+              tenantPhone: '+27 —',
+              tenantEmail: 'pending@tenant.co.za',
+              leaseStartDate: new Date().toISOString().split('T')[0],
+              leaseEndDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+              depositHeldZAR: 0,
+              monthlyRentZAR: grossRentZAR || 0,
+              annualEscalationPercent: 6,
+              status: 'Occupied'
+            }],
             monthlyGrossRentZAR: grossRentZAR || 0,
             monthlyLeviesZAR: 0,
             monthlyRatesTaxesZAR: utilRatesZAR,

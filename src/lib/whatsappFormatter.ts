@@ -42,6 +42,7 @@ export interface ProposalPitchParams {
     primaryFunderName?: string;
     primaryFunderContact?: string;
     coFundersNotes?: string;
+    ancillaryIncomes?: any[];
   };
   strategy: DealStrategy;
   capitalRequested: number;
@@ -145,6 +146,17 @@ export function formatOpportunityForWhatsApp(
     text += `• Est. Gross Rent: *${formatZAR(deal.monthlyRentalEstimate)}/m*\n`;
     text += `• Gross Yield: *${formatPercent(deal.grossYield)}* | Cap Rate: *${formatPercent(deal.capRate)}*\n`;
     text += `• Net Cash Flow: *${formatZAR(deal.monthlyCashFlow)}/m* (After bond, levies, rates)\n`;
+
+    // Ancillary Commercial Covenant Lines (P4)
+    if (deal.ancillaryIncomes?.length) {
+      text += `\n*ANCILLARY COMMERCIAL COVENANTS*\n`;
+      deal.ancillaryIncomes.forEach((a: any) => {
+        const typeLabel = a.type.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase());
+        text += `• ${a.tenantName} (${typeLabel}): *${formatZAR(a.monthlyRentZAR)}/m* (${a.annualEscalationPercent}% escalation, expires ${a.contractEndDate})${a.vatApplicable ? ' +VAT' : ''}\n`;
+      });
+      const ancTotal = deal.ancillaryIncomes.reduce((s: number, a: any) => s + a.monthlyRentZAR, 0);
+      text += `• Combined Gross Income: *${formatZAR(deal.monthlyRentalEstimate + ancTotal)}/m*\n`;
+    }
 
     // Long-Term Wealth Compounding
     const projections = generateLongTermProjection({
@@ -366,6 +378,16 @@ export function formatProposalPitchForWhatsApp(
   text += `• Target Exit Price: *${formatZAR(deal.targetExitPrice)}*\n`;
   text += `• Projected Net Profit: *${formatZAR(projectedNetProfit)}*\n`;
   text += `• Project Net ROI: *${formatPercent(projectROI)}*\n\n`;
+
+  if (deal.ancillaryIncomes?.length) {
+    text += `*ANCILLARY COMMERCIAL COVENANTS*\n`;
+    deal.ancillaryIncomes.forEach((a: any) => {
+      const typeLabel = a.type.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase());
+      text += `• ${a.tenantName} (${typeLabel}): *${formatZAR(a.monthlyRentZAR)}/m* (${a.annualEscalationPercent}% escalation, expires ${a.contractEndDate})${a.vatApplicable ? ' +VAT' : ''}\n`;
+    });
+    const ancTotal = deal.ancillaryIncomes.reduce((s: number, a: any) => s + a.monthlyRentZAR, 0);
+    text += `• Combined Gross Income: *${formatZAR((deal.monthlyRent || 0) + ancTotal)}/m*\n\n`;
+  }
 
   text += `*PROPOSED LENDER / PARTNER RETURN TERMS*\n`;
   text += `• Facility Principal: *${formatZAR(capitalRequested)}*\n`;

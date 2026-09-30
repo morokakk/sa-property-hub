@@ -34,11 +34,17 @@ import {
   FileText,
   ArrowRightLeft,
   Landmark,
+  Clock,
+  Scale,
+  Gift,
+  Tag,
+  ShieldAlert,
 } from 'lucide-react';
 import Link from 'next/link';
 import { exportFlipBOQCSV } from '@/lib/export/csvExport';
 import ImportDropdown from '@/components/common/ImportDropdown';
 import { parseRentalPdfStatement } from '@/lib/utilities/pdfParser';
+import DelayMatrixModal from '@/components/flips/DelayMatrixModal';
 
 export default function FlipsManagerPage() {
   const flips = usePortfolioStore((state) => state.flips);
@@ -79,6 +85,7 @@ export default function FlipsManagerPage() {
   const [showExitModal, setShowExitModal] = useState(false);
   const [showFundingModal, setShowFundingModal] = useState(false);
   const [showConvertModal, setShowConvertModal] = useState(false);
+  const [showDelayMatrixModal, setShowDelayMatrixModal] = useState(false);
 
   // Convert Flip to Rental (BRRRR) Form State
   const [convertGrossRent, setConvertGrossRent] = useState<number>(18000);
@@ -120,6 +127,11 @@ export default function FlipsManagerPage() {
   const [boqActualCost, setBoqActualCost] = useState(0);
   const [boqSupplier, setBoqSupplier] = useState('Builders Warehouse Sandton');
   const [boqStatus, setBoqStatus] = useState<BOQItem['status']>('Quoted');
+  const [boqMilestonePhase, setBoqMilestonePhase] = useState<NonNullable<BOQItem['milestonePhase']>>('First Fix / Wet Works');
+  const [boqRetentionPercent, setBoqRetentionPercent] = useState<number>(0);
+  const [boqIsSponsored, setBoqIsSponsored] = useState(false);
+  const [boqCommercialRetailValue, setBoqCommercialRetailValue] = useState<number>(0);
+  const [boqActualCashOutflow, setBoqActualCashOutflow] = useState<number>(0);
 
   // Flip Project Modal Form State (Unified Add & Edit)
   const [flipTitle, setFlipTitle] = useState('');
@@ -137,6 +149,12 @@ export default function FlipsManagerPage() {
   const [flipCompletionDate, setFlipCompletionDate] = useState(
     new Date(Date.now() + 180 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
   );
+  const [flipTaxEntityType, setFlipTaxEntityType] = useState<NonNullable<FlipProject['taxEntityType']>>('Company (27%)');
+  const [flipSec118Arrears, setFlipSec118Arrears] = useState<number>(0);
+  const [flipAdvanceDeposit, setFlipAdvanceDeposit] = useState<number>(0);
+  const [flipRccStatus, setFlipRccStatus] = useState<NonNullable<FlipProject['municipalClearance']>['rccStatus']>('Pending Application');
+  const [flipRccAppDate, setFlipRccAppDate] = useState<string>('');
+  const [flipDisputeNotes, setFlipDisputeNotes] = useState<string>('');
   const [flipPropertyType, setFlipPropertyType] = useState<PropertyTitleType>('Freehold House');
   const [flipAgmDate, setFlipAgmDate] = useState<string>('');
   const [flipMasterFolderUrl, setFlipMasterFolderUrl] = useState('');
@@ -261,6 +279,7 @@ export default function FlipsManagerPage() {
     if (!activeFlip || !boqDescription) return;
 
     const baselineTotal = boqQuantity * boqBaselineUnitCost;
+    const finalActual = boqIsSponsored && boqActualCashOutflow !== undefined ? boqActualCashOutflow : boqActualCost;
     addBOQItem(activeFlip.id, {
       category: boqCategory,
       itemDescription: boqDescription,
@@ -268,15 +287,25 @@ export default function FlipsManagerPage() {
       quantity: boqQuantity,
       baselineUnitCostZAR: boqBaselineUnitCost,
       baselineTotalZAR: baselineTotal,
-      actualCostZAR: boqActualCost,
-      varianceZAR: boqActualCost - baselineTotal,
+      actualCostZAR: finalActual,
+      varianceZAR: finalActual - baselineTotal,
       supplierOrContractor: boqSupplier,
       status: boqStatus,
+      milestonePhase: boqMilestonePhase,
+      retentionPercent: boqRetentionPercent,
+      isSponsoredOrBarter: boqIsSponsored,
+      commercialRetailValueZAR: boqIsSponsored ? boqCommercialRetailValue : undefined,
+      actualCashOutflowZAR: boqIsSponsored ? boqActualCashOutflow : undefined,
     });
 
     setShowAddBOQModal(false);
     setBoqDescription('');
     setBoqActualCost(0);
+    setBoqMilestonePhase('First Fix / Wet Works');
+    setBoqRetentionPercent(0);
+    setBoqIsSponsored(false);
+    setBoqCommercialRetailValue(0);
+    setBoqActualCashOutflow(0);
   };
 
   const openAddFlipModal = () => {
@@ -294,6 +323,12 @@ export default function FlipsManagerPage() {
     setFlipOtherHoldingCost(2000);
     setFlipTargetExit(3800000);
     setFlipCompletionDate(new Date(Date.now() + 180 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]);
+    setFlipTaxEntityType('Company (27%)');
+    setFlipSec118Arrears(0);
+    setFlipAdvanceDeposit(0);
+    setFlipRccStatus('Pending Application');
+    setFlipRccAppDate(new Date().toISOString().split('T')[0]);
+    setFlipDisputeNotes('');
     setFlipPropertyType('Freehold House');
     setFlipAgmDate('');
     setFlipMasterFolderUrl('');
@@ -328,6 +363,12 @@ export default function FlipsManagerPage() {
     setFlipOtherHoldingCost(other);
     setFlipTargetExit(activeFlip.targetExitPriceZAR);
     setFlipCompletionDate(activeFlip.targetCompletionDate);
+    setFlipTaxEntityType(activeFlip.taxEntityType || 'Company (27%)');
+    setFlipSec118Arrears(activeFlip.municipalClearance?.sec118ArrearsZAR || 0);
+    setFlipAdvanceDeposit(activeFlip.municipalClearance?.advanceCouncilDepositZAR || 0);
+    setFlipRccStatus(activeFlip.municipalClearance?.rccStatus || 'Pending Application');
+    setFlipRccAppDate(activeFlip.municipalClearance?.rccApplicationDate || '');
+    setFlipDisputeNotes(activeFlip.municipalClearance?.disputeNotes || '');
     setFlipPropertyType(activeFlip.propertyType || 'Freehold House');
     setFlipAgmDate(activeFlip.agmDate || '');
     setFlipMasterFolderUrl(activeFlip.driveVault?.masterFolderUrl || '');
@@ -353,6 +394,14 @@ export default function FlipsManagerPage() {
       titleDeedUrl: flipTitleDeedUrl.trim() || undefined,
     };
 
+    const municipalClearanceData = {
+      sec118ArrearsZAR: Number(flipSec118Arrears) || 0,
+      advanceCouncilDepositZAR: Number(flipAdvanceDeposit) || 0,
+      rccStatus: flipRccStatus,
+      rccApplicationDate: flipRccAppDate.trim() || undefined,
+      disputeNotes: flipDisputeNotes.trim() || undefined,
+    };
+
     if (editingFlipId) {
       updateFlip(editingFlipId, {
         title: flipTitle,
@@ -371,6 +420,8 @@ export default function FlipsManagerPage() {
         monthlyOtherHoldingCostZAR: Number(flipOtherHoldingCost),
         targetExitPriceZAR: Number(flipTargetExit),
         targetCompletionDate: flipCompletionDate,
+        taxEntityType: flipTaxEntityType,
+        municipalClearance: municipalClearanceData,
         driveVault: updatedDriveVault,
       });
     } else {
@@ -394,6 +445,14 @@ export default function FlipsManagerPage() {
         municipalValuationZAR: extractedValuationZAR || undefined,
         targetExitPriceZAR: Number(flipTargetExit),
         targetCompletionDate: flipCompletionDate,
+        taxEntityType: flipTaxEntityType,
+        municipalClearance: municipalClearanceData,
+        drawSchedule: {
+          depositPaid: false,
+          firstFixApproved: false,
+          finishesApproved: false,
+          retentionReleased: false,
+        },
         currentPhase: 'Acquisition & Conveyancing',
         linkedFundingIds: [],
         fundingRequiredZAR: Math.round((Number(flipPurchasePrice) + Number(flipAcquisitionCosts) + Number(flipRenovationBudget)) * 0.7),
@@ -463,10 +522,59 @@ export default function FlipsManagerPage() {
     (activeFlip?.acquisitionCostsZAR || 0) +
     totalBOQActual;
 
-  const totalAllInCost = totalCostBasis + totalHoldingCost;
+  // Section 118 Rates Clearance & Municipal Arrears (Requirement 3)
+  const sec118ArrearsVal = activeFlip?.municipalClearance?.sec118ArrearsZAR || 0;
+  const advanceCouncilDepositVal = activeFlip?.municipalClearance?.advanceCouncilDepositZAR || 0;
+  const totalMunicipalClearanceOutlay = sec118ArrearsVal + advanceCouncilDepositVal;
+  const rccStatusVal = activeFlip?.municipalClearance?.rccStatus || 'Pending Application';
+  const isRccDisputed = rccStatusVal === 'Disputed';
+
+  const totalAllInCost = totalCostBasis + totalHoldingCost + totalMunicipalClearanceOutlay;
 
   const projectedNetProfit = (activeFlip?.targetExitPriceZAR || 0) - totalAllInCost;
   const projectedROI = totalAllInCost > 0 ? (projectedNetProfit / totalAllInCost) * 100 : 0;
+
+  // After-Tax ROI & Entity Tax Toggle Calculations (Requirement 5)
+  const currentTaxMode = activeFlip?.taxEntityType || 'Company (27%)';
+  const effectiveTaxRate = currentTaxMode === 'Company (27%)' ? 27 : currentTaxMode === 'Individual (45%)' ? 45 : 0;
+  const preTaxProfit = projectedNetProfit;
+  const estimatedTaxProvision = Math.max(0, Math.round(preTaxProfit * (effectiveTaxRate / 100)));
+  const netProfitAfterTax = preTaxProfit - estimatedTaxProvision;
+  const afterTaxROI = totalAllInCost > 0 ? (netProfitAfterTax / totalAllInCost) * 100 : 0;
+
+  // Sponsor / Barter Dual-Value BOQ Accounting (Requirement 6)
+  const sponsoredItems = (activeFlip?.boq || []).filter((i) => i.isSponsoredOrBarter);
+  const totalSponsorItemsCount = sponsoredItems.length;
+  const sponsorRetailTotal = sponsoredItems.reduce((s, i) => s + (i.commercialRetailValueZAR || i.baselineTotalZAR || 0), 0);
+  const sponsorCashTotal = sponsoredItems.reduce((s, i) => s + (i.actualCashOutflowZAR !== undefined ? i.actualCashOutflowZAR : (i.actualCostZAR || i.baselineTotalZAR || 0)), 0);
+  const totalSponsorSavings = Math.max(0, sponsorRetailTotal - sponsorCashTotal);
+
+  const totalRetailBOQ = (activeFlip?.boq || []).reduce((s, i) => {
+    if (i.isSponsoredOrBarter) return s + (i.commercialRetailValueZAR || i.baselineTotalZAR || 0);
+    return s + (i.actualCostZAR || i.baselineTotalZAR || 0);
+  }, 0);
+  const totalActualCashBOQ = totalBOQActual;
+
+  // Milestone Drawdown Allocations & Retention Pool (Requirement 1)
+  const milestoneDraws = {
+    deposit: activeFlip?.boq.filter((i) => i.milestonePhase === 'Deposit').reduce((s, i) => s + (i.actualCostZAR || i.baselineTotalZAR), 0) || 0,
+    firstFix: activeFlip?.boq.filter((i) => i.milestonePhase === 'First Fix / Wet Works').reduce((s, i) => s + (i.actualCostZAR || i.baselineTotalZAR), 0) || 0,
+    finishes: activeFlip?.boq.filter((i) => i.milestonePhase === 'Finishes').reduce((s, i) => s + (i.actualCostZAR || i.baselineTotalZAR), 0) || 0,
+    retention: activeFlip?.boq.filter((i) => i.milestonePhase === 'Retention').reduce((s, i) => s + (i.actualCostZAR || i.baselineTotalZAR), 0) || 0,
+  };
+  const currentDrawSchedule = activeFlip?.drawSchedule || {
+    depositPaid: false,
+    firstFixApproved: false,
+    finishesApproved: false,
+    retentionReleased: false,
+  };
+  const totalRetentionHeldZAR = activeFlip?.boq.reduce((s, i) => {
+    if (i.milestonePhase === 'Retention') return s + (i.actualCostZAR || i.baselineTotalZAR);
+    if (i.retentionPercent && i.retentionPercent > 0) {
+      return s + Math.round((i.actualCostZAR || i.baselineTotalZAR) * (i.retentionPercent / 100));
+    }
+    return s;
+  }, 0) || Math.round(totalBOQActual * 0.2);
 
   const openConvertModal = () => {
     if (!activeFlip) return;
@@ -759,10 +867,10 @@ export default function FlipsManagerPage() {
                   <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
                     <span className="text-[11px] font-semibold text-slate-500 uppercase">Purchase & Costs</span>
                     <div className="text-xl font-bold text-slate-900 mt-1">
-                      {formatZAR(activeFlip.purchasePriceZAR + activeFlip.acquisitionCostsZAR)}
+                      {formatZAR(activeFlip.purchasePriceZAR + activeFlip.acquisitionCostsZAR + totalMunicipalClearanceOutlay)}
                     </div>
-                    <div className="text-[11px] text-slate-400 mt-0.5">
-                      Legal/Duty: {formatZAR(activeFlip.acquisitionCostsZAR)}
+                    <div className="text-[11px] text-slate-400 mt-0.5 truncate" title={`Legal/Duty: ${formatZAR(activeFlip.acquisitionCostsZAR)}${totalMunicipalClearanceOutlay > 0 ? ` • Sec 118: ${formatZAR(totalMunicipalClearanceOutlay)}` : ''}`}>
+                      Legal: {formatZAR(activeFlip.acquisitionCostsZAR)}{totalMunicipalClearanceOutlay > 0 ? ` • Sec 118: ${formatZAR(totalMunicipalClearanceOutlay)}` : ''}
                     </div>
                   </div>
 
@@ -793,7 +901,7 @@ export default function FlipsManagerPage() {
                       </div>
                     </div>
 
-                    <div className="mt-2.5 pt-2 border-t border-amber-100">
+                    <div className="mt-2.5 pt-2 border-t border-amber-100 flex flex-col gap-1.5">
                       <button
                         type="button"
                         onClick={() => setShowHoldingBreakdown((prev) => !prev)}
@@ -804,7 +912,7 @@ export default function FlipsManagerPage() {
                       </button>
 
                       {showHoldingBreakdown && (
-                        <div className="mt-2 space-y-1 text-[10px] text-slate-600 bg-amber-50/60 p-2 rounded-lg border border-amber-200/80 animate-in fade-in duration-150">
+                        <div className="mt-1 space-y-1 text-[10px] text-slate-600 bg-amber-50/60 p-2 rounded-lg border border-amber-200/80 animate-in fade-in duration-150">
                           <div className="flex justify-between">
                             <span>Interim Bond:</span>
                             <strong className="text-slate-800 font-semibold">{formatZAR(activeFlip.monthlyBondPaymentZAR || 0)}/m</strong>
@@ -823,6 +931,16 @@ export default function FlipsManagerPage() {
                           </div>
                         </div>
                       )}
+
+                      <button
+                        type="button"
+                        onClick={() => setShowDelayMatrixModal(true)}
+                        className="w-full py-1.5 px-2 bg-amber-100/90 hover:bg-amber-200/90 text-amber-950 font-bold text-[10px] rounded-lg border border-amber-300 transition-colors flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs"
+                        title="Simulate Council / Transfer Delay Matrix (+30, +60, +90, +120 Days)"
+                      >
+                        <Clock className="w-3.5 h-3.5 text-amber-800" />
+                        <span>Simulate Delay Matrix (+30–120d)</span>
+                      </button>
                     </div>
                   </div>
 
@@ -853,35 +971,109 @@ export default function FlipsManagerPage() {
                   <div className="bg-gradient-to-br from-emerald-800 to-teal-900 text-white p-4 rounded-xl shadow-sm">
                     <span className="text-[11px] font-semibold text-emerald-200 uppercase">Projected Net Upside</span>
                     <div className="text-xl font-extrabold text-white mt-1">
-                      {formatZAR(projectedNetProfit)}
+                      {effectiveTaxRate > 0 ? formatZAR(netProfitAfterTax) : formatZAR(projectedNetProfit)}
                     </div>
                     <div className="text-[11px] text-emerald-200 mt-0.5 font-bold flex items-center justify-between">
-                      <span>{formatPercent(projectedROI)} Net ROI</span>
-                      <span className="text-[9px] text-emerald-300 opacity-90 font-medium">After Holding Costs</span>
+                      <span>{effectiveTaxRate > 0 ? formatPercent(afterTaxROI) : formatPercent(projectedROI)} {effectiveTaxRate > 0 ? 'After-Tax ROI' : 'Net ROI'}</span>
+                      <span className="text-[9px] text-emerald-300 opacity-90 font-medium">
+                        {effectiveTaxRate > 0 ? `${effectiveTaxRate}% Tax Deducted` : 'Pre-Tax Margin'}
+                      </span>
                     </div>
                   </div>
                 </div>
 
-                {/* Holding Cost Deduction Formula Banner */}
-                <div className="bg-amber-50/50 border border-amber-200/80 rounded-xl p-3 px-4 flex flex-col md:flex-row md:items-center justify-between gap-2 text-xs">
-                  <div className="flex items-center gap-2 flex-wrap text-slate-700">
-                    <span className="font-bold text-slate-900 flex items-center gap-1">
-                      <AlertCircle className="w-3.5 h-3.5 text-amber-600" />
-                      <span>Operational Math:</span>
-                    </span>
-                    <span>Exit {formatZAR(activeFlip.targetExitPriceZAR)}</span>
-                    <span className="text-slate-400">−</span>
-                    <span>Acquisition ({formatZAR(activeFlip.purchasePriceZAR + activeFlip.acquisitionCostsZAR)})</span>
-                    <span className="text-slate-400">−</span>
-                    <span>BOQ Spend ({formatZAR(totalBOQActual)})</span>
-                    <span className="text-slate-400">−</span>
-                    <span className="font-bold text-amber-900 bg-amber-100 border border-amber-300 px-2 py-0.5 rounded">
-                      Total Holding Cost ({flipHoldingMonths} mos × {formatZAR(flipMonthlyHoldingCost)}/mo = {formatZAR(totalHoldingCost)})
-                    </span>
+                {/* Operational Math & Entity Tax Banner (Requirements 5 & 6) */}
+                <div className="bg-amber-50/60 border border-amber-200/90 rounded-xl p-3.5 px-4 space-y-2.5 text-xs shadow-2xs">
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+                    <div className="flex items-center gap-2 flex-wrap text-slate-700">
+                      <span className="font-bold text-slate-900 flex items-center gap-1.5">
+                        <AlertCircle className="w-4 h-4 text-amber-600" />
+                        <span>Operational Math:</span>
+                      </span>
+                      <span>Exit {formatZAR(activeFlip.targetExitPriceZAR)}</span>
+                      <span className="text-slate-400">−</span>
+                      <span>Acquisition ({formatZAR(activeFlip.purchasePriceZAR + activeFlip.acquisitionCostsZAR)})</span>
+                      <span className="text-slate-400">−</span>
+                      <span>BOQ Spend ({formatZAR(totalBOQActual)})</span>
+                      {totalMunicipalClearanceOutlay > 0 && (
+                        <>
+                          <span className="text-slate-400">−</span>
+                          <span className="font-semibold text-blue-900 bg-blue-100 border border-blue-300 px-2 py-0.5 rounded">
+                            Sec 118 Clearance ({formatZAR(totalMunicipalClearanceOutlay)})
+                          </span>
+                        </>
+                      )}
+                      <span className="text-slate-400">−</span>
+                      <span className="font-bold text-amber-900 bg-amber-100 border border-amber-300 px-2 py-0.5 rounded">
+                        Holding ({flipHoldingMonths} mos × {formatZAR(flipMonthlyHoldingCost)}/mo = {formatZAR(totalHoldingCost)})
+                      </span>
+                    </div>
+
+                    {/* Entity Tax Toggle (Pre-Tax / 27% Company / 45% Individual) */}
+                    <div className="flex items-center gap-1.5 shrink-0 bg-white p-1 rounded-lg border border-amber-200 shadow-2xs">
+                      <span className="text-[10px] font-bold text-slate-500 uppercase px-1">Entity Tax:</span>
+                      {(['Company (27%)', 'Individual (45%)', 'Pre-Tax'] as const).map((mode) => (
+                        <button
+                          key={mode}
+                          type="button"
+                          onClick={() => updateFlip(activeFlip.id, { taxEntityType: mode })}
+                          className={`px-2 py-0.5 text-[10px] font-bold rounded-md transition-all cursor-pointer ${
+                            currentTaxMode === mode
+                              ? 'bg-amber-600 text-white shadow-xs'
+                              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                          }`}
+                        >
+                          {mode === 'Company (27%)' ? 'Company (27%)' : mode === 'Individual (45%)' ? 'Individual (45%)' : 'Pre-Tax'}
+                        </button>
+                      ))}
+                    </div>
                   </div>
-                  <div className="text-right shrink-0">
-                    <span className="text-slate-500 font-medium mr-1.5">= Final Net Profit:</span>
-                    <strong className="text-emerald-700 font-black text-sm">{formatZAR(projectedNetProfit)}</strong>
+
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between pt-2 border-t border-amber-200/60 gap-2">
+                    {/* Sponsor / Barter Summary pill */}
+                    <div className="flex items-center gap-2 flex-wrap text-[11px]">
+                      {totalSponsorItemsCount > 0 ? (
+                        <div className="inline-flex items-center gap-1.5 bg-purple-50 text-purple-900 border border-purple-200 px-2.5 py-0.5 rounded-lg font-semibold">
+                          <Gift className="w-3.5 h-3.5 text-purple-600" />
+                          <span>Commercial Retail Value: <strong>{formatZAR(totalRetailBOQ)}</strong></span>
+                          <span>•</span>
+                          <span>Cash Outlay: <strong>{formatZAR(totalActualCashBOQ)}</strong></span>
+                          <span>•</span>
+                          <span className="text-emerald-700 font-bold">Saved {formatZAR(totalSponsorSavings)} ({totalRetailBOQ > 0 ? ((totalSponsorSavings / totalRetailBOQ) * 100).toFixed(0) : 0}%)</span>
+                        </div>
+                      ) : (
+                        <span className="text-slate-500 text-[10px]">
+                          Pre-Tax Operational Profit: <strong>{formatZAR(preTaxProfit)}</strong> ({formatPercent(projectedROI)} Pre-Tax ROI)
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Pre-Tax vs Post-Tax Result */}
+                    <div className="flex items-center gap-3 shrink-0 text-right">
+                      {effectiveTaxRate > 0 ? (
+                        <>
+                          <div className="text-[11px] text-slate-500">
+                            <span>Pre-Tax: <strong>{formatZAR(preTaxProfit)}</strong></span>
+                            <span className="text-rose-600 font-medium ml-1.5">(-{formatZAR(estimatedTaxProvision)} tax)</span>
+                          </div>
+                          <div>
+                            <span className="text-slate-500 font-medium mr-1.5 text-xs">= Net Cash After {effectiveTaxRate}% Tax:</span>
+                            <strong className="text-emerald-700 font-black text-sm">{formatZAR(netProfitAfterTax)}</strong>
+                            <span className="ml-1 text-[10px] font-bold text-emerald-800 bg-emerald-100 px-1.5 py-0.2 rounded">
+                              {formatPercent(afterTaxROI)} After-Tax
+                            </span>
+                          </div>
+                        </>
+                      ) : (
+                        <div>
+                          <span className="text-slate-500 font-medium mr-1.5 text-xs">= Pre-Tax Net Profit:</span>
+                          <strong className="text-emerald-700 font-black text-sm">{formatZAR(projectedNetProfit)}</strong>
+                          <span className="ml-1 text-[10px] font-bold text-emerald-800 bg-emerald-100 px-1.5 py-0.2 rounded">
+                            {formatPercent(projectedROI)} Pre-Tax
+                          </span>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
 
@@ -1036,9 +1228,144 @@ export default function FlipsManagerPage() {
                   </div>
                 </div>
 
-                {/* SA Statutory Compliance (CoC) */}
+                {/* Section 118 Rates Clearance Certificate (RCC) & Municipal Arrears Card (Requirement 3) */}
+                <div className="bg-white rounded-xl border border-slate-200 p-4 sm:p-5 shadow-xs space-y-3">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-slate-200 gap-2">
+                    <div className="flex items-center gap-2.5">
+                      <div className="p-2 rounded-xl bg-blue-500/10 text-blue-700 border border-blue-500/20">
+                        <Landmark className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h3 className="text-sm font-bold text-slate-900">
+                            Section 118 Municipal Rates Clearance (RCC) & Arrears Tracker
+                          </h3>
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                            rccStatusVal === 'Certificate Issued'
+                              ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
+                              : rccStatusVal === 'Disputed'
+                              ? 'bg-rose-50 text-rose-800 border-rose-300'
+                              : rccStatusVal === 'Paid & Awaiting Certificate'
+                              ? 'bg-blue-50 text-blue-800 border-blue-300'
+                              : 'bg-amber-50 text-amber-800 border-amber-300'
+                          }`}>
+                            {rccStatusVal}
+                          </span>
+                        </div>
+                        <p className="text-xs text-slate-500 mt-0.5">
+                          Municipal Systems Act Section 118(1) 2-year clearance, advance rates deposit & Deeds Registry clearance
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <select
+                        value={rccStatusVal}
+                        onChange={(e) =>
+                          updateFlip(activeFlip.id, {
+                            municipalClearance: {
+                              sec118ArrearsZAR: sec118ArrearsVal,
+                              advanceCouncilDepositZAR: advanceCouncilDepositVal,
+                              rccStatus: e.target.value as any,
+                              rccApplicationDate: activeFlip.municipalClearance?.rccApplicationDate,
+                              disputeNotes: activeFlip.municipalClearance?.disputeNotes,
+                            },
+                          })
+                        }
+                        className="text-xs font-bold bg-slate-50 border border-slate-300 rounded-lg px-2.5 py-1.5 cursor-pointer text-slate-800 shadow-2xs"
+                      >
+                        <option value="Pending Application">Pending Application</option>
+                        <option value="Figures Issued">Figures Issued</option>
+                        <option value="Paid & Awaiting Certificate">Paid & Awaiting Certificate</option>
+                        <option value="Disputed">Disputed (CoJ Billing Error)</option>
+                        <option value="Certificate Issued">Certificate Issued (Clear for Transfer)</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Arrears and Advance Deposit Metrics */}
+                  <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 text-xs">
+                    <div className="bg-slate-50 p-3 rounded-xl border border-slate-200">
+                      <span className="text-[10px] uppercase font-bold text-slate-400 block">Section 118(1) 2-Yr Arrears</span>
+                      <div className="text-base font-extrabold text-slate-900 mt-0.5">
+                        {formatZAR(sec118ArrearsVal)}
+                      </div>
+                      <span className="text-[9px] text-slate-400">Statutory municipal historical debt</span>
+                    </div>
+
+                    <div className="bg-slate-50 p-3 rounded-xl border border-slate-200">
+                      <span className="text-[10px] uppercase font-bold text-slate-400 block">Advance Council Deposit</span>
+                      <div className="text-base font-extrabold text-blue-700 mt-0.5">
+                        {formatZAR(advanceCouncilDepositVal)}
+                      </div>
+                      <span className="text-[9px] text-slate-400">4–6 months rates required upfront</span>
+                    </div>
+
+                    <div className="bg-slate-50 p-3 rounded-xl border border-slate-200">
+                      <span className="text-[10px] uppercase font-bold text-slate-400 block">Total RCC Cash Outlay</span>
+                      <div className="text-base font-extrabold text-slate-900 mt-0.5">
+                        {formatZAR(totalMunicipalClearanceOutlay)}
+                      </div>
+                      <span className="text-[9px] text-slate-400">Total payable for clearance certificate</span>
+                    </div>
+
+                    <div className="bg-slate-50 p-3 rounded-xl border border-slate-200">
+                      <span className="text-[10px] uppercase font-bold text-slate-400 block">RCC Application Date</span>
+                      <div className="text-base font-extrabold text-slate-800 mt-0.5">
+                        {activeFlip.municipalClearance?.rccApplicationDate || 'Not Lodged'}
+                      </div>
+                      <span className="text-[9px] text-slate-400">Conveyancer lodgement date</span>
+                    </div>
+                  </div>
+
+                  {/* Dispute & Holding Burn Warning */}
+                  {isRccDisputed && (
+                    <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+                      <div className="flex items-start gap-2 text-rose-900">
+                        <ShieldAlert className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                        <div>
+                          <span className="font-bold">CoJ Municipal Rates Dispute Active:</span>
+                          <p className="text-[11px] text-rose-800 mt-0.5">
+                            Municipal figures are disputed. Property transfer is halted while carrying costs burn at <strong>{formatZAR(flipMonthlyHoldingCost)}/month</strong>.
+                            {activeFlip.municipalClearance?.disputeNotes && (
+                              <span className="block mt-1 italic text-rose-900">Notes: {activeFlip.municipalClearance.disputeNotes}</span>
+                            )}
+                          </p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setShowDelayMatrixModal(true)}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-rose-700 hover:bg-rose-800 text-white rounded-lg font-bold text-xs shrink-0 shadow-2xs cursor-pointer"
+                      >
+                        <Clock className="w-3.5 h-3.5" />
+                        <span>Simulate Dispute Delay (+30–120d)</span>
+                      </button>
+                    </div>
+                  )}
+
+                  {!isRccDisputed && rccStatusVal === 'Pending Application' && (
+                    <div className="p-2.5 rounded-lg bg-amber-50/70 border border-amber-200 text-amber-900 text-[11px] flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-1.5">
+                        <AlertCircle className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                        <span>Conveyancer awaiting City of Johannesburg rates clearance figures. Council turnaround standard is 14 to 30 days.</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setShowDelayMatrixModal(true)}
+                        className="text-amber-900 hover:text-amber-950 font-bold underline cursor-pointer shrink-0 text-[10px]"
+                      >
+                        Check Delay Exposure →
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                {/* SA Statutory Compliance (CoC) (Requirement 4: Auto-adapts by City) */}
                 <ComplianceChecklist
+                  key={activeFlip.id}
                   certificates={activeFlip.cocChecklist}
+                  city={activeFlip.city}
                   onUpdate={(updated) => updateFlip(activeFlip.id, { cocChecklist: updated })}
                 />
 
@@ -1047,6 +1374,199 @@ export default function FlipsManagerPage() {
                   vault={activeFlip.driveVault}
                   onUpdate={(updated) => updateFlip(activeFlip.id, { driveVault: updated })}
                 />
+
+                {/* Contractor Milestone Drawdown & Retention Schedule (Requirement 1) */}
+                <div className="bg-white rounded-xl border border-slate-200 p-4 sm:p-5 shadow-xs space-y-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-slate-200 gap-2">
+                    <div>
+                      <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                        <Hammer className="w-4 h-4 text-emerald-600" />
+                        <span>Contractor Milestone Drawdown & Retention Schedule</span>
+                      </h3>
+                      <p className="text-xs text-slate-500 mt-0.5">
+                        Phase-gated progress payments structured to eliminate contractor abandonment risk (Flipping Johannesburg operator model).
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <div className="text-right">
+                        <span className="text-[10px] text-slate-400 block font-semibold uppercase">
+                          {currentDrawSchedule.retentionReleased ? 'Total Retention Pool' : 'Total Retention Pool Held'}
+                        </span>
+                        <span className={`text-xs font-black px-2 py-0.5 rounded border ${
+                          currentDrawSchedule.retentionReleased
+                            ? 'text-emerald-800 bg-emerald-50 border-emerald-300'
+                            : 'text-amber-800 bg-amber-50 border-amber-200'
+                        }`}>
+                          {formatZAR(totalRetentionHeldZAR)} {currentDrawSchedule.retentionReleased ? '✓ Released' : 'Held (20%)'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 4 Phase Draw Gates */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                    {/* Gate 1: Deposit (20%) */}
+                    <div className={`p-3.5 rounded-xl border transition-all text-xs flex flex-col justify-between ${
+                      currentDrawSchedule.depositPaid
+                        ? 'bg-emerald-50/70 border-emerald-300 text-emerald-950'
+                        : 'bg-slate-50 border-slate-200 text-slate-700'
+                    }`}>
+                      <div>
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="font-bold text-xs uppercase tracking-wide">Phase 1: Deposit</span>
+                          <span className="text-[10px] font-bold bg-white px-1.5 py-0.5 rounded border border-slate-200">
+                            20% Target
+                          </span>
+                        </div>
+                        <p className="text-[10px] text-slate-500 mb-2">Mobilization, prep & materials deposit</p>
+                        <div className="text-base font-extrabold text-slate-900">
+                          {formatZAR(milestoneDraws.deposit || Math.round(activeFlip.baselineRenovationBudgetZAR * 0.2))}
+                        </div>
+                        <span className="text-[10px] text-slate-400">Target: {formatZAR(Math.round(activeFlip.baselineRenovationBudgetZAR * 0.2))}</span>
+                      </div>
+
+                      <div className="pt-3 mt-3 border-t border-slate-200/60">
+                        <label className="flex items-center gap-2 cursor-pointer font-bold text-xs">
+                          <input
+                            type="checkbox"
+                            checked={currentDrawSchedule.depositPaid}
+                            onChange={(e) =>
+                              updateFlip(activeFlip.id, {
+                                drawSchedule: {
+                                  ...currentDrawSchedule,
+                                  depositPaid: e.target.checked,
+                                },
+                              })
+                            }
+                            className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+                          />
+                          <span>{currentDrawSchedule.depositPaid ? '✓ Deposit Paid' : 'Mark Deposit Paid'}</span>
+                        </label>
+                      </div>
+                    </div>
+
+                    {/* Gate 2: First Fix / Wet Works (30%) */}
+                    <div className={`p-3.5 rounded-xl border transition-all text-xs flex flex-col justify-between ${
+                      currentDrawSchedule.firstFixApproved
+                        ? 'bg-emerald-50/70 border-emerald-300 text-emerald-950'
+                        : 'bg-slate-50 border-slate-200 text-slate-700'
+                    }`}>
+                      <div>
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="font-bold text-xs uppercase tracking-wide">Phase 2: First Fix</span>
+                          <span className="text-[10px] font-bold bg-white px-1.5 py-0.5 rounded border border-slate-200">
+                            30% Target
+                          </span>
+                        </div>
+                        <p className="text-[10px] text-slate-500 mb-2">Plumbing rough-in, electrical conduit & wet works</p>
+                        <div className="text-base font-extrabold text-slate-900">
+                          {formatZAR(milestoneDraws.firstFix || Math.round(activeFlip.baselineRenovationBudgetZAR * 0.3))}
+                        </div>
+                        <span className="text-[10px] text-slate-400">Target: {formatZAR(Math.round(activeFlip.baselineRenovationBudgetZAR * 0.3))}</span>
+                      </div>
+
+                      <div className="pt-3 mt-3 border-t border-slate-200/60">
+                        <label className="flex items-center gap-2 cursor-pointer font-bold text-xs">
+                          <input
+                            type="checkbox"
+                            checked={currentDrawSchedule.firstFixApproved}
+                            onChange={(e) =>
+                              updateFlip(activeFlip.id, {
+                                drawSchedule: {
+                                  ...currentDrawSchedule,
+                                  firstFixApproved: e.target.checked,
+                                },
+                              })
+                            }
+                            className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+                          />
+                          <span>{currentDrawSchedule.firstFixApproved ? '✓ Inspected & Approved' : 'Sign Off First Fix'}</span>
+                        </label>
+                      </div>
+                    </div>
+
+                    {/* Gate 3: Finishes & Tiling (30%) */}
+                    <div className={`p-3.5 rounded-xl border transition-all text-xs flex flex-col justify-between ${
+                      currentDrawSchedule.finishesApproved
+                        ? 'bg-emerald-50/70 border-emerald-300 text-emerald-950'
+                        : 'bg-slate-50 border-slate-200 text-slate-700'
+                    }`}>
+                      <div>
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="font-bold text-xs uppercase tracking-wide">Phase 3: Finishes</span>
+                          <span className="text-[10px] font-bold bg-white px-1.5 py-0.5 rounded border border-slate-200">
+                            30% Target
+                          </span>
+                        </div>
+                        <p className="text-[10px] text-slate-500 mb-2">Tiling, joinery, sanitaryware, ceilings & paint</p>
+                        <div className="text-base font-extrabold text-slate-900">
+                          {formatZAR(milestoneDraws.finishes || Math.round(activeFlip.baselineRenovationBudgetZAR * 0.3))}
+                        </div>
+                        <span className="text-[10px] text-slate-400">Target: {formatZAR(Math.round(activeFlip.baselineRenovationBudgetZAR * 0.3))}</span>
+                      </div>
+
+                      <div className="pt-3 mt-3 border-t border-slate-200/60">
+                        <label className="flex items-center gap-2 cursor-pointer font-bold text-xs">
+                          <input
+                            type="checkbox"
+                            checked={currentDrawSchedule.finishesApproved}
+                            onChange={(e) =>
+                              updateFlip(activeFlip.id, {
+                                drawSchedule: {
+                                  ...currentDrawSchedule,
+                                  finishesApproved: e.target.checked,
+                                },
+                              })
+                            }
+                            className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+                          />
+                          <span>{currentDrawSchedule.finishesApproved ? '✓ Finishes Approved' : 'Sign Off Finishes'}</span>
+                        </label>
+                      </div>
+                    </div>
+
+                    {/* Gate 4: Practical Completion & Retention (20%) */}
+                    <div className={`p-3.5 rounded-xl border transition-all text-xs flex flex-col justify-between ${
+                      currentDrawSchedule.retentionReleased
+                        ? 'bg-emerald-50/70 border-emerald-300 text-emerald-950'
+                        : 'bg-amber-50/60 border-amber-200 text-amber-950'
+                    }`}>
+                      <div>
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="font-bold text-xs uppercase tracking-wide">Phase 4: Retention</span>
+                          <span className="text-[10px] font-bold bg-amber-100 text-amber-900 px-1.5 py-0.5 rounded border border-amber-300">
+                            20% Snag Gate
+                          </span>
+                        </div>
+                        <p className="text-[10px] text-slate-500 mb-2">Snag list completion, CoC delivery & handover</p>
+                        <div className="text-base font-extrabold text-amber-900">
+                          {formatZAR(milestoneDraws.retention || Math.round(activeFlip.baselineRenovationBudgetZAR * 0.2))}
+                        </div>
+                        <span className="text-[10px] text-amber-800 font-semibold">Withheld until 100% snag-free</span>
+                      </div>
+
+                      <div className="pt-3 mt-3 border-t border-amber-200/60">
+                        <label className="flex items-center gap-2 cursor-pointer font-bold text-xs">
+                          <input
+                            type="checkbox"
+                            checked={currentDrawSchedule.retentionReleased}
+                            onChange={(e) =>
+                              updateFlip(activeFlip.id, {
+                                drawSchedule: {
+                                  ...currentDrawSchedule,
+                                  retentionReleased: e.target.checked,
+                                },
+                              })
+                            }
+                            className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+                          />
+                          <span>{currentDrawSchedule.retentionReleased ? '✓ Retention Released' : 'Release Retention'}</span>
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+                </div>
 
                 {/* Bill of Quantities (BOQ) Table */}
                 <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-xs">
@@ -1059,7 +1579,7 @@ export default function FlipsManagerPage() {
                         </span>
                       </h3>
                       <p className="text-xs text-slate-500">
-                        Baseline estimates vs. actual contractor & supplier invoices.
+                        Baseline estimates vs. actual contractor & supplier invoices with phase milestones and sponsor barter tracking.
                       </p>
                     </div>
 
@@ -1085,10 +1605,11 @@ export default function FlipsManagerPage() {
                   </div>
 
                   <div className="overflow-x-auto">
-                    <table className="w-full min-w-[700px] text-left text-xs border-collapse">
+                    <table className="w-full min-w-[750px] text-left text-xs border-collapse">
                       <thead>
                         <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase font-semibold text-[10px] tracking-wider">
                           <th className="p-3.5 pl-5">Trade Category</th>
+                          <th className="p-3.5">Draw Phase</th>
                           <th className="p-3.5">Scope / Item Description</th>
                           <th className="p-3.5">Unit / Qty</th>
                           <th className="p-3.5">Baseline (ZAR)</th>
@@ -1105,13 +1626,43 @@ export default function FlipsManagerPage() {
                             <td className="p-3.5 pl-5 font-semibold text-slate-900">
                               {item.category}
                             </td>
+                            <td className="p-3.5">
+                              <select
+                                value={item.milestonePhase || 'First Fix / Wet Works'}
+                                onChange={(e) =>
+                                  updateBOQItem(activeFlip.id, item.id, {
+                                    milestonePhase: e.target.value as any,
+                                  })
+                                }
+                                className="text-[10px] font-semibold px-2 py-1 rounded-md border border-slate-200 cursor-pointer bg-slate-50 text-slate-700 hover:bg-white shadow-2xs block"
+                                title="Change milestone draw phase"
+                              >
+                                <option value="Deposit">Phase 1: Deposit (20%)</option>
+                                <option value="First Fix / Wet Works">Phase 2: First Fix (30%)</option>
+                                <option value="Finishes">Phase 3: Finishes (30%)</option>
+                                <option value="Retention">Phase 4: Retention (20%)</option>
+                              </select>
+                              {item.retentionPercent && item.retentionPercent > 0 ? (
+                                <span className="text-[9px] text-amber-800 font-bold bg-amber-50 border border-amber-200 px-1.5 py-0.2 rounded mt-1 inline-block">
+                                  {item.retentionPercent}% Ret
+                                </span>
+                              ) : null}
+                            </td>
                             <td className="p-3.5 max-w-xs">
                               <div className="font-medium text-slate-800">{item.itemDescription}</div>
-                              {item.invoiceRef && (
-                                <span className="text-[10px] text-slate-400 font-mono">
-                                  Ref: {item.invoiceRef}
-                                </span>
-                              )}
+                              <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
+                                {item.invoiceRef && (
+                                  <span className="text-[10px] text-slate-400 font-mono">
+                                    Ref: {item.invoiceRef}
+                                  </span>
+                                )}
+                                {item.isSponsoredOrBarter && (
+                                  <span className="inline-flex items-center gap-1 text-[9px] bg-purple-100 text-purple-800 font-bold px-1.5 py-0.5 rounded border border-purple-200">
+                                    <Gift className="w-2.5 h-2.5 text-purple-600" />
+                                    <span>Sponsor Barter • Retail {formatZAR(item.commercialRetailValueZAR || item.baselineTotalZAR)}</span>
+                                  </span>
+                                )}
+                              </div>
                             </td>
                             <td className="p-3.5 text-slate-500">
                               {item.quantity} {item.unit}
@@ -1120,7 +1671,12 @@ export default function FlipsManagerPage() {
                               {formatZAR(item.baselineTotalZAR)}
                             </td>
                             <td className="p-3.5 font-bold text-slate-900">
-                              {formatZAR(item.actualCostZAR)}
+                              <div>{formatZAR(item.actualCostZAR)}</div>
+                              {item.isSponsoredOrBarter && (
+                                <div className="text-[9px] text-purple-700 font-normal">
+                                  Retail: {formatZAR(item.commercialRetailValueZAR || item.baselineTotalZAR)}
+                                </div>
+                              )}
                             </td>
                             <td className="p-3.5">
                               <span
@@ -1872,6 +2428,94 @@ export default function FlipsManagerPage() {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Contractor Milestone Draw Phase</label>
+                  <select
+                    value={boqMilestonePhase}
+                    onChange={(e) => setBoqMilestonePhase(e.target.value as any)}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white"
+                  >
+                    <option value="Deposit">Phase 1: Deposit (20%)</option>
+                    <option value="First Fix / Wet Works">Phase 2: First Fix / Wet Works (30%)</option>
+                    <option value="Finishes">Phase 3: Finishes & Tiling (30%)</option>
+                    <option value="Retention">Phase 4: Practical Completion Retention (20%)</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Retention Withheld (%)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="5"
+                    value={boqRetentionPercent}
+                    onChange={(e) => setBoqRetentionPercent(Number(e.target.value))}
+                    placeholder="e.g. 20"
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg"
+                  />
+                  <span className="text-[10px] text-slate-400 mt-0.5 block">Held until practical completion</span>
+                </div>
+              </div>
+
+              {/* Sponsor / Barter Accounting Section */}
+              <div className="p-3 bg-purple-50/70 border border-purple-200 rounded-xl space-y-2">
+                <label className="flex items-center gap-2 cursor-pointer font-bold text-xs text-purple-950">
+                  <input
+                    type="checkbox"
+                    checked={boqIsSponsored}
+                    onChange={(e) => setBoqIsSponsored(e.target.checked)}
+                    className="rounded border-purple-300 text-purple-600 focus:ring-purple-500 cursor-pointer"
+                  />
+                  <span className="flex items-center gap-1.5">
+                    <Gift className="w-3.5 h-3.5 text-purple-700" />
+                    <span>Sponsor Barter / Trade Partner Item (Builders Warehouse, Saint-Gobain, Sonae Arauco)</span>
+                  </span>
+                </label>
+
+                {boqIsSponsored && (
+                  <div className="grid grid-cols-2 gap-3 pt-1 animate-in fade-in">
+                    <div>
+                      <label className="block font-semibold text-slate-700 mb-1 text-[11px]">
+                        Commercial Retail Value (ZAR)
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        step="any"
+                        value={boqCommercialRetailValue}
+                        onChange={(e) => setBoqCommercialRetailValue(Number(e.target.value))}
+                        placeholder="e.g. 45000"
+                        className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg bg-white"
+                      />
+                      <span className="text-[9px] text-slate-500 mt-0.5 block">Full store retail price</span>
+                    </div>
+
+                    <div>
+                      <label className="block font-semibold text-slate-700 mb-1 text-[11px]">
+                        Net Cash Outflow (ZAR)
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        step="any"
+                        value={boqActualCashOutflow}
+                        onChange={(e) => {
+                          const val = Number(e.target.value);
+                          setBoqActualCashOutflow(val);
+                          setBoqActualCost(val);
+                        }}
+                        placeholder="e.g. 15000"
+                        className="w-full px-2.5 py-1.5 border border-purple-300 rounded-lg bg-white font-bold text-purple-900"
+                      />
+                      <span className="text-[9px] text-emerald-700 font-bold mt-0.5 block">
+                        Saved: {formatZAR(Math.max(0, boqCommercialRetailValue - boqActualCashOutflow))}
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
                   <label className="block font-semibold text-slate-700 mb-1">Actual Invoice Cost (ZAR)</label>
                   <input
                     type="number"
@@ -1894,6 +2538,9 @@ export default function FlipsManagerPage() {
                         {s.name} ({s.branchLocation})
                       </option>
                     ))}
+                    <option value="Builders Warehouse Sandton">Builders Warehouse Sandton</option>
+                    <option value="Saint-Gobain Gyproc">Saint-Gobain Gyproc</option>
+                    <option value="Sonae Arauco Panels">Sonae Arauco Panels</option>
                     <option value="Independent Contractor">Independent Contractor</option>
                   </select>
                 </div>
@@ -2269,6 +2916,117 @@ export default function FlipsManagerPage() {
                   <span className="font-bold text-sm text-amber-800">
                     {formatZAR(Number(flipBondPayment) + (flipPropertyType === 'Freehold House' ? 0 : Number(flipLevies)) + Number(flipRates) + Number(flipOtherHoldingCost))}/mo
                   </span>
+                </div>
+              </div>
+
+              {/* Entity Tax Structure (Requirement 5) */}
+              <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="font-bold text-[11px] text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                    <Scale className="w-3.5 h-3.5 text-indigo-600" />
+                    <span>Tax Entity & Provisional Tax Structure</span>
+                  </label>
+                  <span className="text-[10px] text-slate-500">Corporate vs Individual</span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-600 mb-1">Tax Entity Type</label>
+                    <select
+                      value={flipTaxEntityType}
+                      onChange={(e) => setFlipTaxEntityType(e.target.value as any)}
+                      className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg bg-white font-medium text-xs text-slate-800 cursor-pointer"
+                    >
+                      <option value="Company (27%)">Company / PTY Ltd (27% Corporate Tax)</option>
+                      <option value="Individual (45%)">Individual / Sole Prop (45% Marginal Tax)</option>
+                      <option value="Pre-Tax">Pre-Tax / Gross Model (0%)</option>
+                    </select>
+                  </div>
+                  <div className="flex items-center p-2 bg-indigo-50/60 rounded-lg border border-indigo-100 text-[11px] text-indigo-900 leading-snug">
+                    <span>
+                      {flipTaxEntityType === 'Company (27%)' && 'Applies SARS 27% corporate income tax rate to net trading flip upside.'}
+                      {flipTaxEntityType === 'Individual (45%)' && 'Applies top marginal individual tax rate of 45% for high-bracket investors.'}
+                      {flipTaxEntityType === 'Pre-Tax' && 'Excludes provisional tax provision; models pre-tax gross operational return.'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Section 118 Rates Clearance & Municipal Arrears (Requirement 3) */}
+              <div className="p-3 bg-amber-50/60 rounded-lg border border-amber-200/90 space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-[11px] text-amber-950 uppercase tracking-wider flex items-center gap-1.5">
+                    <Landmark className="w-3.5 h-3.5 text-amber-700" />
+                    <span>Section 118 Municipal Arrears & Clearance (RCC)</span>
+                  </span>
+                  <span className="text-[10px] font-semibold text-amber-800 bg-amber-100 px-2 py-0.5 rounded-full border border-amber-300">
+                    Municipal Systems Act
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+                  <div>
+                    <label className="block font-semibold text-slate-700 mb-1 text-[11px]">Sec 118(1) Arrears (ZAR)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="any"
+                      value={flipSec118Arrears}
+                      onChange={(e) => setFlipSec118Arrears(Number(e.target.value))}
+                      placeholder="0"
+                      className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg bg-white font-medium text-xs"
+                    />
+                    <span className="text-[9px] text-slate-500">2-yr historic municipal debt</span>
+                  </div>
+                  <div>
+                    <label className="block font-semibold text-slate-700 mb-1 text-[11px]">Advance Council Deposit (ZAR)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="any"
+                      value={flipAdvanceDeposit}
+                      onChange={(e) => setFlipAdvanceDeposit(Number(e.target.value))}
+                      placeholder="0"
+                      className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg bg-white font-medium text-xs"
+                    />
+                    <span className="text-[9px] text-slate-500">4-6 mos forward deposit</span>
+                  </div>
+                  <div>
+                    <label className="block font-semibold text-slate-700 mb-1 text-[11px]">RCC Clearance Status</label>
+                    <select
+                      value={flipRccStatus}
+                      onChange={(e) => setFlipRccStatus(e.target.value as any)}
+                      className="w-full px-2 py-1.5 border border-slate-300 rounded-lg bg-white font-medium text-xs text-slate-800 cursor-pointer"
+                    >
+                      <option value="Pending Application">Pending Application</option>
+                      <option value="Figures Issued">Figures Issued</option>
+                      <option value="Paid & Awaiting Certificate">Paid & Awaiting Certificate</option>
+                      <option value="Disputed">Disputed (CoJ Billing Query)</option>
+                      <option value="Certificate Issued">Certificate Issued (Clear for Transfer)</option>
+                    </select>
+                    <span className="text-[9px] text-slate-500">Council certificate phase</span>
+                  </div>
+                  <div>
+                    <label className="block font-semibold text-slate-700 mb-1 text-[11px]">RCC Application Date</label>
+                    <input
+                      type="date"
+                      value={flipRccAppDate}
+                      onChange={(e) => setFlipRccAppDate(e.target.value)}
+                      className="w-full px-2 py-1.5 border border-slate-300 rounded-lg bg-white font-medium text-xs"
+                    />
+                    <span className="text-[9px] text-slate-500">Lodge date with council</span>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1 text-[11px]">
+                    Municipal Billing Query / Dispute Notes
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. City of Joburg estimated meter dispute logged (Ref #...)"
+                    value={flipDisputeNotes}
+                    onChange={(e) => setFlipDisputeNotes(e.target.value)}
+                    className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg bg-white text-xs"
+                  />
                 </div>
               </div>
 
@@ -2689,6 +3447,17 @@ export default function FlipsManagerPage() {
             </form>
           </div>
         </div>
+      )}
+
+      {/* Delay Sensitivity Matrix Modal (Requirement 2) */}
+      {activeFlip && showDelayMatrixModal && (
+        <DelayMatrixModal
+          key={activeFlip.id}
+          isOpen={showDelayMatrixModal}
+          onClose={() => setShowDelayMatrixModal(false)}
+          flip={activeFlip}
+          totalCostBasisZAR={totalCostBasis}
+        />
       )}
 
     </div>

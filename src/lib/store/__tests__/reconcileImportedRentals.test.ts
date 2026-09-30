@@ -52,8 +52,8 @@ describe('usePortfolioStore reconcileImportedRentals', () => {
     expect(reconciled.monthlyLeviesZAR).toBe(2300);
     expect(reconciled.monthlyRatesTaxesZAR).toBe(1450);
     expect(reconciled.monthlyAgentFeeZAR).toBe(1560);
-    expect(reconciled.tenantName).toBe('Updated Tenant Name');
-    expect(reconciled.leaseEndDate).toBe('2027-06-30');
+    expect(reconciled.leases?.[0]?.tenantName).toBe('Updated Tenant Name');
+    expect(reconciled.leases?.[0]?.leaseEndDate).toBe('2027-06-30');
 
     // Preserved fields
     expect(reconciled.id).toBe(existing.id);
@@ -81,7 +81,7 @@ describe('usePortfolioStore reconcileImportedRentals', () => {
 
     const reconciled = usePortfolioStore.getState().rentals.find((r) => r.id === existing.id)!;
     expect(reconciled.monthlyGrossRentZAR).toBe(22000);
-    expect(reconciled.tenantName).toBe('Fuzzy Matched Tenant');
+    expect(reconciled.leases?.[0]?.tenantName).toBe('Fuzzy Matched Tenant');
   });
 
   it('appends a brand new rental property when no existing match is found', () => {
@@ -113,7 +113,7 @@ describe('usePortfolioStore reconcileImportedRentals', () => {
     expect(created.monthlyLeviesZAR).toBe(1900);
     expect(created.monthlyRatesTaxesZAR).toBe(1200);
     expect(created.monthlyAgentFeeZAR).toBe(1320);
-    expect(created.tenantName).toBe('Sarah Jenkins');
+    expect(created.leases?.[0]?.tenantName).toBe('Sarah Jenkins');
     expect(created.agencyName).toBe('Trafalgar Property');
     expect(created.status).toBe('Occupied');
   });

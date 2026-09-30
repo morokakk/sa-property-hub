@@ -252,7 +252,7 @@ export default function TenantStatement({
     text += `🏢 *Landlord Entity:* ${investorProfile?.entityName || 'Property Landlord'}\n`;
     text += `🏠 *Property:* ${rental.title}\n`;
     text += `📍 *Unit Address:* ${rental.address}, ${rental.city}\n`;
-    text += `👤 *Tenant:* ${rental.tenantName}\n`;
+    text += `👤 *Tenant:* ${(rental.leases?.[0]?.tenantName || '')}\n`;
     text += `📅 *Billing Period:* ${periodStr}\n\n`;
 
     text += `*FIXED CONTRACTUAL CHARGES:*\n`;
@@ -324,7 +324,7 @@ export default function TenantStatement({
     text += `💰 *TOTAL AMOUNT DUE BY TENANT: ${formatZAR(currentGrandTotal, { includeDecimals: true })}*\n`;
     text += `━━━━━━━━━━━━━━━━━━━━━\n`;
     text += `📌 *Payment Terms:* Due strictly on or before 1st of month.\n`;
-    text += `🏦 *Payment Reference:* ${rental.tenantName.replace(/\s+/g, '-').toUpperCase()} - ${rental.title.substring(0, 15).replace(/\s+/g, '').toUpperCase()}\n\n`;
+    text += `🏦 *Payment Reference:* ${(rental.leases?.[0]?.tenantName || '').replace(/\s+/g, '-').toUpperCase()} - ${rental.title.substring(0, 15).replace(/\s+/g, '').toUpperCase()}\n\n`;
     text += isBundled
       ? `_Utility recoveries are based on the managing agent / body corporate statement. Landlord rates, taxes, and agency fees are excluded from tenant liability._`
       : `_Municipal recoveries are itemized from official council/Eskom invoices. Landlord rates and taxes are excluded from tenant liability._`;
@@ -454,7 +454,7 @@ export default function TenantStatement({
                     Tenant Utility Recovery & Variance
                   </h3>
                   <p className="text-[11px] sm:text-xs text-slate-400 truncate">
-                    {rental.title} • {rental.tenantName}
+                    {rental.title} • {(rental.leases?.[0]?.tenantName || '')}
                   </p>
                 </div>
               </div>
@@ -604,7 +604,7 @@ export default function TenantStatement({
                   </div>
                   <div className="text-slate-600">
                     <span className="text-slate-400">Tenant:</span>{' '}
-                    <strong className="text-slate-900">{rental.tenantName}</strong>
+                    <strong className="text-slate-900">{(rental.leases?.[0]?.tenantName || '')}</strong>
                   </div>
                   <div className="text-[11px] font-semibold text-rose-700">
                     Payment Due Date: 1st of each month
@@ -1147,7 +1147,7 @@ export default function TenantStatement({
                     Payment Reference
                   </span>
                   <span className="font-mono font-bold text-slate-900 text-sm">
-                    {rental.tenantName.replace(/\s+/g, '-').toUpperCase()} - {rental.title.substring(0, 15).replace(/\s+/g, '').toUpperCase()}
+                    {(rental.leases?.[0]?.tenantName || '').replace(/\s+/g, '-').toUpperCase()} - {rental.title.substring(0, 15).replace(/\s+/g, '').toUpperCase()}
                   </span>
                 </div>
                 <div className="text-left sm:text-right">

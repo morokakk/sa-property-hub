@@ -54,7 +54,7 @@ export interface Section13sexCalculation {
 export type CoCStatus = 'Not Applicable' | 'Pending Inspection' | 'Certified / Valid';
 
 export interface CoCItem {
-  type: 'Electrical' | 'Gas' | 'Electric Fence' | 'Plumbing (Cape Town)' | 'Beetle';
+  type: 'Electrical' | 'Gas' | 'Electric Fence' | 'Plumbing (Cape Town)' | 'Beetle' | 'Approved SG Plans';
   status: CoCStatus;
   certificateNumber?: string;
   issueDate?: string;
@@ -65,8 +65,9 @@ export interface ComplianceCertificates {
   electrical: CoCItem;
   gas: CoCItem;
   electricFence: CoCItem;
-  plumbing: CoCItem;
-  beetle: CoCItem;
+  plumbing?: CoCItem;
+  beetle?: CoCItem;
+  approvedPlansSG?: CoCItem;
 }
 
 // Cloud Drive Link Vault (Google Drive, Dropbox, OTP, Rates Bills)
@@ -155,6 +156,8 @@ export interface OpportunityDeal {
   section13sex?: Section13sexCalculation;
   // Cloud Drive Link Vault
   driveVault?: CloudDriveVault;
+  // P4: Ancillary Income Array
+  ancillaryIncomes?: AncillaryIncome[];
   // Calculated outputs
   costs: AcquisitionCostBreakdown;
   grossYield: number; // %
@@ -183,6 +186,16 @@ export interface OpportunityDeal {
   createdAt: string;
 }
 
+// Funding Tranche for Phased Milestone Disbursements
+export interface FundingTranche {
+  id: string;
+  name: string; // e.g., "Tranche 1: Acquisition", "Tranche 2: First Fix"
+  amountZAR: number;
+  disbursedDate?: string;
+  isDisbursed: boolean;
+  linkedMilestonePhase?: 'Deposit' | 'First Fix / Wet Works' | 'Finishes' | 'Retention';
+}
+
 // Funding & Capital Tracker
 export interface FundingSource {
   id: string;
@@ -190,7 +203,7 @@ export interface FundingSource {
   entityOrContact: string;
   emailPhone: string;
   fundingType: FundingType;
-  capitalAmountZAR: number; // Principal
+  capitalAmountZAR: number; // Principal / Total Facility
   disbursementDate: string; // YYYY-MM-DD
   maturityDate: string; // YYYY-MM-DD
   returnTermsType: ReturnTermType;
@@ -201,6 +214,10 @@ export interface FundingSource {
   totalRepaidZAR: number;
   status: 'Active' | 'Accruing' | 'Matured' | 'Settled';
   notes?: string;
+  tranches?: FundingTranche[];
+  delayExtensionDays?: number; // Days extended due to linked deal delays
+  originalMaturityDate?: string;
+  delayNotes?: string;
 }
 
 // Bill of Quantities (BOQ) Item
@@ -217,6 +234,11 @@ export interface BOQItem {
   supplierOrContractor: string;
   status: 'Not Started' | 'Quoted' | 'In Progress' | 'Completed';
   invoiceRef?: string;
+  milestonePhase?: 'Deposit' | 'First Fix / Wet Works' | 'Finishes' | 'Retention';
+  retentionPercent?: number; // e.g. 10% or 20% held until practical completion
+  isSponsoredOrBarter?: boolean;
+  commercialRetailValueZAR?: number; // Market value if purchased at retail
+  actualCashOutflowZAR?: number; // Actual cash paid out after discounts/sponsorships
 }
 
 // Local Supplier & Contractor Directory
@@ -284,6 +306,21 @@ export interface FlipProject {
   exitNotes?: string;
   exitStrategy?: 'Sold' | 'BRRRR';
   convertedToRentalId?: string;
+  // Professional SA Flipping Extensions (Archetype Alignment)
+  taxEntityType?: 'Company (27%)' | 'Individual (45%)' | 'Pre-Tax';
+  municipalClearance?: {
+    sec118ArrearsZAR: number;
+    advanceCouncilDepositZAR: number; // 4-6 months rates in advance
+    rccApplicationDate?: string;
+    rccStatus: 'Pending Application' | 'Figures Issued' | 'Paid & Awaiting Certificate' | 'Disputed' | 'Certificate Issued';
+    disputeNotes?: string;
+  };
+  drawSchedule?: {
+    depositPaid: boolean;
+    firstFixApproved: boolean;
+    finishesApproved: boolean;
+    retentionReleased: boolean;
+  };
 }
 
 // Maintenance Log Item
@@ -296,6 +333,33 @@ export interface MaintenanceLog {
   costZAR: number;
   status: 'Open' | 'In Progress' | 'Resolved';
   invoiceRef?: string;
+}
+
+// Active Lease
+export interface Lease {
+  id: string;
+  unitName: string;
+  tenantName: string;
+  tenantPhone?: string;
+  tenantEmail?: string;
+  leaseStartDate: string;
+  leaseEndDate: string;
+  monthlyRentZAR: number;
+  depositHeldZAR: number;
+  annualEscalationPercent: number;
+  status: 'Occupied' | 'Vacant' | 'Notice Given';
+}
+
+export interface AncillaryIncome {
+  id: string;
+  type: 'cell_tower' | 'billboard' | 'parking' | 'storage' | 'other';
+  tenantName: string;
+  monthlyRentZAR: number;
+  annualEscalationPercent: number;
+  contractStartDate: string;
+  contractEndDate: string;
+  vatApplicable: boolean;
+  notes?: string;
 }
 
 // Active Rental Property
@@ -316,13 +380,7 @@ export interface RentalProperty {
   bondPaymentEffectiveDate?: string; // e.g. '2026-04' (upcoming forward-only month)
   bondRevisionNote?: string; // e.g. 'SARB 25bps repo rate cut'
   // Tenant & Lease details
-  tenantName: string;
-  tenantPhone: string;
-  tenantEmail: string;
-  leaseStartDate: string;
-  leaseEndDate: string;
-  depositHeldZAR: number;
-  annualEscalationPercent: number; // e.g. 7%
+  leases: Lease[];
   // Agency & Property Management
   managementType?: 'Self-Managed' | 'Agency';
   agencyName?: string;
@@ -357,6 +415,16 @@ export interface RentalProperty {
   utilityStatements?: UtilityStatement[];
   // Physical & Municipal Meter Readings
   meterReadings?: MeterReading[];
+  
+  // P1: Rental Tax Reserve
+  taxEntityTypeOverride?: 'Company (27%)' | 'Individual (45%)' | 'Pre-Tax';
+  section13sexAnnualShieldZAR?: number;
+  // P2: Utility Type Attribute
+  utilityType?: 'postpaid' | 'prepaid_submeter' | 'hybrid';
+  prepaidVendorName?: string;
+  monthlyPrepaidVendingFeeZAR?: number;
+  // P4: Ancillary Income Array
+  ancillaryIncomes?: AncillaryIncome[];
 }
 
 // Municipal Meter Dispute Status & Reason Types
@@ -490,12 +558,23 @@ export interface RentalRefinanceParams {
   notes?: string;
 }
 
+export interface EquityExtractionAlert {
+  propertyId: string;
+  propertyTitle: string;
+  currentLTV: number;
+  extractableEquityZAR: number;
+  monthsStabilized: number;
+  isRipe: boolean;
+}
+
 // Global Portfolio Aggregates
 export interface PortfolioSummary {
   totalGrossAssetValue: number;
   totalRentalValue: number;
   totalFlipValue: number;
   liquidCapitalReserve: number;
+  ringFencedWorkingCapital: number; // Retentions + Committed Pending Milestones + Council Deposits
+  freeUnallocatedCash: number; // liquidCapitalReserve - ringFencedWorkingCapital
   unallocatedFundingReserve: number;
   totalAvailablePurchasingPower: number;
   totalFundingLiabilities: number;
@@ -503,13 +582,19 @@ export interface PortfolioSummary {
   totalBondLiabilities: number;
   netEquity: number;
   monthlyNetRentalCashflow: number;
-  totalProjectedFlipProfits: number;
+  totalProjectedFlipProfits: number; // Backward-compatible alias for totalGrossProjectedFlipProfits
+  totalGrossProjectedFlipProfits: number; // Pre-tax pipeline profit
+  totalSarsProvisionalTaxReserve: number; // SARS corporate tax liability (27% Company / 45% Individual)
+  totalNetProjectedFlipProfits: number; // Net realizable equity after tax
   totalRealizedFlipProfits: number;
   activeRentalsCount: number;
   soldRentalsCount: number;
   activeFlipsCount: number;
   completedFlipsCount: number;
   pendingOpportunitiesCount: number;
+  annualRentalTaxReserve: number;
+  monthlyRentalTaxReserve: number;
+  equityAlerts: EquityExtractionAlert[];
 }
 
 // Investor Profile & Platform Settings
@@ -527,6 +612,7 @@ export interface InvestorProfile {
   defaultPrimeRatePercent: number; // e.g. 11.75%
   baselineHurdleYieldPercent: number; // e.g. 10.0%
   defaultAgentCommissionPercent: number; // e.g. 5.0%
+  defaultTaxEntityType?: 'Company (27%)' | 'Individual (45%)' | 'Pre-Tax';
 }
 
 // Long-Term Financial & Wealth Projection Yearly Snapshot
