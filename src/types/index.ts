@@ -212,7 +212,7 @@ export interface FundingSource {
   linkedDealId?: string; // Links to flip or rental
   linkedDealName?: string;
   totalRepaidZAR: number;
-  status: 'Active' | 'Accruing' | 'Matured' | 'Settled';
+  status: 'Active' | 'Accruing' | 'Standby' | 'Matured' | 'Settled';
   notes?: string;
   tranches?: FundingTranche[];
   delayExtensionDays?: number; // Days extended due to linked deal delays
@@ -576,6 +576,7 @@ export interface PortfolioSummary {
   ringFencedWorkingCapital: number; // Retentions + Committed Pending Milestones + Council Deposits
   freeUnallocatedCash: number; // liquidCapitalReserve - ringFencedWorkingCapital
   unallocatedFundingReserve: number;
+  deployableWarChest: number; // liquidCapitalReserve + unallocatedFundingReserve (Gross cash + pre-approved credit lines)
   totalAvailablePurchasingPower: number;
   totalFundingLiabilities: number;
   totalPrivateFundingLiability: number;

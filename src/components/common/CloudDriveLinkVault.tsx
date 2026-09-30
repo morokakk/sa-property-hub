@@ -112,12 +112,14 @@ interface CloudDriveLinkVaultProps {
   vault?: CloudDriveVault;
   onUpdate?: (updated: CloudDriveVault) => void;
   readOnly?: boolean;
+  compact?: boolean;
 }
 
 export default function CloudDriveLinkVault({
   vault = {},
   onUpdate,
   readOnly = false,
+  compact = false,
 }: CloudDriveLinkVaultProps) {
   const [links, setLinks] = useState<CloudDriveVault>(vault);
   const [editingKey, setEditingKey] = useState<keyof CloudDriveVault | null>(null);
@@ -187,22 +189,30 @@ export default function CloudDriveLinkVault({
   const activeProvider = urlInput ? detectCloudProvider(urlInput) : null;
 
   return (
-    <div className="bg-slate-50/90 rounded-xl border border-slate-200/80 p-4 sm:p-5 space-y-3">
-      <div className="flex items-center justify-between pb-2.5 border-b border-slate-200/60 flex-wrap gap-2">
-        <div className="flex items-center gap-2 text-xs sm:text-sm font-bold text-slate-900">
+    <div className={`bg-slate-50/90 rounded-xl border border-slate-200/80 ${compact ? 'p-3 sm:p-3.5 space-y-2.5' : 'p-4 sm:p-5 space-y-3'}`}>
+      <div className="flex items-center justify-between pb-2 border-b border-slate-200/60 flex-wrap gap-1.5">
+        <div className="flex items-center gap-1.5 text-xs sm:text-sm font-bold text-slate-900 min-w-0">
           <Cloud className="w-4 h-4 text-indigo-600 shrink-0" />
-          <span>Cloud & Web Document Vault</span>
+          <span className="truncate">{compact ? 'Cloud Document Vault' : 'Cloud & Web Document Vault'}</span>
         </div>
-        <div className="flex items-center gap-1.5 text-[10px] sm:text-[11px] text-slate-500">
-          <span className="font-semibold text-slate-600">Zero-Storage URL Links</span>
-          <span>•</span>
-          <span className="bg-white px-2 py-0.5 rounded border border-slate-200 text-slate-600 font-medium">
-            OneDrive • GDrive • Dropbox • Web
-          </span>
+        <div className="flex items-center gap-1.5 shrink-0">
+          {compact ? (
+            <span className="text-[9px] sm:text-[10px] bg-slate-200 text-slate-700 px-1.5 py-0.5 rounded font-semibold">
+              Zero-Storage Vault
+            </span>
+          ) : (
+            <div className="flex items-center gap-1.5 text-[10px] sm:text-[11px] text-slate-500">
+              <span className="font-semibold text-slate-600">Zero-Storage URL Links</span>
+              <span>•</span>
+              <span className="bg-white px-2 py-0.5 rounded border border-slate-200 text-slate-600 font-medium">
+                OneDrive • GDrive • Dropbox • Web
+              </span>
+            </div>
+          )}
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className={compact ? 'grid grid-cols-2 gap-2.5' : 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3'}>
         {slots.map(({ key, label, sub, icon: Icon }) => {
           const hasUrl = Boolean(links[key]);
           const currentUrl = links[key];
@@ -212,68 +222,68 @@ export default function CloudDriveLinkVault({
           return (
             <div
               key={key}
-              className={`p-3.5 rounded-xl border text-xs flex flex-col justify-between transition-all min-h-[110px] ${
+              className={`p-2.5 sm:p-3 rounded-xl border text-xs flex flex-col justify-between transition-all min-h-[110px] ${
                 hasUrl
                   ? 'bg-white border-slate-300/80 shadow-2xs'
                   : 'bg-slate-100/60 border-slate-200'
               }`}
             >
               <div>
-                <div className="flex items-center justify-between gap-2 mb-1">
-                  <div className="flex items-center gap-1.5 min-w-0">
-                    <Icon className={`w-4 h-4 shrink-0 ${hasUrl ? 'text-indigo-600' : 'text-slate-400'}`} />
-                    <span className="font-bold text-xs text-slate-900 truncate" title={label}>
+                <div className="flex items-start justify-between gap-1.5 mb-1 min-w-0">
+                  <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                    <Icon className={`w-3.5 h-3.5 shrink-0 ${hasUrl ? 'text-indigo-600' : 'text-slate-400'}`} />
+                    <span className="font-bold text-xs text-slate-900 line-clamp-2 leading-snug" title={label}>
                       {label}
                     </span>
                   </div>
                   {provider && (
                     <span
-                      className={`shrink-0 inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded border ${provider.badgeBg} ${provider.badgeText} ${provider.badgeBorder}`}
+                      className={`shrink-0 inline-flex items-center justify-center text-[10px] px-1 py-0.5 rounded border ${provider.badgeBg} ${provider.badgeText} ${provider.badgeBorder}`}
                       title={`Stored on ${provider.name}`}
                     >
                       <span>{provider.iconText}</span>
-                      <span>{provider.name}</span>
+                      {!compact && <span className="ml-1 truncate max-w-[48px]">{provider.name}</span>}
                     </span>
                   )}
                 </div>
-                <p className="text-[10px] text-slate-500 leading-tight line-clamp-1 mb-2.5" title={sub}>{sub}</p>
+                <p className="text-[10px] text-slate-500 leading-tight line-clamp-1 mb-2" title={sub}>{sub}</p>
               </div>
 
               {isEditing ? (
                 <div className="space-y-1.5 pt-1 border-t border-indigo-100">
-                  <div className="flex items-center justify-between gap-1 text-[9px]">
-                    <span className="text-slate-400 font-medium">Preset Template:</span>
+                  <div className="flex items-center justify-between gap-1 text-[9px] flex-wrap">
+                    <span className="text-slate-400 font-medium">Presets:</span>
                     <div className="flex items-center gap-1">
                       <button
                         type="button"
                         onClick={() => setUrlInput('https://1drv.ms/f/s!')}
-                        className="px-1 py-0.5 rounded bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold border border-blue-200 cursor-pointer"
+                        className="px-1 py-0.5 rounded bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold border border-blue-200 cursor-pointer text-[9px]"
                         title="Paste OneDrive share link"
                       >
-                        OneDrive
+                        1Drv
                       </button>
                       <button
                         type="button"
-                        onClick={() => setUrlInput('https://drive.google.com/drive/folders/')}
-                        className="px-1 py-0.5 rounded bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-bold border border-emerald-200 cursor-pointer"
+                        onClick={() => setUrlInput('https://drive.google.com/')}
+                        className="px-1 py-0.5 rounded bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-bold border border-emerald-200 cursor-pointer text-[9px]"
                         title="Paste Google Drive share link"
                       >
                         GDrive
                       </button>
                       <button
                         type="button"
-                        onClick={() => setUrlInput('https://www.dropbox.com/scl/fo/')}
-                        className="px-1 py-0.5 rounded bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold border border-indigo-200 cursor-pointer"
+                        onClick={() => setUrlInput('https://www.dropbox.com/')}
+                        className="px-1 py-0.5 rounded bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold border border-indigo-200 cursor-pointer text-[9px]"
                         title="Paste Dropbox share link"
                       >
-                        Dropbox
+                        Dropbx
                       </button>
                     </div>
                   </div>
 
                   <input
                     type="url"
-                    placeholder="https://1drv.ms/... or https://drive.google.com/..."
+                    placeholder="https://..."
                     value={urlInput}
                     onChange={(e) => setUrlInput(e.target.value)}
                     onKeyDown={(e) => {
@@ -289,51 +299,50 @@ export default function CloudDriveLinkVault({
                   />
 
                   {activeProvider && (
-                    <div className="flex items-center justify-between text-[9px] text-slate-500">
-                      <span>Detected: <strong>{activeProvider.name}</strong></span>
-                      <span className="text-slate-400">Enter to save</span>
+                    <div className="text-[9px] text-slate-500 truncate">
+                      Detected: <strong>{activeProvider.name}</strong>
                     </div>
                   )}
 
-                  <div className="flex items-center justify-end gap-1">
+                  <div className="flex items-center gap-1.5 pt-0.5">
                     <button
                       type="button"
                       onClick={() => setEditingKey(null)}
-                      className="text-[10px] text-slate-500 px-1.5 py-0.5 rounded hover:bg-slate-200 cursor-pointer"
+                      className="flex-1 text-[10px] text-slate-600 py-1 rounded bg-slate-100 hover:bg-slate-200 font-medium cursor-pointer text-center"
                     >
                       Cancel
                     </button>
                     <button
                       type="button"
                       onClick={() => handleSaveUrl(key)}
-                      className="text-[10px] bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-2 py-0.5 rounded cursor-pointer"
+                      className="flex-1 text-[10px] bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-1 rounded cursor-pointer text-center"
                     >
-                      Save Link
+                      Save
                     </button>
                   </div>
                 </div>
               ) : hasUrl ? (
-                <div className="flex items-center justify-between gap-1 mt-1 pt-1.5 border-t border-slate-100">
+                <div className="flex items-center justify-between gap-1 mt-auto pt-1.5 border-t border-slate-100 min-w-0">
                   <a
                     href={currentUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1.5 text-xs font-bold text-indigo-600 hover:text-indigo-800 hover:underline truncate"
+                    className="inline-flex items-center gap-1 text-[11px] font-bold text-indigo-600 hover:text-indigo-800 hover:underline truncate min-w-0"
                     title={`Open ${label} (${provider?.name || 'Link'})`}
                   >
-                    <span>Open Link</span>
-                    <ExternalLink className="w-3.5 h-3.5 shrink-0" />
+                    <span className="truncate">Open Link</span>
+                    <ExternalLink className="w-3 h-3 shrink-0" />
                   </a>
 
                   {!readOnly && (
-                    <div className="flex items-center gap-1">
+                    <div className="flex items-center gap-0.5 shrink-0">
                       <button
                         type="button"
                         onClick={() => {
                           setEditingKey(key);
                           setUrlInput(currentUrl || '');
                         }}
-                        className="text-slate-400 hover:text-indigo-600 p-0.5 rounded hover:bg-slate-100 transition-colors cursor-pointer"
+                        className="text-slate-400 hover:text-indigo-600 p-1 rounded hover:bg-slate-100 transition-colors cursor-pointer"
                         title="Edit URL"
                       >
                         <Edit2 className="w-3 h-3" />
@@ -345,7 +354,7 @@ export default function CloudDriveLinkVault({
                             handleRemoveUrl(key);
                           }
                         }}
-                        className="text-slate-400 hover:text-rose-600 p-0.5 rounded hover:bg-rose-50 transition-colors cursor-pointer"
+                        className="text-slate-400 hover:text-rose-600 p-1 rounded hover:bg-rose-50 transition-colors cursor-pointer"
                         title="Clear / Remove Link"
                       >
                         <Trash2 className="w-3 h-3" />
@@ -361,7 +370,7 @@ export default function CloudDriveLinkVault({
                       setEditingKey(key);
                       setUrlInput('');
                     }}
-                    className="inline-flex items-center justify-center gap-1 text-[10px] font-semibold text-slate-600 hover:text-slate-900 border border-slate-200 rounded py-1 bg-white hover:bg-slate-50 transition-colors cursor-pointer"
+                    className="mt-auto inline-flex items-center justify-center gap-1 text-[10px] font-semibold text-slate-600 hover:text-slate-900 border border-slate-200 rounded py-1 bg-white hover:bg-slate-50 transition-colors cursor-pointer"
                   >
                     <Plus className="w-3 h-3" />
                     <span>Attach Link</span>

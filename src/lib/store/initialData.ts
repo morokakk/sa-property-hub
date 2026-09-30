@@ -1420,8 +1420,8 @@ export const INITIAL_FUNDING: FundingSource[] = [
     linkedDealId: undefined,
     linkedDealName: 'Liquid Operational Reserve',
     totalRepaidZAR: 0,
-    status: 'Active',
-    notes: 'Working capital cushion for rapid auction deposits and materials cash discounts.',
+    status: 'Standby',
+    notes: 'Pre-approved standby credit line. Unallocated facility ready to deploy for upcoming acquisitions and auction deposits.',
   },
 ];
 

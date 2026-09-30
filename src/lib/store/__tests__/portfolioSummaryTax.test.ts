@@ -303,4 +303,214 @@ describe('Portfolio Summary: Ring-Fenced Working Capital & SARS Provisional Tax 
     // Clean up
     usePortfolioStore.getState().deleteFunding('test-fund-sync');
   });
+
+  it('calculates private funding liability strictly from drawn capital, excluding undrawn tranches and standby lines', () => {
+    const fundingSources: FundingSource[] = [
+      {
+        id: 'fund-tranches',
+        lenderName: 'Tranche Lender',
+        entityOrContact: 'Lender Trust',
+        emailPhone: 'lender@test.co.za',
+        fundingType: 'Private Lender',
+        capitalAmountZAR: 1_500_000,
+        disbursementDate: '2026-03-01',
+        maturityDate: '2026-11-30',
+        returnTermsType: 'Fixed Interest',
+        returnRatePercent: 14.0,
+        paymentSchedule: 'Monthly Interest',
+        linkedDealId: 'deal-1',
+        totalRepaidZAR: 105_000,
+        status: 'Active',
+        tranches: [
+          { id: 't-1', name: 'Tranche 1', amountZAR: 900_000, isDisbursed: true },
+          { id: 't-2', name: 'Tranche 2', amountZAR: 400_000, isDisbursed: true },
+          { id: 't-3', name: 'Tranche 3', amountZAR: 200_000, isDisbursed: false }, // Undrawn: R 200k
+        ],
+      },
+      {
+        id: 'fund-active-no-tranches',
+        lenderName: 'Syndicate',
+        entityOrContact: 'Syndicate MD',
+        emailPhone: 'syndicate@test.co.za',
+        fundingType: 'Proposal-backed',
+        capitalAmountZAR: 800_000,
+        disbursementDate: '2026-05-15',
+        maturityDate: '2027-03-01',
+        returnTermsType: 'Equity Profit Split',
+        returnRatePercent: 25.0,
+        paymentSchedule: 'At Exit (Maturity)',
+        linkedDealId: 'deal-2',
+        totalRepaidZAR: 0,
+        status: 'Active',
+      },
+      {
+        id: 'fund-standby',
+        lenderName: 'Oom Piet (Standby)',
+        entityOrContact: 'Personal',
+        emailPhone: 'piet@test.co.za',
+        fundingType: 'Ad-hoc Friends & Family',
+        capitalAmountZAR: 450_000,
+        disbursementDate: '2026-04-01',
+        maturityDate: '2027-04-01',
+        returnTermsType: 'Fixed Interest',
+        returnRatePercent: 11.5,
+        paymentSchedule: 'At Exit (Maturity)',
+        linkedDealId: undefined,
+        linkedDealName: 'Liquid Operational Reserve',
+        totalRepaidZAR: 0,
+        status: 'Standby',
+      },
+    ];
+
+    const summary = computePortfolioSummary({
+      rentals: [],
+      flips: [],
+      funding: fundingSources,
+      liquidCapitalReserve: 650_000,
+    });
+
+    // fund-tranches: drawn = 1.3M, repaid = 105k -> liability = 1,195,000 (excludes 200k undrawn)
+    // fund-active-no-tranches: drawn = 800k, repaid = 0 -> liability = 800,000
+    // fund-standby: drawn = 0 -> liability = 0 (excludes 450k standby)
+    // Total private funding liability = 1,195,000 + 800,000 = 1,995,000
+    expect(summary.totalPrivateFundingLiability).toBe(1_995_000);
+
+    // Unallocated reserve: fund-standby has status 'Standby' and no linkedDealId -> 450,000
+    expect(summary.unallocatedFundingReserve).toBe(450_000);
+
+    // Free unallocated cash = liquidCapitalReserve (650k) - ringFenced (0) = 650,000
+    expect(summary.freeUnallocatedCash).toBe(650_000);
+
+    // Deployable War Chest = 650,000 + 450,000 = 1,100,000
+    expect(summary.deployableWarChest).toBe(1_100_000);
+
+    // Total deployable purchasing power = 650,000 (free cash) + 450,000 (standby facility) = 1,100,000
+    expect(summary.totalAvailablePurchasingPower).toBe(1_100_000);
+  });
+
+  it('correctly calculates initial portfolio summary from store with updated accounting', () => {
+    const summary = computePortfolioSummary(usePortfolioStore.getState());
+
+    // Private debt should be strictly drawn: R 1,995,000
+    expect(summary.totalPrivateFundingLiability).toBe(1_995_000);
+
+    // Unallocated funding reserve should include Oom Piet's standby facility: R 450,000
+    expect(summary.unallocatedFundingReserve).toBe(450_000);
+
+    // Liquid cash reserve is R 650,000
+    expect(summary.liquidCapitalReserve).toBe(650_000);
+
+    // Deployable War Chest (Cash + Pre-Approved Standby Facility) = R 650,000 + R 450,000 = R 1,100,000
+    expect(summary.deployableWarChest).toBe(1_100_000);
+
+    // In initial store, active flips ring-fence working capital (R 757,150 >= R 650,000), clamping free cash to 0
+    expect(summary.freeUnallocatedCash).toBe(0);
+    // Net purchasing power after ring-fencing = R 0 + R 450,000 = R 450,000
+    expect(summary.totalAvailablePurchasingPower).toBe(450_000);
+
+    // Total bond liabilities across 4 active rentals = 1.28M + 940k + 1.55M + 520k = R 4,290,000
+    expect(summary.totalBondLiabilities).toBe(4_290_000);
+
+    // Total funding liabilities = R 1,995,000 (private) + R 4,290,000 (bonds) = R 6,285,000
+    expect(summary.totalFundingLiabilities).toBe(6_285_000);
+  });
+
+  it('ensures settled funding facilities with tranches carry 0 liability', () => {
+    const settledFacility: FundingSource = {
+      id: 'fund-settled',
+      lenderName: 'Settled Funder',
+      entityOrContact: 'Settled Trust',
+      emailPhone: 'settled@test.co.za',
+      fundingType: 'Private Lender',
+      capitalAmountZAR: 1_000_000,
+      disbursementDate: '2025-01-01',
+      maturityDate: '2026-01-01',
+      returnTermsType: 'Fixed Interest',
+      returnRatePercent: 12.0,
+      paymentSchedule: 'At Exit (Maturity)',
+      totalRepaidZAR: 500_000,
+      status: 'Settled',
+      tranches: [
+        { id: 'st-1', name: 'Tranche 1', amountZAR: 1_000_000, isDisbursed: true },
+      ],
+    };
+
+    const summary = computePortfolioSummary({
+      rentals: [],
+      flips: [],
+      funding: [settledFacility],
+      liquidCapitalReserve: 500_000,
+    });
+
+    expect(summary.totalPrivateFundingLiability).toBe(0);
+  });
+
+  it('validates Unified Net & Gross War Chest bridge metrics across dashboard and funding ledger', () => {
+    const state = usePortfolioStore.getState();
+    const summary = computePortfolioSummary(state);
+
+    // Initial state invariants matching user requirements:
+    // 1. Gross War Chest = liquid reserve (650k) + unallocated standby facilities (450k) = 1,100,000
+    expect(summary.deployableWarChest).toBe(1_100_000);
+    expect(summary.liquidCapitalReserve).toBe(650_000);
+    expect(summary.unallocatedFundingReserve).toBe(450_000);
+
+    // 2. Active flips ring-fenced working capital is R 757,150 (contractor draws, retentions, council deposits)
+    expect(summary.ringFencedWorkingCapital).toBe(757_150);
+
+    // 3. Free Unallocated Cash is clamped to R 0 because 650k < 757,150
+    expect(summary.freeUnallocatedCash).toBe(0);
+
+    // 4. Net Purchasing Power is strictly free cash (0) + unallocated facilities (450k) = 450,000
+    expect(summary.totalAvailablePurchasingPower).toBe(450_000);
+
+    // 5. Deduction bridge equation holds:
+    // Gross War Chest (1,100,000) - Ring-Fenced (757,150 clamped against cash) yields Net Deployable Purchasing Power (450,000)
+    const effectivePurchasingPower = Math.max(0, summary.liquidCapitalReserve - summary.ringFencedWorkingCapital) + summary.unallocatedFundingReserve;
+    expect(summary.totalAvailablePurchasingPower).toBe(effectivePurchasingPower);
+  });
+
+  it('dynamically adapts Unified Net & Gross bridge when seed reserve increases or decreases', () => {
+    const baseState = usePortfolioStore.getState();
+
+    // Case A: Increased liquid reserve to R 1,000,000 (exceeding R 757,150 ring-fenced capital)
+    const surplusSummary = computePortfolioSummary({
+      ...baseState,
+      liquidCapitalReserve: 1_000_000,
+    });
+    // Gross War Chest: 1M cash + 450k standby = 1,450,000
+    expect(surplusSummary.deployableWarChest).toBe(1_450_000);
+    // Free cash: 1,000,000 - 757,150 = 242,850
+    expect(surplusSummary.freeUnallocatedCash).toBe(242_850);
+    // Net purchasing power: 242,850 + 450,000 = 692,850
+    expect(surplusSummary.totalAvailablePurchasingPower).toBe(692_850);
+    // Exact gross-to-net bridge equation holds: 1,450,000 - 757,150 = 692,850
+    expect(surplusSummary.deployableWarChest - surplusSummary.ringFencedWorkingCapital).toBe(surplusSummary.totalAvailablePurchasingPower);
+
+    // Case B: Zero cash reserve (all liquidity relies on pre-approved facilities)
+    const zeroCashSummary = computePortfolioSummary({
+      ...baseState,
+      liquidCapitalReserve: 0,
+    });
+    expect(zeroCashSummary.deployableWarChest).toBe(450_000);
+    expect(zeroCashSummary.freeUnallocatedCash).toBe(0);
+    expect(zeroCashSummary.totalAvailablePurchasingPower).toBe(450_000);
+
+    // Case C: Activating Oom Piet's standby facility transitions it from Standby to Active
+    const activatedFunding = baseState.funding.map((f) =>
+      f.id === 'fund-3' ? { ...f, status: 'Active' as const } : f
+    );
+    const activatedSummary = computePortfolioSummary({
+      ...baseState,
+      funding: activatedFunding,
+    });
+    // Standby is now drawn active debt, so unallocated standby lines drop to 0
+    expect(activatedSummary.unallocatedFundingReserve).toBe(0);
+    // Deployable War Chest is now just cash reserve (650k)
+    expect(activatedSummary.deployableWarChest).toBe(650_000);
+    // Net purchasing power without standby facility drops to 0 (free cash 0 + 0 standby)
+    expect(activatedSummary.totalAvailablePurchasingPower).toBe(0);
+    // Total private funding liability increases by 450,000 (from 1,995,000 to 2,445,000)
+    expect(activatedSummary.totalPrivateFundingLiability).toBe(2_445_000);
+  });
 });

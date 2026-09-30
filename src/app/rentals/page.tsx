@@ -1303,7 +1303,9 @@ export default function RentalPortfolioPage() {
                           <div className="p-3 bg-white">
                             <ComplianceChecklist
                               certificates={property.cocChecklist}
+                              city={property.city}
                               onUpdate={(updated) => updateRental(property.id, { cocChecklist: updated })}
+                              compact
                             />
                           </div>
                         )}
@@ -1313,6 +1315,7 @@ export default function RentalPortfolioPage() {
                             <CloudDriveLinkVault
                               vault={property.driveVault}
                               onUpdate={(updated) => updateRental(property.id, { driveVault: updated })}
+                              compact
                             />
                           </div>
                         )}

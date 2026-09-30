@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   X,
   Printer,
@@ -17,6 +17,11 @@ import {
   ShieldCheck,
   Building,
   AlertTriangle,
+  Radio,
+  Tv,
+  Layers,
+  Receipt,
+  Landmark,
 } from 'lucide-react';
 import { usePortfolioStore } from '@/lib/store/usePortfolioStore';
 import { formatZAR, formatDate } from '@/lib/formatters';
@@ -54,6 +59,20 @@ export default function TenantStatement({
     isError?: boolean;
   } | null>(null);
   const [copiedToast, setCopiedToast] = useState(false);
+
+  // Multi-Target statement selection ('lease-{id}' | 'ancillary-{id}' | 'consolidated')
+  const [selectedTargetId, setSelectedTargetId] = useState<string>('');
+
+  useEffect(() => {
+    if (!rental) return;
+    if (rental.leases && rental.leases.length > 0) {
+      setSelectedTargetId(`lease-${rental.leases[0].id}`);
+    } else if (rental.ancillaryIncomes && rental.ancillaryIncomes.length > 0) {
+      setSelectedTargetId(`ancillary-${rental.ancillaryIncomes[0].id}`);
+    } else {
+      setSelectedTargetId('consolidated');
+    }
+  }, [rental?.id]);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -158,28 +177,89 @@ export default function TenantStatement({
     Boolean(rental.agencyName?.toLowerCase().includes('igrow')) ||
     Boolean(currentStatement?.provider?.toLowerCase().includes('igrow'));
 
-  // Base rent & recoveries
-  const baseRent = currentStatement?.tenantRentBilledZAR || rental.monthlyGrossRentZAR || 0;
+  // Target entity detection
+  const selectedLease = (rental.leases || []).find((l) => `lease-${l.id}` === selectedTargetId) || rental.leases?.[0];
+  const selectedAncillary = (rental.ancillaryIncomes || []).find((a) => `ancillary-${a.id}` === selectedTargetId);
+  const isConsolidated = selectedTargetId === 'consolidated';
+  const isCommercial = Boolean(selectedAncillary);
+  const isResidential = !isCommercial && !isConsolidated;
 
-  const currentTenantUtilities = currentStatement
-    ? isBundled
-      ? (currentStatement.bundledUtilitiesZAR ?? 0)
-      : effectiveElecZAR +
-        effectiveWaterZAR +
-        currentStatement.refuseZAR +
-        currentStatement.sewerageZAR
+  // Active occupied residential units count for splitting
+  const occupiedLeases = (rental.leases || []).filter((l) => l.status === 'Occupied');
+  const occupiedCount = Math.max(1, occupiedLeases.length);
+
+  // Submeter / Hybrid detection
+  // If property is prepaid_submeter: all residential units vend their own tokens via private submeter
+  // If property is hybrid: non-main units (cottages/rooms) are prepaid submetered
+  const isSubmeteredUnit =
+    rental.utilityType === 'prepaid_submeter' ||
+    (rental.utilityType === 'hybrid' &&
+      !selectedLease?.unitName?.toLowerCase().includes('main') &&
+      occupiedLeases.length > 1);
+
+  // Split calculations
+  // In hybrid mode: the main unit bears the post-paid municipal electric/water charges
+  // In regular postpaid mode: equal split among occupied units
+  const splitRatio = rental.utilityType === 'hybrid'
+    ? (isSubmeteredUnit ? 0 : 1)
+    : (1 / occupiedCount);
+
+  // Unit-allocated municipal utilities
+  const unitElecZAR = isSubmeteredUnit ? 0 : Math.round(effectiveElecZAR * splitRatio);
+  const unitWaterZAR = isSubmeteredUnit ? 0 : Math.round(effectiveWaterZAR * splitRatio);
+  const unitRefuseZAR = isSubmeteredUnit ? 0 : Math.round((currentStatement?.refuseZAR || 0) * splitRatio);
+  const unitSewerageZAR = isSubmeteredUnit ? 0 : Math.round((currentStatement?.sewerageZAR || 0) * splitRatio);
+
+  // Base rent calculation based on selected target
+  const baseRent = isCommercial
+    ? (selectedAncillary?.monthlyRentZAR || 0)
+    : isConsolidated
+    ? ((rental.leases || []).filter(l => l.status === 'Occupied').reduce((s, l) => s + l.monthlyRentZAR, 0) +
+       (rental.ancillaryIncomes || []).reduce((s, a) => s + a.monthlyRentZAR, 0))
+    : (selectedLease?.monthlyRentZAR || currentStatement?.tenantRentBilledZAR || rental.monthlyGrossRentZAR || 0);
+
+  // Commercial VAT calculation (15% SA VAT)
+  const commercialVatRate = 0.15;
+  const commercialVatAmount = (isCommercial && selectedAncillary?.vatApplicable)
+    ? Math.round(baseRent * commercialVatRate)
     : 0;
 
+  // Total utilities billed for the selected target
+  const currentTenantUtilities = isCommercial
+    ? 0
+    : isConsolidated
+    ? (currentStatement
+        ? (isBundled
+            ? (currentStatement.bundledUtilitiesZAR ?? 0)
+            : effectiveElecZAR + effectiveWaterZAR + currentStatement.refuseZAR + currentStatement.sewerageZAR)
+        : 0)
+    : (currentStatement
+        ? (isBundled
+            ? Math.round((currentStatement.bundledUtilitiesZAR ?? 0) * splitRatio)
+            : unitElecZAR + unitWaterZAR + unitRefuseZAR + unitSewerageZAR)
+        : 0);
+
+  // Previous statement utilities for variance comparison
   const previousTenantUtilities = previousStatement
-    ? (previousStatement.billingType === 'bundled' || previousStatement.bundledUtilitiesZAR !== undefined || isBundled)
-      ? (previousStatement.bundledUtilitiesZAR ?? 0)
-      : previousStatement.electricityZAR +
-        previousStatement.waterZAR +
-        previousStatement.refuseZAR +
-        previousStatement.sewerageZAR
+    ? (isCommercial
+        ? 0
+        : isConsolidated
+        ? ((previousStatement.billingType === 'bundled' || previousStatement.bundledUtilitiesZAR !== undefined || isBundled)
+            ? (previousStatement.bundledUtilitiesZAR ?? 0)
+            : previousStatement.electricityZAR + previousStatement.waterZAR + previousStatement.refuseZAR + previousStatement.sewerageZAR)
+        : isSubmeteredUnit
+        ? 0
+        : Math.round(
+            ((previousStatement.billingType === 'bundled' || previousStatement.bundledUtilitiesZAR !== undefined || isBundled)
+              ? (previousStatement.bundledUtilitiesZAR ?? 0)
+              : previousStatement.electricityZAR + previousStatement.waterZAR + previousStatement.refuseZAR + previousStatement.sewerageZAR) * splitRatio
+          ))
     : undefined;
 
-  const currentGrandTotal = baseRent + currentTenantUtilities;
+  const currentGrandTotal = isCommercial
+    ? baseRent + commercialVatAmount
+    : baseRent + currentTenantUtilities;
+
   const previousGrandTotal =
     previousTenantUtilities !== undefined
       ? baseRent + previousTenantUtilities
@@ -247,72 +327,130 @@ export default function TenantStatement({
       currentStatement?.billingPeriod ||
       (currentStatement?.statementDate ? formatDate(currentStatement.statementDate) : 'Current Month');
 
+    // 1. COMMERCIAL ANCILLARY CONTRACT INVOICE
+    if (isCommercial && selectedAncillary) {
+      let text = `🧾 *COMMERCIAL TAX INVOICE & RENT REMITTANCE*\n`;
+      text += `━━━━━━━━━━━━━━━━━━━━━\n`;
+      text += `🏢 *Entity:* ${investorProfile?.entityName || 'Commercial Property Lessor'}\n`;
+      text += `📋 *Company Reg / ID:* ${investorProfile?.registrationOrId || 'On Record'}\n`;
+      text += `🏛️ *Property:* ${rental.title}\n`;
+      text += `📍 *Site Address:* ${rental.address}, ${rental.city}\n`;
+      text += `🏢 *Commercial Tenant:* ${selectedAncillary.tenantName}\n`;
+      text += `📑 *Lease Type:* ${selectedAncillary.type.replace('_', ' ').toUpperCase()} LEASE\n`;
+      text += `📅 *Billing Period:* ${periodStr}\n`;
+      text += `⏳ *Contract Expiry:* ${selectedAncillary.contractEndDate} (${selectedAncillary.annualEscalationPercent}% p.a. escalation)\n\n`;
+
+      text += `*INVOICE BREAKDOWN:*\n`;
+      text += `• Net Monthly Site Lease: ${formatZAR(baseRent, { includeDecimals: true })}\n`;
+      if (selectedAncillary.vatApplicable) {
+        text += `• South African VAT (15%): ${formatZAR(commercialVatAmount, { includeDecimals: true })}\n`;
+      }
+      text += `\n━━━━━━━━━━━━━━━━━━━━━\n`;
+      text += `💰 *TOTAL AMOUNT DUE: ${formatZAR(currentGrandTotal, { includeDecimals: true })}*\n`;
+      text += `━━━━━━━━━━━━━━━━━━━━━\n`;
+      text += `📌 *Payment Terms:* Due on 1st of month per commercial contract.\n`;
+      text += `🏦 *Payment Reference:* INV-${selectedAncillary.tenantName.substring(0, 10).replace(/\s+/g, '').toUpperCase()}-${rental.title.substring(0, 10).replace(/\s+/g, '').toUpperCase()}\n\n`;
+      text += `_Commercial Tax Invoice issued in terms of the South African Value-Added Tax Act. Domestic municipal utilities not applicable._`;
+
+      try {
+        if (navigator?.clipboard?.writeText) await navigator.clipboard.writeText(text);
+      } catch {}
+      setCopiedToast(true);
+      setTimeout(() => setCopiedToast(false), 3000);
+      return;
+    }
+
+    // 2. CONSOLIDATED MASTER OVERVIEW FOR LANDLORD
+    if (isConsolidated) {
+      let text = `📊 *CONSOLIDATED PROPERTY REVENUE & AUDIT STATEMENT*\n`;
+      text += `━━━━━━━━━━━━━━━━━━━━━\n`;
+      text += `🏢 *Landlord Entity:* ${investorProfile?.entityName || 'Property Landlord'}\n`;
+      text += `🏠 *Property:* ${rental.title}\n`;
+      text += `📍 *Address:* ${rental.address}, ${rental.city}\n`;
+      text += `📅 *Billing Period:* ${periodStr}\n\n`;
+
+      text += `*RESIDENTIAL UNITS (${rental.leases?.length || 0} Units):*\n`;
+      (rental.leases || []).forEach((l) => {
+        text += `• ${l.unitName}: ${l.tenantName || '(Vacant)'} — ${formatZAR(l.monthlyRentZAR)}/m [${l.status}]\n`;
+      });
+
+      if ((rental.ancillaryIncomes?.length || 0) > 0) {
+        text += `\n*COMMERCIAL ANCILLARY COVENANTS:*\n`;
+        rental.ancillaryIncomes?.forEach((a) => {
+          text += `• ${a.tenantName} (${a.type.replace('_', ' ')}): ${formatZAR(a.monthlyRentZAR)}/m ${a.vatApplicable ? '+15% VAT' : ''}\n`;
+        });
+      }
+
+      text += `\n*MUNICIPAL RECONCILIATION:*\n`;
+      text += `• Total Council Charges: ${formatZAR(currentStatement?.totalDueZAR || 0, { includeDecimals: true })}\n`;
+      text += `• Landlord Rates & Taxes: ${formatZAR(currentStatement?.propertyRatesZAR || 0, { includeDecimals: true })}\n`;
+      text += `• Total Tenant Recoveries Billed: ${formatZAR(currentTenantUtilities, { includeDecimals: true })}\n\n`;
+
+      text += `━━━━━━━━━━━━━━━━━━━━━\n`;
+      text += `💰 *TOTAL MONTHLY PORTFOLIO COLLECTION: ${formatZAR(currentGrandTotal, { includeDecimals: true })}*\n`;
+      text += `━━━━━━━━━━━━━━━━━━━━━\n`;
+      text += `🏦 *Master Audit Ref:* MASTER-${rental.title.substring(0, 15).replace(/\s+/g, '').toUpperCase()}\n`;
+
+      try {
+        if (navigator?.clipboard?.writeText) await navigator.clipboard.writeText(text);
+      } catch {}
+      setCopiedToast(true);
+      setTimeout(() => setCopiedToast(false), 3000);
+      return;
+    }
+
+    // 3. INDIVIDUAL RESIDENTIAL TENANT STATEMENT
+    const tenantName = selectedLease?.tenantName || 'Tenant';
+    const unitName = selectedLease?.unitName || 'Main Unit';
+
     let text = `🧾 *TENANT UTILITY RECOVERY & RENT STATEMENT*\n`;
     text += `━━━━━━━━━━━━━━━━━━━━━\n`;
     text += `🏢 *Landlord Entity:* ${investorProfile?.entityName || 'Property Landlord'}\n`;
-    text += `🏠 *Property:* ${rental.title}\n`;
+    text += `🏠 *Property:* ${rental.title} — *${unitName}*\n`;
     text += `📍 *Unit Address:* ${rental.address}, ${rental.city}\n`;
-    text += `👤 *Tenant:* ${(rental.leases?.[0]?.tenantName || '')}\n`;
+    text += `👤 *Tenant:* ${tenantName}\n`;
     text += `📅 *Billing Period:* ${periodStr}\n\n`;
 
     text += `*FIXED CONTRACTUAL CHARGES:*\n`;
-    text += `• Base Contract Rent: ${formatZAR(baseRent, { includeDecimals: true })}\n\n`;
+    text += `• Base Contract Rent (${unitName}): ${formatZAR(baseRent, { includeDecimals: true })}\n\n`;
 
-    if (isBundled) {
+    if (isSubmeteredUnit) {
+      text += `*PREPAID UTILITY SUB-METER:*\n`;
+      text += `• Electricity & Water: Self-vended via ${rental.prepaidVendorName || 'Prepaid Sub-Meter'} tokens.\n`;
+      text += `• Municipal Utility Recovery on Statement: R 0.00\n`;
+    } else if (isBundled) {
       text += `*BODY CORPORATE UTILITY RECOVERY:*\n`;
       if (currentStatement && currentStatement.bundledUtilitiesZAR !== undefined) {
-        text += `• ${currentStatement.bundledUtilityLabel || 'Water, Sewerage, Refuse & Common'}: ${formatZAR(currentStatement.bundledUtilitiesZAR, { includeDecimals: true })}\n`;
-        text += `  └ Source: ${currentStatement.provider || 'iGrow Rentals / WeconnectU'} (Consolidated Recovery)\n`;
+        text += `• ${currentStatement.bundledUtilityLabel || 'Water, Sewerage, Refuse & Common'}: ${formatZAR(currentTenantUtilities, { includeDecimals: true })}\n`;
+        text += `  └ Source: ${currentStatement.provider || 'iGrow Rentals / WeconnectU'} (${occupiedCount > 1 ? `Unit Share 1 of ${occupiedCount}` : 'Consolidated'})\n`;
         text += `• Total Variable Recoveries: ${formatZAR(currentTenantUtilities, { includeDecimals: true })}\n`;
       } else {
         text += `• No utility recovery currently captured.\n`;
       }
     } else {
-      text += `*ITEMIZED MUNICIPAL UTILITY RECOVERIES:*\n`;
+      text += `*ITEMIZED MUNICIPAL UTILITY RECOVERIES${occupiedCount > 1 ? ` (1/${occupiedCount} Unit Share)` : ''}:*\n`;
       if (currentStatement) {
-        if (effectiveElecZAR > 0) {
-          text += `• Municipal Electricity: ${formatZAR(effectiveElecZAR, { includeDecimals: true })}\n`;
+        if (unitElecZAR > 0) {
+          text += `• Municipal Electricity: ${formatZAR(unitElecZAR, { includeDecimals: true })}\n`;
           if (isElecResolved && activeElecDispute) {
-            if (activeElecDispute.disputeResolutionOutcome === 'dispute_rejected') {
-              text += `  └ Council Dispute Rejected: Original assessment stands (${formatZAR(rawElecZAR, { includeDecimals: true })}).\n`;
-            } else {
-              text += `  └ ✓ Council Dispute Resolved: Credit note of ${formatZAR(elecSettledCredit, { includeDecimals: true })} applied (Net Billed).\n`;
-            }
+            text += `  └ ✓ Council Dispute Resolved: Net settled credit applied.\n`;
           } else if (activeElecDispute) {
-            text += `  ⚠️ Council Dispute Ref #${activeElecDispute.disputeReferenceNumber || 'Pending'} (${activeElecDispute.disputeStatus || 'Open'})\n`;
-            if (isBilledOnActuals) {
-              text += `  └ Billed on verified physical reading (${activeElecDispute.readingValue} kWh vs council estimate ${activeElecDispute.disputedMunicipalReadingValue} kWh). ${formatZAR(activeElecDispute.disputeEstimatedRandImpactZAR, { includeDecimals: true })} held in council query.\n`;
-            } else {
-              text += `  └ Billed council estimate. Council credit will be passed to tenant upon query resolution.\n`;
-            }
-          } else if (elecMeterReading && elecMeterReading.consumption !== undefined) {
-            text += `  └ Meter #${elecMeterReading.meterNumber || '—'}: ${elecMeterReading.previousReadingValue ?? '—'} -> ${elecMeterReading.readingValue} kWh (Usage: ${elecMeterReading.consumption} kWh)\n`;
+            text += `  ⚠️ Council Dispute Lodged (Ref #${activeElecDispute.disputeReferenceNumber || 'Pending'})\n`;
           }
         }
-        if (effectiveWaterZAR > 0) {
-          text += `• Municipal Water: ${formatZAR(effectiveWaterZAR, { includeDecimals: true })}\n`;
+        if (unitWaterZAR > 0) {
+          text += `• Municipal Water: ${formatZAR(unitWaterZAR, { includeDecimals: true })}\n`;
           if (isWaterResolved && activeWaterDispute) {
-            if (activeWaterDispute.disputeResolutionOutcome === 'dispute_rejected') {
-              text += `  └ Council Dispute Rejected: Original assessment stands (${formatZAR(rawWaterZAR, { includeDecimals: true })}).\n`;
-            } else {
-              text += `  └ ✓ Council Dispute Resolved: Credit note of ${formatZAR(waterSettledCredit, { includeDecimals: true })} applied (Net Billed).\n`;
-            }
+            text += `  └ ✓ Council Dispute Resolved: Net settled credit applied.\n`;
           } else if (activeWaterDispute) {
-            text += `  ⚠️ Council Dispute Ref #${activeWaterDispute.disputeReferenceNumber || 'Pending'} (${activeWaterDispute.disputeStatus || 'Open'})\n`;
-            if (isBilledOnActuals) {
-              text += `  └ Billed on verified physical reading (${activeWaterDispute.readingValue} KL vs council estimate ${activeWaterDispute.disputedMunicipalReadingValue} KL). ${formatZAR(activeWaterDispute.disputeEstimatedRandImpactZAR, { includeDecimals: true })} held in council query.\n`;
-            } else {
-              text += `  └ Billed council estimate. Council credit will be passed to tenant upon query resolution.\n`;
-            }
-          } else if (waterMeterReading && waterMeterReading.consumption !== undefined) {
-            text += `  └ Meter #${waterMeterReading.meterNumber || '—'}: ${waterMeterReading.previousReadingValue ?? '—'} -> ${waterMeterReading.readingValue} KL (Usage: ${waterMeterReading.consumption} KL)\n`;
+            text += `  ⚠️ Council Dispute Lodged (Ref #${activeWaterDispute.disputeReferenceNumber || 'Pending'})\n`;
           }
         }
-        if (currentStatement.refuseZAR > 0) {
-          text += `• Pikitup Refuse Removal: ${formatZAR(currentStatement.refuseZAR, { includeDecimals: true })}\n`;
+        if (unitRefuseZAR > 0) {
+          text += `• Pikitup Refuse Removal: ${formatZAR(unitRefuseZAR, { includeDecimals: true })}\n`;
         }
-        if (currentStatement.sewerageZAR > 0) {
-          text += `• Municipal Sewerage & Sanitation: ${formatZAR(currentStatement.sewerageZAR, { includeDecimals: true })}\n`;
+        if (unitSewerageZAR > 0) {
+          text += `• Municipal Sewerage & Sanitation: ${formatZAR(unitSewerageZAR, { includeDecimals: true })}\n`;
         }
         text += `• Total Variable Recoveries: ${formatZAR(currentTenantUtilities, { includeDecimals: true })}\n`;
       } else {
@@ -324,18 +462,14 @@ export default function TenantStatement({
     text += `💰 *TOTAL AMOUNT DUE BY TENANT: ${formatZAR(currentGrandTotal, { includeDecimals: true })}*\n`;
     text += `━━━━━━━━━━━━━━━━━━━━━\n`;
     text += `📌 *Payment Terms:* Due strictly on or before 1st of month.\n`;
-    text += `🏦 *Payment Reference:* ${(rental.leases?.[0]?.tenantName || '').replace(/\s+/g, '-').toUpperCase()} - ${rental.title.substring(0, 15).replace(/\s+/g, '').toUpperCase()}\n\n`;
-    text += isBundled
-      ? `_Utility recoveries are based on the managing agent / body corporate statement. Landlord rates, taxes, and agency fees are excluded from tenant liability._`
-      : `_Municipal recoveries are itemized from official council/Eskom invoices. Landlord rates and taxes are excluded from tenant liability._`;
+    text += `🏦 *Payment Reference:* ${tenantName.replace(/\s+/g, '-').toUpperCase()} - ${unitName.replace(/\s+/g, '').toUpperCase()}\n\n`;
+    text += `_Municipal recoveries reflect verified billing line items from council tax invoices. Landlord property rates are excluded from tenant liability._`;
 
     try {
       if (navigator?.clipboard?.writeText) {
         await navigator.clipboard.writeText(text);
       }
-    } catch {
-      // Ignore headless clipboard restriction
-    }
+    } catch {}
 
     setCopiedToast(true);
     setTimeout(() => setCopiedToast(false), 3000);
@@ -451,10 +585,19 @@ export default function TenantStatement({
                 </div>
                 <div className="min-w-0">
                   <h3 className="text-sm sm:text-base font-bold tracking-tight truncate">
-                    Tenant Utility Recovery & Variance
+                    {isCommercial
+                      ? 'Commercial Tax Invoice & Remittance'
+                      : isConsolidated
+                      ? 'Consolidated Property Master Statement'
+                      : 'Tenant Utility Recovery & Rent Statement'}
                   </h3>
                   <p className="text-[11px] sm:text-xs text-slate-400 truncate">
-                    {rental.title} • {(rental.leases?.[0]?.tenantName || '')}
+                    {rental.title} •{' '}
+                    {isCommercial
+                      ? `${selectedAncillary?.tenantName} (${selectedAncillary?.type.replace('_', ' ')})`
+                      : isConsolidated
+                      ? 'All Units & Commercial Covenants'
+                      : `${selectedLease?.unitName || 'Main'}: ${selectedLease?.tenantName || 'Vacant'}`}
                   </p>
                 </div>
               </div>
@@ -560,13 +703,81 @@ export default function TenantStatement({
               </div>
             )}
 
+            {/* Multi-Target Unit & Contract Statement Selector (Print-Hidden) */}
+            {((rental.leases?.length || 0) + (rental.ancillaryIncomes?.length || 0) > 1) && (
+              <div className="print-hidden-element p-3.5 bg-slate-50/90 rounded-2xl border border-slate-200 shadow-2xs space-y-2">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                      Statement Target:
+                    </span>
+                    <span className="text-[10px] bg-slate-200 text-slate-700 font-bold px-2 py-0.5 rounded-full">
+                      {(rental.leases?.length || 0)} Units • {(rental.ancillaryIncomes?.length || 0)} Commercial
+                    </span>
+                    {rental.utilityType && (
+                      <span className="text-[10px] bg-blue-50 text-blue-700 font-bold px-2 py-0.5 rounded-full border border-blue-200">
+                        {rental.utilityType === 'prepaid_submeter' ? 'Prepaid Sub-Meter' : rental.utilityType === 'hybrid' ? 'Hybrid Utility' : 'Post-Paid Municipal'}
+                      </span>
+                    )}
+                  </div>
+                  <span className="text-[10px] text-slate-400 hidden sm:inline">
+                    Choose unit lease or commercial contract for itemized billing
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <select
+                    value={selectedTargetId}
+                    onChange={(e) => setSelectedTargetId(e.target.value)}
+                    className="w-full text-xs font-bold text-slate-800 bg-white border border-slate-300 rounded-xl px-3 py-2 shadow-2xs cursor-pointer focus:ring-2 focus:ring-emerald-500 focus:outline-hidden"
+                  >
+                    {(rental.leases?.length || 0) > 0 && (
+                      <optgroup label="🏠 Residential Units">
+                        {rental.leases?.map((lease) => (
+                          <option key={lease.id} value={`lease-${lease.id}`}>
+                            {lease.unitName}: {lease.tenantName || 'Vacant'} ({formatZAR(lease.monthlyRentZAR)}/m • {lease.status})
+                          </option>
+                        ))}
+                      </optgroup>
+                    )}
+
+                    {(rental.ancillaryIncomes?.length || 0) > 0 && (
+                      <optgroup label="🏢 Commercial Ancillary Contracts (15% VAT)">
+                        {rental.ancillaryIncomes?.map((anc) => (
+                          <option key={anc.id} value={`ancillary-${anc.id}`}>
+                            {anc.tenantName} ({anc.type.replace('_', ' ')}) — {formatZAR(anc.monthlyRentZAR)}/m {anc.vatApplicable ? '+15% VAT' : ''}
+                          </option>
+                        ))}
+                      </optgroup>
+                    )}
+
+                    <optgroup label="📊 Landlord Accounting">
+                      <option value="consolidated">
+                        📊 Consolidated Master Statement (All Units + Commercial Income)
+                      </option>
+                    </optgroup>
+                  </select>
+                </div>
+              </div>
+            )}
+
             {/* Formal Statement Letterhead Header */}
             <div className="border-b border-slate-200 pb-4">
               <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
                 <div>
-                  <div className="flex items-center gap-2 mb-1.5">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 inline-block">
-                      Monthly Tenant Recovery Statement
+                  <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                    <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border inline-block ${
+                      isCommercial
+                        ? 'text-indigo-800 bg-indigo-50 border-indigo-200'
+                        : isConsolidated
+                        ? 'text-purple-800 bg-purple-50 border-purple-200'
+                        : 'text-emerald-800 bg-emerald-50 border-emerald-200'
+                    }`}>
+                      {isCommercial
+                        ? 'Commercial Tax Invoice & Remittance'
+                        : isConsolidated
+                        ? 'Consolidated Property Master Statement'
+                        : 'Monthly Tenant Recovery Statement'}
                     </span>
                     {investorProfile?.entityName && (
                       <span className="text-[10px] text-slate-500 font-semibold">
@@ -575,10 +786,15 @@ export default function TenantStatement({
                     )}
                   </div>
                   <h1 className="text-xl font-black text-slate-900 tracking-tight">
-                    {rental.title}
+                    {isCommercial
+                      ? `${selectedAncillary?.tenantName} — Site Lease`
+                      : isConsolidated
+                      ? `${rental.title} (Master Roll)`
+                      : `${rental.title} — ${selectedLease?.unitName || 'Main Unit'}`}
                   </h1>
                   <p className="text-xs text-slate-600 mt-0.5 font-medium">
                     {rental.address}, {rental.city}
+                    {isCommercial && ` • ${selectedAncillary?.type.replace('_', ' ').toUpperCase()} INFRASTRUCTURE COVENANT`}
                   </p>
                   {investorProfile?.email && (
                     <p className="text-[11px] text-slate-400 mt-0.5">
@@ -603,18 +819,24 @@ export default function TenantStatement({
                     </strong>
                   </div>
                   <div className="text-slate-600">
-                    <span className="text-slate-400">Tenant:</span>{' '}
-                    <strong className="text-slate-900">{(rental.leases?.[0]?.tenantName || '')}</strong>
+                    <span className="text-slate-400">{isCommercial ? 'Corporate Lessee:' : isConsolidated ? 'Portfolio Scope:' : 'Tenant:'}</span>{' '}
+                    <strong className="text-slate-900">
+                      {isCommercial
+                        ? (selectedAncillary?.tenantName || '')
+                        : isConsolidated
+                        ? `${occupiedLeases.length} Occupied Units • ${(rental.ancillaryIncomes?.length || 0)} Commercial`
+                        : (selectedLease?.tenantName || 'Vacant')}
+                    </strong>
                   </div>
                   <div className="text-[11px] font-semibold text-rose-700">
-                    Payment Due Date: 1st of each month
+                    {isCommercial ? 'Payment Due: 1st of month per commercial contract' : 'Payment Due Date: 1st of each month'}
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* Active Municipal Meter Dispute Alert Banner & Landlord Recovery Mode Toggle */}
-            {hasActiveUnresolvedDispute && currentStatement && (
+            {/* Active Municipal Meter Dispute Alert Banner & Landlord Recovery Mode Toggle (Residential Only) */}
+            {hasActiveUnresolvedDispute && currentStatement && isResidential && (
               <div className="rounded-xl border border-amber-300 bg-amber-50/80 p-4 shadow-xs space-y-3 print-dispute-banner">
                 <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
                   <div className="flex items-start gap-2.5">
@@ -721,7 +943,7 @@ export default function TenantStatement({
             )}
 
             {/* Resolved Municipal Dispute Settlement Banner */}
-            {!hasActiveUnresolvedDispute && hasResolvedDispute && currentStatement && (
+            {!hasActiveUnresolvedDispute && hasResolvedDispute && currentStatement && isResidential && (
               <div className="rounded-xl border border-emerald-300 bg-emerald-50/80 p-4 shadow-xs space-y-2.5 print-dispute-banner">
                 <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
                   <div className="flex items-start gap-2.5">
@@ -770,12 +992,241 @@ export default function TenantStatement({
               </div>
             )}
 
-            {/* Comparative Ledger Table */}
-            <div className="space-y-3">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
-                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-600">
-                  Itemized Tenant Recovery & Rent Breakdown
-                </h4>
+            {/* Dynamic Statement Ledger / Schedule */}
+            {isCommercial && selectedAncillary ? (
+              /* Commercial B2B Tax Invoice Schedule */
+              <div className="space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                  <div>
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                      <Receipt className="w-3.5 h-3.5 text-blue-600" />
+                      Commercial Tax Invoice Schedule
+                    </h4>
+                    <p className="text-[11px] text-slate-500">
+                      Long-term infrastructure covenant • {selectedAncillary.type.replace('_', ' ').toUpperCase()}
+                    </p>
+                  </div>
+                  <span className="text-[11px] font-semibold px-2.5 py-1 rounded-full bg-blue-50 text-blue-800 border border-blue-200">
+                    B2B Commercial Covenant (Exempt from Municipal Utilities)
+                  </span>
+                </div>
+
+                <div className="overflow-x-auto rounded-xl border border-slate-200">
+                  <table className="w-full min-w-[540px] text-left text-xs border-collapse">
+                    <thead>
+                      <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase font-semibold text-[10px] tracking-wider">
+                        <th className="p-3 pl-4">Item Description / Contract Details</th>
+                        <th className="p-3 text-center whitespace-nowrap">Tax Rate</th>
+                        <th className="p-3 text-right whitespace-nowrap">Contract Escalation</th>
+                        <th className="p-3 pr-4 text-right whitespace-nowrap">Total Due (ZAR)</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 text-slate-700">
+                      <tr className="bg-white">
+                        <td className="p-3 pl-4">
+                          <div className="font-bold text-slate-900">
+                            Monthly Infrastructure Site Lease: {selectedAncillary.tenantName}
+                          </div>
+                          <div className="text-[11px] text-slate-500 mt-0.5">
+                            Covenant: {selectedAncillary.type.replace('_', ' ')} • Term: {selectedAncillary.contractStartDate} to {selectedAncillary.contractEndDate}
+                          </div>
+                          {selectedAncillary.notes && (
+                            <div className="text-[10px] text-slate-400 italic mt-0.5">
+                              Note: {selectedAncillary.notes}
+                            </div>
+                          )}
+                        </td>
+                        <td className="p-3 text-center font-mono">
+                          {selectedAncillary.vatApplicable ? 'Standard (15%)' : 'Zero-Rated / Exempt'}
+                        </td>
+                        <td className="p-3 text-right font-mono text-slate-700">
+                          {selectedAncillary.annualEscalationPercent}% p.a.
+                        </td>
+                        <td className="p-3 pr-4 text-right font-mono font-bold text-slate-900">
+                          {formatZAR(baseRent, { includeDecimals: true })}
+                        </td>
+                      </tr>
+
+                      {selectedAncillary.vatApplicable && (
+                        <tr className="bg-white">
+                          <td className="p-3 pl-4">
+                            <div className="font-semibold text-slate-800">
+                              Value-Added Tax (VAT @ 15%)
+                            </div>
+                            <div className="text-[10px] text-slate-400">
+                              South African Revenue Service (SARS) Statutory Output Tax
+                            </div>
+                          </td>
+                          <td className="p-3 text-center font-mono text-slate-600">15.00%</td>
+                          <td className="p-3 text-right text-slate-400 font-mono">—</td>
+                          <td className="p-3 pr-4 text-right font-mono font-bold text-slate-800">
+                            {formatZAR(commercialVatAmount, { includeDecimals: true })}
+                          </td>
+                        </tr>
+                      )}
+
+                      <tr className="bg-blue-50/70 font-black text-slate-900 border-t-2 border-blue-600">
+                        <td className="p-3.5 pl-4 text-sm" colSpan={3}>
+                          TOTAL COMMERCIAL TAX INVOICE PAYABLE
+                          <div className="text-[11px] font-normal text-slate-500">
+                            {selectedAncillary.vatApplicable ? 'Net Site Lease + 15% VAT' : 'Net Commercial Site Lease'}
+                          </div>
+                        </td>
+                        <td className="p-3.5 pr-4 text-right font-mono text-base text-blue-950 font-black whitespace-nowrap">
+                          {formatZAR(currentGrandTotal, { includeDecimals: true })}
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            ) : isConsolidated ? (
+              /* Consolidated Property Master Roll */
+              <div className="space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                  <div>
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                      <Layers className="w-3.5 h-3.5 text-purple-600" />
+                      Consolidated Rent Roll & Utility Recovery Master
+                    </h4>
+                    <p className="text-[11px] text-slate-500">
+                      Reconciling {rental.leases?.length || 0} residential units and {rental.ancillaryIncomes?.length || 0} commercial covenants
+                    </p>
+                  </div>
+                  <span className="text-[11px] font-semibold px-2.5 py-1 rounded-full bg-purple-50 text-purple-800 border border-purple-200">
+                    Master Landlord View
+                  </span>
+                </div>
+
+                {/* 1. Residential Units Table */}
+                <div className="overflow-x-auto rounded-xl border border-slate-200">
+                  <table className="w-full min-w-[560px] text-left text-xs border-collapse">
+                    <thead>
+                      <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase font-semibold text-[10px] tracking-wider">
+                        <th className="p-2.5 pl-3">Unit Name</th>
+                        <th className="p-2.5">Tenant</th>
+                        <th className="p-2.5">Status</th>
+                        <th className="p-2.5 text-right">Base Rent</th>
+                        <th className="p-2.5 text-right">Utility Allocation</th>
+                        <th className="p-2.5 pr-3 text-right">Total Inflow</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 text-slate-700">
+                      {(rental.leases || []).map((lease) => {
+                        const isUnitSubmetered = rental.utilityType === 'prepaid_submeter' ||
+                          (rental.utilityType === 'hybrid' && !lease.unitName.toLowerCase().includes('main') && occupiedLeases.length > 1);
+                        const unitShareUtilities = (lease.status !== 'Occupied' || isUnitSubmetered)
+                          ? 0
+                          : Math.round(currentTenantUtilities / Math.max(1, rental.utilityType === 'hybrid' ? 1 : occupiedLeases.length));
+                        const totalUnit = lease.status === 'Occupied' ? lease.monthlyRentZAR + unitShareUtilities : 0;
+                        return (
+                          <tr key={lease.id} className="hover:bg-slate-50/50">
+                            <td className="p-2.5 pl-3 font-semibold text-slate-900">{lease.unitName}</td>
+                            <td className="p-2.5 text-slate-700">{lease.tenantName || '—'}</td>
+                            <td className="p-2.5">
+                              <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                lease.status === 'Occupied'
+                                  ? 'bg-emerald-100 text-emerald-800'
+                                  : lease.status === 'Notice Given'
+                                  ? 'bg-amber-100 text-amber-800'
+                                  : 'bg-rose-100 text-rose-800'
+                              }`}>
+                                {lease.status}
+                              </span>
+                            </td>
+                            <td className="p-2.5 text-right font-mono font-semibold text-slate-900">
+                              {lease.status === 'Occupied' ? formatZAR(lease.monthlyRentZAR, { includeDecimals: true }) : '—'}
+                            </td>
+                            <td className="p-2.5 text-right font-mono text-slate-600">
+                              {isUnitSubmetered ? (
+                                <span className="text-[10px] text-slate-400 italic">Prepaid Sub-Meter</span>
+                              ) : unitShareUtilities > 0 ? (
+                                formatZAR(unitShareUtilities, { includeDecimals: true })
+                              ) : (
+                                'R 0.00'
+                              )}
+                            </td>
+                            <td className="p-2.5 pr-3 text-right font-mono font-bold text-emerald-700">
+                              {totalUnit > 0 ? formatZAR(totalUnit, { includeDecimals: true }) : '—'}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* 2. Commercial Ancillary Incomes (if any) */}
+                {(rental.ancillaryIncomes || []).length > 0 && (
+                  <div className="space-y-2 pt-2">
+                    <h5 className="text-[11px] font-bold uppercase tracking-wider text-slate-600">
+                      Commercial Ancillary Covenants
+                    </h5>
+                    <div className="overflow-x-auto rounded-xl border border-slate-200">
+                      <table className="w-full min-w-[560px] text-left text-xs border-collapse">
+                        <thead>
+                          <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase font-semibold text-[10px] tracking-wider">
+                            <th className="p-2.5 pl-3">Stream / Lessee</th>
+                            <th className="p-2.5">Type</th>
+                            <th className="p-2.5">Escalation</th>
+                            <th className="p-2.5 text-right">Net Rent</th>
+                            <th className="p-2.5 text-right">VAT (15%)</th>
+                            <th className="p-2.5 pr-3 text-right">Gross Total</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100 text-slate-700">
+                          {rental.ancillaryIncomes!.map((anc) => {
+                            const vat = anc.vatApplicable ? Math.round(anc.monthlyRentZAR * 0.15) : 0;
+                            return (
+                              <tr key={anc.id} className="hover:bg-slate-50/50">
+                                <td className="p-2.5 pl-3 font-semibold text-slate-900">{anc.tenantName}</td>
+                                <td className="p-2.5 capitalize text-slate-600">{anc.type.replace('_', ' ')}</td>
+                                <td className="p-2.5 font-mono text-slate-600">{anc.annualEscalationPercent}% p.a.</td>
+                                <td className="p-2.5 text-right font-mono text-slate-800">
+                                  {formatZAR(anc.monthlyRentZAR, { includeDecimals: true })}
+                                </td>
+                                <td className="p-2.5 text-right font-mono text-slate-600">
+                                  {anc.vatApplicable ? formatZAR(vat, { includeDecimals: true }) : '—'}
+                                </td>
+                                <td className="p-2.5 pr-3 text-right font-mono font-bold text-blue-700">
+                                  {formatZAR(anc.monthlyRentZAR + vat, { includeDecimals: true })}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+
+                {/* 3. Consolidated Grand Inflow Summary Banner */}
+                <div className="p-4 rounded-xl bg-purple-50/70 border border-purple-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div>
+                    <span className="text-xs font-bold text-purple-950 uppercase tracking-wide block">
+                      Total Monthly Portfolio Collection (Gross Cash Inflow)
+                    </span>
+                    <span className="text-[11px] text-purple-800">
+                      Combined Residential Rents + Commercial Ancillary Leases + Billed Municipal Recoveries
+                    </span>
+                  </div>
+                  <div className="text-right">
+                    <span className="font-mono text-xl font-black text-purple-950 block">
+                      {formatZAR(currentGrandTotal, { includeDecimals: true })}
+                    </span>
+                    <span className="text-[10px] text-purple-700">
+                      Municipal bill: {formatZAR(currentStatement?.totalDueZAR || 0)} (Rates paid by Landlord: {formatZAR(currentStatement?.propertyRatesZAR || 0)})
+                    </span>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              /* Comparative Ledger Table */
+              <div className="space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-slate-600">
+                    Itemized Tenant Recovery & Rent Breakdown
+                  </h4>
                 <div className="flex items-center gap-2">
                   <span className="text-[10px] text-slate-400 font-medium sm:hidden">
                     Scroll horizontally for variance →
@@ -808,7 +1259,9 @@ export default function TenantStatement({
                     <tr className="bg-white font-medium">
                       <td className="p-3 pl-4">
                         <div className="font-bold text-slate-900">Base Contract Rent</div>
-                        <div className="text-[11px] text-slate-400">Monthly fixed residential lease fee</div>
+                        <div className="text-[11px] text-slate-400">
+                          {selectedLease?.unitName ? `Unit: ${selectedLease.unitName} • Fixed monthly residential lease fee` : 'Monthly fixed residential lease fee'}
+                        </div>
                       </td>
                       <td className="p-3 text-right font-mono text-slate-700 whitespace-nowrap">
                         {formatZAR(baseRent, { includeDecimals: true })}
@@ -821,7 +1274,24 @@ export default function TenantStatement({
                       </td>
                     </tr>
 
-                    {isBundled ? (
+                    {isSubmeteredUnit ? (
+                      /* Prepaid Sub-Meter Notice Row */
+                      <tr className="bg-blue-50/40">
+                        <td colSpan={4} className="p-3.5 pl-4">
+                          <div className="flex items-start gap-2.5">
+                            <Zap className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
+                            <div>
+                              <div className="font-bold text-blue-950 text-xs">
+                                Prepaid Utility Sub-Meter Active ({rental.prepaidVendorName || 'Private Sub-Meter'})
+                              </div>
+                              <p className="text-[11px] text-blue-800 mt-0.5">
+                                Electricity and water for <strong>{selectedLease?.unitName}</strong> are self-vended directly by the tenant via {rental.prepaidVendorName || 'Citiq / Recharger'} sub-meter tokens. No municipal water or electricity recoveries are levied on this monthly statement (R 0.00 recovery).
+                              </p>
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                    ) : isBundled ? (
                       /* Bundled Recovery Row (iGrow Rentals / Body Corporate) */
                       <tr className="hover:bg-slate-50/60 transition-colors">
                         <td className="p-3 pl-4">
@@ -922,15 +1392,15 @@ export default function TenantStatement({
                             )}
                           </td>
                           <td className="p-3 text-right font-mono text-slate-600 whitespace-nowrap">
-                            {previousStatement ? formatZAR(previousStatement.electricityZAR, { includeDecimals: true }) : '—'}
+                            {previousStatement ? formatZAR(Math.round(previousStatement.electricityZAR * splitRatio), { includeDecimals: true }) : '—'}
                           </td>
                           <td className="p-3 text-right font-mono font-bold text-slate-800 whitespace-nowrap">
                             {currentStatement ? (
                               <div>
-                                <span>{formatZAR(effectiveElecZAR, { includeDecimals: true })}</span>
+                                <span>{formatZAR(unitElecZAR, { includeDecimals: true })}</span>
                                 {((isElecResolved && elecSettledCredit > 0) || (!isElecResolved && isBilledOnActuals && activeElecDispute)) && (
                                   <div className="text-[10px] text-slate-400 line-through font-normal">
-                                    {formatZAR(rawElecZAR, { includeDecimals: true })}
+                                    {formatZAR(Math.round(rawElecZAR * splitRatio), { includeDecimals: true })}
                                   </div>
                                 )}
                               </div>
@@ -940,7 +1410,7 @@ export default function TenantStatement({
                           </td>
                           <td className="p-3 pr-4 text-right whitespace-nowrap">
                             {currentStatement
-                              ? renderVariance(effectiveElecZAR, previousStatement?.electricityZAR)
+                              ? renderVariance(unitElecZAR, previousStatement ? Math.round(previousStatement.electricityZAR * splitRatio) : undefined)
                               : '—'}
                           </td>
                         </tr>
@@ -1016,15 +1486,15 @@ export default function TenantStatement({
                             )}
                           </td>
                           <td className="p-3 text-right font-mono text-slate-600 whitespace-nowrap">
-                            {previousStatement ? formatZAR(previousStatement.waterZAR, { includeDecimals: true }) : '—'}
+                            {previousStatement ? formatZAR(Math.round(previousStatement.waterZAR * splitRatio), { includeDecimals: true }) : '—'}
                           </td>
                           <td className="p-3 text-right font-mono font-bold text-slate-800 whitespace-nowrap">
                             {currentStatement ? (
                               <div>
-                                <span>{formatZAR(effectiveWaterZAR, { includeDecimals: true })}</span>
+                                <span>{formatZAR(unitWaterZAR, { includeDecimals: true })}</span>
                                 {((isWaterResolved && waterSettledCredit > 0) || (!isWaterResolved && isBilledOnActuals && activeWaterDispute)) && (
                                   <div className="text-[10px] text-slate-400 line-through font-normal">
-                                    {formatZAR(rawWaterZAR, { includeDecimals: true })}
+                                    {formatZAR(Math.round(rawWaterZAR * splitRatio), { includeDecimals: true })}
                                   </div>
                                 )}
                               </div>
@@ -1034,7 +1504,7 @@ export default function TenantStatement({
                           </td>
                           <td className="p-3 pr-4 text-right whitespace-nowrap">
                             {currentStatement
-                              ? renderVariance(effectiveWaterZAR, previousStatement?.waterZAR)
+                              ? renderVariance(unitWaterZAR, previousStatement ? Math.round(previousStatement.waterZAR * splitRatio) : undefined)
                               : '—'}
                           </td>
                         </tr>
@@ -1044,18 +1514,18 @@ export default function TenantStatement({
                           <td className="p-3 pl-4">
                             <div className="font-semibold text-slate-800">Pikitup Refuse Removal</div>
                             <div className="text-[10px] text-slate-500">
-                              Source: {currentStatement?.provider || 'City of Johannesburg'} (PIKITUP Refuse Residential + 15% VAT)
+                              Source: {currentStatement?.provider || 'City of Johannesburg'} (PIKITUP Refuse Residential + 15% VAT) {occupiedCount > 1 && `• 1/${occupiedCount} Unit Share`}
                             </div>
                           </td>
                           <td className="p-3 text-right font-mono text-slate-600 whitespace-nowrap">
-                            {previousStatement ? formatZAR(previousStatement.refuseZAR, { includeDecimals: true }) : '—'}
+                            {previousStatement ? formatZAR(Math.round(previousStatement.refuseZAR * splitRatio), { includeDecimals: true }) : '—'}
                           </td>
                           <td className="p-3 text-right font-mono font-bold text-slate-800 whitespace-nowrap">
-                            {currentStatement ? formatZAR(currentStatement.refuseZAR, { includeDecimals: true }) : 'R 0.00'}
+                            {currentStatement ? formatZAR(unitRefuseZAR, { includeDecimals: true }) : 'R 0.00'}
                           </td>
                           <td className="p-3 pr-4 text-right whitespace-nowrap">
                             {currentStatement
-                              ? renderVariance(currentStatement.refuseZAR, previousStatement?.refuseZAR)
+                              ? renderVariance(unitRefuseZAR, previousStatement ? Math.round(previousStatement.refuseZAR * splitRatio) : undefined)
                               : '—'}
                           </td>
                         </tr>
@@ -1065,18 +1535,18 @@ export default function TenantStatement({
                           <td className="p-3 pl-4">
                             <div className="font-semibold text-slate-800">Municipal Sewerage & Sanitation</div>
                             <div className="text-[10px] text-slate-500">
-                              Source: {currentStatement?.provider || 'City of Johannesburg'} (Stand Size Sanitation Charge + 15% VAT)
+                              Source: {currentStatement?.provider || 'City of Johannesburg'} (Stand Size Sanitation Charge + 15% VAT) {occupiedCount > 1 && `• 1/${occupiedCount} Unit Share`}
                             </div>
                           </td>
                           <td className="p-3 text-right font-mono text-slate-600 whitespace-nowrap">
-                            {previousStatement ? formatZAR(previousStatement.sewerageZAR, { includeDecimals: true }) : '—'}
+                            {previousStatement ? formatZAR(Math.round(previousStatement.sewerageZAR * splitRatio), { includeDecimals: true }) : '—'}
                           </td>
                           <td className="p-3 text-right font-mono font-bold text-slate-800 whitespace-nowrap">
-                            {currentStatement ? formatZAR(currentStatement.sewerageZAR, { includeDecimals: true }) : 'R 0.00'}
+                            {currentStatement ? formatZAR(unitSewerageZAR, { includeDecimals: true }) : 'R 0.00'}
                           </td>
                           <td className="p-3 pr-4 text-right whitespace-nowrap">
                             {currentStatement
-                              ? renderVariance(currentStatement.sewerageZAR, previousStatement?.sewerageZAR)
+                              ? renderVariance(unitSewerageZAR, previousStatement ? Math.round(previousStatement.sewerageZAR * splitRatio) : undefined)
                               : '—'}
                           </td>
                         </tr>
@@ -1125,9 +1595,10 @@ export default function TenantStatement({
                 </table>
               </div>
             </div>
+          )}
 
             {/* Landlord Audit Transparency Note */}
-            {currentStatement?.propertyRatesZAR !== undefined && currentStatement.propertyRatesZAR > 0 && (
+            {currentStatement?.propertyRatesZAR !== undefined && currentStatement.propertyRatesZAR > 0 && !isCommercial && (
               <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 text-[11px] text-slate-600 flex flex-col sm:flex-row sm:items-center justify-between gap-1.5">
                 <div>
                   <span className="font-bold text-slate-700">Municipal Audit Transparency:</span> Landlord Property Rates for this period were{' '}
@@ -1147,7 +1618,11 @@ export default function TenantStatement({
                     Payment Reference
                   </span>
                   <span className="font-mono font-bold text-slate-900 text-sm">
-                    {(rental.leases?.[0]?.tenantName || '').replace(/\s+/g, '-').toUpperCase()} - {rental.title.substring(0, 15).replace(/\s+/g, '').toUpperCase()}
+                    {isCommercial && selectedAncillary
+                      ? `INV-${selectedAncillary.tenantName.substring(0, 10).replace(/\s+/g, '').toUpperCase()}-${rental.title.substring(0, 10).replace(/\s+/g, '').toUpperCase()}`
+                      : isConsolidated
+                      ? `MASTER-${rental.title.substring(0, 15).replace(/\s+/g, '').toUpperCase()}`
+                      : `${(selectedLease?.tenantName || 'TENANT').replace(/\s+/g, '-').toUpperCase()} - ${(selectedLease?.unitName || 'UNIT').replace(/\s+/g, '').toUpperCase()}`}
                   </span>
                 </div>
                 <div className="text-left sm:text-right">
@@ -1155,63 +1630,69 @@ export default function TenantStatement({
                     Payment Terms
                   </span>
                   <span className="text-xs font-bold text-slate-900">
-                    Due strictly on or before 1st of month
+                    {isCommercial ? 'Due strictly per commercial contract' : isConsolidated ? 'Landlord Internal Master Roll' : 'Due strictly on or before 1st of month'}
                   </span>
                 </div>
               </div>
               <p className="text-[11px] text-slate-500 leading-relaxed">
-                Payment must reflect in full on or before the 1st of each month. Base contract rent is fixed per the residential lease agreement. Municipal utility recoveries (electricity, water, refuse, sewerage) reflect verified billing line items from local municipal/Eskom tax invoices. Landlord municipal rates & taxes are excluded from the tenant liability.
+                {isCommercial
+                  ? 'Commercial lease remittance in terms of active contract agreement. Value-Added Tax (VAT) charged in accordance with South African tax legislation.'
+                  : isConsolidated
+                  ? 'Consolidated landlord master roll reconciling all residential unit leases, commercial ancillary covenants, and municipal tax invoices for this property.'
+                  : 'Payment must reflect in full on or before the 1st of each month. Base contract rent is fixed per the residential lease agreement. Municipal utility recoveries (electricity, water, refuse, sewerage) reflect verified billing line items from local municipal/Eskom tax invoices. Landlord municipal rates & taxes are excluded from the tenant liability.'}
               </p>
             </div>
 
             {/* Integrated Upload Box - Hidden on Print */}
-            <div className="pt-2 border-t border-slate-200 print-hidden-element">
-              <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 mb-2 flex items-center gap-1.5">
-                <Upload className="w-3.5 h-3.5 text-emerald-600" />
-                Upload New CoJ / Eskom Tax Invoice (.pdf)
-              </h4>
+            {!isCommercial && (
+              <div className="pt-2 border-t border-slate-200 print-hidden-element">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 mb-2 flex items-center gap-1.5">
+                  <Upload className="w-3.5 h-3.5 text-emerald-600" />
+                  Upload New CoJ / Eskom Tax Invoice (.pdf)
+                </h4>
 
-              <div
-                onDragEnter={handleDrag}
-                onDragLeave={handleDrag}
-                onDragOver={handleDrag}
-                onDrop={handleDrop}
-                onClick={() => fileInputRef.current?.click()}
-                className={`border-2 border-dashed rounded-xl p-5 text-center transition-all cursor-pointer ${
-                  dragActive
-                    ? 'border-emerald-500 bg-emerald-50/50'
-                    : 'border-slate-300 hover:border-emerald-400 hover:bg-slate-50/60'
-                }`}
-              >
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept=".pdf"
-                  onChange={(e) => {
-                    if (e.target.files && e.target.files[0]) {
-                      handleProcessFile(e.target.files[0]);
-                    }
-                  }}
-                  className="hidden"
-                />
+                <div
+                  onDragEnter={handleDrag}
+                  onDragLeave={handleDrag}
+                  onDragOver={handleDrag}
+                  onDrop={handleDrop}
+                  onClick={() => fileInputRef.current?.click()}
+                  className={`border-2 border-dashed rounded-xl p-5 text-center transition-all cursor-pointer ${
+                    dragActive
+                      ? 'border-emerald-500 bg-emerald-50/50'
+                      : 'border-slate-300 hover:border-emerald-400 hover:bg-slate-50/60'
+                  }`}
+                >
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept=".pdf"
+                    onChange={(e) => {
+                      if (e.target.files && e.target.files[0]) {
+                        handleProcessFile(e.target.files[0]);
+                      }
+                    }}
+                    className="hidden"
+                  />
 
-                {isUploading ? (
-                  <div className="flex items-center justify-center gap-2 text-xs font-semibold text-emerald-700">
-                    <Loader2 className="w-4 h-4 animate-spin text-emerald-600" />
-                    <span>Processing bill through Dual-Parser Engine...</span>
-                  </div>
-                ) : (
-                  <div className="space-y-1">
-                    <p className="text-xs font-bold text-slate-700">
-                      Click to browse or drop municipal/Eskom statement PDF
-                    </p>
-                    <p className="text-[11px] text-slate-400">
-                      Auto-selects BYOK AI pipeline if configured; otherwise uses instant client-side Regex fallback.
-                    </p>
-                  </div>
-                )}
+                  {isUploading ? (
+                    <div className="flex items-center justify-center gap-2 text-xs font-semibold text-emerald-700">
+                      <Loader2 className="w-4 h-4 animate-spin text-emerald-600" />
+                      <span>Processing bill through Dual-Parser Engine...</span>
+                    </div>
+                  ) : (
+                    <div className="space-y-1">
+                      <p className="text-xs font-bold text-slate-700">
+                        Click to browse or drop municipal/Eskom statement PDF
+                      </p>
+                      <p className="text-[11px] text-slate-400">
+                        Auto-selects BYOK AI pipeline if configured; otherwise uses instant client-side Regex fallback.
+                      </p>
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
+            )}
           </div>
 
           {/* Print Footer Notice */}

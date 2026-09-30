@@ -30,6 +30,9 @@ import { exportFundingCSV } from '@/lib/export/csvExport';
 import { formatPaymentStatement } from '@/lib/whatsappFormatter';
 
 export function getFundingDrawnAndUndrawn(f: FundingSource) {
+  if (f.status === 'Standby') {
+    return { drawn: 0, undrawn: f.capitalAmountZAR, drawnCount: 0, totalTranches: 0, hasTranches: false };
+  }
   if (f.tranches && f.tranches.length > 0) {
     const drawn = f.tranches.filter((t) => t.isDisbursed).reduce((s, t) => s + t.amountZAR, 0);
     const undrawn = f.tranches.filter((t) => !t.isDisbursed).reduce((s, t) => s + t.amountZAR, 0);
@@ -63,6 +66,7 @@ export default function FundingTrackerPage() {
   const [returnRatePercent, setReturnRatePercent] = useState<number>(14);
   const [paymentSchedule, setPaymentSchedule] = useState<'Monthly Interest' | 'Quarterly' | 'At Exit (Maturity)' | 'Bi-Annual'>('Monthly Interest');
   const [linkedDealId, setLinkedDealId] = useState<string>('');
+  const [facilityStatus, setFacilityStatus] = useState<'Active' | 'Standby'>('Active');
   const [notes, setNotes] = useState('');
 
   // Phased Tranches State for New Capital Source
@@ -139,7 +143,7 @@ export default function FundingTrackerPage() {
       linkedDealId: linkedDealId || undefined,
       linkedDealName: linkedFlip ? linkedFlip.title : 'General Portfolio Liquidity',
       totalRepaidZAR: 0,
-      status: 'Active',
+      status: facilityStatus,
       notes,
       tranches: finalTranches,
     };
@@ -151,6 +155,7 @@ export default function FundingTrackerPage() {
     setEntityOrContact('');
     setEmailPhone('');
     setNotes('');
+    setFacilityStatus('Active');
     setEnableTranches(false);
   };
 
@@ -269,8 +274,8 @@ export default function FundingTrackerPage() {
         {/* Purchasing Power & Seed Capital Banner */}
         <div className="bg-gradient-to-r from-slate-950 via-slate-900 to-emerald-950 rounded-2xl p-5 text-white border border-emerald-800/40 shadow-lg">
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-5">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-xl bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shrink-0">
+            <div className="flex items-start sm:items-center gap-3.5">
+              <div className="w-12 h-12 rounded-xl bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shrink-0 shadow-inner">
                 <Wallet className="w-6 h-6" />
               </div>
               <div>
@@ -280,34 +285,67 @@ export default function FundingTrackerPage() {
                   </span>
                   <span className="text-xs text-slate-400">Cash + Pre-Approved Facility Capacity</span>
                 </div>
-                <div className="text-2xl font-black text-white mt-1">
-                  {formatZAR(summary.totalAvailablePurchasingPower)}
-                  <span className="text-xs font-normal text-slate-400 ml-2 font-mono">Total Purchasing Power</span>
+                <h3 className="text-xl sm:text-2xl font-black text-white mt-1 tracking-tight flex items-baseline gap-2">
+                  {formatZAR(summary.deployableWarChest)}
+                  <span className="text-xs font-semibold text-emerald-400 font-sans">Gross War Chest</span>
+                </h3>
+                <div
+                  className="text-xs text-slate-300 mt-2 font-mono bg-slate-950/60 px-2.5 py-1.5 rounded-lg border border-slate-800/80 w-fit flex flex-wrap items-center gap-1.5"
+                  title={`Gross War Chest: ${formatZAR(summary.deployableWarChest)} (${formatZAR(summary.liquidCapitalReserve)} Cash + ${formatZAR(summary.unallocatedFundingReserve)} Facilities) Less Ring-Fenced: ${formatZAR(summary.ringFencedWorkingCapital)} = Net Deployable: ${formatZAR(summary.totalAvailablePurchasingPower)}`}
+                >
+                  <span className="text-slate-300">Less: Ring-Fenced Project Commitments</span>
+                  <span className="text-amber-400 font-semibold">(−{formatZAR(summary.ringFencedWorkingCapital)})</span>
+                  <span className="text-slate-400 font-bold px-0.5">=</span>
+                  <span className="text-slate-300">Net Deployable Purchasing Power:</span>
+                  <strong className="font-bold text-emerald-300">{formatZAR(summary.totalAvailablePurchasingPower)}</strong>
                 </div>
               </div>
             </div>
 
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 border-t lg:border-t-0 lg:border-l border-slate-800 pt-3 lg:pt-0 lg:pl-6">
-              <div className="bg-slate-800/60 rounded-xl p-3 border border-slate-700/60">
-                <span className="text-[11px] text-slate-400 block">Liquid Cash Reserve</span>
-                <span className="text-base font-bold text-emerald-300 block mt-0.5">
-                  {formatZAR(summary.liquidCapitalReserve)}
+            <div className="grid grid-cols-2 xl:grid-cols-4 gap-3 border-t lg:border-t-0 lg:border-l border-slate-800 pt-3 lg:pt-0 lg:pl-6">
+              <div className="bg-slate-800/60 rounded-xl p-3 border border-slate-700/60 flex flex-col justify-between">
+                <div>
+                  <span className="text-[11px] text-slate-400 block font-medium">Liquid Cash Reserve</span>
+                  <span className="text-base font-bold text-emerald-300 block mt-0.5">
+                    {formatZAR(summary.liquidCapitalReserve)}
+                  </span>
+                </div>
+                <span
+                  className="text-[10px] text-slate-400 block mt-1 leading-tight"
+                  title={`${formatZAR(summary.ringFencedWorkingCapital)} is committed to active contractor draws and council deposits, leaving ${formatZAR(summary.freeUnallocatedCash)} unallocated cash from the ${formatZAR(summary.liquidCapitalReserve)} bank balance.`}
+                >
+                  {summary.freeUnallocatedCash === 0 ? 'R 0 free unallocated' : 'Includes exit proceeds'}
                 </span>
-                <span className="text-[10px] text-slate-400 block">Includes exit proceeds</span>
               </div>
-              <div className="bg-slate-800/60 rounded-xl p-3 border border-slate-700/60">
-                <span className="text-[11px] text-slate-400 block">Unallocated Facilities</span>
-                <span className="text-base font-bold text-indigo-300 block mt-0.5">
-                  {formatZAR(summary.unallocatedFundingReserve)}
-                </span>
-                <span className="text-[10px] text-slate-400 block">General liquidity lines</span>
+
+              <div className="bg-slate-800/60 rounded-xl p-3 border border-slate-700/60 flex flex-col justify-between">
+                <div>
+                  <span className="text-[11px] text-amber-400 block font-medium">Ring-Fenced Capital</span>
+                  <span className="text-base font-bold text-amber-300 block mt-0.5">
+                    {formatZAR(summary.ringFencedWorkingCapital)}
+                  </span>
+                </div>
+                <span className="text-[10px] text-slate-400 block mt-1">Committed to active flips</span>
               </div>
-              <div className="bg-slate-800/60 rounded-xl p-3 border border-slate-700/60 col-span-2 sm:col-span-1">
-                <span className="text-[11px] text-slate-400 block">Realized Flip Gains</span>
-                <span className="text-base font-bold text-amber-300 block mt-0.5">
-                  {formatZAR(summary.totalRealizedFlipProfits)}
-                </span>
-                <span className="text-[10px] text-slate-400 block">From {summary.completedFlipsCount} exits</span>
+
+              <div className="bg-slate-800/60 rounded-xl p-3 border border-slate-700/60 flex flex-col justify-between">
+                <div>
+                  <span className="text-[11px] text-slate-400 block font-medium">Unallocated Facilities</span>
+                  <span className="text-base font-bold text-indigo-300 block mt-0.5">
+                    {formatZAR(summary.unallocatedFundingReserve)}
+                  </span>
+                </div>
+                <span className="text-[10px] text-slate-400 block mt-1">General liquidity lines</span>
+              </div>
+
+              <div className="bg-slate-800/60 rounded-xl p-3 border border-slate-700/60 flex flex-col justify-between">
+                <div>
+                  <span className="text-[11px] text-slate-400 block font-medium">Realized Flip Gains</span>
+                  <span className="text-base font-bold text-slate-200 block mt-0.5">
+                    {formatZAR(summary.totalRealizedFlipProfits)}
+                  </span>
+                </div>
+                <span className="text-[10px] text-slate-400 block mt-1">From {summary.completedFlipsCount} exits</span>
               </div>
             </div>
           </div>
@@ -355,7 +393,7 @@ export default function FundingTrackerPage() {
               </p>
             </div>
             <span className="text-xs font-semibold bg-slate-100 text-slate-700 px-3 py-1 rounded-full">
-              {funding.filter((f) => f.status === 'Active').length} Active Facilities
+              {funding.filter((f) => f.status === 'Active').length} Active • {funding.filter((f) => f.status === 'Standby').length} Standby
             </span>
           </div>
 
@@ -446,6 +484,13 @@ export default function FundingTrackerPage() {
                               {isExpanded ? 'Hide Tranches ▲' : 'View Tranches ▼'}
                             </button>
                           </div>
+                        ) : item.status === 'Standby' ? (
+                          <div className="mt-0.5 space-y-0.5">
+                            <div className="text-[11px] text-amber-700 font-semibold">
+                              Undrawn: {formatZAR(undrawn)}
+                            </div>
+                            <div className="text-[10px] text-slate-400">Pre-approved standby capacity</div>
+                          </div>
                         ) : (
                           <div className="text-[10px] text-slate-400">Lump Sum Facility</div>
                         )}
@@ -459,7 +504,9 @@ export default function FundingTrackerPage() {
                         </div>
                         {item.returnTermsType === 'Fixed Interest' && (
                           <div className="text-[10px] text-slate-500 font-normal mt-0.5">
-                            {formatZAR(monthlyInterest)}/mo on drawn
+                            {item.status === 'Standby'
+                              ? 'R 0/mo (Undrawn Standby)'
+                              : `${formatZAR(monthlyInterest)}/mo on drawn`}
                           </div>
                         )}
                       </td>
@@ -495,42 +542,59 @@ export default function FundingTrackerPage() {
                         )}
                       </td>
                       <td className="p-3.5">
-                        <div className="font-semibold text-slate-800">{formatZAR(balance)}</div>
+                        <div className="font-semibold text-slate-800">
+                          {item.status === 'Standby' ? 'R 0 (Undrawn)' : formatZAR(activeDrawnBalance)}
+                        </div>
                         <div className="text-[10px] text-slate-400">Repaid: {formatZAR(item.totalRepaidZAR)}</div>
                       </td>
                       <td className="p-3.5">
                         <span
-                          className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                          className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
                             item.status === 'Active'
                               ? 'bg-emerald-100 text-emerald-800'
+                              : item.status === 'Standby'
+                              ? 'bg-amber-100 text-amber-900 border border-amber-300'
                               : item.status === 'Settled'
                               ? 'bg-slate-200 text-slate-700'
                               : 'bg-amber-100 text-amber-800'
                           }`}
                         >
-                          {item.status}
+                          {item.status === 'Standby' ? 'Standby Facility (Undrawn War Chest)' : item.status}
                         </span>
                       </td>
                       <td className="p-3.5 pr-5 text-right">
                         <div className="flex items-center justify-end gap-1.5">
-                          <button
-                            onClick={() => {
-                              setRepaymentModalSource(item);
-                              setRepaymentAmount(0);
-                              setPaymentType(
-                                item.returnTermsType === 'Equity Profit Split'
-                                  ? 'Profit Share Distribution'
-                                  : item.paymentSchedule === 'At Exit (Maturity)'
-                                  ? 'Principal Repayment'
-                                  : 'Monthly Coupon / Interest'
-                              );
-                              setPaymentDate(new Date().toISOString().split('T')[0]);
-                              setCopyReceiptOnSave(true);
-                            }}
-                            className="px-2 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded text-[11px] font-semibold transition-colors cursor-pointer"
-                          >
-                            Log Payment
-                          </button>
+                          {item.status === 'Standby' ? (
+                            <button
+                              onClick={() => {
+                                updateFunding(item.id, { status: 'Active' });
+                                setToastMessage(`Facility "${item.lenderName}" activated`);
+                              }}
+                              className="px-2 py-1 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 rounded text-[11px] font-semibold transition-colors cursor-pointer"
+                              title="Activate and draw standby credit line"
+                            >
+                              Activate
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => {
+                                setRepaymentModalSource(item);
+                                setRepaymentAmount(0);
+                                setPaymentType(
+                                  item.returnTermsType === 'Equity Profit Split'
+                                    ? 'Profit Share Distribution'
+                                    : item.paymentSchedule === 'At Exit (Maturity)'
+                                    ? 'Principal Repayment'
+                                    : 'Monthly Coupon / Interest'
+                                );
+                                setPaymentDate(new Date().toISOString().split('T')[0]);
+                                setCopyReceiptOnSave(true);
+                              }}
+                              className="px-2 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded text-[11px] font-semibold transition-colors cursor-pointer"
+                            >
+                              Log Payment
+                            </button>
+                          )}
                           {item.linkedDealId && (
                           <button
                             onClick={() => {
@@ -689,7 +753,7 @@ export default function FundingTrackerPage() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">Funding Category</label>
                   <select
@@ -701,6 +765,17 @@ export default function FundingTrackerPage() {
                     <option value="Proposal-backed">Proposal-backed (Syndicate / JV)</option>
                     <option value="Ad-hoc Friends & Family">Ad-hoc Friends & Family</option>
                     <option value="Equity Partner">Equity Partner</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Facility Status</label>
+                  <select
+                    value={facilityStatus}
+                    onChange={(e) => setFacilityStatus(e.target.value as 'Active' | 'Standby')}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white font-medium"
+                  >
+                    <option value="Active">Active (Disbursed / Accruing)</option>
+                    <option value="Standby">Standby (Pre-Approved / Undrawn)</option>
                   </select>
                 </div>
                 <div>

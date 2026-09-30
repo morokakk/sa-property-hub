@@ -1513,20 +1513,42 @@ export function computePortfolioSummary(state: {
   const liquidCapitalReserve = state.liquidCapitalReserve || 0;
   const totalGrossAssetValue = totalRentalValue + totalFlipValue + liquidCapitalReserve;
 
-  // Unallocated private funding facilities for next acquisitions
+  // Unallocated private funding facilities for next acquisitions (Standby facilities + undrawn tranches of unallocated lines)
   const unallocatedFundingReserve = (state.funding || [])
     .filter(
       (f) =>
-        (f.status === 'Active' || f.status === 'Accruing') &&
+        (f.status === 'Active' || f.status === 'Accruing' || f.status === 'Standby') &&
         (!f.linkedDealId || f.linkedDealName === 'General Portfolio Liquidity')
     )
-    .reduce((sum, f) => sum + Math.max(0, (f.capitalAmountZAR || 0) - (f.totalRepaidZAR || 0)), 0);
+    .reduce((sum, f) => {
+      if (f.status === 'Standby') {
+        // Full facility is available undrawn
+        return sum + Math.max(0, (f.capitalAmountZAR || 0) - (f.totalRepaidZAR || 0));
+      }
+      if (f.tranches && f.tranches.length > 0) {
+        // Only undrawn tranches are available
+        return sum + f.tranches.filter((t) => !t.isDisbursed).reduce((s, t) => s + t.amountZAR, 0);
+      }
+      // If active with no tranches, it is already drawn into cash
+      return sum;
+    }, 0);
 
   // totalAvailablePurchasingPower computed after freeUnallocatedCash below
 
+  // Private funding liability calculated strictly from drawn capital minus repayments (undrawn tranches, standby lines, and settled facilities carry R 0 debt)
   const totalPrivateFundingLiability = (state.funding || [])
-    .filter((f) => f.status === 'Active' || f.status === 'Accruing')
-    .reduce((sum, f) => sum + Math.max(0, (f.capitalAmountZAR || 0) - (f.totalRepaidZAR || 0)), 0);
+    .filter((f) => f.status !== 'Settled')
+    .reduce((sum, f) => {
+      let drawn = 0;
+      if (f.status === 'Standby') {
+        drawn = 0;
+      } else if (f.tranches && f.tranches.length > 0) {
+        drawn = f.tranches.filter((t) => t.isDisbursed).reduce((s, t) => s + t.amountZAR, 0);
+      } else if (f.status === 'Active' || f.status === 'Accruing' || f.status === 'Matured') {
+        drawn = f.capitalAmountZAR || 0;
+      }
+      return sum + Math.max(0, drawn - (f.totalRepaidZAR || 0));
+    }, 0);
 
   const totalFundingLiabilities = totalPrivateFundingLiability + totalBondLiabilities;
   const netEquity = totalGrossAssetValue - totalFundingLiabilities;
@@ -1592,6 +1614,9 @@ export function computePortfolioSummary(state: {
 
   // 2. Free Unallocated Cash:
   const freeUnallocatedCash = Math.max(0, liquidCapitalReserve - ringFencedWorkingCapital);
+
+  // Deployable War Chest: Total cash reserve + pre-approved standby lines (ready for immediate deal acquisition)
+  const deployableWarChest = liquidCapitalReserve + unallocatedFundingReserve;
 
   // Deployable purchasing power = free cash (after ring-fencing) + unallocated funding facilities
   const totalAvailablePurchasingPower = freeUnallocatedCash + unallocatedFundingReserve;
@@ -1668,6 +1693,7 @@ export function computePortfolioSummary(state: {
     ringFencedWorkingCapital,
     freeUnallocatedCash,
     unallocatedFundingReserve,
+    deployableWarChest,
     totalAvailablePurchasingPower,
     totalFundingLiabilities,
     totalPrivateFundingLiability,
