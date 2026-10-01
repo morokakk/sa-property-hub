@@ -1,4 +1,4 @@
-import { AcquisitionCostBreakdown, AmenityDistance, AmenityScorecard, LongTermProjectionYear, OpportunityDeal, PropertyTitleType, RentalProperty } from '@/types';
+import { AcquisitionCostBreakdown, AmenityDistance, AmenityScorecard, AncillaryIncome, Lease, LongTermProjectionYear, OpportunityDeal, PropertyTitleType, RentalProperty } from '@/types';
 
 /**
  * Computes Built-in Equity and discount percentage
@@ -226,21 +226,32 @@ export function calculateRentalCashflow(property: {
   agencyVatApplicable?: boolean;
   monthlyAgentFeeZAR?: number;
   unpaidUtilityArrearsZAR?: number;
+  leases?: Lease[];
+  ancillaryIncomes?: AncillaryIncome[];
+  monthlyPrepaidVendingFeeZAR?: number;
 }): {
   agencyCommissionZAR: number;
   monthlyInsuranceZAR: number;
   totalMonthlyExpensesZAR: number;
   unpaidUtilityArrearsZAR: number;
   netMonthlyCashflowZAR: number;
+  grossRentZAR: number;
+  ancillaryIncomeZAR: number;
+  totalGrossIncomeZAR: number;
 } {
-  const gross = property.monthlyGrossRentZAR || 0;
+  const leaseGross = (property.leases && property.leases.length > 0)
+    ? property.leases.filter(l => l.status !== 'Vacant').reduce((sum, l) => sum + (l.monthlyRentZAR || 0), 0)
+    : (property.monthlyGrossRentZAR || 0);
+  const ancillaryIncomeZAR = (property.ancillaryIncomes || []).reduce((sum, a) => sum + (a.monthlyRentZAR || 0), 0);
+  const totalGrossIncomeZAR = leaseGross + ancillaryIncomeZAR;
+
   let agencyCommissionZAR = 0;
 
   if (property.managementType === 'Agency') {
     if (typeof property.monthlyAgentFeeZAR === 'number' && property.monthlyAgentFeeZAR > 0) {
       agencyCommissionZAR = Math.round(property.monthlyAgentFeeZAR);
     } else if (typeof property.agencyCommissionPercent === 'number' && property.agencyCommissionPercent > 0) {
-      const baseCommission = gross * (property.agencyCommissionPercent / 100);
+      const baseCommission = totalGrossIncomeZAR * (property.agencyCommissionPercent / 100);
       const vatMultiplier = property.agencyVatApplicable !== false ? 1.15 : 1.0;
       agencyCommissionZAR = Math.round(baseCommission * vatMultiplier);
     }
@@ -254,6 +265,7 @@ export function calculateRentalCashflow(property: {
 
   // Freehold properties have 0 body corporate levies
   const effectiveLevies = isFreehold ? 0 : (property.monthlyLeviesZAR || 0);
+  const prepaidVendingFee = property.monthlyPrepaidVendingFeeZAR || 0;
 
   const totalMonthlyExpensesZAR =
     effectiveLevies +
@@ -261,10 +273,11 @@ export function calculateRentalCashflow(property: {
     agencyCommissionZAR +
     (property.monthlyMaintenanceReserveZAR || 0) +
     monthlyInsuranceZAR +
-    (property.monthlyBondPaymentZAR || 0);
+    (property.monthlyBondPaymentZAR || 0) +
+    prepaidVendingFee;
 
   const unpaidUtilityArrearsZAR = property.unpaidUtilityArrearsZAR || 0;
-  const netMonthlyCashflowZAR = gross - totalMonthlyExpensesZAR - unpaidUtilityArrearsZAR;
+  const netMonthlyCashflowZAR = totalGrossIncomeZAR - totalMonthlyExpensesZAR - unpaidUtilityArrearsZAR;
 
   return {
     agencyCommissionZAR,
@@ -272,6 +285,9 @@ export function calculateRentalCashflow(property: {
     totalMonthlyExpensesZAR,
     unpaidUtilityArrearsZAR,
     netMonthlyCashflowZAR,
+    grossRentZAR: leaseGross,
+    ancillaryIncomeZAR,
+    totalGrossIncomeZAR,
   };
 }
 

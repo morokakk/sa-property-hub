@@ -890,11 +890,16 @@ export default function RentalPortfolioPage() {
             ) : (
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {activeRentals.map((property) => {
-                  const { agencyCommissionZAR, netMonthlyCashflowZAR: netCashflow } = calculateRentalCashflow(property);
+                  const {
+                    agencyCommissionZAR,
+                    netMonthlyCashflowZAR: netCashflow,
+                    totalGrossIncomeZAR,
+                    ancillaryIncomeZAR,
+                  } = calculateRentalCashflow(property);
 
                   const yieldGross =
                     property.marketValueZAR > 0
-                      ? ((property.monthlyGrossRentZAR * 12) / property.marketValueZAR) * 100
+                      ? ((totalGrossIncomeZAR * 12) / property.marketValueZAR) * 100
                       : 0;
 
                   const entityType = property.taxEntityTypeOverride || investorProfile?.defaultTaxEntityType || 'Company (27%)';
@@ -1140,6 +1145,13 @@ export default function RentalPortfolioPage() {
                                 />
                               </div>
 
+                              {ancillaryIncomeZAR > 0 && (
+                                <div className="flex justify-between items-center text-teal-700 bg-teal-50/60 px-2 py-1 rounded border border-teal-100 text-[11px]">
+                                  <span className="font-semibold">Commercial Ancillary Leases:</span>
+                                  <span className="font-bold font-mono">+ {formatZAR(ancillaryIncomeZAR)}/m</span>
+                                </div>
+                              )}
+
                               {property.propertyType === 'Freehold House' ? (
                                 <div className="flex justify-between items-center text-slate-500">
                                   <span>Building Insurance (Homeowner):</span>
@@ -1202,6 +1214,13 @@ export default function RentalPortfolioPage() {
                                 <span>Maintenance Reserve:</span>
                                 <span>- {formatZAR(property.monthlyMaintenanceReserveZAR)}</span>
                               </div>
+
+                              {(property.monthlyPrepaidVendingFeeZAR || 0) > 0 && (
+                                <div className="flex justify-between items-center text-slate-500">
+                                  <span>Prepaid Sub-Meter Fee ({property.prepaidVendorName || 'Vendor'}):</span>
+                                  <span>- {formatZAR(property.monthlyPrepaidVendingFeeZAR || 0)}</span>
+                                </div>
+                              )}
 
                               <div className="flex justify-between items-center text-slate-700 bg-slate-50/80 px-2 py-1.5 rounded-lg border border-slate-200">
                                 <div className="flex items-center gap-1.5 flex-wrap">

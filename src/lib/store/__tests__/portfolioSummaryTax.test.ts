@@ -532,6 +532,10 @@ describe('Portfolio Summary: Ring-Fenced Working Capital & SARS Provisional Tax 
       monthlyRatesTaxesZAR: 1_000,
       monthlyMaintenanceReserveZAR: 500,
       monthlyBondPaymentZAR: 1_500,
+      outstandingBondBalanceZAR: 100_000,
+      bondInterestRatePercent: 11.5,
+      monthlyAgentFeeZAR: 0,
+      maintenanceHistory: [],
       status: 'Occupied',
       managementType: 'Self-Managed',
       leases: [
