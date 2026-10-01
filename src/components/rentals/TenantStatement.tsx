@@ -614,66 +614,50 @@ export default function TenantStatement({
           role="dialog"
           aria-modal="true"
         >
-          {/* Header - Hidden on Print */}
-          <div className="bg-slate-900 text-white px-4 py-3.5 sm:px-6 sm:py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 print-hidden-element border-b border-slate-800">
-            {/* Top Tier: Icon + Title + Mobile Close Button */}
-            <div className="flex items-center justify-between gap-3 w-full sm:w-auto">
-              <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
-                <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center border border-emerald-500/30 shrink-0">
-                  <FileText className="w-4 h-4 sm:w-5 sm:h-5" />
-                </div>
-                <div className="min-w-0">
-                  <h3 className="text-sm sm:text-base font-bold tracking-tight truncate">
-                    {isCommercial
-                      ? 'Commercial Tax Invoice & Remittance'
-                      : isConsolidated
-                      ? 'Consolidated Property Master Statement'
-                      : 'Tenant Utility Recovery & Rent Statement'}
-                  </h3>
-                  <p className="text-[11px] sm:text-xs text-slate-400 truncate">
-                    {rental.title} •{' '}
-                    {isCommercial
-                      ? `${selectedAncillary?.tenantName} (${selectedAncillary?.type.replace('_', ' ')})`
-                      : isConsolidated
-                      ? 'All Units & Commercial Covenants'
-                      : `${selectedLease?.unitName || 'Main'}: ${selectedLease?.tenantName || 'Vacant'}`}
-                  </p>
-                </div>
+          {/* Header Tier 1: Title & Close Button (Print-Hidden) */}
+          <div className="bg-slate-900 text-white px-4 py-3 sm:px-6 sm:py-3.5 flex items-center justify-between gap-3 print-hidden-element border-b border-slate-800">
+            <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+              <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center border border-emerald-500/30 shrink-0">
+                <FileText className="w-4 h-4 sm:w-5 sm:h-5" />
               </div>
-
-              {/* Close Button on Mobile */}
-              <button
-                type="button"
-                onClick={onClose}
-                className="sm:hidden text-slate-400 hover:text-white hover:bg-slate-800 p-1.5 rounded-lg transition-colors cursor-pointer shrink-0"
-                aria-label="Close dialog"
-              >
-                <X className="w-5 h-5" />
-              </button>
+              <div className="min-w-0">
+                <h3 className="text-sm sm:text-base font-bold tracking-tight text-white truncate">
+                  {isCommercial
+                    ? 'Commercial Tax Invoice & Remittance'
+                    : isConsolidated
+                    ? 'Consolidated Property Master Statement'
+                    : 'Tenant Utility Recovery & Rent Statement'}
+                </h3>
+                <p className="text-[11px] sm:text-xs text-slate-400 truncate">
+                  {rental.title} •{' '}
+                  {isCommercial
+                    ? `${selectedAncillary?.tenantName} (${selectedAncillary?.type.replace('_', ' ')})`
+                    : isConsolidated
+                    ? 'All Units & Commercial Covenants'
+                    : `${selectedLease?.unitName || 'Main'}: ${selectedLease?.tenantName || 'Vacant'}`}
+                </p>
+              </div>
             </div>
 
-            {/* Bottom Tier: Action Buttons toolbar */}
-            <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap sm:flex-nowrap w-full sm:w-auto justify-start sm:justify-end">
-              {currentStatement && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (confirm(`Remove parsed statement for ${currentStatement.billingPeriod || currentStatement.statementDate}?`)) {
-                      deleteUtilityStatement(rental.id, currentStatement.id);
-                    }
-                  }}
-                  className="inline-flex items-center gap-1 bg-rose-950/70 hover:bg-rose-900 text-rose-300 hover:text-white text-[11px] sm:text-xs font-semibold px-2 py-1.5 sm:px-2.5 sm:py-1.5 rounded-lg border border-rose-800/70 transition-colors cursor-pointer shrink-0"
-                  title="Delete this parsed statement"
-                >
-                  <Trash2 className="w-3.5 h-3.5 text-rose-400 shrink-0" />
-                  <span>Delete</span>
-                </button>
-              )}
+            <button
+              type="button"
+              onClick={onClose}
+              className="text-slate-400 hover:text-white hover:bg-slate-800 p-2 rounded-xl transition-colors cursor-pointer shrink-0"
+              aria-label="Close dialog"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+
+          {/* Header Tier 2: Dedicated Actions Toolbar (Print-Hidden) */}
+          <div className="bg-slate-950/80 text-white px-4 py-2 sm:px-6 sm:py-2.5 flex flex-wrap items-center justify-between gap-2 print-hidden-element border-b border-slate-800/80">
+            {/* Left Tools: Secondary Utility Inspection */}
+            <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
               {onOpenMeterReadings && !isBundled && (
                 <button
                   type="button"
                   onClick={onOpenMeterReadings}
-                  className="inline-flex items-center gap-1 bg-cyan-950/70 hover:bg-cyan-900 text-cyan-300 hover:text-white text-[11px] sm:text-xs font-semibold px-2 py-1.5 sm:px-2.5 sm:py-1.5 rounded-lg border border-cyan-800/70 transition-colors cursor-pointer shrink-0"
+                  className="inline-flex items-center gap-1 bg-cyan-950/80 hover:bg-cyan-900 text-cyan-300 hover:text-white text-[11px] sm:text-xs font-semibold px-2.5 py-1.5 rounded-lg border border-cyan-800/70 transition-colors cursor-pointer shrink-0"
                   title="View physical and municipal meter readings"
                 >
                   <Gauge className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
@@ -685,12 +669,31 @@ export default function TenantStatement({
                   )}
                 </button>
               )}
+              {currentStatement && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (confirm(`Remove parsed statement for ${currentStatement.billingPeriod || currentStatement.statementDate}?`)) {
+                      deleteUtilityStatement(rental.id, currentStatement.id);
+                    }
+                  }}
+                  className="inline-flex items-center gap-1 bg-rose-950/80 hover:bg-rose-900 text-rose-300 hover:text-white text-[11px] sm:text-xs font-semibold px-2.5 py-1.5 rounded-lg border border-rose-800/70 transition-colors cursor-pointer shrink-0"
+                  title="Delete this parsed statement"
+                >
+                  <Trash2 className="w-3.5 h-3.5 text-rose-400 shrink-0" />
+                  <span>Delete Statement</span>
+                </button>
+              )}
+            </div>
+
+            {/* Right Tools: Share & Export Actions */}
+            <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap ml-auto">
               {selectedLease?.id && (
                 <button
                   type="button"
                   data-testid="copy-tenant-link-btn"
                   onClick={handleCopySecureLink}
-                  className="inline-flex items-center gap-1 bg-sky-600 hover:bg-sky-700 active:bg-sky-800 text-white text-[11px] sm:text-xs font-semibold px-2.5 py-1.5 sm:px-3 sm:py-1.5 rounded-lg shadow-xs transition-colors cursor-pointer shrink-0"
+                  className="inline-flex items-center gap-1.5 bg-sky-600 hover:bg-sky-700 active:bg-sky-800 text-white text-[11px] sm:text-xs font-semibold px-3 py-1.5 rounded-lg shadow-xs transition-colors cursor-pointer shrink-0"
                   title="Copy shareable secure public statement URL to clipboard"
                 >
                   <Link2 className="w-3.5 h-3.5 shrink-0" />
@@ -700,7 +703,7 @@ export default function TenantStatement({
               <button
                 type="button"
                 onClick={handleCopyWhatsApp}
-                className="inline-flex items-center gap-1 bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] sm:text-xs font-semibold px-2.5 py-1.5 sm:px-3 sm:py-1.5 rounded-lg shadow-sm transition-colors cursor-pointer shrink-0"
+                className="inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] sm:text-xs font-semibold px-3 py-1.5 rounded-lg shadow-sm transition-colors cursor-pointer shrink-0"
                 title="Copy WhatsApp statement to clipboard"
               >
                 <Share2 className="w-3.5 h-3.5 shrink-0" />
@@ -709,20 +712,11 @@ export default function TenantStatement({
               <button
                 type="button"
                 onClick={handlePrint}
-                className="inline-flex items-center gap-1 bg-slate-800 hover:bg-slate-700 text-slate-200 text-[11px] sm:text-xs font-semibold px-2 py-1.5 sm:px-3 sm:py-1.5 rounded-lg border border-slate-700 transition-colors cursor-pointer shrink-0"
+                className="inline-flex items-center gap-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-[11px] sm:text-xs font-semibold px-3 py-1.5 rounded-lg border border-slate-700 transition-colors cursor-pointer shrink-0"
                 title="Print or export as PDF"
               >
                 <Printer className="w-3.5 h-3.5 shrink-0" />
                 <span>Print</span>
-              </button>
-              {/* Close Button on Desktop */}
-              <button
-                type="button"
-                onClick={onClose}
-                className="hidden sm:inline-flex text-slate-400 hover:text-white hover:bg-slate-800 p-1.5 rounded-lg transition-colors cursor-pointer ml-1 shrink-0"
-                aria-label="Close dialog"
-              >
-                <X className="w-5 h-5" />
               </button>
             </div>
           </div>
