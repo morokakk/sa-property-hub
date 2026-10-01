@@ -80,6 +80,7 @@ export default function SettingsPage() {
   const [showApiKey, setShowApiKey] = useState(false);
 
   const [savedSuccess, setSavedSuccess] = useState(false);
+  const [logoError, setLogoError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Cloud Database Synchronization & Supabase Auth State
@@ -199,16 +200,20 @@ export default function SettingsPage() {
 
   // Handle Logo Upload as Base64
   const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setLogoError(null);
     const file = e.target.files?.[0];
     if (!file) return;
 
     if (!file.type.startsWith('image/')) {
-      alert('Please upload an image file (PNG, JPG, SVG, or WEBP).');
+      setLogoError('Please upload an image file (PNG, JPG, SVG, or WEBP).');
+      if (fileInputRef.current) fileInputRef.current.value = '';
       return;
     }
 
     if (file.size > 2 * 1024 * 1024) {
-      alert('Image size exceeds 2MB limit. Please upload a smaller image.');
+      const fileSizeMB = (file.size / (1024 * 1024)).toFixed(2);
+      setLogoError(`File size (${fileSizeMB}MB) exceeds the 2MB limit. Please upload a smaller image.`);
+      if (fileInputRef.current) fileInputRef.current.value = '';
       return;
     }
 
@@ -216,12 +221,14 @@ export default function SettingsPage() {
     reader.onload = (event) => {
       const result = event.target?.result as string;
       setLogoBase64(result);
+      setLogoError(null);
     };
     reader.readAsDataURL(file);
   };
 
   const handleRemoveLogo = () => {
     setLogoBase64('');
+    setLogoError(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -717,6 +724,16 @@ export default function SettingsPage() {
                   <Upload className="w-3.5 h-3.5" />
                   <span>{logoBase64 ? 'Replace Logo' : 'Upload Logo File'}</span>
                 </label>
+
+                {logoError && (
+                  <div
+                    data-testid="logo-upload-error"
+                    className="p-2.5 bg-rose-50 border border-rose-200 rounded-lg text-rose-700 text-xs flex items-start gap-2 animate-in fade-in"
+                  >
+                    <AlertCircle className="w-3.5 h-3.5 text-rose-600 shrink-0 mt-0.5" />
+                    <span>{logoError}</span>
+                  </div>
+                )}
               </div>
 
               {/* Bio Summary Text Area */}
