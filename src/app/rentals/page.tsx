@@ -1252,35 +1252,89 @@ export default function RentalPortfolioPage() {
 
                               {/* SARS Income Tax Provision */}
                               <div className="pt-2 border-t border-slate-200 space-y-1.5">
-                                <div className="flex justify-between items-center text-slate-700 bg-amber-50/60 px-2.5 py-1.5 rounded-lg border border-amber-200">
-                                  <div>
-                                    <div className="flex items-center gap-1.5 flex-wrap">
-                                      <span className="font-semibold text-amber-950 text-[11px]">
-                                        Est. SARS Tax Provision:
-                                      </span>
-                                      <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-amber-100 text-amber-800 border border-amber-200">
-                                        {taxRateLabel}
-                                      </span>
-                                      {sec13Shield > 0 && (
-                                        <span
-                                          className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-emerald-100 text-emerald-800 border border-emerald-300 flex items-center gap-0.5"
-                                          title={`Section 13sex Tax Shield: ${formatZAR(sec13Shield)}/yr allowance saves ${formatZAR(taxSavingsZAR)}/yr in SARS income tax`}
-                                        >
-                                          ✓ Sec 13sex Shield Active (-{formatZAR(taxSavingsZAR)}/yr)
+                                <div className="flex flex-col gap-2 text-slate-700 bg-amber-50/60 p-2.5 rounded-lg border border-amber-200">
+                                  <div className="flex justify-between items-start">
+                                    <div>
+                                      <div className="flex items-center gap-1.5 flex-wrap">
+                                        <span className="font-semibold text-amber-950 text-[11px]">
+                                          Est. SARS Tax Provision:
                                         </span>
-                                      )}
+                                        <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-amber-100 text-amber-800 border border-amber-200">
+                                          {taxRateLabel} {property.taxEntityTypeOverride ? '(Override)' : '(Default)'}
+                                        </span>
+                                        {sec13Shield > 0 && (
+                                          <span
+                                            className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-emerald-100 text-emerald-800 border border-emerald-300 flex items-center gap-0.5"
+                                            title={`Section 13sex Tax Shield: ${formatZAR(sec13Shield)}/yr allowance saves ${formatZAR(taxSavingsZAR)}/yr in SARS income tax`}
+                                          >
+                                            ✓ Sec 13sex Shield Active (-{formatZAR(taxSavingsZAR)}/yr)
+                                          </span>
+                                        )}
+                                      </div>
+                                      <span className="text-[10px] text-amber-700 block mt-0.5">
+                                        {taxRate === 0
+                                          ? 'Pre-Tax entity structure (0% tax liability)'
+                                          : netCashflow <= 0
+                                          ? 'Assessed operational loss (R 0 tax liability)'
+                                          : `${formatZAR(annualTaxZAR)}/yr tax reserve liability`}
+                                      </span>
                                     </div>
-                                    <span className="text-[10px] text-amber-700">
-                                      {taxRate === 0
-                                        ? 'Pre-Tax entity structure (0% tax liability)'
-                                        : netCashflow <= 0
-                                        ? 'Assessed operational loss (R 0 tax liability)'
-                                        : `${formatZAR(annualTaxZAR)}/yr tax reserve liability`}
+                                    <span className="font-mono font-bold text-amber-900 text-xs shrink-0">
+                                      {monthlyTaxZAR > 0 ? `- ${formatZAR(monthlyTaxZAR)}` : 'R 0'}
                                     </span>
                                   </div>
-                                  <span className="font-mono font-bold text-amber-900 text-xs">
-                                    {monthlyTaxZAR > 0 ? `- ${formatZAR(monthlyTaxZAR)}` : 'R 0'}
-                                  </span>
+
+                                  {/* 1-Click Interactive Tax Entity Toggle */}
+                                  <div className="flex items-center gap-1 pt-1.5 border-t border-amber-200/60 flex-wrap">
+                                    <span className="text-[9px] font-bold text-amber-900/70 uppercase tracking-wider mr-0.5">
+                                      Entity:
+                                    </span>
+                                    <button
+                                      type="button"
+                                      onClick={() => updateRental(property.id, { taxEntityTypeOverride: undefined })}
+                                      className={`px-1.5 py-0.5 text-[9px] font-bold rounded transition-all cursor-pointer ${
+                                        property.taxEntityTypeOverride === undefined
+                                          ? 'bg-amber-700 text-white shadow-2xs'
+                                          : 'bg-white text-slate-700 hover:text-slate-900 hover:bg-amber-100 border border-amber-200'
+                                      }`}
+                                      title={`Inherit global default from Settings (${investorProfile?.defaultTaxEntityType || 'Company (27%)'})`}
+                                    >
+                                      Default ({investorProfile?.defaultTaxEntityType === 'Individual (45%)' ? '45%' : investorProfile?.defaultTaxEntityType === 'Pre-Tax' ? '0%' : '27%'})
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => updateRental(property.id, { taxEntityTypeOverride: 'Company (27%)' })}
+                                      className={`px-1.5 py-0.5 text-[9px] font-bold rounded transition-all cursor-pointer ${
+                                        property.taxEntityTypeOverride === 'Company (27%)'
+                                          ? 'bg-amber-700 text-white shadow-2xs'
+                                          : 'bg-white text-slate-700 hover:text-slate-900 hover:bg-amber-100 border border-amber-200'
+                                      }`}
+                                    >
+                                      Company 27%
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => updateRental(property.id, { taxEntityTypeOverride: 'Individual (45%)' })}
+                                      className={`px-1.5 py-0.5 text-[9px] font-bold rounded transition-all cursor-pointer ${
+                                        property.taxEntityTypeOverride === 'Individual (45%)'
+                                          ? 'bg-amber-700 text-white shadow-2xs'
+                                          : 'bg-white text-slate-700 hover:text-slate-900 hover:bg-amber-100 border border-amber-200'
+                                      }`}
+                                    >
+                                      Individual 45%
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => updateRental(property.id, { taxEntityTypeOverride: 'Pre-Tax' })}
+                                      className={`px-1.5 py-0.5 text-[9px] font-bold rounded transition-all cursor-pointer ${
+                                        property.taxEntityTypeOverride === 'Pre-Tax'
+                                          ? 'bg-amber-700 text-white shadow-2xs'
+                                          : 'bg-white text-slate-700 hover:text-slate-900 hover:bg-amber-100 border border-amber-200'
+                                      }`}
+                                    >
+                                      Pre-Tax 0%
+                                    </button>
+                                  </div>
                                 </div>
 
                                 <div className="flex justify-between items-center text-slate-900 bg-emerald-50/70 px-2.5 py-2 rounded-lg border border-emerald-200">
@@ -2940,7 +2994,7 @@ export default function RentalPortfolioPage() {
                   }}
                   className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg bg-white text-xs font-semibold"
                 >
-                  <option value="">Use Default</option>
+                  <option value="">Use Default ({investorProfile?.defaultTaxEntityType || 'Company (27%)'})</option>
                   <option value="Company (27%)">Company (27%)</option>
                   <option value="Individual (45%)">Individual (45%)</option>
                   <option value="Pre-Tax">Pre-Tax</option>

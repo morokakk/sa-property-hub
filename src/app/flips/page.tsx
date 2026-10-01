@@ -149,7 +149,9 @@ export default function FlipsManagerPage() {
   const [flipCompletionDate, setFlipCompletionDate] = useState(
     new Date(Date.now() + 180 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
   );
-  const [flipTaxEntityType, setFlipTaxEntityType] = useState<NonNullable<FlipProject['taxEntityType']>>('Company (27%)');
+  const [flipTaxEntityType, setFlipTaxEntityType] = useState<NonNullable<FlipProject['taxEntityType']>>(
+    investorProfile?.defaultTaxEntityType || 'Company (27%)'
+  );
   const [flipSec118Arrears, setFlipSec118Arrears] = useState<number>(0);
   const [flipAdvanceDeposit, setFlipAdvanceDeposit] = useState<number>(0);
   const [flipRccStatus, setFlipRccStatus] = useState<NonNullable<FlipProject['municipalClearance']>['rccStatus']>('Pending Application');
@@ -323,7 +325,7 @@ export default function FlipsManagerPage() {
     setFlipOtherHoldingCost(2000);
     setFlipTargetExit(3800000);
     setFlipCompletionDate(new Date(Date.now() + 180 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]);
-    setFlipTaxEntityType('Company (27%)');
+    setFlipTaxEntityType(investorProfile?.defaultTaxEntityType || 'Company (27%)');
     setFlipSec118Arrears(0);
     setFlipAdvanceDeposit(0);
     setFlipRccStatus('Pending Application');
@@ -363,7 +365,7 @@ export default function FlipsManagerPage() {
     setFlipOtherHoldingCost(other);
     setFlipTargetExit(activeFlip.targetExitPriceZAR);
     setFlipCompletionDate(activeFlip.targetCompletionDate);
-    setFlipTaxEntityType(activeFlip.taxEntityType || 'Company (27%)');
+    setFlipTaxEntityType(activeFlip.taxEntityType || investorProfile?.defaultTaxEntityType || 'Company (27%)');
     setFlipSec118Arrears(activeFlip.municipalClearance?.sec118ArrearsZAR || 0);
     setFlipAdvanceDeposit(activeFlip.municipalClearance?.advanceCouncilDepositZAR || 0);
     setFlipRccStatus(activeFlip.municipalClearance?.rccStatus || 'Pending Application');

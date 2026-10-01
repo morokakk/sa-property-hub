@@ -1553,7 +1553,8 @@ export function computePortfolioSummary(state: {
   const totalFundingLiabilities = totalPrivateFundingLiability + totalBondLiabilities;
   const netEquity = totalGrossAssetValue - totalFundingLiabilities;
 
-  // Monthly rental cash flow only counts active tenancies (not sold properties)
+  // Monthly rental cash flow and property-by-property SARS provisional tax reserve
+  let annualRentalTaxReserve = 0;
   const monthlyNetRentalCashflow = activeRentals.reduce((sum, r) => {
     const gross = r.leases?.filter(l => l.status !== 'Vacant').reduce((s, l) => s + (l.monthlyRentZAR || 0), 0) || r.monthlyGrossRentZAR || 0;
     const ancillaryTotal = (r.ancillaryIncomes || []).reduce((sum, a) => sum + a.monthlyRentZAR, 0);
@@ -1580,7 +1581,18 @@ export function computePortfolioSummary(state: {
       (r.monthlyBondPaymentZAR || 0) +
       (r.monthlyPrepaidVendingFeeZAR || 0);
     const arrears = r.unpaidUtilityArrearsZAR || 0;
-    return sum + (totalGross - expenses - arrears);
+    const propNetMonthly = totalGross - expenses - arrears;
+
+    // Property-by-property SARS tax reserve aggregation
+    const propAnnualCashflow = Math.max(0, propNetMonthly * 12);
+    const propSec13Shield = r.section13sexAnnualShieldZAR || 0;
+    const propTaxableIncome = Math.max(0, propAnnualCashflow - propSec13Shield);
+    const propEntityType = r.taxEntityTypeOverride || state.investorProfile?.defaultTaxEntityType || 'Company (27%)';
+    const propTaxRate = propEntityType === 'Individual (45%)' ? 0.45 : propEntityType === 'Pre-Tax' ? 0 : 0.27;
+    const propAnnualTax = Math.round(propTaxableIncome * propTaxRate);
+    annualRentalTaxReserve += propAnnualTax;
+
+    return sum + propNetMonthly;
   }, 0);
 
   // 1. Ring-Fenced Project Working Capital:
@@ -1655,12 +1667,6 @@ export function computePortfolioSummary(state: {
     }
   });
 
-  const defaultTaxRate = state.investorProfile?.defaultTaxEntityType === 'Individual (45%)' ? 0.45
-    : state.investorProfile?.defaultTaxEntityType === 'Pre-Tax' ? 0 : 0.27;
-  const annualRentalNetIncome = monthlyNetRentalCashflow * 12;
-  const totalSection13sexShield = activeRentals.reduce((sum, r) => sum + (r.section13sexAnnualShieldZAR || 0), 0);
-  const rentalTaxableIncome = Math.max(0, annualRentalNetIncome - totalSection13sexShield);
-  const annualRentalTaxReserve = Math.round(rentalTaxableIncome * defaultTaxRate);
   totalSarsProvisionalTaxReserve += annualRentalTaxReserve;
 
   const totalNetProjectedFlipProfits = totalGrossProjectedFlipProfits - (totalSarsProvisionalTaxReserve - annualRentalTaxReserve);

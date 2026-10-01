@@ -513,4 +513,90 @@ describe('Portfolio Summary: Ring-Fenced Working Capital & SARS Provisional Tax 
     // Total private funding liability increases by 450,000 (from 1,995,000 to 2,445,000)
     expect(activatedSummary.totalPrivateFundingLiability).toBe(2_445_000);
   });
+
+  it('calculates rental tax reserve property-by-property with individual overrides and global default fallback', () => {
+    const baseState = usePortfolioStore.getState();
+
+    // Rental A: Net cashflow R10,000/mo (R120,000/yr), no override -> inherits global default Company 27% (tax: R32,400)
+    const rentalA: RentalProperty = {
+      id: 'test-tax-a',
+      title: 'Company Default Rental',
+      address: '10 Test St',
+      city: 'Johannesburg',
+      purchasePriceZAR: 1_000_000,
+      marketValueZAR: 1_200_000,
+      purchaseDate: '2025-01-01',
+      propertyType: 'Sectional Title Apartment',
+      monthlyGrossRentZAR: 15_000,
+      monthlyLeviesZAR: 2_000,
+      monthlyRatesTaxesZAR: 1_000,
+      monthlyMaintenanceReserveZAR: 500,
+      monthlyBondPaymentZAR: 1_500,
+      status: 'Occupied',
+      managementType: 'Self-Managed',
+      leases: [
+        {
+          id: 'lease-a',
+          unitName: 'Unit A',
+          tenantName: 'Tenant A',
+          monthlyRentZAR: 15_000,
+          depositHeldZAR: 15_000,
+          annualEscalationPercent: 7,
+          leaseStartDate: '2025-01-01',
+          leaseEndDate: '2026-01-01',
+          status: 'Occupied',
+        },
+      ],
+      // No override -> inherits defaultTaxEntityType
+    };
+
+    // Rental B: Net cashflow R10,000/mo (R120,000/yr), override to Individual 45% (tax: R54,000)
+    const rentalB: RentalProperty = {
+      ...rentalA,
+      id: 'test-tax-b',
+      title: 'Individual Override Rental',
+      taxEntityTypeOverride: 'Individual (45%)',
+    };
+
+    // Rental C: Net cashflow R10,000/mo (R120,000/yr), override to Pre-Tax 0% (tax: R0)
+    const rentalC: RentalProperty = {
+      ...rentalA,
+      id: 'test-tax-c',
+      title: 'Pre-Tax Override Rental',
+      taxEntityTypeOverride: 'Pre-Tax',
+    };
+
+    // Test with default Company (27%)
+    const summaryDefaultCompany = computePortfolioSummary({
+      ...baseState,
+      investorProfile: {
+        ...baseState.investorProfile,
+        defaultTaxEntityType: 'Company (27%)',
+      },
+      rentals: [rentalA, rentalB, rentalC],
+    });
+
+    // Net monthly cashflow for each is: 15000 - (2000 + 1000 + 500 + 1500) = 10,000/mo = 120,000/yr
+    // Rental A: 120,000 * 27% = 32,400
+    // Rental B: 120,000 * 45% = 54,000
+    // Rental C: 120,000 * 0% = 0
+    // Total Annual Reserve: 32,400 + 54,000 + 0 = 86,400
+    expect(summaryDefaultCompany.annualRentalTaxReserve).toBe(86_400);
+    expect(summaryDefaultCompany.monthlyRentalTaxReserve).toBe(Math.round(86_400 / 12));
+
+    // Now test changing global default to Individual (45%)
+    // Rental A (inheriting default) now uses 45% -> 120,000 * 45% = 54,000
+    // Rental B (explicit override 45%) remains 54,000
+    // Rental C (explicit override Pre-Tax) remains 0
+    // Total Annual Reserve: 54,000 + 54,000 + 0 = 108,000
+    const summaryDefaultIndividual = computePortfolioSummary({
+      ...baseState,
+      investorProfile: {
+        ...baseState.investorProfile,
+        defaultTaxEntityType: 'Individual (45%)',
+      },
+      rentals: [rentalA, rentalB, rentalC],
+    });
+    expect(summaryDefaultIndividual.annualRentalTaxReserve).toBe(108_000);
+  });
 });
