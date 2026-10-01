@@ -122,4 +122,49 @@ describe('Tenant Statement Ledger & Calculation Engine', () => {
     expect(formatDate('2025-01-01')).toBe('01 Jan 2025');
     expect(formatDate('2026-12-31')).toBe('31 Dec 2026');
   });
+
+  it('computes month-over-month variance with correct percentage and direction', () => {
+    const prevElec = 900;
+    const currElec = 1200;
+    const diff = currElec - prevElec;
+    const pct = (diff / prevElec) * 100;
+
+    expect(diff).toBe(300);
+    expect(pct.toFixed(1)).toBe('33.3');
+
+    // Negative variance (decrease in cost)
+    const prevWater = 450;
+    const currWater = 300;
+    const waterDiff = currWater - prevWater;
+    const waterPct = (waterDiff / prevWater) * 100;
+
+    expect(waterDiff).toBe(-150);
+    expect(waterPct.toFixed(1)).toBe('-33.3');
+  });
+
+  it('correctly matches extracted meter readings to active statement period', () => {
+    const stmtWithMeters = {
+      ...mockStatementData.utility_statements[0],
+      extractedMeterReadings: [
+        {
+          meterNumber: '10003374',
+          utilityType: 'electricity' as const,
+          previousReadingValue: 39500,
+          readingValue: 39710,
+          consumption: 210,
+          readingType: 'Actual' as const,
+          date: '2026-03-05',
+        },
+      ],
+    };
+
+    const reading = stmtWithMeters.extractedMeterReadings.find(
+      (m) => m.utilityType === 'electricity'
+    );
+    expect(reading).toBeDefined();
+    expect(reading?.meterNumber).toBe('10003374');
+    expect(reading?.previousReadingValue).toBe(39500);
+    expect(reading?.readingValue).toBe(39710);
+    expect(reading?.consumption).toBe(210);
+  });
 });

@@ -55,6 +55,14 @@ test.describe('Secure Tenant Statement Portal', () => {
     // Verify financial breakdown total
     await expect(printRoot.getByText('TOTAL AMOUNT PAYABLE')).toBeVisible();
 
+    // Verify 4-column comparative ledger headers
+    await expect(printRoot.getByText('Billing Item / Municipal Line')).toBeVisible();
+    await expect(printRoot.getByText('Month-over-Month Variance')).toBeVisible();
+
+    // Verify meter dials and consumption usage
+    await expect(printRoot.getByText(/Meter #/i).first()).toBeVisible();
+    await expect(printRoot.getByText(/Usage:/i).first()).toBeVisible();
+
     // Capture visual snapshot into test results
     await page.screenshot({ path: 'test-results/tenant-statement-portal.png', fullPage: true });
   });

@@ -1,4 +1,4 @@
-import { UtilityStatement } from '@/types';
+import { UtilityStatement, MeterReading } from '@/types';
 
 export interface PublicTenantStatementPayload {
   lease: {
@@ -32,4 +32,5 @@ export interface PublicTenantStatementPayload {
     logo_base64?: string | null;
   };
   utility_statements: UtilityStatement[];
+  meter_readings?: MeterReading[];
 }

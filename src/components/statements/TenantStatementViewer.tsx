@@ -12,7 +12,6 @@ import {
   FileText,
   Zap,
   Droplets,
-  ShieldCheck,
   CreditCard,
   Download,
 } from 'lucide-react';
@@ -39,6 +38,7 @@ export default function TenantStatementViewer({
   const [selectedIndex, setSelectedIndex] = useState<number>(0);
 
   const activeStatement = sortedStatements[selectedIndex];
+  const previousStatement = sortedStatements[selectedIndex + 1];
 
   // Base rent from lease
   const baseRent = lease.monthlyRentZAR || 0;
@@ -63,12 +63,124 @@ export default function TenantStatementViewer({
 
   const totalDue = baseRent + totalUtilities;
 
-  // Display Period
+  // Previous statement numbers for MoM comparison
+  const isPrevBundled =
+    previousStatement?.billingType === 'bundled' ||
+    previousStatement?.bundledUtilitiesZAR !== undefined;
+
+  const prevElecZAR = previousStatement
+    ? isPrepaid
+      ? 0
+      : previousStatement.electricityZAR || 0
+    : undefined;
+  const prevWaterZAR = previousStatement
+    ? isPrepaid
+      ? 0
+      : previousStatement.waterZAR || 0
+    : undefined;
+  const prevRefuseZAR = previousStatement
+    ? previousStatement.refuseZAR || 0
+    : undefined;
+  const prevSewerageZAR = previousStatement
+    ? previousStatement.sewerageZAR || 0
+    : undefined;
+  const prevBundledZAR = previousStatement
+    ? isPrevBundled
+      ? previousStatement.bundledUtilitiesZAR || 0
+      : undefined
+    : undefined;
+
+  const prevTotalDue = previousStatement
+    ? baseRent +
+      (isPrevBundled
+        ? previousStatement.bundledUtilitiesZAR || 0
+        : isPrepaid
+        ? (previousStatement.refuseZAR || 0) + (previousStatement.sewerageZAR || 0)
+        : (previousStatement.electricityZAR || 0) +
+          (previousStatement.waterZAR || 0) +
+          (previousStatement.refuseZAR || 0) +
+          (previousStatement.sewerageZAR || 0))
+    : undefined;
+
+  // Meter readings for active statement
+  const elecMeterReading = useMemo(() => {
+    const fromStatement = (activeStatement?.extractedMeterReadings || []).find(
+      (m) => m.utilityType === 'electricity'
+    );
+    if (fromStatement) return fromStatement;
+
+    return (statementData.meter_readings || [])
+      .filter((m) => m.utilityType === 'electricity')
+      .find(
+        (m) =>
+          m.date === activeStatement?.statementDate ||
+          (activeStatement?.statementDate &&
+            m.date.startsWith(activeStatement.statementDate.substring(0, 7)))
+      );
+  }, [activeStatement, statementData.meter_readings]);
+
+  const waterMeterReading = useMemo(() => {
+    const fromStatement = (activeStatement?.extractedMeterReadings || []).find(
+      (m) => m.utilityType === 'water'
+    );
+    if (fromStatement) return fromStatement;
+
+    return (statementData.meter_readings || [])
+      .filter((m) => m.utilityType === 'water')
+      .find(
+        (m) =>
+          m.date === activeStatement?.statementDate ||
+          (activeStatement?.statementDate &&
+            m.date.startsWith(activeStatement.statementDate.substring(0, 7)))
+      );
+  }, [activeStatement, statementData.meter_readings]);
+
+  // Display Periods
   const billingPeriodLabel =
     activeStatement?.billingPeriod ||
     (activeStatement?.statementDate
       ? formatDate(activeStatement.statementDate)
       : 'Current Period');
+
+  const previousPeriodLabel = previousStatement
+    ? previousStatement.billingPeriod ||
+      (previousStatement.statementDate
+        ? formatDate(previousStatement.statementDate)
+        : 'Previous Period')
+    : 'Previous Period';
+
+  // Variance visual badge helper
+  const renderVariance = (curr: number, prev: number | undefined) => {
+    if (prev === undefined) {
+      return (
+        <span className="text-slate-400 text-[11px] font-mono">
+          — (Baseline Period)
+        </span>
+      );
+    }
+    const diff = curr - prev;
+    if (Math.abs(diff) < 0.01) {
+      return (
+        <span className="text-slate-400 text-xs font-mono font-medium">
+          0.00 (0%)
+        </span>
+      );
+    }
+    const pct = prev > 0 ? (diff / prev) * 100 : diff > 0 ? 100 : -100;
+    const isIncrease = diff > 0;
+
+    return (
+      <span
+        className={`inline-flex items-center gap-1 font-bold text-xs ${
+          isIncrease ? 'text-rose-600' : 'text-emerald-600'
+        }`}
+      >
+        {isIncrease ? '▲ +' : '▼ -'}
+        {formatZAR(Math.abs(diff), { includeDecimals: true })} ({isIncrease ? '+' : ''}
+        {pct.toFixed(1)}%)
+      </span>
+    );
+  };
 
   const handlePrint = () => {
     if (typeof window !== 'undefined') {
@@ -115,11 +227,11 @@ export default function TenantStatementViewer({
               }
               @page {
                 size: A4 portrait;
-                margin: 12mm 14mm 12mm 14mm;
+                margin: 10mm 12mm 10mm 12mm;
               }
-              * {
-                -webkit-print-color-adjust: exact !important;
-                print-color-adjust: exact !important;
+              table {
+                min-width: 100% !important;
+                width: 100% !important;
               }
             }
           `,
@@ -127,125 +239,124 @@ export default function TenantStatementViewer({
       />
 
       <div className="max-w-4xl mx-auto space-y-4">
-        {/* Top Control Toolbar (Hidden during Print) */}
-        <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 print-hidden-element">
-          <div className="flex items-center gap-3">
-            <div className="p-2.5 bg-emerald-50 text-emerald-700 rounded-xl">
-              <ShieldCheck className="w-5 h-5" />
+        {/* Interactive Screen Controls (Print-Hidden) */}
+        <div className="bg-white border border-slate-200/80 rounded-2xl p-4 sm:p-5 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 print-hidden-element">
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="p-1.5 rounded-lg bg-emerald-100 text-emerald-800">
+                <FileText className="w-5 h-5" />
+              </span>
+              <h1 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight">
+                Official Tenant Statement
+              </h1>
+              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                Verified Portal
+              </span>
             </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h1 className="text-sm font-bold text-slate-900">Official Tenant Statement</h1>
-                <span className="px-2 py-0.5 text-[10px] font-semibold bg-emerald-100 text-emerald-800 rounded-full">
-                  Verified Portal
-                </span>
-              </div>
-              <p className="text-xs text-slate-500">
-                {property.title} • {lease.unitName}
-              </p>
-            </div>
+            <p className="text-xs text-slate-500 mt-1">
+              {property.title} • {lease.unitName}
+            </p>
           </div>
 
-          <div className="flex items-center gap-2.5 self-end sm:self-auto w-full sm:w-auto">
-            {/* Historical Month Dropdown */}
-            {sortedStatements.length > 0 && (
-              <div className="relative flex-1 sm:flex-initial">
-                <label htmlFor="period-select" className="sr-only">
-                  Billing Period
-                </label>
-                <div className="relative">
-                  <Calendar className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-3 pointer-events-none" />
-                  <select
-                    id="period-select"
-                    data-testid="month-selector"
-                    value={selectedIndex}
-                    onChange={(e) => setSelectedIndex(Number(e.target.value))}
-                    className="w-full sm:w-auto pl-8 pr-8 py-2 text-xs font-semibold bg-slate-50 hover:bg-slate-100 border border-slate-300 rounded-xl text-slate-700 focus:outline-hidden focus:ring-2 focus:ring-emerald-500 cursor-pointer appearance-none transition-colors"
-                  >
-                    {sortedStatements.map((stmt, idx) => (
-                      <option key={stmt.id || idx} value={idx}>
-                        {stmt.billingPeriod || (stmt.statementDate ? formatDate(stmt.statementDate) : `Statement ${idx + 1}`)}
-                      </option>
-                    ))}
-                  </select>
+          <div className="flex items-center gap-2.5 w-full sm:w-auto flex-wrap sm:flex-nowrap">
+            {/* Historical Month Selector */}
+            {sortedStatements.length > 1 && (
+              <div className="relative shrink-0 flex-1 sm:flex-none">
+                <select
+                  data-testid="month-selector-dropdown"
+                  value={selectedIndex}
+                  onChange={(e) => setSelectedIndex(Number(e.target.value))}
+                  className="w-full sm:w-auto appearance-none bg-slate-50 border border-slate-300 hover:border-slate-400 text-slate-800 text-xs font-semibold py-2 pl-3 pr-8 rounded-xl focus:outline-hidden focus:ring-2 focus:ring-emerald-500 transition-colors cursor-pointer"
+                >
+                  {sortedStatements.map((stmt, idx) => (
+                    <option key={stmt.id || idx} value={idx}>
+                      {stmt.billingPeriod ||
+                        (stmt.statementDate
+                          ? formatDate(stmt.statementDate)
+                          : `Statement #${idx + 1}`)}
+                      {idx === 0 ? ' (Latest)' : ''}
+                    </option>
+                  ))}
+                </select>
+                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-slate-500">
+                  <Calendar className="w-3.5 h-3.5" />
                 </div>
               </div>
             )}
 
-            {/* Print / Download Button */}
+            {/* Print & Download Button */}
             <button
               type="button"
               data-testid="download-pdf-btn"
               onClick={handlePrint}
-              className="inline-flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-bold text-xs px-4 py-2 rounded-xl shadow-xs transition-colors cursor-pointer shrink-0"
-              title="Download Statement as PDF"
+              className="inline-flex items-center justify-center gap-1.5 bg-emerald-700 hover:bg-emerald-800 active:bg-emerald-900 text-white text-xs font-semibold px-4 py-2 rounded-xl shadow-xs transition-colors cursor-pointer shrink-0 w-full sm:w-auto"
             >
-              <Download className="w-3.5 h-3.5" />
+              <Download className="w-4 h-4" />
               <span>Download Statement (PDF)</span>
             </button>
           </div>
         </div>
 
-        {/* Printable Statement Document Root */}
+        {/* Statement A4 Container (The Document Root) */}
         <div
           id="tenant-statement-print-root"
           data-testid="statement-document"
-          className="bg-white border border-slate-200 rounded-3xl p-6 sm:p-10 shadow-lg space-y-6"
+          className="bg-white border border-slate-200/90 rounded-2xl p-6 sm:p-8 shadow-sm space-y-6"
         >
-          {/* 1. Official Header & Branding */}
-          <div className="flex flex-col sm:flex-row justify-between items-start gap-6 pb-6 border-b border-slate-200">
-            <div className="space-y-2 max-w-md">
-              {landlord.logo_base64 ? (
-                <div className="max-h-16 max-w-[200px] mb-2 flex items-center">
+          {/* 1. Header: Landlord Branding & Invoice Summary */}
+          <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-6 pb-6 border-b border-slate-200/80">
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                {landlord.logo_base64 ? (
                   <img
                     src={landlord.logo_base64}
                     alt={landlord.entity_name}
-                    className="max-h-16 max-w-[200px] object-contain"
+                    className="w-10 h-10 object-contain rounded-lg border border-slate-200 p-0.5"
                   />
-                </div>
-              ) : (
-                <div className="inline-flex items-center gap-2 text-emerald-700 font-bold text-lg mb-1">
-                  <div className="p-2 bg-emerald-50 rounded-xl border border-emerald-100">
-                    <Building className="w-5 h-5 text-emerald-600" />
+                ) : (
+                  <div className="w-10 h-10 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-700">
+                    <Building className="w-5 h-5" />
                   </div>
-                  <span>{landlord.entity_name}</span>
+                )}
+                <div>
+                  <h2 className="text-base sm:text-lg font-extrabold text-slate-900 tracking-tight">
+                    {landlord.entity_name}
+                  </h2>
+                  {landlord.trading_as && (
+                    <p className="text-xs text-slate-500">
+                      Trading as: {landlord.trading_as}
+                    </p>
+                  )}
                 </div>
-              )}
+              </div>
 
-              {landlord.logo_base64 && (
-                <h2 className="text-base font-bold text-slate-900">{landlord.entity_name}</h2>
-              )}
-
-              {landlord.trading_as && (
-                <p className="text-xs font-semibold text-slate-600">
-                  Trading as: {landlord.trading_as}
-                </p>
-              )}
-
-              {landlord.physical_address && (
-                <p className="text-xs text-slate-500 flex items-start gap-1.5">
-                  <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0 mt-0.5" />
-                  <span>{landlord.physical_address}</span>
-                </p>
-              )}
-
-              <div className="flex flex-wrap items-center gap-y-1 gap-x-4 text-xs text-slate-500 pt-1">
-                {landlord.email && (
-                  <span className="flex items-center gap-1">
-                    <Mail className="w-3 h-3 text-slate-400" /> {landlord.email}
-                  </span>
+              <div className="text-xs text-slate-500 space-y-0.5 pt-1">
+                {landlord.physical_address && (
+                  <p className="flex items-center gap-1.5">
+                    <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                    <span>{landlord.physical_address}</span>
+                  </p>
                 )}
-                {landlord.contact_number && (
-                  <span className="flex items-center gap-1">
-                    <Phone className="w-3 h-3 text-slate-400" /> {landlord.contact_number}
-                  </span>
-                )}
+                <div className="flex items-center gap-3 flex-wrap">
+                  {landlord.email && (
+                    <span className="flex items-center gap-1">
+                      <Mail className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                      <span>{landlord.email}</span>
+                    </span>
+                  )}
+                  {landlord.contact_number && (
+                    <span className="flex items-center gap-1">
+                      <Phone className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                      <span>{landlord.contact_number}</span>
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
 
-            {/* Statement Info Box */}
-            <div className="sm:text-right space-y-1 bg-slate-50 border border-slate-200/80 rounded-2xl p-4 min-w-[240px]">
-              <span className="text-[10px] font-bold tracking-wider uppercase text-emerald-800 bg-emerald-100 px-2.5 py-0.5 rounded-full inline-block mb-1">
+            {/* Statement Invoice Badge */}
+            <div className="text-left sm:text-right bg-slate-50/90 border border-slate-200 rounded-2xl p-4 sm:min-w-[240px]">
+              <span className="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wide bg-emerald-100 text-emerald-900 border border-emerald-200 mb-2">
                 Tax Invoice & Statement
               </span>
               <p className="text-xs text-slate-500">Statement Number</p>
@@ -298,139 +409,269 @@ export default function TenantStatementViewer({
             </div>
           </div>
 
-          {/* 3. Itemized Financial Ledger Table */}
-          <div className="border border-slate-200 rounded-2xl overflow-hidden shadow-2xs">
-            <div className="bg-slate-900 text-white px-4 py-2.5 flex items-center justify-between text-xs font-semibold">
-              <span>Description / Itemized Breakdown</span>
-              <span>Amount (ZAR)</span>
+          {/* 3. 4-Column Itemized Comparative Financial Ledger */}
+          <div className="space-y-2">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-600">
+                Itemized Tenant Recovery & Rent Breakdown
+              </h3>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] text-slate-400 font-medium sm:hidden print-hidden-element">
+                  Scroll horizontally for variance →
+                </span>
+                {previousStatement && (
+                  <span className="text-[11px] font-medium text-slate-500">
+                    Comparing {previousPeriodLabel} vs {billingPeriodLabel}
+                  </span>
+                )}
+              </div>
             </div>
 
-            <div className="divide-y divide-slate-100 text-xs">
-              {/* Contract Base Rent */}
-              <div className="p-3.5 flex items-center justify-between bg-white hover:bg-slate-50/50 transition-colors">
-                <div>
-                  <span className="font-bold text-slate-900 block">Monthly Contract Rent</span>
-                  <span className="text-[11px] text-slate-500">
-                    Unit: {lease.unitName} ({billingPeriodLabel})
-                  </span>
-                </div>
-                <span className="font-bold text-slate-900 font-mono text-sm">
-                  {formatZAR(baseRent, { includeDecimals: true })}
-                </span>
-              </div>
+            <div className="overflow-x-auto rounded-2xl border border-slate-200 shadow-2xs">
+              <table className="w-full min-w-[620px] text-left text-xs border-collapse">
+                <thead>
+                  <tr className="bg-slate-900 text-white uppercase font-semibold text-[10px] tracking-wider">
+                    <th className="p-3 pl-4">Billing Item / Municipal Line</th>
+                    <th className="p-3 text-right whitespace-nowrap">
+                      {previousPeriodLabel}
+                    </th>
+                    <th className="p-3 text-right whitespace-nowrap">
+                      {billingPeriodLabel}
+                    </th>
+                    <th className="p-3 pr-4 text-right whitespace-nowrap">
+                      Month-over-Month Variance
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 text-slate-700 bg-white">
+                  {/* 1. Base Rent Row */}
+                  <tr className="hover:bg-slate-50/50 transition-colors">
+                    <td className="p-3 pl-4">
+                      <div className="font-bold text-slate-900">Base Contract Rent</div>
+                      <div className="text-[11px] text-slate-500 mt-0.5">
+                        Unit: {lease.unitName} • Fixed monthly residential lease fee
+                      </div>
+                    </td>
+                    <td className="p-3 text-right font-mono text-slate-600 whitespace-nowrap">
+                      {previousStatement
+                        ? formatZAR(baseRent, { includeDecimals: true })
+                        : <span className="text-slate-400 font-mono">— (Baseline Period)</span>}
+                    </td>
+                    <td className="p-3 text-right font-mono font-bold text-slate-900 whitespace-nowrap">
+                      {formatZAR(baseRent, { includeDecimals: true })}
+                    </td>
+                    <td className="p-3 pr-4 text-right text-slate-400 font-mono text-xs whitespace-nowrap">
+                      — (Contract Fixed)
+                    </td>
+                  </tr>
 
-              {/* Prepaid Submeter Notice (if applicable) */}
-              {isPrepaid && (
-                <div className="p-3.5 flex items-center justify-between bg-sky-50/50 text-slate-700">
-                  <div className="flex items-center gap-2">
-                    <Zap className="w-3.5 h-3.5 text-sky-600 shrink-0" />
-                    <div>
-                      <span className="font-semibold block">Electricity & Water: Prepaid Sub-Meter</span>
-                      <span className="text-[11px] text-slate-500">
-                        Self-vended via {property.prepaid_vendor_name || 'Prepaid Sub-Meter'} tokens (R0 on statement)
+                  {/* 2. Prepaid Submeter Notice (if applicable) */}
+                  {isPrepaid && (
+                    <tr className="bg-sky-50/40">
+                      <td colSpan={4} className="p-3.5 pl-4">
+                        <div className="flex items-start gap-2.5">
+                          <Zap className="w-4 h-4 text-sky-600 shrink-0 mt-0.5" />
+                          <div>
+                            <div className="font-bold text-sky-950 text-xs">
+                              Prepaid Utility Sub-Meter Active ({property.prepaid_vendor_name || 'Private Sub-Meter'})
+                            </div>
+                            <p className="text-[11px] text-sky-800 mt-0.5">
+                              Electricity and water for <strong>{lease.unitName}</strong> are self-vended directly by the tenant via {property.prepaid_vendor_name || 'Citiq / Recharger'} sub-meter tokens. No municipal water or electricity recoveries are levied on this monthly statement (R 0.00 recovery).
+                            </p>
+                          </div>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+
+                  {/* 3. Bundled Utilities (if applicable) */}
+                  {isBundled && (
+                    <tr className="hover:bg-slate-50/60 transition-colors">
+                      <td className="p-3 pl-4">
+                        <div className="font-semibold text-slate-800 flex items-center gap-1.5">
+                          <Building className="w-3.5 h-3.5 text-teal-600 shrink-0" />
+                          <span>{activeStatement?.bundledUtilityLabel || 'Body Corporate Utilities & Recoveries'}</span>
+                        </div>
+                        <div className="text-[10px] text-slate-500 mt-0.5">
+                          Source: {activeStatement?.provider || 'Body Corporate'} • Consolidated Recovery (Unmetered)
+                        </div>
+                      </td>
+                      <td className="p-3 text-right font-mono text-slate-600 whitespace-nowrap">
+                        {prevBundledZAR !== undefined
+                          ? formatZAR(prevBundledZAR, { includeDecimals: true })
+                          : <span className="text-slate-400 font-mono">— (Baseline Period)</span>}
+                      </td>
+                      <td className="p-3 text-right font-mono font-bold text-slate-800 whitespace-nowrap">
+                        {formatZAR(bundledZAR, { includeDecimals: true })}
+                      </td>
+                      <td className="p-3 pr-4 text-right whitespace-nowrap">
+                        {renderVariance(bundledZAR, prevBundledZAR)}
+                      </td>
+                    </tr>
+                  )}
+
+                  {/* 4. Municipal Electricity with Inline Meter Reading Dials */}
+                  {!isPrepaid && !isBundled && (
+                    <tr className="hover:bg-slate-50/60 transition-colors">
+                      <td className="p-3 pl-4">
+                        <div className="font-semibold text-slate-800 flex items-center gap-1.5 flex-wrap">
+                          <Zap className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                          <span>Municipal Electricity</span>
+                        </div>
+                        {elecMeterReading ? (
+                          <div className="mt-1 flex items-center gap-1.5 flex-wrap text-[10px]">
+                            {elecMeterReading.meterNumber && (
+                              <span className="font-mono font-bold text-amber-800 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded">
+                                Meter #{elecMeterReading.meterNumber}
+                              </span>
+                            )}
+                            <span className="text-slate-600 font-mono">
+                              Prev: {elecMeterReading.previousReadingValue !== undefined ? elecMeterReading.previousReadingValue.toLocaleString('en-ZA') : '—'} kWh → Curr: {elecMeterReading.readingValue.toLocaleString('en-ZA')} kWh
+                            </span>
+                            {elecMeterReading.consumption !== undefined && (
+                              <span className="font-bold text-emerald-800 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded">
+                                Usage: {elecMeterReading.consumption.toLocaleString('en-ZA')} kWh
+                              </span>
+                            )}
+                            <span className="text-[9px] text-slate-400">
+                              • {elecMeterReading.readingType === 'Actual' ? 'Verified Actual Reading' : 'Municipal Reading'}
+                            </span>
+                          </div>
+                        ) : (
+                          <div className="text-[10px] text-slate-400 mt-0.5">
+                            Municipal consumption & service charges
+                          </div>
+                        )}
+                      </td>
+                      <td className="p-3 text-right font-mono text-slate-600 whitespace-nowrap">
+                        {prevElecZAR !== undefined
+                          ? formatZAR(prevElecZAR, { includeDecimals: true })
+                          : <span className="text-slate-400 font-mono">— (Baseline Period)</span>}
+                      </td>
+                      <td className="p-3 text-right font-mono font-bold text-slate-900 whitespace-nowrap">
+                        {formatZAR(elecZAR, { includeDecimals: true })}
+                      </td>
+                      <td className="p-3 pr-4 text-right whitespace-nowrap">
+                        {renderVariance(elecZAR, prevElecZAR)}
+                      </td>
+                    </tr>
+                  )}
+
+                  {/* 5. Municipal Water with Inline Meter Reading Dials */}
+                  {!isPrepaid && !isBundled && (
+                    <tr className="hover:bg-slate-50/60 transition-colors">
+                      <td className="p-3 pl-4">
+                        <div className="font-semibold text-slate-800 flex items-center gap-1.5 flex-wrap">
+                          <Droplets className="w-3.5 h-3.5 text-sky-500 shrink-0" />
+                          <span>Water & Sanitation Recovery</span>
+                        </div>
+                        {waterMeterReading ? (
+                          <div className="mt-1 flex items-center gap-1.5 flex-wrap text-[10px]">
+                            {waterMeterReading.meterNumber && (
+                              <span className="font-mono font-bold text-sky-800 bg-sky-50 border border-sky-200 px-1.5 py-0.5 rounded">
+                                Meter #{waterMeterReading.meterNumber}
+                              </span>
+                            )}
+                            <span className="text-slate-600 font-mono">
+                              Prev: {waterMeterReading.previousReadingValue !== undefined ? waterMeterReading.previousReadingValue.toLocaleString('en-ZA') : '—'} KL → Curr: {waterMeterReading.readingValue.toLocaleString('en-ZA')} KL
+                            </span>
+                            {waterMeterReading.consumption !== undefined && (
+                              <span className="font-bold text-emerald-800 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded">
+                                Usage: {waterMeterReading.consumption.toLocaleString('en-ZA')} KL
+                              </span>
+                            )}
+                            <span className="text-[9px] text-slate-400">
+                              • {waterMeterReading.readingType === 'Actual' ? 'Verified Actual Reading' : 'Municipal Reading'}
+                            </span>
+                          </div>
+                        ) : (
+                          <div className="text-[10px] text-slate-400 mt-0.5">
+                            Metered water consumption
+                          </div>
+                        )}
+                      </td>
+                      <td className="p-3 text-right font-mono text-slate-600 whitespace-nowrap">
+                        {prevWaterZAR !== undefined
+                          ? formatZAR(prevWaterZAR, { includeDecimals: true })
+                          : <span className="text-slate-400 font-mono">— (Baseline Period)</span>}
+                      </td>
+                      <td className="p-3 text-right font-mono font-bold text-slate-900 whitespace-nowrap">
+                        {formatZAR(waterZAR, { includeDecimals: true })}
+                      </td>
+                      <td className="p-3 pr-4 text-right whitespace-nowrap">
+                        {renderVariance(waterZAR, prevWaterZAR)}
+                      </td>
+                    </tr>
+                  )}
+
+                  {/* 6. Refuse Removal */}
+                  {!isBundled && (refuseZAR > 0 || (prevRefuseZAR && prevRefuseZAR > 0)) && (
+                    <tr className="hover:bg-slate-50/60 transition-colors">
+                      <td className="p-3 pl-4">
+                        <div className="font-semibold text-slate-800">Refuse Removal</div>
+                        <div className="text-[10px] text-slate-500 mt-0.5">Municipal waste collection tariff</div>
+                      </td>
+                      <td className="p-3 text-right font-mono text-slate-600 whitespace-nowrap">
+                        {prevRefuseZAR !== undefined
+                          ? formatZAR(prevRefuseZAR, { includeDecimals: true })
+                          : <span className="text-slate-400 font-mono">— (Baseline Period)</span>}
+                      </td>
+                      <td className="p-3 text-right font-mono font-bold text-slate-900 whitespace-nowrap">
+                        {formatZAR(refuseZAR, { includeDecimals: true })}
+                      </td>
+                      <td className="p-3 pr-4 text-right whitespace-nowrap">
+                        {renderVariance(refuseZAR, prevRefuseZAR)}
+                      </td>
+                    </tr>
+                  )}
+
+                  {/* 7. Sewerage Tariff */}
+                  {!isBundled && (sewerageZAR > 0 || (prevSewerageZAR && prevSewerageZAR > 0)) && (
+                    <tr className="hover:bg-slate-50/60 transition-colors">
+                      <td className="p-3 pl-4">
+                        <div className="font-semibold text-slate-800">Sewerage & Effluent</div>
+                        <div className="text-[10px] text-slate-500 mt-0.5">City infrastructure domestic sewerage charge</div>
+                      </td>
+                      <td className="p-3 text-right font-mono text-slate-600 whitespace-nowrap">
+                        {prevSewerageZAR !== undefined
+                          ? formatZAR(prevSewerageZAR, { includeDecimals: true })
+                          : <span className="text-slate-400 font-mono">— (Baseline Period)</span>}
+                      </td>
+                      <td className="p-3 text-right font-mono font-bold text-slate-900 whitespace-nowrap">
+                        {formatZAR(sewerageZAR, { includeDecimals: true })}
+                      </td>
+                      <td className="p-3 pr-4 text-right whitespace-nowrap">
+                        {renderVariance(sewerageZAR, prevSewerageZAR)}
+                      </td>
+                    </tr>
+                  )}
+
+                  {/* 8. Total Balance Due Highlight */}
+                  <tr className="bg-emerald-50/80 border-t-2 border-emerald-600 font-black">
+                    <td className="p-3.5 pl-4 text-xs">
+                      <div className="text-emerald-950 uppercase tracking-wider font-extrabold">
+                        TOTAL AMOUNT PAYABLE
+                      </div>
+                      <div className="text-[11px] font-normal text-emerald-800 mt-0.5">
+                        Includes base rent + all itemized utilities
+                      </div>
+                    </td>
+                    <td className="p-3.5 text-right font-mono text-xs text-slate-700 whitespace-nowrap font-bold">
+                      {prevTotalDue !== undefined
+                        ? formatZAR(prevTotalDue, { includeDecimals: true })
+                        : <span className="text-slate-500 font-normal">— (Baseline Period)</span>}
+                    </td>
+                    <td className="p-3.5 text-right font-mono text-base text-emerald-950 font-black whitespace-nowrap">
+                      <span data-testid="total-due-amount">
+                        {formatZAR(totalDue, { includeDecimals: true })}
                       </span>
-                    </div>
-                  </div>
-                  <span className="font-mono font-semibold text-slate-500">R 0.00</span>
-                </div>
-              )}
-
-              {/* Bundled Utilities (if applicable) */}
-              {isBundled && (
-                <div className="p-3.5 flex items-center justify-between bg-white hover:bg-slate-50/50 transition-colors">
-                  <div>
-                    <span className="font-bold text-slate-900 block">
-                      {activeStatement?.bundledUtilityLabel || 'Body Corporate Utilities & Recoveries'}
-                    </span>
-                    <span className="text-[11px] text-slate-500">
-                      Water, Sewerage, Refuse & Common levy recoveries
-                    </span>
-                  </div>
-                  <span className="font-bold text-slate-900 font-mono">
-                    {formatZAR(bundledZAR, { includeDecimals: true })}
-                  </span>
-                </div>
-              )}
-
-              {/* Itemized Electricity (if not bundled and not prepaid) */}
-              {!isPrepaid && !isBundled && (
-                <div className="p-3.5 flex items-center justify-between bg-white hover:bg-slate-50/50 transition-colors">
-                  <div className="flex items-center gap-2">
-                    <Zap className="w-3.5 h-3.5 text-amber-500 shrink-0" />
-                    <div>
-                      <span className="font-semibold text-slate-800 block">Electricity Recovery</span>
-                      <span className="text-[11px] text-slate-500">
-                        Municipal consumption & service charges
-                      </span>
-                    </div>
-                  </div>
-                  <span className="font-mono font-semibold text-slate-900">
-                    {formatZAR(elecZAR, { includeDecimals: true })}
-                  </span>
-                </div>
-              )}
-
-              {/* Itemized Water (if not bundled and not prepaid) */}
-              {!isPrepaid && !isBundled && (
-                <div className="p-3.5 flex items-center justify-between bg-white hover:bg-slate-50/50 transition-colors">
-                  <div className="flex items-center gap-2">
-                    <Droplets className="w-3.5 h-3.5 text-sky-500 shrink-0" />
-                    <div>
-                      <span className="font-semibold text-slate-800 block">Water & Sanitation Recovery</span>
-                      <span className="text-[11px] text-slate-500">Metered water consumption</span>
-                    </div>
-                  </div>
-                  <span className="font-mono font-semibold text-slate-900">
-                    {formatZAR(waterZAR, { includeDecimals: true })}
-                  </span>
-                </div>
-              )}
-
-              {/* Refuse Removal (if not bundled) */}
-              {!isBundled && refuseZAR > 0 && (
-                <div className="p-3.5 flex items-center justify-between bg-white hover:bg-slate-50/50 transition-colors">
-                  <div>
-                    <span className="font-semibold text-slate-800 block">Refuse Removal</span>
-                    <span className="text-[11px] text-slate-500">Municipal waste collection tariff</span>
-                  </div>
-                  <span className="font-mono font-semibold text-slate-900">
-                    {formatZAR(refuseZAR, { includeDecimals: true })}
-                  </span>
-                </div>
-              )}
-
-              {/* Sewerage Tariff (if not bundled) */}
-              {!isBundled && sewerageZAR > 0 && (
-                <div className="p-3.5 flex items-center justify-between bg-white hover:bg-slate-50/50 transition-colors">
-                  <div>
-                    <span className="font-semibold text-slate-800 block">Sewerage & Effluent</span>
-                    <span className="text-[11px] text-slate-500">City infrastructure domestic sewerage charge</span>
-                  </div>
-                  <span className="font-mono font-semibold text-slate-900">
-                    {formatZAR(sewerageZAR, { includeDecimals: true })}
-                  </span>
-                </div>
-              )}
-
-              {/* Total Balance Due Highlight */}
-              <div className="p-4 bg-emerald-50/70 border-t-2 border-emerald-600 flex items-center justify-between">
-                <div>
-                  <span className="text-xs uppercase font-extrabold text-emerald-950 tracking-wider block">
-                    Total Amount Payable
-                  </span>
-                  <span className="text-[11px] text-emerald-800">
-                    Includes base rent + all itemized utilities for {billingPeriodLabel}
-                  </span>
-                </div>
-                <div className="text-right">
-                  <span
-                    data-testid="total-due-amount"
-                    className="text-lg sm:text-xl font-black text-emerald-900 font-mono"
-                  >
-                    {formatZAR(totalDue, { includeDecimals: true })}
-                  </span>
-                </div>
-              </div>
+                    </td>
+                    <td className="p-3.5 pr-4 text-right whitespace-nowrap">
+                      {renderVariance(totalDue, prevTotalDue)}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
             </div>
           </div>
 
