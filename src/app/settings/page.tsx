@@ -151,7 +151,16 @@ export default function SettingsPage() {
       setAuthEmail('');
       setAuthPassword('');
     } catch (err: any) {
-      setAuthError(err.message || 'Authentication failed');
+      if (
+        err?.code === 'email_address_invalid' ||
+        (err?.message?.toLowerCase().includes('email') && err?.message?.toLowerCase().includes('invalid'))
+      ) {
+        setAuthError(
+          `Supabase's default mailer flagged "${authEmail}" (addresses containing words like "audit", "sponsor", or "admin" are treated as role accounts). Try using a standard personal email, or disable "Confirm email" in Supabase Auth settings.`
+        );
+      } else {
+        setAuthError(err.message || 'Authentication failed');
+      }
     } finally {
       setAuthSubmitting(false);
     }
@@ -393,7 +402,7 @@ export default function SettingsPage() {
                     data-testid="sync-cloud-btn"
                     onClick={handleSyncToCloud}
                     disabled={isSyncing}
-                    className="inline-flex items-center gap-1.5 bg-sky-600 hover:bg-sky-700 disabled:bg-slate-300 text-white font-semibold px-4 py-2 rounded-lg shadow-xs text-xs transition-colors cursor-pointer"
+                    className="inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 disabled:bg-slate-300 text-white font-bold px-5 py-2.5 rounded-lg shadow-sm text-xs transition-colors cursor-pointer"
                   >
                     <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
                     {isSyncing ? 'Syncing to Cloud...' : 'Sync Local Data to Cloud'}
@@ -452,53 +461,61 @@ export default function SettingsPage() {
               )}
 
               {/* Inline Auth Form */}
-              <form onSubmit={handleAuthSubmit} className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Email Address</label>
-                  <div className="relative">
-                    <Mail className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5" />
-                    <input
-                      type="email"
-                      required
-                      placeholder="investor@example.co.za"
-                      value={authEmail}
-                      onChange={(e) => setAuthEmail(e.target.value)}
-                      className="w-full pl-9 pr-3 py-2 border border-slate-300 rounded-lg text-slate-900 focus:ring-1 focus:ring-sky-500 font-medium"
-                    />
+              <form onSubmit={handleAuthSubmit} className="space-y-3 text-xs">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block font-semibold text-slate-700 mb-1">Email Address</label>
+                    <div className="relative">
+                      <Mail className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5" />
+                      <input
+                        type="email"
+                        required
+                        placeholder="investor@example.co.za"
+                        value={authEmail}
+                        onChange={(e) => setAuthEmail(e.target.value)}
+                        className="w-full pl-9 pr-3 py-2 border border-slate-300 rounded-lg text-slate-900 focus:ring-1 focus:ring-emerald-500 font-medium bg-white"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block font-semibold text-slate-700 mb-1">Password</label>
+                    <div className="relative">
+                      <Lock className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5" />
+                      <input
+                        type="password"
+                        required
+                        minLength={6}
+                        placeholder="••••••••"
+                        value={authPassword}
+                        onChange={(e) => setAuthPassword(e.target.value)}
+                        className="w-full pl-9 pr-3 py-2 border border-slate-300 rounded-lg text-slate-900 focus:ring-1 focus:ring-emerald-500 font-medium bg-white"
+                      />
+                    </div>
                   </div>
                 </div>
 
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Password</label>
-                  <div className="relative">
-                    <Lock className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5" />
-                    <input
-                      type="password"
-                      required
-                      minLength={6}
-                      placeholder="••••••••"
-                      value={authPassword}
-                      onChange={(e) => setAuthPassword(e.target.value)}
-                      className="w-full pl-9 pr-3 py-2 border border-slate-300 rounded-lg text-slate-900 focus:ring-1 focus:ring-sky-500 font-medium"
-                    />
-                  </div>
-                </div>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-1 border-t border-slate-100">
+                  <p className="text-[11px] text-slate-500">
+                    {authMode === 'signin'
+                      ? 'Sign in to access your Supabase multi-tenant cloud portfolio.'
+                      : 'Creates your private Supabase user account to begin syncing.'}
+                  </p>
 
-                <div className="flex items-end">
                   <button
                     type="submit"
                     disabled={authSubmitting}
-                    className="w-full inline-flex items-center justify-center gap-1.5 bg-sky-600 hover:bg-sky-700 disabled:bg-slate-300 text-white font-semibold py-2 px-4 rounded-lg shadow-xs transition-colors cursor-pointer"
+                    className="inline-flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 disabled:bg-slate-300 text-white font-bold py-2.5 px-6 rounded-lg shadow-sm text-xs transition-colors cursor-pointer"
                   >
                     {authMode === 'signin' ? (
                       <>
-                        <LogIn className="w-3.5 h-3.5" />
+                        <LogIn className="w-4 h-4" />
                         <span>{authSubmitting ? 'Signing In...' : 'Sign In'}</span>
                       </>
                     ) : (
                       <>
-                        <UserPlus className="w-3.5 h-3.5" />
-                        <span>{authSubmitting ? 'Registering...' : 'Create Account'}</span>
+                        <UserPlus className="w-4 h-4" />
+                        <span>{authSubmitting ? 'Creating Account...' : 'Create Account'}</span>
                       </>
                     )}
                   </button>
