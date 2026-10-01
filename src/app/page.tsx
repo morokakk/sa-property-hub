@@ -329,8 +329,8 @@ export default function GlobalDashboardPage() {
               </div>
               <div className="mt-2 pt-2 border-t border-slate-100 space-y-1">
                 <div className="text-[11px] text-slate-500 flex items-center justify-between">
-                  <span className="text-rose-600 font-medium">− {formatZAR(summary.totalSarsProvisionalTaxReserve)}</span>
-                  <span className="text-slate-400 text-[10px]">SARS 27% Prov. Tax</span>
+                  <span className="text-rose-600 font-medium">− {formatZAR(summary.totalSarsFlipTaxReserve)}</span>
+                  <span className="text-slate-400 text-[10px]">Flip Prov. Tax (27%)</span>
                 </div>
                 <div className="text-[11px] flex items-center justify-between font-bold text-emerald-800 bg-emerald-50 px-2 py-1 rounded border border-emerald-100/80">
                   <span>Net Realizable:</span>
@@ -345,7 +345,7 @@ export default function GlobalDashboardPage() {
           </div>
         </div>
 
-        {/* Rental Tax Reserve & SARS Flip Tax Side-by-Side */}
+        {/* Rental Tax Reserve & SARS Total Tax Side-by-Side */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           {/* Rental Tax Reserve */}
           <div className="bg-amber-50 rounded-xl p-4 border border-amber-200 shadow-xs">
@@ -363,18 +363,24 @@ export default function GlobalDashboardPage() {
             </div>
           </div>
 
-          {/* SARS Flip Provisional Tax */}
+          {/* Total SARS Provisional Tax Reserve */}
           <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-xs">
             <div className="flex items-center justify-between text-slate-500 mb-1">
-              <span className="text-[11px] font-semibold uppercase tracking-wider">SARS Provisional Tax (Flips)</span>
+              <span className="text-[11px] font-semibold uppercase tracking-wider">Total SARS Provisional Tax Reserve</span>
               <Coins className="w-4 h-4 text-rose-500" />
             </div>
             <div className="text-xl font-bold text-slate-900 mt-1">
               {formatZAR(summary.totalSarsProvisionalTaxReserve)}
             </div>
-            <div className="text-[11px] text-slate-500 mt-1 flex items-center justify-between">
-              <span>Combined pipeline reserve</span>
-              <span className="text-rose-600 font-medium">Flip + Rental Tax</span>
+            <div className="mt-2 pt-2 border-t border-slate-100 space-y-1 text-[11px]">
+              <div className="flex items-center justify-between text-slate-600">
+                <span>Flips Provisional Tax (27%):</span>
+                <strong className="text-rose-600 font-semibold">{formatZAR(summary.totalSarsFlipTaxReserve)}</strong>
+              </div>
+              <div className="flex items-center justify-between text-slate-600">
+                <span>Rentals Net Cashflow Tax:</span>
+                <strong className="text-amber-700 font-semibold">{formatZAR(summary.annualRentalTaxReserve)}/yr</strong>
+              </div>
             </div>
           </div>
         </div>
@@ -468,8 +474,8 @@ export default function GlobalDashboardPage() {
             ) : (
               <div className="space-y-3">
                 {flips.map((flip) => {
-                  const totalBoqActual = flip.boq.reduce(
-                    (sum, item) => sum + (item.actualCostZAR || item.baselineTotalZAR),
+                  const totalBoqActual = (flip.boq || []).reduce(
+                    (sum, item) => sum + (item.actualCostZAR || item.baselineTotalZAR || 0),
                     0
                   );
                   const progressPct =

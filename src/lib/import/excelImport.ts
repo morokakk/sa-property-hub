@@ -9,7 +9,7 @@ import {
   UtilityStatement,
 } from '@/types';
 import { computeAcquisitionCosts } from '@/lib/calculations/sarsTax';
-import { calculateDealMetrics } from '@/lib/calculations/propertyMetrics';
+import { calculateDealMetrics, calculateMonthlyBondRepayment } from '@/lib/calculations/propertyMetrics';
 
 export interface ValidationErrorItem {
   row: number;
@@ -858,7 +858,7 @@ export function parseRentalsRows(rawRows: unknown[][]): ParseResult<RentalProper
     let monthlyBondPayment = parseNumber(rawMonthlyBondPayment);
     if (monthlyBondPayment === null) {
       // Estimate PMT bond repayment if bond exists
-      monthlyBondPayment = outstandingBond > 0 ? Math.round(outstandingBond * 0.0108) : 0;
+      monthlyBondPayment = outstandingBond > 0 ? calculateMonthlyBondRepayment(outstandingBond, bondInterestRate, 20) : 0;
     }
 
     let levies = parseNumber(rawLevies) ?? 0;

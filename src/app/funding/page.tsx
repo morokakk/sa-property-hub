@@ -180,15 +180,24 @@ export default function FundingTrackerPage() {
   const handleProcessRepayment = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!repaymentModalSource || repaymentAmount <= 0) return;
+    if (paymentType === 'Principal Repayment' || paymentType === 'Partial Return' || paymentType === 'Full Settlement') {
+      const currentRepaid = repaymentModalSource.totalRepaidZAR || 0;
+      const newTotalRepaid = currentRepaid + repaymentAmount;
+      const { drawn } = getFundingDrawnAndUndrawn(repaymentModalSource);
+      const targetSettlement = (repaymentModalSource.tranches && repaymentModalSource.tranches.length > 0) ? drawn : repaymentModalSource.capitalAmountZAR;
+      const isSettled = newTotalRepaid >= targetSettlement;
 
-    const currentRepaid = repaymentModalSource.totalRepaidZAR || 0;
-    const newTotalRepaid = currentRepaid + repaymentAmount;
-    const isSettled = newTotalRepaid >= repaymentModalSource.capitalAmountZAR;
-
-    updateFunding(repaymentModalSource.id, {
-      totalRepaidZAR: newTotalRepaid,
-      status: isSettled ? 'Settled' : repaymentModalSource.status,
-    });
+      updateFunding(repaymentModalSource.id, {
+        totalRepaidZAR: newTotalRepaid,
+        status: isSettled ? 'Settled' : repaymentModalSource.status,
+      });
+    } else {
+      // Monthly Coupon / Interest or Profit Share Distribution
+      const currentInterest = repaymentModalSource.totalInterestPaidZAR || 0;
+      updateFunding(repaymentModalSource.id, {
+        totalInterestPaidZAR: currentInterest + repaymentAmount,
+      });
+    }
 
     if (copyReceiptOnSave) {
       const returnTermsText = `${repaymentModalSource.returnRatePercent}% ${
@@ -545,7 +554,10 @@ export default function FundingTrackerPage() {
                         <div className="font-semibold text-slate-800">
                           {item.status === 'Standby' ? 'R 0 (Undrawn)' : formatZAR(activeDrawnBalance)}
                         </div>
-                        <div className="text-[10px] text-slate-400">Repaid: {formatZAR(item.totalRepaidZAR)}</div>
+                        <div className="text-[10px] text-slate-400">
+                          Repaid: {formatZAR(item.totalRepaidZAR)}
+                          {item.totalInterestPaidZAR ? ` • Interest: ${formatZAR(item.totalInterestPaidZAR)}` : ''}
+                        </div>
                       </td>
                       <td className="p-3.5">
                         <span
@@ -1255,13 +1267,21 @@ export default function FundingTrackerPage() {
 
               <div className="p-3 rounded-lg bg-slate-50 border border-slate-200 text-[11px] space-y-1">
                 <div className="flex justify-between">
-                  <span>Current Total Repaid:</span>
-                  <strong className="text-slate-800">{formatZAR(repaymentModalSource.totalRepaidZAR)}</strong>
+                  <span>Current Principal Repaid:</span>
+                  <strong className="text-slate-800">{formatZAR(repaymentModalSource.totalRepaidZAR || 0)}</strong>
                 </div>
                 <div className="flex justify-between">
-                  <span>Remaining Principal:</span>
+                  <span>Interest / Coupons Serviced:</span>
+                  <strong className="text-amber-700">{formatZAR(repaymentModalSource.totalInterestPaidZAR || 0)}</strong>
+                </div>
+                <div className="flex justify-between">
+                  <span>Remaining Principal Liability:</span>
                   <strong className="text-emerald-700">
-                    {formatZAR(Math.max(0, repaymentModalSource.capitalAmountZAR - repaymentModalSource.totalRepaidZAR))}
+                    {(() => {
+                      const { drawn } = getFundingDrawnAndUndrawn(repaymentModalSource);
+                      const targetPrincipal = (repaymentModalSource.tranches && repaymentModalSource.tranches.length > 0) ? drawn : repaymentModalSource.capitalAmountZAR;
+                      return formatZAR(Math.max(0, targetPrincipal - (repaymentModalSource.totalRepaidZAR || 0)));
+                    })()}
                   </strong>
                 </div>
               </div>

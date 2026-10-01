@@ -88,18 +88,7 @@ export function exportPortfolioToExcel(data: ExportPortfolioData) {
   ];
 
   const rentalsData = rentals.map((r) => {
-    const cashflow = calculateRentalCashflow({
-      monthlyGrossRentZAR: r.monthlyGrossRentZAR,
-      monthlyLeviesZAR: r.monthlyLeviesZAR,
-      monthlyRatesTaxesZAR: r.monthlyRatesTaxesZAR,
-      monthlyMaintenanceReserveZAR: r.monthlyMaintenanceReserveZAR,
-      monthlyBondPaymentZAR: r.monthlyBondPaymentZAR,
-      managementType: r.managementType,
-      agencyCommissionPercent: r.agencyCommissionPercent,
-      agencyVatApplicable: r.agencyVatApplicable,
-      monthlyAgentFeeZAR: r.monthlyAgentFeeZAR,
-      unpaidUtilityArrearsZAR: r.unpaidUtilityArrearsZAR,
-    });
+    const cashflow = calculateRentalCashflow(r);
 
     return [
       r.title,
@@ -186,10 +175,17 @@ export function exportPortfolioToExcel(data: ExportPortfolioData) {
     const durationMonths = f.estimatedDurationMonths ?? 6;
     const monthlyHolding = f.monthlyHoldingCostZAR ?? 0;
     const totalHoldingCost = durationMonths * monthlyHolding;
-    const totalOutlay = (f.purchasePriceZAR || 0) + (f.acquisitionCostsZAR || 0) + renoCost + totalHoldingCost;
+    const sec118Cost =
+      (f.municipalClearance?.sec118ArrearsZAR || 0) +
+      (f.municipalClearance?.advanceCouncilDepositZAR || 0);
+    const exitCommissionPercent = typeof f.exitCommissionPercent === 'number' ? f.exitCommissionPercent : 5.75;
+    const exitCommission = f.targetExitPriceZAR > 0 ? (f.targetExitPriceZAR * exitCommissionPercent) / 100 : 0;
+    const totalOutlay = (f.purchasePriceZAR || 0) + (f.acquisitionCostsZAR || 0) + renoCost + totalHoldingCost + sec118Cost + exitCommission;
     const projectedProfit = (f.targetExitPriceZAR || 0) - totalOutlay;
     const actualSale = f.actualSalePriceZAR ?? (f.status === 'Completed' ? f.targetExitPriceZAR : undefined);
-    const realizedProfit = actualSale ? actualSale - totalOutlay : undefined;
+    const realizedExitCommission = actualSale ? (actualSale * exitCommissionPercent) / 100 : 0;
+    const realizedTotalOutlay = (f.purchasePriceZAR || 0) + (f.acquisitionCostsZAR || 0) + renoCost + totalHoldingCost + sec118Cost + realizedExitCommission;
+    const realizedProfit = actualSale ? actualSale - realizedTotalOutlay : undefined;
 
     return [
       f.title,
@@ -392,7 +388,15 @@ export function exportPortfolioToExcel(data: ExportPortfolioData) {
   ];
 
   const fundingData = funding.map((f) => {
-    const outstanding = Math.max(0, f.capitalAmountZAR - (f.totalRepaidZAR || 0));
+    let drawn = 0;
+    if (f.status === 'Settled' || f.status === 'Standby') {
+      drawn = 0;
+    } else if (f.tranches && f.tranches.length > 0) {
+      drawn = f.tranches.filter((t) => t.isDisbursed).reduce((s, t) => s + t.amountZAR, 0);
+    } else if (f.status === 'Active' || f.status === 'Accruing' || f.status === 'Matured') {
+      drawn = f.capitalAmountZAR || 0;
+    }
+    const outstanding = Math.max(0, drawn - (f.totalRepaidZAR || 0));
     return [
       f.lenderName,
       f.fundingType,

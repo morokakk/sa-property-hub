@@ -146,6 +146,7 @@ export default function FlipsManagerPage() {
   const [flipRates, setFlipRates] = useState(3500);
   const [flipOtherHoldingCost, setFlipOtherHoldingCost] = useState(2000);
   const [flipTargetExit, setFlipTargetExit] = useState(3800000);
+  const [flipExitCommissionPercent, setFlipExitCommissionPercent] = useState<number>(5.75);
   const [flipCompletionDate, setFlipCompletionDate] = useState(
     new Date(Date.now() + 180 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
   );
@@ -324,6 +325,7 @@ export default function FlipsManagerPage() {
     setFlipRates(3500);
     setFlipOtherHoldingCost(2000);
     setFlipTargetExit(3800000);
+    setFlipExitCommissionPercent(5.75);
     setFlipCompletionDate(new Date(Date.now() + 180 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]);
     setFlipTaxEntityType(investorProfile?.defaultTaxEntityType || 'Company (27%)');
     setFlipSec118Arrears(0);
@@ -364,6 +366,7 @@ export default function FlipsManagerPage() {
     setFlipRates(rates);
     setFlipOtherHoldingCost(other);
     setFlipTargetExit(activeFlip.targetExitPriceZAR);
+    setFlipExitCommissionPercent(activeFlip.exitCommissionPercent ?? 5.75);
     setFlipCompletionDate(activeFlip.targetCompletionDate);
     setFlipTaxEntityType(activeFlip.taxEntityType || investorProfile?.defaultTaxEntityType || 'Company (27%)');
     setFlipSec118Arrears(activeFlip.municipalClearance?.sec118ArrearsZAR || 0);
@@ -421,6 +424,7 @@ export default function FlipsManagerPage() {
         monthlyRatesTaxesZAR: Number(flipRates),
         monthlyOtherHoldingCostZAR: Number(flipOtherHoldingCost),
         targetExitPriceZAR: Number(flipTargetExit),
+        exitCommissionPercent: Number(flipExitCommissionPercent),
         targetCompletionDate: flipCompletionDate,
         taxEntityType: flipTaxEntityType,
         municipalClearance: municipalClearanceData,
@@ -446,6 +450,7 @@ export default function FlipsManagerPage() {
         monthlyOtherHoldingCostZAR: Number(flipOtherHoldingCost),
         municipalValuationZAR: extractedValuationZAR || undefined,
         targetExitPriceZAR: Number(flipTargetExit),
+        exitCommissionPercent: Number(flipExitCommissionPercent),
         targetCompletionDate: flipCompletionDate,
         taxEntityType: flipTaxEntityType,
         municipalClearance: municipalClearanceData,
@@ -510,9 +515,13 @@ export default function FlipsManagerPage() {
   };
 
   // Calculations for active flip
-  const totalBOQBaseline = activeFlip?.boq.reduce((s, i) => s + i.baselineTotalZAR, 0) || 0;
-  const totalBOQActual = activeFlip?.boq.reduce((s, i) => s + (i.actualCostZAR || i.baselineTotalZAR), 0) || 0;
+  const activeFlipBoq = activeFlip?.boq || [];
+  const totalBOQBaseline = activeFlipBoq.reduce((s, i) => s + i.baselineTotalZAR, 0) || 0;
+  const totalBOQActual = activeFlipBoq.reduce((s, i) => s + (i.actualCostZAR || i.baselineTotalZAR), 0) || 0;
   const totalBOQVariance = totalBOQActual - totalBOQBaseline;
+
+  // Empty BOQ baseline renovation budget fallback
+  const effectiveRenoCost = totalBOQActual > 0 ? totalBOQActual : (activeFlip?.baselineRenovationBudgetZAR || 0);
 
   // Holding Period Carrying Costs (interim bond interest, rates, levies, security)
   const flipHoldingMonths = activeFlip?.estimatedDurationMonths ?? 6;
@@ -522,7 +531,7 @@ export default function FlipsManagerPage() {
   const totalCostBasis =
     (activeFlip?.purchasePriceZAR || 0) +
     (activeFlip?.acquisitionCostsZAR || 0) +
-    totalBOQActual;
+    effectiveRenoCost;
 
   // Section 118 Rates Clearance & Municipal Arrears (Requirement 3)
   const sec118ArrearsVal = activeFlip?.municipalClearance?.sec118ArrearsZAR || 0;
@@ -531,7 +540,11 @@ export default function FlipsManagerPage() {
   const rccStatusVal = activeFlip?.municipalClearance?.rccStatus || 'Pending Application';
   const isRccDisputed = rccStatusVal === 'Disputed';
 
-  const totalAllInCost = totalCostBasis + totalHoldingCost + totalMunicipalClearanceOutlay;
+  // Standard Exit Sales Commission (5.75% default or per-flip override)
+  const exitCommissionPercent = activeFlip?.exitCommissionPercent ?? 5.75;
+  const exitCommissionZAR = Math.round((activeFlip?.targetExitPriceZAR || 0) * (exitCommissionPercent / 100));
+
+  const totalAllInCost = totalCostBasis + totalHoldingCost + totalMunicipalClearanceOutlay + exitCommissionZAR;
 
   const projectedNetProfit = (activeFlip?.targetExitPriceZAR || 0) - totalAllInCost;
   const projectedROI = totalAllInCost > 0 ? (projectedNetProfit / totalAllInCost) * 100 : 0;
@@ -545,13 +558,13 @@ export default function FlipsManagerPage() {
   const afterTaxROI = totalAllInCost > 0 ? (netProfitAfterTax / totalAllInCost) * 100 : 0;
 
   // Sponsor / Barter Dual-Value BOQ Accounting (Requirement 6)
-  const sponsoredItems = (activeFlip?.boq || []).filter((i) => i.isSponsoredOrBarter);
+  const sponsoredItems = activeFlipBoq.filter((i) => i.isSponsoredOrBarter);
   const totalSponsorItemsCount = sponsoredItems.length;
   const sponsorRetailTotal = sponsoredItems.reduce((s, i) => s + (i.commercialRetailValueZAR || i.baselineTotalZAR || 0), 0);
   const sponsorCashTotal = sponsoredItems.reduce((s, i) => s + (i.actualCashOutflowZAR !== undefined ? i.actualCashOutflowZAR : (i.actualCostZAR || i.baselineTotalZAR || 0)), 0);
   const totalSponsorSavings = Math.max(0, sponsorRetailTotal - sponsorCashTotal);
 
-  const totalRetailBOQ = (activeFlip?.boq || []).reduce((s, i) => {
+  const totalRetailBOQ = activeFlipBoq.reduce((s, i) => {
     if (i.isSponsoredOrBarter) return s + (i.commercialRetailValueZAR || i.baselineTotalZAR || 0);
     return s + (i.actualCostZAR || i.baselineTotalZAR || 0);
   }, 0);
@@ -559,10 +572,10 @@ export default function FlipsManagerPage() {
 
   // Milestone Drawdown Allocations & Retention Pool (Requirement 1)
   const milestoneDraws = {
-    deposit: activeFlip?.boq.filter((i) => i.milestonePhase === 'Deposit').reduce((s, i) => s + (i.actualCostZAR || i.baselineTotalZAR), 0) || 0,
-    firstFix: activeFlip?.boq.filter((i) => i.milestonePhase === 'First Fix / Wet Works').reduce((s, i) => s + (i.actualCostZAR || i.baselineTotalZAR), 0) || 0,
-    finishes: activeFlip?.boq.filter((i) => i.milestonePhase === 'Finishes').reduce((s, i) => s + (i.actualCostZAR || i.baselineTotalZAR), 0) || 0,
-    retention: activeFlip?.boq.filter((i) => i.milestonePhase === 'Retention').reduce((s, i) => s + (i.actualCostZAR || i.baselineTotalZAR), 0) || 0,
+    deposit: activeFlipBoq.filter((i) => i.milestonePhase === 'Deposit').reduce((s, i) => s + (i.actualCostZAR || i.baselineTotalZAR), 0) || 0,
+    firstFix: activeFlipBoq.filter((i) => i.milestonePhase === 'First Fix / Wet Works').reduce((s, i) => s + (i.actualCostZAR || i.baselineTotalZAR), 0) || 0,
+    finishes: activeFlipBoq.filter((i) => i.milestonePhase === 'Finishes').reduce((s, i) => s + (i.actualCostZAR || i.baselineTotalZAR), 0) || 0,
+    retention: activeFlipBoq.filter((i) => i.milestonePhase === 'Retention').reduce((s, i) => s + (i.actualCostZAR || i.baselineTotalZAR), 0) || 0,
   };
   const currentDrawSchedule = activeFlip?.drawSchedule || {
     depositPaid: false,
@@ -570,7 +583,7 @@ export default function FlipsManagerPage() {
     finishesApproved: false,
     retentionReleased: false,
   };
-  const totalRetentionHeldZAR = activeFlip?.boq.reduce((s, i) => {
+  const totalRetentionHeldZAR = activeFlipBoq.reduce((s, i) => {
     if (i.milestonePhase === 'Retention') return s + (i.actualCostZAR || i.baselineTotalZAR);
     if (i.retentionPercent && i.retentionPercent > 0) {
       return s + Math.round((i.actualCostZAR || i.baselineTotalZAR) * (i.retentionPercent / 100));
@@ -1009,6 +1022,14 @@ export default function FlipsManagerPage() {
                       <span className="font-bold text-amber-900 bg-amber-100 border border-amber-300 px-2 py-0.5 rounded">
                         Holding ({flipHoldingMonths} mos × {formatZAR(flipMonthlyHoldingCost)}/mo = {formatZAR(totalHoldingCost)})
                       </span>
+                      {exitCommissionZAR > 0 && (
+                        <>
+                          <span className="text-slate-400">−</span>
+                          <span className="font-semibold text-rose-900 bg-rose-100 border border-rose-300 px-2 py-0.5 rounded">
+                            Exit Comm {exitCommissionPercent}% ({formatZAR(exitCommissionZAR)})
+                          </span>
+                        </>
+                      )}
                     </div>
 
                     {/* Entity Tax Toggle (Pre-Tax / 27% Company / 45% Individual) */}
@@ -1828,16 +1849,22 @@ export default function FlipsManagerPage() {
                     (sum, b) => sum + (b.actualCostZAR || b.baselineTotalZAR || 0),
                     0
                   );
+                  const renoCost = totalBoqActual > 0 ? totalBoqActual : (flip.baselineRenovationBudgetZAR || 0);
                   const costBasis =
                     (flip.purchasePriceZAR || 0) +
                     (flip.acquisitionCostsZAR || 0) +
-                    totalBoqActual;
+                    renoCost;
                   const holdingMonths = flip.estimatedDurationMonths ?? 6;
                   const totalHoldingCost = holdingMonths * (flip.monthlyHoldingCostZAR ?? 0);
-                  const fullCostBasis = costBasis + totalHoldingCost;
+                  const sec118Cost =
+                    (flip.municipalClearance?.sec118ArrearsZAR || 0) +
+                    (flip.municipalClearance?.advanceCouncilDepositZAR || 0);
                   const salePrice = flip.actualSalePriceZAR || flip.targetExitPriceZAR || 0;
-                  const realizedNetProfit = salePrice - costBasis;
-                  const realizedROI = costBasis > 0 ? (realizedNetProfit / costBasis) * 100 : 0;
+                  const exitCommRate = typeof flip.exitCommissionPercent === 'number' ? flip.exitCommissionPercent : 5.75;
+                  const exitCommission = isBrrrr ? 0 : Math.round(salePrice * (exitCommRate / 100));
+                  const fullCostBasis = costBasis + totalHoldingCost + sec118Cost + exitCommission;
+                  const realizedNetProfit = salePrice - fullCostBasis;
+                  const realizedROI = fullCostBasis > 0 ? (realizedNetProfit / fullCostBasis) * 100 : 0;
                   const brrrrTargetValuation = flip.targetExitPriceZAR || fullCostBasis;
                   const brrrrEquityCreated = Math.max(0, brrrrTargetValuation - fullCostBasis);
 
@@ -1897,7 +1924,7 @@ export default function FlipsManagerPage() {
                             </div>
                             <div>
                               <span className="text-[10px] text-slate-400 block uppercase font-semibold">Total Cost Basis</span>
-                              <strong className="text-xs font-bold text-slate-700">{formatZAR(costBasis)}</strong>
+                              <strong className="text-xs font-bold text-slate-700">{formatZAR(fullCostBasis)}</strong>
                             </div>
                             <div>
                               <span className="text-[10px] text-slate-400 block uppercase font-semibold">Realized Profit</span>
@@ -2769,9 +2796,9 @@ export default function FlipsManagerPage() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Baseline Renovation Budget (ZAR)</label>
+                  <label className="block font-semibold text-slate-700 mb-1">Baseline Reno Budget (ZAR)</label>
                   <input
                     type="number"
                     name="renovationBudgetZAR"
@@ -2794,6 +2821,21 @@ export default function FlipsManagerPage() {
                     value={flipTargetExit}
                     onChange={(e) => setFlipTargetExit(Number(e.target.value))}
                     className="w-full px-3 py-2 border border-slate-300 rounded-lg font-bold text-emerald-700"
+                  />
+                </div>
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Exit Commission (%)</label>
+                  <input
+                    type="number"
+                    name="exitCommissionPercent"
+                    autoComplete="off"
+                    min="0"
+                    max="100"
+                    step="0.05"
+                    value={flipExitCommissionPercent}
+                    onChange={(e) => setFlipExitCommissionPercent(Number(e.target.value))}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg font-semibold text-slate-900"
+                    placeholder="5.75"
                   />
                 </div>
               </div>

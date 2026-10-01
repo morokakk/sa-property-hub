@@ -52,18 +52,7 @@ export function exportRentalsCSV(rentals: RentalProperty[]) {
   ];
 
   const rows = rentals.map((r) => {
-    const cashflow = calculateRentalCashflow({
-      monthlyGrossRentZAR: r.monthlyGrossRentZAR,
-      monthlyLeviesZAR: r.monthlyLeviesZAR,
-      monthlyRatesTaxesZAR: r.monthlyRatesTaxesZAR,
-      monthlyMaintenanceReserveZAR: r.monthlyMaintenanceReserveZAR,
-      monthlyBondPaymentZAR: r.monthlyBondPaymentZAR,
-      managementType: r.managementType,
-      agencyCommissionPercent: r.agencyCommissionPercent,
-      agencyVatApplicable: r.agencyVatApplicable,
-      monthlyAgentFeeZAR: r.monthlyAgentFeeZAR,
-      unpaidUtilityArrearsZAR: r.unpaidUtilityArrearsZAR,
-    });
+    const cashflow = calculateRentalCashflow(r);
 
     return [
       escapeCSV(r.title),
@@ -233,7 +222,15 @@ export function exportFundingCSV(funding: FundingSource[]) {
   ];
 
   const rows = funding.map((f) => {
-    const outstanding = Math.max(0, f.capitalAmountZAR - (f.totalRepaidZAR || 0));
+    let drawn = 0;
+    if (f.status === 'Settled' || f.status === 'Standby') {
+      drawn = 0;
+    } else if (f.tranches && f.tranches.length > 0) {
+      drawn = f.tranches.filter((t) => t.isDisbursed).reduce((s, t) => s + t.amountZAR, 0);
+    } else if (f.status === 'Active' || f.status === 'Accruing' || f.status === 'Matured') {
+      drawn = f.capitalAmountZAR || 0;
+    }
+    const outstanding = Math.max(0, drawn - (f.totalRepaidZAR || 0));
 
     return [
       escapeCSV(f.lenderName),

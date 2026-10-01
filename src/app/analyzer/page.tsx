@@ -9,6 +9,7 @@ import {
   computeBuiltInEquity,
   computeAmenityScore,
   generateLongTermProjection,
+  calculateMonthlyBondRepayment,
 } from '@/lib/calculations/propertyMetrics';
 import { calculateFlipMao, calculateRentalMao } from '@/lib/calculations/maoSolver';
 import { formatOpportunityForWhatsApp } from '@/lib/whatsappFormatter';
@@ -356,6 +357,7 @@ export default function OpportunityAnalyzerPage() {
       costs: calculatedCosts,
       auctioneerCommissionZAR: auctioneerCommission,
       municipalArrearsZAR: municipalArrears,
+      exitCommissionPercent: 5.75,
     });
   }, [
     purchasePrice,
@@ -433,7 +435,8 @@ export default function OpportunityAnalyzerPage() {
   const flipHoldingReserve = useMemo(() => {
     const leviesClean = propertyType === 'Freehold House' ? 0 : monthlyLevies;
     const insuranceClean = propertyType === 'Freehold House' ? Math.round(annualInsurance / 12) : 0;
-    return (leviesClean + monthlyRates + insuranceClean + 1500) * 6;
+    const siteSecurityAndUtilitiesAllowance = 1500;
+    return (leviesClean + monthlyRates + insuranceClean + siteSecurityAndUtilitiesAllowance) * 6;
   }, [propertyType, monthlyLevies, monthlyRates, annualInsurance]);
 
   const computedFlipMao = useMemo(() => {
@@ -443,8 +446,10 @@ export default function OpportunityAnalyzerPage() {
       rehabCost,
       holdingCost: flipHoldingReserve,
       estimatedAcquisitionCostRate: 0.05,
+      exitCommissionPercent: 5.75,
+      municipalClearanceZAR: municipalArrears,
     });
-  }, [maoTargetExitPrice, maoDesiredRoi, rehabCost, flipHoldingReserve]);
+  }, [maoTargetExitPrice, maoDesiredRoi, rehabCost, flipHoldingReserve, municipalArrears]);
 
   const computedRentalMao = useMemo(() => {
     return calculateRentalMao({
@@ -498,6 +503,7 @@ export default function OpportunityAnalyzerPage() {
       agencyVatApplicable,
       vacancyRatePercent: vacancyRate,
       targetExitPrice,
+      exitCommissionPercent: 5.75,
       holdingPeriodMonths: 6,
       monthlyBondPaymentZAR: calculatedMetrics.monthlyBondPayment,
       monthlyOtherHoldingCostZAR: 1500,
@@ -712,6 +718,7 @@ export default function OpportunityAnalyzerPage() {
       agencyVatApplicable,
       vacancyRatePercent: vacancyRate,
       targetExitPrice,
+      exitCommissionPercent: 5.75,
       holdingPeriodMonths: 6,
       monthlyBondPaymentZAR: calculatedMetrics.monthlyBondPayment,
       monthlyOtherHoldingCostZAR: 1500,
@@ -905,7 +912,7 @@ export default function OpportunityAnalyzerPage() {
                               <span className="font-semibold text-slate-800">{formatZAR(computedFlipMao.totalAllowableOutlay)}</span>
                             </div>
                             <div className="flex justify-between text-xs text-slate-600">
-                              <span>Less BOQ + 6M Holding:</span>
+                              <span>Less BOQ, Holding & Exit Friction:</span>
                               <span className="text-rose-600 font-semibold">-{formatZAR(computedFlipMao.nonPurchaseCosts)}</span>
                             </div>
                             <div className="border-t border-violet-200 pt-2 flex justify-between items-center">
@@ -2518,7 +2525,7 @@ export default function OpportunityAnalyzerPage() {
               };
               const effectiveLtv = deal.bondLTV !== undefined ? deal.bondLTV : (deal.loanToValuePercent ?? 100);
               const bondPayment = deal.monthlyBondPaymentZAR ?? (
-                effectiveLtv > 0 ? Math.round(deal.purchasePrice * (effectiveLtv / 100) * 0.0108) : 0
+                effectiveLtv > 0 ? calculateMonthlyBondRepayment(deal.purchasePrice * (effectiveLtv / 100), deal.interestRatePercent ?? 11.75, deal.bondTermYears ?? deal.loanTermYears ?? 20) : 0
               );
               const holdingLevies = deal.propertyType === 'Freehold House' ? 0 : (deal.monthlyLevies ?? 0);
               const holdingRates = deal.monthlyRatesTaxes ?? 0;

@@ -37,12 +37,13 @@ export default function DelayMatrixModal({
   const operationalRatesAndLevies =
     (flip.monthlyRatesTaxesZAR || 0) +
     (flip.propertyType === 'Freehold House' ? 0 : flip.monthlyLeviesZAR || 0) +
-    (flip.monthlyOtherHoldingCostZAR || 0);
+    (flip.monthlyOtherHoldingCostZAR || 0) +
+    (flip.monthlyBondPaymentZAR || 0);
 
   const defaultHoldingBurn =
     operationalRatesAndLevies > 0
       ? operationalRatesAndLevies
-      : Math.max(0, (flip.monthlyHoldingCostZAR || 0) - (flip.monthlyBondPaymentZAR || 0)) || 6500;
+      : (flip.monthlyHoldingCostZAR || 0) || 6500;
 
   const [monthlyHoldingBurn, setMonthlyHoldingBurn] = useState<number>(defaultHoldingBurn);
   const [debtPrincipal, setDebtPrincipal] = useState<number>(

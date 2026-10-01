@@ -20,6 +20,7 @@ describe('Portfolio Summary: Ring-Fenced Working Capital & SARS Provisional Tax 
     status: 'Active',
     currentPhase: 'Finishes & Tiling',
     taxEntityType: 'Company (27%)',
+    exitCommissionPercent: 0,
     municipalClearance: {
       sec118ArrearsZAR: 20_000,
       advanceCouncilDepositZAR: 30_000,

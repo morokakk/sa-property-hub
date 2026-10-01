@@ -890,6 +890,7 @@ export const INITIAL_FLIPS: FlipProject[] = [
     monthlyRatesTaxesZAR: 4_500,
     monthlyOtherHoldingCostZAR: 2_000,
     targetExitPriceZAR: 5_650_000,
+    exitCommissionPercent: 5.75,
     targetCompletionDate: '2026-11-15',
     taxEntityType: 'Company (27%)',
     municipalClearance: {
@@ -1053,6 +1054,7 @@ export const INITIAL_FLIPS: FlipProject[] = [
     monthlyRatesTaxesZAR: 1_800,
     monthlyOtherHoldingCostZAR: 1_400,
     targetExitPriceZAR: 3_350_000,
+    exitCommissionPercent: 5.75,
     targetCompletionDate: '2026-12-20',
     taxEntityType: 'Company (27%)',
     municipalClearance: {
@@ -1188,13 +1190,14 @@ export const INITIAL_FLIPS: FlipProject[] = [
     baselineRenovationBudgetZAR: 320_000,
     strategy: 'Flip',
     estimatedDurationMonths: 8,
-    monthlyHoldingCostZAR: 12_500,
+    monthlyHoldingCostZAR: 3_900,
     monthlyBondPaymentZAR: 0, // Cash purchase, no bond
     monthlyLeviesZAR: 0, // Freehold
     monthlyRatesTaxesZAR: 2_100,
     monthlyOtherHoldingCostZAR: 1_800,
     municipalValuationZAR: 1_350_000,
     targetExitPriceZAR: 2_450_000,
+    exitCommissionPercent: 5.75,
     targetCompletionDate: '2027-02-28',
     taxEntityType: 'Individual (45%)', // Sole proprietor — demonstrates 45% SARS provisional tax
     municipalClearance: {

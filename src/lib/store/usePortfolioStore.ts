@@ -23,6 +23,10 @@ import {
   EquityExtractionAlert,
 } from '@/types';
 import {
+  calculateMonthlyBondRepayment,
+  calculateBondPrincipalFromRepayment,
+} from '@/lib/calculations/propertyMetrics';
+import {
   INITIAL_RENTALS,
   INITIAL_FLIPS,
   INITIAL_FUNDING,
@@ -657,7 +661,13 @@ export const usePortfolioStore = create<PortfolioState>()(
       // Flips
       addFlip: (flip) =>
         set((state) => ({
-          flips: [flip, ...state.flips],
+          flips: [
+            {
+              ...flip,
+              exitCommissionPercent: flip.exitCommissionPercent ?? 5.75,
+            },
+            ...state.flips,
+          ],
           tasks: flip.agmDate
             ? syncAgmReminderTask(state.tasks, 'flip', flip.id, flip.title, flip.agmDate)
             : state.tasks,
@@ -681,8 +691,13 @@ export const usePortfolioStore = create<PortfolioState>()(
           }
         });
 
+        const standardizedFlips = newFlips.map((f) => ({
+          ...f,
+          exitCommissionPercent: f.exitCommissionPercent ?? 5.75,
+        }));
+
         set((state) => ({
-          flips: [...newFlips, ...state.flips],
+          flips: [...standardizedFlips, ...state.flips],
           tasks: updatedTasks,
         }));
 
@@ -833,7 +848,9 @@ export const usePortfolioStore = create<PortfolioState>()(
           marketValueZAR: marketVal,
           purchasePriceZAR: totalCostBasis,
           purchaseDate: flip.purchaseDate || new Date().toISOString().split('T')[0],
-          outstandingBondBalanceZAR: flip.monthlyBondPaymentZAR ? Math.round(flip.monthlyBondPaymentZAR / 0.0108) : 0,
+          outstandingBondBalanceZAR: flip.monthlyBondPaymentZAR
+            ? calculateBondPrincipalFromRepayment(flip.monthlyBondPaymentZAR, 11.75, 20)
+            : 0,
           bondInterestRatePercent: 11.75,
           monthlyBondPaymentZAR: flip.monthlyBondPaymentZAR || 0,
           bondPaymentEffectiveDate: flip.bondPaymentEffectiveDate,
@@ -1070,6 +1087,7 @@ export const usePortfolioStore = create<PortfolioState>()(
           estimatedDurationMonths: opp.holdingPeriodMonths || 6,
           monthlyHoldingCostZAR: (opp.monthlyLevies || 0) + (opp.monthlyRatesTaxes || 0) + (opp.monthlyCashFlow < 0 ? Math.abs(opp.monthlyCashFlow) : 0),
           targetExitPriceZAR: opp.targetExitPrice || opp.purchasePrice * 1.35,
+          exitCommissionPercent: opp.exitCommissionPercent ?? 5.75,
           targetCompletionDate: new Date(Date.now() + (opp.holdingPeriodMonths || 6) * 30 * 24 * 60 * 60 * 1000)
             .toISOString()
             .split('T')[0],
@@ -1175,7 +1193,13 @@ export const usePortfolioStore = create<PortfolioState>()(
           purchaseDate: new Date().toISOString().split('T')[0],
           outstandingBondBalanceZAR: bondAmount,
           bondInterestRatePercent: opp.interestRatePercent || 11.75,
-          monthlyBondPaymentZAR: opp.costs ? Math.round((bondAmount * 0.0108)) : 0,
+          monthlyBondPaymentZAR: opp.costs
+            ? calculateMonthlyBondRepayment(
+                bondAmount,
+                opp.interestRatePercent || 11.75,
+                opp.loanTermYears || 20
+              )
+            : 0,
           leases: [{
             id: `lease-${Date.now()}`,
             unitName: 'Main Unit',
@@ -1635,23 +1659,27 @@ export function computePortfolioSummary(state: {
 
   // 3. Projected Flip Profits & SARS Provisional Tax Reserve:
   let totalGrossProjectedFlipProfits = 0;
-  let totalSarsProvisionalTaxReserve = 0;
+  let totalSarsFlipTaxReserve = 0;
 
   activeFlips.forEach((f) => {
-    const totalBoqActual = (f.boq || []).reduce(
+    const boqSum = (f.boq || []).reduce(
       (bSum, b) => bSum + (b.actualCostZAR || b.baselineTotalZAR || 0),
       0
     );
+    const renovationCost = boqSum > 0 ? boqSum : (f.baselineRenovationBudgetZAR || 0);
     const totalHoldingCost = (f.estimatedDurationMonths || 0) * (f.monthlyHoldingCostZAR || 0);
     const sec118Cost =
       (f.municipalClearance?.sec118ArrearsZAR || 0) +
       (f.municipalClearance?.advanceCouncilDepositZAR || 0);
+    const exitCommRate = typeof f.exitCommissionPercent === 'number' ? f.exitCommissionPercent : 5.75;
+    const exitCommission = Math.round((f.targetExitPriceZAR || 0) * (exitCommRate / 100));
     const totalCost =
       (f.purchasePriceZAR || 0) +
       (f.acquisitionCostsZAR || 0) +
-      totalBoqActual +
+      renovationCost +
       totalHoldingCost +
-      sec118Cost;
+      sec118Cost +
+      exitCommission;
     const grossProfit = (f.targetExitPriceZAR || 0) - totalCost;
     totalGrossProjectedFlipProfits += grossProfit;
 
@@ -1663,29 +1691,38 @@ export function computePortfolioSummary(state: {
           : f.taxEntityType === 'Pre-Tax'
           ? 0
           : 0.27; // Default 27% Corporate Income Tax
-      totalSarsProvisionalTaxReserve += Math.round(grossProfit * taxRate);
+      totalSarsFlipTaxReserve += Math.round(grossProfit * taxRate);
     }
   });
 
-  totalSarsProvisionalTaxReserve += annualRentalTaxReserve;
+  const totalSarsRentalTaxReserve = annualRentalTaxReserve;
+  const totalSarsProvisionalTaxReserve = totalSarsFlipTaxReserve + totalSarsRentalTaxReserve;
 
-  const totalNetProjectedFlipProfits = totalGrossProjectedFlipProfits - (totalSarsProvisionalTaxReserve - annualRentalTaxReserve);
+  const totalNetProjectedFlipProfits = totalGrossProjectedFlipProfits - totalSarsFlipTaxReserve;
   const totalProjectedFlipProfits = totalGrossProjectedFlipProfits;
 
   // Realized profit on completed/sold flips (excludes BRRRR converted rentals)
   const totalRealizedFlipProfits = completedFlips.reduce((sum, f) => {
     if (f.exitStrategy === 'BRRRR') return sum;
-    const totalBoqActual = (f.boq || []).reduce(
+    const boqSum = (f.boq || []).reduce(
       (bSum, b) => bSum + (b.actualCostZAR || b.baselineTotalZAR || 0),
       0
     );
+    const renovationCost = boqSum > 0 ? boqSum : (f.baselineRenovationBudgetZAR || 0);
     const totalHoldingCost = (f.estimatedDurationMonths || 0) * (f.monthlyHoldingCostZAR || 0);
+    const sec118Cost =
+      (f.municipalClearance?.sec118ArrearsZAR || 0) +
+      (f.municipalClearance?.advanceCouncilDepositZAR || 0);
+    const exitPrice = f.actualSalePriceZAR ?? f.targetExitPriceZAR ?? 0;
+    const exitCommRate = typeof f.exitCommissionPercent === 'number' ? f.exitCommissionPercent : 5.75;
+    const exitCommission = Math.round(exitPrice * (exitCommRate / 100));
     const totalCost =
       (f.purchasePriceZAR || 0) +
       (f.acquisitionCostsZAR || 0) +
-      totalBoqActual +
-      totalHoldingCost;
-    const exitPrice = f.actualSalePriceZAR ?? f.targetExitPriceZAR ?? 0;
+      renovationCost +
+      totalHoldingCost +
+      sec118Cost +
+      exitCommission;
     return sum + (exitPrice - totalCost);
   }, 0);
 
@@ -1708,6 +1745,8 @@ export function computePortfolioSummary(state: {
     monthlyNetRentalCashflow,
     totalProjectedFlipProfits,
     totalGrossProjectedFlipProfits,
+    totalSarsFlipTaxReserve,
+    totalSarsRentalTaxReserve,
     totalSarsProvisionalTaxReserve,
     totalNetProjectedFlipProfits,
     totalRealizedFlipProfits,

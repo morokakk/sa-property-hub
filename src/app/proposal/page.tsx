@@ -5,7 +5,7 @@ import { useSearchParams } from 'next/navigation';
 import TopHeader from '@/components/navigation/TopHeader';
 import { usePortfolioStore } from '@/lib/store/usePortfolioStore';
 import { formatZAR, formatPercent, formatDate } from '@/lib/formatters';
-import { generateLongTermProjection } from '@/lib/calculations/propertyMetrics';
+import { generateLongTermProjection, calculateMonthlyBondRepayment } from '@/lib/calculations/propertyMetrics';
 import { formatProposalPitchForWhatsApp } from '@/lib/whatsappFormatter';
 import LongTermProjectionChart from '@/components/analytics/LongTermProjectionChart';
 import { DealStrategy, DealSource } from '@/types';
@@ -93,6 +93,7 @@ function ProposalGeneratorContent() {
       municipalArrears: 0,
       isSection13Eligible: false,
       holdingDurationMonths: f.estimatedDurationMonths ?? 6,
+      exitCommissionPercent: f.exitCommissionPercent ?? 5.75,
       monthlyBondHolding: f.monthlyBondPaymentZAR ?? 0,
       monthlyLeviesHolding: f.monthlyLeviesZAR ?? 0,
       monthlyRatesHolding: f.monthlyRatesTaxesZAR ?? 0,
@@ -163,14 +164,15 @@ function ProposalGeneratorContent() {
         isSection13Eligible: o.section13sex?.isEligible ?? false,
         section13Allowance: o.section13sex?.annualAllowanceZAR ?? 0,
         holdingDurationMonths: o.holdingPeriodMonths ?? 6,
-        monthlyBondHolding: o.monthlyBondPaymentZAR ?? (o.bondLTV ? Math.round(o.purchasePrice * (o.bondLTV / 100) * 0.0108) : 0),
+        exitCommissionPercent: o.exitCommissionPercent ?? 5.75,
+        monthlyBondHolding: o.monthlyBondPaymentZAR ?? (o.bondLTV ? calculateMonthlyBondRepayment(o.purchasePrice * (o.bondLTV / 100), o.interestRatePercent ?? 11.75, o.loanTermYears ?? 20) : 0),
         monthlyLeviesHolding: o.monthlyLevies ?? 0,
         monthlyRatesHolding: o.monthlyRatesTaxes ?? 0,
         monthlyOtherHolding: o.monthlyOtherHoldingCostZAR ?? 1500,
         monthlyHoldingCost: o.monthlyHoldingCostZAR ?? (
           (o.monthlyLevies ?? 0) +
           (o.monthlyRatesTaxes ?? 0) +
-          (o.monthlyBondPaymentZAR ?? (o.bondLTV ? Math.round(o.purchasePrice * (o.bondLTV / 100) * 0.0108) : 0)) +
+          (o.monthlyBondPaymentZAR ?? (o.bondLTV ? calculateMonthlyBondRepayment(o.purchasePrice * (o.bondLTV / 100), o.interestRatePercent ?? 11.75, o.loanTermYears ?? 20) : 0)) +
           (o.monthlyOtherHoldingCostZAR ?? 1500)
         ),
         targetExitPrice: o.targetExitPrice,
@@ -240,6 +242,7 @@ function ProposalGeneratorContent() {
         monthlyOtherHolding: (r.monthlyAgentFeeZAR || 0) + (r.monthlyMaintenanceReserveZAR || 0),
         monthlyHoldingCost: (r.monthlyBondPaymentZAR || 0) + (r.monthlyLeviesZAR || 0) + (r.monthlyRatesTaxesZAR || 0),
         targetExitPrice: openMarket,
+        exitCommissionPercent: 5.75,
         completionDate: r.leases?.[0]?.leaseEndDate || new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
         boq: [],
         notes: `Seasoned portfolio asset. Tenant: ${r.leases?.[0]?.tenantName || 'In-place'}. Gross Rent: ${formatZAR(r.monthlyGrossRentZAR)}/mo. Bond balance: ${formatZAR(r.outstandingBondBalanceZAR || 0)}.`,
@@ -385,6 +388,8 @@ function ProposalGeneratorContent() {
   const totalHoldingReserve = isFlip ? monthlyBurnRate * holdingDuration : 0;
   const auctioneerCommission = deal?.auctioneerCommission ?? 0;
   const municipalArrears = deal?.municipalArrears ?? 0;
+  const exitCommissionPercent = deal?.exitCommissionPercent ?? 5.75;
+  const exitCommission = isFlip && (deal?.targetExitPrice || 0) > 0 ? ((deal?.targetExitPrice || 0) * exitCommissionPercent) / 100 : 0;
 
   const totalProjectCost =
     (deal?.purchasePrice || 0) +
@@ -392,7 +397,8 @@ function ProposalGeneratorContent() {
     (deal?.renovationBudget || 0) +
     totalHoldingReserve +
     auctioneerCommission +
-    municipalArrears;
+    municipalArrears +
+    exitCommission;
 
   const projectedNetProfit = (deal?.targetExitPrice || 0) - totalProjectCost;
   const netProjectROI = totalProjectCost > 0 ? (projectedNetProfit / totalProjectCost) * 100 : 0;
@@ -407,6 +413,7 @@ function ProposalGeneratorContent() {
         ...deal,
         auctioneerCommission,
         municipalArrears,
+        exitCommissionPercent,
         isSection13Eligible: deal.isSection13Eligible,
       },
       strategy: pitchStrategy,
@@ -416,7 +423,7 @@ function ProposalGeneratorContent() {
       securityType,
       investorProfile,
     });
-  }, [deal, pitchStrategy, capitalRequested, fundingOfferType, offeredRate, securityType, investorProfile, auctioneerCommission, municipalArrears]);
+  }, [deal, pitchStrategy, capitalRequested, fundingOfferType, offeredRate, securityType, investorProfile, auctioneerCommission, municipalArrears, exitCommissionPercent]);
 
   const handleCopyPitchWhatsApp = async () => {
     if (!pitchWhatsAppText) return;
@@ -1185,7 +1192,7 @@ function ProposalGeneratorContent() {
                     <span className="font-semibold text-slate-700">Projected Lender Payout:</span>
                     <strong className="text-emerald-700 text-sm">
                       {fundingOfferType === 'Fixed Interest'
-                        ? formatZAR(capitalRequested + (capitalRequested * (offeredRate / 100) * 0.5))
+                        ? formatZAR(capitalRequested + (capitalRequested * (offeredRate / 100) * (holdingDuration / 12)))
                         : formatZAR(capitalRequested + (projectedNetProfit * (offeredRate / 100)))}
                     </strong>
                   </div>
@@ -1371,7 +1378,7 @@ function ProposalGeneratorContent() {
                   const totalCapitalInvested = totalProjectCost;
                   const capitalExtracted = Math.min(totalCapitalInvested, newBankMortgage);
                   const netEquityTrapped = Math.max(0, totalCapitalInvested - newBankMortgage);
-                  const monthlyRefiBond = Math.round(newBankMortgage * 0.0108); // ~11.75% 20y bond factor
+                  const monthlyRefiBond = calculateMonthlyBondRepayment(newBankMortgage, 11.75, 20);
                   const netRentalCashflowPostRefi = (deal.monthlyRent || Math.round(deal.purchasePrice * 0.009)) - (monthlyRefiBond + monthlyLevies + monthlyRates);
 
                   return (

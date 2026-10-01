@@ -73,6 +73,21 @@ export function calculateMonthlyBondRepayment(
   return Math.round((principal * (monthlyRate * factor)) / (factor - 1));
 }
 
+/**
+ * Calculates mortgage principal balance from monthly bond repayment (inverse PMT).
+ */
+export function calculateBondPrincipalFromRepayment(
+  monthlyPayment: number,
+  annualInterestRate: number,
+  years: number
+): number {
+  if (monthlyPayment <= 0 || annualInterestRate <= 0 || years <= 0) return 0;
+  const monthlyRate = annualInterestRate / 100 / 12;
+  const totalMonths = years * 12;
+  const factor = Math.pow(1 + monthlyRate, totalMonths);
+  return Math.round((monthlyPayment * (factor - 1)) / (monthlyRate * factor));
+}
+
 export interface OpportunityMetricsResult {
   grossYield: number;
   capRate: number;
@@ -108,6 +123,7 @@ export function calculateDealMetrics(params: {
   costs: AcquisitionCostBreakdown;
   auctioneerCommissionZAR?: number;
   municipalArrearsZAR?: number;
+  exitCommissionPercent?: number;
 }): OpportunityMetricsResult {
   const {
     purchasePrice,
@@ -129,6 +145,7 @@ export function calculateDealMetrics(params: {
     costs,
     auctioneerCommissionZAR,
     municipalArrearsZAR,
+    exitCommissionPercent,
   } = params;
 
   // Effective LTV and Deposit
@@ -178,8 +195,9 @@ export function calculateDealMetrics(params: {
   const netRoi = totalCashRequired > 0 ? (annualCashFlow / totalCashRequired) * 100 : 0;
 
   // Buy-and-Flip Projections
-  // Assume 5% estate agent sales commission + VAT on exit price
-  const exitCommission = targetExitPrice * 0.05 * 1.15;
+  // Standard 5.75% estate agent sales commission (or per-flip override)
+  const commissionRate = typeof exitCommissionPercent === 'number' ? exitCommissionPercent / 100 : 0.0575;
+  const exitCommission = targetExitPrice * commissionRate;
   const holdingBondInterest = (monthlyBondPayment * holdingPeriodMonths);
   const holdingLeviesAndRates = (monthlyLevies + monthlyRatesTaxes) * holdingPeriodMonths;
   const totalHoldingCosts = holdingBondInterest + holdingLeviesAndRates;

@@ -129,6 +129,7 @@ export interface OpportunityDeal {
   agencyVatApplicable?: boolean; // Whether 15% VAT is added on top of agency commission (defaults to true)
   vacancyRatePercent: number; // e.g. 5%
   targetExitPrice: number; // For flip exit
+  exitCommissionPercent?: number; // e.g. 5.75% default or 0% override
   holdingPeriodMonths: number;
   strategy?: DealStrategy; // 'Flip' | 'Rental' | 'BRRRR'
   monthlyHoldingCostZAR?: number;
@@ -212,6 +213,7 @@ export interface FundingSource {
   linkedDealId?: string; // Links to flip or rental
   linkedDealName?: string;
   totalRepaidZAR: number;
+  totalInterestPaidZAR?: number; // Total monthly coupon / interest paid (separate from principal repayment)
   status: 'Active' | 'Accruing' | 'Standby' | 'Matured' | 'Settled';
   notes?: string;
   tranches?: FundingTranche[];
@@ -280,6 +282,7 @@ export interface FlipProject {
   municipalValuationZAR?: number; // Official municipal property valuation from CoJ bill
   bondPaymentEffectiveDate?: string; // e.g. '2026-04'
   targetExitPriceZAR: number;
+  exitCommissionPercent?: number; // Defaults to 5.75% (5% + 15% VAT). Set 0 for direct/off-market private sales
   targetCompletionDate: string;
   currentPhase: 'Acquisition & Conveyancing' | 'Strip & Demolition' | 'First Fix (Plumbing/Elec)' | 'Finishes & Tiling' | 'Snagging' | 'Staging & Marketing' | 'Sold / Awaiting Transfer';
   boq: BOQItem[];
@@ -585,8 +588,10 @@ export interface PortfolioSummary {
   monthlyNetRentalCashflow: number;
   totalProjectedFlipProfits: number; // Backward-compatible alias for totalGrossProjectedFlipProfits
   totalGrossProjectedFlipProfits: number; // Pre-tax pipeline profit
-  totalSarsProvisionalTaxReserve: number; // SARS corporate tax liability (27% Company / 45% Individual)
-  totalNetProjectedFlipProfits: number; // Net realizable equity after tax
+  totalSarsFlipTaxReserve: number; // SARS corporate tax on flips (27% Company / 45% Individual)
+  totalSarsRentalTaxReserve: number; // SARS annual rental cash flow tax liability
+  totalSarsProvisionalTaxReserve: number; // Total SARS provisional tax liability (Flip tax + Rental tax)
+  totalNetProjectedFlipProfits: number; // Net realizable equity after flip tax
   totalRealizedFlipProfits: number;
   activeRentalsCount: number;
   soldRentalsCount: number;
@@ -637,6 +642,7 @@ export interface AnalyzerDraft {
   monthlyLevies: number;
   monthlyRates: number;
   targetExitPrice: number;
+  exitCommissionPercent?: number;
   auctioneerCommission: number;
   municipalArrears: number;
   depositZAR: number;

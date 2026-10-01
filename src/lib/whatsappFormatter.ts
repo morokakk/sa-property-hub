@@ -1,6 +1,6 @@
 import { formatZAR, formatPercent, formatDate } from './formatters';
 import { OpportunityDeal, FlipProject, InvestorProfile, DealStrategy, DealSource } from '@/types';
-import { generateLongTermProjection } from './calculations/propertyMetrics';
+import { generateLongTermProjection, calculateMonthlyBondRepayment } from './calculations/propertyMetrics';
 
 export interface ProposalPitchParams {
   deal: {
@@ -19,6 +19,7 @@ export interface ProposalPitchParams {
     builtInEquityPercent?: number;
     auctioneerCommission?: number;
     municipalArrears?: number;
+    exitCommissionPercent?: number;
     isSection13Eligible?: boolean;
     arvZAR?: number;
     refinanceLtvPercent?: number;
@@ -85,15 +86,18 @@ export function formatOpportunityForWhatsApp(
   if (isFlip) {
     // BUY-AND-FLIP METRICS
     const holdingDuration = deal.holdingPeriodMonths || 6;
-    const monthlyBond = deal.monthlyBondPaymentZAR ?? (deal.bondLTV ? Math.round(deal.purchasePrice * (deal.bondLTV / 100) * 0.0108) : 0);
+    const bondLtv = deal.bondLTV ?? deal.loanToValuePercent ?? 100;
+    const monthlyBond = deal.monthlyBondPaymentZAR ?? (bondLtv > 0 ? calculateMonthlyBondRepayment(deal.purchasePrice * (bondLtv / 100), deal.interestRatePercent ?? 11.75, deal.bondTermYears ?? deal.loanTermYears ?? 20) : 0);
     const monthlyLevies = deal.monthlyLevies ?? 0;
     const monthlyRates = deal.monthlyRatesTaxes ?? 0;
     const monthlyOther = deal.monthlyOtherHoldingCostZAR ?? 1500;
     const monthlyBurnRate = deal.monthlyHoldingCostZAR || (monthlyBond + monthlyLevies + monthlyRates + monthlyOther);
     const totalHoldingReserve = monthlyBurnRate * holdingDuration;
 
+    const exitCommissionPercent = deal.exitCommissionPercent ?? 5.75;
+    const exitCommission = (deal.targetExitPrice || 0) > 0 ? ((deal.targetExitPrice || 0) * exitCommissionPercent) / 100 : 0;
     const acquisitionLegalAndDuty = deal.costs.totalAcquisitionCost - deal.purchasePrice;
-    const totalProjectCost = deal.purchasePrice + acquisitionLegalAndDuty + deal.estimatedRehabCost + totalHoldingReserve;
+    const totalProjectCost = deal.purchasePrice + acquisitionLegalAndDuty + deal.estimatedRehabCost + totalHoldingReserve + exitCommission;
     const projectedNetProfit = (deal.targetExitPrice || 0) - totalProjectCost;
     const projectROI = totalProjectCost > 0 ? (projectedNetProfit / totalProjectCost) * 100 : 0;
 
@@ -113,13 +117,20 @@ export function formatOpportunityForWhatsApp(
     text += `• Renovation / Capex (BOQ): *${formatZAR(deal.estimatedRehabCost)}*\n`;
     text += `• Holding Period Reserve: *${formatZAR(totalHoldingReserve)}* (${holdingDuration} mos @ ${formatZAR(monthlyBurnRate)}/m)\n`;
     text += `  ↳ Bond: ${formatZAR(monthlyBond)} | Levies: ${formatZAR(monthlyLevies)} | Rates: ${formatZAR(monthlyRates)} | Security: ${formatZAR(monthlyOther)}\n`;
+    if (exitCommission > 0) {
+      text += `• Exit Commission (${exitCommissionPercent}%): ${formatZAR(exitCommission)}\n`;
+    }
     text += `• Total Project Outlay: *${formatZAR(totalProjectCost)}*\n`;
     text += `• Initial Capital Required (Day 1): *${formatZAR(initialCap)}*\n`;
+
+    const nominalRoi = projectROI;
+    const annualizedRoi = holdingDuration > 0 ? nominalRoi * (12 / holdingDuration) : nominalRoi;
 
     text += `\n*EXIT VALUATION & PROJECTED PROFIT*\n`;
     text += `• Target Exit Price: *${formatZAR(deal.targetExitPrice)}*\n`;
     text += `• Projected Net Flip Profit: *${formatZAR(projectedNetProfit)}* (After capex & carrying escrow)\n`;
-    text += `• Net Project ROI: *${formatPercent(projectROI)}* on total capital\n`;
+    text += `• Net Project ROI: *${formatPercent(nominalRoi)}* (Nominal)\n`;
+    text += `• Annualized Net ROI: *${formatPercent(annualizedRoi)}*\n`;
   } else {
     // BUY-AND-HOLD RENTAL / BRRRR METRICS
     const ltvVal = deal.bondLTV ?? deal.loanToValuePercent ?? 100;
@@ -236,11 +247,17 @@ export function formatFlipForWhatsApp(
   const monthlyHolding = flip.monthlyHoldingCostZAR || (monthlyBond + monthlyLevies + monthlyRates + monthlyOther);
   const totalHoldingReserve = monthlyHolding * holdingDuration;
 
-  const boqSum = flip.boq.reduce((s, i) => s + (i.actualCostZAR || i.baselineTotalZAR || 0), 0);
+  const boqSum = (flip.boq || []).reduce((s, i) => s + (i.actualCostZAR || i.baselineTotalZAR || 0), 0);
   const totalBoq = boqSum > 0 ? boqSum : flip.baselineRenovationBudgetZAR;
-  const totalCost = flip.purchasePriceZAR + flip.acquisitionCostsZAR + totalBoq + totalHoldingReserve;
+  const sec118Cost =
+    (flip.municipalClearance?.sec118ArrearsZAR || 0) +
+    (flip.municipalClearance?.advanceCouncilDepositZAR || 0);
+  const exitCommissionPercent = flip.exitCommissionPercent ?? 5.75;
+  const exitCommission = flip.targetExitPriceZAR > 0 ? (flip.targetExitPriceZAR * exitCommissionPercent) / 100 : 0;
+  const totalCost = flip.purchasePriceZAR + flip.acquisitionCostsZAR + totalBoq + totalHoldingReserve + sec118Cost + exitCommission;
   const netProfit = flip.targetExitPriceZAR - totalCost;
-  const roi = totalCost > 0 ? (netProfit / totalCost) * 100 : 0;
+  const nominalRoi = totalCost > 0 ? (netProfit / totalCost) * 100 : 0;
+  const annualizedRoi = holdingDuration > 0 ? nominalRoi * (12 / holdingDuration) : nominalRoi;
 
   const fundingReq = flip.fundingRequiredZAR ?? Math.round(totalCost * 0.7);
   const capitalRaised = flip.capitalRaisedZAR ?? 0;
@@ -259,12 +276,19 @@ export function formatFlipForWhatsApp(
   text += `• BOQ Renovation Spend: *${formatZAR(totalBoq)}* (Budget: ${formatZAR(flip.baselineRenovationBudgetZAR)})\n`;
   text += `• Holding Period Reserve: *${formatZAR(totalHoldingReserve)}* (${holdingDuration} mos @ ${formatZAR(monthlyHolding)}/m)\n`;
   text += `  ↳ Bond: ${formatZAR(monthlyBond)} | Levies: ${formatZAR(monthlyLevies)} | Rates: ${formatZAR(monthlyRates)} | Security: ${formatZAR(monthlyOther)}\n`;
+  if (sec118Cost > 0) {
+    text += `• Municipal Clearance (Sec 118): ${formatZAR(sec118Cost)}\n`;
+  }
+  if (exitCommission > 0) {
+    text += `• Exit Commission (${exitCommissionPercent}%): ${formatZAR(exitCommission)}\n`;
+  }
   text += `• Total Capital Invested: *${formatZAR(totalCost)}*\n\n`;
 
   text += `*PROFIT & EXIT VALUATION*\n`;
   text += `• Target Exit Price: *${formatZAR(flip.targetExitPriceZAR)}*\n`;
   text += `• Projected Net Profit: *${formatZAR(netProfit)}* (After capex & holding reserve)\n`;
-  text += `• Annualized Net ROI: *${formatPercent(roi)}*\n`;
+  text += `• Project Net ROI (Nominal): *${formatPercent(nominalRoi)}*\n`;
+  text += `• Annualized Net ROI: *${formatPercent(annualizedRoi)}*\n`;
 
   text += `\n*FUNDING & SYNDICATE STATUS*\n`;
   text += `• Target Facility Required: *${formatZAR(fundingReq)}*\n`;
@@ -311,6 +335,8 @@ export function formatProposalPitchForWhatsApp(
   const holdingReserve = isFlip ? monthlyBurn * holdingDuration : 0;
   const auctionFee = deal.auctioneerCommission ?? 0;
   const arrears = deal.municipalArrears ?? 0;
+  const exitCommissionPercent = deal.exitCommissionPercent ?? 5.75;
+  const exitCommission = isFlip && deal.targetExitPrice > 0 ? (deal.targetExitPrice * exitCommissionPercent) / 100 : 0;
 
   const totalProjectCost =
     deal.purchasePrice +
@@ -318,14 +344,16 @@ export function formatProposalPitchForWhatsApp(
     deal.renovationBudget +
     holdingReserve +
     auctionFee +
-    arrears;
+    arrears +
+    exitCommission;
   const projectedNetProfit = deal.targetExitPrice - totalProjectCost;
   const projectROI = totalProjectCost > 0 ? (projectedNetProfit / totalProjectCost) * 100 : 0;
   const loanToCost = totalProjectCost > 0 ? (capitalRequested / totalProjectCost) * 100 : 0;
 
+  const durationFactor = (holdingDuration || 6) / 12;
   const projectedLenderPayout =
     fundingOfferType === 'Fixed Interest'
-      ? capitalRequested + capitalRequested * (offeredRate / 100) * 0.5
+      ? capitalRequested + capitalRequested * (offeredRate / 100) * durationFactor
       : capitalRequested + projectedNetProfit * (offeredRate / 100);
 
   let text = `*CONFIDENTIAL INVESTMENT MEMORANDUM*\n`;
@@ -373,6 +401,9 @@ export function formatProposalPitchForWhatsApp(
   text += `• Capex & Legal: ${formatZAR(deal.acquisitionCosts + deal.renovationBudget)}\n`;
   if (isFlip) {
     text += `• Holding Cost Escrow: *${formatZAR(holdingReserve)}* (${holdingDuration} mos @ ${formatZAR(monthlyBurn)}/m)\n`;
+    if (exitCommission > 0) {
+      text += `• Exit Commission (${exitCommissionPercent}%): ${formatZAR(exitCommission)}\n`;
+    }
   }
   text += `• Total Project Outlay: *${formatZAR(totalProjectCost)}*\n`;
   text += `• Target Exit Price: *${formatZAR(deal.targetExitPrice)}*\n`;
