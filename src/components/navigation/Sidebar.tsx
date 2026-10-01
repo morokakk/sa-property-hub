@@ -28,6 +28,12 @@ import { exportPortfolioToExcel } from '@/lib/export/excelExport';
 
 export default function Sidebar() {
   const pathname = usePathname();
+
+  // Hide sidebar completely on tenant statement portal
+  if (pathname.startsWith('/statement')) {
+    return null;
+  }
+
   const pendingOpportunitiesCount = usePortfolioStore((state) => state.opportunities.length);
   const activeFlipsCount = usePortfolioStore((state) => state.flips.filter((f) => f.status === 'Active').length);
   const activeRentalsCount = usePortfolioStore((state) => state.rentals.length);

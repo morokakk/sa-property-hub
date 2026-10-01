@@ -22,6 +22,7 @@ import {
   Layers,
   Receipt,
   Landmark,
+  Link2,
 } from 'lucide-react';
 import { usePortfolioStore } from '@/lib/store/usePortfolioStore';
 import { formatZAR, formatDate } from '@/lib/formatters';
@@ -59,6 +60,7 @@ export default function TenantStatement({
     isError?: boolean;
   } | null>(null);
   const [copiedToast, setCopiedToast] = useState(false);
+  const [copiedToastMessage, setCopiedToastMessage] = useState('WhatsApp Statement copied to clipboard!');
 
   // Multi-Target statement selection ('lease-{id}' | 'ancillary-{id}' | 'consolidated')
   const [selectedTargetId, setSelectedTargetId] = useState<string>('');
@@ -479,6 +481,43 @@ export default function TenantStatement({
     window.print();
   };
 
+  // Copy Secure Shareable Tenant Statement Link
+  const handleCopySecureLink = async () => {
+    if (!selectedLease?.id) {
+      setStatusMessage({
+        text: 'No residential lease unit selected. Please select a unit lease to generate a public link.',
+        isError: true,
+      });
+      setTimeout(() => setStatusMessage(null), 4000);
+      return;
+    }
+
+    const isCloudSynced =
+      typeof localStorage !== 'undefined' &&
+      localStorage.getItem('cloud_sync_completed') === 'true';
+
+    const origin = typeof window !== 'undefined' ? window.location.origin : '';
+    const shareUrl = `${origin}/statement/${selectedLease.id}`;
+
+    try {
+      if (navigator?.clipboard?.writeText) {
+        await navigator.clipboard.writeText(shareUrl);
+      }
+    } catch {}
+
+    if (!isCloudSynced) {
+      setStatusMessage({
+        text: `Link copied (${shareUrl})! Note: Your portfolio is currently in Local Storage mode. Remember to click "Sync Local Data to Cloud" in Settings so the link is accessible online.`,
+        isError: false,
+      });
+      setTimeout(() => setStatusMessage(null), 7000);
+    } else {
+      setCopiedToastMessage('Secure Tenant Link copied to clipboard!');
+      setCopiedToast(true);
+      setTimeout(() => setCopiedToast(false), 3000);
+    }
+  };
+
   // Variance visual badge helper
   const renderVariance = (curr: number, prev: number | undefined) => {
     if (prev === undefined) {
@@ -646,6 +685,18 @@ export default function TenantStatement({
                   )}
                 </button>
               )}
+              {selectedLease?.id && (
+                <button
+                  type="button"
+                  data-testid="copy-tenant-link-btn"
+                  onClick={handleCopySecureLink}
+                  className="inline-flex items-center gap-1 bg-sky-600 hover:bg-sky-700 active:bg-sky-800 text-white text-[11px] sm:text-xs font-semibold px-2.5 py-1.5 sm:px-3 sm:py-1.5 rounded-lg shadow-xs transition-colors cursor-pointer shrink-0"
+                  title="Copy shareable secure public statement URL to clipboard"
+                >
+                  <Link2 className="w-3.5 h-3.5 shrink-0" />
+                  <span>Copy Secure Tenant Link</span>
+                </button>
+              )}
               <button
                 type="button"
                 onClick={handleCopyWhatsApp}
@@ -699,7 +750,7 @@ export default function TenantStatement({
             {copiedToast && (
               <div className="bg-emerald-600 text-white px-4 py-2.5 rounded-xl text-xs font-semibold flex items-center gap-2 shadow-lg animate-in fade-in print-hidden-element">
                 <CheckCircle2 className="w-4 h-4" />
-                <span>WhatsApp Statement copied to clipboard!</span>
+                <span>{copiedToastMessage}</span>
               </div>
             )}
 
