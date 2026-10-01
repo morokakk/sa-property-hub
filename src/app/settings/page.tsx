@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import TopHeader from '@/components/navigation/TopHeader';
 import { usePortfolioStore } from '@/lib/store/usePortfolioStore';
 import {
@@ -24,8 +24,19 @@ import {
   EyeOff,
   Key,
   ShieldCheck,
+  Cloud,
+  Database as DbIcon,
+  RefreshCw,
+  AlertCircle,
+  LogIn,
+  LogOut,
+  UserCheck,
+  UserPlus,
+  Lock,
 } from 'lucide-react';
 import Link from 'next/link';
+import { supabase } from '@/lib/supabaseClient';
+import { migrateToCloud, MigrationResult } from '@/lib/db/migrateToCloud';
 
 export default function SettingsPage() {
   const investorProfile = usePortfolioStore((state) => state.investorProfile);
@@ -70,6 +81,112 @@ export default function SettingsPage() {
 
   const [savedSuccess, setSavedSuccess] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Cloud Database Synchronization & Supabase Auth State
+  const [currentUser, setCurrentUser] = useState<{ id: string; email?: string } | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
+  const [authMode, setAuthMode] = useState<'signin' | 'signup'>('signin');
+  const [authEmail, setAuthEmail] = useState('');
+  const [authPassword, setAuthPassword] = useState('');
+  const [authSubmitting, setAuthSubmitting] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
+  const [authInfo, setAuthInfo] = useState<string | null>(null);
+
+  // Sync execution state
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [syncResult, setSyncResult] = useState<MigrationResult | null>(null);
+  const [syncError, setSyncError] = useState<string | null>(null);
+  const [lastSyncTime, setLastSyncTime] = useState<string | null>(null);
+
+  useEffect(() => {
+    // Check initial auth state
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      setCurrentUser(user ? { id: user.id, email: user.email } : null);
+      setAuthLoading(false);
+    });
+
+    // Subscribe to auth state updates
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setCurrentUser(session?.user ? { id: session.user.id, email: session.user.email } : null);
+    });
+
+    if (typeof localStorage !== 'undefined') {
+      const ts = localStorage.getItem('cloud_sync_timestamp');
+      if (ts) setLastSyncTime(ts);
+    }
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, []);
+
+  const handleAuthSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setAuthError(null);
+    setAuthInfo(null);
+    setAuthSubmitting(true);
+    try {
+      if (authMode === 'signin') {
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email: authEmail.trim(),
+          password: authPassword,
+        });
+        if (error) throw error;
+        setCurrentUser(data.user ? { id: data.user.id, email: data.user.email } : null);
+      } else {
+        const { data, error } = await supabase.auth.signUp({
+          email: authEmail.trim(),
+          password: authPassword,
+        });
+        if (error) throw error;
+        if (data.user && !data.session) {
+          setAuthInfo('Account created! If confirmation is enabled, please verify your email before syncing.');
+          setCurrentUser(null);
+        } else {
+          setCurrentUser(data.user ? { id: data.user.id, email: data.user.email } : null);
+        }
+      }
+      setAuthEmail('');
+      setAuthPassword('');
+    } catch (err: any) {
+      setAuthError(err.message || 'Authentication failed');
+    } finally {
+      setAuthSubmitting(false);
+    }
+  };
+
+  const handleSignOut = async () => {
+    await supabase.auth.signOut();
+    setCurrentUser(null);
+    setSyncResult(null);
+    setSyncError(null);
+  };
+
+  const handleSyncToCloud = async () => {
+    setIsSyncing(true);
+    setSyncError(null);
+    setSyncResult(null);
+    try {
+      const result = await migrateToCloud({
+        state: usePortfolioStore.getState(),
+      });
+      if (result.success) {
+        setSyncResult(result);
+        if (typeof localStorage !== 'undefined') {
+          const ts = localStorage.getItem('cloud_sync_timestamp');
+          if (ts) setLastSyncTime(ts);
+        }
+      } else {
+        setSyncError(result.error || 'Failed to sync data to cloud');
+      }
+    } catch (err: any) {
+      setSyncError(err.message || 'An unexpected error occurred during sync');
+    } finally {
+      setIsSyncing(false);
+    }
+  };
 
   // Handle Logo Upload as Base64
   const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -162,6 +279,234 @@ export default function SettingsPage() {
             </Link>
           </div>
         )}
+
+        {/* Card: Cloud Database Synchronization */}
+        <div
+          data-testid="cloud-sync-card"
+          className="bg-white rounded-xl border border-slate-200 p-4 sm:p-6 shadow-xs space-y-4"
+        >
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
+            <div className="flex items-center gap-2.5">
+              <div className="p-2 bg-sky-50 rounded-lg text-sky-700">
+                <Cloud className="w-5 h-5" />
+              </div>
+              <div>
+                <h2 className="text-base font-bold text-slate-900">Cloud Database Synchronization</h2>
+                <p className="text-xs text-slate-500">
+                  Securely backup and replicate your local browser portfolio into the cloud PostgreSQL database.
+                </p>
+              </div>
+            </div>
+
+            <div>
+              {currentUser ? (
+                <span
+                  data-testid="cloud-status-badge"
+                  className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200"
+                >
+                  <UserCheck className="w-3.5 h-3.5" />
+                  Cloud Connected
+                </span>
+              ) : (
+                <span
+                  data-testid="local-mode-badge"
+                  className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-800 border border-amber-200"
+                >
+                  <DbIcon className="w-3.5 h-3.5" />
+                  Local Storage Only
+                </span>
+              )}
+            </div>
+          </div>
+
+          {/* Sync Success Feedback Banner */}
+          {syncResult && (
+            <div
+              data-testid="sync-success-banner"
+              className="bg-emerald-50 border border-emerald-200 text-emerald-900 rounded-xl p-4 text-xs space-y-2 animate-in fade-in"
+            >
+              <div className="flex items-center gap-2 font-bold text-emerald-800">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                <span>Cloud Portfolio Migration Complete!</span>
+              </div>
+              <p className="text-emerald-700">
+                All local portfolio records were successfully backed up and synchronized to your private cloud database schema.
+              </p>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2 border-t border-emerald-200/60 font-medium text-emerald-800 text-[11px]">
+                <div>• Profile: {syncResult.counts.profile}</div>
+                <div>• Rentals: {syncResult.counts.properties}</div>
+                <div>• Flips: {syncResult.counts.flips}</div>
+                <div>• BOQ Items: {syncResult.counts.boqItems}</div>
+                <div>• Funding: {syncResult.counts.fundingSources}</div>
+                <div>• Opportunities: {syncResult.counts.opportunities}</div>
+                <div>• Tasks: {syncResult.counts.tasks}</div>
+                <div>• Suppliers: {syncResult.counts.suppliers}</div>
+              </div>
+            </div>
+          )}
+
+          {/* Sync Error Feedback Banner */}
+          {syncError && (
+            <div
+              data-testid="sync-error-banner"
+              className="bg-rose-50 border border-rose-200 text-rose-900 rounded-xl p-4 text-xs flex items-start gap-2.5"
+            >
+              <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+              <div>
+                <span className="font-bold block">Synchronization Failed</span>
+                <span className="text-rose-700">{syncError}</span>
+              </div>
+            </div>
+          )}
+
+          {currentUser ? (
+            /* Authenticated View */
+            <div className="space-y-4">
+              <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+                <div>
+                  <div className="font-semibold text-slate-800 flex items-center gap-1.5">
+                    <UserCheck className="w-4 h-4 text-emerald-600" />
+                    <span>Logged in as: <strong className="text-slate-900 font-bold">{currentUser.email}</strong></span>
+                  </div>
+                  <div className="text-slate-500 text-[11px] mt-0.5">
+                    Last Cloud Sync:{' '}
+                    {lastSyncTime ? (
+                      <span className="font-semibold text-slate-700">{new Date(lastSyncTime).toLocaleString('en-ZA')}</span>
+                    ) : (
+                      <span className="italic">Not synced yet</span>
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={handleSignOut}
+                    className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-slate-300 text-slate-600 hover:bg-slate-100 font-semibold text-xs transition-colors cursor-pointer"
+                  >
+                    <LogOut className="w-3.5 h-3.5" />
+                    Sign Out
+                  </button>
+
+                  <button
+                    type="button"
+                    data-testid="sync-cloud-btn"
+                    onClick={handleSyncToCloud}
+                    disabled={isSyncing}
+                    className="inline-flex items-center gap-1.5 bg-sky-600 hover:bg-sky-700 disabled:bg-slate-300 text-white font-semibold px-4 py-2 rounded-lg shadow-xs text-xs transition-colors cursor-pointer"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
+                    {isSyncing ? 'Syncing to Cloud...' : 'Sync Local Data to Cloud'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : (
+            /* Unauthenticated POC View (Local Storage Only with Inline Auth Toggle) */
+            <div className="space-y-4">
+              <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-600 space-y-1">
+                <p className="font-semibold text-slate-800">
+                  POC Zero-Gate Experience: Sign in is strictly optional.
+                </p>
+                <p className="text-[11px] text-slate-500 leading-relaxed">
+                  Your property portfolios, deals, and finances operate completely offline in your browser&apos;s Local Storage without requiring an account. To enable multi-tenant cloud storage, backup, or team sharing, sign in or register below.
+                </p>
+              </div>
+
+              {/* Inline Auth Mode Switcher */}
+              <div className="bg-slate-100 p-1 rounded-lg inline-flex gap-1 text-xs font-semibold">
+                <button
+                  type="button"
+                  data-testid="auth-mode-signin"
+                  onClick={() => { setAuthMode('signin'); setAuthError(null); }}
+                  className={`px-3 py-1.5 rounded-md transition-colors cursor-pointer ${
+                    authMode === 'signin' ? 'bg-white text-slate-900 shadow-2xs' : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  Sign In
+                </button>
+                <button
+                  type="button"
+                  data-testid="auth-mode-signup"
+                  onClick={() => { setAuthMode('signup'); setAuthError(null); }}
+                  className={`px-3 py-1.5 rounded-md transition-colors cursor-pointer ${
+                    authMode === 'signup' ? 'bg-white text-slate-900 shadow-2xs' : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  Create Account
+                </button>
+              </div>
+
+              {authError && (
+                <div className="p-3 bg-rose-50 border border-rose-200 rounded-lg text-rose-800 text-xs flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+                  <span>{authError}</span>
+                </div>
+              )}
+
+              {authInfo && (
+                <div className="p-3 bg-sky-50 border border-sky-200 rounded-lg text-sky-800 text-xs flex items-center gap-2">
+                  <Info className="w-4 h-4 text-sky-600 shrink-0" />
+                  <span>{authInfo}</span>
+                </div>
+              )}
+
+              {/* Inline Auth Form */}
+              <form onSubmit={handleAuthSubmit} className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Email Address</label>
+                  <div className="relative">
+                    <Mail className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5" />
+                    <input
+                      type="email"
+                      required
+                      placeholder="investor@example.co.za"
+                      value={authEmail}
+                      onChange={(e) => setAuthEmail(e.target.value)}
+                      className="w-full pl-9 pr-3 py-2 border border-slate-300 rounded-lg text-slate-900 focus:ring-1 focus:ring-sky-500 font-medium"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Password</label>
+                  <div className="relative">
+                    <Lock className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5" />
+                    <input
+                      type="password"
+                      required
+                      minLength={6}
+                      placeholder="••••••••"
+                      value={authPassword}
+                      onChange={(e) => setAuthPassword(e.target.value)}
+                      className="w-full pl-9 pr-3 py-2 border border-slate-300 rounded-lg text-slate-900 focus:ring-1 focus:ring-sky-500 font-medium"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex items-end">
+                  <button
+                    type="submit"
+                    disabled={authSubmitting}
+                    className="w-full inline-flex items-center justify-center gap-1.5 bg-sky-600 hover:bg-sky-700 disabled:bg-slate-300 text-white font-semibold py-2 px-4 rounded-lg shadow-xs transition-colors cursor-pointer"
+                  >
+                    {authMode === 'signin' ? (
+                      <>
+                        <LogIn className="w-3.5 h-3.5" />
+                        <span>{authSubmitting ? 'Signing In...' : 'Sign In'}</span>
+                      </>
+                    ) : (
+                      <>
+                        <UserPlus className="w-3.5 h-3.5" />
+                        <span>{authSubmitting ? 'Registering...' : 'Create Account'}</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </form>
+            </div>
+          )}
+        </div>
 
         <form onSubmit={handleSave} noValidate className="space-y-6">
           {/* Section 1: Entity & Contact Details */}

@@ -7,6 +7,12 @@ export default defineConfig({
   fullyParallel: false,
   retries: 0,
   reporter: [['list'], ['html', { open: 'never', outputFolder: 'e2e/report' }]],
+  webServer: {
+    command: 'npm run dev',
+    port: 3000,
+    reuseExistingServer: true,
+    timeout: 120_000,
+  },
   use: {
     baseURL: 'http://localhost:3000',
     channel: 'chrome', // Use natively installed Google Chrome
