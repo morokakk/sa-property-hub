@@ -38,6 +38,7 @@ import {
   EMPTY_ANALYZER_DRAFT,
   DEFAULT_AI_SETTINGS,
 } from './initialData';
+import type { PortfolioStateSnapshot } from '@/lib/db/mergePortfolioState';
 
 interface PortfolioState {
   rentals: RentalProperty[];
@@ -134,7 +135,8 @@ interface PortfolioState {
   // Liquid Reserve Action
   updateLiquidReserve: (amount: number) => void;
 
-  // System State Actions
+  // System State & Cloud Hydration Actions
+  hydrateFromCloudState: (snapshot: PortfolioStateSnapshot) => void;
   resetToDemoData: () => void;
   clearAllData: () => void;
   importPortfolioJSON: (jsonString: string) => boolean;
@@ -1296,8 +1298,33 @@ export const usePortfolioStore = create<PortfolioState>()(
       // Liquid Reserve
       updateLiquidReserve: (amount) => set({ liquidCapitalReserve: amount }),
 
-      // Reset & Import/Export
-      resetToDemoData: () =>
+      // Reset & Cloud Hydration & Import/Export
+      hydrateFromCloudState: (snapshot) =>
+        set((state) => ({
+          rentals: snapshot.rentals ?? state.rentals,
+          flips: snapshot.flips ?? state.flips,
+          funding: snapshot.funding ?? state.funding,
+          opportunities: snapshot.opportunities ?? state.opportunities,
+          suppliers: snapshot.suppliers ?? state.suppliers,
+          tasks: snapshot.tasks ?? state.tasks,
+          investorProfile: snapshot.investorProfile ?? state.investorProfile,
+          liquidCapitalReserve:
+            snapshot.liquidCapitalReserve !== undefined
+              ? snapshot.liquidCapitalReserve
+              : state.liquidCapitalReserve,
+          rentalForecastView: snapshot.rentalForecastView ?? state.rentalForecastView,
+          aiSettings: snapshot.aiSettings ?? state.aiSettings,
+          analyzerDraft: snapshot.analyzerDraft ?? state.analyzerDraft,
+        })),
+      resetToDemoData: () => {
+        if (typeof window !== 'undefined' && window.localStorage) {
+          try {
+            window.localStorage.removeItem('cloud_sync_completed');
+            window.localStorage.removeItem('cloud_sync_timestamp');
+          } catch (e) {
+            console.error('Failed to clear cloud sync localStorage keys', e);
+          }
+        }
         set({
           rentals: INITIAL_RENTALS,
           flips: INITIAL_FLIPS,
@@ -1308,8 +1335,10 @@ export const usePortfolioStore = create<PortfolioState>()(
           liquidCapitalReserve: 650_000,
           investorProfile: INITIAL_INVESTOR_PROFILE,
           analyzerDraft: INITIAL_ANALYZER_DRAFT,
+          aiSettings: DEFAULT_AI_SETTINGS,
           rentalForecastView: 'wealth-only',
-        }),
+        });
+      },
       clearAllData: () =>
         set((state) => ({
           rentals: [],

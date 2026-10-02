@@ -38,12 +38,14 @@ import {
 import Link from 'next/link';
 import { supabase } from '@/lib/supabaseClient';
 import { migrateToCloud, MigrationResult } from '@/lib/db/migrateToCloud';
+import { hydrateFromCloud } from '@/lib/db/hydrateFromCloud';
 
 export default function SettingsPage() {
   const investorProfile = usePortfolioStore((state) => state.investorProfile);
   const updateInvestorProfile = usePortfolioStore((state) => state.updateInvestorProfile);
   const aiSettings = usePortfolioStore((state) => state.aiSettings);
   const updateAiSettings = usePortfolioStore((state) => state.updateAiSettings);
+  const resetToDemoData = usePortfolioStore((state) => state.resetToDemoData);
 
   // Form state initialized from Zustand
   const [entityName, setEntityName] = useState(investorProfile.entityName || '');
@@ -101,6 +103,11 @@ export default function SettingsPage() {
   const [syncResult, setSyncResult] = useState<MigrationResult | null>(null);
   const [syncError, setSyncError] = useState<string | null>(null);
   const [lastSyncTime, setLastSyncTime] = useState<string | null>(null);
+
+  // Cloud hydration execution state
+  const [isHydrating, setIsHydrating] = useState(false);
+  const [hydrateFeedback, setHydrateFeedback] = useState<string | null>(null);
+  const [hydrateError, setHydrateError] = useState<string | null>(null);
 
   useEffect(() => {
     // Check initial auth state
@@ -229,9 +236,43 @@ export default function SettingsPage() {
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
+    resetToDemoData();
     setCurrentUser(null);
+    setLastSyncTime(null);
     setSyncResult(null);
     setSyncError(null);
+    setHydrateFeedback(null);
+    setHydrateError(null);
+  };
+
+  const handleRefreshFromCloud = async () => {
+    setIsHydrating(true);
+    setHydrateError(null);
+    setHydrateFeedback(null);
+    try {
+      const result = await hydrateFromCloud();
+      if (result.success) {
+        if (result.hydrated) {
+          setHydrateFeedback(
+            result.hasNewLocalItems
+              ? 'Portfolio hydrated from cloud & new local items synchronized!'
+              : 'Portfolio successfully refreshed from cloud!'
+          );
+        } else {
+          setHydrateFeedback('No cloud portfolio found for this account.');
+        }
+        if (typeof localStorage !== 'undefined') {
+          const ts = localStorage.getItem('cloud_sync_timestamp');
+          if (ts) setLastSyncTime(ts);
+        }
+      } else {
+        setHydrateError(result.error || 'Failed to refresh from cloud');
+      }
+    } catch (err: any) {
+      setHydrateError(err?.message || 'An unexpected error occurred during cloud refresh');
+    } finally {
+      setIsHydrating(false);
+    }
   };
 
   const handleSyncToCloud = async () => {
@@ -435,6 +476,33 @@ export default function SettingsPage() {
             </div>
           )}
 
+          {/* Hydrate Feedback Banners */}
+          {hydrateFeedback && (
+            <div
+              data-testid="hydrate-success-banner"
+              className="bg-sky-50 border border-sky-200 text-sky-900 rounded-xl p-4 text-xs flex items-start gap-2.5 animate-in fade-in"
+            >
+              <CheckCircle2 className="w-4 h-4 text-sky-600 shrink-0 mt-0.5" />
+              <div>
+                <span className="font-bold block">Cloud Refresh Complete</span>
+                <span className="text-sky-700">{hydrateFeedback}</span>
+              </div>
+            </div>
+          )}
+
+          {hydrateError && (
+            <div
+              data-testid="hydrate-error-banner"
+              className="bg-rose-50 border border-rose-200 text-rose-900 rounded-xl p-4 text-xs flex items-start gap-2.5"
+            >
+              <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+              <div>
+                <span className="font-bold block">Cloud Refresh Failed</span>
+                <span className="text-rose-700">{hydrateError}</span>
+              </div>
+            </div>
+          )}
+
           {currentUser ? (
             /* Authenticated View */
             <div className="space-y-4">
@@ -466,9 +534,20 @@ export default function SettingsPage() {
 
                   <button
                     type="button"
+                    data-testid="refresh-cloud-btn"
+                    onClick={handleRefreshFromCloud}
+                    disabled={isHydrating || isSyncing}
+                    className="inline-flex items-center gap-1.5 bg-sky-600 hover:bg-sky-700 active:bg-sky-800 disabled:bg-slate-300 text-white font-bold px-4 py-2.5 rounded-lg shadow-sm text-xs transition-colors cursor-pointer"
+                  >
+                    <Cloud className={`w-3.5 h-3.5 ${isHydrating ? 'animate-spin' : ''}`} />
+                    {isHydrating ? 'Refreshing...' : 'Refresh from Cloud'}
+                  </button>
+
+                  <button
+                    type="button"
                     data-testid="sync-cloud-btn"
                     onClick={handleSyncToCloud}
-                    disabled={isSyncing}
+                    disabled={isSyncing || isHydrating}
                     className="inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 disabled:bg-slate-300 text-white font-bold px-5 py-2.5 rounded-lg shadow-sm text-xs transition-colors cursor-pointer"
                   >
                     <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />

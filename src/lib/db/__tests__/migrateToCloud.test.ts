@@ -11,7 +11,13 @@ import {
   migrateToCloud,
   toDateOnly,
   PortfolioMigrationPayload,
+  isStockDemoState,
 } from '../migrateToCloud';
+import {
+  INITIAL_RENTALS,
+  INITIAL_FLIPS,
+  INITIAL_INVESTOR_PROFILE,
+} from '@/lib/store/initialData';
 import { supabase } from '@/lib/supabaseClient';
 import type {
   RentalProperty,
@@ -688,5 +694,170 @@ describe('migrateToCloud Execution Engine', () => {
     expect(result.success).toBe(false);
     expect(result.error).toContain('Rentals sync failed: Database connection timeout');
     expect(localStorage.setItem).not.toHaveBeenCalledWith('cloud_sync_completed', 'true');
+  });
+
+  describe('Accidental Demo Upload Guard', () => {
+    it('correctly identifies stock demo state', () => {
+      expect(
+        isStockDemoState({
+          rentals: INITIAL_RENTALS,
+          flips: INITIAL_FLIPS,
+          investorProfile: INITIAL_INVESTOR_PROFILE,
+        })
+      ).toBe(true);
+
+      expect(
+        isStockDemoState({
+          rentals: [
+            {
+              id: 'rental-custom-xyz',
+              title: 'Custom Investment',
+              address: '1 Custom Rd',
+              city: 'JHB',
+              propertyType: 'Sectional Title Apartment',
+              purchaseDate: '2024-01-01',
+              marketValueZAR: 1000000,
+              purchasePriceZAR: 900000,
+              outstandingBondBalanceZAR: 0,
+              bondInterestRatePercent: 0,
+              monthlyBondPaymentZAR: 0,
+              monthlyGrossRentZAR: 10000,
+              monthlyLeviesZAR: 0,
+              monthlyRatesTaxesZAR: 0,
+              monthlyAgentFeeZAR: 0,
+              monthlyMaintenanceReserveZAR: 0,
+              status: 'Occupied',
+              leases: [],
+              maintenanceHistory: [],
+            },
+          ],
+        })
+      ).toBe(false);
+
+      // User deletes a rental (e.g. holds only 3 of 4 units) -> should NOT be considered unmodified demo data
+      expect(
+        isStockDemoState({
+          rentals: INITIAL_RENTALS.slice(0, 3),
+          flips: INITIAL_FLIPS,
+          investorProfile: INITIAL_INVESTOR_PROFILE,
+        })
+      ).toBe(false);
+
+      // User modifies rent of demo rental-1 without changing title -> should NOT be considered unmodified demo data
+      expect(
+        isStockDemoState({
+          rentals: [
+            {
+              ...INITIAL_RENTALS[0],
+              monthlyGrossRentZAR: 28_000,
+            },
+            ...INITIAL_RENTALS.slice(1),
+          ],
+          flips: INITIAL_FLIPS,
+          investorProfile: INITIAL_INVESTOR_PROFILE,
+        })
+      ).toBe(false);
+
+      // User modifies exit price of demo flip-1 -> should NOT be considered unmodified demo data
+      expect(
+        isStockDemoState({
+          rentals: INITIAL_RENTALS,
+          flips: [
+            {
+              ...INITIAL_FLIPS[0],
+              targetExitPriceZAR: 5_000_000,
+            },
+            ...INITIAL_FLIPS.slice(1),
+          ],
+          investorProfile: INITIAL_INVESTOR_PROFILE,
+        })
+      ).toBe(false);
+    });
+
+    it('blocks upload and returns CLOUD_PORTFOLIO_EXISTS if state is demo data and cloud records exist', async () => {
+      (supabase.auth.getUser as any).mockResolvedValue({
+        data: { user: { id: TEST_USER_ID, email: 'investor@example.com' } },
+        error: null,
+      });
+
+      const mockSelect = vi.fn().mockReturnValue({
+        eq: vi.fn().mockResolvedValue({ count: 2, error: null }),
+      });
+
+      (supabase.from as any).mockImplementation(() => ({
+        select: mockSelect,
+        upsert: mockUpsert,
+      }));
+
+      const demoPayload: PortfolioMigrationPayload = {
+        rentals: INITIAL_RENTALS,
+        flips: INITIAL_FLIPS,
+        investorProfile: INITIAL_INVESTOR_PROFILE,
+      };
+
+      const result = await migrateToCloud({ state: demoPayload });
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe(
+        'CLOUD_PORTFOLIO_EXISTS: Cannot overwrite cloud portfolio with default demo data.'
+      );
+      expect(mockUpsert).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('Deletion Reconciliation', () => {
+    it('executes deletion reconciliation for items omitted from local payload', async () => {
+      (supabase.auth.getUser as any).mockResolvedValue({
+        data: { user: { id: TEST_USER_ID, email: 'investor@example.com' } },
+        error: null,
+      });
+
+      const mockDelete = vi.fn().mockReturnValue({
+        eq: vi.fn().mockReturnValue({
+          not: vi.fn().mockResolvedValue({ error: null }),
+        }),
+      });
+
+      (supabase.from as any).mockImplementation(() => ({
+        upsert: mockUpsert,
+        delete: mockDelete,
+      }));
+
+      const customPayload: PortfolioMigrationPayload = {
+        rentals: [
+          {
+            id: 'rental-custom-keep-1',
+            title: 'Kept Unit',
+            address: '10 Kept Rd',
+            city: 'JHB',
+            propertyType: 'Sectional Title Apartment',
+            purchaseDate: '2024-01-01',
+            marketValueZAR: 1200000,
+            purchasePriceZAR: 1000000,
+            outstandingBondBalanceZAR: 0,
+            bondInterestRatePercent: 0,
+            monthlyBondPaymentZAR: 0,
+            monthlyGrossRentZAR: 12000,
+            monthlyLeviesZAR: 0,
+            monthlyRatesTaxesZAR: 0,
+            monthlyAgentFeeZAR: 0,
+            monthlyMaintenanceReserveZAR: 0,
+            status: 'Occupied',
+            leases: [],
+            maintenanceHistory: [],
+          },
+        ],
+        flips: [],
+        funding: [],
+        opportunities: [],
+        tasks: [],
+        suppliers: [],
+      };
+
+      const result = await migrateToCloud({ state: customPayload });
+
+      expect(result.success).toBe(true);
+      expect(mockDelete).toHaveBeenCalled();
+    });
   });
 });

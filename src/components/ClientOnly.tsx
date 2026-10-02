@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import AuthHydrator from '@/components/AuthHydrator';
 
 export default function ClientOnly({ children }: { children: React.ReactNode }) {
   const [hasMounted, setHasMounted] = useState(false);
@@ -20,5 +21,10 @@ export default function ClientOnly({ children }: { children: React.ReactNode }) 
     );
   }
 
-  return <>{children}</>;
+  return (
+    <>
+      <AuthHydrator />
+      {children}
+    </>
+  );
 }

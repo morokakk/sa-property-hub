@@ -11,6 +11,130 @@ import type {
   AnalyzerDraft,
   AiSettings,
 } from '@/types';
+import {
+  DEMO_RENTAL_IDS,
+  DEMO_FLIP_IDS,
+  DEMO_OPP_IDS,
+  DEMO_FUNDING_IDS,
+  DEMO_TASK_IDS,
+  DEMO_SUPPLIER_IDS,
+} from './mergePortfolioState';
+import {
+  INITIAL_RENTALS,
+  INITIAL_FLIPS,
+  INITIAL_OPPORTUNITIES,
+  INITIAL_FUNDING,
+  INITIAL_TASKS,
+  INITIAL_SUPPLIERS,
+  INITIAL_INVESTOR_PROFILE,
+} from '@/lib/store/initialData';
+
+export function isStockDemoState(state?: PortfolioMigrationPayload | null): boolean {
+  if (!state) return false;
+
+  const rentals = state.rentals || [];
+  const flips = state.flips || [];
+  const opps = state.opportunities || [];
+  const funding = state.funding || [];
+  const tasks = state.tasks || [];
+  const suppliers = state.suppliers || [];
+
+  if (
+    rentals.length === 0 &&
+    flips.length === 0 &&
+    opps.length === 0 &&
+    funding.length === 0 &&
+    tasks.length === 0 &&
+    suppliers.length === 0
+  ) {
+    return false;
+  }
+
+  // If any provided collection count differs from initial demo data, the user has removed or added items
+  if (state.rentals !== undefined && rentals.length !== INITIAL_RENTALS.length) return false;
+  if (state.flips !== undefined && flips.length !== INITIAL_FLIPS.length) return false;
+  if (state.opportunities !== undefined && opps.length !== INITIAL_OPPORTUNITIES.length) return false;
+  if (state.funding !== undefined && funding.length !== INITIAL_FUNDING.length) return false;
+  if (state.tasks !== undefined && tasks.length !== INITIAL_TASKS.length) return false;
+  if (state.suppliers !== undefined && suppliers.length !== INITIAL_SUPPLIERS.length) return false;
+
+  const hasCustomRentals = rentals.some((r) => !DEMO_RENTAL_IDS.has(r.id));
+  const hasCustomFlips = flips.some((f) => !DEMO_FLIP_IDS.has(f.id));
+  const hasCustomOpps = opps.some((o) => !DEMO_OPP_IDS.has(o.id));
+  const hasCustomFunding = funding.some((f) => !DEMO_FUNDING_IDS.has(f.id));
+  const hasCustomTasks = tasks.some((t) => !DEMO_TASK_IDS.has(t.id));
+  const hasCustomSuppliers = suppliers.some((s) => !DEMO_SUPPLIER_IDS.has(s.id));
+
+  if (
+    hasCustomRentals ||
+    hasCustomFlips ||
+    hasCustomOpps ||
+    hasCustomFunding ||
+    hasCustomTasks ||
+    hasCustomSuppliers
+  ) {
+    return false;
+  }
+
+  if (
+    state.investorProfile?.entityName &&
+    state.investorProfile.entityName !== INITIAL_INVESTOR_PROFILE.entityName &&
+    state.investorProfile.entityName !== 'Portfolio Owner'
+  ) {
+    return false;
+  }
+
+  const initialRentalsMap = new Map(INITIAL_RENTALS.map((r) => [r.id, r]));
+  const isAnyRentalModified = rentals.some((r) => {
+    const orig = initialRentalsMap.get(r.id);
+    if (!orig) return true;
+    return (
+      r.title !== orig.title ||
+      r.address !== orig.address ||
+      r.marketValueZAR !== orig.marketValueZAR ||
+      r.purchasePriceZAR !== orig.purchasePriceZAR ||
+      r.monthlyGrossRentZAR !== orig.monthlyGrossRentZAR ||
+      r.outstandingBondBalanceZAR !== orig.outstandingBondBalanceZAR
+    );
+  });
+  if (isAnyRentalModified) return false;
+
+  const initialFlipsMap = new Map(INITIAL_FLIPS.map((f) => [f.id, f]));
+  const isAnyFlipModified = flips.some((f) => {
+    const orig = initialFlipsMap.get(f.id);
+    if (!orig) return true;
+    return (
+      f.title !== orig.title ||
+      f.address !== orig.address ||
+      f.purchasePriceZAR !== orig.purchasePriceZAR ||
+      f.baselineRenovationBudgetZAR !== orig.baselineRenovationBudgetZAR ||
+      f.targetExitPriceZAR !== orig.targetExitPriceZAR
+    );
+  });
+  if (isAnyFlipModified) return false;
+
+  const initialOppsMap = new Map(INITIAL_OPPORTUNITIES.map((o) => [o.id, o]));
+  const isAnyOppModified = opps.some((o) => {
+    const orig = initialOppsMap.get(o.id);
+    if (!orig) return true;
+    return (
+      o.title !== orig.title ||
+      o.purchasePrice !== orig.purchasePrice ||
+      o.openMarketValueZAR !== orig.openMarketValueZAR
+    );
+  });
+  if (isAnyOppModified) return false;
+
+  const initialTasksMap = new Map(INITIAL_TASKS.map((t) => [t.id, t]));
+  const isAnyTaskModified = tasks.some((t) => {
+    const orig = initialTasksMap.get(t.id);
+    if (!orig) return true;
+    return t.title !== orig.title || t.status !== orig.status;
+  });
+  if (isAnyTaskModified) return false;
+
+  return true;
+}
 
 export interface PortfolioMigrationPayload {
   rentals?: RentalProperty[];
@@ -483,6 +607,40 @@ export async function migrateToCloud(options?: {
     };
   }
 
+  // Guard against accidental demo data overwrite
+  if (isStockDemoState(state)) {
+    try {
+      const propQuery = supabase.from('properties');
+      if (typeof propQuery?.select === 'function') {
+        const [pRes, fRes, oRes, fsRes, tRes, sRes] = await Promise.all([
+          supabase.from('properties').select('id', { count: 'exact', head: true }).eq('user_id', userId),
+          supabase.from('flips').select('id', { count: 'exact', head: true }).eq('user_id', userId),
+          supabase.from('opportunities').select('id', { count: 'exact', head: true }).eq('user_id', userId),
+          supabase.from('funding_sources').select('id', { count: 'exact', head: true }).eq('user_id', userId),
+          supabase.from('tasks').select('id', { count: 'exact', head: true }).eq('user_id', userId),
+          supabase.from('suppliers').select('id', { count: 'exact', head: true }).eq('user_id', userId),
+        ]);
+        const totalCloudRecords =
+          (pRes.count || 0) +
+          (fRes.count || 0) +
+          (oRes.count || 0) +
+          (fsRes.count || 0) +
+          (tRes.count || 0) +
+          (sRes.count || 0);
+
+        if (totalCloudRecords > 0) {
+          return {
+            success: false,
+            counts,
+            error: 'CLOUD_PORTFOLIO_EXISTS: Cannot overwrite cloud portfolio with default demo data.',
+          };
+        }
+      }
+    } catch (checkErr) {
+      console.warn('Could not verify existing cloud records count:', checkErr);
+    }
+  }
+
   try {
     // 3. Map entities
     const profileRow = mapProfile(
@@ -558,6 +716,69 @@ export async function migrateToCloud(options?: {
       const { error: supplierError } = await supabase.from('suppliers').upsert(supplierRows);
       if (supplierError) throw new Error(`Suppliers sync failed: ${supplierError.message}`);
       counts.suppliers = supplierRows.length;
+    }
+
+    // Step 4.9: Deletion Reconciliation
+    // Reconcile deleted records in cloud that are no longer present in local payload
+    const deleteRecordsNotInPayload = async (
+      table: 'properties' | 'flips' | 'boq_items' | 'funding_sources' | 'opportunities' | 'tasks' | 'suppliers',
+      localIds: string[]
+    ) => {
+      try {
+        const tbl = supabase.from(table);
+        if (typeof tbl?.delete !== 'function') return;
+
+        if (localIds.length === 0) {
+          const res = await supabase.from(table).delete().eq('user_id', userId);
+          if (res?.error) {
+            console.warn(`Deletion reconciliation error for ${table}:`, res.error.message);
+          }
+        } else {
+          const res = await supabase
+            .from(table)
+            .delete()
+            .eq('user_id', userId)
+            .not('id', 'in', `(${localIds.join(',')})`);
+          if (res?.error) {
+            console.warn(`Deletion reconciliation error for ${table}:`, res.error.message);
+          }
+        }
+      } catch (delErr) {
+        console.warn(`Deletion reconciliation warning for ${table}:`, delErr);
+      }
+    };
+
+    if (Array.isArray(state.flips)) {
+      // Reconcile BOQ items first (foreign key dependency on flips)
+      const localBoqIds = boqRows.map((b) => b.id).filter(Boolean);
+      await deleteRecordsNotInPayload('boq_items', localBoqIds as string[]);
+      const localFlipIds = flipRows.map((f) => f.id).filter(Boolean);
+      await deleteRecordsNotInPayload('flips', localFlipIds as string[]);
+    }
+
+    if (Array.isArray(state.rentals)) {
+      const localPropIds = propertyRows.map((p) => p.id).filter(Boolean);
+      await deleteRecordsNotInPayload('properties', localPropIds as string[]);
+    }
+
+    if (Array.isArray(state.funding)) {
+      const localFundIds = fundingRows.map((f) => f.id).filter(Boolean);
+      await deleteRecordsNotInPayload('funding_sources', localFundIds as string[]);
+    }
+
+    if (Array.isArray(state.opportunities)) {
+      const localOppIds = opportunityRows.map((o) => o.id).filter(Boolean);
+      await deleteRecordsNotInPayload('opportunities', localOppIds as string[]);
+    }
+
+    if (Array.isArray(state.tasks)) {
+      const localTaskIds = taskRows.map((t) => t.id).filter(Boolean);
+      await deleteRecordsNotInPayload('tasks', localTaskIds as string[]);
+    }
+
+    if (Array.isArray(state.suppliers)) {
+      const localSupIds = supplierRows.map((s) => s.id).filter(Boolean);
+      await deleteRecordsNotInPayload('suppliers', localSupIds as string[]);
     }
 
     // 5. On complete success, record flags in localStorage
