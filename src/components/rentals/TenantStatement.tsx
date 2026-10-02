@@ -28,6 +28,10 @@ import { usePortfolioStore } from '@/lib/store/usePortfolioStore';
 import { formatZAR, formatDate } from '@/lib/formatters';
 import { UtilityStatement } from '@/types';
 import { parseUtilityPdf } from '@/lib/utilities/pdfParser';
+import { supabase } from '@/lib/supabaseClient';
+import { migrateToCloud } from '@/lib/db/migrateToCloud';
+import { DEMO_RENTAL_IDS } from '@/lib/db/mergePortfolioState';
+import CloudPublishModal from './CloudPublishModal';
 
 interface TenantStatementProps {
   propertyId: string | null;
@@ -61,6 +65,8 @@ export default function TenantStatement({
   } | null>(null);
   const [copiedToast, setCopiedToast] = useState(false);
   const [copiedToastMessage, setCopiedToastMessage] = useState('WhatsApp Statement copied to clipboard!');
+  const [showCloudPublishModal, setShowCloudPublishModal] = useState(false);
+  const [isPublishingLink, setIsPublishingLink] = useState(false);
 
   // Multi-Target statement selection ('lease-{id}' | 'ancillary-{id}' | 'consolidated')
   const [selectedTargetId, setSelectedTargetId] = useState<string>('');
@@ -357,6 +363,7 @@ export default function TenantStatement({
       try {
         if (navigator?.clipboard?.writeText) await navigator.clipboard.writeText(text);
       } catch {}
+      setCopiedToastMessage('WhatsApp Statement copied to clipboard!');
       setCopiedToast(true);
       setTimeout(() => setCopiedToast(false), 3000);
       return;
@@ -396,6 +403,7 @@ export default function TenantStatement({
       try {
         if (navigator?.clipboard?.writeText) await navigator.clipboard.writeText(text);
       } catch {}
+      setCopiedToastMessage('WhatsApp Statement copied to clipboard!');
       setCopiedToast(true);
       setTimeout(() => setCopiedToast(false), 3000);
       return;
@@ -473,6 +481,7 @@ export default function TenantStatement({
       }
     } catch {}
 
+    setCopiedToastMessage('WhatsApp Statement copied to clipboard!');
     setCopiedToast(true);
     setTimeout(() => setCopiedToast(false), 3000);
   };
@@ -492,29 +501,71 @@ export default function TenantStatement({
       return;
     }
 
-    const isCloudSynced =
-      typeof localStorage !== 'undefined' &&
-      localStorage.getItem('cloud_sync_completed') === 'true';
-
     const origin = typeof window !== 'undefined' ? window.location.origin : '';
     const shareUrl = `${origin}/statement/${selectedLease.id}`;
 
-    try {
-      if (navigator?.clipboard?.writeText) {
-        await navigator.clipboard.writeText(shareUrl);
-      }
-    } catch {}
+    // 1. Detect if current property is a demo property (rental-1..rental-4, demo-rental-*)
+    const isDemo = DEMO_RENTAL_IDS.has(rental.id) || rental.id.startsWith('demo-rental-');
 
-    if (!isCloudSynced) {
-      setStatusMessage({
-        text: `Link copied (${shareUrl})! Note: Your portfolio is currently in Local Storage mode. Remember to click "Sync Local Data to Cloud" in Settings so the link is accessible online.`,
-        isError: false,
-      });
-      setTimeout(() => setStatusMessage(null), 7000);
-    } else {
+    if (isDemo) {
+      try {
+        if (navigator?.clipboard?.writeText) {
+          await navigator.clipboard.writeText(shareUrl);
+        }
+      } catch {}
+
       setCopiedToastMessage('Secure Tenant Link copied to clipboard!');
       setCopiedToast(true);
       setTimeout(() => setCopiedToast(false), 3000);
+      return;
+    }
+
+    // 2. USER-CREATED property: Check Supabase auth state
+    let user = null;
+    try {
+      const { data } = await supabase.auth.getUser();
+      user = data?.user ?? null;
+    } catch {
+      user = null;
+    }
+
+    if (!user) {
+      // Local Storage Only mode: Do NOT copy a link that will 404 for the tenant.
+      setShowCloudPublishModal(true);
+      return;
+    }
+
+    // 3. Authenticated user: Automatically publish/upload property to Supabase on the fly
+    try {
+      setIsPublishingLink(true);
+      const res = await migrateToCloud({ state: usePortfolioStore.getState() });
+
+      if (!res.success) {
+        setStatusMessage({
+          text: `Cloud publish failed: ${res.error || 'Unable to publish statement to cloud.'}`,
+          isError: true,
+        });
+        setTimeout(() => setStatusMessage(null), 5000);
+        return;
+      }
+
+      try {
+        if (navigator?.clipboard?.writeText) {
+          await navigator.clipboard.writeText(shareUrl);
+        }
+      } catch {}
+
+      setCopiedToastMessage('Secure Tenant Link published & copied to clipboard!');
+      setCopiedToast(true);
+      setTimeout(() => setCopiedToast(false), 3000);
+    } catch (err: any) {
+      setStatusMessage({
+        text: `Error publishing link: ${err?.message || 'Unknown error'}`,
+        isError: true,
+      });
+      setTimeout(() => setStatusMessage(null), 5000);
+    } finally {
+      setIsPublishingLink(false);
     }
   };
 
@@ -693,11 +744,21 @@ export default function TenantStatement({
                   type="button"
                   data-testid="copy-tenant-link-btn"
                   onClick={handleCopySecureLink}
-                  className="inline-flex items-center gap-1.5 bg-sky-600 hover:bg-sky-700 active:bg-sky-800 text-white text-[11px] sm:text-xs font-semibold px-3 py-1.5 rounded-lg shadow-xs transition-colors cursor-pointer shrink-0"
+                  disabled={isPublishingLink}
+                  className="inline-flex items-center gap-1.5 bg-sky-600 hover:bg-sky-700 active:bg-sky-800 disabled:opacity-60 disabled:cursor-not-allowed text-white text-[11px] sm:text-xs font-semibold px-3 py-1.5 rounded-lg shadow-xs transition-colors cursor-pointer shrink-0"
                   title="Copy shareable secure public statement URL to clipboard"
                 >
-                  <Link2 className="w-3.5 h-3.5 shrink-0" />
-                  <span>Copy Secure Tenant Link</span>
+                  {isPublishingLink ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" />
+                      <span>Publishing Link...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Link2 className="w-3.5 h-3.5 shrink-0" />
+                      <span>Copy Secure Tenant Link</span>
+                    </>
+                  )}
                 </button>
               )}
               <button
@@ -1740,11 +1801,21 @@ export default function TenantStatement({
             )}
           </div>
 
-          {/* Print Footer Notice */}
+        {/* Print Footer Notice */}
           <div className="p-3 text-[10px] text-slate-400 border-t border-slate-200 text-center bg-slate-50/50">
             Payment is due on or before the 1st of each month. Generated via SA Property Portfolio Hub.
           </div>
         </div>
+
+        {/* Dedicated Cloud Publishing Modal for Unauthenticated Landlords */}
+        <CloudPublishModal
+          isOpen={showCloudPublishModal}
+          onClose={() => setShowCloudPublishModal(false)}
+          onCopyWhatsApp={async () => {
+            setShowCloudPublishModal(false);
+            await handleCopyWhatsApp();
+          }}
+        />
       </div>
     </>
   );

@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
 import TopHeader from '@/components/navigation/TopHeader';
 import { usePortfolioStore } from '@/lib/store/usePortfolioStore';
 import {
@@ -40,7 +41,11 @@ import { supabase } from '@/lib/supabaseClient';
 import { migrateToCloud, MigrationResult } from '@/lib/db/migrateToCloud';
 import { hydrateFromCloud } from '@/lib/db/hydrateFromCloud';
 
-export default function SettingsPage() {
+function SettingsContent() {
+  const searchParams = useSearchParams();
+  const actionParam = searchParams.get('action');
+  const isPublishLinkAction = actionParam === 'publish_link';
+
   const investorProfile = usePortfolioStore((state) => state.investorProfile);
   const updateInvestorProfile = usePortfolioStore((state) => state.updateInvestorProfile);
   const aiSettings = usePortfolioStore((state) => state.aiSettings);
@@ -394,6 +399,38 @@ export default function SettingsPage() {
             >
               View Updated Proposal Deck
             </Link>
+          </div>
+        )}
+
+        {/* Publish Link Guidance Banner */}
+        {isPublishLinkAction && (
+          <div
+            data-testid="publish-link-guidance-banner"
+            className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-4 sm:p-5 text-xs text-amber-950 flex flex-col sm:flex-row sm:items-center justify-between gap-4 animate-in fade-in"
+          >
+            <div className="flex items-start sm:items-center gap-3">
+              <div className="p-2 bg-amber-500/20 text-amber-700 rounded-lg shrink-0">
+                <Cloud className="w-5 h-5" />
+              </div>
+              <div className="space-y-0.5">
+                <h3 className="font-bold text-sm text-amber-950">
+                  Cloud Statement Publishing
+                </h3>
+                <p className="text-amber-800">
+                  Sign in or create your account below to publish your rental property statement link online.
+                </p>
+              </div>
+            </div>
+
+            {currentUser && (
+              <Link
+                href="/rentals"
+                data-testid="return-to-rentals-btn"
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-semibold bg-amber-600 hover:bg-amber-700 text-white shrink-0 shadow-xs transition-colors text-center"
+              >
+                <span>← Return to Rental Statements</span>
+              </Link>
+            )}
           </div>
         )}
 
@@ -1295,5 +1332,22 @@ export default function SettingsPage() {
         </form>
       </main>
     </div>
+  );
+}
+
+export default function SettingsPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex-1 flex items-center justify-center p-12">
+          <div className="flex flex-col items-center gap-3">
+            <div className="w-8 h-8 border-[3px] border-emerald-600 border-t-transparent rounded-full animate-spin"></div>
+            <span className="text-xs text-slate-500 font-medium">Loading Settings...</span>
+          </div>
+        </div>
+      }
+    >
+      <SettingsContent />
+    </Suspense>
   );
 }
