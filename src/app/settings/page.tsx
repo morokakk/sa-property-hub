@@ -33,6 +33,7 @@ import {
   UserCheck,
   UserPlus,
   Lock,
+  ArrowLeft,
 } from 'lucide-react';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabaseClient';
@@ -86,9 +87,11 @@ export default function SettingsPage() {
   // Cloud Database Synchronization & Supabase Auth State
   const [currentUser, setCurrentUser] = useState<{ id: string; email?: string } | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
-  const [authMode, setAuthMode] = useState<'signin' | 'signup'>('signin');
+  const [authMode, setAuthMode] = useState<'signin' | 'signup' | 'forgot_password' | 'update_password'>('signin');
   const [authEmail, setAuthEmail] = useState('');
   const [authPassword, setAuthPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmNewPassword, setConfirmNewPassword] = useState('');
   const [authSubmitting, setAuthSubmitting] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
   const [authInfo, setAuthInfo] = useState<string | null>(null);
@@ -106,10 +109,29 @@ export default function SettingsPage() {
       setAuthLoading(false);
     });
 
+    // Check for password recovery hash / parameters on mount
+    if (typeof window !== 'undefined') {
+      const hash = window.location.hash || '';
+      const search = window.location.search || '';
+      if (
+        hash.includes('type=recovery') ||
+        hash.includes('recovery') ||
+        search.includes('reset_password=true')
+      ) {
+        setAuthMode('update_password');
+        setAuthInfo('Password recovery session detected. Please enter your new password below.');
+      }
+    }
+
     // Subscribe to auth state updates
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'PASSWORD_RECOVERY') {
+        setAuthMode('update_password');
+        setAuthError(null);
+        setAuthInfo('Please set your new password below.');
+      }
       setCurrentUser(session?.user ? { id: session.user.id, email: session.user.email } : null);
     });
 
@@ -130,13 +152,21 @@ export default function SettingsPage() {
     setAuthSubmitting(true);
     try {
       if (authMode === 'signin') {
+        if (authPassword.length < 8) {
+          throw new Error('Password must be at least 8 characters.');
+        }
         const { data, error } = await supabase.auth.signInWithPassword({
           email: authEmail.trim(),
           password: authPassword,
         });
         if (error) throw error;
         setCurrentUser(data.user ? { id: data.user.id, email: data.user.email } : null);
-      } else {
+        setAuthEmail('');
+        setAuthPassword('');
+      } else if (authMode === 'signup') {
+        if (authPassword.length < 8) {
+          throw new Error('Password must be at least 8 characters.');
+        }
         const { data, error } = await supabase.auth.signUp({
           email: authEmail.trim(),
           password: authPassword,
@@ -148,9 +178,39 @@ export default function SettingsPage() {
         } else {
           setCurrentUser(data.user ? { id: data.user.id, email: data.user.email } : null);
         }
+        setAuthEmail('');
+        setAuthPassword('');
+      } else if (authMode === 'forgot_password') {
+        if (!authEmail.trim()) {
+          throw new Error('Please enter your email address.');
+        }
+        const { error } = await supabase.auth.resetPasswordForEmail(authEmail.trim(), {
+          redirectTo: `${typeof window !== 'undefined' ? window.location.origin : ''}/settings#recovery`,
+        });
+        if (error) throw error;
+        setAuthInfo(
+          `Password reset link sent to "${authEmail.trim()}". Check your inbox (and spam folder) for instructions.`
+        );
+      } else if (authMode === 'update_password') {
+        if (newPassword.length < 8) {
+          throw new Error('New password must be at least 8 characters.');
+        }
+        if (newPassword !== confirmNewPassword) {
+          throw new Error('Passwords do not match. Please verify both fields.');
+        }
+        const { data, error } = await supabase.auth.updateUser({
+          password: newPassword,
+        });
+        if (error) throw error;
+        setCurrentUser(data.user ? { id: data.user.id, email: data.user.email } : null);
+        setAuthInfo('Password successfully updated! You are now signed in.');
+        setAuthMode('signin');
+        setNewPassword('');
+        setConfirmNewPassword('');
+        if (typeof window !== 'undefined' && window.location.hash) {
+          window.history.replaceState(null, '', window.location.pathname);
+        }
       }
-      setAuthEmail('');
-      setAuthPassword('');
     } catch (err: any) {
       if (
         err?.code === 'email_address_invalid' ||
@@ -429,29 +489,77 @@ export default function SettingsPage() {
                 </p>
               </div>
 
-              {/* Inline Auth Mode Switcher */}
-              <div className="bg-slate-100 p-1 rounded-lg inline-flex gap-1 text-xs font-semibold">
-                <button
-                  type="button"
-                  data-testid="auth-mode-signin"
-                  onClick={() => { setAuthMode('signin'); setAuthError(null); }}
-                  className={`px-3 py-1.5 rounded-md transition-colors cursor-pointer ${
-                    authMode === 'signin' ? 'bg-white text-slate-900 shadow-2xs' : 'text-slate-600 hover:text-slate-900'
-                  }`}
-                >
-                  Sign In
-                </button>
-                <button
-                  type="button"
-                  data-testid="auth-mode-signup"
-                  onClick={() => { setAuthMode('signup'); setAuthError(null); }}
-                  className={`px-3 py-1.5 rounded-md transition-colors cursor-pointer ${
-                    authMode === 'signup' ? 'bg-white text-slate-900 shadow-2xs' : 'text-slate-600 hover:text-slate-900'
-                  }`}
-                >
-                  Create Account
-                </button>
-              </div>
+              {/* Mode Switcher for Sign In / Sign Up */}
+              {(authMode === 'signin' || authMode === 'signup') && (
+                <div className="bg-slate-100 p-1 rounded-lg inline-flex gap-1 text-xs font-semibold">
+                  <button
+                    type="button"
+                    data-testid="auth-mode-signin"
+                    onClick={() => { setAuthMode('signin'); setAuthError(null); }}
+                    className={`px-3 py-1.5 rounded-md transition-colors cursor-pointer ${
+                      authMode === 'signin' ? 'bg-white text-slate-900 shadow-2xs' : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    Sign In
+                  </button>
+                  <button
+                    type="button"
+                    data-testid="auth-mode-signup"
+                    onClick={() => { setAuthMode('signup'); setAuthError(null); }}
+                    className={`px-3 py-1.5 rounded-md transition-colors cursor-pointer ${
+                      authMode === 'signup' ? 'bg-white text-slate-900 shadow-2xs' : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    Create Account
+                  </button>
+                </div>
+              )}
+
+              {/* Forgot Password Header */}
+              {authMode === 'forgot_password' && (
+                <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+                  <div className="flex items-center gap-2">
+                    <Key className="w-4 h-4 text-emerald-600" />
+                    <div>
+                      <h3 className="font-bold text-slate-900 text-xs">Reset Your Password</h3>
+                      <p className="text-[11px] text-slate-500">
+                        Enter your email address to receive a secure recovery link.
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    data-testid="back-to-signin-btn"
+                    onClick={() => {
+                      setAuthMode('signin');
+                      setAuthError(null);
+                      setAuthInfo(null);
+                    }}
+                    className="text-xs font-semibold text-slate-600 hover:text-slate-900 inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 transition-colors cursor-pointer shrink-0"
+                  >
+                    <ArrowLeft className="w-3.5 h-3.5" />
+                    <span>Back to Sign In</span>
+                  </button>
+                </div>
+              )}
+
+              {/* Update Password Header */}
+              {authMode === 'update_password' && (
+                <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+                  <div className="flex items-center gap-2">
+                    <Key className="w-4 h-4 text-emerald-600" />
+                    <div>
+                      <h3 className="font-bold text-slate-900 text-xs">Set New Password</h3>
+                      <p className="text-[11px] text-slate-500">
+                        Enter a new secure password (minimum 8 characters).
+                      </p>
+                    </div>
+                  </div>
+                  <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                    Recovery Session
+                  </span>
+                </div>
+              )}
 
               {authError && (
                 <div className="p-3 bg-rose-50 border border-rose-200 rounded-lg text-rose-800 text-xs flex items-center gap-2">
@@ -467,16 +575,103 @@ export default function SettingsPage() {
                 </div>
               )}
 
-              {/* Inline Auth Form */}
-              <form onSubmit={handleAuthSubmit} className="space-y-3 text-xs">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {/* Inline Auth Form: Sign In / Create Account */}
+              {(authMode === 'signin' || authMode === 'signup') && (
+                <form onSubmit={handleAuthSubmit} className="space-y-3 text-xs">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block font-semibold text-slate-700 mb-1">Email Address</label>
+                      <div className="relative">
+                        <Mail className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5" />
+                        <input
+                          type="email"
+                          required
+                          placeholder="investor@example.co.za"
+                          value={authEmail}
+                          onChange={(e) => setAuthEmail(e.target.value)}
+                          className="w-full pl-9 pr-3 py-2 border border-slate-300 rounded-lg text-slate-900 focus:ring-1 focus:ring-emerald-500 font-medium bg-white"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="font-semibold text-slate-700">Password</label>
+                        <span className="text-[10px] text-slate-400 font-normal">Min. 8 characters</span>
+                      </div>
+                      <div className="relative">
+                        <Lock className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5" />
+                        <input
+                          type="password"
+                          required
+                          minLength={8}
+                          data-testid="auth-password-input"
+                          placeholder="Min. 8 characters"
+                          value={authPassword}
+                          onChange={(e) => setAuthPassword(e.target.value)}
+                          className="w-full pl-9 pr-3 py-2 border border-slate-300 rounded-lg text-slate-900 focus:ring-1 focus:ring-emerald-500 font-medium bg-white"
+                        />
+                      </div>
+                      {authMode === 'signin' && (
+                        <div className="flex justify-end pt-1">
+                          <button
+                            type="button"
+                            data-testid="forgot-password-link"
+                            onClick={() => {
+                              setAuthMode('forgot_password');
+                              setAuthError(null);
+                              setAuthInfo(null);
+                            }}
+                            className="text-[11px] font-semibold text-emerald-700 hover:text-emerald-800 hover:underline cursor-pointer"
+                          >
+                            Forgot password?
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-1 border-t border-slate-100">
+                    <p className="text-[11px] text-slate-500">
+                      {authMode === 'signin'
+                        ? 'Sign in to access your Supabase multi-tenant cloud portfolio.'
+                        : 'Creates your private Supabase user account to begin syncing.'}
+                    </p>
+
+                    <button
+                      type="submit"
+                      disabled={authSubmitting}
+                      className="inline-flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 disabled:bg-slate-300 text-white font-bold py-2.5 px-6 rounded-lg shadow-sm text-xs transition-colors cursor-pointer"
+                    >
+                      {authMode === 'signin' ? (
+                        <>
+                          <LogIn className="w-4 h-4" />
+                          <span>{authSubmitting ? 'Signing In...' : 'Sign In'}</span>
+                        </>
+                      ) : (
+                        <>
+                          <UserPlus className="w-4 h-4" />
+                          <span>{authSubmitting ? 'Creating Account...' : 'Create Account'}</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </form>
+              )}
+
+              {/* Inline Auth Form: Forgot Password */}
+              {authMode === 'forgot_password' && (
+                <form onSubmit={handleAuthSubmit} className="space-y-3 text-xs">
                   <div>
-                    <label className="block font-semibold text-slate-700 mb-1">Email Address</label>
+                    <label className="block font-semibold text-slate-700 mb-1">
+                      Account Email Address
+                    </label>
                     <div className="relative">
                       <Mail className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5" />
                       <input
                         type="email"
                         required
+                        data-testid="forgot-password-email-input"
                         placeholder="investor@example.co.za"
                         value={authEmail}
                         onChange={(e) => setAuthEmail(e.target.value)}
@@ -485,49 +680,86 @@ export default function SettingsPage() {
                     </div>
                   </div>
 
-                  <div>
-                    <label className="block font-semibold text-slate-700 mb-1">Password</label>
-                    <div className="relative">
-                      <Lock className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5" />
-                      <input
-                        type="password"
-                        required
-                        minLength={6}
-                        placeholder="••••••••"
-                        value={authPassword}
-                        onChange={(e) => setAuthPassword(e.target.value)}
-                        className="w-full pl-9 pr-3 py-2 border border-slate-300 rounded-lg text-slate-900 focus:ring-1 focus:ring-emerald-500 font-medium bg-white"
-                      />
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-1 border-t border-slate-100">
+                    <p className="text-[11px] text-slate-500">
+                      We will email you a secure link to reset your cloud password.
+                    </p>
+
+                    <button
+                      type="submit"
+                      data-testid="send-reset-link-btn"
+                      disabled={authSubmitting}
+                      className="inline-flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 disabled:bg-slate-300 text-white font-bold py-2.5 px-6 rounded-lg shadow-sm text-xs transition-colors cursor-pointer"
+                    >
+                      <Mail className="w-4 h-4" />
+                      <span>{authSubmitting ? 'Sending Link...' : 'Send Password Reset Link'}</span>
+                    </button>
+                  </div>
+                </form>
+              )}
+
+              {/* Inline Auth Form: Update Password (Recovery Mode) */}
+              {authMode === 'update_password' && (
+                <form onSubmit={handleAuthSubmit} className="space-y-3 text-xs">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="font-semibold text-slate-700">New Password</label>
+                        <span className="text-[10px] text-slate-400 font-normal">Min. 8 characters</span>
+                      </div>
+                      <div className="relative">
+                        <Lock className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5" />
+                        <input
+                          type="password"
+                          required
+                          minLength={8}
+                          data-testid="new-password-input"
+                          placeholder="Min. 8 characters"
+                          value={newPassword}
+                          onChange={(e) => setNewPassword(e.target.value)}
+                          className="w-full pl-9 pr-3 py-2 border border-slate-300 rounded-lg text-slate-900 focus:ring-1 focus:ring-emerald-500 font-medium bg-white"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="font-semibold text-slate-700">Confirm New Password</label>
+                        <span className="text-[10px] text-slate-400 font-normal">Must match</span>
+                      </div>
+                      <div className="relative">
+                        <Lock className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5" />
+                        <input
+                          type="password"
+                          required
+                          minLength={8}
+                          data-testid="confirm-new-password-input"
+                          placeholder="Re-enter new password"
+                          value={confirmNewPassword}
+                          onChange={(e) => setConfirmNewPassword(e.target.value)}
+                          className="w-full pl-9 pr-3 py-2 border border-slate-300 rounded-lg text-slate-900 focus:ring-1 focus:ring-emerald-500 font-medium bg-white"
+                        />
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-1 border-t border-slate-100">
-                  <p className="text-[11px] text-slate-500">
-                    {authMode === 'signin'
-                      ? 'Sign in to access your Supabase multi-tenant cloud portfolio.'
-                      : 'Creates your private Supabase user account to begin syncing.'}
-                  </p>
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-1 border-t border-slate-100">
+                    <p className="text-[11px] text-slate-500">
+                      Must be at least 8 characters. You will be automatically signed in upon saving.
+                    </p>
 
-                  <button
-                    type="submit"
-                    disabled={authSubmitting}
-                    className="inline-flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 disabled:bg-slate-300 text-white font-bold py-2.5 px-6 rounded-lg shadow-sm text-xs transition-colors cursor-pointer"
-                  >
-                    {authMode === 'signin' ? (
-                      <>
-                        <LogIn className="w-4 h-4" />
-                        <span>{authSubmitting ? 'Signing In...' : 'Sign In'}</span>
-                      </>
-                    ) : (
-                      <>
-                        <UserPlus className="w-4 h-4" />
-                        <span>{authSubmitting ? 'Creating Account...' : 'Create Account'}</span>
-                      </>
-                    )}
-                  </button>
-                </div>
-              </form>
+                    <button
+                      type="submit"
+                      data-testid="save-new-password-btn"
+                      disabled={authSubmitting}
+                      className="inline-flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 disabled:bg-slate-300 text-white font-bold py-2.5 px-6 rounded-lg shadow-sm text-xs transition-colors cursor-pointer"
+                    >
+                      <CheckCircle2 className="w-4 h-4" />
+                      <span>{authSubmitting ? 'Saving Password...' : 'Save New Password & Sign In'}</span>
+                    </button>
+                  </div>
+                </form>
+              )}
             </div>
           )}
         </div>
