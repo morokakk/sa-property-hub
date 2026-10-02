@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import TopHeader from '@/components/navigation/TopHeader';
 import { usePortfolioStore } from '@/lib/store/usePortfolioStore';
 import { formatDate } from '@/lib/formatters';
-import { TaskItem, TaskPriority, TaskStatus, LinkedEntity } from '@/types';
+import { TaskItem, TaskPriority, TaskStatus, LinkedEntity, TaskRecurrence } from '@/types';
 import {
   CheckSquare,
   PlusCircle,
@@ -18,6 +18,7 @@ import {
   Trash2,
   Filter,
   CheckCircle2,
+  Repeat,
 } from 'lucide-react';
 
 export default function TaskEnginePage() {
@@ -36,6 +37,7 @@ export default function TaskEnginePage() {
   const [filterPriority, setFilterPriority] = useState<string>('ALL');
   const [filterStatus, setFilterStatus] = useState<string>('ALL');
   const [filterEntityType, setFilterEntityType] = useState<string>('ALL');
+  const [filterRecurrence, setFilterRecurrence] = useState<string>('ALL');
 
   // Modal State
   const [showAddModal, setShowAddModal] = useState(false);
@@ -45,6 +47,8 @@ export default function TaskEnginePage() {
     new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
   );
   const [priority, setPriority] = useState<TaskPriority>('High');
+  const [recurrence, setRecurrence] = useState<TaskRecurrence>('None');
+  const [recurrenceEndDate, setRecurrenceEndDate] = useState<string>('');
   const [linkedType, setLinkedType] = useState<LinkedEntity['type']>('flip');
   const [linkedId, setLinkedId] = useState<string>('');
 
@@ -73,6 +77,8 @@ export default function TaskEnginePage() {
       dueDate,
       priority,
       status: 'Pending',
+      recurrence: recurrence !== 'None' ? recurrence : undefined,
+      recurrenceEndDate: recurrence !== 'None' && recurrenceEndDate ? recurrenceEndDate : undefined,
       linkedEntity: {
         type: linkedType,
         id: linkedId || undefined,
@@ -83,6 +89,8 @@ export default function TaskEnginePage() {
     setShowAddModal(false);
     setTitle('');
     setDescription('');
+    setRecurrence('None');
+    setRecurrenceEndDate('');
   };
 
   // Filter logic
@@ -90,6 +98,8 @@ export default function TaskEnginePage() {
     if (filterPriority !== 'ALL' && t.priority !== filterPriority) return false;
     if (filterStatus !== 'ALL' && t.status !== filterStatus) return false;
     if (filterEntityType !== 'ALL' && t.linkedEntity.type !== filterEntityType) return false;
+    if (filterRecurrence === 'RECURRING' && (!t.recurrence || t.recurrence === 'None')) return false;
+    if (filterRecurrence === 'ONEOFF' && t.recurrence && t.recurrence !== 'None') return false;
     return true;
   });
 
@@ -194,6 +204,17 @@ export default function TaskEnginePage() {
               <option value="funding">Funding Partners</option>
               <option value="opportunity">Opportunity Pipeline</option>
             </select>
+
+            {/* Recurrence Filter */}
+            <select
+              value={filterRecurrence}
+              onChange={(e) => setFilterRecurrence(e.target.value)}
+              className="px-2.5 py-1.5 border border-slate-300 rounded-lg bg-white text-slate-700 font-medium"
+            >
+              <option value="ALL">All Schedules</option>
+              <option value="RECURRING">Recurring Only</option>
+              <option value="ONEOFF">One-off Only</option>
+            </select>
           </div>
 
           <span className="text-slate-400 font-medium">
@@ -238,6 +259,20 @@ export default function TaskEnginePage() {
                         {task.priority}
                       </span>
 
+                      {task.recurrence && task.recurrence !== 'None' && (
+                        <span
+                          className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 border border-indigo-200"
+                          title={
+                            task.recurrenceEndDate
+                              ? `Repeats ${task.recurrence} until ${formatDate(task.recurrenceEndDate)}`
+                              : `Repeats ${task.recurrence} indefinitely`
+                          }
+                        >
+                          <Repeat className="w-2.5 h-2.5" />
+                          {task.recurrence}
+                        </span>
+                      )}
+
                       <span className="text-xs font-semibold text-slate-900">
                         {task.title}
                       </span>
@@ -253,6 +288,14 @@ export default function TaskEnginePage() {
                       <span className="flex items-center gap-1 font-medium text-slate-500">
                         <Calendar className="w-3 h-3" /> Due {formatDate(task.dueDate)}
                       </span>
+                      {task.recurrence && task.recurrence !== 'None' && task.recurrenceEndDate && (
+                        <>
+                          <span>•</span>
+                          <span className="text-indigo-600 font-medium">
+                            Repeats until {formatDate(task.recurrenceEndDate)}
+                          </span>
+                        </>
+                      )}
                       <span>•</span>
                       <span className="bg-slate-100 px-2 py-0.5 rounded text-slate-700 font-semibold">
                         Linked: {task.linkedEntity.name} ({task.linkedEntity.type})
@@ -351,6 +394,42 @@ export default function TaskEnginePage() {
                     <option value="Low">Low</option>
                   </select>
                 </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Recurrence Schedule</label>
+                  <select
+                    value={recurrence}
+                    onChange={(e) => setRecurrence(e.target.value as TaskRecurrence)}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white font-semibold min-h-[40px]"
+                  >
+                    <option value="None">Does not repeat (One-off)</option>
+                    <option value="Weekly">Weekly</option>
+                    <option value="Monthly">Monthly</option>
+                    <option value="Quarterly">Quarterly</option>
+                    <option value="Annually">Annually</option>
+                  </select>
+                </div>
+                {recurrence !== 'None' ? (
+                  <div>
+                    <label className="block font-semibold text-slate-700 mb-1">Repeat Until (Optional)</label>
+                    <input
+                      type="date"
+                      name="taskRecurrenceEndDate"
+                      autoComplete="off"
+                      value={recurrenceEndDate}
+                      min={dueDate}
+                      onChange={(e) => setRecurrenceEndDate(e.target.value)}
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg min-h-[40px]"
+                    />
+                  </div>
+                ) : (
+                  <div>
+                    <span className="block font-semibold text-slate-400 mb-1">Repeat Cadence</span>
+                    <p className="text-slate-400 text-xs py-2 italic">Standard single-instance task</p>
+                  </div>
+                )}
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

@@ -6,7 +6,9 @@ import { usePortfolioStore, usePortfolioSummary } from '@/lib/store/usePortfolio
 import { formatZAR, formatPercent, formatDate } from '@/lib/formatters';
 import ComplianceChecklist from '@/components/common/ComplianceChecklist';
 import CloudDriveLinkVault from '@/components/common/CloudDriveLinkVault';
-import { RentalProperty, MaintenanceLog, PropertyTitleType, CloudDriveVault, Lease, AncillaryIncome } from '@/types';
+import { RentalProperty, MaintenanceLog, PropertyTitleType, CloudDriveVault, Lease, AncillaryIncome, PaymentMethod, TenantPaymentRecord } from '@/types';
+import { calculatePropertyArrears, reconcileOpeningBalanceForTargetArrears, getMonthKey } from '@/lib/calculations/arrears';
+import { formatTenantAccountStatementForWhatsApp, formatTenantPaymentReceiptForWhatsApp } from '@/lib/whatsappFormatter';
 import { PropertyTypeBadge, AgmDateChip, isAgmUpcoming } from '@/components/common/PropertyTypeBadge';
 import { calculateRentalCashflow, calculateMonthlyBondRepayment, generateRentalLongTermProjection } from '@/lib/calculations/propertyMetrics';
 import LongTermProjectionChart from '@/components/analytics/LongTermProjectionChart';
@@ -229,6 +231,10 @@ export default function RentalPortfolioPage() {
   const markRentalAsSold = usePortfolioStore((state) => state.markRentalAsSold);
   const reopenRental = usePortfolioStore((state) => state.reopenRental);
   const refinanceRental = usePortfolioStore((state) => state.refinanceRental);
+  const recordTenantPayment = usePortfolioStore((state) => state.recordTenantPayment);
+  const updateTenantPayment = usePortfolioStore((state) => state.updateTenantPayment);
+  const deleteTenantPayment = usePortfolioStore((state) => state.deleteTenantPayment);
+  const updateArrearsOpeningBalance = usePortfolioStore((state) => state.updateArrearsOpeningBalance);
   const rentalForecastView = usePortfolioStore((state) => state.rentalForecastView);
   const setRentalForecastView = usePortfolioStore((state) => state.setRentalForecastView);
   const aiSettings = usePortfolioStore((state) => state.aiSettings);
@@ -312,8 +318,113 @@ export default function RentalPortfolioPage() {
   // Physical & Municipal Meter Readings Modal State
   const [meterModalPropertyId, setMeterModalPropertyId] = useState<string | null>(null);
 
-  // Per-card tab selection ('financials' | 'coc' | 'vault')
-  const [cardTab, setCardTab] = useState<Record<string, 'financials' | 'coc' | 'vault'>>({});
+  // Per-card tab selection ('financials' | 'payments' | 'coc' | 'vault')
+  const [cardTab, setCardTab] = useState<Record<string, 'financials' | 'payments' | 'coc' | 'vault'>>({});
+
+  // Per-property tenant selector sub-tab within Payments ('all' | leaseId)
+  const [selectedTenantTab, setSelectedTenantTab] = useState<Record<string, string>>({});
+
+  // Payment Modal State
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [paymentPropertyId, setPaymentPropertyId] = useState<string | null>(null);
+  const [paymentLeaseId, setPaymentLeaseId] = useState<string>('');
+  const [editingPayment, setEditingPayment] = useState<TenantPaymentRecord | null>(null);
+  const [paymentPeriodMonth, setPaymentPeriodMonth] = useState<string>(getMonthKey());
+  const [paymentDate, setPaymentDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [paymentAmount, setPaymentAmount] = useState<number>(0);
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('EFT');
+  const [paymentReference, setPaymentReference] = useState<string>('');
+  const [paymentNotes, setPaymentNotes] = useState<string>('');
+
+  // Toast feedback state
+  const [copyFeedbackToast, setCopyFeedbackToast] = useState<string | null>(null);
+  useEffect(() => {
+    if (!copyFeedbackToast) return;
+    const t = setTimeout(() => setCopyFeedbackToast(null), 3500);
+    return () => clearTimeout(t);
+  }, [copyFeedbackToast]);
+
+  const handleOpenLogPaymentModal = (
+    property: RentalProperty,
+    targetMonth?: string,
+    suggestedAmount?: number,
+    leaseId?: string
+  ) => {
+    const month = targetMonth || getMonthKey();
+    const activeTab = selectedTenantTab[property.id] || 'all';
+    const effectiveLeaseId =
+      leaseId ||
+      (activeTab !== 'all'
+        ? activeTab
+        : (property.leases && property.leases.length === 1 ? property.leases[0].id : ''));
+
+    const targetLease = property.leases?.find((l) => l.id === effectiveLeaseId);
+
+    let amount = 0;
+    if (suggestedAmount !== undefined && suggestedAmount > 0) {
+      amount = suggestedAmount;
+    } else if (targetLease) {
+      amount = targetLease.monthlyRentZAR || 0;
+    } else {
+      amount = property.monthlyGrossRentZAR || 0;
+    }
+
+    setPaymentPropertyId(property.id);
+    setPaymentLeaseId(effectiveLeaseId);
+    setEditingPayment(null);
+    setPaymentPeriodMonth(month);
+    setPaymentDate(new Date().toISOString().split('T')[0]);
+    setPaymentAmount(amount);
+    setPaymentMethod('EFT');
+    setPaymentReference('');
+    setPaymentNotes('');
+    setShowPaymentModal(true);
+  };
+
+  const handleEditPayment = (property: RentalProperty, payment: TenantPaymentRecord) => {
+    setPaymentPropertyId(property.id);
+    setPaymentLeaseId(payment.leaseId || '');
+    setEditingPayment(payment);
+    setPaymentPeriodMonth(payment.periodMonth || getMonthKey(payment.paymentDate));
+    setPaymentDate(payment.paymentDate);
+    setPaymentAmount(payment.amountReceivedZAR);
+    setPaymentMethod(payment.paymentMethod);
+    setPaymentReference(payment.reference || '');
+    setPaymentNotes(payment.notes || '');
+    setShowPaymentModal(true);
+  };
+
+  const handleSavePayment = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!paymentPropertyId || paymentAmount <= 0) return;
+
+    if (editingPayment) {
+      updateTenantPayment(paymentPropertyId, editingPayment.id, {
+        paymentDate,
+        amountReceivedZAR: Number(paymentAmount),
+        periodMonth: paymentPeriodMonth,
+        paymentMethod,
+        leaseId: paymentLeaseId || undefined,
+        reference: paymentReference.trim() || undefined,
+        notes: paymentNotes.trim() || undefined,
+      });
+      setCopyFeedbackToast('Payment updated successfully');
+    } else {
+      recordTenantPayment(paymentPropertyId, {
+        paymentDate,
+        amountReceivedZAR: Number(paymentAmount),
+        periodMonth: paymentPeriodMonth,
+        paymentMethod,
+        leaseId: paymentLeaseId || undefined,
+        reference: paymentReference.trim() || undefined,
+        notes: paymentNotes.trim() || undefined,
+      });
+      setCopyFeedbackToast('Payment recorded successfully');
+    }
+
+    setShowPaymentModal(false);
+    setEditingPayment(null);
+  };
 
   // Selected Unit for Maintenance Log
   const [selectedRentalForMaint, setSelectedRentalForMaint] = useState<RentalProperty | null>(null);
@@ -913,6 +1024,7 @@ export default function RentalPortfolioPage() {
                   const taxSavingsZAR = sec13Shield > 0 ? Math.round(Math.min(annualCashflow, sec13Shield) * taxRate) : 0;
                   const postTaxCashflow = netCashflow - monthlyTaxZAR;
                   const yieldPostTax = property.marketValueZAR > 0 ? ((postTaxCashflow * 12) / property.marketValueZAR) * 100 : 0;
+                  const arrearsInfo = calculatePropertyArrears(property);
 
                   return (
                     <div
@@ -985,14 +1097,14 @@ export default function RentalPortfolioPage() {
                         </div>
 
                         {/* Tenant Default Risk Alert Banner */}
-                        {(property.unpaidUtilityArrearsZAR || 0) > 0 && (
+                        {arrearsInfo.totalArrearsZAR > 0 && (
                           <div className="bg-rose-50 border-y border-rose-200 px-4 py-2 flex items-center justify-between text-xs">
                             <span className="flex items-center gap-1.5 font-bold text-rose-700">
                               <AlertCircle className="w-3.5 h-3.5 text-rose-600 animate-pulse" />
-                              ⚠️ Tenant Default Risk: Utility Arrears Accruing
+                              ⚠️ Tenant Default Risk: Arrears Accruing
                             </span>
                             <span className="font-extrabold text-rose-700 font-mono">
-                              -{formatZAR(property.unpaidUtilityArrearsZAR || 0)}
+                              -{formatZAR(arrearsInfo.totalArrearsZAR)}
                             </span>
                           </div>
                         )}
@@ -1031,6 +1143,26 @@ export default function RentalPortfolioPage() {
                           >
                             <UserCheck className="w-3.5 h-3.5" />
                             <span>Lease & Costs</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            data-testid={`tab-payments-${property.id}`}
+                            onClick={() => setCardTab((prev) => ({ ...prev, [property.id]: 'payments' }))}
+                            className={`flex-1 py-1.5 px-2 rounded-md transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                              cardTab[property.id] === 'payments'
+                                ? 'bg-white text-emerald-800 shadow-2xs font-bold'
+                                : 'text-slate-600 hover:text-slate-900'
+                            }`}
+                          >
+                            <CreditCard className="w-3.5 h-3.5 text-emerald-600" />
+                            <span>Payments & Arrears</span>
+                            {arrearsInfo.totalArrearsZAR > 0 && (
+                              <span
+                                className="w-2 h-2 rounded-full bg-rose-500 shrink-0"
+                                title={`Outstanding Arrears: ${formatZAR(arrearsInfo.totalArrearsZAR)}`}
+                              />
+                            )}
                           </button>
 
                           <button
@@ -1451,6 +1583,613 @@ export default function RentalPortfolioPage() {
                             </div>
                           </>
                         )}
+
+                        {cardTab[property.id] === 'payments' && (() => {
+                          const activeTenantTab = selectedTenantTab[property.id] || 'all';
+                          const activeTenantLease = activeTenantTab !== 'all'
+                            ? (property.leases || []).find((l) => l.id === activeTenantTab)
+                            : undefined;
+
+                          const currentTabArrearsInfo = calculatePropertyArrears(
+                            property,
+                            undefined,
+                            activeTenantLease ? { leaseId: activeTenantLease.id } : undefined
+                          );
+
+                          return (
+                            <div className="p-4 space-y-4 bg-white text-xs">
+                              {/* 1. Tenant / Unit Selector Pill Bar (Consolidated + Individual Leases) */}
+                              {property.leases && property.leases.length > 0 && (
+                                <div className="flex items-center gap-1.5 overflow-x-auto pb-2 border-b border-slate-200">
+                                  <button
+                                    type="button"
+                                    data-testid={`tenant-tab-all-${property.id}`}
+                                    onClick={() => setSelectedTenantTab((prev) => ({ ...prev, [property.id]: 'all' }))}
+                                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all shrink-0 cursor-pointer flex items-center gap-1.5 ${
+                                      activeTenantTab === 'all'
+                                        ? 'bg-slate-900 text-white shadow-2xs'
+                                        : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                                    }`}
+                                  >
+                                    <Building2 className="w-3.5 h-3.5" />
+                                    <span>All Units (Consolidated)</span>
+                                    {property.unpaidUtilityArrearsZAR && property.unpaidUtilityArrearsZAR > 0 ? (
+                                      <span className="text-[9px] font-extrabold bg-rose-500 text-white px-1.5 py-0.2 rounded-full">
+                                        -{formatZAR(property.unpaidUtilityArrearsZAR, { compact: true })}
+                                      </span>
+                                    ) : null}
+                                  </button>
+
+                                  {property.leases.map((lease) => {
+                                    const isSelected = activeTenantTab === lease.id;
+                                    const leaseArrears = lease.unpaidUtilityArrearsZAR || 0;
+                                    return (
+                                      <button
+                                        key={lease.id}
+                                        type="button"
+                                        data-testid={`tenant-tab-${lease.id}`}
+                                        onClick={() => setSelectedTenantTab((prev) => ({ ...prev, [property.id]: lease.id }))}
+                                        className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all shrink-0 cursor-pointer flex items-center gap-1.5 ${
+                                          isSelected
+                                            ? 'bg-emerald-700 text-white font-bold shadow-2xs'
+                                            : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                                        }`}
+                                      >
+                                        <UserCheck className="w-3.5 h-3.5" />
+                                        <span>{lease.unitName}: {lease.tenantName}</span>
+                                        {leaseArrears > 0 && (
+                                          <span
+                                            className={`text-[9px] px-1.5 py-0.2 rounded-full font-bold ${
+                                              isSelected ? 'bg-rose-500 text-white' : 'bg-rose-100 text-rose-700 border border-rose-200'
+                                            }`}
+                                          >
+                                            -{formatZAR(leaseArrears, { compact: true })}
+                                          </span>
+                                        )}
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+                              )}
+
+                              {/* 2. Current Month Status Banner */}
+                              <div
+                                className={`p-3.5 rounded-xl border transition-all ${
+                                  currentTabArrearsInfo.currentMonthStatus === 'Paid in Full'
+                                    ? 'bg-emerald-50/80 border-emerald-200 text-emerald-950'
+                                    : currentTabArrearsInfo.currentMonthStatus === 'Overpaid'
+                                    ? 'bg-teal-50/80 border-teal-200 text-teal-950'
+                                    : currentTabArrearsInfo.currentMonthStatus === 'Partial'
+                                    ? 'bg-amber-50/90 border-amber-300 text-amber-950'
+                                    : 'bg-rose-50/90 border-rose-200 text-rose-950'
+                                }`}
+                              >
+                                <div className="flex items-center justify-between gap-2 flex-wrap mb-2">
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <span className="font-bold text-xs uppercase tracking-wider">
+                                      {currentTabArrearsInfo.currentMonthItem.monthLabel}
+                                    </span>
+
+                                    {activeTenantLease ? (
+                                      <span className="inline-flex items-center gap-1 text-[11px] font-bold text-slate-800 bg-white/80 px-2 py-0.5 rounded border border-slate-200">
+                                        <UserCheck className="w-3 h-3 text-emerald-700" />
+                                        {activeTenantLease.unitName} ({activeTenantLease.tenantName})
+                                      </span>
+                                    ) : (
+                                      <span className="inline-flex items-center gap-1 text-[11px] font-bold text-slate-800 bg-white/80 px-2 py-0.5 rounded border border-slate-200">
+                                        <Building2 className="w-3 h-3 text-slate-600" />
+                                        Consolidated ({property.leases?.length || 0} Units)
+                                      </span>
+                                    )}
+
+                                    {currentTabArrearsInfo.currentMonthStatus === 'Paid in Full' && (
+                                      <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300">
+                                        <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                                        Paid in Full
+                                      </span>
+                                    )}
+                                    {currentTabArrearsInfo.currentMonthStatus === 'Overpaid' && (
+                                      <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-teal-100 text-teal-800 border border-teal-300">
+                                        <CheckCircle2 className="w-3 h-3 text-teal-600" />
+                                        Overpaid (+{formatZAR(Math.abs(currentTabArrearsInfo.currentMonthItem.netVariance))})
+                                      </span>
+                                    )}
+                                    {currentTabArrearsInfo.currentMonthStatus === 'Partial' && (
+                                      <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-300">
+                                        <AlertTriangle className="w-3 h-3 text-amber-600" />
+                                        Partial ({formatZAR(currentTabArrearsInfo.currentMonthDueZAR)} due)
+                                      </span>
+                                    )}
+                                    {currentTabArrearsInfo.currentMonthStatus === 'Unpaid' && (
+                                      <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-100 text-rose-800 border border-rose-300">
+                                        <AlertCircle className="w-3 h-3 text-rose-600" />
+                                        Unpaid (Due 1st: {formatZAR(currentTabArrearsInfo.currentMonthDueZAR)})
+                                      </span>
+                                    )}
+                                  </div>
+
+                                  <div className="flex items-center gap-1.5">
+                                    {currentTabArrearsInfo.currentMonthDueZAR > 0 && (
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          if (activeTenantLease) {
+                                            recordTenantPayment(property.id, {
+                                              periodMonth: currentTabArrearsInfo.currentMonth,
+                                              paymentDate: new Date().toISOString().split('T')[0],
+                                              amountReceivedZAR: currentTabArrearsInfo.currentMonthDueZAR,
+                                              paymentMethod: 'EFT',
+                                              leaseId: activeTenantLease.id,
+                                              reference: `${activeTenantLease.unitName} Full Rent`,
+                                              notes: `Paid in full for ${currentTabArrearsInfo.currentMonthItem.monthLabel} (${activeTenantLease.tenantName})`,
+                                            });
+                                            setCopyFeedbackToast(
+                                              `Marked ${activeTenantLease.unitName} as Paid in Full (${formatZAR(currentTabArrearsInfo.currentMonthDueZAR)})`
+                                            );
+                                          } else {
+                                            if (property.leases && property.leases.length > 0) {
+                                              let recordedCount = 0;
+                                              property.leases.forEach((l) => {
+                                                const leaseArrears = calculatePropertyArrears(property, undefined, { leaseId: l.id });
+                                                if (leaseArrears.currentMonthDueZAR > 0) {
+                                                  recordTenantPayment(property.id, {
+                                                    periodMonth: currentTabArrearsInfo.currentMonth,
+                                                    paymentDate: new Date().toISOString().split('T')[0],
+                                                    amountReceivedZAR: leaseArrears.currentMonthDueZAR,
+                                                    paymentMethod: 'EFT',
+                                                    leaseId: l.id,
+                                                    reference: `${l.unitName || 'Rent'} Paid in Full`,
+                                                    notes: `Paid in full for ${currentTabArrearsInfo.currentMonthItem.monthLabel} (${l.tenantName})`,
+                                                  });
+                                                  recordedCount++;
+                                                }
+                                              });
+                                              setCopyFeedbackToast(
+                                                `Marked ${recordedCount} lease(s) as Paid in Full (${formatZAR(currentTabArrearsInfo.currentMonthDueZAR)})`
+                                              );
+                                            } else {
+                                              recordTenantPayment(property.id, {
+                                                periodMonth: currentTabArrearsInfo.currentMonth,
+                                                paymentDate: new Date().toISOString().split('T')[0],
+                                                amountReceivedZAR: currentTabArrearsInfo.currentMonthDueZAR,
+                                                paymentMethod: 'EFT',
+                                                reference: 'Full Rent & Utilities',
+                                                notes: `Paid in full for ${currentTabArrearsInfo.currentMonthItem.monthLabel}`,
+                                              });
+                                              setCopyFeedbackToast(
+                                                `Marked ${currentTabArrearsInfo.currentMonthItem.monthLabel} as Paid in Full (${formatZAR(currentTabArrearsInfo.currentMonthDueZAR)})`
+                                              );
+                                            }
+                                          }
+                                        }}
+                                        className="inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-bold bg-emerald-600 hover:bg-emerald-700 text-white rounded shadow-2xs transition-colors cursor-pointer"
+                                        title="1-Click: Mark month as Paid in Full"
+                                      >
+                                        <CheckCircle2 className="w-3 h-3" />
+                                        <span>Mark Month as Paid ({formatZAR(currentTabArrearsInfo.currentMonthDueZAR)})</span>
+                                      </button>
+                                    )}
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        handleOpenLogPaymentModal(
+                                          property,
+                                          currentTabArrearsInfo.currentMonth,
+                                          currentTabArrearsInfo.currentMonthDueZAR > 0
+                                            ? currentTabArrearsInfo.currentMonthDueZAR
+                                            : currentTabArrearsInfo.currentMonthBilledZAR,
+                                          activeTenantLease?.id
+                                        )
+                                      }
+                                      className="inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-bold bg-white border border-slate-300 hover:bg-slate-50 text-slate-800 rounded shadow-2xs transition-colors cursor-pointer"
+                                      title="Log a tenant payment for this property"
+                                    >
+                                      <PlusCircle className="w-3 h-3 text-emerald-600" />
+                                      <span>+ Log Payment</span>
+                                    </button>
+                                  </div>
+                                </div>
+
+                                <div className="grid grid-cols-3 gap-2 pt-2 border-t border-slate-200/60 text-center">
+                                  <div className="bg-white/70 p-1.5 rounded-lg border border-slate-200/50">
+                                    <span className="text-[10px] text-slate-500 block">Total Billed</span>
+                                    <span className="font-bold text-slate-900 font-mono">
+                                      {formatZAR(currentTabArrearsInfo.currentMonthBilledZAR)}
+                                    </span>
+                                    <span className="text-[9px] text-slate-400 block">
+                                      Rent {formatZAR(currentTabArrearsInfo.currentMonthItem.baseRent)} + Util {formatZAR(currentTabArrearsInfo.currentMonthItem.utilitiesBilled)}
+                                    </span>
+                                  </div>
+                                  <div className="bg-white/70 p-1.5 rounded-lg border border-slate-200/50">
+                                    <span className="text-[10px] text-slate-500 block">Payments Received</span>
+                                    <span className="font-bold text-emerald-700 font-mono">
+                                      {formatZAR(currentTabArrearsInfo.currentMonthPaidZAR)}
+                                    </span>
+                                    <span className="text-[9px] text-slate-400 block">
+                                      {currentTabArrearsInfo.currentMonthItem.payments.length} payment(s)
+                                    </span>
+                                  </div>
+                                  <div className="bg-white/70 p-1.5 rounded-lg border border-slate-200/50">
+                                    <span className="text-[10px] text-slate-500 block">Period Variance</span>
+                                    <span
+                                      className={`font-bold font-mono ${
+                                        currentTabArrearsInfo.currentMonthItem.netVariance > 0
+                                          ? 'text-rose-700'
+                                          : currentTabArrearsInfo.currentMonthItem.netVariance < 0
+                                          ? 'text-teal-700'
+                                          : 'text-emerald-700'
+                                      }`}
+                                    >
+                                      {currentTabArrearsInfo.currentMonthItem.netVariance > 0
+                                        ? `${formatZAR(currentTabArrearsInfo.currentMonthItem.netVariance)} Due`
+                                        : currentTabArrearsInfo.currentMonthItem.netVariance < 0
+                                        ? `-${formatZAR(Math.abs(currentTabArrearsInfo.currentMonthItem.netVariance))} Credit`
+                                        : 'R 0.00'}
+                                    </span>
+                                    <span className="text-[9px] text-slate-400 block">
+                                      Due 1st of month
+                                    </span>
+                                  </div>
+                                </div>
+
+                                {/* Multi-Tenant Unit Breakdown Roster in Consolidated View */}
+                                {activeTenantTab === 'all' && (property.leases || []).length > 1 && (
+                                  <div className="mt-3 pt-2.5 border-t border-slate-200/70">
+                                    <div className="text-[10px] font-bold text-slate-600 mb-1.5 uppercase tracking-wider">
+                                      Tenant Unit Breakdown (This Month)
+                                    </div>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                      {(property.leases || []).map((lease) => {
+                                        const leaseArrears = calculatePropertyArrears(property, undefined, { leaseId: lease.id });
+                                        const status = leaseArrears.currentMonthStatus;
+                                        return (
+                                          <div
+                                            key={lease.id}
+                                            className="p-2 rounded-lg bg-white/90 border border-slate-200 flex items-center justify-between gap-2"
+                                          >
+                                            <div>
+                                              <div className="font-bold text-slate-900 text-xs">
+                                                {lease.unitName}: {lease.tenantName}
+                                              </div>
+                                              <div className="text-[10px] text-slate-500">
+                                                Rent: {formatZAR(lease.monthlyRentZAR)}/m • Total Arrears: <strong className={leaseArrears.totalArrearsZAR > 0 ? 'text-rose-700' : 'text-emerald-700'}>{formatZAR(leaseArrears.totalArrearsZAR)}</strong>
+                                              </div>
+                                            </div>
+                                            <div className="flex items-center gap-1.5">
+                                              <span
+                                                className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${
+                                                  status === 'Paid in Full'
+                                                    ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                                                    : status === 'Partial'
+                                                    ? 'bg-amber-100 text-amber-900 border-amber-300'
+                                                    : 'bg-rose-100 text-rose-800 border-rose-300'
+                                                }`}
+                                              >
+                                                {status}
+                                              </span>
+                                              <button
+                                                type="button"
+                                                onClick={() => setSelectedTenantTab((prev) => ({ ...prev, [property.id]: lease.id }))}
+                                                className="px-2 py-0.5 text-[10px] font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 rounded transition-colors cursor-pointer"
+                                              >
+                                                View Tab →
+                                              </button>
+                                            </div>
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+
+                              {/* 3. Arrears Balance Box with Live Reconciliation */}
+                              <div
+                                className={`p-3.5 rounded-xl border transition-all ${
+                                  currentTabArrearsInfo.totalArrearsZAR > 0
+                                    ? 'bg-rose-50/80 border-rose-200 text-rose-950'
+                                    : 'bg-slate-50 border-slate-200 text-slate-800'
+                                }`}
+                              >
+                                <div className="flex items-center justify-between mb-1.5">
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="font-bold text-[11px] uppercase tracking-wider">
+                                      {activeTenantLease ? `${activeTenantLease.unitName} Arrears Balance` : 'Total Arrears Balance (All Units)'}
+                                    </span>
+                                    {currentTabArrearsInfo.totalArrearsZAR > 0 ? (
+                                      <span className="text-[9px] font-extrabold text-rose-700 bg-rose-100 px-1.5 py-0.5 rounded border border-rose-200 uppercase tracking-wider">
+                                        ⚠️ Arrears Outstanding
+                                      </span>
+                                    ) : currentTabArrearsInfo.totalArrearsZAR < 0 ? (
+                                      <span className="text-[10px] text-teal-700 bg-teal-100 px-1.5 py-0.5 rounded font-bold">
+                                        In Credit
+                                      </span>
+                                    ) : (
+                                      <span className="text-[10px] text-emerald-700 bg-emerald-100 px-1.5 py-0.5 rounded font-bold">
+                                        ✓ Account Paid Up
+                                      </span>
+                                    )}
+                                  </div>
+                                  <span className="font-mono font-black text-sm text-slate-900">
+                                    {currentTabArrearsInfo.totalArrearsZAR > 0
+                                      ? formatZAR(currentTabArrearsInfo.totalArrearsZAR)
+                                      : currentTabArrearsInfo.totalArrearsZAR < 0
+                                      ? `-${formatZAR(Math.abs(currentTabArrearsInfo.totalArrearsZAR))}`
+                                      : 'R 0.00'}
+                                  </span>
+                                </div>
+
+                                <p className="text-[10px] text-slate-500 font-mono bg-white/60 p-1.5 rounded border border-slate-200/50">
+                                  Opening Balance ({formatZAR(currentTabArrearsInfo.openingBalanceZAR)}) + Billed Charges ({formatZAR(currentTabArrearsInfo.totalBilledChargesZAR)}) - Payments ({formatZAR(currentTabArrearsInfo.totalPaymentsReceivedZAR)}) = <strong className="text-slate-900">{formatZAR(currentTabArrearsInfo.totalArrearsZAR)}</strong>
+                                </p>
+
+                                {/* Live Arrears Reconciliation Controls */}
+                                <div className="flex items-center justify-between gap-2 mt-2 pt-2 border-t border-slate-200 flex-wrap">
+                                  <div className="flex items-center gap-1.5 flex-1 min-w-[200px]">
+                                    <span className="text-[10px] text-slate-600 font-semibold">
+                                      Reconcile / Set Arrears:
+                                    </span>
+                                    <div className="relative flex-1 max-w-[120px]">
+                                      <span className="absolute left-2.5 top-1 text-xs text-slate-400 font-bold">R</span>
+                                      <input
+                                        type="number"
+                                        step="any"
+                                        key={`${property.id}-${activeTenantTab}-rec-${currentTabArrearsInfo.totalArrearsZAR}`}
+                                        defaultValue={currentTabArrearsInfo.totalArrearsZAR}
+                                        onBlur={(e) => {
+                                          const targetVal = Number(e.target.value);
+                                          if (!isNaN(targetVal) && targetVal !== currentTabArrearsInfo.totalArrearsZAR) {
+                                            if (activeTenantLease) {
+                                              const newOpening = reconcileOpeningBalanceForTargetArrears(property, targetVal, undefined, { leaseId: activeTenantLease.id });
+                                              updateArrearsOpeningBalance(property.id, newOpening, activeTenantLease.id);
+                                              setCopyFeedbackToast(`${activeTenantLease.unitName} arrears reconciled to ${formatZAR(targetVal)} (Opening balance: ${formatZAR(newOpening)})`);
+                                            } else {
+                                              const newOpening = reconcileOpeningBalanceForTargetArrears(property, targetVal);
+                                              updateArrearsOpeningBalance(property.id, newOpening);
+                                              setCopyFeedbackToast(`Property arrears reconciled to ${formatZAR(targetVal)} (Opening balance: ${formatZAR(newOpening)})`);
+                                            }
+                                          }
+                                        }}
+                                        onKeyDown={(e) => {
+                                          if (e.key === 'Enter') {
+                                            (e.target as HTMLInputElement).blur();
+                                          }
+                                        }}
+                                        className="w-full pl-6 pr-2 py-0.5 text-xs font-mono font-bold bg-white rounded border border-slate-300 focus:outline-none focus:ring-1 focus:ring-emerald-500 text-slate-800"
+                                        title="Type arrears amount and press Enter or blur to reconcile opening balance."
+                                      />
+                                    </div>
+                                  </div>
+
+                                  {currentTabArrearsInfo.totalArrearsZAR > 0 && (
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        if (activeTenantLease) {
+                                          const newOpening = reconcileOpeningBalanceForTargetArrears(property, 0, undefined, { leaseId: activeTenantLease.id });
+                                          updateArrearsOpeningBalance(property.id, newOpening, activeTenantLease.id);
+                                          setCopyFeedbackToast(`${activeTenantLease.unitName} arrears cleared to R 0.00`);
+                                        } else {
+                                          const newOpening = reconcileOpeningBalanceForTargetArrears(property, 0);
+                                          updateArrearsOpeningBalance(property.id, newOpening);
+                                          setCopyFeedbackToast('Property arrears cleared to R 0.00 via opening balance adjustment');
+                                        }
+                                      }}
+                                      className="px-2.5 py-1 text-[10px] font-bold bg-white border border-rose-200 text-rose-600 hover:bg-rose-50 rounded transition-colors cursor-pointer shadow-2xs"
+                                      title="Adjust opening balance so calculated arrears equals R 0.00"
+                                    >
+                                      Clear Arrears (R 0)
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+
+                              {/* 4. Historical Billing & Payment Ledger */}
+                              <div className="space-y-2">
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-1.5">
+                                    <History className="w-3.5 h-3.5 text-slate-400" />
+                                    <span className="font-bold text-slate-800 text-xs">
+                                      {activeTenantLease ? `${activeTenantLease.unitName} Billing & Payment Ledger` : 'Billing & Payment Ledger (All Units)'}
+                                    </span>
+                                    <span className="text-[10px] text-slate-400">
+                                      ({currentTabArrearsInfo.ledger.length} months)
+                                    </span>
+                                  </div>
+                                  <div className="flex items-center gap-1.5">
+                                    <button
+                                      type="button"
+                                      onClick={async () => {
+                                        const stmt = formatTenantAccountStatementForWhatsApp(property, {
+                                          leaseId: activeTenantLease?.id,
+                                          investorProfile,
+                                        });
+                                        if (navigator?.clipboard?.writeText) {
+                                          await navigator.clipboard.writeText(stmt);
+                                        }
+                                        setCopyFeedbackToast('WhatsApp Statement copied to clipboard!');
+                                      }}
+                                      className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 hover:text-emerald-900 bg-emerald-50 hover:bg-emerald-100 px-2 py-0.5 rounded border border-emerald-200 transition-colors cursor-pointer"
+                                      title="Copy 4-tier account statement ready for WhatsApp"
+                                    >
+                                      <MessageCircle className="w-3 h-3 text-emerald-600" />
+                                      <span>WhatsApp Statement</span>
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => setStatementModalPropertyId(property.id)}
+                                      className="inline-flex items-center gap-1 text-[10px] font-bold text-teal-700 hover:text-teal-900 bg-teal-50 hover:bg-teal-100 px-2 py-0.5 rounded border border-teal-200 transition-colors cursor-pointer"
+                                      title="Open interactive tenant statement modal"
+                                    >
+                                      <FileText className="w-3 h-3 text-teal-600" />
+                                      <span>Statement Viewer</span>
+                                    </button>
+                                  </div>
+                                </div>
+
+                                <div className="space-y-2 max-h-[360px] overflow-y-auto pr-1">
+                                  {[...currentTabArrearsInfo.ledger].reverse().map((item) => (
+                                    <div
+                                      key={item.month}
+                                      className="border border-slate-200 rounded-lg p-2.5 bg-slate-50/50 space-y-1.5"
+                                    >
+                                      <div className="flex items-center justify-between text-[11px]">
+                                        <div className="flex items-center gap-1.5">
+                                          <span className="font-bold text-slate-800">
+                                            {item.monthLabel}
+                                          </span>
+                                          <span
+                                            className={`text-[9px] font-bold px-1.5 py-0.2 rounded border ${
+                                              item.status === 'Paid in Full'
+                                                ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                                                : item.status === 'Overpaid'
+                                                ? 'bg-teal-100 text-teal-800 border-teal-300'
+                                                : item.status === 'Partial'
+                                                ? 'bg-amber-100 text-amber-800 border-amber-300'
+                                                : 'bg-rose-100 text-rose-800 border-rose-300'
+                                            }`}
+                                          >
+                                            {item.status}
+                                          </span>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                          <span className="text-slate-500">
+                                            Billed: <strong className="text-slate-800 font-mono">{formatZAR(item.totalBilled)}</strong>
+                                          </span>
+                                          <span className="text-slate-500">
+                                            Paid: <strong className="text-emerald-700 font-mono">{formatZAR(item.paymentsReceived)}</strong>
+                                          </span>
+                                          <span
+                                            className={`font-mono font-bold ${
+                                              item.netVariance > 0
+                                                ? 'text-rose-700'
+                                                : item.netVariance < 0
+                                                ? 'text-teal-700'
+                                                : 'text-slate-400'
+                                            }`}
+                                          >
+                                            {item.netVariance > 0
+                                              ? `+${formatZAR(item.netVariance)}`
+                                              : item.netVariance < 0
+                                              ? `-${formatZAR(Math.abs(item.netVariance))}`
+                                              : 'R 0'}
+                                          </span>
+                                        </div>
+                                      </div>
+
+                                      {/* Itemized Payments for this month */}
+                                      {item.payments.length > 0 ? (
+                                        <div className="space-y-1 pt-1 border-t border-slate-200/60">
+                                          {item.payments.map((p) => {
+                                            const paymentLease = (property.leases || []).find((l) => l.id === p.leaseId);
+                                            return (
+                                              <div
+                                                key={p.id}
+                                                className="flex items-center justify-between bg-white px-2 py-1 rounded border border-slate-200 text-[11px]"
+                                              >
+                                                <div className="flex items-center gap-1.5 flex-wrap">
+                                                  <span className="font-semibold text-slate-700">
+                                                    {formatDate(p.paymentDate)}
+                                                  </span>
+                                                  <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-slate-100 text-slate-600 border border-slate-200">
+                                                    {p.paymentMethod}
+                                                  </span>
+                                                  {paymentLease && (
+                                                    <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                                      {paymentLease.unitName}
+                                                    </span>
+                                                  )}
+                                                  {p.reference && (
+                                                    <span className="text-[10px] text-slate-400">
+                                                      Ref: {p.reference}
+                                                    </span>
+                                                  )}
+                                                </div>
+
+                                                <div className="flex items-center gap-2">
+                                                  <span className="font-mono font-bold text-emerald-700">
+                                                    {formatZAR(p.amountReceivedZAR)}
+                                                  </span>
+                                                  <div className="flex items-center gap-1">
+                                                    <button
+                                                      type="button"
+                                                      onClick={async () => {
+                                                        const receipt = formatTenantPaymentReceiptForWhatsApp(
+                                                          property,
+                                                          p,
+                                                          investorProfile
+                                                        );
+                                                        if (navigator?.clipboard?.writeText) {
+                                                          await navigator.clipboard.writeText(receipt);
+                                                        }
+                                                        setCopyFeedbackToast(
+                                                          `WhatsApp Receipt for ${formatZAR(p.amountReceivedZAR)} copied!`
+                                                        );
+                                                      }}
+                                                      className="p-1 text-emerald-600 hover:text-emerald-800 hover:bg-emerald-50 rounded transition-colors cursor-pointer"
+                                                      title="Copy WhatsApp payment receipt"
+                                                    >
+                                                      <MessageCircle className="w-3.5 h-3.5" />
+                                                    </button>
+                                                    <button
+                                                      type="button"
+                                                      onClick={() => handleEditPayment(property, p)}
+                                                      className="p-1 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded transition-colors cursor-pointer"
+                                                      title="Edit payment"
+                                                    >
+                                                      <Edit3 className="w-3.5 h-3.5" />
+                                                    </button>
+                                                    <button
+                                                      type="button"
+                                                      onClick={() => {
+                                                        if (
+                                                          window.confirm(
+                                                            `Delete payment of ${formatZAR(
+                                                              p.amountReceivedZAR
+                                                            )} recorded on ${formatDate(p.paymentDate)}?`
+                                                          )
+                                                        ) {
+                                                          deleteTenantPayment(property.id, p.id);
+                                                          setCopyFeedbackToast('Payment deleted');
+                                                        }
+                                                      }}
+                                                      className="p-1 text-rose-400 hover:text-rose-700 hover:bg-rose-50 rounded transition-colors cursor-pointer"
+                                                      title="Delete payment"
+                                                    >
+                                                      <Trash2 className="w-3.5 h-3.5" />
+                                                    </button>
+                                                  </div>
+                                                </div>
+                                              </div>
+                                            );
+                                          })}
+                                        </div>
+                                      ) : (
+                                        <div className="flex items-center justify-between text-[10px] text-slate-400 pt-0.5">
+                                          <span>No payments recorded for {item.monthLabel}</span>
+                                          <button
+                                            type="button"
+                                            onClick={() =>
+                                              handleOpenLogPaymentModal(
+                                                property,
+                                                item.month,
+                                                item.netVariance > 0 ? item.netVariance : item.totalBilled,
+                                                activeTenantLease?.id
+                                              )
+                                            }
+                                            className="text-emerald-700 hover:text-emerald-900 font-bold hover:underline cursor-pointer"
+                                          >
+                                            + Add Payment
+                                          </button>
+                                        </div>
+                                      )}
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })()}
 
                         {cardTab[property.id] === 'coc' && (
                           <div className="p-3 bg-white">
@@ -3424,6 +4163,193 @@ export default function RentalPortfolioPage() {
         isOpen={Boolean(meterModalPropertyId)}
         onClose={() => setMeterModalPropertyId(null)}
       />
+
+      {/* Log / Edit Tenant Payment Modal */}
+      {showPaymentModal && paymentPropertyId && (() => {
+        const prop = rentals.find((r) => r.id === paymentPropertyId);
+        if (!prop) return null;
+        return (
+          <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+            <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+              <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/80">
+                <div className="flex items-center gap-2">
+                  <div className="p-2 rounded-xl bg-emerald-100 text-emerald-800">
+                    <CreditCard className="w-5 h-5 text-emerald-600" />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-bold text-slate-900">
+                      {editingPayment ? 'Edit Payment Record' : 'Log Tenant Payment'}
+                    </h3>
+                    <p className="text-xs text-slate-500">{prop.title}</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowPaymentModal(false)}
+                  className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <form onSubmit={handleSavePayment} className="p-6 space-y-4">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Billing Period (Month)
+                  </label>
+                  <input
+                    type="month"
+                    required
+                    value={paymentPeriodMonth}
+                    onChange={(e) => setPaymentPeriodMonth(e.target.value)}
+                    className="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  />
+                  <p className="text-[10px] text-slate-400 mt-0.5">
+                    Month towards which this payment will be allocated in the ledger.
+                  </p>
+                </div>
+
+                {prop.leases && prop.leases.length > 0 && (
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">
+                      Tenant / Unit Allocation
+                    </label>
+                    <select
+                      value={paymentLeaseId}
+                      onChange={(e) => {
+                        const newLeaseId = e.target.value;
+                        setPaymentLeaseId(newLeaseId);
+                        if (!editingPayment) {
+                          const l = prop.leases?.find((x) => x.id === newLeaseId);
+                          if (l) {
+                            setPaymentAmount(l.monthlyRentZAR);
+                          } else {
+                            setPaymentAmount(prop.monthlyGrossRentZAR || 0);
+                          }
+                        }
+                      }}
+                      className="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white"
+                    >
+                      {prop.leases.length > 1 && (
+                        <option value="">-- All Units / Unallocated Property Account --</option>
+                      )}
+                      {prop.leases.map((l) => (
+                        <option key={l.id} value={l.id}>
+                          {l.unitName ? `${l.unitName} - ` : ''}{l.tenantName} ({formatZAR(l.monthlyRentZAR)}/mo)
+                        </option>
+                      ))}
+                    </select>
+                    <p className="text-[10px] text-slate-400 mt-0.5">
+                      Links this payment directly to the specific lease ledger and tenant statement.
+                    </p>
+                  </div>
+                )}
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">
+                      Payment Date
+                    </label>
+                    <input
+                      type="date"
+                      required
+                      value={paymentDate}
+                      onChange={(e) => setPaymentDate(e.target.value)}
+                      className="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">
+                      Amount Received (ZAR)
+                    </label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-2 text-sm font-bold text-slate-400">R</span>
+                      <input
+                        type="number"
+                        min="0.01"
+                        step="any"
+                        required
+                        value={paymentAmount || ''}
+                        onChange={(e) => setPaymentAmount(parseFloat(e.target.value) || 0)}
+                        placeholder="0.00"
+                        className="w-full pl-8 pr-3 py-2 text-sm font-mono font-bold rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Payment Method
+                  </label>
+                  <select
+                    value={paymentMethod}
+                    onChange={(e) => setPaymentMethod(e.target.value as PaymentMethod)}
+                    className="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white"
+                  >
+                    <option value="EFT">EFT (Electronic Funds Transfer)</option>
+                    <option value="Cash Deposit">Cash Deposit (Bank ATM / Branch)</option>
+                    <option value="Debit Order">Debit Order</option>
+                    <option value="Instant EFT / Card">Instant EFT / Card (PayFast / Ozow)</option>
+                    <option value="Other">Other</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Bank Reference / Proof
+                  </label>
+                  <input
+                    type="text"
+                    value={paymentReference}
+                    onChange={(e) => setPaymentReference(e.target.value)}
+                    placeholder="e.g. FNB-REF-98432 or April Rent"
+                    className="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Internal Notes (Optional)
+                  </label>
+                  <textarea
+                    rows={2}
+                    value={paymentNotes}
+                    onChange={(e) => setPaymentNotes(e.target.value)}
+                    placeholder="Any notes about this payment..."
+                    className="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500 resize-none"
+                  />
+                </div>
+
+                <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+                  <button
+                    type="button"
+                    onClick={() => setShowPaymentModal(false)}
+                    className="px-4 py-2 text-xs font-semibold text-slate-600 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-4 py-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg shadow-sm transition-colors cursor-pointer"
+                  >
+                    {editingPayment ? 'Save Changes' : 'Record Payment'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Floating Action / Clipboard Feedback Toast */}
+      {copyFeedbackToast && (
+        <div className="fixed bottom-6 right-6 z-50 bg-slate-900 text-white text-xs px-4 py-3 rounded-xl shadow-2xl border border-emerald-500/40 flex items-center gap-2.5 animate-in fade-in slide-in-from-bottom-2">
+          <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+          <span className="font-semibold">{copyFeedbackToast}</span>
+        </div>
+      )}
     </div>
   );
 }

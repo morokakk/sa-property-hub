@@ -135,6 +135,13 @@ export function unmapRentals(rows: Database['public']['Tables']['properties']['R
     monthlyMaintenanceReserveZAR: toNum(r.monthly_maintenance_reserve_zar, 0),
     annualBuildingInsuranceZAR: toNullableNum(r.annual_building_insurance_zar),
     unpaidUtilityArrearsZAR: toNullableNum(r.unpaid_utility_arrears_zar),
+    paymentRecords: (r as any).payment_records
+      ? parseJson((r as any).payment_records, [])
+      : (Array.isArray(r.leases) && (r.leases[0] as any)?.paymentRecords) || [],
+    arrearsOpeningBalanceZAR:
+      toNullableNum((r as any).arrears_opening_balance_zar) ??
+      (Array.isArray(r.leases) && (r.leases[0] as any)?.arrearsOpeningBalanceZAR) ??
+      undefined,
     maintenanceHistory: parseJson(r.maintenance_history, []),
     status: (r.status as any) || 'Occupied',
     cocChecklist: r.coc_checklist ? (parseJson(r.coc_checklist, undefined) as any) : undefined,
@@ -350,16 +357,26 @@ export function unmapOpportunities(
 export function unmapTasks(
   rows: Database['public']['Tables']['tasks']['Row'][] = []
 ): TaskItem[] {
-  return rows.map((t) => ({
-    id: t.id,
-    title: t.title,
-    description: t.description || undefined,
-    dueDate: t.due_date,
-    priority: (t.priority as any) || 'Medium',
-    status: (t.status as any) || 'Pending',
-    linkedEntity: parseJson(t.linked_entity, { type: 'general', name: 'General' } as any),
-    createdAt: (t as any).created_at || new Date().toISOString(),
-  }));
+  return rows.map((t) => {
+    const linked = parseJson(t.linked_entity, { type: 'general', name: 'General' } as any);
+    const recurrence = (t as any).recurrence || linked?.recurrence || undefined;
+    const recurrenceEndDate = (t as any).recurrence_end_date || linked?.recurrenceEndDate || undefined;
+    const recurrenceGroupId = (t as any).recurrence_group_id || linked?.recurrenceGroupId || undefined;
+
+    return {
+      id: t.id,
+      title: t.title,
+      description: t.description || undefined,
+      dueDate: t.due_date,
+      priority: (t.priority as any) || 'Medium',
+      status: (t.status as any) || 'Pending',
+      linkedEntity: linked,
+      recurrence,
+      recurrenceEndDate,
+      recurrenceGroupId,
+      createdAt: (t as any).created_at || new Date().toISOString(),
+    };
+  });
 }
 
 export function unmapSuppliers(

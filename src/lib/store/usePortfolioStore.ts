@@ -9,6 +9,7 @@ import {
   FundingSource,
   LocalSupplier,
   TaskItem,
+  TaskStatus,
   PortfolioSummary,
   BOQItem,
   InvestorProfile,
@@ -21,11 +22,17 @@ import {
   UtilityStatement,
   MeterReading,
   EquityExtractionAlert,
+  TenantPaymentRecord,
 } from '@/types';
 import {
   calculateMonthlyBondRepayment,
   calculateBondPrincipalFromRepayment,
 } from '@/lib/calculations/propertyMetrics';
+import {
+  calculatePropertyArrears,
+  reconcileOpeningBalanceForTargetArrears,
+} from '@/lib/calculations/arrears';
+import { handleTaskCompletionRecurrence } from '@/lib/calculations/recurrence';
 import {
   INITIAL_RENTALS,
   INITIAL_FLIPS,
@@ -92,6 +99,20 @@ interface PortfolioState {
     statementId: string,
     method: 'municipal_statement' | 'independent_actuals'
   ) => void;
+  recordTenantPayment: (
+    propertyId: string,
+    payment: Omit<TenantPaymentRecord, 'id' | 'createdAt' | 'propertyId'> & {
+      id?: string;
+      propertyId?: string;
+    }
+  ) => void;
+  updateTenantPayment: (
+    propertyId: string,
+    paymentId: string,
+    updates: Partial<TenantPaymentRecord>
+  ) => void;
+  deleteTenantPayment: (propertyId: string, paymentId: string) => void;
+  updateArrearsOpeningBalance: (propertyId: string, openingBalance: number, leaseId?: string) => void;
 
   // Flip Actions
   addFlip: (flip: FlipProject) => void;
@@ -439,9 +460,37 @@ export const usePortfolioStore = create<PortfolioState>()(
       },
       updateRental: (id, updates) =>
         set((state) => {
-          const updatedRentals = state.rentals.map((r) =>
-            r.id === id ? { ...r, ...updates } : r
-          );
+          const updatedRentals = state.rentals.map((r) => {
+            if (r.id !== id) return r;
+            const reconciledUpdates = { ...updates };
+            if (
+              updates.unpaidUtilityArrearsZAR !== undefined &&
+              updates.arrearsOpeningBalanceZAR === undefined
+            ) {
+              reconciledUpdates.arrearsOpeningBalanceZAR = reconcileOpeningBalanceForTargetArrears(
+                r,
+                updates.unpaidUtilityArrearsZAR
+              );
+            } else if (
+              updates.arrearsOpeningBalanceZAR !== undefined ||
+              updates.paymentRecords !== undefined ||
+              updates.leases !== undefined ||
+              updates.monthlyGrossRentZAR !== undefined
+            ) {
+              const tempRental = { ...r, ...reconciledUpdates };
+              const updatedLeases = (tempRental.leases || []).map((l) => {
+                const leaseArrears = calculatePropertyArrears(tempRental, undefined, { leaseId: l.id });
+                return {
+                  ...l,
+                  unpaidUtilityArrearsZAR: Math.max(0, leaseArrears.totalArrearsZAR),
+                };
+              });
+              const arrearsResult = calculatePropertyArrears({ ...tempRental, leases: updatedLeases });
+              reconciledUpdates.leases = updatedLeases;
+              reconciledUpdates.unpaidUtilityArrearsZAR = Math.max(0, arrearsResult.totalArrearsZAR);
+            }
+            return { ...r, ...reconciledUpdates };
+          });
           const target = updatedRentals.find((r) => r.id === id);
           const agmDate = updates.agmDate !== undefined ? updates.agmDate : target?.agmDate;
           const tasks = target
@@ -584,6 +633,14 @@ export const usePortfolioStore = create<PortfolioState>()(
               ...r,
               utilityStatements: combined,
               meterReadings: updatedMeterReadings,
+              unpaidUtilityArrearsZAR: Math.max(
+                0,
+                calculatePropertyArrears({
+                  ...r,
+                  utilityStatements: combined,
+                  meterReadings: updatedMeterReadings,
+                }).totalArrearsZAR
+              ),
             };
           }),
         })),
@@ -591,10 +648,18 @@ export const usePortfolioStore = create<PortfolioState>()(
         set((state) => ({
           rentals: state.rentals.map((r) => {
             if (r.id !== propertyId) return r;
+            const remaining = (r.utilityStatements || []).filter(
+              (s) => s.id !== statementId
+            );
             return {
               ...r,
-              utilityStatements: (r.utilityStatements || []).filter(
-                (s) => s.id !== statementId
+              utilityStatements: remaining,
+              unpaidUtilityArrearsZAR: Math.max(
+                0,
+                calculatePropertyArrears({
+                  ...r,
+                  utilityStatements: remaining,
+                }).totalArrearsZAR
               ),
             };
           }),
@@ -656,6 +721,126 @@ export const usePortfolioStore = create<PortfolioState>()(
                   tenantBillingMethod: method,
                 };
               }),
+            };
+          }),
+        })),
+      recordTenantPayment: (propertyId, payment) =>
+        set((state) => ({
+          rentals: state.rentals.map((r) => {
+            if (r.id !== propertyId) return r;
+            const newPayment: TenantPaymentRecord = {
+              ...payment,
+              id: payment.id || `pay-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+              propertyId,
+              createdAt: new Date().toISOString(),
+            };
+            const updatedPayments = [newPayment, ...(r.paymentRecords || [])].sort((a, b) =>
+              b.paymentDate.localeCompare(a.paymentDate)
+            );
+            const tempRental: RentalProperty = {
+              ...r,
+              paymentRecords: updatedPayments,
+            };
+            const updatedLeases = (tempRental.leases || []).map((l) => {
+              const leaseArrears = calculatePropertyArrears(tempRental, undefined, { leaseId: l.id });
+              return {
+                ...l,
+                unpaidUtilityArrearsZAR: Math.max(0, leaseArrears.totalArrearsZAR),
+              };
+            });
+            const arrearsResult = calculatePropertyArrears({ ...tempRental, leases: updatedLeases });
+            return {
+              ...tempRental,
+              leases: updatedLeases,
+              unpaidUtilityArrearsZAR: Math.max(0, arrearsResult.totalArrearsZAR),
+            };
+          }),
+        })),
+      updateTenantPayment: (propertyId, paymentId, updates) =>
+        set((state) => ({
+          rentals: state.rentals.map((r) => {
+            if (r.id !== propertyId) return r;
+            const updatedPayments = (r.paymentRecords || []).map((p) =>
+              p.id === paymentId ? { ...p, ...updates } : p
+            ).sort((a, b) => b.paymentDate.localeCompare(a.paymentDate));
+            const tempRental: RentalProperty = {
+              ...r,
+              paymentRecords: updatedPayments,
+            };
+            const updatedLeases = (tempRental.leases || []).map((l) => {
+              const leaseArrears = calculatePropertyArrears(tempRental, undefined, { leaseId: l.id });
+              return {
+                ...l,
+                unpaidUtilityArrearsZAR: Math.max(0, leaseArrears.totalArrearsZAR),
+              };
+            });
+            const arrearsResult = calculatePropertyArrears({ ...tempRental, leases: updatedLeases });
+            return {
+              ...tempRental,
+              leases: updatedLeases,
+              unpaidUtilityArrearsZAR: Math.max(0, arrearsResult.totalArrearsZAR),
+            };
+          }),
+        })),
+      deleteTenantPayment: (propertyId, paymentId) =>
+        set((state) => ({
+          rentals: state.rentals.map((r) => {
+            if (r.id !== propertyId) return r;
+            const updatedPayments = (r.paymentRecords || []).filter((p) => p.id !== paymentId);
+            const tempRental: RentalProperty = {
+              ...r,
+              paymentRecords: updatedPayments,
+            };
+            const updatedLeases = (tempRental.leases || []).map((l) => {
+              const leaseArrears = calculatePropertyArrears(tempRental, undefined, { leaseId: l.id });
+              return {
+                ...l,
+                unpaidUtilityArrearsZAR: Math.max(0, leaseArrears.totalArrearsZAR),
+              };
+            });
+            const arrearsResult = calculatePropertyArrears({ ...tempRental, leases: updatedLeases });
+            return {
+              ...tempRental,
+              leases: updatedLeases,
+              unpaidUtilityArrearsZAR: Math.max(0, arrearsResult.totalArrearsZAR),
+            };
+          }),
+        })),
+      updateArrearsOpeningBalance: (propertyId, openingBalance, leaseId) =>
+        set((state) => ({
+          rentals: state.rentals.map((r) => {
+            if (r.id !== propertyId) return r;
+            let updatedLeases = r.leases || [];
+            let propOpening = openingBalance;
+
+            if (leaseId) {
+              updatedLeases = updatedLeases.map((l) =>
+                l.id === leaseId ? { ...l, arrearsOpeningBalanceZAR: openingBalance } : l
+              );
+              propOpening = updatedLeases.reduce((s, l) => s + (l.arrearsOpeningBalanceZAR || 0), 0);
+            } else if (updatedLeases.length === 1) {
+              updatedLeases = [{ ...updatedLeases[0], arrearsOpeningBalanceZAR: openingBalance }];
+            }
+
+            const tempRental: RentalProperty = {
+              ...r,
+              arrearsOpeningBalanceZAR: propOpening,
+              leases: updatedLeases,
+            };
+
+            const finalizedLeases = updatedLeases.map((l) => {
+              const leaseArrears = calculatePropertyArrears(tempRental, undefined, { leaseId: l.id });
+              return {
+                ...l,
+                unpaidUtilityArrearsZAR: Math.max(0, leaseArrears.totalArrearsZAR),
+              };
+            });
+
+            const arrearsResult = calculatePropertyArrears({ ...tempRental, leases: finalizedLeases });
+            return {
+              ...tempRental,
+              leases: finalizedLeases,
+              unpaidUtilityArrearsZAR: Math.max(0, arrearsResult.totalArrearsZAR),
             };
           }),
         })),
@@ -1258,30 +1443,81 @@ export const usePortfolioStore = create<PortfolioState>()(
 
       // Tasks
       addTask: (task) =>
-        set((state) => ({
-          tasks: [
-            {
-              ...task,
-              id: `task-${Date.now()}`,
-              createdAt: new Date().toISOString(),
-            },
-            ...state.tasks,
-          ],
-        })),
+        set((state) => {
+          const taskId = `task-${Date.now()}`;
+          const isRecurring = task.recurrence && task.recurrence !== 'None';
+          const recurrenceGroupId = task.recurrenceGroupId || (isRecurring ? `series-${taskId}` : undefined);
+          return {
+            tasks: [
+              {
+                ...task,
+                id: taskId,
+                recurrenceGroupId,
+                createdAt: new Date().toISOString(),
+              },
+              ...state.tasks,
+            ],
+          };
+        }),
       toggleTaskStatus: (taskId) =>
-        set((state) => ({
-          tasks: state.tasks.map((t) => {
+        set((state) => {
+          const targetTask = state.tasks.find((t) => t.id === taskId);
+          if (!targetTask) return state;
+
+          const willBeCompleted = targetTask.status !== 'Completed';
+          let spawnedTask: TaskItem | null = null;
+
+          if (willBeCompleted) {
+            spawnedTask = handleTaskCompletionRecurrence(targetTask, state.tasks);
+          }
+
+          const updatedTasks = state.tasks.map((t) => {
             if (t.id !== taskId) return t;
-            const nextStatus = t.status === 'Completed' ? 'Pending' : 'Completed';
-            return { ...t, status: nextStatus };
-          }),
-        })),
+            const nextStatus: TaskStatus = willBeCompleted ? 'Completed' : 'Pending';
+            return {
+              ...t,
+              status: nextStatus,
+              recurrenceGroupId:
+                t.recurrenceGroupId ||
+                (t.recurrence && t.recurrence !== 'None' ? `series-${t.id}` : undefined),
+            };
+          });
+
+          return {
+            tasks: spawnedTask ? [spawnedTask, ...updatedTasks] : updatedTasks,
+          };
+        }),
       updateTask: (taskId, updates) =>
-        set((state) => ({
-          tasks: state.tasks.map((t) =>
-            t.id === taskId ? { ...t, ...updates } : t
-          ),
-        })),
+        set((state) => {
+          const targetTask = state.tasks.find((t) => t.id === taskId);
+          if (!targetTask) return state;
+
+          const willBeCompleted =
+            updates.status === 'Completed' && targetTask.status !== 'Completed';
+          let spawnedTask: TaskItem | null = null;
+
+          if (willBeCompleted) {
+            const merged = { ...targetTask, ...updates };
+            spawnedTask = handleTaskCompletionRecurrence(merged, state.tasks);
+          }
+
+          const updatedTasks = state.tasks.map((t) => {
+            if (t.id !== taskId) return t;
+            const updated = { ...t, ...updates };
+            if (
+              updated.recurrence &&
+              updated.recurrence !== 'None' &&
+              !updated.recurrenceGroupId
+            ) {
+              updated.recurrenceGroupId = `series-${t.id}`;
+            }
+            return updated;
+          });
+
+          return {
+            tasks: spawnedTask ? [spawnedTask, ...updatedTasks] : updatedTasks,
+          };
+        }),
       deleteTask: (taskId) =>
         set((state) => ({
           tasks: state.tasks.filter((t) => t.id !== taskId),

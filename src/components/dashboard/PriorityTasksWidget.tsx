@@ -3,7 +3,7 @@
 import React from 'react';
 import { usePortfolioStore } from '@/lib/store/usePortfolioStore';
 import { formatDate } from '@/lib/formatters';
-import { CheckSquare, AlertCircle, ArrowUpRight } from 'lucide-react';
+import { CheckSquare, AlertCircle, ArrowUpRight, Repeat } from 'lucide-react';
 import Link from 'next/link';
 
 export default function PriorityTasksWidget() {
@@ -62,6 +62,15 @@ export default function PriorityTasksWidget() {
                     >
                       {task.priority}
                     </span>
+                    {task.recurrence && task.recurrence !== 'None' && (
+                      <span
+                        className="inline-flex items-center gap-0.5 text-[10px] font-semibold px-1.5 py-0.2 rounded bg-indigo-50 text-indigo-700 border border-indigo-200"
+                        title={`Repeats ${task.recurrence}`}
+                      >
+                        <Repeat className="w-2.5 h-2.5" />
+                        {task.recurrence}
+                      </span>
+                    )}
                     <span className="text-[11px] text-slate-400">Due {formatDate(task.dueDate)}</span>
                   </div>
                   <p className="text-xs font-semibold text-slate-900 mt-1">{task.title}</p>

@@ -1,4 +1,4 @@
-import { UtilityStatement, MeterReading } from '@/types';
+import { UtilityStatement, MeterReading, TenantPaymentRecord } from '@/types';
 
 export interface PublicTenantStatementPayload {
   lease: {
@@ -13,6 +13,7 @@ export interface PublicTenantStatementPayload {
     depositHeldZAR: number;
     annualEscalationPercent?: number;
     status?: string;
+    arrears_opening_balance_zar?: number | null;
   };
   property: {
     id: string;
@@ -21,6 +22,8 @@ export interface PublicTenantStatementPayload {
     city: string;
     utility_type?: string | null;
     prepaid_vendor_name?: string | null;
+    arrears_opening_balance_zar?: number | null;
+    payment_records?: TenantPaymentRecord[];
   };
   landlord: {
     entity_name: string;
@@ -33,4 +36,6 @@ export interface PublicTenantStatementPayload {
   };
   utility_statements: UtilityStatement[];
   meter_readings?: MeterReading[];
+  payment_records?: TenantPaymentRecord[];
+  arrears_opening_balance_zar?: number;
 }

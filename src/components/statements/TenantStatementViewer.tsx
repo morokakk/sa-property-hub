@@ -16,6 +16,7 @@ import {
   Download,
 } from 'lucide-react';
 import { PublicTenantStatementPayload } from '@/types/tenantStatement';
+import { TenantPaymentRecord } from '@/types';
 import { formatZAR, formatDate } from '@/lib/formatters';
 
 interface TenantStatementViewerProps {
@@ -101,6 +102,105 @@ export default function TenantStatementViewer({
           (previousStatement.refuseZAR || 0) +
           (previousStatement.sewerageZAR || 0))
     : undefined;
+
+  // Payments & Arrears Calculations
+  const paymentRecords = ((statementData.payment_records || statementData.property?.payment_records || []) as TenantPaymentRecord[]);
+  const arrearsOpeningBalanceZAR = Number(
+    statementData.lease?.arrears_opening_balance_zar ??
+    statementData.arrears_opening_balance_zar ??
+    statementData.property?.arrears_opening_balance_zar ??
+    0
+  );
+
+  const relevantPayments = useMemo(() => {
+    return paymentRecords.filter((p) => {
+      if (p.leaseId) return p.leaseId === lease.id;
+      return true;
+    });
+  }, [paymentRecords, lease.id]);
+
+  const activeMonth = activeStatement?.statementDate ? activeStatement.statementDate.slice(0, 7) : '';
+  const activePayments = relevantPayments.filter(
+    (p) => !activeMonth || (p.periodMonth || p.paymentDate.slice(0, 7)) === activeMonth
+  );
+  const totalPaymentsForPeriod = activePayments.reduce((s, p) => s + (p.amountReceivedZAR || 0), 0);
+
+  // Compute prior charges and prior payments for true Balance Brought Forward
+  const priorCharges = useMemo(() => {
+    if (!activeMonth) return 0;
+    const priorMonthsSet = new Set<string>();
+    const leaseStartKey = lease.leaseStartDate ? lease.leaseStartDate.slice(0, 7) : '';
+    const leaseEndKey = lease.leaseEndDate ? lease.leaseEndDate.slice(0, 7) : '';
+
+    if (leaseStartKey) {
+      if (leaseStartKey < activeMonth) {
+        const [startY, startM] = leaseStartKey.split('-').map(Number);
+        const [actY, actM] = activeMonth.split('-').map(Number);
+        const diff = (actY - startY) * 12 + (actM - startM);
+        if (diff > 0 && diff <= 36) {
+          const startDateObj = new Date(startY, startM - 1, 1);
+          for (let i = 0; i < diff; i++) {
+            const d = new Date(startDateObj.getFullYear(), startDateObj.getMonth() + i, 1);
+            const y = d.getFullYear();
+            const mo = String(d.getMonth() + 1).padStart(2, '0');
+            priorMonthsSet.add(`${y}-${mo}`);
+          }
+        }
+      }
+    } else {
+      sortedStatements.forEach((stmt) => {
+        const m = stmt.statementDate ? stmt.statementDate.slice(0, 7) : '';
+        if (m && m < activeMonth) priorMonthsSet.add(m);
+      });
+    }
+
+    let chargesSum = 0;
+    priorMonthsSet.forEach((pm) => {
+      const isActiveInMonth =
+        (!leaseStartKey || pm >= leaseStartKey) && (!leaseEndKey || pm <= leaseEndKey);
+      if (isActiveInMonth) {
+        chargesSum += baseRent;
+      }
+      const matching = sortedStatements.filter((s) => s.statementDate?.startsWith(pm));
+      matching.forEach((stmt) => {
+        if (!isPrepaid && isActiveInMonth) {
+          if (stmt.billingType === 'bundled' || stmt.bundledUtilitiesZAR !== undefined) {
+            chargesSum += stmt.bundledUtilitiesZAR || 0;
+          } else {
+            chargesSum +=
+              (stmt.electricityZAR || 0) +
+              (stmt.waterZAR || 0) +
+              (stmt.refuseZAR || 0) +
+              (stmt.sewerageZAR || 0);
+          }
+        }
+      });
+    });
+    return chargesSum;
+  }, [activeMonth, sortedStatements, lease.leaseStartDate, lease.leaseEndDate, baseRent, isPrepaid]);
+
+  const priorPayments = useMemo(() => {
+    if (!activeMonth) return 0;
+    return relevantPayments
+      .filter((p) => {
+        const pm = p.periodMonth || p.paymentDate.slice(0, 7);
+        return pm < activeMonth;
+      })
+      .reduce((s, p) => s + (p.amountReceivedZAR || 0), 0);
+  }, [activeMonth, relevantPayments]);
+
+  const balanceBroughtForward = Math.round((arrearsOpeningBalanceZAR + priorCharges - priorPayments) * 100) / 100;
+  const grandTotalDue = Math.round((balanceBroughtForward + totalDue - totalPaymentsForPeriod) * 100) / 100;
+
+  const prevMonth = previousStatement?.statementDate ? previousStatement.statementDate.slice(0, 7) : '';
+  const prevPayments = relevantPayments.filter(
+    (p) => !prevMonth || (p.periodMonth || p.paymentDate.slice(0, 7)) === prevMonth
+  );
+  const prevTotalPayments = prevPayments.reduce((s, p) => s + (p.amountReceivedZAR || 0), 0);
+  const prevGrandTotalDue =
+    prevTotalDue !== undefined
+      ? Math.round((prevTotalDue - prevTotalPayments) * 100) / 100
+      : undefined;
 
   // Meter readings for active statement
   const elecMeterReading = useMemo(() => {
@@ -444,7 +544,34 @@ export default function TenantStatementViewer({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 text-slate-700 bg-white">
-                  {/* 1. Base Rent Row */}
+                  {/* 1. Balance Brought Forward (Prior Arrears) */}
+                  <tr className="bg-slate-50/70 border-b border-slate-200">
+                    <td className="p-3 pl-4">
+                      <div className="font-bold text-slate-900">1. Balance Brought Forward</div>
+                      <div className="text-[10px] text-slate-500 mt-0.5">
+                        Historical account balance accrued prior to this billing period
+                      </div>
+                    </td>
+                    <td className="p-3 text-right font-mono text-slate-400 whitespace-nowrap">—</td>
+                    <td className={`p-3 text-right font-mono font-bold whitespace-nowrap ${balanceBroughtForward > 0 ? 'text-rose-700' : 'text-slate-800'}`}>
+                      {formatZAR(balanceBroughtForward, { includeDecimals: true })}
+                    </td>
+                    <td className="p-3 pr-4 text-right text-[10px] whitespace-nowrap font-medium">
+                      {balanceBroughtForward > 0 ? (
+                        <span className="text-rose-700 font-bold bg-rose-50 px-1.5 py-0.5 rounded border border-rose-200">
+                          Prior Arrears
+                        </span>
+                      ) : balanceBroughtForward < 0 ? (
+                        <span className="text-emerald-700 font-bold bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                          Prior Credit
+                        </span>
+                      ) : (
+                        <span className="text-emerald-700">✓ Good Standing</span>
+                      )}
+                    </td>
+                  </tr>
+
+                  {/* 2. Base Rent Row */}
                   <tr className="hover:bg-slate-50/50 transition-colors">
                     <td className="p-3 pl-4">
                       <div className="font-bold text-slate-900">Base Contract Rent</div>
@@ -646,28 +773,82 @@ export default function TenantStatementViewer({
                     </tr>
                   )}
 
-                  {/* 8. Total Balance Due Highlight */}
+                  {/* 2. Subtotal Current Period Charges */}
+                  <tr className="bg-slate-50/90 font-bold border-t border-slate-200 text-slate-900">
+                    <td className="p-2.5 pl-4 text-xs">
+                      2. Subtotal Current Period Charges
+                      <div className="text-[10px] font-normal text-slate-500">Base Rent + itemized utility recoveries</div>
+                    </td>
+                    <td className="p-2.5 text-right font-mono text-xs text-slate-700 whitespace-nowrap">
+                      {prevTotalDue !== undefined ? formatZAR(prevTotalDue, { includeDecimals: true }) : '—'}
+                    </td>
+                    <td className="p-2.5 text-right font-mono text-xs font-bold text-slate-900 whitespace-nowrap">
+                      {formatZAR(totalDue, { includeDecimals: true })}
+                    </td>
+                    <td className="p-2.5 pr-4 text-right whitespace-nowrap text-xs">
+                      {renderVariance(totalDue, prevTotalDue)}
+                    </td>
+                  </tr>
+
+                  {/* 3. Less: Payments Received */}
+                  {activePayments.length > 0 ? (
+                    activePayments.map((p) => (
+                      <tr key={p.id} className="hover:bg-slate-50/50 transition-colors bg-emerald-50/30">
+                        <td className="p-3 pl-4">
+                          <div className="font-semibold text-emerald-800 flex items-center gap-1.5">
+                            <CreditCard className="w-3.5 h-3.5 text-emerald-600" />
+                            <span>Payment Received: {formatDate(p.paymentDate)}</span>
+                          </div>
+                          <div className="text-[10px] text-slate-500">
+                            Method: {p.paymentMethod} {p.reference ? `• Ref: ${p.reference}` : ''}
+                          </div>
+                        </td>
+                        <td className="p-3 text-right font-mono text-slate-400 whitespace-nowrap">—</td>
+                        <td className="p-3 text-right font-mono font-bold text-emerald-700 whitespace-nowrap">
+                          -{formatZAR(p.amountReceivedZAR, { includeDecimals: true })}
+                        </td>
+                        <td className="p-3 pr-4 text-right whitespace-nowrap text-[10px] text-emerald-700 font-semibold">
+                          Payment Applied
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr className="hover:bg-slate-50/50 transition-colors">
+                      <td className="p-3 pl-4">
+                        <div className="font-medium text-slate-700 flex items-center gap-1.5">
+                          <CreditCard className="w-3.5 h-3.5 text-slate-400" />
+                          <span>3. Less: Payments Received</span>
+                        </div>
+                        <div className="text-[10px] text-slate-400">No payments recorded for this billing period yet</div>
+                      </td>
+                      <td className="p-3 text-right font-mono text-slate-400 whitespace-nowrap">—</td>
+                      <td className="p-3 text-right font-mono text-slate-500 whitespace-nowrap">R 0.00</td>
+                      <td className="p-3 pr-4 text-right whitespace-nowrap text-[10px] text-slate-400">Pending</td>
+                    </tr>
+                  )}
+
+                  {/* 4. Total Balance Due Highlight */}
                   <tr className="bg-emerald-50/80 border-t-2 border-emerald-600 font-black">
                     <td className="p-3.5 pl-4 text-xs">
                       <div className="text-emerald-950 uppercase tracking-wider font-extrabold">
-                        TOTAL AMOUNT PAYABLE
+                        4. TOTAL AMOUNT DUE / OUTSTANDING BALANCE
                       </div>
                       <div className="text-[11px] font-normal text-emerald-800 mt-0.5">
-                        Includes base rent + all itemized utilities
+                        Balance Brought Forward + Current Charges - Payments Received
                       </div>
                     </td>
                     <td className="p-3.5 text-right font-mono text-xs text-slate-700 whitespace-nowrap font-bold">
-                      {prevTotalDue !== undefined
-                        ? formatZAR(prevTotalDue, { includeDecimals: true })
+                      {prevGrandTotalDue !== undefined
+                        ? formatZAR(prevGrandTotalDue, { includeDecimals: true })
                         : <span className="text-slate-500 font-normal">— (Baseline Period)</span>}
                     </td>
                     <td className="p-3.5 text-right font-mono text-base text-emerald-950 font-black whitespace-nowrap">
                       <span data-testid="total-due-amount">
-                        {formatZAR(totalDue, { includeDecimals: true })}
+                        {formatZAR(grandTotalDue, { includeDecimals: true })}
                       </span>
                     </td>
                     <td className="p-3.5 pr-4 text-right whitespace-nowrap">
-                      {renderVariance(totalDue, prevTotalDue)}
+                      {renderVariance(grandTotalDue, prevGrandTotalDue)}
                     </td>
                   </tr>
                 </tbody>

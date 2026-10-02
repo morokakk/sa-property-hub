@@ -681,6 +681,8 @@ export type Database = {
           title: string
           total_equity_extracted_zar: number | null
           unpaid_utility_arrears_zar: number | null
+          arrears_opening_balance_zar?: number | null
+          payment_records?: Json | null
           updated_at: string
           user_id: string
           utility_statements: Json
@@ -735,6 +737,8 @@ export type Database = {
           title: string
           total_equity_extracted_zar?: number | null
           unpaid_utility_arrears_zar?: number | null
+          arrears_opening_balance_zar?: number | null
+          payment_records?: Json | null
           updated_at?: string
           user_id?: string
           utility_statements?: Json
@@ -789,6 +793,8 @@ export type Database = {
           title?: string
           total_equity_extracted_zar?: number | null
           unpaid_utility_arrears_zar?: number | null
+          arrears_opening_balance_zar?: number | null
+          payment_records?: Json | null
           updated_at?: string
           user_id?: string
           utility_statements?: Json

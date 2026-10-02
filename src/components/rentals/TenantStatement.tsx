@@ -31,6 +31,8 @@ import { parseUtilityPdf } from '@/lib/utilities/pdfParser';
 import { supabase } from '@/lib/supabaseClient';
 import { migrateToCloud } from '@/lib/db/migrateToCloud';
 import { DEMO_RENTAL_IDS, isDemoRentalProperty } from '@/lib/db/mergePortfolioState';
+import { formatTenantAccountStatementForWhatsApp } from '@/lib/whatsappFormatter';
+import { calculatePropertyArrears, calculateTenantStatementTiers, getMonthKey } from '@/lib/calculations/arrears';
 import CloudPublishModal from './CloudPublishModal';
 
 interface TenantStatementProps {
@@ -283,6 +285,20 @@ export default function TenantStatement({
       ? (utilityDelta / previousTenantUtilities) * 100
       : 0;
 
+  // Account Statement 4-Tier Ledger Calculations
+  const statementPeriodKey = currentStatement?.statementDate ? currentStatement.statementDate.slice(0, 7) : getMonthKey();
+  const tiers = calculateTenantStatementTiers(
+    rental,
+    statementPeriodKey,
+    !isConsolidated && selectedLease ? { leaseId: selectedLease.id } : undefined
+  );
+  const periodPayments = tiers.periodPayments;
+  const periodPaymentsTotal = tiers.periodPaymentsTotal;
+  const periodBroughtForward = tiers.balanceBroughtForward;
+  const periodNetOutstanding = Math.round(
+    (periodBroughtForward + currentGrandTotal - periodPaymentsTotal) * 100
+  ) / 100;
+
   // Handle PDF Upload & Parsing
   const handleProcessFile = async (file: File) => {
     if (!file) return;
@@ -410,70 +426,12 @@ export default function TenantStatement({
     }
 
     // 3. INDIVIDUAL RESIDENTIAL TENANT STATEMENT
-    const tenantName = selectedLease?.tenantName || 'Tenant';
-    const unitName = selectedLease?.unitName || 'Main Unit';
-
-    let text = `🧾 *TENANT UTILITY RECOVERY & RENT STATEMENT*\n`;
-    text += `━━━━━━━━━━━━━━━━━━━━━\n`;
-    text += `🏢 *Landlord Entity:* ${investorProfile?.entityName || 'Property Landlord'}\n`;
-    text += `🏠 *Property:* ${rental.title} — *${unitName}*\n`;
-    text += `📍 *Unit Address:* ${rental.address}, ${rental.city}\n`;
-    text += `👤 *Tenant:* ${tenantName}\n`;
-    text += `📅 *Billing Period:* ${periodStr}\n\n`;
-
-    text += `*FIXED CONTRACTUAL CHARGES:*\n`;
-    text += `• Base Contract Rent (${unitName}): ${formatZAR(baseRent, { includeDecimals: true })}\n\n`;
-
-    if (isSubmeteredUnit) {
-      text += `*PREPAID UTILITY SUB-METER:*\n`;
-      text += `• Electricity & Water: Self-vended via ${rental.prepaidVendorName || 'Prepaid Sub-Meter'} tokens.\n`;
-      text += `• Municipal Utility Recovery on Statement: R 0.00\n`;
-    } else if (isBundled) {
-      text += `*BODY CORPORATE UTILITY RECOVERY:*\n`;
-      if (currentStatement && currentStatement.bundledUtilitiesZAR !== undefined) {
-        text += `• ${currentStatement.bundledUtilityLabel || 'Water, Sewerage, Refuse & Common'}: ${formatZAR(currentTenantUtilities, { includeDecimals: true })}\n`;
-        text += `  └ Source: ${currentStatement.provider || 'iGrow Rentals / WeconnectU'} (${occupiedCount > 1 ? `Unit Share 1 of ${occupiedCount}` : 'Consolidated'})\n`;
-        text += `• Total Variable Recoveries: ${formatZAR(currentTenantUtilities, { includeDecimals: true })}\n`;
-      } else {
-        text += `• No utility recovery currently captured.\n`;
-      }
-    } else {
-      text += `*ITEMIZED MUNICIPAL UTILITY RECOVERIES${occupiedCount > 1 ? ` (1/${occupiedCount} Unit Share)` : ''}:*\n`;
-      if (currentStatement) {
-        if (unitElecZAR > 0) {
-          text += `• Municipal Electricity: ${formatZAR(unitElecZAR, { includeDecimals: true })}\n`;
-          if (isElecResolved && activeElecDispute) {
-            text += `  └ ✓ Council Dispute Resolved: Net settled credit applied.\n`;
-          } else if (activeElecDispute) {
-            text += `  ⚠️ Council Dispute Lodged (Ref #${activeElecDispute.disputeReferenceNumber || 'Pending'})\n`;
-          }
-        }
-        if (unitWaterZAR > 0) {
-          text += `• Municipal Water: ${formatZAR(unitWaterZAR, { includeDecimals: true })}\n`;
-          if (isWaterResolved && activeWaterDispute) {
-            text += `  └ ✓ Council Dispute Resolved: Net settled credit applied.\n`;
-          } else if (activeWaterDispute) {
-            text += `  ⚠️ Council Dispute Lodged (Ref #${activeWaterDispute.disputeReferenceNumber || 'Pending'})\n`;
-          }
-        }
-        if (unitRefuseZAR > 0) {
-          text += `• Pikitup Refuse Removal: ${formatZAR(unitRefuseZAR, { includeDecimals: true })}\n`;
-        }
-        if (unitSewerageZAR > 0) {
-          text += `• Municipal Sewerage & Sanitation: ${formatZAR(unitSewerageZAR, { includeDecimals: true })}\n`;
-        }
-        text += `• Total Variable Recoveries: ${formatZAR(currentTenantUtilities, { includeDecimals: true })}\n`;
-      } else {
-        text += `• No municipal bill currently captured.\n`;
-      }
-    }
-
-    text += `\n━━━━━━━━━━━━━━━━━━━━━\n`;
-    text += `💰 *TOTAL AMOUNT DUE BY TENANT: ${formatZAR(currentGrandTotal, { includeDecimals: true })}*\n`;
-    text += `━━━━━━━━━━━━━━━━━━━━━\n`;
-    text += `📌 *Payment Terms:* Due strictly on or before 1st of month.\n`;
-    text += `🏦 *Payment Reference:* ${tenantName.replace(/\s+/g, '-').toUpperCase()} - ${unitName.replace(/\s+/g, '').toUpperCase()}\n\n`;
-    text += `_Municipal recoveries reflect verified billing line items from council tax invoices. Landlord property rates are excluded from tenant liability._`;
+    const monthKey = currentStatement?.statementDate ? currentStatement.statementDate.slice(0, 7) : undefined;
+    const text = formatTenantAccountStatementForWhatsApp(rental, {
+      leaseId: selectedLease?.id,
+      month: monthKey,
+      investorProfile,
+    });
 
     try {
       if (navigator?.clipboard?.writeText) {
@@ -1368,7 +1326,34 @@ export default function TenantStatement({
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 text-slate-700">
-                    {/* 1. Base Rent Row */}
+                    {/* 1. Balance Brought Forward (Prior Arrears / Credit) */}
+                    <tr className="bg-slate-50/70 border-b border-slate-200">
+                      <td className="p-3 pl-4">
+                        <div className="font-bold text-slate-900">1. Balance Brought Forward</div>
+                        <div className="text-[11px] text-slate-400">
+                          Prior unpaid arrears or credit balance carried forward
+                        </div>
+                      </td>
+                      <td className="p-3 text-right font-mono text-slate-400 whitespace-nowrap">—</td>
+                      <td className={`p-3 text-right font-mono font-bold whitespace-nowrap ${periodBroughtForward > 0 ? 'text-rose-700' : 'text-slate-800'}`}>
+                        {formatZAR(periodBroughtForward, { includeDecimals: true })}
+                      </td>
+                      <td className="p-3 pr-4 text-right text-[10px] whitespace-nowrap font-medium">
+                        {periodBroughtForward > 0 ? (
+                          <span className="text-rose-700 font-bold bg-rose-50 px-1.5 py-0.5 rounded border border-rose-200">
+                            Prior Arrears
+                          </span>
+                        ) : periodBroughtForward < 0 ? (
+                          <span className="text-emerald-700 font-bold bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                            Prior Credit
+                          </span>
+                        ) : (
+                          <span className="text-emerald-700">✓ Paid Up</span>
+                        )}
+                      </td>
+                    </tr>
+
+                    {/* 2. Base Rent Row */}
                     <tr className="bg-white font-medium">
                       <td className="p-3 pl-4">
                         <div className="font-bold text-slate-900">Base Contract Rent</div>
@@ -1684,23 +1669,79 @@ export default function TenantStatement({
                       </td>
                     </tr>
 
-                    {/* Grand Total Row */}
+                    {/* 2. Subtotal Current Period Charges */}
+                    <tr className="bg-slate-50/90 font-bold border-t border-slate-200 text-slate-900">
+                      <td className="p-2.5 pl-4 text-xs">
+                        2. Subtotal Current Period Charges
+                        <div className="text-[10px] font-normal text-slate-500">Base Rent + itemized utility recoveries</div>
+                      </td>
+                      <td className="p-2.5 text-right font-mono text-xs text-slate-700 whitespace-nowrap">
+                        {previousGrandTotal !== undefined ? formatZAR(previousGrandTotal, { includeDecimals: true }) : '—'}
+                      </td>
+                      <td className="p-2.5 text-right font-mono text-xs font-bold text-slate-900 whitespace-nowrap">
+                        {formatZAR(currentGrandTotal, { includeDecimals: true })}
+                      </td>
+                      <td className="p-2.5 pr-4 text-right whitespace-nowrap text-xs">
+                        {currentStatement
+                          ? renderVariance(currentGrandTotal, previousGrandTotal)
+                          : '—'}
+                      </td>
+                    </tr>
+
+                    {/* 3. Less: Payments Received */}
+                    {periodPayments.length > 0 ? (
+                      periodPayments.map((p) => (
+                        <tr key={p.id} className="hover:bg-slate-50/50 transition-colors bg-emerald-50/30">
+                          <td className="p-3 pl-4">
+                            <div className="font-semibold text-emerald-800 flex items-center gap-1.5">
+                              <Receipt className="w-3.5 h-3.5 text-emerald-600" />
+                              <span>Payment Received: {formatDate(p.paymentDate)}</span>
+                            </div>
+                            <div className="text-[10px] text-slate-500">
+                              Method: {p.paymentMethod} {p.reference ? `• Ref: ${p.reference}` : ''}
+                            </div>
+                          </td>
+                          <td className="p-3 text-right font-mono text-slate-400 whitespace-nowrap">—</td>
+                          <td className="p-3 text-right font-mono font-bold text-emerald-700 whitespace-nowrap">
+                            -{formatZAR(p.amountReceivedZAR, { includeDecimals: true })}
+                          </td>
+                          <td className="p-3 pr-4 text-right whitespace-nowrap text-[10px] text-emerald-700 font-semibold">
+                            Payment Applied
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr className="hover:bg-slate-50/50 transition-colors">
+                        <td className="p-3 pl-4">
+                          <div className="font-medium text-slate-700 flex items-center gap-1.5">
+                            <Receipt className="w-3.5 h-3.5 text-slate-400" />
+                            <span>3. Less: Payments Received</span>
+                          </div>
+                          <div className="text-[10px] text-slate-400">No payments recorded for this billing period yet</div>
+                        </td>
+                        <td className="p-3 text-right font-mono text-slate-400 whitespace-nowrap">—</td>
+                        <td className="p-3 text-right font-mono text-slate-500 whitespace-nowrap">R 0.00</td>
+                        <td className="p-3 pr-4 text-right whitespace-nowrap text-[10px] text-slate-400">Pending</td>
+                      </tr>
+                    )}
+
+                    {/* 4. Grand Total Row */}
                     <tr className="bg-emerald-50/70 font-black text-slate-900 border-t-2 border-emerald-600">
                       <td className="p-3.5 pl-4 text-sm">
-                        TOTAL AMOUNT DUE BY TENANT
+                        TOTAL AMOUNT DUE / OUTSTANDING BALANCE
                         <div className="text-[11px] font-normal text-slate-500">
-                          Base Rent + Itemized Utility Recoveries
+                          Balance Brought Forward + Current Charges - Payments Received
                         </div>
                       </td>
                       <td className="p-3.5 text-right font-mono text-sm text-slate-700 whitespace-nowrap">
                         {previousGrandTotal !== undefined ? formatZAR(previousGrandTotal, { includeDecimals: true }) : '—'}
                       </td>
                       <td className="p-3.5 text-right font-mono text-base text-emerald-950 font-black whitespace-nowrap">
-                        {formatZAR(currentGrandTotal, { includeDecimals: true })}
+                        {formatZAR(periodNetOutstanding, { includeDecimals: true })}
                       </td>
                       <td className="p-3.5 pr-4 text-right whitespace-nowrap">
                         {currentStatement
-                          ? renderVariance(currentGrandTotal, previousGrandTotal)
+                          ? renderVariance(periodNetOutstanding, previousGrandTotal)
                           : '—'}
                       </td>
                     </tr>

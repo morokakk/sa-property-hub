@@ -295,6 +295,8 @@ export function mapRentals(rentals: RentalProperty[] = [], userId: string): Prop
     monthly_maintenance_reserve_zar: toNumeric(r.monthlyMaintenanceReserveZAR, 0),
     annual_building_insurance_zar: toNullableNumeric(r.annualBuildingInsuranceZAR),
     unpaid_utility_arrears_zar: toNullableNumeric(r.unpaidUtilityArrearsZAR),
+    arrears_opening_balance_zar: toNullableNumeric(r.arrearsOpeningBalanceZAR),
+    payment_records: (r.paymentRecords ? JSON.parse(JSON.stringify(r.paymentRecords)) : []) as any,
     maintenance_history: (r.maintenanceHistory ? JSON.parse(JSON.stringify(r.maintenanceHistory)) : []) as any,
     status: r.status || 'Occupied',
     coc_checklist: (r.cocChecklist ? JSON.parse(JSON.stringify(r.cocChecklist)) : {}) as any,
@@ -524,17 +526,25 @@ export function mapOpportunities(opportunities: OpportunityDeal[] = [], userId: 
 }
 
 export function mapTasks(tasks: TaskItem[] = [], userId: string): TaskInsert[] {
-  return tasks.map((t, index) => ({
-    id: t.id || `task-${index + 1}-${Date.now()}`,
-    user_id: userId,
-    title: t.title || 'Untitled Task',
-    description: t.description || null,
-    due_date: toDateOnly(t.dueDate) || new Date().toISOString().split('T')[0],
-    priority: t.priority || 'Medium',
-    status: t.status || 'Pending',
-    linked_entity: (t.linkedEntity ? JSON.parse(JSON.stringify(t.linkedEntity)) : { type: 'general', name: 'General' }) as any,
-    updated_at: new Date().toISOString(),
-  }));
+  return tasks.map((t, index) => {
+    const linkedEntityData = t.linkedEntity ? { ...t.linkedEntity } : { type: 'general', name: 'General' };
+    if (t.recurrence && t.recurrence !== 'None') {
+      (linkedEntityData as any).recurrence = t.recurrence;
+      if (t.recurrenceEndDate) (linkedEntityData as any).recurrenceEndDate = t.recurrenceEndDate;
+      if (t.recurrenceGroupId) (linkedEntityData as any).recurrenceGroupId = t.recurrenceGroupId;
+    }
+    return {
+      id: t.id || `task-${index + 1}-${Date.now()}`,
+      user_id: userId,
+      title: t.title || 'Untitled Task',
+      description: t.description || null,
+      due_date: toDateOnly(t.dueDate) || new Date().toISOString().split('T')[0],
+      priority: t.priority || 'Medium',
+      status: t.status || 'Pending',
+      linked_entity: linkedEntityData as any,
+      updated_at: new Date().toISOString(),
+    };
+  });
 }
 
 export function mapSuppliers(suppliers: LocalSupplier[] = [], userId: string): SupplierInsert[] {

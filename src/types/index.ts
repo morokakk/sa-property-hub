@@ -9,6 +9,7 @@ export type ReturnTermType = 'Fixed Interest' | 'Monthly Coupon' | 'Equity Profi
 
 export type TaskPriority = 'Urgent' | 'High' | 'Medium' | 'Low';
 export type TaskStatus = 'Pending' | 'In Progress' | 'Completed';
+export type TaskRecurrence = 'None' | 'Weekly' | 'Monthly' | 'Quarterly' | 'Annually';
 
 export interface LinkedEntity {
   type: 'rental' | 'flip' | 'opportunity' | 'funding' | 'general';
@@ -25,6 +26,9 @@ export interface TaskItem {
   status: TaskStatus;
   linkedEntity: LinkedEntity;
   createdAt: string;
+  recurrence?: TaskRecurrence;
+  recurrenceEndDate?: string; // Optional ISO date string YYYY-MM-DD
+  recurrenceGroupId?: string; // Unique ID linking instances in a recurring series
 }
 
 // SARS Tax & Acquisition Costs
@@ -351,6 +355,8 @@ export interface Lease {
   depositHeldZAR: number;
   annualEscalationPercent: number;
   status: 'Occupied' | 'Vacant' | 'Notice Given';
+  arrearsOpeningBalanceZAR?: number;
+  unpaidUtilityArrearsZAR?: number;
 }
 
 export interface AncillaryIncome {
@@ -363,6 +369,22 @@ export interface AncillaryIncome {
   contractEndDate: string;
   vatApplicable: boolean;
   notes?: string;
+}
+
+// Tenant Payment Ledger Record
+export type PaymentMethod = 'EFT' | 'Cash Deposit' | 'Debit Order' | 'Instant EFT / Card' | 'Other';
+
+export interface TenantPaymentRecord {
+  id: string;
+  propertyId: string;
+  leaseId?: string;
+  periodMonth: string; // e.g. '2026-04'
+  paymentDate: string; // 'YYYY-MM-DD'
+  amountReceivedZAR: number;
+  paymentMethod: PaymentMethod;
+  reference?: string;
+  notes?: string;
+  createdAt: string;
 }
 
 // Active Rental Property
@@ -397,8 +419,10 @@ export interface RentalProperty {
   monthlyAgentFeeZAR: number;
   monthlyMaintenanceReserveZAR: number;
   annualBuildingInsuranceZAR?: number; // Homeowner structural insurance for Freehold properties
-  // Tenant Utility Arrears & Operational Risk
-  unpaidUtilityArrearsZAR?: number;
+  // Tenant Payments & Calculated Arrears Ledger
+  paymentRecords?: TenantPaymentRecord[];
+  arrearsOpeningBalanceZAR?: number;
+  unpaidUtilityArrearsZAR?: number; // kept synchronized with calculated arrears for backward compatibility
   maintenanceHistory: MaintenanceLog[];
   status: 'Occupied' | 'Vacant' | 'Notice Given' | 'Sold';
   cocChecklist?: ComplianceCertificates;

@@ -29,7 +29,7 @@ export const DEMO_BOQ_IDS = new Set([
 export const DEMO_OPP_IDS = new Set(['opp-1', 'opp-2', 'opp-3']);
 export const DEMO_FUNDING_IDS = new Set(['fund-1', 'fund-2', 'fund-3']);
 export const DEMO_TASK_IDS = new Set([
-  'task-1', 'task-2', 'task-3', 'task-4', 'task-5',
+  'task-1', 'task-2', 'task-3', 'task-4', 'task-5', 'task-6', 'task-7',
   'task-agm-rental-1', 'task-agm-rental-2',
 ]);
 export const DEMO_SUPPLIER_IDS = new Set(['sup-1', 'sup-2', 'sup-3', 'sup-4', 'sup-5', 'sup-6']);
@@ -200,7 +200,8 @@ export function mergePortfolioState(
       cloudTasks.some(
         (ct) =>
           normalizeStr(ct.title) === normalizeStr(localT.title) &&
-          normalizeStr(ct.linkedEntity?.name) === normalizeStr(localT.linkedEntity?.name)
+          normalizeStr(ct.linkedEntity?.name) === normalizeStr(localT.linkedEntity?.name) &&
+          ct.dueDate === localT.dueDate
       );
 
     if (!conflicts) {
