@@ -16,6 +16,11 @@ import {
 } from '@/lib/store/initialData';
 
 export const DEMO_RENTAL_IDS = new Set(['rental-1', 'rental-2', 'rental-3', 'rental-4']);
+
+export function isDemoRentalProperty(propertyId?: string | null): boolean {
+  if (!propertyId || typeof propertyId !== 'string') return false;
+  return DEMO_RENTAL_IDS.has(propertyId) || propertyId.startsWith('demo-rental-');
+}
 export const DEMO_FLIP_IDS = new Set(['flip-1', 'flip-2', 'flip-3']);
 export const DEMO_BOQ_IDS = new Set([
   'boq-1', 'boq-2', 'boq-3', 'boq-4', 'boq-5', 'boq-6', 'boq-7', 'boq-8',

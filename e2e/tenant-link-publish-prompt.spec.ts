@@ -94,7 +94,7 @@ test.describe('Tenant Statement Link Publishing & Auth Prompt Workflow', () => {
     await page.goto('/rentals', { waitUntil: 'domcontentloaded' });
 
     // Locate the custom property card and open statement modal
-    const customCard = page.locator('div').filter({ hasText: 'Sandton Grand Luxury Suite' }).first();
+    const customCard = page.locator('[data-testid="rental-card-rental-custom-test-101"]');
     await expect(customCard).toBeVisible({ timeout: 15_000 });
 
     const statementBtn = customCard.locator('button:has-text("Utilities & Statement")').first();
@@ -121,8 +121,7 @@ test.describe('Tenant Statement Link Publishing & Auth Prompt Workflow', () => {
     await expect(publishModal).not.toBeVisible();
     await expect(page.getByText('WhatsApp Statement copied to clipboard!')).toBeVisible({ timeout: 5_000 });
 
-    // Open statement modal again and test primary action navigation
-    await statementBtn.click();
+    // Click Copy Secure Tenant Link again (statement modal remains open) to test primary action navigation
     await copyLinkBtn.click();
     await expect(publishModal).toBeVisible();
 
@@ -151,12 +150,27 @@ test.describe('Tenant Statement Link Publishing & Auth Prompt Workflow', () => {
   }) => {
     await context.grantPermissions(['clipboard-read', 'clipboard-write']);
 
-    // Route Supabase auth user check
+    // Route Supabase auth user check and token refresh
     await page.route(`${SUPABASE_BASE_URL}/auth/v1/user*`, async (route) => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify(mockUser),
+      });
+    });
+
+    await page.route(`${SUPABASE_BASE_URL}/auth/v1/token*`, async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          access_token: 'mock-jwt-token-authenticated',
+          token_type: 'bearer',
+          expires_in: 3600,
+          expires_at: Math.floor(Date.now() / 1000) + 3600,
+          refresh_token: 'mock-refresh-token',
+          user: mockUser,
+        }),
       });
     });
 
@@ -177,6 +191,7 @@ test.describe('Tenant Statement Link Publishing & Auth Prompt Workflow', () => {
           access_token: 'mock-jwt-token-authenticated',
           token_type: 'bearer',
           expires_in: 3600,
+          expires_at: Math.floor(Date.now() / 1000) + 3600,
           refresh_token: 'mock-refresh-token',
           user,
         })
@@ -191,7 +206,7 @@ test.describe('Tenant Statement Link Publishing & Auth Prompt Workflow', () => {
     await page.goto('/rentals', { waitUntil: 'domcontentloaded' });
 
     // Open statement modal on custom property
-    const customCard = page.locator('div').filter({ hasText: 'Sandton Grand Luxury Suite' }).first();
+    const customCard = page.locator('[data-testid="rental-card-rental-custom-test-101"]');
     await expect(customCard).toBeVisible({ timeout: 15_000 });
 
     const statementBtn = customCard.locator('button:has-text("Utilities & Statement")').first();

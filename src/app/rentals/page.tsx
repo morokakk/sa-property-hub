@@ -917,6 +917,7 @@ export default function RentalPortfolioPage() {
                   return (
                     <div
                       key={property.id}
+                      data-testid={`rental-card-${property.id}`}
                       className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-xs flex flex-col justify-between"
                     >
                       <div>

@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import Link from 'next/link';
 import { Cloud, ShieldCheck, Share2, LogIn, X, Info } from 'lucide-react';
 
@@ -15,6 +15,15 @@ export default function CloudPublishModal({
   onClose,
   onCopyWhatsApp,
 }: CloudPublishModalProps) {
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
   if (!isOpen) return null;
 
   return (
@@ -23,6 +32,7 @@ export default function CloudPublishModal({
       aria-modal="true"
       aria-labelledby="cloud-publish-modal-title"
       data-testid="cloud-publish-modal"
+      onClick={onClose}
       className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs animate-in fade-in duration-200"
     >
       <div

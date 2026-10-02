@@ -30,7 +30,7 @@ import { UtilityStatement } from '@/types';
 import { parseUtilityPdf } from '@/lib/utilities/pdfParser';
 import { supabase } from '@/lib/supabaseClient';
 import { migrateToCloud } from '@/lib/db/migrateToCloud';
-import { DEMO_RENTAL_IDS } from '@/lib/db/mergePortfolioState';
+import { DEMO_RENTAL_IDS, isDemoRentalProperty } from '@/lib/db/mergePortfolioState';
 import CloudPublishModal from './CloudPublishModal';
 
 interface TenantStatementProps {
@@ -492,7 +492,9 @@ export default function TenantStatement({
 
   // Copy Secure Shareable Tenant Statement Link
   const handleCopySecureLink = async () => {
-    if (!selectedLease?.id) {
+    if (isPublishingLink) return;
+
+    if (!selectedLease?.id || !isResidential) {
       setStatusMessage({
         text: 'No residential lease unit selected. Please select a unit lease to generate a public link.',
         isError: true,
@@ -505,7 +507,7 @@ export default function TenantStatement({
     const shareUrl = `${origin}/statement/${selectedLease.id}`;
 
     // 1. Detect if current property is a demo property (rental-1..rental-4, demo-rental-*)
-    const isDemo = DEMO_RENTAL_IDS.has(rental.id) || rental.id.startsWith('demo-rental-');
+    const isDemo = isDemoRentalProperty(rental.id);
 
     if (isDemo) {
       try {
@@ -520,24 +522,29 @@ export default function TenantStatement({
       return;
     }
 
-    // 2. USER-CREATED property: Check Supabase auth state
-    let user = null;
+    // 2. USER-CREATED property: Show immediate loading state and check Supabase auth state
+    setIsPublishingLink(true);
     try {
-      const { data } = await supabase.auth.getUser();
-      user = data?.user ?? null;
-    } catch {
-      user = null;
-    }
+      let user = null;
+      try {
+        const { data: sessionData } = await supabase.auth.getSession();
+        user = sessionData?.session?.user ?? null;
+        if (!user) {
+          const { data: userData } = await supabase.auth.getUser();
+          user = userData?.user ?? null;
+        }
+      } catch {
+        user = null;
+      }
 
-    if (!user) {
-      // Local Storage Only mode: Do NOT copy a link that will 404 for the tenant.
-      setShowCloudPublishModal(true);
-      return;
-    }
+      if (!user) {
+        setIsPublishingLink(false);
+        // Local Storage Only mode: Do NOT copy a link that will 404 for the tenant.
+        setShowCloudPublishModal(true);
+        return;
+      }
 
-    // 3. Authenticated user: Automatically publish/upload property to Supabase on the fly
-    try {
-      setIsPublishingLink(true);
+      // 3. Authenticated user: Automatically publish/upload property to Supabase on the fly
       const res = await migrateToCloud({ state: usePortfolioStore.getState() });
 
       if (!res.success) {
@@ -739,7 +746,7 @@ export default function TenantStatement({
 
             {/* Right Tools: Share & Export Actions */}
             <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap ml-auto">
-              {selectedLease?.id && (
+              {selectedLease?.id && isResidential && (
                 <button
                   type="button"
                   data-testid="copy-tenant-link-btn"
@@ -1806,17 +1813,17 @@ export default function TenantStatement({
             Payment is due on or before the 1st of each month. Generated via SA Property Portfolio Hub.
           </div>
         </div>
-
-        {/* Dedicated Cloud Publishing Modal for Unauthenticated Landlords */}
-        <CloudPublishModal
-          isOpen={showCloudPublishModal}
-          onClose={() => setShowCloudPublishModal(false)}
-          onCopyWhatsApp={async () => {
-            setShowCloudPublishModal(false);
-            await handleCopyWhatsApp();
-          }}
-        />
       </div>
+
+      {/* Dedicated Cloud Publishing Modal for Unauthenticated Landlords */}
+      <CloudPublishModal
+        isOpen={showCloudPublishModal}
+        onClose={() => setShowCloudPublishModal(false)}
+        onCopyWhatsApp={async () => {
+          setShowCloudPublishModal(false);
+          await handleCopyWhatsApp();
+        }}
+      />
     </>
   );
 }

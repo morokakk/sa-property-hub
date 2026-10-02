@@ -44,6 +44,7 @@ import { hydrateFromCloud } from '@/lib/db/hydrateFromCloud';
 function SettingsContent() {
   const searchParams = useSearchParams();
   const actionParam = searchParams.get('action');
+  const returnToParam = searchParams.get('returnTo');
   const isPublishLinkAction = actionParam === 'publish_link';
 
   const investorProfile = usePortfolioStore((state) => state.investorProfile);
@@ -424,7 +425,7 @@ function SettingsContent() {
 
             {currentUser && (
               <Link
-                href="/rentals"
+                href={returnToParam ? `/${returnToParam}` : '/rentals'}
                 data-testid="return-to-rentals-btn"
                 className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-semibold bg-amber-600 hover:bg-amber-700 text-white shrink-0 shadow-xs transition-colors text-center"
               >
