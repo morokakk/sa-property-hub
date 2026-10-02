@@ -9,6 +9,8 @@
 /e2e/screenshots/
 /test-results/
 /playwright-report/
+/.stryker-tmp/
+/reports/
 
 # next.js
 /.next/

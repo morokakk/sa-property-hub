@@ -5,7 +5,7 @@ export default defineConfig({
   test: {
     environment: 'node',
     globals: true,
-    exclude: ['**/node_modules/**', '**/e2e/**', '**/dist/**', '**/.next/**'],
+    exclude: ['**/node_modules/**', '**/e2e/**', '**/dist/**', '**/.next/**', '**/.stryker-tmp/**'],
   },
   resolve: {
     alias: {

@@ -595,17 +595,68 @@ describe('Audit Formula & Dashboard Consistency Plan Verification', () => {
     });
 
     it('guarantees archive card visual math equation: Realized Sale - Full Cost Basis = Realized Profit', () => {
-      const salePrice = 2_450_000;
-      const costBasis = 1_450_000 + 98_500 + 320_000; // 1,868,500
-      const totalHoldingCost = 8 * 3_900; // 31,200
-      const sec118Cost = 32_000 + 12_600; // 44,600
-      const exitCommRate = 5.75;
-      const exitCommission = Math.round(salePrice * (exitCommRate / 100)); // 140,875
-      const fullCostBasis = costBasis + totalHoldingCost + sec118Cost + exitCommission; // 2,085,175
-      const realizedNetProfit = salePrice - fullCostBasis; // 364,825
+      const completedFlip: FlipProject = {
+        id: 'flip-archive-visual-math',
+        title: 'Archived Completed Flip Project',
+        address: '22 Ocean View',
+        city: 'Camps Bay',
+        purchaseDate: '2025-01-01',
+        purchasePriceZAR: 1_450_000,
+        acquisitionCostsZAR: 98_500,
+        baselineRenovationBudgetZAR: 320_000,
+        monthlyHoldingCostZAR: 3_900,
+        estimatedDurationMonths: 8, // total holding = 31,200
+        municipalClearance: {
+          sec118ArrearsZAR: 32_000,
+          advanceCouncilDepositZAR: 12_600,
+          rccStatus: 'Certificate Issued',
+        },
+        targetExitPriceZAR: 2_450_000,
+        actualSalePriceZAR: 2_450_000,
+        targetCompletionDate: '2025-09-01',
+        linkedFundingIds: [],
+        status: 'Completed',
+        currentPhase: 'Sold / Awaiting Transfer',
+        taxEntityType: 'Company (27%)',
+        exitCommissionPercent: 5.75, // exit commission = 140,875
+        drawSchedule: {
+          depositPaid: true,
+          firstFixApproved: true,
+          finishesApproved: true,
+          retentionReleased: true,
+        },
+        boq: [],
+      };
 
-      expect(salePrice - fullCostBasis).toBe(realizedNetProfit);
-      expect(realizedNetProfit).toBe(364_825);
+      const summary = computePortfolioSummary({
+        rentals: [],
+        flips: [completedFlip],
+        funding: [],
+        opportunities: [],
+        liquidCapitalReserve: 0,
+      });
+
+      // Breakdown:
+      // costBasis = purchase (1,450,000) + acquisition (98,500) + reno (320,000) = 1,868,500
+      // holdingCost = 8 * 3,900 = 31,200
+      // sec118Cost = 32,000 + 12_600 = 44,600
+      // exitCommission = Math.round(2,450,000 * 0.0575) = 140,875
+      // fullCostBasis = 1,868,500 + 31,200 + 44,600 + 140,875 = 2,085,175
+      // Realized profit = 2,450,000 - 2,085,175 = 364,825
+      const expectedFullCostBasis = 2_085_175;
+      const expectedRealizedNetProfit = 364_825;
+
+      expect(summary.totalRealizedFlipProfits).toBe(expectedRealizedNetProfit);
+
+      // Verify dynamic calculation: extending holding duration by 2 months (2 * 3,900 = 7,800) reduces realized profit by exactly 7,800
+      const delayedSummary = computePortfolioSummary({
+        rentals: [],
+        flips: [{ ...completedFlip, id: 'flip-archive-delayed', estimatedDurationMonths: 10 }],
+        funding: [],
+        opportunities: [],
+        liquidCapitalReserve: 0,
+      });
+      expect(delayedSummary.totalRealizedFlipProfits).toBe(expectedRealizedNetProfit - 7_800);
     });
   });
 

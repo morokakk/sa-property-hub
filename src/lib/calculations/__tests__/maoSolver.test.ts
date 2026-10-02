@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import fc from 'fast-check';
 import { calculateFlipMao, calculateRentalMao } from '../maoSolver';
 
 describe('MAO Solver Engine', () => {
@@ -19,8 +20,7 @@ describe('MAO Solver Engine', () => {
       // Max bid (with 5% duty/legal) = 1,893,261 / 1.05 = ~1,803,106
       expect(result.totalAllowableOutlay).toBe(2_478_261);
       expect(result.nonPurchaseCosts).toBe(585_000);
-      expect(result.maxAllowableBid).toBeGreaterThan(1_700_000);
-      expect(result.maxAllowableBid).toBeLessThan(1_900_000);
+      expect(result.maxAllowableBid).toBe(1_803_106);
       expect(result.projectedProfitAtMao).toBe(371_739);
     });
 
@@ -44,6 +44,153 @@ describe('MAO Solver Engine', () => {
         holdingCost: 20_000,
       });
       expect(result.maxAllowableBid).toBe(0);
+      expect(result.totalAllowableOutlay).toBe(0);
+      expect(result.nonPurchaseCosts).toBe(0);
+      expect(result.projectedProfitAtMao).toBe(0);
+    });
+
+    it('handles negative or zero exit commission without corrupting non-purchase costs', () => {
+      const resZero = calculateFlipMao({
+        targetExitPrice: 2_000_000,
+        desiredRoiPercent: 15,
+        rehabCost: 200_000,
+        holdingCost: 50_000,
+        exitCommissionPercent: 0,
+      });
+      expect(resZero.nonPurchaseCosts).toBe(250_000);
+
+      const resNegative = calculateFlipMao({
+        targetExitPrice: 2_000_000,
+        desiredRoiPercent: 15,
+        rehabCost: 200_000,
+        holdingCost: 50_000,
+        exitCommissionPercent: -5,
+      });
+      expect(resNegative.nonPurchaseCosts).toBe(250_000);
+    });
+
+    it('satisfies property: monotonicity with respect to exit price', () => {
+      fc.assert(
+        fc.property(
+          fc.integer({ min: 100_000, max: 10_000_000 }),
+          fc.integer({ min: 1, max: 5_000_000 }),
+          fc.integer({ min: 5, max: 40 }),
+          fc.integer({ min: 10_000, max: 500_000 }),
+          fc.integer({ min: 5_000, max: 100_000 }),
+          (baseExitPrice, delta, roi, rehab, holding) => {
+            const low = calculateFlipMao({
+              targetExitPrice: baseExitPrice,
+              desiredRoiPercent: roi,
+              rehabCost: rehab,
+              holdingCost: holding,
+            });
+            const high = calculateFlipMao({
+              targetExitPrice: baseExitPrice + delta,
+              desiredRoiPercent: roi,
+              rehabCost: rehab,
+              holdingCost: holding,
+            });
+            return high.maxAllowableBid >= low.maxAllowableBid;
+          }
+        ),
+        { numRuns: 100 }
+      );
+    });
+
+    it('satisfies property: zero or negative exit price or negative capex returns 0 max bid', () => {
+      fc.assert(
+        fc.property(
+          fc.integer({ max: 0 }),
+          fc.integer({ min: -80, max: 100 }),
+          fc.integer({ min: 0, max: 1_000_000 }),
+          fc.integer({ min: 0, max: 500_000 }),
+          (targetExitPrice, desiredRoiPercent, rehabCost, holdingCost) => {
+            const res = calculateFlipMao({
+              targetExitPrice,
+              desiredRoiPercent,
+              rehabCost,
+              holdingCost,
+            });
+            return res.maxAllowableBid === 0 && res.totalAllowableOutlay === 0;
+          }
+        ),
+        { numRuns: 100 }
+      );
+
+      // Property: negative rehabCost strictly returns 0
+      fc.assert(
+        fc.property(
+          fc.integer({ min: 100_000, max: 10_000_000 }),
+          fc.integer({ min: 5, max: 50 }),
+          fc.integer({ max: -1 }),
+          fc.integer({ min: 0, max: 100_000 }),
+          (targetExitPrice, desiredRoiPercent, rehabCost, holdingCost) => {
+            const res = calculateFlipMao({
+              targetExitPrice,
+              desiredRoiPercent,
+              rehabCost,
+              holdingCost,
+            });
+            return res.maxAllowableBid === 0 && res.totalAllowableOutlay === 0;
+          }
+        ),
+        { numRuns: 100 }
+      );
+
+      // Property: negative holdingCost strictly returns 0
+      fc.assert(
+        fc.property(
+          fc.integer({ min: 100_000, max: 10_000_000 }),
+          fc.integer({ min: 5, max: 50 }),
+          fc.integer({ min: 0, max: 100_000 }),
+          fc.integer({ max: -1 }),
+          (targetExitPrice, desiredRoiPercent, rehabCost, holdingCost) => {
+            const res = calculateFlipMao({
+              targetExitPrice,
+              desiredRoiPercent,
+              rehabCost,
+              holdingCost,
+            });
+            return res.maxAllowableBid === 0 && res.totalAllowableOutlay === 0;
+          }
+        ),
+        { numRuns: 100 }
+      );
+    });
+
+    it('satisfies property: total outlay invariant and profit equation', () => {
+      fc.assert(
+        fc.property(
+          fc.integer({ min: 500_000, max: 15_000_000 }),
+          fc.integer({ min: 5, max: 50 }),
+          fc.integer({ min: 10_000, max: 300_000 }),
+          fc.integer({ min: 5_000, max: 50_000 }),
+          fc.double({ min: 0.01, max: 0.15, noNaN: true }),
+          (targetExitPrice, desiredRoiPercent, rehabCost, holdingCost, rate) => {
+            const res = calculateFlipMao({
+              targetExitPrice,
+              desiredRoiPercent,
+              rehabCost,
+              holdingCost,
+              estimatedAcquisitionCostRate: rate,
+            });
+
+            // Invariant: total allowable outlay plus projected profit must exactly equal exit price
+            const sumInvariant = res.totalAllowableOutlay + res.projectedProfitAtMao === targetExitPrice;
+            const profitMatch = res.projectedProfitAtMao === targetExitPrice - res.totalAllowableOutlay;
+
+            if (res.maxAllowableBid > 0) {
+              // Bid plus acquisition friction plus non-purchase capex must not exceed allowable outlay (+2 for rounding)
+              const impliedAcquisitionCost = res.maxAllowableBid * (1 + rate);
+              const impliedOutlay = impliedAcquisitionCost + res.nonPurchaseCosts;
+              return sumInvariant && profitMatch && impliedOutlay <= res.totalAllowableOutlay + 2;
+            }
+
+            return sumInvariant && profitMatch;
+          }
+        ),
+        { numRuns: 100 }
+      );
     });
   });
 
@@ -92,6 +239,31 @@ describe('MAO Solver Engine', () => {
       expect(flatResult.maxAllowablePrice).toBe(1_716_000);
     });
 
+    it('calculates max purchase price with non-zero annual building insurance', () => {
+      const result = calculateRentalMao({
+        monthlyRent: 20_000,
+        vacancyRatePercent: 5.0,
+        managementFeePercent: 10.0,
+        agencyVatApplicable: true,
+        monthlyLevies: 1_200,
+        monthlyRates: 800,
+        annualInsurance: 6_000,
+        targetNetYieldPercent: 9.0,
+      });
+
+      // Gross annual: 240,000
+      // Vacancy 5%: 12,000 -> Effective Gross Rent = 228,000
+      // Mgmt fee (10% + 15% VAT = 11.5%): 240,000 * 0.115 = 27,600
+      // Levies + Rates: 2,000 * 12 = 24,000
+      // Insurance: 6,000
+      // Total OpEx: 27,600 + 24,000 + 6,000 = 57,600
+      // Stress-Tested NOI: 228,000 - 57,600 = 170,400
+      // Max price @ 9% cap rate: Math.round(170,400 / 0.09) = 1,893,333
+      expect(result.annualOperatingExpenses).toBe(57_600);
+      expect(result.stressTestedNoi).toBe(170_400);
+      expect(result.maxAllowablePrice).toBe(1_893_333);
+    });
+
     it('returns 0 when target net yield is zero or negative', () => {
       const result = calculateRentalMao({
         monthlyRent: 16_500,
@@ -117,6 +289,129 @@ describe('MAO Solver Engine', () => {
       });
       expect(result.stressTestedNoi).toBeLessThan(0);
       expect(result.maxAllowablePrice).toBe(0);
+    });
+
+    it('satisfies property: monotonicity with respect to monthly rent', () => {
+      fc.assert(
+        fc.property(
+          fc.integer({ min: 5_000, max: 100_000 }),
+          fc.integer({ min: 1, max: 50_000 }),
+          fc.integer({ min: 0, max: 15 }),
+          fc.integer({ min: 0, max: 15 }),
+          fc.integer({ min: 5, max: 15 }),
+          (baseRent, delta, vacancy, mgmt, yieldPct) => {
+            const low = calculateRentalMao({
+              monthlyRent: baseRent,
+              vacancyRatePercent: vacancy,
+              managementFeePercent: mgmt,
+              monthlyLevies: 1_000,
+              monthlyRates: 800,
+              annualInsurance: 6_000,
+              targetNetYieldPercent: yieldPct,
+            });
+            const high = calculateRentalMao({
+              monthlyRent: baseRent + delta,
+              vacancyRatePercent: vacancy,
+              managementFeePercent: mgmt,
+              monthlyLevies: 1_000,
+              monthlyRates: 800,
+              annualInsurance: 6_000,
+              targetNetYieldPercent: yieldPct,
+            });
+            return high.maxAllowablePrice >= low.maxAllowablePrice;
+          }
+        ),
+        { numRuns: 100 }
+      );
+    });
+
+    it('satisfies property: zero or negative target yield returns 0 max price', () => {
+      fc.assert(
+        fc.property(
+          fc.integer({ min: 1_000, max: 100_000 }),
+          fc.integer({ max: 0 }),
+          (monthlyRent, targetNetYieldPercent) => {
+            const res = calculateRentalMao({
+              monthlyRent,
+              vacancyRatePercent: 5,
+              managementFeePercent: 8,
+              monthlyLevies: 500,
+              monthlyRates: 500,
+              annualInsurance: 3_000,
+              targetNetYieldPercent,
+            });
+            return res.maxAllowablePrice === 0;
+          }
+        ),
+        { numRuns: 100 }
+      );
+    });
+
+    it('satisfies property: NOI and operating expenses invariant', () => {
+      fc.assert(
+        fc.property(
+          fc.integer({ min: 1_000, max: 100_000 }),
+          fc.integer({ min: 0, max: 30 }),
+          fc.integer({ min: 0, max: 20 }),
+          fc.integer({ min: 0, max: 10_000 }),
+          fc.integer({ min: 0, max: 10_000 }),
+          fc.integer({ min: 0, max: 50_000 }),
+          fc.integer({ min: 1, max: 20 }),
+          fc.boolean(),
+          (rent, vacancy, mgmt, levies, rates, insurance, yieldPct, agencyVat) => {
+            const res = calculateRentalMao({
+              monthlyRent: rent,
+              vacancyRatePercent: vacancy,
+              managementFeePercent: mgmt,
+              agencyVatApplicable: agencyVat,
+              monthlyLevies: levies,
+              monthlyRates: rates,
+              annualInsurance: insurance,
+              targetNetYieldPercent: yieldPct,
+            });
+            const expectedNoi = res.effectiveGrossRentAnnual - res.annualOperatingExpenses;
+            return res.stressTestedNoi === expectedNoi && res.maxAllowablePrice >= 0;
+          }
+        ),
+        { numRuns: 100 }
+      );
+    });
+
+    it('satisfies property: agency VAT always reduces or maintains max allowable price', () => {
+      fc.assert(
+        fc.property(
+          fc.integer({ min: 5_000, max: 100_000 }),
+          fc.integer({ min: 1, max: 20 }),
+          fc.integer({ min: 4, max: 15 }),
+          (monthlyRent, managementFeePercent, targetNetYieldPercent) => {
+            const withVat = calculateRentalMao({
+              monthlyRent,
+              vacancyRatePercent: 5,
+              managementFeePercent,
+              agencyVatApplicable: true,
+              monthlyLevies: 1_000,
+              monthlyRates: 1_000,
+              annualInsurance: 5_000,
+              targetNetYieldPercent,
+            });
+            const withoutVat = calculateRentalMao({
+              monthlyRent,
+              vacancyRatePercent: 5,
+              managementFeePercent,
+              agencyVatApplicable: false,
+              monthlyLevies: 1_000,
+              monthlyRates: 1_000,
+              annualInsurance: 5_000,
+              targetNetYieldPercent,
+            });
+            return (
+              withVat.managementFeeAnnual >= withoutVat.managementFeeAnnual &&
+              withVat.maxAllowablePrice <= withoutVat.maxAllowablePrice
+            );
+          }
+        ),
+        { numRuns: 100 }
+      );
     });
   });
 });

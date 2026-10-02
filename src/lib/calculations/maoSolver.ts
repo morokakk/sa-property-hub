@@ -59,7 +59,12 @@ export function calculateFlipMao(params: FlipMaoParams): FlipMaoResult {
     municipalClearanceZAR = 0,
   } = params;
 
-  if (targetExitPrice <= 0 || desiredRoiPercent < -90) {
+  if (
+    targetExitPrice <= 0 ||
+    desiredRoiPercent < -90 ||
+    rehabCost < 0 ||
+    holdingCost < 0
+  ) {
     return {
       maxAllowableBid: 0,
       totalAllowableOutlay: 0,
@@ -68,8 +73,8 @@ export function calculateFlipMao(params: FlipMaoParams): FlipMaoResult {
     };
   }
 
-  // Total allowable capital outlay to hit desired ROI
-  const totalAllowableOutlay = targetExitPrice / (1 + desiredRoiPercent / 100);
+  // Total allowable capital outlay to hit desired ROI (rounded to integer ZAR)
+  const totalAllowableOutlay = Math.round(targetExitPrice / (1 + desiredRoiPercent / 100));
   const exitCommission = typeof exitCommissionPercent === 'number' && exitCommissionPercent > 0
     ? Math.round(targetExitPrice * (exitCommissionPercent / 100))
     : 0;
@@ -78,16 +83,17 @@ export function calculateFlipMao(params: FlipMaoParams): FlipMaoResult {
   const allowableForAcquisition = totalAllowableOutlay - nonPurchaseCosts;
 
   // Account for acquisition friction (transfer duty + legal fees ~5% on average)
+  const acqRate = Math.max(0, estimatedAcquisitionCostRate);
   const maxBid = allowableForAcquisition > 0
-    ? Math.round(allowableForAcquisition / (1 + estimatedAcquisitionCostRate))
+    ? Math.round(allowableForAcquisition / (1 + acqRate))
     : 0;
 
   const clampedMaxBid = Math.max(0, maxBid);
-  const projectedProfitAtMao = Math.round(targetExitPrice - totalAllowableOutlay);
+  const projectedProfitAtMao = targetExitPrice - totalAllowableOutlay;
 
   return {
     maxAllowableBid: clampedMaxBid,
-    totalAllowableOutlay: Math.round(totalAllowableOutlay),
+    totalAllowableOutlay,
     nonPurchaseCosts: Math.round(nonPurchaseCosts),
     projectedProfitAtMao,
   };

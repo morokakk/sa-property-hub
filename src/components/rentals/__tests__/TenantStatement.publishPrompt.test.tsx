@@ -3,6 +3,7 @@ import React from 'react';
 import { renderToString } from 'react-dom/server';
 import { DEMO_RENTAL_IDS, isDemoRentalProperty } from '@/lib/db/mergePortfolioState';
 import CloudPublishModal from '../CloudPublishModal';
+import PublishLinkGuidanceBanner from '../PublishLinkGuidanceBanner';
 
 describe('Tenant Statement Link Publishing & Auth Prompt Workflow', () => {
   describe('1. Real Demo Property vs User-Created Property Detection (isDemoRentalProperty)', () => {
@@ -225,24 +226,92 @@ describe('Tenant Statement Link Publishing & Auth Prompt Workflow', () => {
 
   describe('4. Settings Guidance Banner Logic & Return Navigation', () => {
     it('verifies correct guidance message text and return button attributes when action=publish_link', () => {
-      const action = 'publish_link';
-      const returnTo = 'rentals';
-      const isPublishLinkAction = action === 'publish_link';
+      const htmlAuthed = renderToString(
+        <PublishLinkGuidanceBanner
+          action="publish_link"
+          returnTo="rentals"
+          currentUser={{ id: 'user-1' }}
+        />
+      );
 
-      expect(isPublishLinkAction).toBe(true);
+      expect(htmlAuthed).toContain('data-testid="publish-link-guidance-banner"');
+      expect(htmlAuthed).toContain(
+        'Sign in or create your account below to publish your rental property statement link online.'
+      );
+      expect(htmlAuthed).toContain('data-testid="return-to-rentals-btn"');
+      expect(htmlAuthed).toContain('href="/rentals"');
 
-      const guidanceText =
-        'Sign in or create your account below to publish your rental property statement link online.';
-      expect(guidanceText).toContain('publish your rental property statement link online');
+      const htmlUnauthed = renderToString(
+        <PublishLinkGuidanceBanner
+          action="publish_link"
+          returnTo="rentals"
+          currentUser={null}
+        />
+      );
 
-      const returnHref = returnTo ? `/${returnTo}` : '/rentals';
-      expect(returnHref).toBe('/rentals');
+      expect(htmlUnauthed).toContain('data-testid="publish-link-guidance-banner"');
+      expect(htmlUnauthed).not.toContain('data-testid="return-to-rentals-btn"');
+    });
+
+    it('sanitizes and normalizes returnTo paths cleanly', () => {
+      // Leading slash preserved without double-slashes
+      const htmlWithSlash = renderToString(
+        <PublishLinkGuidanceBanner
+          action="publish_link"
+          returnTo="/properties"
+          currentUser={{ id: 'user-1' }}
+        />
+      );
+      expect(htmlWithSlash).toContain('href="/properties"');
+
+      // Missing returnTo defaults to /rentals
+      const htmlNoReturnTo = renderToString(
+        <PublishLinkGuidanceBanner
+          action="publish_link"
+          returnTo={null}
+          currentUser={{ id: 'user-1' }}
+        />
+      );
+      expect(htmlNoReturnTo).toContain('href="/rentals"');
+
+      // Security: Disallow protocol-relative or external domain redirect injection
+      const htmlProtocolRelative = renderToString(
+        <PublishLinkGuidanceBanner
+          action="publish_link"
+          returnTo="//malicious-phishing.com"
+          currentUser={{ id: 'user-1' }}
+        />
+      );
+      expect(htmlProtocolRelative).toContain('href="/rentals"');
+
+      const htmlExternal = renderToString(
+        <PublishLinkGuidanceBanner
+          action="publish_link"
+          returnTo="https://evil.com"
+          currentUser={{ id: 'user-1' }}
+        />
+      );
+      expect(htmlExternal).toContain('href="/rentals"');
     });
 
     it('ignores guidance banner when action is not publish_link', () => {
-      const action = 'profile_edit';
-      const isPublishLinkAction = action === 'publish_link';
-      expect(isPublishLinkAction).toBe(false);
+      const htmlDifferentAction = renderToString(
+        <PublishLinkGuidanceBanner
+          action="profile_edit"
+          returnTo="rentals"
+          currentUser={{ id: 'user-1' }}
+        />
+      );
+      expect(htmlDifferentAction).toBe('');
+
+      const htmlNullAction = renderToString(
+        <PublishLinkGuidanceBanner
+          action={null}
+          returnTo="rentals"
+          currentUser={{ id: 'user-1' }}
+        />
+      );
+      expect(htmlNullAction).toBe('');
     });
   });
 });
