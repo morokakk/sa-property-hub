@@ -50,6 +50,7 @@ export default function FundingTrackerPage() {
   const syncFundingWithDealDelay = usePortfolioStore((state) => state.syncFundingWithDealDelay);
   const summary = usePortfolioSummary();
   const flips = usePortfolioStore((state) => state.flips);
+  const rentals = usePortfolioStore((state) => state.rentals);
 
   // New Capital Source Form State
   const [showAddModal, setShowAddModal] = useState(false);
@@ -107,7 +108,7 @@ export default function FundingTrackerPage() {
       return;
     }
 
-    const linkedFlip = flips.find((f) => f.id === linkedDealId);
+    const linkedDeal = flips.find((f) => f.id === linkedDealId) || rentals.find((r) => r.id === linkedDealId);
 
     let finalTranches: FundingTranche[] | undefined = undefined;
     let finalPrincipal = capitalAmountZAR;
@@ -141,7 +142,7 @@ export default function FundingTrackerPage() {
       returnRatePercent,
       paymentSchedule,
       linkedDealId: linkedDealId || undefined,
-      linkedDealName: linkedFlip ? linkedFlip.title : 'General Portfolio Liquidity',
+      linkedDealName: linkedDeal ? linkedDeal.title : 'General Portfolio Liquidity',
       totalRepaidZAR: 0,
       status: facilityStatus,
       notes,
@@ -442,12 +443,13 @@ export default function FundingTrackerPage() {
                         ? Math.round(((activeDrawnBalance * (item.returnRatePercent / 100)) / 365) * item.delayExtensionDays)
                         : 0;
 
-                    const linkedFlip = flips.find((f) => f.id === item.linkedDealId);
+                    const linkedDeal = flips.find((f) => f.id === item.linkedDealId) || rentals.find((r) => r.id === item.linkedDealId);
                     const isLinkedFlipDelayed =
-                      linkedFlip &&
-                      (linkedFlip.status === 'Delayed' ||
-                        linkedFlip.municipalClearance?.rccStatus === 'Disputed' ||
-                        Boolean(linkedFlip.municipalClearance?.disputeNotes));
+                      linkedDeal &&
+                      ('municipalClearance' in linkedDeal ? 
+                        (linkedDeal.status === 'Delayed' ||
+                          linkedDeal.municipalClearance?.rccStatus === 'Disputed' ||
+                          Boolean(linkedDeal.municipalClearance?.disputeNotes)) : false);
                     const isExpanded = expandedTranchesId === item.id;
 
                   return (
@@ -613,8 +615,8 @@ export default function FundingTrackerPage() {
                               setSyncModalSource(item);
                               setSelectedDelayDays(30);
                               setDelayReason(
-                                linkedFlip?.municipalClearance?.rccStatus === 'Disputed'
-                                  ? `Section 118 municipal rates dispute: ${linkedFlip.title}`
+                                linkedDeal && 'municipalClearance' in linkedDeal && linkedDeal.municipalClearance?.rccStatus === 'Disputed'
+                                  ? `Section 118 municipal rates dispute: ${linkedDeal.title}`
                                   : 'Contractor snagging & conveyancing queue'
                               );
                             }}
@@ -856,11 +858,20 @@ export default function FundingTrackerPage() {
                     className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white"
                   >
                     <option value="">-- General Operational Reserve --</option>
-                    {flips.map((flip) => (
-                      <option key={flip.id} value={flip.id}>
-                        {flip.title} ({flip.city})
-                      </option>
-                    ))}
+                    <optgroup label="Active Flips">
+                      {flips.map((flip) => (
+                        <option key={flip.id} value={flip.id}>
+                          [FLIP] {flip.title} ({flip.city})
+                        </option>
+                      ))}
+                    </optgroup>
+                    <optgroup label="Portfolio Rentals">
+                      {rentals.map((rental) => (
+                        <option key={rental.id} value={rental.id}>
+                          [RENTAL] {rental.title} ({rental.city})
+                        </option>
+                      ))}
+                    </optgroup>
                   </select>
                 </div>
               </div>
@@ -1127,7 +1138,7 @@ export default function FundingTrackerPage() {
                   <input
                     type="text"
                     disabled
-                    value={syncModalSource.linkedDealName || 'Active Flip Deal'}
+                    value={syncModalSource.linkedDealName || 'Active Deal'}
                     className="w-full px-3 py-2 border border-slate-200 rounded-lg bg-slate-50 text-slate-500 text-xs"
                   />
                 </div>
