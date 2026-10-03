@@ -547,7 +547,7 @@ export default function FundingTrackerPage() {
                         {isLinkedFlipDelayed && (
                           <div className="mt-1">
                             <span className="inline-flex items-center gap-1 text-[9px] font-bold bg-rose-50 text-rose-700 border border-rose-200 px-1.5 py-0.5 rounded">
-                              <AlertTriangle className="w-2.5 h-2.5" /> Flip Blocked / Disputed
+                              <AlertTriangle className="w-2.5 h-2.5" /> Deal Blocked / Disputed
                             </span>
                           </div>
                         )}
@@ -816,7 +816,7 @@ export default function FundingTrackerPage() {
                     className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white"
                   >
                     <option value="Fixed Interest">Fixed Interest (% per annum)</option>
-                    <option value="Equity Profit Split">Equity Profit Split (% of Net Flip)</option>
+                    <option value="Equity Profit Split">Equity Profit Split (% of Net Profit)</option>
                     <option value="Monthly Coupon">Monthly Coupon</option>
                     <option value="Bullet Repayment">Bullet Repayment</option>
                   </select>
@@ -851,7 +851,7 @@ export default function FundingTrackerPage() {
                   </select>
                 </div>
                 <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Link to Active Flip</label>
+                  <label className="block font-semibold text-slate-700 mb-1">Link to Active Deal / Project</label>
                   <select
                     value={linkedDealId}
                     onChange={(e) => setLinkedDealId(e.target.value)}
