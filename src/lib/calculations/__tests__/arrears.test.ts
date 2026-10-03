@@ -7,7 +7,12 @@ import {
   calculateTenantStatementTiers,
   isLeaseActiveInMonth,
   getMonthKey,
+  getNextMonthKey,
+  getPreviousMonthKey,
   formatMonthLabel,
+  allocateOldestFirst,
+  migrateNegativeArrearsToRental,
+  formatAllocationsSummary,
 } from '../arrears';
 import {
   formatTenantAccountStatementForWhatsApp,
@@ -501,4 +506,175 @@ describe('calculateTenantStatementTiers (4-Tier Ledger Breakdown)', () => {
     );
   });
 });
+
+describe('allocateOldestFirst (Polymorphic Multi-Month Lump-Sum Allocation)', () => {
+  const unpaid = [
+    { month: '2026-01', unpaidAmountZAR: 5000 },
+    { month: '2026-02', unpaidAmountZAR: 5000 },
+    { month: '2026-03', unpaidAmountZAR: 5000 },
+  ];
+
+  it('allocates strictly oldest-month-first given (amount, unpaidMonths)', () => {
+    const allocs = allocateOldestFirst(8000, unpaid);
+    expect(allocs).toHaveLength(2);
+    expect(allocs[0]).toEqual({ periodMonth: '2026-01', amountZAR: 5000 });
+    expect(allocs[1]).toEqual({ periodMonth: '2026-02', amountZAR: 3000 });
+  });
+
+  it('allocates strictly oldest-month-first given (unpaidMonths, amount) inverted order', () => {
+    const allocs = allocateOldestFirst(unpaid, 8000);
+    expect(allocs).toHaveLength(2);
+    expect(allocs[0]).toEqual({ periodMonth: '2026-01', amountZAR: 5000 });
+    expect(allocs[1]).toEqual({ periodMonth: '2026-02', amountZAR: 3000 });
+  });
+
+  it('places surplus/excess amount into the next billing month as advance credit', () => {
+    const allocs = allocateOldestFirst(18000, unpaid);
+    expect(allocs).toHaveLength(4);
+    expect(allocs[0]).toEqual({ periodMonth: '2026-01', amountZAR: 5000 });
+    expect(allocs[1]).toEqual({ periodMonth: '2026-02', amountZAR: 5000 });
+    expect(allocs[2]).toEqual({ periodMonth: '2026-03', amountZAR: 5000 });
+    expect(allocs[3]).toEqual({ periodMonth: '2026-04', amountZAR: 3000 });
+  });
+
+  it('handles empty or zero inputs safely without throwing', () => {
+    expect(allocateOldestFirst(0, [])).toEqual([]);
+    expect(allocateOldestFirst([], 0)).toEqual([]);
+    expect(allocateOldestFirst(1000, [])).toEqual([
+      { periodMonth: expect.any(String), amountZAR: 1000 },
+    ]);
+  });
+});
+
+describe('migrateNegativeArrearsToRental (Audited Bad Debt Conversion)', () => {
+  it('converts negative arrearsOpeningBalanceZAR to an audited ArrearsWriteOff and resets opening balance to 0', () => {
+    const legacyRental = createMockRental({
+      arrearsOpeningBalanceZAR: -37000,
+      arrearsWriteOffs: [],
+    });
+
+    const migrated = migrateNegativeArrearsToRental(legacyRental);
+
+    expect(migrated.arrearsOpeningBalanceZAR).toBe(0);
+    expect(migrated.arrearsWriteOffs).toBeDefined();
+    expect(migrated.arrearsWriteOffs).toHaveLength(1);
+
+    const writeOff = migrated.arrearsWriteOffs![0];
+    expect(writeOff.amountZAR).toBe(37000);
+    expect(writeOff.reason).toBe('Other');
+    expect(writeOff.notes).toContain('Converted from Clear Arrears');
+    expect(writeOff.allocations.length).toBeGreaterThan(0);
+  });
+
+  it('leaves positive arrearsOpeningBalanceZAR untouched and idempotent', () => {
+    const normalRental = createMockRental({
+      arrearsOpeningBalanceZAR: 5000,
+      arrearsWriteOffs: [],
+    });
+
+    const migrated = migrateNegativeArrearsToRental(normalRental);
+    expect(migrated.arrearsOpeningBalanceZAR).toBe(5000);
+    expect(migrated.arrearsWriteOffs).toEqual([]);
+  });
+});
+
+describe('Arrears Write-Offs in Ledger & Statement Tiers', () => {
+  it('deducts write-offs from outstanding tenant balance in monthly ledger and statement tiers', () => {
+    const rentalWithWriteOff = createMockRental({
+      arrearsOpeningBalanceZAR: 0,
+      arrearsWriteOffs: [
+        {
+          id: 'wo-1',
+          date: '2026-03-15',
+          amountZAR: 16500,
+          reason: 'Absconded',
+          notes: 'Tenant absconded with March rent due',
+          allocations: [{ periodMonth: '2026-03', amountZAR: 16500 }],
+          createdAt: '2026-03-15T10:00:00Z',
+        },
+      ],
+      paymentRecords: [],
+    });
+
+    // March 2026 rent was 16500, but written off 16500 -> totalArrears should not include March debt
+    const arrears = calculatePropertyArrears(rentalWithWriteOff, '2026-04-01');
+    const marchItem = arrears.ledger.find((m) => m.month === '2026-03');
+    expect(marchItem?.writeOffsApplied).toBe(16500);
+    expect(marchItem?.netVariance).toBe(0);
+    expect(marchItem?.status).toBe('Paid in Full');
+
+    // Tenant statement for April should reflect the write-off in brought-forward
+    const tiers = calculateTenantStatementTiers(rentalWithWriteOff, '2026-04');
+    expect(tiers.priorWriteOffs).toBe(16500);
+    expect(tiers.balanceBroughtForward).toBe(33000); // Jan (16500) + Feb (16500) + Mar (16500 - 16500 written off)
+  });
+
+  it('prevents ghost arrears brought forward on long-standing leases (e.g. Sandhurst Suite starting 2023)', () => {
+    // Sandhurst has leaseStartDate '2023-04-01' and payments starting '2026-02'.
+    // Prior to fix, diff <= 36 generated 33 phantom unrecorded months (R 610,500).
+    const longStandingRental = createMockRental({
+      arrearsOpeningBalanceZAR: 0,
+      leases: [
+        {
+          id: 'lease-sandhurst',
+          unitName: 'Main Unit',
+          tenantName: 'Dr. Thabo Mokoena',
+          tenantPhone: '+27 82 456 7890',
+          tenantEmail: 'thabo@example.com',
+          monthlyRentZAR: 18500,
+          depositHeldZAR: 37000,
+          leaseStartDate: '2023-04-01',
+          leaseEndDate: '2027-03-31',
+          annualEscalationPercent: 7.0,
+          status: 'Occupied',
+        },
+      ],
+      paymentRecords: [
+        {
+          id: 'pay-2026-02',
+          propertyId: 'test-rental-1',
+          leaseId: 'lease-sandhurst',
+          periodMonth: '2026-02',
+          paymentDate: '2026-02-01',
+          amountReceivedZAR: 18500,
+          paymentMethod: 'EFT',
+          createdAt: '2026-02-01T08:00:00Z',
+        },
+        {
+          id: 'pay-2026-03',
+          propertyId: 'test-rental-1',
+          leaseId: 'lease-sandhurst',
+          periodMonth: '2026-03',
+          paymentDate: '2026-03-01',
+          amountReceivedZAR: 18500,
+          paymentMethod: 'EFT',
+          createdAt: '2026-03-01T08:00:00Z',
+        },
+        {
+          id: 'pay-2026-04',
+          propertyId: 'test-rental-1',
+          leaseId: 'lease-sandhurst',
+          periodMonth: '2026-04',
+          paymentDate: '2026-04-01',
+          amountReceivedZAR: 18500,
+          paymentMethod: 'EFT',
+          createdAt: '2026-04-01T08:00:00Z',
+        },
+      ],
+    });
+
+    const statementApril = calculateTenantStatementTiers(longStandingRental, '2026-04');
+    // Balance brought forward for April must be 0, NOT 33 months of rent (R 610,500)
+    expect(statementApril.balanceBroughtForward).toBe(0);
+    // Total amount due for April after R 18 500 payment is 0
+    expect(statementApril.totalAmountDue).toBe(0);
+  });
+
+  it('correctly calculates previous calendar month with getPreviousMonthKey', () => {
+    expect(getPreviousMonthKey('2026-10')).toBe('2026-09');
+    expect(getPreviousMonthKey('2026-01')).toBe('2025-12');
+    expect(getPreviousMonthKey('2026-05')).toBe('2026-04');
+  });
+});
+
 

@@ -203,5 +203,68 @@ describe('usePortfolioStore Tenant Payment & Arrears Actions', () => {
     expect(updatedLeaseB?.unpaidUtilityArrearsZAR).toBe(9500);
     expect(stored?.arrearsOpeningBalanceZAR).toBe(1500);
   });
+
+  it('Deposit Applied reduces depositHeldZAR and restores it on deletion or update', () => {
+    const rental = createTestRental('rental-dep-test');
+    usePortfolioStore.getState().addRental(rental);
+
+    // Initial deposit held is 37000
+    let stored = usePortfolioStore.getState().rentals.find((r) => r.id === 'rental-dep-test');
+    expect(stored?.leases[0].depositHeldZAR).toBe(37000);
+
+    // Apply 10000 of deposit towards rent
+    usePortfolioStore.getState().recordTenantPayment('rental-dep-test', {
+      id: 'dep-pay-1',
+      leaseId: 'lease-1',
+      periodMonth: '2026-04',
+      paymentDate: '2026-04-05',
+      amountReceivedZAR: 10000,
+      paymentMethod: 'Deposit Applied',
+    });
+
+    stored = usePortfolioStore.getState().rentals.find((r) => r.id === 'rental-dep-test');
+    expect(stored?.leases[0].depositHeldZAR).toBe(27000);
+
+    // Update payment to apply 15000 instead
+    usePortfolioStore.getState().updateTenantPayment('rental-dep-test', 'dep-pay-1', {
+      amountReceivedZAR: 15000,
+    });
+
+    stored = usePortfolioStore.getState().rentals.find((r) => r.id === 'rental-dep-test');
+    expect(stored?.leases[0].depositHeldZAR).toBe(22000);
+
+    // Delete the deposit payment -> deposit should be restored to 37000
+    usePortfolioStore.getState().deleteTenantPayment('rental-dep-test', 'dep-pay-1');
+
+    stored = usePortfolioStore.getState().rentals.find((r) => r.id === 'rental-dep-test');
+    expect(stored?.leases[0].depositHeldZAR).toBe(37000);
+  });
+
+  it('recordArrearsWriteOff and deleteArrearsWriteOff manage audited write-offs and recompute arrears', () => {
+    const rental = createTestRental('rental-wo-store');
+    usePortfolioStore.getState().addRental(rental);
+
+    usePortfolioStore.getState().recordArrearsWriteOff('rental-wo-store', {
+      id: 'wo-store-1',
+      date: '2026-04-10',
+      amountZAR: 18500,
+      reason: 'Absconded',
+      notes: 'Tenant absconded',
+      allocations: [{ periodMonth: '2026-04', amountZAR: 18500 }],
+    });
+
+    let stored = usePortfolioStore.getState().rentals.find((r) => r.id === 'rental-wo-store');
+    expect(stored?.arrearsWriteOffs).toBeDefined();
+    expect(stored?.arrearsWriteOffs).toHaveLength(1);
+    expect(stored?.arrearsWriteOffs?.[0].amountZAR).toBe(18500);
+    expect(stored?.arrearsWriteOffs?.[0].reason).toBe('Absconded');
+
+    // Delete the write-off
+    usePortfolioStore.getState().deleteArrearsWriteOff('rental-wo-store', 'wo-store-1');
+
+    stored = usePortfolioStore.getState().rentals.find((r) => r.id === 'rental-wo-store');
+    expect(stored?.arrearsWriteOffs).toHaveLength(0);
+  });
 });
+
 

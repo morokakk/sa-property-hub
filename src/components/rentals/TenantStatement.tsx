@@ -23,6 +23,8 @@ import {
   Receipt,
   Landmark,
   Link2,
+  Calendar,
+  ChevronDown,
 } from 'lucide-react';
 import { usePortfolioStore } from '@/lib/store/usePortfolioStore';
 import { formatZAR, formatDate } from '@/lib/formatters';
@@ -32,7 +34,17 @@ import { supabase } from '@/lib/supabaseClient';
 import { migrateToCloud } from '@/lib/db/migrateToCloud';
 import { DEMO_RENTAL_IDS, isDemoRentalProperty } from '@/lib/db/mergePortfolioState';
 import { formatTenantAccountStatementForWhatsApp } from '@/lib/whatsappFormatter';
-import { calculatePropertyArrears, calculateTenantStatementTiers, getMonthKey } from '@/lib/calculations/arrears';
+import {
+  calculatePropertyArrears,
+  calculateTenantStatementTiers,
+  getMonthKey,
+  getNextMonthKey,
+  getPreviousMonthKey,
+  formatMonthLabel,
+  formatAllocationsSummary,
+  getStatementLedgerOptions,
+  StatementPeriodOption,
+} from '@/lib/calculations/arrears';
 import CloudPublishModal from './CloudPublishModal';
 
 interface TenantStatementProps {
@@ -72,6 +84,8 @@ export default function TenantStatement({
 
   // Multi-Target statement selection ('lease-{id}' | 'ancillary-{id}' | 'consolidated')
   const [selectedTargetId, setSelectedTargetId] = useState<string>('');
+  const [selectedPeriodMonth, setSelectedPeriodMonth] = useState<string>('');
+  const [isBroughtForwardExpanded, setIsBroughtForwardExpanded] = useState<boolean>(false);
 
   useEffect(() => {
     if (!rental) return;
@@ -84,17 +98,61 @@ export default function TenantStatement({
     }
   }, [rental?.id]);
 
+  useEffect(() => {
+    if (isOpen) {
+      setSelectedPeriodMonth('');
+    }
+  }, [isOpen, rental?.id]);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Target entity detection (computed early so period options can be scoped to selected lease)
+  const selectedLease = (rental?.leases || []).find((l) => `lease-${l.id}` === selectedTargetId) || rental?.leases?.[0];
+  const selectedAncillary = (rental?.ancillaryIncomes || []).find((a) => `ancillary-${a.id}` === selectedTargetId);
+  const isConsolidated = selectedTargetId === 'consolidated';
+  const isCommercial = Boolean(selectedAncillary);
+  const isResidential = !isCommercial && !isConsolidated;
+
+  // Billing period options for this property/lease
+  const periodOptions = React.useMemo(() => {
+    if (!rental) return [];
+    return getStatementLedgerOptions(
+      rental,
+      !isConsolidated && selectedLease ? { leaseId: selectedLease.id } : undefined
+    );
+  }, [rental, isConsolidated, selectedLease?.id]);
+
+  // Active period month (defaults to latest active ledger month, e.g. October 2026)
+  const activePeriodMonth =
+    (selectedPeriodMonth && periodOptions.some((p) => p.month === selectedPeriodMonth))
+      ? selectedPeriodMonth
+      : (periodOptions[0]?.month || getMonthKey());
+
+  useEffect(() => {
+    setIsBroughtForwardExpanded(false);
+  }, [activePeriodMonth, selectedTargetId]);
 
   if (!isOpen || !rental) return null;
 
-  // Chronologically sort statements descending (latest first)
-  const statements = [...(rental.utilityStatements || [])].sort((a, b) =>
-    b.statementDate.localeCompare(a.statementDate)
-  );
+  // Current statement for activePeriodMonth (if municipal PDF was uploaded for this period)
+  const currentStatement = (rental.utilityStatements || [])
+    .filter((s) => s.statementDate && s.statementDate.startsWith(activePeriodMonth))
+    .sort((a, b) => b.statementDate.localeCompare(a.statementDate))[0] as UtilityStatement | undefined;
 
-  const currentStatement = statements[0] as UtilityStatement | undefined;
-  const previousStatement = statements[1] as UtilityStatement | undefined;
+  const billingPeriodLabel =
+    currentStatement?.billingPeriod ||
+    formatMonthLabel(activePeriodMonth);
+
+  // Immediate preceding calendar month for true Month-over-Month (MoM) comparison
+  const previousCalendarMonth = getPreviousMonthKey(activePeriodMonth);
+
+  // Previous statement strictly for the immediate preceding calendar month (if uploaded)
+  const previousStatement = (rental.utilityStatements || [])
+    .find((s) => s.statementDate && s.statementDate.startsWith(previousCalendarMonth)) as UtilityStatement | undefined;
+
+  const previousPeriodLabel =
+    previousStatement?.billingPeriod ||
+    formatMonthLabel(previousCalendarMonth);
 
   // Municipal Meter Disputes for this Statement Period
   const activeElecDispute = (rental.meterReadings || []).find(
@@ -186,13 +244,6 @@ export default function TenantStatement({
     currentStatement?.bundledUtilitiesZAR !== undefined ||
     Boolean(rental.agencyName?.toLowerCase().includes('igrow')) ||
     Boolean(currentStatement?.provider?.toLowerCase().includes('igrow'));
-
-  // Target entity detection
-  const selectedLease = (rental.leases || []).find((l) => `lease-${l.id}` === selectedTargetId) || rental.leases?.[0];
-  const selectedAncillary = (rental.ancillaryIncomes || []).find((a) => `ancillary-${a.id}` === selectedTargetId);
-  const isConsolidated = selectedTargetId === 'consolidated';
-  const isCommercial = Boolean(selectedAncillary);
-  const isResidential = !isCommercial && !isConsolidated;
 
   // Active occupied residential units count for splitting
   const occupiedLeases = (rental.leases || []).filter((l) => l.status === 'Occupied');
@@ -286,17 +337,22 @@ export default function TenantStatement({
       : 0;
 
   // Account Statement 4-Tier Ledger Calculations
-  const statementPeriodKey = currentStatement?.statementDate ? currentStatement.statementDate.slice(0, 7) : getMonthKey();
+  const statementPeriodKey = activePeriodMonth;
   const tiers = calculateTenantStatementTiers(
     rental,
     statementPeriodKey,
     !isConsolidated && selectedLease ? { leaseId: selectedLease.id } : undefined
   );
   const periodPayments = tiers.periodPayments;
+  const periodAllocatedPayments = tiers.periodAllocatedPayments;
   const periodPaymentsTotal = tiers.periodPaymentsTotal;
+  const periodWriteOffs = tiers.periodWriteOffs;
+  const periodAllocatedWriteOffs = tiers.periodAllocatedWriteOffs;
+  const periodWriteOffsTotal = tiers.periodWriteOffsTotal;
   const periodBroughtForward = tiers.balanceBroughtForward;
+  const priorUnpaidMonths = tiers.priorUnpaidMonths || [];
   const periodNetOutstanding = Math.round(
-    (periodBroughtForward + currentGrandTotal - periodPaymentsTotal) * 100
+    (periodBroughtForward + currentGrandTotal - periodPaymentsTotal - periodWriteOffsTotal) * 100
   ) / 100;
 
   // Handle PDF Upload & Parsing
@@ -349,7 +405,7 @@ export default function TenantStatement({
   const handleCopyWhatsApp = async () => {
     const periodStr =
       currentStatement?.billingPeriod ||
-      (currentStatement?.statementDate ? formatDate(currentStatement.statementDate) : 'Current Month');
+      formatMonthLabel(activePeriodMonth);
 
     // 1. COMMERCIAL ANCILLARY CONTRACT INVOICE
     if (isCommercial && selectedAncillary) {
@@ -426,7 +482,7 @@ export default function TenantStatement({
     }
 
     // 3. INDIVIDUAL RESIDENTIAL TENANT STATEMENT
-    const monthKey = currentStatement?.statementDate ? currentStatement.statementDate.slice(0, 7) : undefined;
+    const monthKey = activePeriodMonth;
     const text = formatTenantAccountStatementForWhatsApp(rental, {
       leaseId: selectedLease?.id,
       month: monthKey,
@@ -462,7 +518,7 @@ export default function TenantStatement({
     }
 
     const origin = typeof window !== 'undefined' ? window.location.origin : '';
-    const shareUrl = `${origin}/statement/${selectedLease.id}`;
+    const shareUrl = `${origin}/statement/${selectedLease.id}?month=${activePeriodMonth}`;
 
     // 1. Detect if current property is a demo property (rental-1..rental-4, demo-rental-*)
     const isDemo = isDemoRentalProperty(rental.id);
@@ -774,6 +830,43 @@ export default function TenantStatement({
               </div>
             )}
 
+            {/* Dedicated Billing Period Selector Dropdown (Print-Hidden) */}
+            <div className="print-hidden-element p-3 sm:p-3.5 bg-slate-50/90 rounded-2xl border border-slate-200 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+              <div className="flex items-center gap-2 flex-wrap">
+                <label htmlFor="tenant-statement-period-select" className="text-[11px] font-bold uppercase tracking-wider text-slate-600 flex items-center gap-1.5">
+                  <Calendar className="w-3.5 h-3.5 text-emerald-600" />
+                  Billing Period:
+                </label>
+                <select
+                  id="tenant-statement-period-select"
+                  data-testid="statement-period-select"
+                  value={activePeriodMonth}
+                  onChange={(e) => setSelectedPeriodMonth(e.target.value)}
+                  className="text-xs font-bold text-slate-800 bg-white border border-slate-300 hover:border-slate-400 rounded-xl px-3 py-1.5 shadow-2xs cursor-pointer focus:ring-2 focus:ring-emerald-500 focus:outline-hidden"
+                >
+                  {periodOptions.map((opt) => (
+                    <option key={opt.month} value={opt.month}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex items-center gap-2 text-[11px] text-slate-500">
+                {currentStatement ? (
+                  <span className="inline-flex items-center gap-1 text-emerald-700 font-semibold bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                    <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                    Utility Bill Attached ({currentStatement.provider})
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 text-amber-700 font-semibold bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">
+                    <AlertCircle className="w-3 h-3 text-amber-600" />
+                    Municipal Bill Pending Upload (Base Rent Only)
+                  </span>
+                )}
+              </div>
+            </div>
+
             {/* Multi-Target Unit & Contract Statement Selector (Print-Hidden) */}
             {((rental.leases?.length || 0) + (rental.ancillaryIncomes?.length || 0) > 1) && (
               <div className="print-hidden-element p-3.5 bg-slate-50/90 rounded-2xl border border-slate-200 shadow-2xs space-y-2">
@@ -878,7 +971,7 @@ export default function TenantStatement({
                   <div>
                     <span className="text-slate-500">Billing Period:</span>{' '}
                     <span className="text-emerald-700 font-extrabold font-mono text-sm">
-                      {currentStatement?.billingPeriod || 'Current Month'}
+                      {currentStatement?.billingPeriod || formatMonthLabel(activePeriodMonth)}
                     </span>
                   </div>
                   <div className="text-slate-600">
@@ -886,7 +979,7 @@ export default function TenantStatement({
                     <strong>
                       {currentStatement?.statementDate
                         ? formatDate(currentStatement.statementDate)
-                        : formatDate(new Date().toISOString().split('T')[0])}
+                        : formatDate(`${activePeriodMonth}-01`)}
                     </strong>
                   </div>
                   <div className="text-slate-600">
@@ -1302,12 +1395,9 @@ export default function TenantStatement({
                   <span className="text-[10px] text-slate-400 font-medium sm:hidden">
                     Scroll horizontally for variance →
                   </span>
-                  {previousStatement && (
-                    <span className="text-[11px] font-medium text-slate-500">
-                      Comparing {previousStatement.billingPeriod || formatDate(previousStatement.statementDate)} vs{' '}
-                      {currentStatement?.billingPeriod || formatDate(currentStatement?.statementDate)}
-                    </span>
-                  )}
+                  <span className="text-[11px] font-medium text-slate-500">
+                    Comparing {previousPeriodLabel} vs {billingPeriodLabel}
+                  </span>
                 </div>
               </div>
 
@@ -1317,10 +1407,10 @@ export default function TenantStatement({
                     <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase font-semibold text-[10px] tracking-wider">
                       <th className="p-3 pl-4">Billing Item / Municipal Line</th>
                       <th className="p-3 text-right whitespace-nowrap">
-                        {previousStatement?.billingPeriod || 'Previous Month'}
+                        {previousPeriodLabel}
                       </th>
                       <th className="p-3 text-right whitespace-nowrap">
-                        {currentStatement?.billingPeriod || 'Current Month'}
+                        {billingPeriodLabel}
                       </th>
                       <th className="p-3 pr-4 text-right whitespace-nowrap">Month-over-Month Variance</th>
                     </tr>
@@ -1329,10 +1419,43 @@ export default function TenantStatement({
                     {/* 1. Balance Brought Forward (Prior Arrears / Credit) */}
                     <tr className="bg-slate-50/70 border-b border-slate-200">
                       <td className="p-3 pl-4">
-                        <div className="font-bold text-slate-900">1. Balance Brought Forward</div>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-bold text-slate-900">1. Balance Brought Forward</span>
+                          {priorUnpaidMonths.length > 0 && (
+                            <button
+                              type="button"
+                              data-testid="toggle-brought-forward-btn"
+                              onClick={() => setIsBroughtForwardExpanded(!isBroughtForwardExpanded)}
+                              className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-800 bg-amber-50 hover:bg-amber-100 border border-amber-200 px-2 py-0.5 rounded-full transition-colors cursor-pointer"
+                              title="Toggle overdue months breakdown"
+                            >
+                              <span>⚠️ {priorUnpaidMonths.length} Unpaid {priorUnpaidMonths.length === 1 ? 'Month' : 'Months'}</span>
+                              <ChevronDown className={`w-3 h-3 transition-transform ${isBroughtForwardExpanded ? 'rotate-180' : ''}`} />
+                            </button>
+                          )}
+                        </div>
                         <div className="text-[11px] text-slate-400">
                           Prior unpaid arrears or credit balance carried forward
                         </div>
+                        {isBroughtForwardExpanded && priorUnpaidMonths.length > 0 && (
+                          <div
+                            data-testid="brought-forward-breakdown"
+                            className="mt-2 p-2.5 bg-amber-50/80 border border-amber-200 rounded-lg text-xs text-amber-950 space-y-1"
+                          >
+                            <div className="text-[10px] font-bold uppercase tracking-wider text-amber-800">
+                              Overdue Months Breakdown:
+                            </div>
+                            <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[11px] font-mono">
+                              {priorUnpaidMonths.map((m, idx) => (
+                                <span key={m.month} className="inline-flex items-center gap-1">
+                                  <span className="font-semibold text-slate-700">{m.shortLabel}:</span>
+                                  <span className="font-bold text-rose-700">{formatZAR(m.netVariance, { includeDecimals: true })}</span>
+                                  {idx < priorUnpaidMonths.length - 1 && <span className="text-slate-300 ml-1">|</span>}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
                       </td>
                       <td className="p-3 text-right font-mono text-slate-400 whitespace-nowrap">—</td>
                       <td className={`p-3 text-right font-mono font-bold whitespace-nowrap ${periodBroughtForward > 0 ? 'text-rose-700' : 'text-slate-800'}`}>
@@ -1415,6 +1538,33 @@ export default function TenantStatement({
                           {currentStatement?.bundledUtilitiesZAR !== undefined
                             ? renderVariance(currentStatement.bundledUtilitiesZAR, previousStatement?.bundledUtilitiesZAR)
                             : '—'}
+                        </td>
+                      </tr>
+                    ) : !currentStatement ? (
+                      /* Municipal Utility Notice Row when Statement is Pending Upload */
+                      <tr className="bg-slate-50/60 border-y border-slate-200">
+                        <td colSpan={4} className="p-3.5 pl-4">
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                            <div className="flex items-center gap-2.5">
+                              <FileText className="w-4 h-4 text-slate-500 shrink-0" />
+                              <div>
+                                <div className="font-semibold text-slate-800 text-xs">
+                                  Municipal utility invoice for this period pending upload (R 0.00 recovery billed)
+                                </div>
+                                <div className="text-[10px] text-slate-500 mt-0.5">
+                                  Only Base Contract Rent is currently billed for {formatMonthLabel(activePeriodMonth)}. Upload the municipal bill to itemize electricity, water, refuse & sewerage recoveries.
+                                </div>
+                              </div>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => fileInputRef.current?.click()}
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold shadow-2xs transition-colors shrink-0 cursor-pointer self-start sm:self-auto print-hidden-element"
+                            >
+                              <Upload className="w-3.5 h-3.5" />
+                              <span>Upload Bill</span>
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ) : (
@@ -1689,27 +1839,64 @@ export default function TenantStatement({
                     </tr>
 
                     {/* 3. Less: Payments Received */}
-                    {periodPayments.length > 0 ? (
-                      periodPayments.map((p) => (
-                        <tr key={p.id} className="hover:bg-slate-50/50 transition-colors bg-emerald-50/30">
-                          <td className="p-3 pl-4">
-                            <div className="font-semibold text-emerald-800 flex items-center gap-1.5">
-                              <Receipt className="w-3.5 h-3.5 text-emerald-600" />
-                              <span>Payment Received: {formatDate(p.paymentDate)}</span>
-                            </div>
-                            <div className="text-[10px] text-slate-500">
-                              Method: {p.paymentMethod} {p.reference ? `• Ref: ${p.reference}` : ''}
-                            </div>
-                          </td>
-                          <td className="p-3 text-right font-mono text-slate-400 whitespace-nowrap">—</td>
-                          <td className="p-3 text-right font-mono font-bold text-emerald-700 whitespace-nowrap">
-                            -{formatZAR(p.amountReceivedZAR, { includeDecimals: true })}
-                          </td>
-                          <td className="p-3 pr-4 text-right whitespace-nowrap text-[10px] text-emerald-700 font-semibold">
-                            Payment Applied
-                          </td>
-                        </tr>
-                      ))
+                    {periodAllocatedPayments && periodAllocatedPayments.length > 0 ? (
+                      periodAllocatedPayments.map(({ payment: p, allocatedAmountZAR }) => {
+                        const isDeposit = p.paymentMethod === 'Deposit Applied';
+                        return (
+                          <tr key={p.id} className="hover:bg-slate-50/50 transition-colors bg-emerald-50/30">
+                            <td className="p-3 pl-4">
+                              <div className="font-semibold text-emerald-800 flex items-center gap-1.5">
+                                <Receipt className="w-3.5 h-3.5 text-emerald-600" />
+                                <span>{isDeposit ? 'Deposit applied to arrears' : `Payment Received: ${formatDate(p.paymentDate)}`}</span>
+                              </div>
+                              <div className="text-[10px] text-slate-500">
+                                Method: {isDeposit ? 'Deposit Applied' : p.paymentMethod} {p.reference ? `• Ref: ${p.reference}` : ''}
+                                {p.allocations && p.allocations.length > 1 && (
+                                  <span className="ml-1 text-slate-600 font-medium">
+                                    • {p.reference ? `${p.reference} — ` : ''}{formatZAR(p.amountReceivedZAR)} (${formatAllocationsSummary(p.allocations)})
+                                  </span>
+                                )}
+                              </div>
+                            </td>
+                            <td className="p-3 text-right font-mono text-slate-400 whitespace-nowrap">—</td>
+                            <td className="p-3 text-right font-mono font-bold text-emerald-700 whitespace-nowrap">
+                              -{formatZAR(allocatedAmountZAR, { includeDecimals: true })}
+                            </td>
+                            <td className="p-3 pr-4 text-right whitespace-nowrap text-[10px] text-emerald-700 font-semibold">
+                              {isDeposit ? 'Deposit Applied' : 'Payment Applied'}
+                            </td>
+                          </tr>
+                        );
+                      })
+                    ) : periodPayments.length > 0 ? (
+                      periodPayments.map((p) => {
+                        const isDeposit = p.paymentMethod === 'Deposit Applied';
+                        return (
+                          <tr key={p.id} className="hover:bg-slate-50/50 transition-colors bg-emerald-50/30">
+                            <td className="p-3 pl-4">
+                              <div className="font-semibold text-emerald-800 flex items-center gap-1.5">
+                                <Receipt className="w-3.5 h-3.5 text-emerald-600" />
+                                <span>{isDeposit ? 'Deposit applied to arrears' : `Payment Received: ${formatDate(p.paymentDate)}`}</span>
+                              </div>
+                              <div className="text-[10px] text-slate-500">
+                                Method: {isDeposit ? 'Deposit Applied' : p.paymentMethod} {p.reference ? `• Ref: ${p.reference}` : ''}
+                                {p.allocations && p.allocations.length > 1 && (
+                                  <span className="ml-1 text-slate-600 font-medium">
+                                    • {p.reference ? `${p.reference} — ` : ''}{formatZAR(p.amountReceivedZAR)} ({formatAllocationsSummary(p.allocations)})
+                                  </span>
+                                )}
+                              </div>
+                            </td>
+                            <td className="p-3 text-right font-mono text-slate-400 whitespace-nowrap">—</td>
+                            <td className="p-3 text-right font-mono font-bold text-emerald-700 whitespace-nowrap">
+                              -{formatZAR(p.amountReceivedZAR, { includeDecimals: true })}
+                            </td>
+                            <td className="p-3 pr-4 text-right whitespace-nowrap text-[10px] text-emerald-700 font-semibold">
+                              {isDeposit ? 'Deposit Applied' : 'Payment Applied'}
+                            </td>
+                          </tr>
+                        );
+                      })
                     ) : (
                       <tr className="hover:bg-slate-50/50 transition-colors">
                         <td className="p-3 pl-4">
@@ -1725,10 +1912,45 @@ export default function TenantStatement({
                       </tr>
                     )}
 
+                    {/* Sanitized Credits / Balance Write-Offs */}
+                    {periodAllocatedWriteOffs && periodAllocatedWriteOffs.length > 0 ? (
+                      periodAllocatedWriteOffs.map(({ writeOff: w, allocatedAmountZAR }) => (
+                        <tr key={w.id} className="hover:bg-slate-50/50 transition-colors bg-slate-50/60">
+                          <td className="p-3 pl-4">
+                            <div className="font-semibold text-slate-700 flex items-center gap-1.5">
+                              <Receipt className="w-3.5 h-3.5 text-slate-500" />
+                              <span>Credit: Balance written off</span>
+                            </div>
+                            <div className="text-[10px] text-slate-400">
+                              Date: {formatDate(w.date)}
+                            </div>
+                          </td>
+                          <td className="p-3 text-right font-mono text-slate-400 whitespace-nowrap">—</td>
+                          <td className="p-3 text-right font-mono font-bold text-slate-600 whitespace-nowrap">
+                            -{formatZAR(allocatedAmountZAR, { includeDecimals: true })}
+                          </td>
+                          <td className="p-3 pr-4 text-right whitespace-nowrap text-[10px] text-slate-500 font-semibold">
+                            Credit Applied
+                          </td>
+                        </tr>
+                      ))
+                    ) : null}
+
                     {/* 4. Grand Total Row */}
                     <tr className="bg-emerald-50/70 font-black text-slate-900 border-t-2 border-emerald-600">
                       <td className="p-3.5 pl-4 text-sm">
-                        TOTAL AMOUNT DUE / OUTSTANDING BALANCE
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span>TOTAL AMOUNT DUE / OUTSTANDING BALANCE</span>
+                          {periodNetOutstanding > 0 ? (
+                            <span className="text-rose-700 font-bold bg-rose-100/90 px-2 py-0.5 rounded text-xs border border-rose-200">
+                              ⚠️ In Arrears
+                            </span>
+                          ) : (
+                            <span className="text-emerald-700 font-bold bg-emerald-100/90 px-2 py-0.5 rounded text-xs border border-emerald-200">
+                              ✓ Paid Up
+                            </span>
+                          )}
+                        </div>
                         <div className="text-[11px] font-normal text-slate-500">
                           Balance Brought Forward + Current Charges - Payments Received
                         </div>

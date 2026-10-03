@@ -14,6 +14,7 @@ import {
   EMPTY_ANALYZER_DRAFT,
   DEFAULT_AI_SETTINGS,
 } from '@/lib/store/initialData';
+import { migrateNegativeArrearsToRental } from '@/lib/calculations/arrears';
 
 export const DEMO_RENTAL_IDS = new Set(['rental-1', 'rental-2', 'rental-3', 'rental-4']);
 
@@ -263,7 +264,7 @@ export function mergePortfolioState(
 
   return {
     mergedState: {
-      rentals: mergedRentals,
+      rentals: mergedRentals.map(migrateNegativeArrearsToRental),
       flips: mergedFlips,
       funding: mergedFunding,
       opportunities: mergedOpps,

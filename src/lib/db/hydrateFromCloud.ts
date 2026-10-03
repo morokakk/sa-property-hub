@@ -18,6 +18,7 @@ import {
 } from './mergePortfolioState';
 import { usePortfolioStore } from '@/lib/store/usePortfolioStore';
 import { migrateToCloud } from './migrateToCloud';
+import { migrateNegativeArrearsToRental } from '@/lib/calculations/arrears';
 
 export interface HydrationResult {
   success: boolean;
@@ -106,7 +107,7 @@ export function unmapProfile(row?: Database['public']['Tables']['profiles']['Row
 }
 
 export function unmapRentals(rows: Database['public']['Tables']['properties']['Row'][] = []): RentalProperty[] {
-  return rows.map((r) => ({
+  return rows.map((r) => migrateNegativeArrearsToRental({
     id: r.id,
     title: r.title,
     address: r.address,
@@ -135,6 +136,9 @@ export function unmapRentals(rows: Database['public']['Tables']['properties']['R
     monthlyMaintenanceReserveZAR: toNum(r.monthly_maintenance_reserve_zar, 0),
     annualBuildingInsuranceZAR: toNullableNum(r.annual_building_insurance_zar),
     unpaidUtilityArrearsZAR: toNullableNum(r.unpaid_utility_arrears_zar),
+    arrearsWriteOffs: (r as any).arrears_write_offs
+      ? parseJson((r as any).arrears_write_offs, [])
+      : [],
     paymentRecords: (r as any).payment_records
       ? parseJson((r as any).payment_records, [])
       : (Array.isArray(r.leases) && (r.leases[0] as any)?.paymentRecords) || [],

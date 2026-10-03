@@ -296,6 +296,7 @@ export function mapRentals(rentals: RentalProperty[] = [], userId: string): Prop
     annual_building_insurance_zar: toNullableNumeric(r.annualBuildingInsuranceZAR),
     unpaid_utility_arrears_zar: toNullableNumeric(r.unpaidUtilityArrearsZAR),
     arrears_opening_balance_zar: toNullableNumeric(r.arrearsOpeningBalanceZAR),
+    arrears_write_offs: (r.arrearsWriteOffs ? JSON.parse(JSON.stringify(r.arrearsWriteOffs)) : []) as any,
     payment_records: (r.paymentRecords ? JSON.parse(JSON.stringify(r.paymentRecords)) : []) as any,
     maintenance_history: (r.maintenanceHistory ? JSON.parse(JSON.stringify(r.maintenanceHistory)) : []) as any,
     status: r.status || 'Occupied',

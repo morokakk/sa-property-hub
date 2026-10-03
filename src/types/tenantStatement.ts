@@ -1,4 +1,4 @@
-import { UtilityStatement, MeterReading, TenantPaymentRecord } from '@/types';
+import { UtilityStatement, MeterReading, TenantPaymentRecord, ArrearsWriteOff } from '@/types';
 
 export interface PublicTenantStatementPayload {
   lease: {
@@ -38,4 +38,6 @@ export interface PublicTenantStatementPayload {
   meter_readings?: MeterReading[];
   payment_records?: TenantPaymentRecord[];
   arrears_opening_balance_zar?: number;
+  arrears_write_offs?: ArrearsWriteOff[];
 }
+

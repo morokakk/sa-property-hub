@@ -372,18 +372,58 @@ export interface AncillaryIncome {
 }
 
 // Tenant Payment Ledger Record
-export type PaymentMethod = 'EFT' | 'Cash Deposit' | 'Debit Order' | 'Instant EFT / Card' | 'Other';
+export type PaymentMethod =
+  | 'EFT'
+  | 'Cash Deposit'
+  | 'Debit Order'
+  | 'Instant EFT / Card'
+  | 'Deposit Applied'
+  | 'Other';
+
+/** Portion of a payment / write-off applied to a specific billing month. */
+export interface PaymentAllocation {
+  periodMonth: string; // 'YYYY-MM'
+  amountZAR: number;
+}
 
 export interface TenantPaymentRecord {
   id: string;
   propertyId: string;
   leaseId?: string;
-  periodMonth: string; // e.g. '2026-04'
+  periodMonth: string; // e.g. '2026-04' (primary / first allocated month)
   paymentDate: string; // 'YYYY-MM-DD'
   amountReceivedZAR: number;
   paymentMethod: PaymentMethod;
   reference?: string;
   notes?: string;
+  createdAt: string;
+  /**
+   * Optional split of a single payment across billing months (must sum to amountReceivedZAR).
+   * Legacy payments without allocations count fully toward periodMonth (or month of paymentDate).
+   */
+  allocations?: PaymentAllocation[];
+}
+
+export type ArrearsWriteOffReason =
+  | 'Tenant absconded'
+  | 'Settlement / discount agreed'
+  | 'Uncollectable / bad debt'
+  | 'Absconded'
+  | 'Negotiated Settlement'
+  | 'Prescribed / Statute Barred'
+  | 'Uncollectable'
+  | 'Dispute Concession'
+  | 'Other';
+
+/** Audited write-off of tenant arrears (bad debt — tax-deductible loss, not income). */
+export interface ArrearsWriteOff {
+  id: string;
+  leaseId?: string;
+  date: string; // 'YYYY-MM-DD'
+  amountZAR: number;
+  reason: ArrearsWriteOffReason;
+  notes?: string;
+  allocations: PaymentAllocation[];
   createdAt: string;
 }
 
@@ -421,6 +461,7 @@ export interface RentalProperty {
   annualBuildingInsuranceZAR?: number; // Homeowner structural insurance for Freehold properties
   // Tenant Payments & Calculated Arrears Ledger
   paymentRecords?: TenantPaymentRecord[];
+  arrearsWriteOffs?: ArrearsWriteOff[];
   arrearsOpeningBalanceZAR?: number;
   unpaidUtilityArrearsZAR?: number; // kept synchronized with calculated arrears for backward compatibility
   maintenanceHistory: MaintenanceLog[];

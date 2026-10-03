@@ -23,6 +23,7 @@ import {
   MeterReading,
   EquityExtractionAlert,
   TenantPaymentRecord,
+  ArrearsWriteOff,
 } from '@/types';
 import {
   calculateMonthlyBondRepayment,
@@ -31,6 +32,7 @@ import {
 import {
   calculatePropertyArrears,
   reconcileOpeningBalanceForTargetArrears,
+  migrateNegativeArrearsToRental,
 } from '@/lib/calculations/arrears';
 import { handleTaskCompletionRecurrence } from '@/lib/calculations/recurrence';
 import {
@@ -112,6 +114,13 @@ interface PortfolioState {
     updates: Partial<TenantPaymentRecord>
   ) => void;
   deleteTenantPayment: (propertyId: string, paymentId: string) => void;
+  recordArrearsWriteOff: (
+    propertyId: string,
+    writeOff: Omit<ArrearsWriteOff, 'id' | 'createdAt'> & {
+      id?: string;
+    }
+  ) => void;
+  deleteArrearsWriteOff: (propertyId: string, writeOffId: string) => void;
   updateArrearsOpeningBalance: (propertyId: string, openingBalance: number, leaseId?: string) => void;
 
   // Flip Actions
@@ -463,16 +472,12 @@ export const usePortfolioStore = create<PortfolioState>()(
           const updatedRentals = state.rentals.map((r) => {
             if (r.id !== id) return r;
             const reconciledUpdates = { ...updates };
+            if (updates.arrearsOpeningBalanceZAR !== undefined) {
+              reconciledUpdates.arrearsOpeningBalanceZAR = Math.max(0, updates.arrearsOpeningBalanceZAR);
+            }
             if (
-              updates.unpaidUtilityArrearsZAR !== undefined &&
-              updates.arrearsOpeningBalanceZAR === undefined
-            ) {
-              reconciledUpdates.arrearsOpeningBalanceZAR = reconcileOpeningBalanceForTargetArrears(
-                r,
-                updates.unpaidUtilityArrearsZAR
-              );
-            } else if (
               updates.arrearsOpeningBalanceZAR !== undefined ||
+              updates.arrearsWriteOffs !== undefined ||
               updates.paymentRecords !== undefined ||
               updates.leases !== undefined ||
               updates.monthlyGrossRentZAR !== undefined
@@ -487,7 +492,9 @@ export const usePortfolioStore = create<PortfolioState>()(
               });
               const arrearsResult = calculatePropertyArrears({ ...tempRental, leases: updatedLeases });
               reconciledUpdates.leases = updatedLeases;
-              reconciledUpdates.unpaidUtilityArrearsZAR = Math.max(0, arrearsResult.totalArrearsZAR);
+              if (updates.unpaidUtilityArrearsZAR === undefined) {
+                reconciledUpdates.unpaidUtilityArrearsZAR = Math.max(0, arrearsResult.totalArrearsZAR);
+              }
             }
             return { ...r, ...reconciledUpdates };
           });
@@ -737,21 +744,40 @@ export const usePortfolioStore = create<PortfolioState>()(
             const updatedPayments = [newPayment, ...(r.paymentRecords || [])].sort((a, b) =>
               b.paymentDate.localeCompare(a.paymentDate)
             );
+
+            // Handle 'Deposit Applied': reduces the selected lease's depositHeldZAR
+            let updatedLeases = r.leases || [];
+            if (newPayment.paymentMethod === 'Deposit Applied') {
+              const targetLeaseId =
+                newPayment.leaseId || (updatedLeases.length === 1 ? updatedLeases[0].id : undefined);
+              if (targetLeaseId) {
+                updatedLeases = updatedLeases.map((l) =>
+                  l.id === targetLeaseId
+                    ? {
+                        ...l,
+                        depositHeldZAR: Math.max(0, (l.depositHeldZAR || 0) - newPayment.amountReceivedZAR),
+                      }
+                    : l
+                );
+              }
+            }
+
             const tempRental: RentalProperty = {
               ...r,
               paymentRecords: updatedPayments,
+              leases: updatedLeases,
             };
-            const updatedLeases = (tempRental.leases || []).map((l) => {
+            const finalizedLeases = (tempRental.leases || []).map((l) => {
               const leaseArrears = calculatePropertyArrears(tempRental, undefined, { leaseId: l.id });
               return {
                 ...l,
                 unpaidUtilityArrearsZAR: Math.max(0, leaseArrears.totalArrearsZAR),
               };
             });
-            const arrearsResult = calculatePropertyArrears({ ...tempRental, leases: updatedLeases });
+            const arrearsResult = calculatePropertyArrears({ ...tempRental, leases: finalizedLeases });
             return {
               ...tempRental,
-              leases: updatedLeases,
+              leases: finalizedLeases,
               unpaidUtilityArrearsZAR: Math.max(0, arrearsResult.totalArrearsZAR),
             };
           }),
@@ -760,12 +786,141 @@ export const usePortfolioStore = create<PortfolioState>()(
         set((state) => ({
           rentals: state.rentals.map((r) => {
             if (r.id !== propertyId) return r;
+            const oldPayment = (r.paymentRecords || []).find((p) => p.id === paymentId);
+            let updatedLeases = r.leases || [];
+
+            // Adjust depositHeldZAR if editing a Deposit Applied payment
+            if (oldPayment) {
+              const oldMethod = oldPayment.paymentMethod;
+              const newMethod = updates.paymentMethod !== undefined ? updates.paymentMethod : oldMethod;
+              const oldAmount = oldPayment.amountReceivedZAR;
+              const newAmount = updates.amountReceivedZAR !== undefined ? updates.amountReceivedZAR : oldAmount;
+              const oldLeaseId = oldPayment.leaseId || (updatedLeases.length === 1 ? updatedLeases[0].id : undefined);
+              const newLeaseId =
+                (updates.leaseId !== undefined ? updates.leaseId : oldPayment.leaseId) ||
+                (updatedLeases.length === 1 ? updatedLeases[0].id : undefined);
+
+              if (oldMethod === 'Deposit Applied' && newMethod !== 'Deposit Applied') {
+                if (oldLeaseId) {
+                  updatedLeases = updatedLeases.map((l) =>
+                    l.id === oldLeaseId ? { ...l, depositHeldZAR: (l.depositHeldZAR || 0) + oldAmount } : l
+                  );
+                }
+              } else if (oldMethod !== 'Deposit Applied' && newMethod === 'Deposit Applied') {
+                if (newLeaseId) {
+                  updatedLeases = updatedLeases.map((l) =>
+                    l.id === newLeaseId
+                      ? { ...l, depositHeldZAR: Math.max(0, (l.depositHeldZAR || 0) - newAmount) }
+                      : l
+                  );
+                }
+              } else if (oldMethod === 'Deposit Applied' && newMethod === 'Deposit Applied') {
+                if (oldLeaseId === newLeaseId) {
+                  const diff = newAmount - oldAmount;
+                  if (oldLeaseId) {
+                    updatedLeases = updatedLeases.map((l) =>
+                      l.id === oldLeaseId
+                        ? { ...l, depositHeldZAR: Math.max(0, (l.depositHeldZAR || 0) - diff) }
+                        : l
+                    );
+                  }
+                } else {
+                  if (oldLeaseId) {
+                    updatedLeases = updatedLeases.map((l) =>
+                      l.id === oldLeaseId ? { ...l, depositHeldZAR: (l.depositHeldZAR || 0) + oldAmount } : l
+                    );
+                  }
+                  if (newLeaseId) {
+                    updatedLeases = updatedLeases.map((l) =>
+                      l.id === newLeaseId
+                        ? { ...l, depositHeldZAR: Math.max(0, (l.depositHeldZAR || 0) - newAmount) }
+                        : l
+                    );
+                  }
+                }
+              }
+            }
+
             const updatedPayments = (r.paymentRecords || []).map((p) =>
               p.id === paymentId ? { ...p, ...updates } : p
             ).sort((a, b) => b.paymentDate.localeCompare(a.paymentDate));
+
             const tempRental: RentalProperty = {
               ...r,
               paymentRecords: updatedPayments,
+              leases: updatedLeases,
+            };
+            const finalizedLeases = (tempRental.leases || []).map((l) => {
+              const leaseArrears = calculatePropertyArrears(tempRental, undefined, { leaseId: l.id });
+              return {
+                ...l,
+                unpaidUtilityArrearsZAR: Math.max(0, leaseArrears.totalArrearsZAR),
+              };
+            });
+            const arrearsResult = calculatePropertyArrears({ ...tempRental, leases: finalizedLeases });
+            return {
+              ...tempRental,
+              leases: finalizedLeases,
+              unpaidUtilityArrearsZAR: Math.max(0, arrearsResult.totalArrearsZAR),
+            };
+          }),
+        })),
+      deleteTenantPayment: (propertyId, paymentId) =>
+        set((state) => ({
+          rentals: state.rentals.map((r) => {
+            if (r.id !== propertyId) return r;
+            const deletedPayment = (r.paymentRecords || []).find((p) => p.id === paymentId);
+            let updatedLeases = r.leases || [];
+
+            // Restores deposit if deleted payment was 'Deposit Applied'
+            if (deletedPayment && deletedPayment.paymentMethod === 'Deposit Applied') {
+              const targetLeaseId =
+                deletedPayment.leaseId || (updatedLeases.length === 1 ? updatedLeases[0].id : undefined);
+              if (targetLeaseId) {
+                updatedLeases = updatedLeases.map((l) =>
+                  l.id === targetLeaseId
+                    ? { ...l, depositHeldZAR: (l.depositHeldZAR || 0) + deletedPayment.amountReceivedZAR }
+                    : l
+                );
+              }
+            }
+
+            const updatedPayments = (r.paymentRecords || []).filter((p) => p.id !== paymentId);
+            const tempRental: RentalProperty = {
+              ...r,
+              paymentRecords: updatedPayments,
+              leases: updatedLeases,
+            };
+            const finalizedLeases = (tempRental.leases || []).map((l) => {
+              const leaseArrears = calculatePropertyArrears(tempRental, undefined, { leaseId: l.id });
+              return {
+                ...l,
+                unpaidUtilityArrearsZAR: Math.max(0, leaseArrears.totalArrearsZAR),
+              };
+            });
+            const arrearsResult = calculatePropertyArrears({ ...tempRental, leases: finalizedLeases });
+            return {
+              ...tempRental,
+              leases: finalizedLeases,
+              unpaidUtilityArrearsZAR: Math.max(0, arrearsResult.totalArrearsZAR),
+            };
+          }),
+        })),
+      recordArrearsWriteOff: (propertyId, writeOff) =>
+        set((state) => ({
+          rentals: state.rentals.map((r) => {
+            if (r.id !== propertyId) return r;
+            const newWriteOff: ArrearsWriteOff = {
+              ...writeOff,
+              id: writeOff.id || `woff-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+              createdAt: new Date().toISOString(),
+            };
+            const updatedWriteOffs = [newWriteOff, ...(r.arrearsWriteOffs || [])].sort((a, b) =>
+              b.date.localeCompare(a.date)
+            );
+            const tempRental: RentalProperty = {
+              ...r,
+              arrearsWriteOffs: updatedWriteOffs,
             };
             const updatedLeases = (tempRental.leases || []).map((l) => {
               const leaseArrears = calculatePropertyArrears(tempRental, undefined, { leaseId: l.id });
@@ -782,14 +937,14 @@ export const usePortfolioStore = create<PortfolioState>()(
             };
           }),
         })),
-      deleteTenantPayment: (propertyId, paymentId) =>
+      deleteArrearsWriteOff: (propertyId, writeOffId) =>
         set((state) => ({
           rentals: state.rentals.map((r) => {
             if (r.id !== propertyId) return r;
-            const updatedPayments = (r.paymentRecords || []).filter((p) => p.id !== paymentId);
+            const updatedWriteOffs = (r.arrearsWriteOffs || []).filter((w) => w.id !== writeOffId);
             const tempRental: RentalProperty = {
               ...r,
-              paymentRecords: updatedPayments,
+              arrearsWriteOffs: updatedWriteOffs,
             };
             const updatedLeases = (tempRental.leases || []).map((l) => {
               const leaseArrears = calculatePropertyArrears(tempRental, undefined, { leaseId: l.id });
@@ -810,16 +965,17 @@ export const usePortfolioStore = create<PortfolioState>()(
         set((state) => ({
           rentals: state.rentals.map((r) => {
             if (r.id !== propertyId) return r;
+            const sanitizedBalance = Math.max(0, openingBalance);
             let updatedLeases = r.leases || [];
-            let propOpening = openingBalance;
+            let propOpening = sanitizedBalance;
 
             if (leaseId) {
               updatedLeases = updatedLeases.map((l) =>
-                l.id === leaseId ? { ...l, arrearsOpeningBalanceZAR: openingBalance } : l
+                l.id === leaseId ? { ...l, arrearsOpeningBalanceZAR: sanitizedBalance } : l
               );
               propOpening = updatedLeases.reduce((s, l) => s + (l.arrearsOpeningBalanceZAR || 0), 0);
             } else if (updatedLeases.length === 1) {
-              updatedLeases = [{ ...updatedLeases[0], arrearsOpeningBalanceZAR: openingBalance }];
+              updatedLeases = [{ ...updatedLeases[0], arrearsOpeningBalanceZAR: sanitizedBalance }];
             }
 
             const tempRental: RentalProperty = {
@@ -1737,10 +1893,12 @@ export const usePortfolioStore = create<PortfolioState>()(
           return migrated;
         });
 
+        const finalRentals = migratedRentals.map((r: RentalProperty) => migrateNegativeArrearsToRental(r));
+
         return {
           ...currentState,
           ...pState,
-          rentals: migratedRentals,
+          rentals: finalRentals,
           opportunities: migratedOpportunities,
           aiSettings: {
             ...DEFAULT_AI_SETTINGS,
@@ -1748,6 +1906,22 @@ export const usePortfolioStore = create<PortfolioState>()(
             model: migratedModel,
           },
         };
+      },
+      onRehydrateStorage: () => (state) => {
+        if (state && Array.isArray(state.rentals)) {
+          const hasNegative = state.rentals.some(
+            (r) =>
+              (typeof r.arrearsOpeningBalanceZAR === 'number' && r.arrearsOpeningBalanceZAR < 0) ||
+              (r.leases || []).some(
+                (l) => typeof l.arrearsOpeningBalanceZAR === 'number' && l.arrearsOpeningBalanceZAR < 0
+              )
+          );
+          if (hasNegative) {
+            usePortfolioStore.setState({
+              rentals: state.rentals.map((r) => migrateNegativeArrearsToRental(r)),
+            });
+          }
+        }
       },
     }
   )
@@ -1869,13 +2043,13 @@ export function computePortfolioSummary(state: {
       (r.monthlyMaintenanceReserveZAR || 0) +
       (r.monthlyBondPaymentZAR || 0) +
       (r.monthlyPrepaidVendingFeeZAR || 0);
-    const arrears = r.unpaidUtilityArrearsZAR || 0;
-    const propNetMonthly = totalGross - expenses - arrears;
+    const propNetMonthly = totalGross - expenses;
 
-    // Property-by-property SARS tax reserve aggregation
+    // Property-by-property SARS tax reserve aggregation (bad debt write-offs are tax-deductible losses)
     const propAnnualCashflow = Math.max(0, propNetMonthly * 12);
+    const propBadDebt = (r.arrearsWriteOffs || []).reduce((sum, w) => sum + (w.amountZAR || 0), 0);
     const propSec13Shield = r.section13sexAnnualShieldZAR || 0;
-    const propTaxableIncome = Math.max(0, propAnnualCashflow - propSec13Shield);
+    const propTaxableIncome = Math.max(0, propAnnualCashflow - propBadDebt - propSec13Shield);
     const propEntityType = r.taxEntityTypeOverride || state.investorProfile?.defaultTaxEntityType || 'Company (27%)';
     const propTaxRate = propEntityType === 'Individual (45%)' ? 0.45 : propEntityType === 'Pre-Tax' ? 0 : 0.27;
     const propAnnualTax = Math.round(propTaxableIncome * propTaxRate);

@@ -295,7 +295,7 @@ export function calculateRentalCashflow(property: {
     prepaidVendingFee;
 
   const unpaidUtilityArrearsZAR = property.unpaidUtilityArrearsZAR || 0;
-  const netMonthlyCashflowZAR = totalGrossIncomeZAR - totalMonthlyExpensesZAR - unpaidUtilityArrearsZAR;
+  const netMonthlyCashflowZAR = totalGrossIncomeZAR - totalMonthlyExpensesZAR;
 
   return {
     agencyCommissionZAR,

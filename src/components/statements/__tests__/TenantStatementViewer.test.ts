@@ -167,4 +167,57 @@ describe('Tenant Statement Ledger & Calculation Engine', () => {
     expect(reading?.readingValue).toBe(39710);
     expect(reading?.consumption).toBe(210);
   });
+
+  describe('Sandhurst Executive Suite Statement Parity & Period Selection', () => {
+    it('defaults to October 2026 with R92,500 brought forward, R18,500 current charges, and R111,000 total due', async () => {
+      const { INITIAL_RENTALS } = await import('@/lib/store/initialData');
+      const { calculateTenantStatementTiers, getStatementLedgerOptions } = await import('@/lib/calculations/arrears');
+
+      const sandhurst = INITIAL_RENTALS[0];
+      const leaseId = sandhurst.leases![0].id;
+
+      // Descending options
+      const options = getStatementLedgerOptions(sandhurst, { leaseId });
+      expect(options.length).toBeGreaterThan(0);
+      expect(options[0].month).toBe('2026-10');
+      expect(options[0].isCurrent).toBe(true);
+      expect(options[0].label).toContain('October 2026');
+      expect(options[0].label).toMatch(/Due:\s*R\s*111\s*000/);
+
+      // October 2026 Tiers
+      const octTiers = calculateTenantStatementTiers(sandhurst, '2026-10', { leaseId });
+      expect(octTiers.balanceBroughtForward).toBe(92500);
+      expect(octTiers.currentCharges).toBe(18500);
+      expect(octTiers.periodPaymentsTotal).toBe(0);
+      expect(octTiers.totalAmountDue).toBe(111000);
+
+      // Overdue breakdown for May-Sep (5 unpaid months)
+      expect(octTiers.priorUnpaidMonths.length).toBe(5);
+      const months = octTiers.priorUnpaidMonths.map((m) => m.month);
+      expect(months).toEqual(['2026-05', '2026-06', '2026-07', '2026-08', '2026-09']);
+      octTiers.priorUnpaidMonths.forEach((m) => {
+        expect(m.netVariance).toBe(18500);
+      });
+    });
+
+    it('displays April 2026 as Paid in Full / Paid Up when selected from descending options', async () => {
+      const { INITIAL_RENTALS } = await import('@/lib/store/initialData');
+      const { calculateTenantStatementTiers, getStatementLedgerOptions } = await import('@/lib/calculations/arrears');
+
+      const sandhurst = INITIAL_RENTALS[0];
+      const leaseId = sandhurst.leases![0].id;
+
+      const options = getStatementLedgerOptions(sandhurst, { leaseId });
+      const aprOption = options.find((o) => o.month === '2026-04');
+      expect(aprOption).toBeDefined();
+      expect(aprOption?.label).toContain('Paid in Full');
+
+      // April 2026 Tiers
+      const aprTiers = calculateTenantStatementTiers(sandhurst, '2026-04', { leaseId });
+      expect(aprTiers.balanceBroughtForward).toBe(0);
+      expect(aprTiers.currentCharges).toBe(20043.05); // 18500 rent + 1543.05 utilities
+      expect(aprTiers.periodPaymentsTotal).toBe(20043.05);
+      expect(aprTiers.totalAmountDue).toBeLessThanOrEqual(0); // Paid up
+    });
+  });
 });

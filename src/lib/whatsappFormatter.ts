@@ -574,13 +574,38 @@ export function formatTenantAccountStatementForWhatsApp(
 
   // 3. Less: Payments Received
   text += `*3. LESS: PAYMENTS RECEIVED*\n`;
-  if (periodPayments.length > 0) {
+  if (tiers.periodAllocatedPayments && tiers.periodAllocatedPayments.length > 0) {
+    tiers.periodAllocatedPayments.forEach(({ payment: p, allocatedAmountZAR }) => {
+      const isDeposit = p.paymentMethod === 'Deposit Applied';
+      const methodLabel = isDeposit ? 'Deposit Applied' : p.paymentMethod;
+      let allocDetail = '';
+      if (p.allocations && p.allocations.length > 1) {
+        const clearedMonths = p.allocations.map((a) => formatMonthLabel(a.periodMonth)).join(', ');
+        allocDetail = ` (${formatZAR(allocatedAmountZAR)} of ${formatZAR(p.amountReceivedZAR)} lump sum — Cleared: ${clearedMonths})`;
+      } else if (p.allocations && p.allocations.length === 1) {
+        allocDetail = ` (Cleared: ${formatMonthLabel(p.allocations[0].periodMonth)})`;
+      } else if (isDeposit) {
+        allocDetail = ' (Deposit applied to arrears)';
+      }
+      text += `• ${formatDate(p.paymentDate)} [${methodLabel}]: -${formatZAR(allocatedAmountZAR, { includeDecimals: true })}${allocDetail}${p.reference ? ` (Ref: ${p.reference})` : ''}\n`;
+    });
+    text += `• *Total Payments Received: -${formatZAR(periodPaymentsTotal, { includeDecimals: true })}*\n\n`;
+  } else if (periodPayments.length > 0) {
     periodPayments.forEach((p) => {
-      text += `• ${formatDate(p.paymentDate)} [${p.paymentMethod}]: -${formatZAR(p.amountReceivedZAR, { includeDecimals: true })}${p.reference ? ` (Ref: ${p.reference})` : ''}\n`;
+      const isDeposit = p.paymentMethod === 'Deposit Applied';
+      const methodLabel = isDeposit ? 'Deposit Applied' : p.paymentMethod;
+      const allocDetail = isDeposit ? ' (Deposit applied to arrears)' : '';
+      text += `• ${formatDate(p.paymentDate)} [${methodLabel}]: -${formatZAR(p.amountReceivedZAR, { includeDecimals: true })}${allocDetail}${p.reference ? ` (Ref: ${p.reference})` : ''}\n`;
     });
     text += `• *Total Payments Received: -${formatZAR(periodPaymentsTotal, { includeDecimals: true })}*\n\n`;
   } else {
     text += `• No payments recorded for this period.\n\n`;
+  }
+
+  // Credits / Write-offs applied (Sanitized: internal notes/reasons omitted)
+  if (tiers.periodWriteOffsTotal > 0) {
+    text += `*CREDITS / BALANCE WRITE-OFFS*\n`;
+    text += `• Credit applied (Balance written off): -${formatZAR(tiers.periodWriteOffsTotal, { includeDecimals: true })}\n\n`;
   }
 
   // 4. Total Amount Due / Outstanding Balance
@@ -626,7 +651,10 @@ export function formatTenantPaymentReceiptForWhatsApp(
   text += `*PAYMENT PARTICULARS:*\n`;
   text += `• Date Received: *${formatDate(payment.paymentDate)}*\n`;
   text += `• Period Applied: *${formatMonthLabel(payment.periodMonth || getMonthKey(payment.paymentDate))}*\n`;
-  text += `• Payment Method: *${payment.paymentMethod}*\n`;
+  text += `• Payment Method: *${payment.paymentMethod}*${payment.paymentMethod === 'Deposit Applied' ? ' (Deposit applied to rent arrears)' : ''}\n`;
+  if (payment.allocations && payment.allocations.length > 0) {
+    text += `• Allocated Months: *${payment.allocations.map((a) => `${formatMonthLabel(a.periodMonth)} (${formatZAR(a.amountZAR)})`).join(', ')}*\n`;
+  }
   if (payment.reference) {
     text += `• Reference / Proof: *${payment.reference}*\n`;
   }

@@ -6,8 +6,29 @@ import { usePortfolioStore, usePortfolioSummary } from '@/lib/store/usePortfolio
 import { formatZAR, formatPercent, formatDate } from '@/lib/formatters';
 import ComplianceChecklist from '@/components/common/ComplianceChecklist';
 import CloudDriveLinkVault from '@/components/common/CloudDriveLinkVault';
-import { RentalProperty, MaintenanceLog, PropertyTitleType, CloudDriveVault, Lease, AncillaryIncome, PaymentMethod, TenantPaymentRecord } from '@/types';
-import { calculatePropertyArrears, reconcileOpeningBalanceForTargetArrears, getMonthKey } from '@/lib/calculations/arrears';
+import {
+  RentalProperty,
+  MaintenanceLog,
+  PropertyTitleType,
+  CloudDriveVault,
+  Lease,
+  AncillaryIncome,
+  PaymentMethod,
+  TenantPaymentRecord,
+  ArrearsWriteOff,
+  ArrearsWriteOffReason,
+  PaymentAllocation,
+} from '@/types';
+import {
+  calculatePropertyArrears,
+  reconcileOpeningBalanceForTargetArrears,
+  getMonthKey,
+  allocateOldestFirst,
+  getUnpaidLedgerMonths,
+  getNextMonthKey,
+  formatAllocationsSummary,
+  formatMonthLabel,
+} from '@/lib/calculations/arrears';
 import { formatTenantAccountStatementForWhatsApp, formatTenantPaymentReceiptForWhatsApp } from '@/lib/whatsappFormatter';
 import { PropertyTypeBadge, AgmDateChip, isAgmUpcoming } from '@/components/common/PropertyTypeBadge';
 import { calculateRentalCashflow, calculateMonthlyBondRepayment, generateRentalLongTermProjection } from '@/lib/calculations/propertyMetrics';
@@ -46,6 +67,7 @@ import {
   FileText,
   Gauge,
   Loader2,
+  MinusCircle,
 } from 'lucide-react';
 import { exportRentalsCSV } from '@/lib/export/csvExport';
 import ImportDropdown from '@/components/common/ImportDropdown';
@@ -234,6 +256,8 @@ export default function RentalPortfolioPage() {
   const recordTenantPayment = usePortfolioStore((state) => state.recordTenantPayment);
   const updateTenantPayment = usePortfolioStore((state) => state.updateTenantPayment);
   const deleteTenantPayment = usePortfolioStore((state) => state.deleteTenantPayment);
+  const recordArrearsWriteOff = usePortfolioStore((state) => state.recordArrearsWriteOff);
+  const deleteArrearsWriteOff = usePortfolioStore((state) => state.deleteArrearsWriteOff);
   const updateArrearsOpeningBalance = usePortfolioStore((state) => state.updateArrearsOpeningBalance);
   const rentalForecastView = usePortfolioStore((state) => state.rentalForecastView);
   const setRentalForecastView = usePortfolioStore((state) => state.setRentalForecastView);
@@ -335,6 +359,18 @@ export default function RentalPortfolioPage() {
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('EFT');
   const [paymentReference, setPaymentReference] = useState<string>('');
   const [paymentNotes, setPaymentNotes] = useState<string>('');
+  const [paymentAllocations, setPaymentAllocations] = useState<PaymentAllocation[]>([]);
+  const [showAllocationsEditor, setShowAllocationsEditor] = useState<boolean>(false);
+
+  // Arrears Write-Off Modal State
+  const [showWriteOffModal, setShowWriteOffModal] = useState(false);
+  const [writeOffPropertyId, setWriteOffPropertyId] = useState<string | null>(null);
+  const [writeOffLeaseId, setWriteOffLeaseId] = useState<string>('');
+  const [writeOffAmount, setWriteOffAmount] = useState<number>(0);
+  const [writeOffDate, setWriteOffDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [writeOffReason, setWriteOffReason] = useState<ArrearsWriteOffReason>('Tenant absconded');
+  const [writeOffNotes, setWriteOffNotes] = useState<string>('');
+  const [writeOffAllocations, setWriteOffAllocations] = useState<PaymentAllocation[]>([]);
 
   // Toast feedback state
   const [copyFeedbackToast, setCopyFeedbackToast] = useState<string | null>(null);
@@ -348,7 +384,8 @@ export default function RentalPortfolioPage() {
     property: RentalProperty,
     targetMonth?: string,
     suggestedAmount?: number,
-    leaseId?: string
+    leaseId?: string,
+    isArrearsPayment?: boolean
   ) => {
     const month = targetMonth || getMonthKey();
     const activeTab = selectedTenantTab[property.id] || 'all';
@@ -363,6 +400,9 @@ export default function RentalPortfolioPage() {
     let amount = 0;
     if (suggestedAmount !== undefined && suggestedAmount > 0) {
       amount = suggestedAmount;
+    } else if (isArrearsPayment) {
+      const arrears = calculatePropertyArrears(property, undefined, effectiveLeaseId ? { leaseId: effectiveLeaseId } : undefined);
+      amount = Math.max(0, arrears.totalArrearsZAR);
     } else if (targetLease) {
       amount = targetLease.monthlyRentZAR || 0;
     } else {
@@ -376,8 +416,23 @@ export default function RentalPortfolioPage() {
     setPaymentDate(new Date().toISOString().split('T')[0]);
     setPaymentAmount(amount);
     setPaymentMethod('EFT');
-    setPaymentReference('');
+    setPaymentReference(isArrearsPayment ? 'Arrears Settlement' : '');
     setPaymentNotes('');
+
+    // Pre-calculate allocations
+    if (isArrearsPayment) {
+      const unpaid = getUnpaidLedgerMonths(property, effectiveLeaseId ? { leaseId: effectiveLeaseId } : undefined);
+      const allocs = allocateOldestFirst(unpaid, amount);
+      setPaymentAllocations(allocs);
+      setShowAllocationsEditor(allocs.length > 1);
+    } else if (targetMonth) {
+      setPaymentAllocations([{ periodMonth: targetMonth, amountZAR: amount }]);
+      setShowAllocationsEditor(false);
+    } else {
+      setPaymentAllocations([{ periodMonth: month, amountZAR: amount }]);
+      setShowAllocationsEditor(false);
+    }
+
     setShowPaymentModal(true);
   };
 
@@ -385,12 +440,20 @@ export default function RentalPortfolioPage() {
     setPaymentPropertyId(property.id);
     setPaymentLeaseId(payment.leaseId || '');
     setEditingPayment(payment);
-    setPaymentPeriodMonth(payment.periodMonth || getMonthKey(payment.paymentDate));
+    const periodMonth = payment.periodMonth || getMonthKey(payment.paymentDate);
+    setPaymentPeriodMonth(periodMonth);
     setPaymentDate(payment.paymentDate);
     setPaymentAmount(payment.amountReceivedZAR);
     setPaymentMethod(payment.paymentMethod);
     setPaymentReference(payment.reference || '');
     setPaymentNotes(payment.notes || '');
+
+    const allocs = payment.allocations && payment.allocations.length > 0
+      ? payment.allocations
+      : [{ periodMonth, amountZAR: payment.amountReceivedZAR }];
+    setPaymentAllocations(allocs);
+    setShowAllocationsEditor(allocs.length > 1);
+
     setShowPaymentModal(true);
   };
 
@@ -398,32 +461,123 @@ export default function RentalPortfolioPage() {
     e.preventDefault();
     if (!paymentPropertyId || paymentAmount <= 0) return;
 
+    const prop = rentals.find((r) => r.id === paymentPropertyId);
+    const targetLease = prop?.leases?.find((l) => l.id === paymentLeaseId);
+
+    // Validate 'Deposit Applied'
+    if (paymentMethod === 'Deposit Applied') {
+      if (!targetLease) {
+        alert('Please select a specific tenant / lease to apply the held deposit from.');
+        return;
+      }
+      const existingDepositRefund = editingPayment && editingPayment.paymentMethod === 'Deposit Applied'
+        ? editingPayment.amountReceivedZAR
+        : 0;
+      const availableDeposit = (targetLease.depositHeldZAR || 0) + existingDepositRefund;
+      if (paymentAmount > availableDeposit) {
+        alert(
+          `Cannot apply ${formatZAR(paymentAmount)}: only ${formatZAR(availableDeposit)} deposit is held in trust for ${targetLease.tenantName}.`
+        );
+        return;
+      }
+    }
+
+    // Clean allocations
+    const validAllocations = paymentAllocations.filter((a) => a.periodMonth && a.amountZAR > 0);
+    const finalAllocations = validAllocations.length > 0
+      ? validAllocations
+      : [{ periodMonth: paymentPeriodMonth, amountZAR: Number(paymentAmount) }];
+
+    const paymentPayload = {
+      paymentDate,
+      amountReceivedZAR: Number(paymentAmount),
+      periodMonth: paymentPeriodMonth,
+      paymentMethod,
+      leaseId: paymentLeaseId || undefined,
+      reference: paymentReference.trim() || undefined,
+      notes: paymentNotes.trim() || undefined,
+      allocations: finalAllocations,
+    };
+
     if (editingPayment) {
-      updateTenantPayment(paymentPropertyId, editingPayment.id, {
-        paymentDate,
-        amountReceivedZAR: Number(paymentAmount),
-        periodMonth: paymentPeriodMonth,
-        paymentMethod,
-        leaseId: paymentLeaseId || undefined,
-        reference: paymentReference.trim() || undefined,
-        notes: paymentNotes.trim() || undefined,
-      });
+      updateTenantPayment(paymentPropertyId, editingPayment.id, paymentPayload);
       setCopyFeedbackToast('Payment updated successfully');
     } else {
-      recordTenantPayment(paymentPropertyId, {
-        paymentDate,
-        amountReceivedZAR: Number(paymentAmount),
-        periodMonth: paymentPeriodMonth,
-        paymentMethod,
-        leaseId: paymentLeaseId || undefined,
-        reference: paymentReference.trim() || undefined,
-        notes: paymentNotes.trim() || undefined,
-      });
+      recordTenantPayment(paymentPropertyId, paymentPayload);
       setCopyFeedbackToast('Payment recorded successfully');
     }
 
     setShowPaymentModal(false);
     setEditingPayment(null);
+  };
+
+  const handleOpenWriteOffModal = (
+    property: RentalProperty,
+    suggestedAmount?: number,
+    leaseId?: string
+  ) => {
+    const activeTab = selectedTenantTab[property.id] || 'all';
+    const effectiveLeaseId =
+      leaseId ||
+      (activeTab !== 'all'
+        ? activeTab
+        : (property.leases && property.leases.length === 1 ? property.leases[0].id : ''));
+
+    const arrears = calculatePropertyArrears(property, undefined, effectiveLeaseId ? { leaseId: effectiveLeaseId } : undefined);
+    const maxBalance = Math.max(0, arrears.totalArrearsZAR);
+    const amount = suggestedAmount !== undefined && suggestedAmount > 0
+      ? Math.min(suggestedAmount, maxBalance)
+      : maxBalance;
+
+    setWriteOffPropertyId(property.id);
+    setWriteOffLeaseId(effectiveLeaseId);
+    setWriteOffAmount(amount);
+    setWriteOffDate(new Date().toISOString().split('T')[0]);
+    setWriteOffReason('Tenant absconded');
+    setWriteOffNotes('');
+
+    const unpaid = getUnpaidLedgerMonths(property, effectiveLeaseId ? { leaseId: effectiveLeaseId } : undefined);
+    const allocs = allocateOldestFirst(unpaid, amount);
+    setWriteOffAllocations(allocs);
+
+    setShowWriteOffModal(true);
+  };
+
+  const handleSaveWriteOff = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!writeOffPropertyId || writeOffAmount <= 0) return;
+
+    const prop = rentals.find((r) => r.id === writeOffPropertyId);
+    if (!prop) return;
+
+    if (prop.leases && prop.leases.length > 1 && !writeOffLeaseId) {
+      alert('Please select a specific lease for this write-off.');
+      return;
+    }
+
+    const arrears = calculatePropertyArrears(prop, undefined, writeOffLeaseId ? { leaseId: writeOffLeaseId } : undefined);
+    const maxBalance = Math.max(0, arrears.totalArrearsZAR);
+    if (writeOffAmount > maxBalance) {
+      alert(`Write-off amount (${formatZAR(writeOffAmount)}) cannot exceed outstanding balance of ${formatZAR(maxBalance)}.`);
+      return;
+    }
+
+    const validAllocations = writeOffAllocations.filter((a) => a.periodMonth && a.amountZAR > 0);
+    const finalAllocations = validAllocations.length > 0
+      ? validAllocations
+      : [{ periodMonth: getMonthKey(writeOffDate), amountZAR: Number(writeOffAmount) }];
+
+    recordArrearsWriteOff(writeOffPropertyId, {
+      date: writeOffDate,
+      amountZAR: Number(writeOffAmount),
+      reason: writeOffReason,
+      notes: writeOffNotes.trim() || undefined,
+      leaseId: writeOffLeaseId || undefined,
+      allocations: finalAllocations,
+    });
+
+    setCopyFeedbackToast(`Written off ${formatZAR(writeOffAmount)} (${writeOffReason})`);
+    setShowWriteOffModal(false);
   };
 
   // Selected Unit for Maintenance Log
@@ -1018,7 +1172,8 @@ export default function RentalPortfolioPage() {
                   const taxRateLabel = entityType === 'Individual (45%)' ? 'Individual 45%' : entityType === 'Pre-Tax' ? 'Pre-Tax 0%' : 'Company 27%';
                   const annualCashflow = Math.max(0, netCashflow * 12);
                   const sec13Shield = property.section13sexAnnualShieldZAR || 0;
-                  const taxableIncome = Math.max(0, annualCashflow - sec13Shield);
+                  const totalBadDebt = (property.arrearsWriteOffs || []).reduce((sum, w) => sum + (w.amountZAR || 0), 0);
+                  const taxableIncome = Math.max(0, annualCashflow - totalBadDebt - sec13Shield);
                   const annualTaxZAR = Math.round(taxableIncome * taxRate);
                   const monthlyTaxZAR = Math.round(annualTaxZAR / 12);
                   const taxSavingsZAR = sec13Shield > 0 ? Math.round(Math.min(annualCashflow, sec13Shield) * taxRate) : 0;
@@ -1920,34 +2075,32 @@ export default function RentalPortfolioPage() {
                                 </div>
 
                                 <p className="text-[10px] text-slate-500 font-mono bg-white/60 p-1.5 rounded border border-slate-200/50">
-                                  Opening Balance ({formatZAR(currentTabArrearsInfo.openingBalanceZAR)}) + Billed Charges ({formatZAR(currentTabArrearsInfo.totalBilledChargesZAR)}) - Payments ({formatZAR(currentTabArrearsInfo.totalPaymentsReceivedZAR)}) = <strong className="text-slate-900">{formatZAR(currentTabArrearsInfo.totalArrearsZAR)}</strong>
+                                  Opening Balance ({formatZAR(currentTabArrearsInfo.openingBalanceZAR)}) + Billed Charges ({formatZAR(currentTabArrearsInfo.totalBilledChargesZAR)}) - Payments ({formatZAR(currentTabArrearsInfo.totalPaymentsReceivedZAR)}) {currentTabArrearsInfo.totalWriteOffsZAR > 0 ? `- Write-offs (${formatZAR(currentTabArrearsInfo.totalWriteOffsZAR)}) ` : ''}= <strong className="text-slate-900">{formatZAR(currentTabArrearsInfo.totalArrearsZAR)}</strong>
                                 </p>
 
-                                {/* Live Arrears Reconciliation Controls */}
+                                {/* Opening Balance & Action Controls */}
                                 <div className="flex items-center justify-between gap-2 mt-2 pt-2 border-t border-slate-200 flex-wrap">
-                                  <div className="flex items-center gap-1.5 flex-1 min-w-[200px]">
-                                    <span className="text-[10px] text-slate-600 font-semibold">
-                                      Reconcile / Set Arrears:
+                                  <div className="flex items-center gap-1.5 flex-1 min-w-[240px]">
+                                    <span className="text-[10px] text-slate-600 font-semibold" title="Historical debt from before system tracking. Edit directly (>= 0).">
+                                      Opening Balance (debt from before tracking):
                                     </span>
                                     <div className="relative flex-1 max-w-[120px]">
                                       <span className="absolute left-2.5 top-1 text-xs text-slate-400 font-bold">R</span>
                                       <input
                                         type="number"
                                         step="any"
-                                        key={`${property.id}-${activeTenantTab}-rec-${currentTabArrearsInfo.totalArrearsZAR}`}
-                                        defaultValue={currentTabArrearsInfo.totalArrearsZAR}
+                                        min="0"
+                                        key={`${property.id}-${activeTenantTab}-ob-${currentTabArrearsInfo.openingBalanceZAR}`}
+                                        defaultValue={currentTabArrearsInfo.openingBalanceZAR}
                                         onBlur={(e) => {
-                                          const targetVal = Number(e.target.value);
-                                          if (!isNaN(targetVal) && targetVal !== currentTabArrearsInfo.totalArrearsZAR) {
-                                            if (activeTenantLease) {
-                                              const newOpening = reconcileOpeningBalanceForTargetArrears(property, targetVal, undefined, { leaseId: activeTenantLease.id });
-                                              updateArrearsOpeningBalance(property.id, newOpening, activeTenantLease.id);
-                                              setCopyFeedbackToast(`${activeTenantLease.unitName} arrears reconciled to ${formatZAR(targetVal)} (Opening balance: ${formatZAR(newOpening)})`);
-                                            } else {
-                                              const newOpening = reconcileOpeningBalanceForTargetArrears(property, targetVal);
-                                              updateArrearsOpeningBalance(property.id, newOpening);
-                                              setCopyFeedbackToast(`Property arrears reconciled to ${formatZAR(targetVal)} (Opening balance: ${formatZAR(newOpening)})`);
-                                            }
+                                          const targetVal = Math.max(0, Number(e.target.value) || 0);
+                                          if (targetVal !== currentTabArrearsInfo.openingBalanceZAR) {
+                                            updateArrearsOpeningBalance(property.id, targetVal, activeTenantLease?.id);
+                                            setCopyFeedbackToast(
+                                              activeTenantLease
+                                                ? `${activeTenantLease.unitName} opening balance updated to ${formatZAR(targetVal)}`
+                                                : `Opening balance updated to ${formatZAR(targetVal)}`
+                                            );
                                           }
                                         }}
                                         onKeyDown={(e) => {
@@ -1956,31 +2109,50 @@ export default function RentalPortfolioPage() {
                                           }
                                         }}
                                         className="w-full pl-6 pr-2 py-0.5 text-xs font-mono font-bold bg-white rounded border border-slate-300 focus:outline-none focus:ring-1 focus:ring-emerald-500 text-slate-800"
-                                        title="Type arrears amount and press Enter or blur to reconcile opening balance."
+                                        title="Opening balance from before tracking. Direct edit (>= 0)."
                                       />
                                     </div>
                                   </div>
 
-                                  {currentTabArrearsInfo.totalArrearsZAR > 0 && (
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        if (activeTenantLease) {
-                                          const newOpening = reconcileOpeningBalanceForTargetArrears(property, 0, undefined, { leaseId: activeTenantLease.id });
-                                          updateArrearsOpeningBalance(property.id, newOpening, activeTenantLease.id);
-                                          setCopyFeedbackToast(`${activeTenantLease.unitName} arrears cleared to R 0.00`);
-                                        } else {
-                                          const newOpening = reconcileOpeningBalanceForTargetArrears(property, 0);
-                                          updateArrearsOpeningBalance(property.id, newOpening);
-                                          setCopyFeedbackToast('Property arrears cleared to R 0.00 via opening balance adjustment');
-                                        }
-                                      }}
-                                      className="px-2.5 py-1 text-[10px] font-bold bg-white border border-rose-200 text-rose-600 hover:bg-rose-50 rounded transition-colors cursor-pointer shadow-2xs"
-                                      title="Adjust opening balance so calculated arrears equals R 0.00"
-                                    >
-                                      Clear Arrears (R 0)
-                                    </button>
-                                  )}
+                                  <div className="flex items-center gap-1.5 flex-wrap">
+                                    {currentTabArrearsInfo.totalArrearsZAR > 0 && (
+                                      <>
+                                        <button
+                                          type="button"
+                                          onClick={() =>
+                                            handleOpenLogPaymentModal(
+                                              property,
+                                              undefined,
+                                              currentTabArrearsInfo.totalArrearsZAR,
+                                              activeTenantLease?.id,
+                                              true // isArrearsPayment
+                                            )
+                                          }
+                                          className="inline-flex items-center gap-1 px-2.5 py-1 text-[10px] font-bold bg-emerald-600 hover:bg-emerald-700 text-white rounded transition-colors cursor-pointer shadow-2xs"
+                                          title="Receive payment towards accumulated arrears (allocated oldest-unpaid-month-first)"
+                                        >
+                                          <Coins className="w-3 h-3" />
+                                          <span>Receive Arrears Payment</span>
+                                        </button>
+
+                                        <button
+                                          type="button"
+                                          onClick={() =>
+                                            handleOpenWriteOffModal(
+                                              property,
+                                              currentTabArrearsInfo.totalArrearsZAR,
+                                              activeTenantLease?.id
+                                            )
+                                          }
+                                          className="inline-flex items-center gap-1 px-2.5 py-1 text-[10px] font-bold bg-white border border-rose-200 text-rose-600 hover:bg-rose-50 rounded transition-colors cursor-pointer shadow-2xs"
+                                          title="Write off uncollectable arrears with audit reason and tax deduction"
+                                        >
+                                          <MinusCircle className="w-3 h-3 text-rose-500" />
+                                          <span>Write Off</span>
+                                        </button>
+                                      </>
+                                    )}
+                                  </div>
                                 </div>
                               </div>
 
@@ -2059,6 +2231,11 @@ export default function RentalPortfolioPage() {
                                           <span className="text-slate-500">
                                             Paid: <strong className="text-emerald-700 font-mono">{formatZAR(item.paymentsReceived)}</strong>
                                           </span>
+                                          {item.writeOffsApplied > 0 && (
+                                            <span className="text-slate-500">
+                                              Written off: <strong className="text-slate-600 font-mono">-{formatZAR(item.writeOffsApplied)}</strong>
+                                            </span>
+                                          )}
                                           <span
                                             className={`font-mono font-bold ${
                                               item.netVariance > 0
@@ -2078,21 +2255,26 @@ export default function RentalPortfolioPage() {
                                       </div>
 
                                       {/* Itemized Payments for this month */}
-                                      {item.payments.length > 0 ? (
+                                      {item.allocatedPayments && item.allocatedPayments.length > 0 ? (
                                         <div className="space-y-1 pt-1 border-t border-slate-200/60">
-                                          {item.payments.map((p) => {
+                                          {item.allocatedPayments.map(({ payment: p, allocatedAmountZAR }) => {
                                             const paymentLease = (property.leases || []).find((l) => l.id === p.leaseId);
+                                            const isDeposit = p.paymentMethod === 'Deposit Applied';
                                             return (
                                               <div
-                                                key={p.id}
+                                                key={`${p.id}-${item.month}`}
                                                 className="flex items-center justify-between bg-white px-2 py-1 rounded border border-slate-200 text-[11px]"
                                               >
                                                 <div className="flex items-center gap-1.5 flex-wrap">
                                                   <span className="font-semibold text-slate-700">
                                                     {formatDate(p.paymentDate)}
                                                   </span>
-                                                  <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-slate-100 text-slate-600 border border-slate-200">
-                                                    {p.paymentMethod}
+                                                  <span className={`text-[9px] font-bold px-1.5 py-0.2 rounded border ${
+                                                    isDeposit
+                                                      ? 'bg-amber-50 text-amber-800 border-amber-200'
+                                                      : 'bg-slate-100 text-slate-600 border-slate-200'
+                                                  }`}>
+                                                    {isDeposit ? 'Deposit Applied' : p.paymentMethod}
                                                   </span>
                                                   {paymentLease && (
                                                     <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">
@@ -2104,11 +2286,16 @@ export default function RentalPortfolioPage() {
                                                       Ref: {p.reference}
                                                     </span>
                                                   )}
+                                                  {allocatedAmountZAR < p.amountReceivedZAR && (
+                                                    <span className="text-[10px] text-slate-500 font-medium">
+                                                      ({formatZAR(allocatedAmountZAR)} of {formatZAR(p.amountReceivedZAR)})
+                                                    </span>
+                                                  )}
                                                 </div>
 
                                                 <div className="flex items-center gap-2">
                                                   <span className="font-mono font-bold text-emerald-700">
-                                                    {formatZAR(p.amountReceivedZAR)}
+                                                    {formatZAR(allocatedAmountZAR)}
                                                   </span>
                                                   <div className="flex items-center gap-1">
                                                     <button
@@ -2167,22 +2354,81 @@ export default function RentalPortfolioPage() {
                                       ) : (
                                         <div className="flex items-center justify-between text-[10px] text-slate-400 pt-0.5">
                                           <span>No payments recorded for {item.monthLabel}</span>
-                                          <button
-                                            type="button"
-                                            onClick={() =>
-                                              handleOpenLogPaymentModal(
-                                                property,
-                                                item.month,
-                                                item.netVariance > 0 ? item.netVariance : item.totalBilled,
-                                                activeTenantLease?.id
-                                              )
-                                            }
-                                            className="text-emerald-700 hover:text-emerald-900 font-bold hover:underline cursor-pointer"
-                                          >
-                                            + Add Payment
-                                          </button>
                                         </div>
                                       )}
+
+                                      {/* Itemized Write-offs for this month */}
+                                      {item.allocatedWriteOffs && item.allocatedWriteOffs.length > 0 && (
+                                        <div className="space-y-1 pt-1 border-t border-slate-200/60">
+                                          {item.allocatedWriteOffs.map(({ writeOff: w, allocatedAmountZAR }) => (
+                                            <div
+                                              key={`woff-${w.id}-${item.month}`}
+                                              className="flex items-center justify-between bg-slate-100/90 px-2 py-1 rounded border border-slate-200 text-[11px]"
+                                            >
+                                              <div className="flex items-center gap-1.5 flex-wrap">
+                                                <span className="font-semibold text-slate-600">
+                                                  {formatDate(w.date)}
+                                                </span>
+                                                <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-slate-200 text-slate-700 border border-slate-300">
+                                                  Written off ({w.reason})
+                                                </span>
+                                                {allocatedAmountZAR < w.amountZAR && (
+                                                  <span className="text-[10px] text-slate-500">
+                                                    ({formatZAR(allocatedAmountZAR)} of {formatZAR(w.amountZAR)})
+                                                  </span>
+                                                )}
+                                                {w.notes && (
+                                                  <span className="text-[10px] text-slate-400 italic">
+                                                    {w.notes}
+                                                  </span>
+                                                )}
+                                              </div>
+                                              <div className="flex items-center gap-2">
+                                                <span className="font-mono font-bold text-slate-600">
+                                                  -{formatZAR(allocatedAmountZAR)}
+                                                </span>
+                                                <button
+                                                  type="button"
+                                                  onClick={() => {
+                                                    if (
+                                                      window.confirm(
+                                                        `Delete write-off of ${formatZAR(
+                                                          w.amountZAR
+                                                        )} recorded on ${formatDate(w.date)}? This will restore arrears.`
+                                                      )
+                                                    ) {
+                                                      deleteArrearsWriteOff(property.id, w.id);
+                                                      setCopyFeedbackToast('Write-off deleted and arrears restored');
+                                                    }
+                                                  }}
+                                                  className="p-1 text-rose-400 hover:text-rose-700 hover:bg-rose-50 rounded transition-colors cursor-pointer"
+                                                  title="Delete write-off"
+                                                >
+                                                  <Trash2 className="w-3.5 h-3.5" />
+                                                </button>
+                                              </div>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      )}
+
+                                      {/* Per-month + Add Payment shortcut */}
+                                      <div className="flex justify-end pt-0.5">
+                                        <button
+                                          type="button"
+                                          onClick={() =>
+                                            handleOpenLogPaymentModal(
+                                              property,
+                                              item.month,
+                                              item.netVariance > 0 ? item.netVariance : item.totalBilled,
+                                              activeTenantLease?.id
+                                            )
+                                          }
+                                          className="text-emerald-700 hover:text-emerald-900 font-bold hover:underline text-[10px] cursor-pointer"
+                                        >
+                                          + Add Payment
+                                        </button>
+                                      </div>
                                     </div>
                                   ))}
                                 </div>
@@ -4168,10 +4414,12 @@ export default function RentalPortfolioPage() {
       {showPaymentModal && paymentPropertyId && (() => {
         const prop = rentals.find((r) => r.id === paymentPropertyId);
         if (!prop) return null;
+        const targetLease = prop.leases?.find((l) => l.id === paymentLeaseId);
+
         return (
           <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-            <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 duration-150">
-              <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/80">
+            <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-lg max-h-[90vh] overflow-y-auto animate-in fade-in zoom-in-95 duration-150">
+              <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/80 sticky top-0 bg-white z-10">
                 <div className="flex items-center gap-2">
                   <div className="p-2 rounded-xl bg-emerald-100 text-emerald-800">
                     <CreditCard className="w-5 h-5 text-emerald-600" />
@@ -4271,7 +4519,13 @@ export default function RentalPortfolioPage() {
                         step="any"
                         required
                         value={paymentAmount || ''}
-                        onChange={(e) => setPaymentAmount(parseFloat(e.target.value) || 0)}
+                        onChange={(e) => {
+                          const val = parseFloat(e.target.value) || 0;
+                          setPaymentAmount(val);
+                          if (paymentAllocations.length <= 1) {
+                            setPaymentAllocations([{ periodMonth: paymentPeriodMonth, amountZAR: val }]);
+                          }
+                        }}
                         placeholder="0.00"
                         className="w-full pl-8 pr-3 py-2 text-sm font-mono font-bold rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500"
                       />
@@ -4292,8 +4546,154 @@ export default function RentalPortfolioPage() {
                     <option value="Cash Deposit">Cash Deposit (Bank ATM / Branch)</option>
                     <option value="Debit Order">Debit Order</option>
                     <option value="Instant EFT / Card">Instant EFT / Card (PayFast / Ozow)</option>
+                    <option value="Deposit Applied">Deposit Applied (Deduct from Held Deposit)</option>
                     <option value="Other">Other</option>
                   </select>
+                </div>
+
+                {paymentMethod === 'Deposit Applied' && (
+                  <div
+                    className={`p-3 rounded-xl text-xs border ${
+                      targetLease && (targetLease.depositHeldZAR || 0) >= paymentAmount
+                        ? 'bg-amber-50 border-amber-200 text-amber-900'
+                        : 'bg-rose-50 border-rose-200 text-rose-900'
+                    }`}
+                  >
+                    <div className="font-semibold flex items-center justify-between">
+                      <span>Held Security Deposit in Trust:</span>
+                      <span className="font-mono text-sm font-bold">
+                        {targetLease ? formatZAR(targetLease.depositHeldZAR || 0) : 'R 0'}
+                      </span>
+                    </div>
+                    <p className="text-[11px] mt-1 leading-relaxed opacity-90">
+                      Applying this deposit directly settles rent/utility arrears and permanently deducts the amount from the tenant's held security deposit balance.
+                      {!targetLease && (
+                        <span className="block text-rose-600 font-bold mt-1">
+                          ⚠️ Please select a specific tenant / lease above to apply the deposit from.
+                        </span>
+                      )}
+                      {targetLease && (targetLease.depositHeldZAR || 0) < paymentAmount && (
+                        <span className="block text-rose-600 font-bold mt-1">
+                          ⚠️ Requested payment amount ({formatZAR(paymentAmount)}) exceeds available held deposit ({formatZAR(targetLease.depositHeldZAR || 0)}).
+                        </span>
+                      )}
+                    </p>
+                  </div>
+                )}
+
+                {/* Multi-Month Allocation Breakdown */}
+                <div className="border border-slate-200 rounded-xl p-3 bg-slate-50/70 space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                        <span>Ledger Month Allocation</span>
+                        {paymentAllocations.length > 1 && (
+                          <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-100 text-emerald-800">
+                            {paymentAllocations.length} months
+                          </span>
+                        )}
+                      </label>
+                      <p className="text-[10px] text-slate-500">
+                        Allocate lump sum across specific billing months
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const unpaid = getUnpaidLedgerMonths(prop, paymentLeaseId ? { leaseId: paymentLeaseId } : undefined);
+                          const allocs = allocateOldestFirst(unpaid, paymentAmount);
+                          setPaymentAllocations(allocs);
+                          setShowAllocationsEditor(true);
+                        }}
+                        className="text-[11px] font-semibold text-emerald-700 hover:text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 px-2 py-1 rounded cursor-pointer transition-colors"
+                      >
+                        Auto-allocate (Oldest First)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setShowAllocationsEditor(!showAllocationsEditor)}
+                        className="text-xs text-slate-500 hover:text-slate-700 underline cursor-pointer"
+                      >
+                        {showAllocationsEditor ? 'Hide Details' : 'Customize'}
+                      </button>
+                    </div>
+                  </div>
+
+                  {showAllocationsEditor && (
+                    <div className="space-y-2 pt-2 border-t border-slate-200">
+                      {paymentAllocations.map((alloc, idx) => (
+                        <div key={idx} className="flex items-center gap-2">
+                          <input
+                            type="month"
+                            value={alloc.periodMonth}
+                            onChange={(e) => {
+                              const updated = [...paymentAllocations];
+                              updated[idx] = { ...updated[idx], periodMonth: e.target.value };
+                              setPaymentAllocations(updated);
+                            }}
+                            className="px-2 py-1 text-xs rounded border border-slate-300 bg-white"
+                          />
+                          <div className="relative flex-1">
+                            <span className="absolute left-2 top-1 text-xs font-bold text-slate-400">R</span>
+                            <input
+                              type="number"
+                              min="0"
+                              step="any"
+                              value={alloc.amountZAR || ''}
+                              onChange={(e) => {
+                                const updated = [...paymentAllocations];
+                                updated[idx] = { ...updated[idx], amountZAR: parseFloat(e.target.value) || 0 };
+                                setPaymentAllocations(updated);
+                              }}
+                              className="w-full pl-6 pr-2 py-1 text-xs font-mono font-bold rounded border border-slate-300 bg-white"
+                              placeholder="0.00"
+                            />
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const updated = paymentAllocations.filter((_, i) => i !== idx);
+                              setPaymentAllocations(updated.length > 0 ? updated : [{ periodMonth: paymentPeriodMonth, amountZAR: paymentAmount }]);
+                            }}
+                            className="text-slate-400 hover:text-rose-600 text-sm px-1 cursor-pointer"
+                            title="Remove month allocation"
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      ))}
+
+                      <div className="flex items-center justify-between pt-1">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const lastMonth = paymentAllocations[paymentAllocations.length - 1]?.periodMonth || paymentPeriodMonth;
+                            setPaymentAllocations([...paymentAllocations, { periodMonth: getNextMonthKey(lastMonth), amountZAR: 0 }]);
+                          }}
+                          className="text-[11px] font-semibold text-slate-600 hover:text-slate-900 cursor-pointer"
+                        >
+                          + Add Month Row
+                        </button>
+                        {(() => {
+                          const allocatedSum = paymentAllocations.reduce((s, a) => s + (a.amountZAR || 0), 0);
+                          const diff = Math.round((paymentAmount - allocatedSum) * 100) / 100;
+                          return (
+                            <span className={`text-[11px] font-mono ${diff === 0 ? 'text-emerald-600 font-bold' : 'text-amber-600 font-bold'}`}>
+                              Allocated: {formatZAR(allocatedSum)}
+                              {diff !== 0 && ` (${diff > 0 ? `+${formatZAR(diff)} unallocated` : `${formatZAR(Math.abs(diff))} over`})`}
+                            </span>
+                          );
+                        })()}
+                      </div>
+                    </div>
+                  )}
+
+                  {!showAllocationsEditor && paymentAllocations.length > 0 && (
+                    <div className="text-[11px] text-slate-600 font-mono bg-white px-2.5 py-1.5 rounded border border-slate-200">
+                      {paymentAllocations.map((a) => `${formatMonthLabel(a.periodMonth)}: ${formatZAR(a.amountZAR)} ✓`).join(', ')}
+                    </div>
+                  )}
                 </div>
 
                 <div>
@@ -4335,6 +4735,275 @@ export default function RentalPortfolioPage() {
                     className="px-4 py-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg shadow-sm transition-colors cursor-pointer"
                   >
                     {editingPayment ? 'Save Changes' : 'Record Payment'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Arrears Write-Off Modal (Bad Debt Audit Record) */}
+      {showWriteOffModal && writeOffPropertyId && (() => {
+        const prop = rentals.find((r) => r.id === writeOffPropertyId);
+        if (!prop) return null;
+        const targetLease = prop.leases?.find((l) => l.id === writeOffLeaseId);
+
+        return (
+          <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+            <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-lg max-h-[90vh] overflow-y-auto animate-in fade-in zoom-in-95 duration-150">
+              <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-rose-50/70 sticky top-0 bg-white z-10">
+                <div className="flex items-center gap-2">
+                  <div className="p-2 rounded-xl bg-rose-100 text-rose-800">
+                    <Archive className="w-5 h-5 text-rose-600" />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-bold text-slate-900">
+                      Write Off Tenant Arrears
+                    </h3>
+                    <p className="text-xs text-slate-500">
+                      {prop.title} {targetLease ? `• ${targetLease.tenantName}` : ''}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowWriteOffModal(false)}
+                  className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <form onSubmit={handleSaveWriteOff} className="p-6 space-y-4">
+                <div className="p-3 bg-amber-50 rounded-xl border border-amber-200 text-xs text-amber-900 space-y-1">
+                  <div className="font-semibold flex items-center gap-1.5">
+                    <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+                    <span>SARS Bad Debt & Audit Trail Notice</span>
+                  </div>
+                  <p className="text-[11px] leading-relaxed text-amber-800">
+                    Writing off arrears relieves the tenant debt in the operational ledger and enables bad debt deduction under Section 11(i) of the Income Tax Act. Internal reasons and audit notes are strictly confidential and will <strong>never</strong> appear on tenant-facing statements or WhatsApp messages.
+                  </p>
+                </div>
+
+                {prop.leases && prop.leases.length > 0 && (
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">
+                      Tenant / Unit {prop.leases.length > 1 && <span className="text-rose-600 font-bold">*</span>}
+                    </label>
+                    <select
+                      required={prop.leases.length > 1}
+                      value={writeOffLeaseId}
+                      onChange={(e) => {
+                        const newLeaseId = e.target.value;
+                        setWriteOffLeaseId(newLeaseId);
+                        const leaseArrears = calculatePropertyArrears(prop, undefined, newLeaseId ? { leaseId: newLeaseId } : undefined);
+                        const maxForLease = Math.max(0, leaseArrears.totalArrearsZAR);
+                        const newAmount = Math.min(writeOffAmount || maxForLease, maxForLease);
+                        setWriteOffAmount(newAmount);
+                        const unpaid = getUnpaidLedgerMonths(prop, newLeaseId ? { leaseId: newLeaseId } : undefined);
+                        const allocs = allocateOldestFirst(unpaid, newAmount);
+                        setWriteOffAllocations(allocs);
+                      }}
+                      className="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-rose-500 bg-white"
+                    >
+                      {prop.leases.length > 1 && (
+                        <option value="" disabled>-- Select Lease (Required) --</option>
+                      )}
+                      {prop.leases.map((l) => (
+                        <option key={l.id} value={l.id}>
+                          {l.unitName ? `${l.unitName} - ` : ''}{l.tenantName} ({formatZAR(l.monthlyRentZAR)}/mo)
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                {(() => {
+                  const leaseArrears = calculatePropertyArrears(prop, undefined, writeOffLeaseId ? { leaseId: writeOffLeaseId } : undefined);
+                  const maxEligible = Math.max(0, leaseArrears.totalArrearsZAR);
+                  return (
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-700 mb-1">
+                          Write-Off Date
+                        </label>
+                        <input
+                          type="date"
+                          required
+                          value={writeOffDate}
+                          onChange={(e) => setWriteOffDate(e.target.value)}
+                          className="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-rose-500"
+                        />
+                      </div>
+
+                      <div>
+                        <div className="flex items-center justify-between mb-1">
+                          <label className="block text-xs font-semibold text-slate-700">
+                            Amount to Write Off (ZAR)
+                          </label>
+                          {maxEligible > 0 && (
+                            <span className="text-[10px] text-slate-500">
+                              Max: <strong className="text-slate-700 font-mono">{formatZAR(maxEligible)}</strong>
+                            </span>
+                          )}
+                        </div>
+                        <div className="relative">
+                          <span className="absolute left-3 top-2 text-sm font-bold text-slate-400">R</span>
+                          <input
+                            type="number"
+                            min="0.01"
+                            max={maxEligible > 0 ? maxEligible : undefined}
+                            step="any"
+                            required
+                            value={writeOffAmount || ''}
+                            onChange={(e) => {
+                              const val = parseFloat(e.target.value) || 0;
+                              setWriteOffAmount(val);
+                              const unpaid = getUnpaidLedgerMonths(prop, writeOffLeaseId ? { leaseId: writeOffLeaseId } : undefined);
+                              setWriteOffAllocations(allocateOldestFirst(unpaid, val));
+                            }}
+                            placeholder="0.00"
+                            className="w-full pl-8 pr-3 py-2 text-sm font-mono font-bold rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-rose-500"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Audit Reason (Tax / SARS Justification)
+                  </label>
+                  <select
+                    value={writeOffReason}
+                    onChange={(e) => setWriteOffReason(e.target.value as ArrearsWriteOffReason)}
+                    className="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-rose-500 bg-white"
+                  >
+                    <option value="Tenant absconded">Tenant absconded</option>
+                    <option value="Settlement / discount agreed">Settlement / discount agreed</option>
+                    <option value="Uncollectable / bad debt">Uncollectable / bad debt</option>
+                    <option value="Other">Other</option>
+                  </select>
+                </div>
+
+                {/* Month Allocation Breakdown for Write-Off */}
+                <div className="border border-slate-200 rounded-xl p-3 bg-slate-50/60 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <label className="text-xs font-bold text-slate-800">
+                        Target Billing Months to Clear
+                      </label>
+                      <p className="text-[10px] text-slate-500">
+                        Select which historical months' debt will be reduced
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const unpaid = getUnpaidLedgerMonths(prop, writeOffLeaseId ? { leaseId: writeOffLeaseId } : undefined);
+                        setWriteOffAllocations(allocateOldestFirst(unpaid, writeOffAmount));
+                      }}
+                      className="text-[11px] font-semibold text-rose-700 hover:text-rose-800 bg-rose-50 hover:bg-rose-100 border border-rose-200 px-2 py-1 rounded cursor-pointer transition-colors"
+                    >
+                      Auto-allocate (Oldest First)
+                    </button>
+                  </div>
+
+                  <div className="space-y-1.5 pt-1">
+                    {writeOffAllocations.map((alloc, idx) => (
+                      <div key={idx} className="flex items-center gap-2">
+                        <input
+                          type="month"
+                          value={alloc.periodMonth}
+                          onChange={(e) => {
+                            const updated = [...writeOffAllocations];
+                            updated[idx] = { ...updated[idx], periodMonth: e.target.value };
+                            setWriteOffAllocations(updated);
+                          }}
+                          className="px-2 py-1 text-xs rounded border border-slate-300 bg-white"
+                        />
+                        <div className="relative flex-1">
+                          <span className="absolute left-2 top-1 text-xs font-bold text-slate-400">R</span>
+                          <input
+                            type="number"
+                            min="0"
+                            step="any"
+                            value={alloc.amountZAR || ''}
+                            onChange={(e) => {
+                              const updated = [...writeOffAllocations];
+                              updated[idx] = { ...updated[idx], amountZAR: parseFloat(e.target.value) || 0 };
+                              setWriteOffAllocations(updated);
+                            }}
+                            className="w-full pl-6 pr-2 py-1 text-xs font-mono font-bold rounded border border-slate-300 bg-white"
+                            placeholder="0.00"
+                          />
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const updated = writeOffAllocations.filter((_, i) => i !== idx);
+                            setWriteOffAllocations(updated);
+                          }}
+                          className="text-slate-400 hover:text-rose-600 text-sm px-1 cursor-pointer"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="flex items-center justify-between pt-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const lastMonth = writeOffAllocations[writeOffAllocations.length - 1]?.periodMonth || getMonthKey(writeOffDate);
+                        setWriteOffAllocations([...writeOffAllocations, { periodMonth: getNextMonthKey(lastMonth), amountZAR: 0 }]);
+                      }}
+                      className="text-[11px] font-semibold text-slate-600 hover:text-slate-900 cursor-pointer"
+                    >
+                      + Add Month Row
+                    </button>
+                    {(() => {
+                      const totalAlloc = writeOffAllocations.reduce((s, a) => s + (a.amountZAR || 0), 0);
+                      const diff = Math.round((writeOffAmount - totalAlloc) * 100) / 100;
+                      return (
+                        <span className={`text-[11px] font-mono ${diff === 0 ? 'text-emerald-600 font-bold' : 'text-amber-600 font-bold'}`}>
+                          Total Allocated: {formatZAR(totalAlloc)}
+                          {diff !== 0 && ` (${diff > 0 ? `+${formatZAR(diff)} unallocated` : `${formatZAR(Math.abs(diff))} over`})`}
+                        </span>
+                      );
+                    })()}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Internal Audit Notes (Confidential)
+                  </label>
+                  <textarea
+                    rows={2}
+                    value={writeOffNotes}
+                    onChange={(e) => setWriteOffNotes(e.target.value)}
+                    placeholder="Record debt recovery attempts, case numbers, attorney correspondence, or settlement terms..."
+                    className="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-rose-500 resize-none"
+                  />
+                </div>
+
+                <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+                  <button
+                    type="button"
+                    onClick={() => setShowWriteOffModal(false)}
+                    className="px-4 py-2 text-xs font-semibold text-slate-600 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-4 py-2 text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 rounded-lg shadow-sm transition-colors cursor-pointer"
+                  >
+                    Confirm Write-Off
                   </button>
                 </div>
               </form>
