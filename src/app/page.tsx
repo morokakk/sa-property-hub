@@ -8,6 +8,7 @@ import PriorityTasksWidget from '@/components/dashboard/PriorityTasksWidget';
 import { usePortfolioStore, usePortfolioSummary } from '@/lib/store/usePortfolioStore';
 import { formatZAR, formatPercent, formatDate } from '@/lib/formatters';
 import { calculateRentalCashflow } from '@/lib/calculations/propertyMetrics';
+import { calculatePropertyArrears } from '@/lib/calculations/arrears';
 import {
   TrendingUp,
   ShieldCheck,
@@ -558,7 +559,9 @@ export default function GlobalDashboardPage() {
               <div className="space-y-3">
                 {rentals.map((rental) => {
                   const { netMonthlyCashflowZAR: netMonthly } = calculateRentalCashflow(rental);
-                  const hasArrears = (rental.unpaidUtilityArrearsZAR || 0) > 0;
+                  const arrearsInfo = calculatePropertyArrears(rental);
+                  const totalArrears = Math.max(0, arrearsInfo.totalArrearsZAR);
+                  const hasArrears = totalArrears > 0;
 
                   return (
                     <div
@@ -581,7 +584,7 @@ export default function GlobalDashboardPage() {
                         <div className="flex items-center gap-1">
                           {hasArrears && (
                             <span className="text-[9px] font-bold bg-rose-100 text-rose-800 border border-rose-300 px-1.5 py-0.5 rounded-full">
-                              ⚠️ Arrears: -{formatZAR(rental.unpaidUtilityArrearsZAR || 0)}
+                              ⚠️ Arrears: -{formatZAR(totalArrears)}
                             </span>
                           )}
                           <span className="text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded-full">

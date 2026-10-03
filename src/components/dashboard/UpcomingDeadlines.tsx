@@ -112,6 +112,52 @@ export default function UpcomingDeadlines() {
       });
     });
 
+  // 5. Active Lease Expiries (Surfaced if expiring within 90 days or overdue)
+  rentals.forEach((r) => {
+    (r.leases || []).forEach((l) => {
+      if (!l.leaseEndDate || l.status === 'Vacant') return;
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const end = new Date(l.leaseEndDate);
+      const diffDays = Math.ceil((end.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+      if (diffDays <= 90 && diffDays >= -30) {
+        const isExpired = diffDays < 0;
+        deadlines.push({
+          id: `lease-${r.id}-${l.id}`,
+          title: `Lease Expiry: ${l.tenantName}`,
+          date: l.leaseEndDate,
+          type: 'lease',
+          badge: isExpired ? 'Lease Overdue' : 'Lease Renewal',
+          badgeColor: isExpired
+            ? 'bg-rose-100 text-rose-800 border-rose-300 font-bold'
+            : 'bg-purple-100 text-purple-800 border-purple-200 font-medium',
+          detail: `${r.title} (${l.unitName}) • ${formatZAR(l.monthlyRentZAR)}/mo`,
+          isUrgentDispute: isExpired,
+        });
+      }
+    });
+  });
+
+  // 6. Sectional Title Body Corporate AGMs (Within 90 days)
+  rentals.forEach((r) => {
+    if (!r.agmDate) return;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const agm = new Date(r.agmDate);
+    const diffDays = Math.ceil((agm.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+    if (diffDays <= 90 && diffDays >= -7) {
+      deadlines.push({
+        id: `agm-${r.id}`,
+        title: `Body Corporate AGM: ${r.title}`,
+        date: r.agmDate,
+        type: 'conveyancing',
+        badge: 'Sectional Title AGM',
+        badgeColor: 'bg-teal-100 text-teal-800 border-teal-200 font-medium',
+        detail: 'Review scheme maintenance plan, CSOS compliance & levy budget',
+      });
+    }
+  });
+
   // Sort: Active disputes first, then chronological by earliest date
   const sortedDeadlines = deadlines
     .sort((a, b) => {
@@ -119,7 +165,7 @@ export default function UpcomingDeadlines() {
       if (!a.isUrgentDispute && b.isUrgentDispute) return 1;
       return new Date(a.date).getTime() - new Date(b.date).getTime();
     })
-    .slice(0, 6);
+    .slice(0, 8);
 
   return (
     <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-xs flex flex-col justify-between">
