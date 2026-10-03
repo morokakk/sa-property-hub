@@ -364,6 +364,80 @@ describe('whatsappFormatter - Strategy Adaptive Formatting', () => {
     expect(output).toContain('Lender Capital Exit: Phase 2 Bank Refinance @ Month 6');
   });
 
+  it('formats Proposal Generator pitch for rental deal suppressing municipal arrears and adding collection track record', () => {
+    const output = formatProposalPitchForWhatsApp({
+      deal: {
+        id: 'deal-rental-1',
+        type: 'rental',
+        title: 'Sandhurst Executive Suite',
+        address: '35 Fredman Drive',
+        city: 'Sandton',
+        purchasePrice: 2_100_000,
+        acquisitionCosts: 105_000,
+        renovationBudget: 0,
+        targetExitPrice: 2_450_000,
+        strategy: 'Rental',
+        source: 'Private Agent',
+        municipalArrears: 111_000, // Should be suppressed for rental
+        collectionRate: 85.2,
+        totalCollected12m: 170_000,
+        totalBilled12m: 200_000,
+        tenantArrears: 30_000,
+      },
+      strategy: 'Rental',
+      capitalRequested: 1_000_000,
+      fundingOfferType: 'Fixed Interest',
+      offeredRate: 13.5,
+      securityType: '2nd Mortgage Bond registered over title deed',
+      investorProfile: mockInvestorProfile,
+    });
+
+    // Suppress municipal clearance arrears line
+    expect(output).not.toContain('Municipal Clearance Arrears:');
+
+    // Output 12-month collection metrics
+    expect(output).toContain(`• 12-Mo Collection Rate: 85.2% (${formatZAR(170_000)} of ${formatZAR(200_000)})`);
+    expect(output).toContain(`• Tenant Arrears Receivable: ${formatZAR(30_000)} (Excluded from project outlay)`);
+    expect(output).toContain('⚠️ Diligence Note: Tenant Collection Risk flagged (<90% collection).');
+
+    // Must not leak tenant personal details
+    expect(output).not.toContain('Dr. Thabo Mokoena');
+    expect(output).not.toContain('+27 82 456 7890');
+  });
+
+  it('formats Proposal Generator pitch for healthy rental without diligence alert', () => {
+    const output = formatProposalPitchForWhatsApp({
+      deal: {
+        id: 'deal-rental-healthy',
+        type: 'rental',
+        title: 'Rosebank Luxury Lofts',
+        address: '15 Oxford Road',
+        city: 'Johannesburg',
+        purchasePrice: 1_800_000,
+        acquisitionCosts: 90_000,
+        renovationBudget: 0,
+        targetExitPrice: 2_100_000,
+        strategy: 'Rental',
+        source: 'Private Agent',
+        collectionRate: 100,
+        totalCollected12m: 180_000,
+        totalBilled12m: 180_000,
+        tenantArrears: 0,
+      },
+      strategy: 'Rental',
+      capitalRequested: 900_000,
+      fundingOfferType: 'Fixed Interest',
+      offeredRate: 13.5,
+      securityType: '2nd Mortgage Bond',
+      investorProfile: mockInvestorProfile,
+    });
+
+    expect(output).not.toContain('Municipal Clearance Arrears:');
+    expect(output).toContain(`• 12-Mo Collection Rate: 100% (${formatZAR(180_000)} of ${formatZAR(180_000)})`);
+    expect(output).not.toContain('Tenant Arrears Receivable:');
+    expect(output).not.toContain('Tenant Collection Risk flagged');
+  });
+
   describe('formatPaymentStatement - WhatsApp Payment Receipts', () => {
     it('formats investment payment notification with entity and linked asset', () => {
       const receipt = formatPaymentStatement({

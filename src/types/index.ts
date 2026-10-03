@@ -139,6 +139,8 @@ export interface OpportunityDeal {
   monthlyHoldingCostZAR?: number;
   monthlyBondPaymentZAR?: number;
   monthlyOtherHoldingCostZAR?: number;
+  monthlyMaintenanceReserveZAR?: number; // e.g. R 800
+  monthlyPrepaidVendingFeeZAR?: number; // e.g. R 150
   // Financing
   loanToValuePercent: number; // e.g. 80% or 0% for cash
   bondLTV: number; // e.g. 100% or 80%
@@ -722,6 +724,8 @@ export interface AnalyzerDraft {
   vacancyRatePercent?: number;
   managementFeePercent?: number;
   agencyVatApplicable?: boolean;
+  monthlyMaintenanceReserveZAR?: number;
+  monthlyPrepaidVendingFeeZAR?: number;
 }
 
 // Client-side BYOK AI Integration Settings

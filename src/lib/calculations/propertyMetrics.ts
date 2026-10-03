@@ -112,6 +112,8 @@ export function calculateDealMetrics(params: {
   annualInsurance: number;
   managementFeePercent: number;
   agencyVatApplicable?: boolean;
+  monthlyMaintenanceReserveZAR?: number;
+  monthlyPrepaidVendingFeeZAR?: number;
   vacancyRatePercent: number;
   targetExitPrice: number;
   holdingPeriodMonths: number;
@@ -134,6 +136,8 @@ export function calculateDealMetrics(params: {
     annualInsurance,
     managementFeePercent,
     agencyVatApplicable,
+    monthlyMaintenanceReserveZAR,
+    monthlyPrepaidVendingFeeZAR,
     vacancyRatePercent,
     targetExitPrice,
     holdingPeriodMonths,
@@ -182,7 +186,12 @@ export function calculateDealMetrics(params: {
   const managementFee = (grossMonthlyRent * (managementFeePercent / 100)) * vatMultiplier;
   const monthlyInsurance = annualInsurance / 12;
   const totalMonthlyOperatingExpenses =
-    monthlyLevies + monthlyRatesTaxes + managementFee + monthlyInsurance;
+    monthlyLevies + 
+    monthlyRatesTaxes + 
+    managementFee + 
+    monthlyInsurance + 
+    (monthlyMaintenanceReserveZAR || 0) + 
+    (monthlyPrepaidVendingFeeZAR || 0);
 
   const monthlyNetOperatingIncome = effectiveGrossRent - totalMonthlyOperatingExpenses;
   const annualNetOperatingIncome = monthlyNetOperatingIncome * 12;

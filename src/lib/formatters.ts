@@ -10,21 +10,24 @@ export function formatZAR(
     return 'R 0';
   }
 
+  const isNegative = amount < 0;
+  const absAmount = Math.abs(amount);
+
   if (options?.compact) {
-    if (Math.abs(amount) >= 1_000_000) {
-      return `R ${(amount / 1_000_000).toFixed(2)}M`;
+    if (absAmount >= 1_000_000) {
+      return `${isNegative ? '-' : ''}R ${(absAmount / 1_000_000).toFixed(2)}M`;
     }
-    if (Math.abs(amount) >= 1_000) {
-      return `R ${(amount / 1_000).toFixed(0)}k`;
+    if (absAmount >= 1_000) {
+      return `${isNegative ? '-' : ''}R ${(absAmount / 1_000).toFixed(0)}k`;
     }
   }
 
   const formatted = new Intl.NumberFormat('en-ZA', {
     minimumFractionDigits: options?.includeDecimals ? 2 : 0,
     maximumFractionDigits: options?.includeDecimals ? 2 : 0,
-  }).format(amount);
+  }).format(absAmount);
 
-  return `R ${formatted}`;
+  return `${isNegative ? '-' : ''}R ${formatted}`;
 }
 
 export function formatPercent(value: number | undefined | null): string {

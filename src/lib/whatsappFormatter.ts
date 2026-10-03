@@ -45,6 +45,12 @@ export interface ProposalPitchParams {
     primaryFunderContact?: string;
     coFundersNotes?: string;
     ancillaryIncomes?: any[];
+    type?: 'flip' | 'opportunity' | 'rental';
+    collectionRate?: number;
+    totalCollected12m?: number;
+    totalBilled12m?: number;
+    tenantArrears?: number;
+    overdueMonths?: number;
   };
   strategy: DealStrategy;
   capitalRequested: number;
@@ -390,7 +396,7 @@ export function formatProposalPitchForWhatsApp(
   if (auctionFee > 0) {
     text += `• Auctioneer Fee (10%+VAT): *${formatZAR(auctionFee)}*\n`;
   }
-  if (arrears > 0) {
+  if (deal.type !== 'rental' && arrears > 0) {
     text += `• Municipal Clearance Arrears: *${formatZAR(arrears)}*\n`;
   }
   if (deal.source === 'iGrow Rentals') {
@@ -409,7 +415,24 @@ export function formatProposalPitchForWhatsApp(
   text += `• Total Project Outlay: *${formatZAR(totalProjectCost)}*\n`;
   text += `• Target Exit Price: *${formatZAR(deal.targetExitPrice)}*\n`;
   text += `• Projected Net Profit: *${formatZAR(projectedNetProfit)}*\n`;
-  text += `• Project Net ROI: *${formatPercent(projectROI)}*\n\n`;
+  text += `• Project Net ROI: *${formatPercent(projectROI)}*\n`;
+
+  if (deal.type === 'rental') {
+    const colRate = deal.collectionRate ?? 100;
+    const collected = deal.totalCollected12m ?? 0;
+    const billed = deal.totalBilled12m ?? 0;
+    const tArrears = deal.tenantArrears ?? 0;
+    const colRateStr = Number(colRate.toFixed(1)).toString();
+
+    text += `• 12-Mo Collection Rate: ${colRateStr}% (${formatZAR(collected)} of ${formatZAR(billed)})\n`;
+    if (tArrears > 0) {
+      text += `• Tenant Arrears Receivable: ${formatZAR(tArrears)} (Excluded from project outlay)\n`;
+    }
+    if (colRate < 90) {
+      text += `⚠️ Diligence Note: Tenant Collection Risk flagged (<90% collection).\n`;
+    }
+  }
+  text += `\n`;
 
   if (deal.ancillaryIncomes?.length) {
     text += `*ANCILLARY COMMERCIAL COVENANTS*\n`;

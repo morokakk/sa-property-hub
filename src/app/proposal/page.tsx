@@ -32,7 +32,13 @@ import {
   Zap,
   Repeat,
   AlertTriangle,
+  Users,
 } from 'lucide-react';
+import {
+  calculateRentalHoldingCosts,
+  calculate12MonthCollectionMetrics,
+  maskTenantName,
+} from '@/lib/calculations/proposalMetrics';
 
 function getSafeLogoUri(uri?: string): string {
   if (!uri) return '';
@@ -63,8 +69,10 @@ function ProposalGeneratorContent() {
   const updateFlip = usePortfolioStore((state) => state.updateFlip);
   const updateOpportunity = usePortfolioStore((state) => state.updateOpportunity);
 
+  const [showTenantNames, setShowTenantNames] = useState<boolean>(false);
+
   // Combine Flips, Opportunities, and Active Rentals as pitch candidates
-  const allDeals = [
+  const allDeals = useMemo(() => [
     ...flips.map((f) => ({
       id: f.id,
       type: 'flip' as const,
@@ -130,6 +138,18 @@ function ProposalGeneratorContent() {
       annualExpenseInflationPercent: 6.0,
       bondTermYears: 20,
       ancillaryIncomes: [],
+      tenantArrears: 0,
+      overdueMonths: 0,
+      collectionRate: 100,
+      totalCollected12m: 0,
+      totalBilled12m: 0,
+      paidInFullMonths: 0,
+      totalTrackedMonths: 0,
+      arrearsWriteOffsTotal: 0,
+      isCollectionRisk: false,
+      actualCollectedRentAvg: 0,
+      adjustedVacancyRate: 5,
+      rawRental: undefined,
     })),
     ...opportunities.map((o) => {
       const openMarket = o.openMarketValueZAR || Math.round(o.purchasePrice * 1.2);
@@ -203,12 +223,27 @@ function ProposalGeneratorContent() {
         annualExpenseInflationPercent: o.annualExpenseInflationPercent ?? 6.0,
         bondTermYears: o.bondTermYears ?? o.loanTermYears ?? 20,
         ancillaryIncomes: o.ancillaryIncomes || [],
+        tenantArrears: 0,
+        overdueMonths: 0,
+        collectionRate: 100,
+        totalCollected12m: 0,
+        totalBilled12m: 0,
+        paidInFullMonths: 0,
+        totalTrackedMonths: 0,
+        arrearsWriteOffsTotal: 0,
+        isCollectionRisk: false,
+        actualCollectedRentAvg: 0,
+        adjustedVacancyRate: 5,
+        rawRental: undefined,
       };
     }),
     ...rentals.map((r) => {
       const openMarket = r.marketValueZAR || r.purchasePriceZAR;
       const builtIn = Math.max(0, openMarket - (r.outstandingBondBalanceZAR || r.purchasePriceZAR));
       const builtInPct = openMarket > 0 ? Number(((builtIn / openMarket) * 100).toFixed(1)) : 0;
+      const holdingCosts = calculateRentalHoldingCosts(r);
+      const collectionMetrics = calculate12MonthCollectionMetrics(r);
+
       return {
         id: r.id,
         type: 'rental' as const,
@@ -232,20 +267,20 @@ function ProposalGeneratorContent() {
         strategy: 'Rental' as DealStrategy,
         source: r.source ?? 'Private Agent',
         auctioneerCommission: 0,
-        municipalArrears: r.unpaidUtilityArrearsZAR ?? 0,
+        municipalArrears: 0,
         isSection13Eligible: false,
         section13Allowance: 0,
         holdingDurationMonths: 12,
-        monthlyBondHolding: r.monthlyBondPaymentZAR ?? 0,
-        monthlyLeviesHolding: r.monthlyLeviesZAR ?? 0,
-        monthlyRatesHolding: r.monthlyRatesTaxesZAR ?? 0,
-        monthlyOtherHolding: (r.monthlyAgentFeeZAR || 0) + (r.monthlyMaintenanceReserveZAR || 0),
-        monthlyHoldingCost: (r.monthlyBondPaymentZAR || 0) + (r.monthlyLeviesZAR || 0) + (r.monthlyRatesTaxesZAR || 0),
+        monthlyBondHolding: holdingCosts.monthlyBond,
+        monthlyLeviesHolding: holdingCosts.monthlyLevies,
+        monthlyRatesHolding: holdingCosts.monthlyRates,
+        monthlyOtherHolding: holdingCosts.monthlyOther,
+        monthlyHoldingCost: holdingCosts.monthlyHoldingCost,
         targetExitPrice: openMarket,
         exitCommissionPercent: 5.75,
         completionDate: r.leases?.[0]?.leaseEndDate || new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
         boq: [],
-        notes: `Seasoned portfolio asset. Tenant: ${r.leases?.[0]?.tenantName || 'In-place'}. Gross Rent: ${formatZAR(r.monthlyGrossRentZAR)}/mo. Bond balance: ${formatZAR(r.outstandingBondBalanceZAR || 0)}.`,
+        notes: `Seasoned portfolio asset. Tenant: ${showTenantNames ? (r.leases?.[0]?.tenantName || 'In-place') : 'In-Place (Masked)'}. Gross Rent: ${formatZAR(r.monthlyGrossRentZAR)}/mo. Bond balance: ${formatZAR(r.outstandingBondBalanceZAR || 0)}.`,
         fundingRequiredZAR: Math.round(openMarket * 0.3),
         capitalRaisedZAR: 0,
         primaryFunderName: undefined,
@@ -257,8 +292,8 @@ function ProposalGeneratorContent() {
         promisedPayoutSchedule: 'Monthly Interest',
         securityOffered: '2nd Mortgage Bond registered over title deed',
         monthlyRent: r.monthlyGrossRentZAR,
-        monthlyLevies: r.monthlyLeviesZAR,
-        monthlyRates: r.monthlyRatesTaxesZAR,
+        monthlyLevies: holdingCosts.monthlyLevies,
+        monthlyRates: holdingCosts.monthlyRates,
         depositZAR: Math.max(0, openMarket - (r.outstandingBondBalanceZAR || 0)),
         loanToValue: openMarket > 0 ? Math.round(((r.outstandingBondBalanceZAR || 0) / openMarket) * 100) : 70,
         interestRatePercent: r.bondInterestRatePercent || 11.75,
@@ -268,9 +303,21 @@ function ProposalGeneratorContent() {
         annualExpenseInflationPercent: 6.0,
         bondTermYears: 20,
         ancillaryIncomes: r.ancillaryIncomes || [],
+        tenantArrears: collectionMetrics.tenantArrears,
+        overdueMonths: collectionMetrics.overdueMonths,
+        collectionRate: collectionMetrics.collectionRate,
+        totalCollected12m: collectionMetrics.totalCollected12m,
+        totalBilled12m: collectionMetrics.totalBilled12m,
+        paidInFullMonths: collectionMetrics.paidInFullMonths,
+        totalTrackedMonths: collectionMetrics.totalTrackedMonths,
+        arrearsWriteOffsTotal: collectionMetrics.totalBadDebt,
+        isCollectionRisk: collectionMetrics.isCollectionRisk,
+        actualCollectedRentAvg: collectionMetrics.actualCollectedRentAvg,
+        adjustedVacancyRate: collectionMetrics.adjustedVacancyRate,
+        rawRental: r,
       };
     }),
-  ];
+  ], [flips, opportunities, rentals, showTenantNames]);
 
   const [selectedDealId, setSelectedDealId] = useState<string>(
     queryDealId || allDeals[0]?.id || ''
@@ -292,6 +339,9 @@ function ProposalGeneratorContent() {
 
   const projectionData = useMemo(() => {
     if (!deal || isFlip) return [];
+    const vacancyRate = deal.type === 'rental' && (deal.collectionRate ?? 100) < 90
+      ? Math.max(5, Math.round(100 - deal.collectionRate))
+      : 5;
     return generateLongTermProjection({
       purchasePrice: deal.purchasePrice,
       openMarketValueZAR: deal.openMarketValue,
@@ -309,7 +359,7 @@ function ProposalGeneratorContent() {
       monthlyRatesTaxes: deal.monthlyRates || 0,
       annualInsurance: 7_200,
       managementFeePercent: 8,
-      vacancyRatePercent: 5,
+      vacancyRatePercent: vacancyRate,
     });
   }, [deal, isFlip]);
 
@@ -403,6 +453,10 @@ function ProposalGeneratorContent() {
   const projectedNetProfit = (deal?.targetExitPrice || 0) - totalProjectCost;
   const netProjectROI = totalProjectCost > 0 ? (projectedNetProfit / totalProjectCost) * 100 : 0;
   const loanToCost = totalProjectCost > 0 ? (capitalRequested / totalProjectCost) * 100 : 0;
+  const netMonthlyCashflow =
+    (deal?.monthlyRent || 0) +
+    (deal?.ancillaryIncomes?.reduce((acc: number, curr: any) => acc + curr.monthlyRentZAR, 0) || 0) -
+    monthlyBurnRate;
 
   const [copiedPitchWhatsApp, setCopiedPitchWhatsApp] = useState(false);
 
@@ -412,9 +466,14 @@ function ProposalGeneratorContent() {
       deal: {
         ...deal,
         auctioneerCommission,
-        municipalArrears,
+        municipalArrears: deal.type === 'rental' ? 0 : municipalArrears,
         exitCommissionPercent,
         isSection13Eligible: deal.isSection13Eligible,
+        collectionRate: deal.collectionRate,
+        totalCollected12m: deal.totalCollected12m,
+        totalBilled12m: deal.totalBilled12m,
+        tenantArrears: deal.tenantArrears,
+        overdueMonths: deal.overdueMonths,
       },
       strategy: pitchStrategy,
       capitalRequested,
@@ -449,6 +508,21 @@ function ProposalGeneratorContent() {
         subtitle="Professional one-page executive tear-sheet to pitch deals to private lenders and JV partners"
         actionButton={
           <div className="flex items-center gap-2">
+            <label
+              className="no-print inline-flex items-center gap-1.5 bg-slate-100 hover:bg-slate-200 border border-slate-300 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-slate-700 transition-colors cursor-pointer"
+              title="Show tenant names (NDA Signed)"
+            >
+              <input
+                type="checkbox"
+                data-testid="toggle-tenant-names-header"
+                checked={showTenantNames}
+                onChange={(e) => setShowTenantNames(e.target.checked)}
+                className="rounded text-emerald-600 focus:ring-emerald-500 w-3.5 h-3.5 cursor-pointer"
+              />
+              <span className="hidden sm:inline">Show tenant names (NDA Signed)</span>
+              <span className="sm:hidden">NDA Names</span>
+            </label>
+
             <button
               onClick={handleCopyPitchWhatsApp}
               className="inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold px-3 py-2 rounded-lg shadow-sm transition-colors cursor-pointer"
@@ -802,19 +876,29 @@ function ProposalGeneratorContent() {
               </div>
 
               <div className="p-3 rounded-lg bg-emerald-50 border border-emerald-200">
-                <span className="text-[10px] uppercase font-bold text-emerald-800 block">Projected Net Profit</span>
-                <span className="text-sm font-extrabold text-emerald-900 block mt-0.5">
-                  {formatZAR(projectedNetProfit)}
+                <span className="text-[10px] uppercase font-bold text-emerald-800 block">
+                  {isFlip ? 'Projected Net Profit' : 'Net Monthly Cashflow'}
                 </span>
-                <span className="text-[9px] text-emerald-700 font-semibold">After all capex</span>
+                <span className={`text-sm font-extrabold block mt-0.5 ${!isFlip && netMonthlyCashflow < 0 ? 'text-rose-600' : 'text-emerald-900'}`}>
+                  {isFlip ? formatZAR(projectedNetProfit) : `${formatZAR(netMonthlyCashflow)}/m`}
+                </span>
+                <span className="text-[9px] text-emerald-700 font-semibold">
+                  {isFlip ? 'After all capex' : 'After all debt & opex'}
+                </span>
               </div>
 
               <div className="p-3 rounded-lg bg-emerald-900 text-white border border-emerald-950">
-                <span className="text-[10px] uppercase font-bold text-emerald-200 block">Project ROI</span>
-                <span className="text-sm font-extrabold text-white block mt-0.5">
-                  {formatPercent(netProjectROI)}
+                <span className="text-[10px] uppercase font-bold text-emerald-200 block">
+                  {isFlip ? 'Project ROI' : 'Contracted Gross Yield'}
                 </span>
-                <span className="text-[9px] text-emerald-200">On total capital</span>
+                <span className="text-sm font-extrabold text-white block mt-0.5">
+                  {isFlip
+                    ? formatPercent(netProjectROI)
+                    : formatPercent(deal?.openMarketValue > 0 ? (((deal?.monthlyRent || 0) * 12) / deal.openMarketValue) * 100 : 0)}
+                </span>
+                <span className="text-[9px] text-emerald-200">
+                  {isFlip ? 'On total capital' : 'Contracted baseline'}
+                </span>
               </div>
             </div>
 
@@ -935,6 +1019,189 @@ function ProposalGeneratorContent() {
               )}
             </div>
 
+            {/* Rent Roll & Collection Track Record (Portfolio Rentals) */}
+            {deal.type === 'rental' && (
+              <div data-testid="rent-roll-card" className="space-y-3.5 print:break-inside-avoid">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-200 pb-1.5">
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-sm uppercase tracking-wider font-extrabold text-slate-900">
+                      Rent Roll &amp; Collection Track Record
+                    </h2>
+                    <span className="text-[10px] bg-teal-100 text-teal-800 font-bold px-2 py-0.5 rounded border border-teal-300">
+                      💼 Stabilized Portfolio Asset
+                    </span>
+                  </div>
+                  <label className="no-print inline-flex items-center gap-2 cursor-pointer bg-slate-100 hover:bg-slate-200 border border-slate-300 px-2.5 py-1 rounded-md text-xs font-semibold text-slate-700 transition-colors">
+                    <input
+                      type="checkbox"
+                      data-testid="toggle-tenant-names-rentroll"
+                      checked={showTenantNames}
+                      onChange={(e) => setShowTenantNames(e.target.checked)}
+                      className="rounded text-emerald-600 focus:ring-emerald-500 w-3.5 h-3.5 cursor-pointer"
+                    />
+                    <span>Show tenant names (NDA Signed)</span>
+                  </label>
+                </div>
+
+                {/* Diligence Banner if Collection Rate < 90% */}
+                {deal.collectionRate < 90 && (
+                  <div
+                    data-testid="tenant-collection-risk-banner"
+                    className="p-3.5 rounded-xl bg-amber-50 border border-amber-300 text-xs text-amber-950 flex items-start gap-3 shadow-xs"
+                  >
+                    <AlertTriangle className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
+                    <div className="space-y-1">
+                      <span className="font-bold text-amber-900 block text-xs">
+                        ⚠️ Tenant Collection Risk: Historical Under-Collection ({deal.collectionRate.toFixed(1)}%)
+                      </span>
+                      <p className="text-amber-800 leading-relaxed text-[11px]">
+                        The tracked 12-month tenant collection rate is <strong>{deal.collectionRate.toFixed(1)}%</strong> ({formatZAR(deal.totalCollected12m)} collected of {formatZAR(deal.totalBilled12m)} billed) with an outstanding tenant arrears receivable of <strong>{formatZAR(deal.tenantArrears)}</strong> ({deal.overdueMonths} {deal.overdueMonths === 1 ? 'month' : 'months'} overdue). Underwriting and long-term projections have been adjusted to reflect actual historical credit performance.
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {/* 12-Month Metrics Cards */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+                  <div className="p-3 rounded-lg bg-slate-50 border border-slate-200">
+                    <span className="text-[10px] uppercase font-bold text-slate-500 block">
+                      12-Month Collection Rate
+                    </span>
+                    <span className={`text-sm font-extrabold block mt-0.5 font-mono ${deal.collectionRate < 90 ? 'text-amber-700' : 'text-emerald-700'}`}>
+                      {deal.collectionRate.toFixed(1)}%
+                    </span>
+                    <span className="text-[9px] text-slate-500 block">
+                      {formatZAR(deal.totalCollected12m)} of {formatZAR(deal.totalBilled12m)} billed
+                    </span>
+                  </div>
+
+                  <div className="p-3 rounded-lg bg-slate-50 border border-slate-200">
+                    <span className="text-[10px] uppercase font-bold text-slate-500 block">
+                      Payment Track Record
+                    </span>
+                    <span className="text-sm font-extrabold text-slate-900 block mt-0.5 font-mono">
+                      {deal.paidInFullMonths} / {deal.totalTrackedMonths} Mos
+                    </span>
+                    <span className="text-[9px] text-slate-500 block">
+                      Months paid in full
+                    </span>
+                  </div>
+
+                  <div className="p-3 rounded-lg bg-slate-50 border border-slate-200">
+                    <span className="text-[10px] uppercase font-bold text-slate-500 block">
+                      Tenant Arrears Receivable
+                    </span>
+                    <span className={`text-sm font-extrabold block mt-0.5 font-mono ${deal.tenantArrears > 0 ? 'text-amber-800' : 'text-slate-900'}`}>
+                      {formatZAR(deal.tenantArrears)}
+                    </span>
+                    <span className="text-[9px] text-slate-500 block">
+                      {deal.overdueMonths > 0 ? `${deal.overdueMonths} ${deal.overdueMonths === 1 ? 'month' : 'months'} overdue` : 'Up to date'}
+                    </span>
+                  </div>
+
+                  <div className="p-3 rounded-lg bg-slate-50 border border-slate-200">
+                    <span className="text-[10px] uppercase font-bold text-slate-500 block">
+                      Bad Debt Written Off
+                    </span>
+                    <span className="text-sm font-extrabold text-slate-900 block mt-0.5 font-mono">
+                      {formatZAR(deal.arrearsWriteOffsTotal)}
+                    </span>
+                    <span className="text-[9px] text-slate-500 block">
+                      Total historical write-offs
+                    </span>
+                  </div>
+                </div>
+
+                {/* Secondary Rent & Cashflow Summary */}
+                <div className="p-3 rounded-lg bg-emerald-50/50 border border-emerald-200 flex flex-wrap items-center justify-between gap-3 text-xs">
+                  <div className="flex items-center gap-4 flex-wrap">
+                    <div>
+                      <span className="text-[10px] uppercase font-bold text-slate-500 block">Contracted Gross Rent</span>
+                      <strong className="text-slate-900 font-mono">{formatZAR(deal.monthlyRent)}/mo</strong>
+                    </div>
+                    <div className="border-l border-emerald-300 pl-4">
+                      <span className="text-[10px] uppercase font-bold text-slate-500 block">Actual Collected (Last 12 Mo Avg)</span>
+                      <strong className="text-emerald-800 font-mono">{formatZAR(deal.actualCollectedRentAvg)}/mo</strong>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-[10px] uppercase font-bold text-slate-500 block">Net Monthly Cashflow</span>
+                    <strong className={`font-mono text-sm ${netMonthlyCashflow >= 0 ? 'text-emerald-700' : 'text-rose-600'}`}>
+                      {formatZAR(netMonthlyCashflow)}/mo
+                    </strong>
+                  </div>
+                </div>
+
+                {/* Table of Active Leases */}
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs text-left border border-slate-200 rounded-lg overflow-hidden">
+                    <thead className="bg-slate-100 text-slate-700 font-bold uppercase text-[10px]">
+                      <tr>
+                        <th className="p-2.5">Unit</th>
+                        <th className="p-2.5">Tenant Name (POPIA)</th>
+                        <th className="p-2.5">Monthly Rent</th>
+                        <th className="p-2.5">Escalation</th>
+                        <th className="p-2.5">Lease Term</th>
+                        <th className="p-2.5">Deposit Held</th>
+                        <th className="p-2.5 text-right">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-200 text-slate-800">
+                      {deal.rawRental?.leases && deal.rawRental.leases.length > 0 ? (
+                        deal.rawRental.leases.map((lease: any, idx: number) => {
+                          const maskedName = maskTenantName(lease, idx, showTenantNames);
+                          return (
+                            <tr key={lease.id || idx} className="hover:bg-slate-50/50">
+                              <td className="p-2.5 font-bold text-slate-900">
+                                {lease.unitName || `Unit ${idx + 1}`}
+                              </td>
+                              <td className="p-2.5 font-medium">
+                                <div className="flex items-center gap-1.5">
+                                  <span>{maskedName}</span>
+                                  {!showTenantNames && (
+                                    <span className="text-[9px] bg-slate-100 text-slate-500 px-1.5 py-0.2 rounded font-normal">
+                                      POPIA Masked
+                                    </span>
+                                  )}
+                                </div>
+                              </td>
+                              <td className="p-2.5 font-bold font-mono text-slate-900">
+                                {formatZAR(lease.monthlyRentZAR)}/mo
+                              </td>
+                              <td className="p-2.5 font-medium">
+                                {lease.annualEscalationPercent ? `${lease.annualEscalationPercent}% p.a.` : '—'}
+                              </td>
+                              <td className="p-2.5 text-slate-500">
+                                {formatDate(lease.leaseStartDate)} → {formatDate(lease.leaseEndDate)}
+                              </td>
+                              <td className="p-2.5 font-mono">
+                                {formatZAR(lease.depositHeldZAR)}
+                              </td>
+                              <td className="p-2.5 text-right">
+                                <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                                  lease.status === 'Occupied'
+                                    ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                                    : 'bg-amber-100 text-amber-800 border border-amber-300'
+                                }`}>
+                                  {lease.status || 'Occupied'}
+                                </span>
+                              </td>
+                            </tr>
+                          );
+                        })
+                      ) : (
+                        <tr>
+                          <td colSpan={7} className="p-3 text-center text-slate-400 italic">
+                            No active lease records attached to this property.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
             {/* Capital Requirement & Use of Funds */}
             <div className="space-y-3">
               <h2 className="text-sm uppercase tracking-wider font-extrabold text-slate-900 border-b border-slate-200 pb-1">
@@ -984,7 +1251,7 @@ function ProposalGeneratorContent() {
                         <td className="p-2.5 text-slate-500">Payable to auction house on fall of hammer</td>
                       </tr>
                     )}
-                    {municipalArrears > 0 && (
+                    {deal.type !== 'rental' && municipalArrears > 0 && (
                       <tr className="bg-rose-50/50">
                         <td className="p-2.5 font-medium text-rose-950 flex items-center gap-1.5 flex-wrap">
                           <span>Municipal Section 118 Rates Clearance Arrears</span>
@@ -995,6 +1262,18 @@ function ProposalGeneratorContent() {
                         <td className="p-2.5 font-bold text-rose-900">{formatZAR(municipalArrears)}</td>
                         <td className="p-2.5 text-rose-900">{totalProjectCost > 0 ? formatPercent((municipalArrears / totalProjectCost) * 100) : '0%'}</td>
                         <td className="p-2.5 text-slate-500">City Council clearance certificate requirement</td>
+                      </tr>
+                    )}
+                    {deal.type === 'rental' && (deal.tenantArrears || 0) > 0 && (
+                      <tr className="bg-amber-50/60" data-testid="tenant-arrears-disclosure-row">
+                        <td className="p-2.5 font-medium text-amber-950" colSpan={4}>
+                          <div className="flex items-center gap-1.5 flex-wrap text-xs">
+                            <span className="font-bold text-amber-900">ℹ️ Note:</span>
+                            <span className="text-amber-900">
+                              Tenant arrears receivable: <strong>{formatZAR(deal.tenantArrears)}</strong> ({deal.overdueMonths} {deal.overdueMonths === 1 ? 'month' : 'months'} overdue), excluded from project capital stack.
+                            </span>
+                          </div>
+                        </td>
                       </tr>
                     )}
                     <tr>
@@ -1488,6 +1767,15 @@ function ProposalGeneratorContent() {
                 <div className="print:border print:border-slate-300 rounded-xl overflow-hidden">
                   <LongTermProjectionChart data={projectionData} />
                 </div>
+
+                {deal.type === 'rental' && deal.collectionRate < 90 && (
+                  <div className="text-[11px] text-amber-900 bg-amber-50/90 border border-amber-200 rounded-lg p-2.5 flex items-center gap-2">
+                    <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                    <span>
+                      Vacancy &amp; Credit Loss set to {deal.adjustedVacancyRate}% reflecting actual historical tenant collection rate (normally 5%).
+                    </span>
+                  </div>
+                )}
               </div>
             )}
 

@@ -92,6 +92,8 @@ export default function OpportunityAnalyzerPage() {
   const [vacancyRate, setVacancyRate] = useState<number>(analyzerDraft?.vacancyRatePercent ?? 6.0);
   const [managementFee, setManagementFee] = useState<number>(analyzerDraft?.managementFeePercent ?? 8.0);
   const [agencyVatApplicable, setAgencyVatApplicable] = useState<boolean>(analyzerDraft?.agencyVatApplicable ?? true);
+  const [monthlyMaintenanceReserve, setMonthlyMaintenanceReserve] = useState<number>(analyzerDraft?.monthlyMaintenanceReserveZAR ?? 800);
+  const [monthlyPrepaidVendingFee, setMonthlyPrepaidVendingFee] = useState<number>(analyzerDraft?.monthlyPrepaidVendingFeeZAR ?? 150);
 
   // MAO Quick Solver State
   const [showMaoSolver, setShowMaoSolver] = useState(false);
@@ -163,6 +165,8 @@ export default function OpportunityAnalyzerPage() {
       if (analyzerDraft.vacancyRatePercent !== undefined) setVacancyRate(analyzerDraft.vacancyRatePercent);
       if (analyzerDraft.managementFeePercent !== undefined) setManagementFee(analyzerDraft.managementFeePercent);
       if (analyzerDraft.agencyVatApplicable !== undefined) setAgencyVatApplicable(analyzerDraft.agencyVatApplicable);
+      if (analyzerDraft.monthlyMaintenanceReserveZAR !== undefined) setMonthlyMaintenanceReserve(analyzerDraft.monthlyMaintenanceReserveZAR);
+      if (analyzerDraft.monthlyPrepaidVendingFeeZAR !== undefined) setMonthlyPrepaidVendingFee(analyzerDraft.monthlyPrepaidVendingFeeZAR);
     }
   }, [analyzerDraft]);
 
@@ -358,6 +362,8 @@ export default function OpportunityAnalyzerPage() {
       auctioneerCommissionZAR: auctioneerCommission,
       municipalArrearsZAR: municipalArrears,
       exitCommissionPercent: 5.75,
+      monthlyMaintenanceReserveZAR: monthlyMaintenanceReserve,
+      monthlyPrepaidVendingFeeZAR: monthlyPrepaidVendingFee,
     });
   }, [
     purchasePrice,
@@ -368,6 +374,8 @@ export default function OpportunityAnalyzerPage() {
     annualInsurance,
     managementFee,
     agencyVatApplicable,
+    monthlyMaintenanceReserve,
+    monthlyPrepaidVendingFee,
     vacancyRate,
     propertyType,
     targetExitPrice,
@@ -721,8 +729,10 @@ export default function OpportunityAnalyzerPage() {
       exitCommissionPercent: 5.75,
       holdingPeriodMonths: 6,
       monthlyBondPaymentZAR: calculatedMetrics.monthlyBondPayment,
-      monthlyOtherHoldingCostZAR: 1500,
-      monthlyHoldingCostZAR: (finalLevies || 0) + (monthlyRates || 0) + monthlyInsurance + (calculatedMetrics.monthlyBondPayment || 0) + 1500,
+      monthlyOtherHoldingCostZAR: (monthlyMaintenanceReserve || 0) + (monthlyPrepaidVendingFee || 0),
+      monthlyMaintenanceReserveZAR: monthlyMaintenanceReserve,
+      monthlyPrepaidVendingFeeZAR: monthlyPrepaidVendingFee,
+      monthlyHoldingCostZAR: (finalLevies || 0) + (monthlyRates || 0) + monthlyInsurance + (calculatedMetrics.monthlyBondPayment || 0) + (monthlyMaintenanceReserve || 0) + (monthlyPrepaidVendingFee || 0),
       auctioneerCommissionZAR: auctioneerCommission,
       municipalArrearsZAR: municipalArrears,
       loanToValuePercent: loanToValue,
@@ -1639,6 +1649,72 @@ export default function OpportunityAnalyzerPage() {
                   Professional rental agent tenant placement & collection fee (iGrow / WeconnectU baseline: 8.0%{agencyVatApplicable ? ' + 15% VAT = 9.2%' : ''}).
                 </p>
               </div>
+
+              {strategy !== 'Flip' && (
+                <>
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="block text-[11px] font-semibold text-slate-700">
+                        Monthly Maintenance Reserve (ZAR)
+                      </label>
+                      <span className="text-[10px] font-bold text-slate-700 bg-slate-200 px-1.5 py-0.5 rounded">
+                        -{formatZAR(monthlyMaintenanceReserve)}/pm
+                      </span>
+                    </div>
+                    <div className="relative">
+                      <span className="absolute left-3 top-2 text-xs text-slate-400 font-bold">R</span>
+                      <input
+                        type="number"
+                        name="monthlyMaintenanceReserveZAR"
+                        autoComplete="off"
+                        min="0"
+                        step="50"
+                        value={monthlyMaintenanceReserve}
+                        onChange={(e) => {
+                          const val = Number(e.target.value);
+                          setMonthlyMaintenanceReserve(val);
+                          updateAnalyzerDraft({ monthlyMaintenanceReserveZAR: val });
+                        }}
+                        className="w-full text-xs pl-7 pr-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-emerald-500 font-semibold text-slate-900 bg-white"
+                      />
+                    </div>
+                    <p className="text-[10px] text-slate-500 mt-1">
+                      Provisioning for general repairs, wear-and-tear, and appliance servicing. Default: R 800.
+                    </p>
+                  </div>
+
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="block text-[11px] font-semibold text-slate-700">
+                        Prepaid Meter Vending Fee (ZAR)
+                      </label>
+                      <span className="text-[10px] font-bold text-slate-700 bg-slate-200 px-1.5 py-0.5 rounded">
+                        -{formatZAR(monthlyPrepaidVendingFee)}/pm
+                      </span>
+                    </div>
+                    <div className="relative">
+                      <span className="absolute left-3 top-2 text-xs text-slate-400 font-bold">R</span>
+                      <input
+                        type="number"
+                        name="monthlyPrepaidVendingFeeZAR"
+                        autoComplete="off"
+                        min="0"
+                        step="10"
+                        value={monthlyPrepaidVendingFee}
+                        onChange={(e) => {
+                          const val = Number(e.target.value);
+                          setMonthlyPrepaidVendingFee(val);
+                          updateAnalyzerDraft({ monthlyPrepaidVendingFeeZAR: val });
+                        }}
+                        className="w-full text-xs pl-7 pr-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-emerald-500 font-semibold text-slate-900 bg-white"
+                      />
+                    </div>
+                    <p className="text-[10px] text-slate-500 mt-1">
+                      CitiQ / Recharger monthly fixed admin fee for prepaid electricity/water recovery. Default: R 150.
+                    </p>
+                  </div>
+                </>
+              )}
             </div>
 
             {/* Auction / Distressed Costs Input Row - Conditionally rendered only for Auction & Distressed Bank Repo */}
