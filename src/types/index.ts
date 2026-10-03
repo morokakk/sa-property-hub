@@ -495,6 +495,60 @@ export interface RentalProperty {
   monthlyPrepaidVendingFeeZAR?: number;
   // P4: Ancillary Income Array
   ancillaryIncomes?: AncillaryIncome[];
+  // Property Meter Registry (Multiple meters per property, multi-tenant units, council mains)
+  meterRegistry?: PropertyMeter[];
+}
+
+// Property Meter Registry Record
+export interface PropertyMeter {
+  id: string;
+  meterNumber: string; // Serial Number found on physical meter
+  utilityType: 'water' | 'electricity';
+  meterType: 'council_main' | 'sub_meter';
+  unitName?: string; // e.g. "Main House", "Cottage A", or unit reference
+  tenantId?: string; // Optional linked lease / tenant id
+  location?: string; // e.g. "Front boundary wall", "Under kitchen sink"
+  notes?: string;
+  createdAt: string;
+}
+
+// Municipal Revenue Office Contact (Central Directory)
+export interface MunicipalContact {
+  id: string;
+  municipalityName: string; // e.g. "City of Johannesburg (CoJ)"
+  shortCode: string; // e.g. "COJ", "CPT", "ETH", "TSH", "EKU", "PLK", "MAN", "NMB"
+  revenueEmail: string; // Primary email to lodge billing dispute
+  escalationEmail?: string; // Secondary / ombudsman / regional email
+  phone?: string;
+  website?: string;
+  notes?: string;
+  isCustom?: boolean;
+}
+
+// Municipal Dispute Letter & PDF Export Parameters
+export interface DisputeLetterData {
+  propertyTitle: string;
+  propertyAddress: string;
+  municipalityName: string;
+  municipalityEmail: string;
+  date: string; // YYYY-MM-DD
+  accountNumber: string;
+  billDate: string; // YYYY-MM-DD
+  utilityType: 'water' | 'electricity';
+  municipalReading: number;
+  physicalReading: number;
+  meterNumber: string;
+  photoDate: string; // YYYY-MM-DD
+  photoFilename?: string;
+  photoBase64?: string; // Downscaled JPEG data URL
+  photoBytes?: Uint8Array; // Raw JPEG bytes for pdf-lib
+  discrepancyUnits?: number;
+  effectiveTariff?: number;
+  estimatedOverchargeZAR?: number;
+  referenceNumber?: string;
+  senderName: string;
+  senderPhone: string;
+  senderEmail: string;
 }
 
 // Municipal Meter Dispute Status & Reason Types

@@ -24,6 +24,8 @@ import {
   EquityExtractionAlert,
   TenantPaymentRecord,
   ArrearsWriteOff,
+  PropertyMeter,
+  MunicipalContact,
 } from '@/types';
 import {
   calculateMonthlyBondRepayment,
@@ -46,6 +48,7 @@ import {
   INITIAL_ANALYZER_DRAFT,
   EMPTY_ANALYZER_DRAFT,
   DEFAULT_AI_SETTINGS,
+  INITIAL_MUNICIPAL_DIRECTORY,
 } from './initialData';
 import type { PortfolioStateSnapshot } from '@/lib/db/mergePortfolioState';
 
@@ -56,6 +59,7 @@ interface PortfolioState {
   opportunities: OpportunityDeal[];
   suppliers: LocalSupplier[];
   tasks: TaskItem[];
+  municipalDirectory: MunicipalContact[];
   liquidCapitalReserve: number;
   investorProfile: InvestorProfile;
   analyzerDraft: AnalyzerDraft;
@@ -122,6 +126,10 @@ interface PortfolioState {
   ) => void;
   deleteArrearsWriteOff: (propertyId: string, writeOffId: string) => void;
   updateArrearsOpeningBalance: (propertyId: string, openingBalance: number, leaseId?: string) => void;
+  // Property Meter Registry Actions
+  addPropertyMeter: (propertyId: string, meter: Omit<PropertyMeter, 'id' | 'createdAt'>) => void;
+  updatePropertyMeter: (propertyId: string, meterId: string, updates: Partial<PropertyMeter>) => void;
+  deletePropertyMeter: (propertyId: string, meterId: string) => void;
 
   // Flip Actions
   addFlip: (flip: FlipProject) => void;
@@ -161,6 +169,12 @@ interface PortfolioState {
   // Supplier Actions
   addSupplier: (supplier: LocalSupplier) => void;
   deleteSupplier: (id: string) => void;
+
+  // Municipal Directory Actions
+  addMunicipalContact: (contact: Omit<MunicipalContact, 'id'>) => void;
+  updateMunicipalContact: (id: string, updates: Partial<MunicipalContact>) => void;
+  deleteMunicipalContact: (id: string) => void;
+  resetMunicipalDirectory: () => void;
 
   // Liquid Reserve Action
   updateLiquidReserve: (amount: number) => void;
@@ -226,6 +240,7 @@ export const usePortfolioStore = create<PortfolioState>()(
       opportunities: INITIAL_OPPORTUNITIES,
       suppliers: INITIAL_SUPPLIERS,
       tasks: INITIAL_TASKS,
+      municipalDirectory: INITIAL_MUNICIPAL_DIRECTORY,
       liquidCapitalReserve: 650_000, // ZAR 650k operational cash reserve
       investorProfile: INITIAL_INVESTOR_PROFILE,
       analyzerDraft: INITIAL_ANALYZER_DRAFT,
@@ -712,6 +727,43 @@ export const usePortfolioStore = create<PortfolioState>()(
                   ...disputeData,
                 };
               }),
+            };
+          }),
+        })),
+      addPropertyMeter: (propertyId, meter) =>
+        set((state) => ({
+          rentals: state.rentals.map((r) => {
+            if (r.id !== propertyId) return r;
+            const newMeter: PropertyMeter = {
+              ...meter,
+              id: `reg-m-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+              createdAt: new Date().toISOString(),
+            };
+            return {
+              ...r,
+              meterRegistry: [...(r.meterRegistry || []), newMeter],
+            };
+          }),
+        })),
+      updatePropertyMeter: (propertyId, meterId, updates) =>
+        set((state) => ({
+          rentals: state.rentals.map((r) => {
+            if (r.id !== propertyId) return r;
+            return {
+              ...r,
+              meterRegistry: (r.meterRegistry || []).map((m) =>
+                m.id === meterId ? { ...m, ...updates } : m
+              ),
+            };
+          }),
+        })),
+      deletePropertyMeter: (propertyId, meterId) =>
+        set((state) => ({
+          rentals: state.rentals.map((r) => {
+            if (r.id !== propertyId) return r;
+            return {
+              ...r,
+              meterRegistry: (r.meterRegistry || []).filter((m) => m.id !== meterId),
             };
           }),
         })),
@@ -1687,6 +1739,33 @@ export const usePortfolioStore = create<PortfolioState>()(
           suppliers: state.suppliers.filter((s) => s.id !== id),
         })),
 
+      // Municipal Directory Actions
+      addMunicipalContact: (contact) =>
+        set((state) => ({
+          municipalDirectory: [
+            ...state.municipalDirectory,
+            {
+              ...contact,
+              id: `muni-custom-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+              isCustom: true,
+            },
+          ],
+        })),
+      updateMunicipalContact: (id, updates) =>
+        set((state) => ({
+          municipalDirectory: state.municipalDirectory.map((m) =>
+            m.id === id ? { ...m, ...updates } : m
+          ),
+        })),
+      deleteMunicipalContact: (id) =>
+        set((state) => ({
+          municipalDirectory: state.municipalDirectory.filter((m) => m.id !== id),
+        })),
+      resetMunicipalDirectory: () =>
+        set({
+          municipalDirectory: INITIAL_MUNICIPAL_DIRECTORY,
+        }),
+
       // Liquid Reserve
       updateLiquidReserve: (amount) => set({ liquidCapitalReserve: amount }),
 
@@ -1699,6 +1778,7 @@ export const usePortfolioStore = create<PortfolioState>()(
           opportunities: snapshot.opportunities ?? state.opportunities,
           suppliers: snapshot.suppliers ?? state.suppliers,
           tasks: snapshot.tasks ?? state.tasks,
+          municipalDirectory: (snapshot as any).municipalDirectory ?? state.municipalDirectory,
           investorProfile: snapshot.investorProfile ?? state.investorProfile,
           liquidCapitalReserve:
             snapshot.liquidCapitalReserve !== undefined
@@ -1724,6 +1804,7 @@ export const usePortfolioStore = create<PortfolioState>()(
           opportunities: INITIAL_OPPORTUNITIES,
           suppliers: INITIAL_SUPPLIERS,
           tasks: INITIAL_TASKS,
+          municipalDirectory: INITIAL_MUNICIPAL_DIRECTORY,
           liquidCapitalReserve: 650_000,
           investorProfile: INITIAL_INVESTOR_PROFILE,
           analyzerDraft: INITIAL_ANALYZER_DRAFT,
@@ -1738,6 +1819,7 @@ export const usePortfolioStore = create<PortfolioState>()(
           funding: [],
           opportunities: [],
           tasks: [],
+          municipalDirectory: INITIAL_MUNICIPAL_DIRECTORY,
           liquidCapitalReserve: 0,
           analyzerDraft: EMPTY_ANALYZER_DRAFT,
           // Preserve South African trade suppliers directory for immediate BOQ contractor selection
@@ -1754,6 +1836,7 @@ export const usePortfolioStore = create<PortfolioState>()(
               opportunities: parsed.opportunities || [],
               suppliers: parsed.suppliers || [],
               tasks: parsed.tasks || [],
+              municipalDirectory: parsed.municipalDirectory || INITIAL_MUNICIPAL_DIRECTORY,
               liquidCapitalReserve: parsed.liquidCapitalReserve || 0,
               investorProfile: parsed.investorProfile || INITIAL_INVESTOR_PROFILE,
             });
@@ -1873,6 +1956,13 @@ export const usePortfolioStore = create<PortfolioState>()(
             }];
           }
 
+          const defaultMeterRegistry =
+            currentState.rentals.find((r) => r.id === rental.id)?.meterRegistry || [];
+          const healedMeterRegistry =
+            rental.meterRegistry && rental.meterRegistry.length > 0
+              ? rental.meterRegistry
+              : defaultMeterRegistry;
+
           const migrated = {
             ...rental,
             monthlyAgentFeeZAR,
@@ -1880,6 +1970,7 @@ export const usePortfolioStore = create<PortfolioState>()(
             agencyCommissionPercent,
             utilityStatements: healedStatements,
             meterReadings: healedMeterReadings,
+            meterRegistry: healedMeterRegistry,
             leases
           };
           delete migrated.tenantName;
@@ -1900,6 +1991,10 @@ export const usePortfolioStore = create<PortfolioState>()(
           ...pState,
           rentals: finalRentals,
           opportunities: migratedOpportunities,
+          municipalDirectory:
+            pState.municipalDirectory && pState.municipalDirectory.length > 0
+              ? pState.municipalDirectory
+              : currentState.municipalDirectory,
           aiSettings: {
             ...DEFAULT_AI_SETTINGS,
             ...(pState.aiSettings || {}),

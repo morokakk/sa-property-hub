@@ -23,6 +23,7 @@ import {
   Receipt,
   Check,
   Ban,
+  Building,
 } from 'lucide-react';
 import { usePortfolioStore } from '@/lib/store/usePortfolioStore';
 import {
@@ -33,6 +34,9 @@ import {
 } from '@/types';
 import { formatDate, formatZAR } from '@/lib/formatters';
 import { calculateMunicipalDisputeImpact } from '@/lib/calculations/municipalTariffs';
+import DisputeLetterModal from './DisputeLetterModal';
+import PropertyMeterRegistryModal from './PropertyMeterRegistryModal';
+import MunicipalDirectoryModal from './MunicipalDirectoryModal';
 
 interface MeterReadingsModalProps {
   propertyId: string | null;
@@ -51,6 +55,14 @@ export default function MeterReadingsModal({
   const addMeterReading = usePortfolioStore((state) => state.addMeterReading);
   const deleteMeterReading = usePortfolioStore((state) => state.deleteMeterReading);
   const updateMeterReadingDispute = usePortfolioStore((state) => state.updateMeterReadingDispute);
+  const addPropertyMeter = usePortfolioStore((state) => state.addPropertyMeter);
+  const municipalDirectory = usePortfolioStore((state) => state.municipalDirectory);
+
+  // Sub-modal state
+  const [isDisputeLetterModalOpen, setIsDisputeLetterModalOpen] = useState(false);
+  const [disputeLetterReading, setDisputeLetterReading] = useState<MeterReading | null>(null);
+  const [isMeterRegistryOpen, setIsMeterRegistryOpen] = useState(false);
+  const [isMuniDirectoryOpen, setIsMuniDirectoryOpen] = useState(false);
 
   // Tab Filtering: 'all' | 'electricity' | 'water' | 'disputes'
   const [activeTab, setActiveTab] = useState<'all' | 'electricity' | 'water' | 'disputes'>('all');
@@ -119,6 +131,10 @@ export default function MeterReadingsModal({
       availableStatements[0]
     );
   }, [availableStatements, disputedStatementId]);
+
+  const propertyMeters = useMemo(() => {
+    return rental?.meterRegistry || [];
+  }, [rental?.meterRegistry]);
 
   const formTopRef = useRef<HTMLDivElement>(null);
 
@@ -547,13 +563,35 @@ export default function MeterReadingsModal({
             </div>
           </div>
 
-          <button
-            type="button"
-            onClick={onClose}
-            className="p-1.5 sm:p-2 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-200/60 transition-colors cursor-pointer shrink-0 ml-2"
-          >
-            <X className="w-5 h-5" />
-          </button>
+          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0 ml-2">
+            <button
+              type="button"
+              onClick={() => setIsMeterRegistryOpen(true)}
+              className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1.5 text-[11px] font-bold text-cyan-800 bg-cyan-50 hover:bg-cyan-100 rounded-lg border border-cyan-200 transition-colors cursor-pointer"
+              title="View and configure registered meters for this property"
+            >
+              <Gauge className="w-3.5 h-3.5 text-cyan-600" />
+              <span>Meters ({rental?.meterRegistry?.length || 0})</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setIsMuniDirectoryOpen(true)}
+              className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1.5 text-[11px] font-bold text-amber-900 bg-amber-50 hover:bg-amber-100 rounded-lg border border-amber-200 transition-colors cursor-pointer"
+              title="View central municipal directory contacts"
+            >
+              <Building className="w-3.5 h-3.5 text-amber-600" />
+              <span>Directory</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={onClose}
+              className="p-1.5 sm:p-2 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-200/60 transition-colors cursor-pointer"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
         </div>
 
         {/* Content Body */}
@@ -635,13 +673,28 @@ export default function MeterReadingsModal({
                   </p>
                 </div>
               </div>
-              <button
-                type="button"
-                onClick={() => setActiveTab('disputes')}
-                className="text-[11px] font-bold text-amber-900 hover:text-amber-950 bg-amber-200/80 hover:bg-amber-200 px-3 py-1.5 rounded-lg border border-amber-300 transition-colors shrink-0 cursor-pointer"
-              >
-                View Disputes →
-              </button>
+              <div className="flex items-center gap-2 shrink-0 flex-wrap">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const firstDispute = activeDisputes[0];
+                    setDisputeLetterReading(firstDispute || null);
+                    setIsDisputeLetterModalOpen(true);
+                  }}
+                  className="text-[11px] font-bold text-white bg-amber-600 hover:bg-amber-700 px-3 py-1.5 rounded-lg transition-colors shrink-0 cursor-pointer flex items-center gap-1 shadow-2xs"
+                  title="Generate official dispute letter & download PDF"
+                >
+                  <FileText className="w-3.5 h-3.5" />
+                  <span>Generate Dispute PDF</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('disputes')}
+                  className="text-[11px] font-bold text-amber-900 hover:text-amber-950 bg-amber-200/80 hover:bg-amber-200 px-3 py-1.5 rounded-lg border border-amber-300 transition-colors shrink-0 cursor-pointer"
+                >
+                  View Disputes →
+                </button>
+              </div>
             </div>
           )}
 
@@ -681,6 +734,45 @@ export default function MeterReadingsModal({
                 </div>
 
                 <form onSubmit={handleSaveReading} noValidate className="space-y-3.5">
+                  {/* Property Meter Registry Quick Chips */}
+                  {propertyMeters.length > 0 && (
+                    <div className="flex items-center gap-1.5 flex-wrap p-2 bg-white/90 rounded-lg border border-slate-200">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1 shrink-0">
+                        <Gauge className="w-3 h-3 text-cyan-600" />
+                        <span>Registered Meters:</span>
+                      </span>
+                      {propertyMeters.map((m) => {
+                        const isSelected = meterNumber.trim().toLowerCase() === m.meterNumber.toLowerCase();
+                        const isSameUtil = m.utilityType === utilityType;
+                        return (
+                          <button
+                            key={m.id}
+                            type="button"
+                            onClick={() => {
+                              setMeterNumber(m.meterNumber);
+                              if (m.utilityType !== utilityType) {
+                                setUtilityType(m.utilityType);
+                              }
+                            }}
+                            className={`text-[10px] font-mono px-2 py-0.5 rounded-full border transition-all cursor-pointer flex items-center gap-1 ${
+                              isSelected
+                                ? 'bg-cyan-600 text-white border-cyan-600 font-bold shadow-2xs'
+                                : isSameUtil
+                                ? 'bg-cyan-50/70 text-cyan-900 border-cyan-300 hover:border-cyan-500 hover:bg-cyan-100'
+                                : 'bg-slate-50 text-slate-500 border-slate-200 hover:border-slate-300'
+                            }`}
+                            title={`${m.utilityType === 'electricity' ? '⚡ Electricity' : '💧 Water'} • ${m.meterType}${m.location ? ` (${m.location})` : ''}${m.unitName ? ` [Unit ${m.unitName}]` : ''}`}
+                          >
+                            <span>{m.utilityType === 'electricity' ? '⚡' : '💧'}</span>
+                            <span className="font-bold">#{m.meterNumber}</span>
+                            {m.unitName && <span className="opacity-75">U:{m.unitName}</span>}
+                            {m.location && <span className="opacity-75 text-[9px] font-sans">({m.location})</span>}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+
                   <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
                     {/* 1. Utility Type Toggle */}
                     <div>
@@ -733,9 +825,20 @@ export default function MeterReadingsModal({
 
                     {/* 3. Meter Number */}
                     <div>
-                      <label className="block text-[11px] font-bold text-slate-600 mb-1">
-                        Meter Number / Tag (Optional)
-                      </label>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="block text-[11px] font-bold text-slate-600">
+                          Meter Number / Tag (Optional)
+                        </label>
+                        <button
+                          type="button"
+                          onClick={() => setIsMeterRegistryOpen(true)}
+                          className="text-[10px] text-cyan-600 hover:text-cyan-800 font-bold flex items-center gap-0.5 cursor-pointer"
+                          title="Manage property meter registry"
+                        >
+                          <Gauge className="w-2.5 h-2.5" />
+                          <span>Meters ({propertyMeters.length})</span>
+                        </button>
+                      </div>
                       <input
                         type="text"
                         name="meterNumber"
@@ -745,6 +848,27 @@ export default function MeterReadingsModal({
                         placeholder={utilityType === 'electricity' ? 'e.g. 10003374' : 'e.g. 211001886'}
                         className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg text-xs bg-white text-slate-900 focus:ring-1 focus:ring-cyan-500 focus:outline-none font-mono"
                       />
+                      {meterNumber.trim() && !propertyMeters.some((m) => m.meterNumber.toLowerCase() === meterNumber.trim().toLowerCase()) && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const trimmed = meterNumber.trim();
+                            addPropertyMeter(rental.id, {
+                              meterNumber: trimmed,
+                              utilityType,
+                              meterType: 'sub_meter',
+                              location: 'Added from manual reading',
+                            });
+                            setSuccessToast(`Saved meter #${trimmed} to Property Meter Registry`);
+                            setTimeout(() => setSuccessToast(null), 3000);
+                          }}
+                          className="mt-1 text-[10px] font-bold text-cyan-700 hover:text-cyan-900 bg-cyan-50 hover:bg-cyan-100 border border-cyan-200 px-1.5 py-0.5 rounded flex items-center gap-1 transition-colors cursor-pointer w-full justify-center"
+                          title="Save this serial number to the property's meter registry"
+                        >
+                          <PlusCircle className="w-2.5 h-2.5 shrink-0" />
+                          <span className="truncate">+ Save #{meterNumber.trim()} to Registry</span>
+                        </button>
+                      )}
                     </div>
 
                     {/* 4. Reading Value */}
@@ -1008,12 +1132,64 @@ export default function MeterReadingsModal({
                       </p>
                     </div>
 
+                    {/* Registered Meters Quick Pick in Dispute Form */}
+                    {propertyMeters.length > 0 && (
+                      <div className="p-2 bg-emerald-50/50 rounded-lg border border-emerald-200/60">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-800 flex items-center gap-1 mb-1">
+                          <Gauge className="w-3 h-3 text-emerald-600" />
+                          <span>Property Registered Meters:</span>
+                        </span>
+                        <div className="flex flex-wrap gap-1">
+                          {propertyMeters.map((m) => {
+                            const isSelected = meterNumber.trim().toLowerCase() === m.meterNumber.toLowerCase();
+                            const isSameUtil = m.utilityType === utilityType;
+                            return (
+                              <button
+                                key={m.id}
+                                type="button"
+                                onClick={() => {
+                                  setMeterNumber(m.meterNumber);
+                                  if (m.utilityType !== utilityType) {
+                                    setUtilityType(m.utilityType);
+                                  }
+                                }}
+                                className={`text-[10px] font-mono px-2 py-0.5 rounded-full border transition-all cursor-pointer flex items-center gap-1 ${
+                                  isSelected
+                                    ? 'bg-emerald-700 text-white border-emerald-700 font-bold shadow-2xs'
+                                    : isSameUtil
+                                    ? 'bg-white text-emerald-950 border-emerald-300 hover:border-emerald-500 hover:bg-emerald-100/50'
+                                    : 'bg-white/70 text-slate-500 border-slate-200 hover:border-slate-300'
+                                }`}
+                                title={`${m.utilityType === 'electricity' ? '⚡ Electricity' : '💧 Water'} • ${m.meterType}${m.location ? ` (${m.location})` : ''}${m.unitName ? ` [Unit ${m.unitName}]` : ''}`}
+                              >
+                                <span>{m.utilityType === 'electricity' ? '⚡' : '💧'}</span>
+                                <span className="font-bold">#{m.meterNumber}</span>
+                                {m.unitName && <span className="opacity-75">U:{m.unitName}</span>}
+                                {m.location && <span className="opacity-75 text-[9px] font-sans">({m.location})</span>}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+
                     {/* Meter Serial # & Inspection Date */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                       <div>
-                        <label className="block text-[11px] font-bold text-slate-700 mb-1">
-                          Meter Serial # / Tag
-                        </label>
+                        <div className="flex items-center justify-between mb-1">
+                          <label className="block text-[11px] font-bold text-slate-700">
+                            Meter Serial # / Tag
+                          </label>
+                          <button
+                            type="button"
+                            onClick={() => setIsMeterRegistryOpen(true)}
+                            className="text-[10px] text-emerald-700 hover:text-emerald-900 font-bold flex items-center gap-0.5 cursor-pointer"
+                            title="Manage property meter registry"
+                          >
+                            <Gauge className="w-2.5 h-2.5" />
+                            <span>Meters ({propertyMeters.length})</span>
+                          </button>
+                        </div>
                         <input
                           type="text"
                           value={meterNumber}
@@ -1021,6 +1197,27 @@ export default function MeterReadingsModal({
                           placeholder={utilityType === 'electricity' ? 'e.g. 10003374' : 'e.g. 211001886'}
                           className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg text-xs bg-white text-slate-900 font-mono focus:ring-1 focus:ring-emerald-500 focus:outline-none"
                         />
+                        {meterNumber.trim() && !propertyMeters.some((m) => m.meterNumber.toLowerCase() === meterNumber.trim().toLowerCase()) && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const trimmed = meterNumber.trim();
+                              addPropertyMeter(rental.id, {
+                                meterNumber: trimmed,
+                                utilityType,
+                                meterType: 'sub_meter',
+                                location: 'Added from dispute form',
+                              });
+                              setSuccessToast(`Saved meter #${trimmed} to Property Meter Registry`);
+                              setTimeout(() => setSuccessToast(null), 3000);
+                            }}
+                            className="mt-1 text-[10px] font-bold text-emerald-800 hover:text-emerald-950 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 px-1.5 py-0.5 rounded flex items-center gap-1 transition-colors cursor-pointer w-full justify-center"
+                            title="Save this serial number to the property's meter registry"
+                          >
+                            <PlusCircle className="w-2.5 h-2.5 shrink-0" />
+                            <span className="truncate">+ Save #{meterNumber.trim()} to Registry</span>
+                          </button>
+                        )}
                       </div>
                       <div>
                         <label className="block text-[11px] font-bold text-slate-700 mb-1">
@@ -1360,7 +1557,7 @@ export default function MeterReadingsModal({
                 </div>
 
                 {/* Submit Buttons */}
-                <div className="flex items-center justify-between pt-1">
+                <div className="flex items-center justify-between pt-1 gap-2 flex-wrap">
                   <button
                     type="button"
                     onClick={() => setIsDisputed(false)}
@@ -1368,13 +1565,46 @@ export default function MeterReadingsModal({
                   >
                     Cancel Dispute Mode
                   </button>
-                  <button
-                    type="submit"
-                    className="px-5 py-2 text-white rounded-lg font-bold text-xs flex items-center gap-1.5 shadow-sm transition-colors cursor-pointer bg-amber-600 hover:bg-amber-700"
-                  >
-                    <CheckCircle2 className="w-3.5 h-3.5" />
-                    <span>Save & Flag Municipal Dispute</span>
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const draftReading: MeterReading = {
+                          id: 'draft-dispute',
+                          createdAt: new Date().toISOString(),
+                          utilityType,
+                          date: readingDate,
+                          readingValue: parseFloat(readingValue) || 0,
+                          meterNumber: meterNumber || undefined,
+                          source: 'manual',
+                          readingType,
+                          photoUrl: photoUrl || undefined,
+                          isDisputed: true,
+                          disputedStatementId: disputedStatementId || selectedStatement?.id,
+                          disputedMunicipalReadingValue: parseFloat(disputedMunicipalReadingValue) || undefined,
+                          disputeReferenceNumber: disputeReferenceNumber || undefined,
+                          disputeReason,
+                          disputeStatus,
+                          disputeLodgedDate,
+                          disputeResolutionNotes,
+                        };
+                        setDisputeLetterReading(draftReading);
+                        setIsDisputeLetterModalOpen(true);
+                      }}
+                      className="px-3.5 py-2 text-amber-900 bg-amber-100 hover:bg-amber-200 border border-amber-300 rounded-lg font-bold text-xs flex items-center gap-1.5 shadow-2xs transition-colors cursor-pointer"
+                      title="Preview formal dispute letter & generate downloadable PDF"
+                    >
+                      <FileText className="w-3.5 h-3.5 text-amber-700" />
+                      <span>Generate Dispute Letter (PDF)</span>
+                    </button>
+                    <button
+                      type="submit"
+                      className="px-5 py-2 text-white rounded-lg font-bold text-xs flex items-center gap-1.5 shadow-sm transition-colors cursor-pointer bg-amber-600 hover:bg-amber-700"
+                    >
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      <span>Save & Flag Municipal Dispute</span>
+                    </button>
+                  </div>
                 </div>
               </form>
             )}
@@ -1692,6 +1922,18 @@ export default function MeterReadingsModal({
                                 )}
                                 {reading.isDisputed && (
                                   <>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setDisputeLetterReading(reading);
+                                        setIsDisputeLetterModalOpen(true);
+                                      }}
+                                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold text-amber-900 bg-amber-100 hover:bg-amber-200 border border-amber-300 transition-colors cursor-pointer mr-0.5"
+                                      title="Generate official dispute letter & download PDF"
+                                    >
+                                      <FileText className="w-3 h-3 text-amber-700" />
+                                      <span>Letter/PDF</span>
+                                    </button>
                                     {reading.disputeStatus !== 'Resolved' && (
                                       <button
                                         type="button"
@@ -2164,6 +2406,40 @@ export default function MeterReadingsModal({
             </form>
           </div>
         </div>
+      )}
+
+      {/* Sub-Modals */}
+      {isDisputeLetterModalOpen && rental && (
+        <DisputeLetterModal
+          property={rental}
+          reading={disputeLetterReading}
+          statement={selectedStatement}
+          isOpen={isDisputeLetterModalOpen}
+          onClose={() => {
+            setIsDisputeLetterModalOpen(false);
+            setDisputeLetterReading(null);
+          }}
+        />
+      )}
+
+      {isMeterRegistryOpen && rental && (
+        <PropertyMeterRegistryModal
+          property={rental}
+          isOpen={isMeterRegistryOpen}
+          onClose={() => setIsMeterRegistryOpen(false)}
+          onSelectMeter={(num, type) => {
+            setMeterNumber(num);
+            setUtilityType(type);
+            setIsMeterRegistryOpen(false);
+          }}
+        />
+      )}
+
+      {isMuniDirectoryOpen && (
+        <MunicipalDirectoryModal
+          isOpen={isMuniDirectoryOpen}
+          onClose={() => setIsMuniDirectoryOpen(false)}
+        />
       )}
     </div>
   );
