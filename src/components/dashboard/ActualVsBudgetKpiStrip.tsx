@@ -13,7 +13,7 @@ import {
   Info,
   AlertCircle,
 } from 'lucide-react';
-import { calculatePropertyArrears } from '@/lib/calculations/arrears';
+import { calculatePropertyArrears, getMonthKey } from '@/lib/calculations/arrears';
 
 interface ActualVsBudgetKpiStripProps {
   rentals: RentalProperty[];
@@ -133,17 +133,51 @@ export default function ActualVsBudgetKpiStrip({
     });
   });
 
-  // Calculate total active tenant arrears across properties
-  const totalArrearsYTD = activeRentals.reduce((sum, r) => {
-    const arrearsResult = calculatePropertyArrears(r);
-    return sum + Math.max(0, arrearsResult.totalArrearsZAR);
-  }, 0);
+  // 3. Logged Payment Records (count as collected rent when manual Transaction records are absent)
+  let actualPaymentRecordsGrossRentYTD = 0;
+  let hasLoggedPaymentRecords = false;
 
-  // If no manual ledger transactions exist, compute collected rent as budgeted gross minus uncollected tenant arrears
+  activeRentals.forEach((r) => {
+    (r.paymentRecords || []).forEach((p) => {
+      if (p.paymentDate >= taxYearInfo.startDateStr && p.paymentDate <= taxYearInfo.endDateStr) {
+        actualPaymentRecordsGrossRentYTD += p.amountReceivedZAR || 0;
+        hasLoggedPaymentRecords = true;
+      }
+    });
+  });
+
+  // 4. Calculate tenant arrears strictly accrued within current tax year, plus total cumulative arrears
+  const taxYearStartMonth = `${taxYearInfo.startYear}-03`;
+  const currentMonthKey = getMonthKey();
+  let currentTaxYearArrears = 0;
+  let totalCumulativeArrears = 0;
+
+  activeRentals.forEach((r) => {
+    const arrearsResult = calculatePropertyArrears(r);
+    totalCumulativeArrears += Math.max(0, arrearsResult.totalArrearsZAR);
+
+    // Sum uncollected net variance for billing months strictly within current tax year up to current month
+    const taxYearLedgerItems = (arrearsResult.ledger || []).filter(
+      (item) => item.month >= taxYearStartMonth && item.month <= currentMonthKey
+    );
+    const rentalTaxYearArrears = taxYearLedgerItems.reduce(
+      (sum, item) => sum + Math.max(0, item.netVariance),
+      0
+    );
+    currentTaxYearArrears += rentalTaxYearArrears;
+  });
+
+  // Effective collected rent determination:
+  // Preference 1: Manual Transaction ledger records
+  // Preference 2: Logged paymentRecords within current tax year
+  // Preference 3: Budgeted gross rent minus arrears accrued strictly within current tax year
   const hasTransactions = totalLoggedTransactionsCount > 0;
   const effectiveActualRent = hasTransactions
     ? actualGrossRentYTD
-    : Math.max(0, budgetedGrossRentYTD - totalArrearsYTD);
+    : hasLoggedPaymentRecords
+    ? actualPaymentRecordsGrossRentYTD
+    : Math.max(0, budgetedGrossRentYTD - currentTaxYearArrears);
+
   const effectiveActualOpex = hasTransactions ? actualOpexYTD : budgetedOpexYTD;
   const effectiveActualInterest = hasTransactions ? actualBondInterestYTD : budgetedSec11aInterestYTD;
   const effectiveActualNet = effectiveActualRent - effectiveActualOpex - (hasTransactions ? (actualBondInterestYTD + actualBondCapitalYTD) : budgetedBondPaymentYTD);
@@ -178,7 +212,9 @@ export default function ActualVsBudgetKpiStrip({
             </div>
             {showSubtitle && (
               <p className="text-[11px] text-slate-500 mt-0.5">
-                Audited Section 11(a) operating comparison between budgeted income/expenses and actual ledger transactions.
+                {hasTransactions
+                  ? 'Audited Section 11(a) operating comparison between budgeted income/expenses and actual ledger transactions.'
+                  : 'Section 11(a) Operational Overview comparing pro-rated annual budget against tracked revenue and expenses.'}
               </p>
             )}
           </div>
@@ -188,8 +224,10 @@ export default function ActualVsBudgetKpiStrip({
           <div className="flex items-center gap-1.5 text-[11px] text-slate-500 bg-slate-50 px-2.5 py-1 rounded-lg border border-slate-200 self-start sm:self-auto">
             <Info className="w-3.5 h-3.5 text-slate-400 shrink-0" />
             <span>
-              {totalArrearsYTD > 0
-                ? `Adjusted for ${formatZAR(totalArrearsYTD)} active tenant arrears`
+              {hasLoggedPaymentRecords
+                ? `Derived from ${formatZAR(effectiveActualRent)} logged tenant payment records`
+                : currentTaxYearArrears > 0
+                ? `Adjusted for ${formatZAR(currentTaxYearArrears)} current tax year tenant arrears`
                 : 'Tracking against budgeted baseline (0 transactions logged for YTD)'}
             </span>
           </div>
@@ -210,9 +248,9 @@ export default function ActualVsBudgetKpiStrip({
             </div>
             <div className="text-[11px] text-slate-500 mt-0.5 flex flex-wrap items-center justify-between gap-1">
               <span>Budget YTD: <strong className="text-slate-700">{formatZAR(budgetedGrossRentYTD)}</strong></span>
-              {totalArrearsYTD > 0 && (
-                <span className="text-[10px] font-bold text-rose-600 bg-rose-50 px-1.5 py-0.5 rounded border border-rose-200" title="Active unpaid tenant arrears deducted from collected rent">
-                  Arrears: -{formatZAR(totalArrearsYTD)}
+              {!hasTransactions && !hasLoggedPaymentRecords && currentTaxYearArrears > 0 && (
+                <span className="text-[10px] font-bold text-rose-600 bg-rose-50 px-1.5 py-0.5 rounded border border-rose-200" title="Active unpaid tenant arrears accrued in current tax year deducted from collected rent">
+                  Tax Year Arrears: -{formatZAR(currentTaxYearArrears)}
                 </span>
               )}
             </div>

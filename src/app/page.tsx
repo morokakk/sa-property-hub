@@ -27,6 +27,7 @@ import {
   Sparkles,
   AlertTriangle,
   Landmark,
+  Compass,
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -187,6 +188,15 @@ export default function GlobalDashboardPage() {
               </div>
             </div>
 
+            <Link
+              href="/get-started"
+              data-testid="clean-slate-quick-start-link"
+              className="mt-4 flex items-center gap-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-3 shadow-sm transition-colors"
+            >
+              <Compass className="w-5 h-5 shrink-0" />
+              <span className="text-sm font-bold">New here? Follow the 5-minute Quick Start Guide →</span>
+            </Link>
+
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-4">
               <Link
                 href="/analyzer"
@@ -248,7 +258,7 @@ export default function GlobalDashboardPage() {
         )}
 
         {/* Top Executive KPI Metric Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+        <div id="dashboard-kpis" className="scroll-mt-20 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
           {/* Total Portfolio Value */}
           <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-xs">
             <div className="flex items-center justify-between text-slate-500 mb-1">
@@ -348,10 +358,12 @@ export default function GlobalDashboardPage() {
         </div>
 
         {/* Actuals YTD vs. Budget KPI Strip (SA Tax Year 1 Mar - 28/29 Feb) */}
-        <ActualVsBudgetKpiStrip rentals={rentals} />
+        <div id="dashboard-actuals" className="scroll-mt-20">
+          <ActualVsBudgetKpiStrip rentals={rentals} />
+        </div>
 
         {/* Rental Tax Reserve & SARS Total Tax Side-by-Side */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div id="dashboard-tax-reserve" className="scroll-mt-20 grid grid-cols-1 sm:grid-cols-2 gap-4">
           {/* Rental Tax Reserve */}
           <div className="bg-amber-50 rounded-xl p-4 border border-amber-200 shadow-xs">
             <div className="flex items-center justify-between text-amber-800 mb-1">

@@ -22,6 +22,7 @@ import {
   FileSpreadsheet,
   FileCode2,
   CheckCircle2,
+  Compass,
 } from 'lucide-react';
 import { usePortfolioStore } from '@/lib/store/usePortfolioStore';
 import { exportPortfolioToExcel } from '@/lib/export/excelExport';
@@ -57,6 +58,8 @@ export default function Sidebar() {
   const handleReset = () => {
     if (confirm('Reset portfolio state to South African realistic demo data? This will restore sample rentals, flips, funding and tasks.')) {
       resetToDemoData();
+      // Close the drawer so the refreshed page is visible (and clickable) behind the toast
+      setIsMobileDrawerOpen(false);
       showDrawerNotice('Portfolio reset to South African demo dataset.');
     }
   };
@@ -68,6 +71,8 @@ export default function Sidebar() {
       )
     ) {
       clearAllData();
+      // Close the drawer so the Clean Slate card (and its Quick Start link) is not hidden behind the overlay
+      setIsMobileDrawerOpen(false);
       showDrawerNotice('Portfolio cleared.');
     }
   };
@@ -199,6 +204,15 @@ export default function Sidebar() {
     },
   ];
 
+  // Permanent secondary utility links (static: never reordered or hidden based on guide progress)
+  const utilityNavItems = [
+    {
+      name: 'Get Started Guide',
+      href: '/get-started',
+      icon: Compass,
+    },
+  ];
+
   // Mobile Bottom Quick Navigation Tabs (4 Core Modules + More Drawer Trigger)
   const bottomTabs = [
     { name: 'Dashboard', href: '/', icon: LayoutDashboard },
@@ -257,6 +271,28 @@ export default function Sidebar() {
                     {item.badge}
                   </span>
                 )}
+              </Link>
+            );
+          })}
+
+          <div className="px-3 pt-4 pb-2 text-[10px] uppercase tracking-wider font-semibold text-slate-400">
+            Help &amp; Reference
+          </div>
+          {utilityNavItems.map((item) => {
+            const isActive = pathname === item.href;
+            const Icon = item.icon;
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
+                  isActive
+                    ? 'bg-emerald-600 text-white shadow-sm shadow-emerald-900/40 font-semibold'
+                    : 'text-slate-300 hover:bg-slate-800/80 hover:text-white'
+                }`}
+              >
+                <Icon className={`w-4 h-4 ${isActive ? 'text-white' : 'text-emerald-400'}`} />
+                <span>{item.name}</span>
               </Link>
             );
           })}
@@ -369,6 +405,29 @@ export default function Sidebar() {
                           {item.badge}
                         </span>
                       )}
+                    </Link>
+                  );
+                })}
+
+                <div className="px-3 pt-3 pb-1.5 text-[10px] uppercase tracking-wider font-semibold text-slate-400">
+                  Help &amp; Reference
+                </div>
+                {utilityNavItems.map((item) => {
+                  const isActive = pathname === item.href;
+                  const Icon = item.icon;
+                  return (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      onClick={() => setIsMobileDrawerOpen(false)}
+                      className={`flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-xs font-medium transition-all ${
+                        isActive
+                          ? 'bg-emerald-600 text-white font-semibold shadow-sm'
+                          : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                      }`}
+                    >
+                      <Icon className={`w-4 h-4 ${isActive ? 'text-white' : 'text-emerald-400'}`} />
+                      <span>{item.name}</span>
                     </Link>
                   );
                 })}

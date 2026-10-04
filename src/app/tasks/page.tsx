@@ -223,7 +223,7 @@ export default function TaskEnginePage() {
         </div>
 
         {/* Task Items List */}
-        <div className="space-y-3">
+        <div id="tasks-list" className="scroll-mt-20 space-y-3">
           {filteredTasks.length === 0 ? (
             <div className="bg-white rounded-xl p-8 text-center border border-slate-200">
               <p className="text-xs text-slate-400">No tasks match your selected filter criteria.</p>

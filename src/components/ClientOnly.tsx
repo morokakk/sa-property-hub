@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import AuthHydrator from '@/components/AuthHydrator';
+import HashScroller from '@/components/navigation/HashScroller';
 
 export default function ClientOnly({ children }: { children: React.ReactNode }) {
   const [hasMounted, setHasMounted] = useState(false);
@@ -24,6 +25,7 @@ export default function ClientOnly({ children }: { children: React.ReactNode }) 
   return (
     <>
       <AuthHydrator />
+      <HashScroller />
       {children}
     </>
   );

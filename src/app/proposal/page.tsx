@@ -559,7 +559,7 @@ function ProposalGeneratorContent() {
 
       <main className="flex-1 p-4 sm:p-6 space-y-6 max-w-5xl w-full mx-auto">
         {/* Deal Selector & Terms Customizer (Hidden on Print) */}
-        <div className="no-print bg-white rounded-xl border border-slate-200 p-4 sm:p-5 shadow-xs space-y-4">
+        <div id="proposal-deal-selector" className="scroll-mt-20 no-print bg-white rounded-xl border border-slate-200 p-4 sm:p-5 shadow-xs space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
               <h3 className="font-bold text-sm text-slate-900">Select Deal & Tailor Pitch Terms</h3>

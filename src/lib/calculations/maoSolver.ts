@@ -10,7 +10,9 @@ export interface FlipMaoParams {
   targetExitPrice: number;
   desiredRoiPercent: number; // e.g. 15 for 15%
   rehabCost: number;
-  holdingCost: number; // e.g. 6-month holding reserve
+  holdingCost?: number; // total holding reserve, or derived from monthlyHoldingCost * holdingPeriodMonths
+  monthlyHoldingCost?: number;
+  holdingPeriodMonths?: number;
   estimatedAcquisitionCostRate?: number; // e.g. 0.05 (5% duty + legal friction approximation)
   exitCommissionPercent?: number; // Optional exit sales commission (e.g. 5.75 for 5.75%)
   municipalClearanceZAR?: number; // Section 118 municipal arrears and council clearance
@@ -31,6 +33,10 @@ export interface RentalMaoParams {
   monthlyLevies: number;
   monthlyRates: number;
   annualInsurance: number;
+  monthlyMaintenanceReserve?: number;
+  monthlyPrepaidVendingFee?: number;
+  rehabCost?: number;
+  estimatedAcquisitionCostRate?: number;
   targetNetYieldPercent: number; // Target Cap Rate, e.g. 8.5%
 }
 
@@ -42,6 +48,7 @@ export interface RentalMaoResult {
   managementFeeAnnual: number;
   annualOperatingExpenses: number;
   stressTestedNoi: number;
+  totalAllowableCost?: number;
 }
 
 /**
@@ -54,16 +61,26 @@ export function calculateFlipMao(params: FlipMaoParams): FlipMaoResult {
     desiredRoiPercent,
     rehabCost,
     holdingCost,
+    monthlyHoldingCost,
+    holdingPeriodMonths,
     estimatedAcquisitionCostRate = 0.05,
     exitCommissionPercent,
     municipalClearanceZAR = 0,
   } = params;
 
+  const holdingMonths = typeof holdingPeriodMonths === 'number' && holdingPeriodMonths > 0
+    ? holdingPeriodMonths
+    : 6;
+
+  const resolvedHoldingCost = typeof holdingCost === 'number'
+    ? holdingCost
+    : (typeof monthlyHoldingCost === 'number' ? monthlyHoldingCost * holdingMonths : 0);
+
   if (
     targetExitPrice <= 0 ||
     desiredRoiPercent < -90 ||
     rehabCost < 0 ||
-    holdingCost < 0
+    resolvedHoldingCost < 0
   ) {
     return {
       maxAllowableBid: 0,
@@ -79,7 +96,7 @@ export function calculateFlipMao(params: FlipMaoParams): FlipMaoResult {
     ? Math.round(targetExitPrice * (exitCommissionPercent / 100))
     : 0;
   const municipalClearance = Math.max(0, municipalClearanceZAR || 0);
-  const nonPurchaseCosts = rehabCost + holdingCost + exitCommission + municipalClearance;
+  const nonPurchaseCosts = rehabCost + resolvedHoldingCost + exitCommission + municipalClearance;
   const allowableForAcquisition = totalAllowableOutlay - nonPurchaseCosts;
 
   // Account for acquisition friction (transfer duty + legal fees ~5% on average)
@@ -102,7 +119,8 @@ export function calculateFlipMao(params: FlipMaoParams): FlipMaoResult {
 /**
  * Solve Rental Maximum Purchase Price
  * MAO = Stress-Tested NOI / Target Net Yield%
- * where Stress-Tested NOI = (Gross Rent * (1 - Vacancy%)) - OpEx (Levies + Rates + Insurance + Management)
+ * where Stress-Tested NOI = (Gross Rent * (1 - Vacancy%)) - OpEx (Levies + Rates + Insurance + Management + Maintenance + Vending)
+ * All-in cost includes acquisition friction and rehab matching the Buy Box capRate definition.
  */
 export function calculateRentalMao(params: RentalMaoParams): RentalMaoResult {
   const {
@@ -113,6 +131,10 @@ export function calculateRentalMao(params: RentalMaoParams): RentalMaoResult {
     monthlyLevies,
     monthlyRates,
     annualInsurance,
+    monthlyMaintenanceReserve = 0,
+    monthlyPrepaidVendingFee = 0,
+    rehabCost = 0,
+    estimatedAcquisitionCostRate = 0,
     targetNetYieldPercent,
   } = params;
 
@@ -124,7 +146,15 @@ export function calculateRentalMao(params: RentalMaoParams): RentalMaoResult {
   const managementFeeAnnual = Math.round(grossAnnualRent * (Math.max(0, managementFeePercent) / 100) * vatMultiplier);
   const statutoryAndLeviesAnnual = (Math.max(0, monthlyLevies) + Math.max(0, monthlyRates)) * 12;
   const annualInsuranceClean = Math.max(0, annualInsurance);
-  const annualOperatingExpenses = statutoryAndLeviesAnnual + annualInsuranceClean + managementFeeAnnual;
+  const maintenanceAnnual = Math.max(0, monthlyMaintenanceReserve) * 12;
+  const vendingAnnual = Math.max(0, monthlyPrepaidVendingFee) * 12;
+
+  const annualOperatingExpenses =
+    statutoryAndLeviesAnnual +
+    annualInsuranceClean +
+    managementFeeAnnual +
+    maintenanceAnnual +
+    vendingAnnual;
 
   const stressTestedNoi = effectiveGrossRentAnnual - annualOperatingExpenses;
 
@@ -137,10 +167,18 @@ export function calculateRentalMao(params: RentalMaoParams): RentalMaoResult {
       managementFeeAnnual,
       annualOperatingExpenses,
       stressTestedNoi: Math.round(stressTestedNoi),
+      totalAllowableCost: 0,
     };
   }
 
-  const maxAllowablePrice = Math.max(0, Math.round(stressTestedNoi / (targetNetYieldPercent / 100)));
+  // All-in cost matches Buy Box capRate definition:
+  // capRate = (stressTestedNoi / totalAllInCost) * 100 = targetNetYieldPercent
+  const totalAllowableCost = Math.round(stressTestedNoi / (targetNetYieldPercent / 100));
+  const allowableAcquisition = totalAllowableCost - Math.max(0, rehabCost);
+  const acqRate = Math.max(0, estimatedAcquisitionCostRate);
+  const maxAllowablePrice = allowableAcquisition > 0
+    ? Math.max(0, Math.round(allowableAcquisition / (1 + acqRate)))
+    : 0;
 
   return {
     maxAllowablePrice,
@@ -150,5 +188,6 @@ export function calculateRentalMao(params: RentalMaoParams): RentalMaoResult {
     managementFeeAnnual,
     annualOperatingExpenses,
     stressTestedNoi: Math.round(stressTestedNoi),
+    totalAllowableCost,
   };
 }

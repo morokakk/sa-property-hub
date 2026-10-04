@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { evaluateDealCriteria, calculateDealMetrics, calculateEffectiveExitCommission } from '../propertyMetrics';
+import { evaluateDealCriteria, calculateDealMetrics, calculateEffectiveExitCommission, calculateDealDscr } from '../propertyMetrics';
 import { getSaTaxYearInfo } from '@/components/dashboard/ActualVsBudgetKpiStrip';
 import { InvestorProfile } from '@/types';
 
@@ -138,6 +138,108 @@ describe('Phase 1 & 2: Strategy-Aware Buy Box Hurdles & DSCR Evaluation', () => 
     // DSCR = 7,896 / 8,521 = 0.93
     expect(metrics.dscr).toBeCloseTo(0.93, 2);
     expect(metrics.bondAmount).toBe(800_000);
+  });
+
+  it('fails maxDay1Cash hurdle when initialCapitalRequired is undefined/missing', () => {
+    const missingCashFlip = evaluateDealCriteria(
+      {
+        projectedFlipRoi: 25.0,
+        // initialCapitalRequired omitted
+      },
+      mockProfile,
+      'Flip'
+    );
+    expect(missingCashFlip.criteriaMap['maxDay1Cash']).toBe(false);
+    expect(missingCashFlip.meetsBuyBox).toBe(false);
+
+    const missingCashRental = evaluateDealCriteria(
+      {
+        capRate: 9.0,
+        monthlyCashFlow: 2500,
+        netRoi: 10.5,
+        dscr: 1.35,
+        // initialCapitalRequired omitted
+      },
+      mockProfile,
+      'Rental'
+    );
+    expect(missingCashRental.criteriaMap['maxDay1Cash']).toBe(false);
+    expect(missingCashRental.meetsBuyBox).toBe(false);
+  });
+
+  it('unifies DSCR across calculateDealDscr and calculateDealMetrics without rounding discrepancies', () => {
+    const dealParams = {
+      purchasePrice: 1_000_000,
+      monthlyRentalEstimate: 12_000,
+      monthlyLevies: 1_000,
+      monthlyRatesTaxes: 800,
+      annualInsurance: 0,
+      managementFeePercent: 8.0,
+      agencyVatApplicable: true,
+      vacancyRatePercent: 5.0,
+      monthlyMaintenanceReserveZAR: 500,
+      monthlyPrepaidVendingFeeZAR: 100,
+      loanToValuePercent: 80,
+      depositZAR: 200_000,
+      bondLTV: 80,
+      interestRatePercent: 11.5,
+      loanTermYears: 20,
+    };
+
+    const dscrResult = calculateDealDscr(dealParams, 11.5);
+    expect(dscrResult.dscr).toBe(0.93);
+    expect(dscrResult.monthlyBondPayment).toBe(8_521);
+    expect(dscrResult.monthlyNoi).toBe(7_896);
+
+    // If maintenance reserve is explicitly 0, it should not default to 800
+    const zeroMaintResult = calculateDealDscr({
+      ...dealParams,
+      monthlyMaintenanceReserveZAR: 0,
+    }, 11.5);
+    expect(zeroMaintResult.monthlyNoi).toBe(7_896 + 500);
+  });
+
+  it('computes flip holding bond interest as interest-only and includes holding cash in flip ROI denominator', () => {
+    // Purchase: 1,000,000, Bond: 800,000 @ 12% (1% / mo = 8,000 / mo interest), Deposit: 200,000
+    // Levies & Rates: 1,000 + 1,000 = 2,000 / mo
+    // Holding: 6 months -> Bond interest = 48,000, Levies/Rates = 12,000 -> Total holding = 60,000
+    // Day-1 cash = Deposit (200k) + acq fees (50k) + rehab (100k) = 350,000
+    // Total cash invested = 350,000 + 60,000 = 410,000
+    const metrics = calculateDealMetrics({
+      purchasePrice: 1_000_000,
+      estimatedRehabCost: 100_000,
+      monthlyRentalEstimate: 10_000,
+      monthlyLevies: 1_000,
+      monthlyRatesTaxes: 1_000,
+      annualInsurance: 0,
+      managementFeePercent: 8.0,
+      agencyVatApplicable: true,
+      vacancyRatePercent: 5.0,
+      targetExitPrice: 1_500_000,
+      holdingPeriodMonths: 6,
+      loanToValuePercent: 80,
+      depositZAR: 200_000,
+      bondLTV: 80,
+      interestRatePercent: 12.0,
+      loanTermYears: 20,
+      costs: {
+        purchasePrice: 1_000_000,
+        transferDuty: 0,
+        conveyancingFee: 25_000,
+        deedsOfficeFee: 0,
+        bondRegistrationFee: 25_000,
+        ficaSundries: 0,
+        totalAcquisitionCost: 1_050_000,
+      },
+      exitCommissionPercent: 5.0,
+    });
+
+    // Exit commission = 1,500,000 * 5% = 75,000
+    // Total costs = 1,050,000 (acq) + 100,000 (rehab) + 60,000 (holding) + 75,000 (exit comm) = 1,285,000
+    // Net profit = 1,500,000 - 1,285,000 = 215,000
+    expect(metrics.projectedFlipNetProfit).toBe(215_000);
+    // Flip ROI = (215,000 / 410,000) * 100 = 52.44%
+    expect(metrics.projectedFlipRoi).toBeCloseTo(52.44, 1);
   });
 });
 

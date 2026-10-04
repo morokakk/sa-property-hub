@@ -282,7 +282,7 @@ export default function FundingTrackerPage() {
 
       <main className="flex-1 p-4 sm:p-6 space-y-6 max-w-7xl w-full mx-auto">
         {/* Purchasing Power & Seed Capital Banner */}
-        <div className="bg-gradient-to-r from-slate-950 via-slate-900 to-emerald-950 rounded-2xl p-5 text-white border border-emerald-800/40 shadow-lg">
+        <div id="funding-reserve" className="scroll-mt-20 bg-gradient-to-r from-slate-950 via-slate-900 to-emerald-950 rounded-2xl p-5 text-white border border-emerald-800/40 shadow-lg">
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-5">
             <div className="flex items-start sm:items-center gap-3.5">
               <div className="w-12 h-12 rounded-xl bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shrink-0 shadow-inner">
@@ -394,7 +394,7 @@ export default function FundingTrackerPage() {
         </div>
 
         {/* Funding Sources Table & Cards */}
-        <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-xs">
+        <div id="funding-ledger" className="scroll-mt-20 bg-white rounded-xl border border-slate-200 overflow-hidden shadow-xs">
           <div className="p-5 border-b border-slate-200 flex items-center justify-between">
             <div>
               <h3 className="text-base font-bold text-slate-900">Capital Ledger & Terms</h3>

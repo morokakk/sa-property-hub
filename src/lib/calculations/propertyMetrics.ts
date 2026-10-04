@@ -88,6 +88,102 @@ export function calculateBondPrincipalFromRepayment(
   return Math.round((monthlyPayment * (factor - 1)) / (monthlyRate * factor));
 }
 
+export interface DealDscrParams {
+  purchasePrice: number;
+  monthlyRentalEstimate?: number;
+  vacancyRatePercent?: number;
+  managementFeePercent?: number;
+  agencyVatApplicable?: boolean;
+  monthlyLevies?: number;
+  monthlyRatesTaxes?: number;
+  annualInsurance?: number;
+  monthlyMaintenanceReserveZAR?: number;
+  monthlyPrepaidVendingFeeZAR?: number;
+  propertyType?: PropertyTitleType;
+  depositZAR?: number;
+  bondLTV?: number;
+  loanToValuePercent?: number;
+  interestRatePercent?: number;
+  interestRateMargin?: number;
+  loanTermYears?: number;
+  bondTermYears?: number;
+  monthlyBondPaymentZAR?: number;
+}
+
+export interface DealDscrResult {
+  monthlyNoi: number;
+  annualNetOperatingIncome: number;
+  monthlyBondPayment: number;
+  dscr: number;
+  rawDscr: number;
+  operatingExpenses: number;
+  effectiveGrossRent: number;
+}
+
+/**
+ * Shared Net Operating Income (NOI) and Debt Service Coverage Ratio (DSCR) calculation helper.
+ * Unifies calculations across Analyzer active form, Deal Card, and Compare Modal.
+ */
+export function calculateDealDscr(
+  deal: DealDscrParams,
+  profileOrPrime?: number | Partial<InvestorProfile>
+): DealDscrResult {
+  const prime = typeof profileOrPrime === 'number'
+    ? profileOrPrime
+    : (profileOrPrime?.defaultPrimeRatePercent ?? 10.75);
+
+  const grossRent = deal.monthlyRentalEstimate || 0;
+  const vacRate = deal.vacancyRatePercent ?? 6.0;
+  const vacLoss = (grossRent * vacRate) / 100;
+  const effectiveGrossRent = grossRent - vacLoss;
+
+  const vatMult = deal.agencyVatApplicable !== false ? 1.15 : 1.0;
+  const mgmtFeePercent = deal.managementFeePercent ?? 8.0;
+  const agentMgt = (grossRent * (mgmtFeePercent / 100)) * vatMult;
+
+  const levies = deal.propertyType === 'Freehold House' ? 0 : (deal.monthlyLevies || 0);
+  const rates = deal.monthlyRatesTaxes || 0;
+  const insurance = Math.round((deal.annualInsurance || 0) / 12);
+  const maintenance = deal.monthlyMaintenanceReserveZAR ?? 0;
+  const vending = deal.monthlyPrepaidVendingFeeZAR ?? 0;
+
+  const operatingExpenses = levies + rates + agentMgt + insurance + maintenance + vending;
+  const monthlyNoi = effectiveGrossRent - operatingExpenses;
+  const annualNetOperatingIncome = monthlyNoi * 12;
+
+  // Financed principal & bond repayment
+  const effLtv = deal.bondLTV !== undefined ? deal.bondLTV : (deal.loanToValuePercent ?? 100);
+  const deposit = deal.depositZAR !== undefined
+    ? deal.depositZAR
+    : Math.max(0, Math.round((deal.purchasePrice || 0) * (1 - effLtv / 100)));
+  const debt = Math.max(0, (deal.purchasePrice || 0) - deposit);
+  const rate = deal.interestRateMargin !== undefined
+    ? prime + deal.interestRateMargin
+    : (deal.interestRatePercent ?? prime);
+  const termYears = deal.bondTermYears ?? deal.loanTermYears ?? 20;
+
+  const monthlyBondPayment = deal.monthlyBondPaymentZAR ?? (
+    debt > 0 ? calculateMonthlyBondRepayment(debt, rate, termYears) : 0
+  );
+
+  const rawDscr = monthlyBondPayment > 0
+    ? monthlyNoi / monthlyBondPayment
+    : (monthlyNoi > 0 ? 99.0 : 0);
+  const dscr = monthlyBondPayment > 0
+    ? Number(rawDscr.toFixed(2))
+    : (monthlyNoi > 0 ? 99.0 : 0);
+
+  return {
+    monthlyNoi: Math.round(monthlyNoi),
+    annualNetOperatingIncome: Math.round(annualNetOperatingIncome),
+    monthlyBondPayment: Math.round(monthlyBondPayment),
+    dscr,
+    rawDscr,
+    operatingExpenses: Math.round(operatingExpenses),
+    effectiveGrossRent: Math.round(effectiveGrossRent),
+  };
+}
+
 export interface OpportunityMetricsResult {
   grossYield: number;
   capRate: number;
@@ -102,6 +198,7 @@ export interface OpportunityMetricsResult {
   projectedFlipNetProfit: number;
   projectedFlipRoi: number;
   dscr: number;
+  rawDscr?: number;
 }
 
 /**
@@ -226,8 +323,11 @@ export function calculateDealMetrics(params: {
   const netRoi = totalCashRequired > 0 ? (annualCashFlow / totalCashRequired) * 100 : 0;
 
   // Debt Service Coverage Ratio (DSCR): Monthly NOI / Monthly Bond Repayment
+  const rawDscr = monthlyBondPayment > 0
+    ? (monthlyNetOperatingIncome / monthlyBondPayment)
+    : (monthlyNetOperatingIncome > 0 ? 99.0 : 0);
   const dscr = monthlyBondPayment > 0
-    ? Number((monthlyNetOperatingIncome / monthlyBondPayment).toFixed(2))
+    ? Number(rawDscr.toFixed(2))
     : (monthlyNetOperatingIncome > 0 ? 99.0 : 0);
 
   // Buy-and-Flip Projections
@@ -239,7 +339,9 @@ export function calculateDealMetrics(params: {
 
   const commissionRate = effectiveCommissionPercent / 100;
   const exitCommission = targetExitPrice * commissionRate;
-  const holdingBondInterest = (monthlyBondPayment * holdingPeriodMonths);
+  // Holding bond cost reflects bond interest only (not double-counting principal repayment)
+  const monthlyBondInterest = bondAmount > 0 ? (bondAmount * (interestRatePercent / 100 / 12)) : 0;
+  const holdingBondInterest = monthlyBondInterest * holdingPeriodMonths;
   const holdingLeviesAndRates = (monthlyLevies + monthlyRatesTaxes) * holdingPeriodMonths;
   const totalHoldingCosts = holdingBondInterest + holdingLeviesAndRates;
 
@@ -251,7 +353,11 @@ export function calculateDealMetrics(params: {
     exitCommission;
 
   const projectedFlipNetProfit = targetExitPrice - totalFlipCosts;
-  const projectedFlipRoi = totalCost > 0 ? (projectedFlipNetProfit / (totalCashRequired > 0 ? totalCashRequired : totalCost)) * 100 : 0;
+  // Flip ROI denominator (cash invested) includes holding cash requirements alongside Day-1 cash
+  const flipCashInvested = initialCapitalRequired + totalHoldingCosts;
+  const projectedFlipRoi = flipCashInvested > 0
+    ? (projectedFlipNetProfit / flipCashInvested) * 100
+    : (totalCost > 0 ? (projectedFlipNetProfit / totalCost) * 100 : 0);
 
   return {
     grossYield: Number(grossYield.toFixed(2)),
@@ -267,6 +373,7 @@ export function calculateDealMetrics(params: {
     projectedFlipNetProfit: Math.round(projectedFlipNetProfit),
     projectedFlipRoi: Number(projectedFlipRoi.toFixed(2)),
     dscr,
+    rawDscr,
   };
 }
 
@@ -305,16 +412,19 @@ export function evaluateDealCriteria(
   const maxDay1Cash = profile.maxDay1CashZAR ?? 500000;
   const minDscr = profile.minDscr ?? 1.20;
 
-  const day1Cash = metrics.initialCapitalRequired ?? metrics.totalCashRequired ?? 0;
+  // Day-1 Capital Required: missing or undefined critical data should not falsely pass as 0
+  const rawDay1Cash = metrics.initialCapitalRequired ?? metrics.totalCashRequired;
+  const hasDay1Cash = typeof rawDay1Cash === 'number';
+  const day1Cash = hasDay1Cash ? rawDay1Cash : undefined;
 
   let dscr = metrics.dscr;
   if (dscr === undefined) {
     const bondPayment = metrics.monthlyBondPayment ?? 0;
     if (bondPayment > 0) {
-      const noi = metrics.annualNetOperatingIncome
+      const noi = metrics.annualNetOperatingIncome !== undefined
         ? metrics.annualNetOperatingIncome / 12
         : (metrics.monthlyCashFlow ?? 0) + bondPayment;
-      dscr = Number((noi / bondPayment).toFixed(2));
+      dscr = noi / bondPayment;
     } else {
       dscr = 99.0;
     }
@@ -324,14 +434,14 @@ export function evaluateDealCriteria(
 
   if (strategy === 'Flip') {
     criteriaMap['minFlipRoi'] = (metrics.projectedFlipRoi ?? 0) >= minFlipRoi;
-    criteriaMap['maxDay1Cash'] = day1Cash <= maxDay1Cash;
+    criteriaMap['maxDay1Cash'] = day1Cash !== undefined ? day1Cash <= maxDay1Cash : false;
   } else {
     // 'Rental' and 'BRRRR'
     criteriaMap['minNetYield'] = (metrics.capRate ?? 0) >= minNetYield;
     criteriaMap['minMonthlyCashflow'] = (metrics.monthlyCashFlow ?? 0) >= minMonthlyCashflow;
     criteriaMap['minNetRoi'] = (metrics.netRoi ?? 0) >= minNetRoi;
-    criteriaMap['maxDay1Cash'] = day1Cash <= maxDay1Cash;
-    criteriaMap['minDscr'] = dscr >= minDscr;
+    criteriaMap['maxDay1Cash'] = day1Cash !== undefined ? day1Cash <= maxDay1Cash : false;
+    criteriaMap['minDscr'] = (dscr ?? 0) >= (minDscr - 1e-4);
   }
 
   const values = Object.values(criteriaMap);

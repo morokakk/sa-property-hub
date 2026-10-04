@@ -152,31 +152,31 @@ describe('Arithym-Validated Financial Engines', () => {
     });
   });
 
-  describe('Engine 4: SARS Transfer Duty 2024–2026 Statutory Brackets', () => {
-    it('matches Arithym verified duty for R1,850,000 (Bracket 3: R12,375 + 6% over R1,512,500)', () => {
-      // Arithym multiply(337500, 0.06) = 20,250
-      // 12,375 + 20,250 = 32,625
+  describe('Engine 4: SARS Transfer Duty Current Statutory Brackets', () => {
+    it('matches verified duty for R1,850,000 (Bracket 3: R13,614 + 6% over R1,663,800)', () => {
+      // 1,850,000 - 1,663,800 = 186,200 * 0.06 = 11,172
+      // 13,614 + 11,172 = 24,786
       const duty = calculateSarsTransferDuty(1_850_000);
-      expect(duty).toBe(32_625);
+      expect(duty).toBe(24_786);
     });
 
-    it('matches Arithym verified duty for R1,750,000 (Parkhurst Auction)', () => {
-      // Over 1,512,500 = 237,500 * 0.06 = 14,250
-      // 12,375 + 14,250 = 26,625
+    it('matches verified duty for R1,750,000 (Parkhurst Auction)', () => {
+      // Over 1,663,800 = 86,200 * 0.06 = 5,172
+      // 13,614 + 5,172 = 18,786
       const duty = calculateSarsTransferDuty(1_750_000);
-      expect(duty).toBe(26_625);
+      expect(duty).toBe(18_786);
     });
 
-    it('returns R0 duty for properties at or below R1,100,000 exemption limit', () => {
+    it('returns R0 duty for properties at or below R1,210,000 exemption limit', () => {
       expect(calculateSarsTransferDuty(899_000)).toBe(0);
-      expect(calculateSarsTransferDuty(1_100_000)).toBe(0);
+      expect(calculateSarsTransferDuty(1_210_000)).toBe(0);
     });
 
-    it('matches Arithym verified duty for R2,500,000 (Bracket 4: R48,675 + 8% over R2,117,500)', () => {
-      // Over 2,117,500 = 382,500 * 0.08 = 30,600
-      // 48,675 + 30,600 = 79,275
+    it('matches verified duty for R2,500,000 (Bracket 4: R53,544 + 8% over R2,329,300)', () => {
+      // Over 2,329,300 = 170,700 * 0.08 = 13,656
+      // 53,544 + 13,656 = 67,200
       const duty = calculateSarsTransferDuty(2_500_000);
-      expect(duty).toBe(79_275);
+      expect(duty).toBe(67_200);
     });
   });
 

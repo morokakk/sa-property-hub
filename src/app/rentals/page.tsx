@@ -1007,6 +1007,7 @@ export default function RentalPortfolioPage() {
               }}
             />
             <button
+              id="rentals-import"
               type="button"
               onClick={() => smartPdfInputRef.current?.click()}
               title="Upload managing agent payout statements or municipal / Eskom utility bills (PDF)"
@@ -1028,6 +1029,7 @@ export default function RentalPortfolioPage() {
               <span>Export CSV</span>
             </button>
             <button
+              id="rentals-itr12"
               onClick={() => exportITR12TaxReport(rentals, 2026)}
               title="Download official SARS ITR12 Rental Tax Schedule (Sec 11(a) & 13sex) as Excel"
               className="inline-flex items-center gap-1.5 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 text-xs font-semibold px-3 py-2 rounded-lg shadow-2xs transition-colors cursor-pointer shrink-0 whitespace-nowrap"
@@ -1094,7 +1096,7 @@ export default function RentalPortfolioPage() {
         <ActualVsBudgetKpiStrip rentals={rentals} />
 
         {/* Active vs Sold Archive Tab Toggle */}
-        <div className="flex items-center justify-between bg-slate-100 p-1 rounded-xl max-w-md">
+        <div id="rentals-portfolio" className="scroll-mt-20 flex items-center justify-between bg-slate-100 p-1 rounded-xl max-w-md">
           <button
             type="button"
             onClick={() => setViewTab('active')}

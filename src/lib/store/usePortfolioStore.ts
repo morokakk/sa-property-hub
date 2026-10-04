@@ -67,6 +67,11 @@ interface PortfolioState {
   aiSettings: AiSettings;
   rentalForecastView: 'wealth-only' | 'cashflow-only';
 
+  // Get Started guide: manually ticked step IDs (local-only, never synced to the cloud)
+  completedGuideSteps: string[];
+  toggleGuideStep: (stepId: string) => void;
+  resetGuideProgress: () => void;
+
   // Computed selector
   getSummary: () => PortfolioSummary;
 
@@ -237,6 +242,19 @@ function syncAgmReminderTask(
   return [agmTask, ...tasks];
 }
 
+/**
+ * Normalises persisted Get Started checklist data: keeps only non-empty strings, de-duplicated.
+ * Anything else (undefined, null, objects, legacy shapes) collapses to an empty list.
+ */
+export function sanitizeCompletedGuideSteps(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return [];
+  const seen = new Set<string>();
+  for (const item of raw) {
+    if (typeof item === 'string' && item.trim().length > 0) seen.add(item);
+  }
+  return Array.from(seen);
+}
+
 export const usePortfolioStore = create<PortfolioState>()(
   persist(
     (set, get) => ({
@@ -252,6 +270,17 @@ export const usePortfolioStore = create<PortfolioState>()(
       analyzerDraft: INITIAL_ANALYZER_DRAFT,
       aiSettings: DEFAULT_AI_SETTINGS,
       rentalForecastView: 'wealth-only',
+      completedGuideSteps: [],
+
+      toggleGuideStep: (stepId) => {
+        if (typeof stepId !== 'string' || stepId.trim().length === 0) return;
+        set((state) => ({
+          completedGuideSteps: state.completedGuideSteps.includes(stepId)
+            ? state.completedGuideSteps.filter((id) => id !== stepId)
+            : [...state.completedGuideSteps, stepId],
+        }));
+      },
+      resetGuideProgress: () => set({ completedGuideSteps: [] }),
 
       getSummary: (): PortfolioSummary => {
         return computePortfolioSummary(get());
@@ -2057,6 +2086,7 @@ export const usePortfolioStore = create<PortfolioState>()(
             ...(pState.aiSettings || {}),
             model: migratedModel,
           },
+          completedGuideSteps: sanitizeCompletedGuideSteps(pState.completedGuideSteps),
         };
       },
       onRehydrateStorage: () => (state) => {

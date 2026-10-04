@@ -891,7 +891,7 @@ function SettingsContent() {
 
         <form onSubmit={handleSave} noValidate className="space-y-6">
           {/* Section 1: Entity & Contact Details */}
-          <div className="bg-white rounded-xl border border-slate-200 p-4 sm:p-6 shadow-xs space-y-4">
+          <div id="settings-entity" className="scroll-mt-20 bg-white rounded-xl border border-slate-200 p-4 sm:p-6 shadow-xs space-y-4">
             <div className="flex items-center gap-2.5 pb-3 border-b border-slate-100">
               <div className="p-2 bg-emerald-50 rounded-lg text-emerald-700">
                 <Building className="w-5 h-5" />
@@ -1017,7 +1017,7 @@ function SettingsContent() {
           </div>
 
           {/* Section 2: Logo Upload & Bio Summary */}
-          <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-xs space-y-4">
+          <div id="settings-branding" className="scroll-mt-20 bg-white rounded-xl border border-slate-200 p-6 shadow-xs space-y-4">
             <div className="flex items-center gap-2.5 pb-3 border-b border-slate-100">
               <div className="p-2 bg-indigo-50 rounded-lg text-indigo-700">
                 <FileText className="w-5 h-5" />
@@ -1113,7 +1113,7 @@ function SettingsContent() {
           </div>
 
           {/* Section 3: Default Acquisition & Hurdle Metrics */}
-          <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-xs space-y-4">
+          <div id="settings-finance" className="scroll-mt-20 bg-white rounded-xl border border-slate-200 p-6 shadow-xs space-y-4">
             <div className="flex items-center gap-2.5 pb-3 border-b border-slate-100">
               <div className="p-2 bg-amber-50 rounded-lg text-amber-700">
                 <Coins className="w-5 h-5" />
@@ -1218,7 +1218,7 @@ function SettingsContent() {
           </div>
 
           {/* Section 4: Strategy-Aware Buy Box Hurdles & SARS Criteria */}
-          <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-xs space-y-4">
+          <div id="settings-buybox" className="scroll-mt-20 bg-white rounded-xl border border-slate-200 p-6 shadow-xs space-y-4">
             <div className="flex items-center gap-2.5 pb-3 border-b border-slate-100">
               <div className="p-2 bg-emerald-50 rounded-lg text-emerald-700">
                 <Target className="w-5 h-5" />

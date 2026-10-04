@@ -5,22 +5,22 @@ import { AcquisitionCostBreakdown } from '@/types';
  * Based on 2024 / 2025 / 2026 National Budget Progressive Brackets
  */
 export function calculateSarsTransferDuty(propertyValue: number): number {
-  if (propertyValue <= 1_100_000) {
+  if (propertyValue <= 1_210_000) {
     return 0;
   }
-  if (propertyValue <= 1_512_500) {
-    return (propertyValue - 1_100_000) * 0.03;
+  if (propertyValue <= 1_663_800) {
+    return (propertyValue - 1_210_000) * 0.03;
   }
-  if (propertyValue <= 2_117_500) {
-    return 12_375 + (propertyValue - 1_512_500) * 0.06;
+  if (propertyValue <= 2_329_300) {
+    return 13_614 + (propertyValue - 1_663_800) * 0.06;
   }
-  if (propertyValue <= 2_722_500) {
-    return 48_675 + (propertyValue - 2_117_500) * 0.08;
+  if (propertyValue <= 2_994_800) {
+    return 53_544 + (propertyValue - 2_329_300) * 0.08;
   }
-  if (propertyValue <= 12_100_000) {
-    return 97_075 + (propertyValue - 2_722_500) * 0.11;
+  if (propertyValue <= 13_310_000) {
+    return 106_784 + (propertyValue - 2_994_800) * 0.11;
   }
-  return 1_128_600 + (propertyValue - 12_100_000) * 0.13;
+  return 1_241_456 + (propertyValue - 13_310_000) * 0.13;
 }
 
 /**

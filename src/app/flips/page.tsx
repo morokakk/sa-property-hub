@@ -900,7 +900,7 @@ export default function FlipsManagerPage() {
                   </div>
 
                   {/* Total Holding Carrying Cost Card (Expandable Itemization) */}
-                  <div className="bg-white p-4 rounded-xl border border-amber-200/90 shadow-xs flex flex-col justify-between">
+                  <div id="flips-holding-cost" className="scroll-mt-20 bg-white p-4 rounded-xl border border-amber-200/90 shadow-xs flex flex-col justify-between">
                     <div>
                       <div className="flex items-center justify-between">
                         <span className="text-[11px] font-semibold text-slate-500 uppercase">Total Holding Cost</span>
@@ -1399,7 +1399,7 @@ export default function FlipsManagerPage() {
                 />
 
                 {/* Contractor Milestone Drawdown & Retention Schedule (Requirement 1) */}
-                <div className="bg-white rounded-xl border border-slate-200 p-4 sm:p-5 shadow-xs space-y-4">
+                <div id="flips-drawdown" className="scroll-mt-20 bg-white rounded-xl border border-slate-200 p-4 sm:p-5 shadow-xs space-y-4">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-slate-200 gap-2">
                     <div>
                       <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
@@ -1592,7 +1592,7 @@ export default function FlipsManagerPage() {
                 </div>
 
                 {/* Bill of Quantities (BOQ) Table */}
-                <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-xs">
+                <div id="flips-boq" className="scroll-mt-20 bg-white rounded-xl border border-slate-200 overflow-hidden shadow-xs">
                   <div className="p-5 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                     <div>
                       <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">

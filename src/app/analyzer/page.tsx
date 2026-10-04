@@ -6,6 +6,7 @@ import { usePortfolioStore } from '@/lib/store/usePortfolioStore';
 import { computeAcquisitionCosts, calculateSection13sex } from '@/lib/calculations/sarsTax';
 import {
   calculateDealMetrics,
+  calculateDealDscr,
   computeBuiltInEquity,
   computeAmenityScore,
   generateLongTermProjection,
@@ -103,7 +104,7 @@ export default function OpportunityAnalyzerPage() {
 
   // Exit VAT & Holding Sensitivity State
   const [holdingPeriodMonths, setHoldingPeriodMonths] = useState<number>(analyzerDraft?.holdingPeriodMonths ?? 6);
-  const [vatExemptAgent, setVatExemptAgent] = useState<boolean>(analyzerDraft?.vatExemptAgent ?? false);
+  const [vatExemptAgent, setVatExemptAgent] = useState<boolean>(analyzerDraft?.vatExemptAgent ?? investorProfile?.vatExemptAgent ?? false);
 
   // MAO Quick Solver State
   const [showMaoSolver, setShowMaoSolver] = useState(false);
@@ -189,10 +190,14 @@ export default function OpportunityAnalyzerPage() {
         setInterestRateMargin(analyzerDraft.interestRateMargin);
         setInterestRate(Number(((investorProfile?.defaultPrimeRatePercent ?? 10.75) + analyzerDraft.interestRateMargin).toFixed(2)));
       }
-      if (analyzerDraft.vatExemptAgent !== undefined) setVatExemptAgent(analyzerDraft.vatExemptAgent);
+      if (analyzerDraft.vatExemptAgent !== undefined) {
+        setVatExemptAgent(analyzerDraft.vatExemptAgent);
+      } else if (investorProfile?.vatExemptAgent !== undefined) {
+        setVatExemptAgent(investorProfile.vatExemptAgent);
+      }
       if (analyzerDraft.holdingPeriodMonths !== undefined) setHoldingPeriodMonths(analyzerDraft.holdingPeriodMonths);
     }
-  }, [analyzerDraft, investorProfile?.defaultPrimeRatePercent]);
+  }, [analyzerDraft, investorProfile?.defaultPrimeRatePercent, investorProfile?.vatExemptAgent]);
 
   // Sync MAO solver mode when deal strategy changes
   useEffect(() => {
@@ -364,6 +369,11 @@ export default function OpportunityAnalyzerPage() {
     });
   }, [purchasePrice, loanToValue, overrideTax, customTransferDuty, overrideLegal, customConveyancing]);
 
+  const defaultAgentCommission = investorProfile?.defaultAgentCommissionPercent ?? 5.0;
+  const effectiveExitCommissionPercent = useMemo(() => {
+    return calculateEffectiveExitCommission(defaultAgentCommission, vatExemptAgent);
+  }, [defaultAgentCommission, vatExemptAgent]);
+
   const calculatedMetrics = useMemo(() => {
     return calculateDealMetrics({
       purchasePrice,
@@ -383,12 +393,12 @@ export default function OpportunityAnalyzerPage() {
       interestRatePercent: interestRate,
       interestRateMargin,
       vatExemptAgent,
-      defaultAgentCommissionPercent: investorProfile?.defaultAgentCommissionPercent ?? 5.0,
+      defaultAgentCommissionPercent: defaultAgentCommission,
       loanTermYears,
       costs: calculatedCosts,
       auctioneerCommissionZAR: auctioneerCommission,
       municipalArrearsZAR: municipalArrears,
-      exitCommissionPercent: vatExemptAgent ? 5.0 : 5.75,
+      exitCommissionPercent: effectiveExitCommissionPercent,
       monthlyMaintenanceReserveZAR: monthlyMaintenanceReserve,
       monthlyPrepaidVendingFeeZAR: monthlyPrepaidVendingFee,
     });
@@ -412,7 +422,8 @@ export default function OpportunityAnalyzerPage() {
     interestRate,
     interestRateMargin,
     vatExemptAgent,
-    investorProfile?.defaultAgentCommissionPercent,
+    defaultAgentCommission,
+    effectiveExitCommissionPercent,
     loanTermYears,
     calculatedCosts,
     auctioneerCommission,
@@ -470,13 +481,14 @@ export default function OpportunityAnalyzerPage() {
     propertyType,
   ]);
 
-  // Holding reserve estimation for Flip MAO solver (6 months holding of rates, levies, insurance + buffer)
+  // Holding reserve estimation for Flip MAO solver accounting for actual holdingPeriodMonths
   const flipHoldingReserve = useMemo(() => {
     const leviesClean = propertyType === 'Freehold House' ? 0 : monthlyLevies;
     const insuranceClean = propertyType === 'Freehold House' ? Math.round(annualInsurance / 12) : 0;
     const siteSecurityAndUtilitiesAllowance = 1500;
-    return (leviesClean + monthlyRates + insuranceClean + siteSecurityAndUtilitiesAllowance) * 6;
-  }, [propertyType, monthlyLevies, monthlyRates, annualInsurance]);
+    const holdingMonths = holdingPeriodMonths > 0 ? holdingPeriodMonths : 6;
+    return (leviesClean + monthlyRates + insuranceClean + siteSecurityAndUtilitiesAllowance) * holdingMonths;
+  }, [propertyType, monthlyLevies, monthlyRates, annualInsurance, holdingPeriodMonths]);
 
   const computedFlipMao = useMemo(() => {
     return calculateFlipMao({
@@ -484,11 +496,12 @@ export default function OpportunityAnalyzerPage() {
       desiredRoiPercent: maoDesiredRoi,
       rehabCost,
       holdingCost: flipHoldingReserve,
+      holdingPeriodMonths,
       estimatedAcquisitionCostRate: 0.05,
-      exitCommissionPercent: 5.75,
+      exitCommissionPercent: effectiveExitCommissionPercent,
       municipalClearanceZAR: municipalArrears,
     });
-  }, [maoTargetExitPrice, maoDesiredRoi, rehabCost, flipHoldingReserve, municipalArrears]);
+  }, [maoTargetExitPrice, maoDesiredRoi, rehabCost, flipHoldingReserve, holdingPeriodMonths, effectiveExitCommissionPercent, municipalArrears]);
 
   const computedRentalMao = useMemo(() => {
     return calculateRentalMao({
@@ -499,9 +512,13 @@ export default function OpportunityAnalyzerPage() {
       monthlyLevies: propertyType === 'Freehold House' ? 0 : monthlyLevies,
       monthlyRates,
       annualInsurance: propertyType === 'Freehold House' ? annualInsurance : 0,
+      monthlyMaintenanceReserve,
+      monthlyPrepaidVendingFee,
+      rehabCost,
+      estimatedAcquisitionCostRate: 0.05,
       targetNetYieldPercent: maoTargetYield,
     });
-  }, [monthlyRent, vacancyRate, managementFee, agencyVatApplicable, propertyType, monthlyLevies, monthlyRates, annualInsurance, maoTargetYield]);
+  }, [monthlyRent, vacancyRate, managementFee, agencyVatApplicable, propertyType, monthlyLevies, monthlyRates, annualInsurance, monthlyMaintenanceReserve, monthlyPrepaidVendingFee, rehabCost, maoTargetYield]);
 
   const handleApplyMaoBid = (bidAmount: number) => {
     if (bidAmount <= 0) return;
@@ -605,7 +622,9 @@ export default function OpportunityAnalyzerPage() {
     setAgencyVatApplicable(deal.agencyVatApplicable !== false);
     setHoldingPeriodMonths(deal.holdingPeriodMonths ?? 6);
     setInterestRateMargin(deal.interestRateMargin ?? 0.0);
-    setVatExemptAgent(deal.vatExemptAgent ?? false);
+    setVatExemptAgent(deal.vatExemptAgent ?? (investorProfile?.vatExemptAgent ?? false));
+    setMonthlyMaintenanceReserve(deal.monthlyMaintenanceReserveZAR !== undefined ? deal.monthlyMaintenanceReserveZAR : (analyzerDraft?.monthlyMaintenanceReserveZAR ?? 800));
+    setMonthlyPrepaidVendingFee(deal.monthlyPrepaidVendingFeeZAR !== undefined ? deal.monthlyPrepaidVendingFeeZAR : (analyzerDraft?.monthlyPrepaidVendingFeeZAR ?? 150));
     const effectiveLtv = deal.bondLTV !== undefined ? deal.bondLTV : (deal.loanToValuePercent ?? 100);
     setLoanToValue(effectiveLtv);
     const effectiveDep = deal.depositZAR !== undefined ? deal.depositZAR : Math.max(0, Math.round(deal.purchasePrice * (1 - effectiveLtv / 100)));
@@ -642,7 +661,9 @@ export default function OpportunityAnalyzerPage() {
     setInterestRateMargin(0.0);
     setInterestRate(defaultPrimeRate);
     setHoldingPeriodMonths(6);
-    setVatExemptAgent(false);
+    setVatExemptAgent(investorProfile?.vatExemptAgent ?? false);
+    setMonthlyMaintenanceReserve(analyzerDraft?.monthlyMaintenanceReserveZAR ?? 800);
+    setMonthlyPrepaidVendingFee(analyzerDraft?.monthlyPrepaidVendingFeeZAR ?? 150);
     setAnnualCapitalGrowth(5.0);
     setAnnualRentalEscalation(6.0);
     setAnnualExpenseInflation(6.0);
@@ -691,12 +712,14 @@ export default function OpportunityAnalyzerPage() {
         agencyVatApplicable,
         targetExitPrice,
         holdingPeriodMonths,
-        exitCommissionPercent: vatExemptAgent ? 5.0 : 5.75,
+        exitCommissionPercent: effectiveExitCommissionPercent,
         vatExemptAgent,
         interestRateMargin,
         monthlyBondPaymentZAR: calculatedMetrics.monthlyBondPayment,
-        monthlyOtherHoldingCostZAR: 1500,
-        monthlyHoldingCostZAR: (finalLevies || 0) + (monthlyRates || 0) + monthlyInsurance + (calculatedMetrics.monthlyBondPayment || 0) + 1500,
+        monthlyOtherHoldingCostZAR: (monthlyMaintenanceReserve || 0) + (monthlyPrepaidVendingFee || 0),
+        monthlyMaintenanceReserveZAR: monthlyMaintenanceReserve,
+        monthlyPrepaidVendingFeeZAR: monthlyPrepaidVendingFee,
+        monthlyHoldingCostZAR: (finalLevies || 0) + (monthlyRates || 0) + monthlyInsurance + (calculatedMetrics.monthlyBondPayment || 0) + (monthlyMaintenanceReserve || 0) + (monthlyPrepaidVendingFee || 0),
         auctioneerCommissionZAR: auctioneerCommission,
         municipalArrearsZAR: municipalArrears,
         loanToValuePercent: loanToValue,
@@ -735,7 +758,9 @@ export default function OpportunityAnalyzerPage() {
       setInterestRateMargin(0.0);
       setInterestRate(defaultPrimeRate);
       setHoldingPeriodMonths(6);
-      setVatExemptAgent(false);
+      setVatExemptAgent(investorProfile?.vatExemptAgent ?? false);
+      setMonthlyMaintenanceReserve(analyzerDraft?.monthlyMaintenanceReserveZAR ?? 800);
+      setMonthlyPrepaidVendingFee(analyzerDraft?.monthlyPrepaidVendingFeeZAR ?? 150);
       setAnnualCapitalGrowth(5.0);
       setAnnualRentalEscalation(6.0);
       setAnnualExpenseInflation(6.0);
@@ -771,7 +796,7 @@ export default function OpportunityAnalyzerPage() {
       agencyVatApplicable,
       vacancyRatePercent: vacancyRate,
       targetExitPrice,
-      exitCommissionPercent: vatExemptAgent ? 5.0 : 5.75,
+      exitCommissionPercent: effectiveExitCommissionPercent,
       vatExemptAgent,
       interestRateMargin,
       holdingPeriodMonths,
@@ -816,6 +841,9 @@ export default function OpportunityAnalyzerPage() {
     setMunicipalArrears(0);
     setLoanToValue(100);
     setDepositZAR(0);
+    setVatExemptAgent(investorProfile?.vatExemptAgent ?? false);
+    setMonthlyMaintenanceReserve(analyzerDraft?.monthlyMaintenanceReserveZAR ?? 800);
+    setMonthlyPrepaidVendingFee(analyzerDraft?.monthlyPrepaidVendingFeeZAR ?? 150);
     setVacancyRate(analyzerDraft?.vacancyRatePercent ?? 6.0);
     setManagementFee(analyzerDraft?.managementFeePercent ?? 8.0);
     setAgencyVatApplicable(analyzerDraft?.agencyVatApplicable ?? true);
@@ -846,7 +874,7 @@ export default function OpportunityAnalyzerPage() {
 
       <main className="flex-1 p-4 sm:p-6 space-y-6 max-w-7xl w-full mx-auto">
         {/* Deal Calculator Card */}
-        <div className="bg-white rounded-xl border border-slate-200 p-4 sm:p-6 shadow-xs">
+        <div id="analyzer-calculator" className="scroll-mt-20 bg-white rounded-xl border border-slate-200 p-4 sm:p-6 shadow-xs">
           <div className="flex items-center justify-between pb-4 mb-6 border-b border-slate-100 flex-wrap gap-3">
             <div className="flex items-center gap-2.5">
               <div className="p-2 bg-emerald-50 rounded-lg text-emerald-700">
@@ -1609,7 +1637,7 @@ export default function OpportunityAnalyzerPage() {
             </div>
 
             {/* Holding Period Sensitivity (1-12 Months) & Agent Commission VAT */}
-            <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
+            <div id="analyzer-sensitivity" className="scroll-mt-20 p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
                 <div className="flex items-center gap-2">
                   <Sliders className="w-4 h-4 text-indigo-600" />
@@ -1618,7 +1646,7 @@ export default function OpportunityAnalyzerPage() {
                   </span>
                 </div>
                 <span className="text-xs font-bold text-indigo-900 bg-indigo-50 px-2.5 py-0.5 rounded border border-indigo-200 self-start sm:self-auto">
-                  {holdingPeriodMonths} Months Holding &bull; Exit Comm: {vatExemptAgent ? '5.00%' : '5.75%'}
+                  {holdingPeriodMonths} Months Holding &bull; Exit Comm: {formatPercent(effectiveExitCommissionPercent)}
                 </span>
               </div>
 
@@ -1664,7 +1692,7 @@ export default function OpportunityAnalyzerPage() {
                   <span>VAT-Exempt Real Estate Agent (Off-market / Private Seller, skips 15% VAT)</span>
                 </label>
                 <span className="text-[10px] font-bold text-slate-600 bg-white px-2 py-0.5 rounded border border-slate-200">
-                  {vatExemptAgent ? '5.0% (Exempt)' : '5.75% (Standard 5% + 15% VAT)'}
+                  {vatExemptAgent ? `${defaultAgentCommission.toFixed(1)}% (Exempt)` : `${calculateEffectiveExitCommission(defaultAgentCommission, false).toFixed(2)}% (Standard ${defaultAgentCommission.toFixed(1)}% + 15% VAT)`}
                 </span>
               </div>
             </div>
@@ -2679,7 +2707,7 @@ export default function OpportunityAnalyzerPage() {
         </div>
 
         {/* Opportunity Pipeline List */}
-        <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-xs">
+        <div id="analyzer-pipeline" className="scroll-mt-20 bg-white rounded-xl border border-slate-200 p-6 shadow-xs">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
             <div>
               <h3 className="text-base font-bold text-slate-900">Deal Sourcing Pipeline</h3>
@@ -2769,30 +2797,15 @@ export default function OpportunityAnalyzerPage() {
                 compositeGrade: 'A-Grade (Prime Hub)' as const,
                 compositeScore: 12,
               };
-              const dealDeposit = deal.depositZAR !== undefined ? deal.depositZAR : Math.max(0, Math.round(deal.purchasePrice * (1 - (deal.bondLTV ?? deal.loanToValuePercent ?? 100) / 100)));
-              const mortgageDebt = Math.max(0, deal.purchasePrice - dealDeposit);
-              const primeRate = investorProfile?.defaultPrimeRatePercent ?? 10.75;
-              const effectiveDealRate = deal.interestRateMargin !== undefined
-                ? primeRate + deal.interestRateMargin
-                : (deal.interestRatePercent ?? primeRate);
-              const bondPayment = deal.monthlyBondPaymentZAR ?? (
-                mortgageDebt > 0 ? calculateMonthlyBondRepayment(mortgageDebt, effectiveDealRate, deal.bondTermYears ?? deal.loanTermYears ?? 20) : 0
-              );
+              // Strategy-aware DSCR & Buy Box Evaluation using shared helper
+              const dscrInfo = calculateDealDscr(deal, investorProfile?.defaultPrimeRatePercent);
+              const bondPayment = dscrInfo.monthlyBondPayment;
               const holdingLevies = deal.propertyType === 'Freehold House' ? 0 : (deal.monthlyLevies ?? 0);
               const holdingRates = deal.monthlyRatesTaxes ?? 0;
               const holdingInsurance = deal.propertyType === 'Freehold House' ? Math.round((deal.annualInsurance ?? 0) / 12) : 0;
               const holdingOther = deal.monthlyOtherHoldingCostZAR ?? 1500;
               const holdingCost = deal.monthlyHoldingCostZAR ?? (bondPayment + holdingLevies + holdingRates + holdingInsurance + holdingOther);
-
-              // Strategy-aware DSCR & Buy Box Evaluation
-              const grossRent = deal.monthlyRentalEstimate || 0;
-              const vacLoss = (grossRent * (deal.vacancyRatePercent || 0)) / 100;
-              const effGross = grossRent - vacLoss;
-              const vatMult = deal.agencyVatApplicable !== false ? 1.15 : 1.0;
-              const agentMgt = (grossRent * ((deal.managementFeePercent ?? 8) / 100)) * vatMult;
-              const opex = holdingLevies + holdingRates + agentMgt + holdingInsurance + (deal.monthlyMaintenanceReserveZAR ?? 800) + (deal.monthlyPrepaidVendingFeeZAR ?? 150);
-              const noi = effGross - opex;
-              const dealDscr = bondPayment > 0 ? Number((noi / bondPayment).toFixed(2)) : (noi > 0 ? 99.0 : 0);
+              const dealDscr = dscrInfo.dscr;
 
               const buyBoxResult = evaluateDealCriteria(
                 {
@@ -2803,7 +2816,7 @@ export default function OpportunityAnalyzerPage() {
                   initialCapitalRequired: deal.initialCapitalRequired,
                   projectedFlipRoi: deal.projectedFlipRoi,
                   projectedFlipNetProfit: deal.projectedFlipNetProfit,
-                  dscr: dealDscr,
+                  dscr: dscrInfo.rawDscr,
                   monthlyBondPayment: bondPayment,
                 },
                 investorProfile,
@@ -3423,17 +3436,9 @@ export default function OpportunityAnalyzerPage() {
                       {opportunities
                         .filter((d) => selectedDealIds.includes(d.id))
                         .map((deal) => {
-                          const dep = deal.depositZAR !== undefined ? deal.depositZAR : Math.max(0, Math.round(deal.purchasePrice * (1 - (deal.bondLTV ?? deal.loanToValuePercent ?? 100) / 100)));
-                          const debt = Math.max(0, deal.purchasePrice - dep);
-                          const prime = investorProfile?.defaultPrimeRatePercent ?? 10.75;
-                          const rate = deal.interestRateMargin !== undefined ? prime + deal.interestRateMargin : (deal.interestRatePercent ?? prime);
-                          const bondPmt = deal.monthlyBondPaymentZAR ?? (debt > 0 ? calculateMonthlyBondRepayment(debt, rate, deal.bondTermYears ?? deal.loanTermYears ?? 20) : 0);
-                          const gross = deal.monthlyRentalEstimate || 0;
-                          const effGross = gross * (1 - (deal.vacancyRatePercent || 0) / 100);
-                          const opex = (deal.propertyType === 'Freehold House' ? 0 : (deal.monthlyLevies || 0)) + (deal.monthlyRatesTaxes || 0) + (deal.monthlyMaintenanceReserveZAR || 800);
-                          const noi = effGross - opex;
-                          const dscr = bondPmt > 0 ? Number((noi / bondPmt).toFixed(2)) : (noi > 0 ? 99.0 : 0);
-                          const meetsHurdle = dscr >= (investorProfile?.minDscr ?? 1.20);
+                          const dscrInfo = calculateDealDscr(deal, investorProfile?.defaultPrimeRatePercent);
+                          const dscr = dscrInfo.dscr;
+                          const meetsHurdle = dscrInfo.rawDscr >= (investorProfile?.minDscr ?? 1.20) - 1e-4;
                           return (
                             <td key={deal.id} className="p-3 border-l border-slate-100">
                               <span className={`font-bold px-2 py-0.5 rounded text-xs ${meetsHurdle ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'}`}>
@@ -3450,16 +3455,7 @@ export default function OpportunityAnalyzerPage() {
                       {opportunities
                         .filter((d) => selectedDealIds.includes(d.id))
                         .map((deal) => {
-                          const dep = deal.depositZAR !== undefined ? deal.depositZAR : Math.max(0, Math.round(deal.purchasePrice * (1 - (deal.bondLTV ?? deal.loanToValuePercent ?? 100) / 100)));
-                          const debt = Math.max(0, deal.purchasePrice - dep);
-                          const prime = investorProfile?.defaultPrimeRatePercent ?? 10.75;
-                          const rate = deal.interestRateMargin !== undefined ? prime + deal.interestRateMargin : (deal.interestRatePercent ?? prime);
-                          const bondPmt = deal.monthlyBondPaymentZAR ?? (debt > 0 ? calculateMonthlyBondRepayment(debt, rate, deal.bondTermYears ?? deal.loanTermYears ?? 20) : 0);
-                          const gross = deal.monthlyRentalEstimate || 0;
-                          const effGross = gross * (1 - (deal.vacancyRatePercent || 0) / 100);
-                          const opex = (deal.propertyType === 'Freehold House' ? 0 : (deal.monthlyLevies || 0)) + (deal.monthlyRatesTaxes || 0) + (deal.monthlyMaintenanceReserveZAR || 800);
-                          const noi = effGross - opex;
-                          const dscr = bondPmt > 0 ? Number((noi / bondPmt).toFixed(2)) : (noi > 0 ? 99.0 : 0);
+                          const dscrInfo = calculateDealDscr(deal, investorProfile?.defaultPrimeRatePercent);
 
                           const evalResult = evaluateDealCriteria(
                             {
@@ -3470,8 +3466,8 @@ export default function OpportunityAnalyzerPage() {
                               initialCapitalRequired: deal.initialCapitalRequired,
                               projectedFlipRoi: deal.projectedFlipRoi,
                               projectedFlipNetProfit: deal.projectedFlipNetProfit,
-                              dscr,
-                              monthlyBondPayment: bondPmt,
+                              dscr: dscrInfo.rawDscr,
+                              monthlyBondPayment: dscrInfo.monthlyBondPayment,
                             },
                             investorProfile,
                             deal.strategy ?? 'Rental'
