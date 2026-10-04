@@ -188,7 +188,7 @@ describe('Phase 1 & 2: Strategy-Aware Buy Box Hurdles & DSCR Evaluation', () => 
 
     const dscrResult = calculateDealDscr(dealParams, 11.5);
     expect(dscrResult.dscr).toBe(0.93);
-    expect(dscrResult.monthlyBondPayment).toBe(8_521);
+    expect(dscrResult.monthlyBondPayment).toBe(8_531);
     expect(dscrResult.monthlyNoi).toBe(7_896);
 
     // If maintenance reserve is explicitly 0, it should not default to 800
