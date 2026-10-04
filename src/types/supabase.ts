@@ -582,6 +582,14 @@ export type Database = {
           updated_at: string
           user_id: string
           website: string | null
+          min_net_yield_percent?: number | null
+          min_monthly_cashflow_zar?: number | null
+          min_net_roi_percent?: number | null
+          min_flip_roi_percent?: number | null
+          max_day1_cash_zar?: number | null
+          min_dscr?: number | null
+          vat_exempt_agent?: boolean | null
+          marginal_tax_rate_percent?: number | null
         }
         Insert: {
           ai_settings?: Json | null
@@ -605,6 +613,14 @@ export type Database = {
           updated_at?: string
           user_id?: string
           website?: string | null
+          min_net_yield_percent?: number | null
+          min_monthly_cashflow_zar?: number | null
+          min_net_roi_percent?: number | null
+          min_flip_roi_percent?: number | null
+          max_day1_cash_zar?: number | null
+          min_dscr?: number | null
+          vat_exempt_agent?: boolean | null
+          marginal_tax_rate_percent?: number | null
         }
         Update: {
           ai_settings?: Json | null
@@ -628,6 +644,14 @@ export type Database = {
           updated_at?: string
           user_id?: string
           website?: string | null
+          min_net_yield_percent?: number | null
+          min_monthly_cashflow_zar?: number | null
+          min_net_roi_percent?: number | null
+          min_flip_roi_percent?: number | null
+          max_day1_cash_zar?: number | null
+          min_dscr?: number | null
+          vat_exempt_agent?: boolean | null
+          marginal_tax_rate_percent?: number | null
         }
         Relationships: []
       }

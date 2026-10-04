@@ -438,3 +438,163 @@ export function exportPortfolioToExcel(data: ExportPortfolioData) {
   const dateStr = new Date().toISOString().split('T')[0];
   XLSX.writeFile(wb, `sa-property-portfolio-${dateStr}.xlsx`);
 }
+
+/**
+ * Builds and downloads a SARS ITR12 Rental Income and Expenses Tax Report (.xlsx)
+ * strictly formatted with official SARS ITR12 rental codes:
+ * - Gross Rental Income (Code 4210)
+ * - Rates & Taxes (Code 4212)
+ * - Body Corporate / HOA Levies (Code 4214)
+ * - Bond Interest Section 11(a) (Code 4216 - excludes non-deductible capital repayments)
+ * - Agent Commission / Management Fees (Code 4218)
+ * - Insurance Premiums (Code 4220)
+ * - Repairs & Maintenance (Code 4222)
+ * - Bad Debts Written Off (Code 4226)
+ * - SARS Section 13sex Allowance (Code 4224)
+ */
+export function exportITR12TaxReport(rentals: RentalProperty[], taxYear: number | string = 2026) {
+  const wb = XLSX.utils.book_new();
+
+  const titleRows = [
+    ['SARS ITR12 - RENTAL INCOME & EXPENSES TAX SCHEDULE'],
+    ['Tax Assessment Year', String(taxYear)],
+    ['Generated On', new Date().toLocaleString('en-ZA')],
+    ['Accounting Standard', 'SARS Section 11(a) Interest Deductions & Section 13sex Building Allowances'],
+    ['Notice', 'Bond deductions strictly reflect bond interest. Capital repayments are non-deductible per SARS guidelines.'],
+    [''],
+  ];
+
+  const headers = [
+    'Property Title',
+    'Address',
+    'City',
+    'Gross Rent (Code 4210)',
+    'Rates & Taxes (Code 4212)',
+    'Levies (Code 4214)',
+    'Bond Interest Sec 11(a) (Code 4216)',
+    'Agent Commission (Code 4218)',
+    'Insurance (Code 4220)',
+    'Repairs & Maint (Code 4222)',
+    'Bad Debts Written Off (Code 4226)',
+    'Section 13sex Allowance (Code 4224)',
+    'Total Allowable Deductions',
+    'Net Taxable Rental Income / Loss',
+  ];
+
+  let totalGross = 0;
+  let totalRates = 0;
+  let totalLevies = 0;
+  let totalInterest = 0;
+  let totalAgent = 0;
+  let totalInsurance = 0;
+  let totalRepairs = 0;
+  let totalBadDebts = 0;
+  let totalSec13 = 0;
+  let totalDeductionsAll = 0;
+  let totalNetTaxable = 0;
+
+  const dataRows = rentals.map((r) => {
+    const isFreehold = r.propertyType === 'Freehold House';
+
+    // Transactions actuals vs annual baseline fallback
+    const tx = r.transactions || [];
+    const getTxAmount = (cat: string) => tx.filter((t) => t.category === cat).reduce((s, t) => s + (t.amountZAR || 0), 0);
+
+    const grossRent = getTxAmount('gross_rent') || ((r.monthlyGrossRentZAR || 0) * 12);
+    const rates = getTxAmount('rates_taxes') || ((r.monthlyRatesTaxesZAR || 0) * 12);
+    const levies = isFreehold ? 0 : (getTxAmount('levies') || ((r.monthlyLeviesZAR || 0) * 12));
+
+    // Section 11(a): interest only
+    const bondInterest = getTxAmount('bond_interest') || (
+      (r.outstandingBondBalanceZAR && r.bondInterestRatePercent)
+        ? Math.round(r.outstandingBondBalanceZAR * (r.bondInterestRatePercent / 100))
+        : 0
+    );
+
+    let agentFee = getTxAmount('agent_commission');
+    if (!agentFee && r.managementType === 'Agency') {
+      if (typeof r.monthlyAgentFeeZAR === 'number' && r.monthlyAgentFeeZAR > 0) {
+        agentFee = r.monthlyAgentFeeZAR * 12;
+      } else if (typeof r.agencyCommissionPercent === 'number' && r.agencyCommissionPercent > 0) {
+        const baseComm = (r.monthlyGrossRentZAR || 0) * (r.agencyCommissionPercent / 100);
+        const vatMultiplier = r.agencyVatApplicable !== false ? 1.15 : 1.0;
+        agentFee = Math.round(baseComm * vatMultiplier) * 12;
+      }
+    }
+
+    const insurance = isFreehold ? (getTxAmount('insurance') || (r.annualBuildingInsuranceZAR || 0)) : 0;
+    const repairs = getTxAmount('repairs_maintenance') || ((r.monthlyMaintenanceReserveZAR || 0) * 12);
+    const badDebts = (r.arrearsWriteOffs || []).reduce((sum, w) => sum + (w.amountZAR || 0), 0);
+    const sec13 = r.section13sexAnnualShieldZAR || 0;
+
+    const deductions = rates + levies + bondInterest + (agentFee || 0) + insurance + repairs + badDebts + sec13;
+    const netTaxable = grossRent - deductions;
+
+    totalGross += grossRent;
+    totalRates += rates;
+    totalLevies += levies;
+    totalInterest += bondInterest;
+    totalAgent += (agentFee || 0);
+    totalInsurance += insurance;
+    totalRepairs += repairs;
+    totalBadDebts += badDebts;
+    totalSec13 += sec13;
+    totalDeductionsAll += deductions;
+    totalNetTaxable += netTaxable;
+
+    return [
+      r.title,
+      r.address,
+      r.city,
+      grossRent,
+      rates,
+      levies,
+      bondInterest,
+      agentFee || 0,
+      insurance,
+      repairs,
+      badDebts,
+      sec13,
+      deductions,
+      netTaxable,
+    ];
+  });
+
+  const totalsRow = [
+    'TOTAL PORTFOLIO',
+    '',
+    '',
+    totalGross,
+    totalRates,
+    totalLevies,
+    totalInterest,
+    totalAgent,
+    totalInsurance,
+    totalRepairs,
+    totalBadDebts,
+    totalSec13,
+    totalDeductionsAll,
+    totalNetTaxable,
+  ];
+
+  const ws = XLSX.utils.aoa_to_sheet([...titleRows, headers, ...dataRows, totalsRow]);
+  ws['!cols'] = [
+    { wch: 28 },
+    { wch: 26 },
+    { wch: 16 },
+    { wch: 22 },
+    { wch: 22 },
+    { wch: 18 },
+    { wch: 30 },
+    { wch: 24 },
+    { wch: 18 },
+    { wch: 22 },
+    { wch: 26 },
+    { wch: 28 },
+    { wch: 24 },
+    { wch: 28 },
+  ];
+
+  XLSX.utils.book_append_sheet(wb, ws, `ITR12 Tax ${taxYear}`);
+  XLSX.writeFile(wb, `sars-itr12-rental-tax-report-${taxYear}.xlsx`);
+}

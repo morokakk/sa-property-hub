@@ -134,8 +134,10 @@ export interface OpportunityDeal {
   vacancyRatePercent: number; // e.g. 5%
   targetExitPrice: number; // For flip exit
   exitCommissionPercent?: number; // e.g. 5.75% default or 0% override
+  vatExemptAgent?: boolean;
   holdingPeriodMonths: number;
   strategy?: DealStrategy; // 'Flip' | 'Rental' | 'BRRRR'
+  interestRateMargin?: number; // deal interest rate margin / spread vs Prime (e.g. +0.50% or -0.50%)
   monthlyHoldingCostZAR?: number;
   monthlyBondPaymentZAR?: number;
   monthlyOtherHoldingCostZAR?: number;
@@ -429,6 +431,28 @@ export interface ArrearsWriteOff {
   createdAt: string;
 }
 
+// SARS Section 11(a) Property Transaction Ledger Record
+export type TransactionCategory =
+  | 'gross_rent'
+  | 'rates_taxes'
+  | 'levies'
+  | 'bond_interest'
+  | 'bond_capital'
+  | 'agent_commission'
+  | 'repairs_maintenance'
+  | 'insurance'
+  | 'other';
+
+export interface Transaction {
+  id: string;
+  propertyId: string;
+  date: string; // YYYY-MM-DD
+  category: TransactionCategory;
+  amountZAR: number;
+  invoiceRef?: string;
+  description?: string;
+}
+
 // Active Rental Property
 export interface RentalProperty {
   id: string;
@@ -497,6 +521,8 @@ export interface RentalProperty {
   ancillaryIncomes?: AncillaryIncome[];
   // Property Meter Registry (Multiple meters per property, multi-tenant units, council mains)
   meterRegistry?: PropertyMeter[];
+  // SARS ITR12 Property Actual Transactions
+  transactions?: Transaction[];
 }
 
 // Property Meter Registry Record
@@ -736,10 +762,19 @@ export interface InvestorProfile {
   logoBase64?: string;
   bioSummary: string;
   // Default Acquisition & Investment Hurdles
-  defaultPrimeRatePercent: number; // e.g. 11.75%
+  defaultPrimeRatePercent: number; // e.g. 10.75%
   baselineHurdleYieldPercent: number; // e.g. 10.0%
   defaultAgentCommissionPercent: number; // e.g. 5.0%
   defaultTaxEntityType?: 'Company (27%)' | 'Individual (45%)' | 'Pre-Tax';
+  // Strategy-Aware Buy Box Hurdles & SARS Settings
+  minNetYieldPercent?: number; // default 8.0%
+  minMonthlyCashflowZAR?: number; // default 1500 ZAR
+  minNetRoiPercent?: number; // default 8.0%
+  minFlipRoiPercent?: number; // default 18.0%
+  maxDay1CashZAR?: number; // default 500000 ZAR
+  minDscr?: number; // default 1.20
+  vatExemptAgent?: boolean; // default false
+  marginalTaxRatePercent?: number; // default 31.0%
 }
 
 // Long-Term Financial & Wealth Projection Yearly Snapshot
@@ -780,6 +815,9 @@ export interface AnalyzerDraft {
   agencyVatApplicable?: boolean;
   monthlyMaintenanceReserveZAR?: number;
   monthlyPrepaidVendingFeeZAR?: number;
+  interestRateMargin?: number;
+  vatExemptAgent?: boolean;
+  holdingPeriodMonths?: number;
 }
 
 // Client-side BYOK AI Integration Settings

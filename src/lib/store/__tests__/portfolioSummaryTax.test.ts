@@ -581,19 +581,23 @@ describe('Portfolio Summary: Ring-Fenced Working Capital & SARS Provisional Tax 
       rentals: [rentalA, rentalB, rentalC],
     });
 
-    // Net monthly cashflow for each is: 15000 - (2000 + 1000 + 500 + 1500) = 10,000/mo = 120,000/yr
-    // Rental A: 120,000 * 27% = 32,400
-    // Rental B: 120,000 * 45% = 54,000
-    // Rental C: 120,000 * 0% = 0
-    // Total Annual Reserve: 32,400 + 54,000 + 0 = 86,400
-    expect(summaryDefaultCompany.annualRentalTaxReserve).toBe(86_400);
-    expect(summaryDefaultCompany.monthlyRentalTaxReserve).toBe(Math.round(86_400 / 12));
+    // Under SARS Section 11(a) interest-only deduction:
+    // Gross rent: 15,000 * 12 = 180,000
+    // Deductible expenses: Levies (24k) + Rates (12k) + Maint (6k) + Bond Interest (100k * 11.5% = 11,500) = 53,500
+    // Non-deductible capital repayment: 18,000 bond payments - 11,500 interest = 6,500
+    // Taxable income = 180,000 - 53,500 = 126,500
+    // Rental A: 126,500 * 27% = 34,155
+    // Rental B: 126,500 * 45% = 56,925
+    // Rental C: 126,500 * 0% = 0
+    // Total Annual Reserve: 34,155 + 56,925 + 0 = 91,080
+    expect(summaryDefaultCompany.annualRentalTaxReserve).toBe(91_080);
+    expect(summaryDefaultCompany.monthlyRentalTaxReserve).toBe(Math.round(91_080 / 12));
 
     // Now test changing global default to Individual (45%)
-    // Rental A (inheriting default) now uses 45% -> 120,000 * 45% = 54,000
-    // Rental B (explicit override 45%) remains 54,000
+    // Rental A (inheriting default) now uses 45% -> 126,500 * 45% = 56,925
+    // Rental B (explicit override 45%) remains 56,925
     // Rental C (explicit override Pre-Tax) remains 0
-    // Total Annual Reserve: 54,000 + 54,000 + 0 = 108,000
+    // Total Annual Reserve: 56,925 + 56,925 + 0 = 113,850
     const summaryDefaultIndividual = computePortfolioSummary({
       ...baseState,
       investorProfile: {
@@ -602,6 +606,59 @@ describe('Portfolio Summary: Ring-Fenced Working Capital & SARS Provisional Tax 
       },
       rentals: [rentalA, rentalB, rentalC],
     });
-    expect(summaryDefaultIndividual.annualRentalTaxReserve).toBe(108_000);
+    expect(summaryDefaultIndividual.annualRentalTaxReserve).toBe(113_850);
+  });
+
+  it('strictly adheres to SARS Section 11(a) by deducting only bond interest, verifying the R2,015 tax liability difference under a 31% marginal rate', () => {
+    const baseState = usePortfolioStore.getState();
+
+    // Rental with R18,000 annual bond installment (R1,500/mo) but only R11,500 deductible interest (R100k @ 11.5%)
+    const rental: RentalProperty = {
+      id: 'test-sec11a-prop',
+      title: 'Sec 11a Test Asset',
+      address: '100 Sandton Dr',
+      city: 'Johannesburg',
+      purchasePriceZAR: 1_000_000,
+      marketValueZAR: 1_200_000,
+      purchaseDate: '2025-01-01',
+      propertyType: 'Sectional Title Apartment',
+      monthlyGrossRentZAR: 15_000, // R180,000 / yr
+      monthlyLeviesZAR: 2_000,      // R24,000 / yr
+      monthlyRatesTaxesZAR: 1_000,  // R12,000 / yr
+      monthlyMaintenanceReserveZAR: 500, // R6,000 / yr
+      monthlyBondPaymentZAR: 1_500, // R18,000 / yr total bond installment
+      outstandingBondBalanceZAR: 100_000,
+      bondInterestRatePercent: 11.5, // R11,500 deductible interest; R6,500 non-deductible capital repayment
+      monthlyAgentFeeZAR: 0,
+      maintenanceHistory: [],
+      status: 'Occupied',
+      managementType: 'Self-Managed',
+      leases: [],
+    };
+
+    // Under Section 11(a):
+    // Deductibles = 24k + 12k + 6k + 11.5k = 53,500
+    // Taxable Income = 180,000 - 53,500 = 126,500
+    // At marginal rate 31%: Tax = 126,500 * 0.31 = 39,215
+    const summarySec11a = computePortfolioSummary({
+      ...baseState,
+      investorProfile: {
+        ...baseState.investorProfile,
+        defaultTaxEntityType: undefined,
+        marginalTaxRatePercent: 31.0,
+      },
+      rentals: [rental],
+    });
+
+    expect(summarySec11a.annualRentalTaxReserve).toBe(39_215);
+
+    // If full installment (including R6,500 capital repayment) were erroneously deducted:
+    // Deductibles would be 24k + 12k + 6k + 18k = 60,000
+    // Taxable income would be 180,000 - 60,000 = 120,000
+    // At marginal rate 31%: Tax would be 120,000 * 0.31 = 37,200
+    // Disallowing the R6,500 non-deductible bond principal at 31% creates exactly R2,015 of additional tax liability:
+    const hypotheticalFullInstallmentTax = 120_000 * 0.31;
+    const taxDifference = summarySec11a.annualRentalTaxReserve - hypotheticalFullInstallmentTax;
+    expect(taxDifference).toBe(2_015);
   });
 });

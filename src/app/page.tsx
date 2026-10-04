@@ -5,6 +5,7 @@ import TopHeader from '@/components/navigation/TopHeader';
 import AssetAllocationChart from '@/components/dashboard/AssetAllocationChart';
 import UpcomingDeadlines from '@/components/dashboard/UpcomingDeadlines';
 import PriorityTasksWidget from '@/components/dashboard/PriorityTasksWidget';
+import ActualVsBudgetKpiStrip from '@/components/dashboard/ActualVsBudgetKpiStrip';
 import { usePortfolioStore, usePortfolioSummary } from '@/lib/store/usePortfolioStore';
 import { formatZAR, formatPercent, formatDate } from '@/lib/formatters';
 import { calculateRentalCashflow } from '@/lib/calculations/propertyMetrics';
@@ -345,6 +346,9 @@ export default function GlobalDashboardPage() {
             </div>
           </div>
         </div>
+
+        {/* Actuals YTD vs. Budget KPI Strip (SA Tax Year 1 Mar - 28/29 Feb) */}
+        <ActualVsBudgetKpiStrip rentals={rentals} />
 
         {/* Rental Tax Reserve & SARS Total Tax Side-by-Side */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

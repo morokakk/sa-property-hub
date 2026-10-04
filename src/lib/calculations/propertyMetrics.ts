@@ -1,4 +1,4 @@
-import { AcquisitionCostBreakdown, AmenityDistance, AmenityScorecard, AncillaryIncome, Lease, LongTermProjectionYear, OpportunityDeal, PropertyTitleType, RentalProperty } from '@/types';
+import { AcquisitionCostBreakdown, AmenityDistance, AmenityScorecard, AncillaryIncome, DealStrategy, InvestorProfile, Lease, LongTermProjectionYear, OpportunityDeal, PropertyTitleType, RentalProperty } from '@/types';
 
 /**
  * Computes Built-in Equity and discount percentage
@@ -101,6 +101,22 @@ export interface OpportunityMetricsResult {
   monthlyBondPayment: number;
   projectedFlipNetProfit: number;
   projectedFlipRoi: number;
+  dscr: number;
+}
+
+/**
+ * Calculates effective exit commission percentage based on default commission and VAT exemption status.
+ * Standard estate agent sales commission applies 15% SARS VAT (1.15 multiplier) unless vatExemptAgent is true.
+ */
+export function calculateEffectiveExitCommission(
+  defaultAgentCommissionPercent: number = 5.0,
+  vatExemptAgent: boolean = false,
+  overridePercent?: number
+): number {
+  if (typeof overridePercent === 'number') {
+    return overridePercent;
+  }
+  return vatExemptAgent ? defaultAgentCommissionPercent : Number((defaultAgentCommissionPercent * 1.15).toFixed(4));
 }
 
 export function calculateDealMetrics(params: {
@@ -121,11 +137,14 @@ export function calculateDealMetrics(params: {
   depositZAR?: number;
   bondLTV?: number;
   interestRatePercent: number;
+  interestRateMargin?: number;
   loanTermYears: number;
   costs: AcquisitionCostBreakdown;
   auctioneerCommissionZAR?: number;
   municipalArrearsZAR?: number;
   exitCommissionPercent?: number;
+  defaultAgentCommissionPercent?: number;
+  vatExemptAgent?: boolean;
 }): OpportunityMetricsResult {
   const {
     purchasePrice,
@@ -145,11 +164,14 @@ export function calculateDealMetrics(params: {
     depositZAR,
     bondLTV,
     interestRatePercent,
+    interestRateMargin,
     loanTermYears,
     costs,
     auctioneerCommissionZAR,
     municipalArrearsZAR,
     exitCommissionPercent,
+    defaultAgentCommissionPercent = 5.0,
+    vatExemptAgent = false,
   } = params;
 
   // Effective LTV and Deposit
@@ -203,9 +225,19 @@ export function calculateDealMetrics(params: {
   const capRate = totalCost > 0 ? (annualNetOperatingIncome / totalCost) * 100 : 0;
   const netRoi = totalCashRequired > 0 ? (annualCashFlow / totalCashRequired) * 100 : 0;
 
+  // Debt Service Coverage Ratio (DSCR): Monthly NOI / Monthly Bond Repayment
+  const dscr = monthlyBondPayment > 0
+    ? Number((monthlyNetOperatingIncome / monthlyBondPayment).toFixed(2))
+    : (monthlyNetOperatingIncome > 0 ? 99.0 : 0);
+
   // Buy-and-Flip Projections
-  // Standard 5.75% estate agent sales commission (or per-flip override)
-  const commissionRate = typeof exitCommissionPercent === 'number' ? exitCommissionPercent / 100 : 0.0575;
+  // Apply 15% SARS VAT (1.15 multiplier) to default agent commission unless vatExemptAgent is explicitly true
+  const effectiveCommissionPercent =
+    typeof exitCommissionPercent === 'number'
+      ? exitCommissionPercent
+      : calculateEffectiveExitCommission(defaultAgentCommissionPercent, vatExemptAgent);
+
+  const commissionRate = effectiveCommissionPercent / 100;
   const exitCommission = targetExitPrice * commissionRate;
   const holdingBondInterest = (monthlyBondPayment * holdingPeriodMonths);
   const holdingLeviesAndRates = (monthlyLevies + monthlyRatesTaxes) * holdingPeriodMonths;
@@ -234,6 +266,84 @@ export function calculateDealMetrics(params: {
     monthlyBondPayment: Math.round(monthlyBondPayment),
     projectedFlipNetProfit: Math.round(projectedFlipNetProfit),
     projectedFlipRoi: Number(projectedFlipRoi.toFixed(2)),
+    dscr,
+  };
+}
+
+export interface BuyBoxEvaluationResult {
+  meetsBuyBox: boolean;
+  passedCount: number;
+  totalCount: number;
+  criteriaMap: Record<string, boolean>;
+}
+
+/**
+ * Strategy-aware evaluation of deal metrics against an InvestorProfile's Buy Box criteria.
+ * Evaluates only relevant metrics based on deal.strategy ('Flip' | 'Rental' | 'BRRRR').
+ */
+export function evaluateDealCriteria(
+  metrics: {
+    capRate?: number;
+    grossYield?: number;
+    netRoi?: number;
+    monthlyCashFlow?: number;
+    initialCapitalRequired?: number;
+    totalCashRequired?: number;
+    projectedFlipRoi?: number;
+    projectedFlipNetProfit?: number;
+    dscr?: number;
+    monthlyBondPayment?: number;
+    annualNetOperatingIncome?: number;
+  },
+  profile: Partial<InvestorProfile>,
+  strategy: DealStrategy = 'Rental'
+): BuyBoxEvaluationResult {
+  const minNetYield = profile.minNetYieldPercent ?? 8.0;
+  const minMonthlyCashflow = profile.minMonthlyCashflowZAR ?? 1500;
+  const minNetRoi = profile.minNetRoiPercent ?? 8.0;
+  const minFlipRoi = profile.minFlipRoiPercent ?? 18.0;
+  const maxDay1Cash = profile.maxDay1CashZAR ?? 500000;
+  const minDscr = profile.minDscr ?? 1.20;
+
+  const day1Cash = metrics.initialCapitalRequired ?? metrics.totalCashRequired ?? 0;
+
+  let dscr = metrics.dscr;
+  if (dscr === undefined) {
+    const bondPayment = metrics.monthlyBondPayment ?? 0;
+    if (bondPayment > 0) {
+      const noi = metrics.annualNetOperatingIncome
+        ? metrics.annualNetOperatingIncome / 12
+        : (metrics.monthlyCashFlow ?? 0) + bondPayment;
+      dscr = Number((noi / bondPayment).toFixed(2));
+    } else {
+      dscr = 99.0;
+    }
+  }
+
+  const criteriaMap: Record<string, boolean> = {};
+
+  if (strategy === 'Flip') {
+    criteriaMap['minFlipRoi'] = (metrics.projectedFlipRoi ?? 0) >= minFlipRoi;
+    criteriaMap['maxDay1Cash'] = day1Cash <= maxDay1Cash;
+  } else {
+    // 'Rental' and 'BRRRR'
+    criteriaMap['minNetYield'] = (metrics.capRate ?? 0) >= minNetYield;
+    criteriaMap['minMonthlyCashflow'] = (metrics.monthlyCashFlow ?? 0) >= minMonthlyCashflow;
+    criteriaMap['minNetRoi'] = (metrics.netRoi ?? 0) >= minNetRoi;
+    criteriaMap['maxDay1Cash'] = day1Cash <= maxDay1Cash;
+    criteriaMap['minDscr'] = dscr >= minDscr;
+  }
+
+  const values = Object.values(criteriaMap);
+  const totalCount = values.length;
+  const passedCount = values.filter(Boolean).length;
+  const meetsBuyBox = totalCount > 0 && passedCount === totalCount;
+
+  return {
+    meetsBuyBox,
+    passedCount,
+    totalCount,
+    criteriaMap,
   };
 }
 

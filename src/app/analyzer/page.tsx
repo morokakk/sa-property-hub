@@ -10,6 +10,8 @@ import {
   computeAmenityScore,
   generateLongTermProjection,
   calculateMonthlyBondRepayment,
+  evaluateDealCriteria,
+  calculateEffectiveExitCommission,
 } from '@/lib/calculations/propertyMetrics';
 import { calculateFlipMao, calculateRentalMao } from '@/lib/calculations/maoSolver';
 import { formatOpportunityForWhatsApp } from '@/lib/whatsappFormatter';
@@ -48,6 +50,9 @@ import {
   RotateCcw,
   Target,
   X,
+  Layers,
+  Sliders,
+  ArrowRightLeft,
 } from 'lucide-react';
 import Link from 'next/link';
 import { exportOpportunitiesCSV } from '@/lib/export/csvExport';
@@ -58,6 +63,7 @@ export default function OpportunityAnalyzerPage() {
   const addOpportunity = usePortfolioStore((state) => state.addOpportunity);
   const updateOpportunity = usePortfolioStore((state) => state.updateOpportunity);
   const deleteOpportunity = usePortfolioStore((state) => state.deleteOpportunity);
+  const duplicateOpportunity = usePortfolioStore((state) => state.duplicateOpportunity);
   const passOpportunity = usePortfolioStore((state) => state.passOpportunity);
   const reactivateOpportunity = usePortfolioStore((state) => state.reactivateOpportunity);
   const advanceOpportunityStage = usePortfolioStore((state) => state.advanceOpportunityStage);
@@ -95,6 +101,10 @@ export default function OpportunityAnalyzerPage() {
   const [monthlyMaintenanceReserve, setMonthlyMaintenanceReserve] = useState<number>(analyzerDraft?.monthlyMaintenanceReserveZAR ?? 800);
   const [monthlyPrepaidVendingFee, setMonthlyPrepaidVendingFee] = useState<number>(analyzerDraft?.monthlyPrepaidVendingFeeZAR ?? 150);
 
+  // Exit VAT & Holding Sensitivity State
+  const [holdingPeriodMonths, setHoldingPeriodMonths] = useState<number>(analyzerDraft?.holdingPeriodMonths ?? 6);
+  const [vatExemptAgent, setVatExemptAgent] = useState<boolean>(analyzerDraft?.vatExemptAgent ?? false);
+
   // MAO Quick Solver State
   const [showMaoSolver, setShowMaoSolver] = useState(false);
   const [maoSolverMode, setMaoSolverMode] = useState<'Flip' | 'Rental'>(analyzerDraft?.strategy === 'Flip' ? 'Flip' : 'Rental');
@@ -110,6 +120,10 @@ export default function OpportunityAnalyzerPage() {
   const [passReason, setPassReason] = useState<PassReason>('Yield Too Low');
   const [passNotes, setPassNotes] = useState('');
 
+  // Deal Comparison State
+  const [selectedDealIds, setSelectedDealIds] = useState<string[]>([]);
+  const [showComparisonModal, setShowComparisonModal] = useState(false);
+
   // Auction Outlays & Distressed Arrears State
   const [auctioneerCommission, setAuctioneerCommission] = useState<number>(analyzerDraft?.auctioneerCommission ?? 0);
   const [municipalArrears, setMunicipalArrears] = useState<number>(analyzerDraft?.municipalArrears ?? 0);
@@ -121,9 +135,13 @@ export default function OpportunityAnalyzerPage() {
   const [mallDistance, setMallDistance] = useState<AmenityDistance>('0-5km');
 
   // Financing & Bidirectional Deposit / LTV (Defaults to 100% LTV / 0% Deposit)
+  const defaultPrimeRate = investorProfile?.defaultPrimeRatePercent ?? 10.75;
   const [loanToValue, setLoanToValue] = useState<number>(analyzerDraft?.loanToValue ?? 100);
   const [depositZAR, setDepositZAR] = useState<number>(analyzerDraft?.depositZAR ?? 0);
-  const [interestRate, setInterestRate] = useState<number>(11.75); // SA Prime Rate
+  const [interestRateMargin, setInterestRateMargin] = useState<number>(analyzerDraft?.interestRateMargin ?? 0.0);
+  const [interestRate, setInterestRate] = useState<number>(
+    Number((defaultPrimeRate + (analyzerDraft?.interestRateMargin ?? 0.0)).toFixed(2))
+  );
   const [loanTermYears, setLoanTermYears] = useState<number>(analyzerDraft?.bondTermYears ?? 20);
 
   // Strategy Selection
@@ -167,8 +185,14 @@ export default function OpportunityAnalyzerPage() {
       if (analyzerDraft.agencyVatApplicable !== undefined) setAgencyVatApplicable(analyzerDraft.agencyVatApplicable);
       if (analyzerDraft.monthlyMaintenanceReserveZAR !== undefined) setMonthlyMaintenanceReserve(analyzerDraft.monthlyMaintenanceReserveZAR);
       if (analyzerDraft.monthlyPrepaidVendingFeeZAR !== undefined) setMonthlyPrepaidVendingFee(analyzerDraft.monthlyPrepaidVendingFeeZAR);
+      if (analyzerDraft.interestRateMargin !== undefined) {
+        setInterestRateMargin(analyzerDraft.interestRateMargin);
+        setInterestRate(Number(((investorProfile?.defaultPrimeRatePercent ?? 10.75) + analyzerDraft.interestRateMargin).toFixed(2)));
+      }
+      if (analyzerDraft.vatExemptAgent !== undefined) setVatExemptAgent(analyzerDraft.vatExemptAgent);
+      if (analyzerDraft.holdingPeriodMonths !== undefined) setHoldingPeriodMonths(analyzerDraft.holdingPeriodMonths);
     }
-  }, [analyzerDraft]);
+  }, [analyzerDraft, investorProfile?.defaultPrimeRatePercent]);
 
   // Sync MAO solver mode when deal strategy changes
   useEffect(() => {
@@ -352,16 +376,19 @@ export default function OpportunityAnalyzerPage() {
       agencyVatApplicable,
       vacancyRatePercent: vacancyRate,
       targetExitPrice,
-      holdingPeriodMonths: 6,
+      holdingPeriodMonths,
       loanToValuePercent: loanToValue,
       depositZAR,
       bondLTV: loanToValue,
       interestRatePercent: interestRate,
+      interestRateMargin,
+      vatExemptAgent,
+      defaultAgentCommissionPercent: investorProfile?.defaultAgentCommissionPercent ?? 5.0,
       loanTermYears,
       costs: calculatedCosts,
       auctioneerCommissionZAR: auctioneerCommission,
       municipalArrearsZAR: municipalArrears,
-      exitCommissionPercent: 5.75,
+      exitCommissionPercent: vatExemptAgent ? 5.0 : 5.75,
       monthlyMaintenanceReserveZAR: monthlyMaintenanceReserve,
       monthlyPrepaidVendingFeeZAR: monthlyPrepaidVendingFee,
     });
@@ -379,9 +406,13 @@ export default function OpportunityAnalyzerPage() {
     vacancyRate,
     propertyType,
     targetExitPrice,
+    holdingPeriodMonths,
     loanToValue,
     depositZAR,
     interestRate,
+    interestRateMargin,
+    vatExemptAgent,
+    investorProfile?.defaultAgentCommissionPercent,
     loanTermYears,
     calculatedCosts,
     auctioneerCommission,
@@ -572,6 +603,9 @@ export default function OpportunityAnalyzerPage() {
     setVacancyRate(deal.vacancyRatePercent ?? 6.0);
     setManagementFee(deal.managementFeePercent ?? 8.0);
     setAgencyVatApplicable(deal.agencyVatApplicable !== false);
+    setHoldingPeriodMonths(deal.holdingPeriodMonths ?? 6);
+    setInterestRateMargin(deal.interestRateMargin ?? 0.0);
+    setVatExemptAgent(deal.vatExemptAgent ?? false);
     const effectiveLtv = deal.bondLTV !== undefined ? deal.bondLTV : (deal.loanToValuePercent ?? 100);
     setLoanToValue(effectiveLtv);
     const effectiveDep = deal.depositZAR !== undefined ? deal.depositZAR : Math.max(0, Math.round(deal.purchasePrice * (1 - effectiveLtv / 100)));
@@ -605,6 +639,10 @@ export default function OpportunityAnalyzerPage() {
     setMunicipalArrears(0);
     setLoanToValue(100);
     setDepositZAR(0);
+    setInterestRateMargin(0.0);
+    setInterestRate(defaultPrimeRate);
+    setHoldingPeriodMonths(6);
+    setVatExemptAgent(false);
     setAnnualCapitalGrowth(5.0);
     setAnnualRentalEscalation(6.0);
     setAnnualExpenseInflation(6.0);
@@ -652,7 +690,10 @@ export default function OpportunityAnalyzerPage() {
         managementFeePercent: managementFee,
         agencyVatApplicable,
         targetExitPrice,
-        holdingPeriodMonths: 6,
+        holdingPeriodMonths,
+        exitCommissionPercent: vatExemptAgent ? 5.0 : 5.75,
+        vatExemptAgent,
+        interestRateMargin,
         monthlyBondPaymentZAR: calculatedMetrics.monthlyBondPayment,
         monthlyOtherHoldingCostZAR: 1500,
         monthlyHoldingCostZAR: (finalLevies || 0) + (monthlyRates || 0) + monthlyInsurance + (calculatedMetrics.monthlyBondPayment || 0) + 1500,
@@ -691,6 +732,10 @@ export default function OpportunityAnalyzerPage() {
       setMunicipalArrears(0);
       setLoanToValue(100);
       setDepositZAR(0);
+      setInterestRateMargin(0.0);
+      setInterestRate(defaultPrimeRate);
+      setHoldingPeriodMonths(6);
+      setVatExemptAgent(false);
       setAnnualCapitalGrowth(5.0);
       setAnnualRentalEscalation(6.0);
       setAnnualExpenseInflation(6.0);
@@ -726,8 +771,10 @@ export default function OpportunityAnalyzerPage() {
       agencyVatApplicable,
       vacancyRatePercent: vacancyRate,
       targetExitPrice,
-      exitCommissionPercent: 5.75,
-      holdingPeriodMonths: 6,
+      exitCommissionPercent: vatExemptAgent ? 5.0 : 5.75,
+      vatExemptAgent,
+      interestRateMargin,
+      holdingPeriodMonths,
       monthlyBondPaymentZAR: calculatedMetrics.monthlyBondPayment,
       monthlyOtherHoldingCostZAR: (monthlyMaintenanceReserve || 0) + (monthlyPrepaidVendingFee || 0),
       monthlyMaintenanceReserveZAR: monthlyMaintenanceReserve,
@@ -1561,6 +1608,67 @@ export default function OpportunityAnalyzerPage() {
               </div>
             </div>
 
+            {/* Holding Period Sensitivity (1-12 Months) & Agent Commission VAT */}
+            <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                <div className="flex items-center gap-2">
+                  <Sliders className="w-4 h-4 text-indigo-600" />
+                  <span className="text-xs font-bold text-slate-900 uppercase tracking-wider">
+                    Holding Period & Exit VAT Sensitivity
+                  </span>
+                </div>
+                <span className="text-xs font-bold text-indigo-900 bg-indigo-50 px-2.5 py-0.5 rounded border border-indigo-200 self-start sm:self-auto">
+                  {holdingPeriodMonths} Months Holding &bull; Exit Comm: {vatExemptAgent ? '5.00%' : '5.75%'}
+                </span>
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between text-[11px] mb-1">
+                  <span className="font-semibold text-slate-700">Holding Period Duration</span>
+                  <span className="font-mono font-bold text-indigo-800">{holdingPeriodMonths} Months</span>
+                </div>
+                <input
+                  type="range"
+                  min="1"
+                  max="12"
+                  step="1"
+                  value={holdingPeriodMonths}
+                  onChange={(e) => {
+                    const val = Number(e.target.value);
+                    setHoldingPeriodMonths(val);
+                    updateAnalyzerDraft({ holdingPeriodMonths: val });
+                  }}
+                  className="w-full accent-indigo-600 cursor-pointer h-1.5 bg-slate-200 rounded-lg"
+                />
+                <div className="flex justify-between text-[9px] text-slate-400 font-medium px-0.5 mt-0.5">
+                  <span>1 Mo (Quick Flip)</span>
+                  <span>3 Mo</span>
+                  <span>6 Mo (Standard)</span>
+                  <span>9 Mo</span>
+                  <span>12 Mo (Long Reno)</span>
+                </div>
+              </div>
+
+              <div className="pt-2 border-t border-slate-200/80 flex items-center justify-between">
+                <label className="flex items-center gap-2 text-xs font-semibold text-slate-700 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={vatExemptAgent}
+                    onChange={(e) => {
+                      const checked = e.target.checked;
+                      setVatExemptAgent(checked);
+                      updateAnalyzerDraft({ vatExemptAgent: checked });
+                    }}
+                    className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500"
+                  />
+                  <span>VAT-Exempt Real Estate Agent (Off-market / Private Seller, skips 15% VAT)</span>
+                </label>
+                <span className="text-[10px] font-bold text-slate-600 bg-white px-2 py-0.5 rounded border border-slate-200">
+                  {vatExemptAgent ? '5.0% (Exempt)' : '5.75% (Standard 5% + 15% VAT)'}
+                </span>
+              </div>
+            </div>
+
             {/* Vacancy Buffer & Credit Loss Stress-Testing */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 rounded-xl bg-slate-50 border border-slate-200">
               <div>
@@ -1589,6 +1697,35 @@ export default function OpportunityAnalyzerPage() {
                     className="w-full text-xs px-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-emerald-500 font-semibold text-slate-900 bg-white"
                   />
                   <span className="absolute right-3 top-2 text-xs text-slate-400 font-bold">%</span>
+                </div>
+                {/* Vacancy Sensitivity Range Slider 0-15% */}
+                <div className="pt-2">
+                  <div className="flex items-center justify-between text-[10px] text-slate-500 mb-0.5">
+                    <span className="font-semibold flex items-center gap-1 text-slate-700">
+                      <Sliders className="w-3 h-3 text-amber-600" />
+                      Vacancy Sensitivity (0–15%)
+                    </span>
+                    <span className="font-bold text-amber-800">{vacancyRate}%</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="0"
+                    max="15"
+                    step="0.5"
+                    value={vacancyRate}
+                    onChange={(e) => {
+                      const val = Number(e.target.value);
+                      setVacancyRate(val);
+                      updateAnalyzerDraft({ vacancyRatePercent: val });
+                    }}
+                    className="w-full accent-amber-600 cursor-pointer h-1.5 bg-slate-200 rounded-lg"
+                  />
+                  <div className="flex justify-between text-[9px] text-slate-400 font-medium px-0.5 mt-0.5">
+                    <span>0% (Full Occ.)</span>
+                    <span>5% (SA Avg)</span>
+                    <span>10% (Suburban)</span>
+                    <span>15% (Stress)</span>
+                  </div>
                 </div>
                 <p className="text-[10px] text-slate-500 mt-1">
                   Deducts from gross rent before computing NOI, Cap Rate, and Cash-on-Cash yields. Default: 6.0%.
@@ -1977,6 +2114,39 @@ export default function OpportunityAnalyzerPage() {
                         />
                         <span className="ml-1 text-xs text-slate-500 font-bold">yr</span>
                       </div>
+                    </div>
+                  </div>
+
+                  {/* Prime Spread (±200 bps) Sensitivity Slider */}
+                  <div className="pt-2 border-t border-slate-200">
+                    <div className="flex items-center justify-between text-[10px] mb-1">
+                      <span className="font-bold text-slate-700 flex items-center gap-1">
+                        <Sliders className="w-3 h-3 text-emerald-600" />
+                        Prime Spread (±200 bps)
+                      </span>
+                      <span className="font-mono font-bold text-emerald-800 bg-white px-1.5 py-0.5 rounded border border-slate-200">
+                        {interestRateMargin >= 0 ? `+${interestRateMargin.toFixed(2)}%` : `${interestRateMargin.toFixed(2)}%`} ({((interestRateMargin) * 100).toFixed(0)} bps)
+                      </span>
+                    </div>
+                    <input
+                      type="range"
+                      min="-2"
+                      max="2"
+                      step="0.25"
+                      value={interestRateMargin}
+                      onChange={(e) => {
+                        const margin = Number(e.target.value);
+                        setInterestRateMargin(margin);
+                        const prime = investorProfile?.defaultPrimeRatePercent ?? 10.75;
+                        setInterestRate(Number((prime + margin).toFixed(2)));
+                        updateAnalyzerDraft({ interestRateMargin: margin });
+                      }}
+                      className="w-full accent-emerald-600 cursor-pointer h-1.5 bg-slate-200 rounded-lg"
+                    />
+                    <div className="flex justify-between text-[9px] text-slate-400 font-mono mt-0.5">
+                      <span>-200 bps</span>
+                      <span>Prime ({(investorProfile?.defaultPrimeRatePercent ?? 10.75).toFixed(2)}%)</span>
+                      <span>+200 bps</span>
                     </div>
                   </div>
 
@@ -2599,15 +2769,46 @@ export default function OpportunityAnalyzerPage() {
                 compositeGrade: 'A-Grade (Prime Hub)' as const,
                 compositeScore: 12,
               };
-              const effectiveLtv = deal.bondLTV !== undefined ? deal.bondLTV : (deal.loanToValuePercent ?? 100);
+              const dealDeposit = deal.depositZAR !== undefined ? deal.depositZAR : Math.max(0, Math.round(deal.purchasePrice * (1 - (deal.bondLTV ?? deal.loanToValuePercent ?? 100) / 100)));
+              const mortgageDebt = Math.max(0, deal.purchasePrice - dealDeposit);
+              const primeRate = investorProfile?.defaultPrimeRatePercent ?? 10.75;
+              const effectiveDealRate = deal.interestRateMargin !== undefined
+                ? primeRate + deal.interestRateMargin
+                : (deal.interestRatePercent ?? primeRate);
               const bondPayment = deal.monthlyBondPaymentZAR ?? (
-                effectiveLtv > 0 ? calculateMonthlyBondRepayment(deal.purchasePrice * (effectiveLtv / 100), deal.interestRatePercent ?? 11.75, deal.bondTermYears ?? deal.loanTermYears ?? 20) : 0
+                mortgageDebt > 0 ? calculateMonthlyBondRepayment(mortgageDebt, effectiveDealRate, deal.bondTermYears ?? deal.loanTermYears ?? 20) : 0
               );
               const holdingLevies = deal.propertyType === 'Freehold House' ? 0 : (deal.monthlyLevies ?? 0);
               const holdingRates = deal.monthlyRatesTaxes ?? 0;
               const holdingInsurance = deal.propertyType === 'Freehold House' ? Math.round((deal.annualInsurance ?? 0) / 12) : 0;
               const holdingOther = deal.monthlyOtherHoldingCostZAR ?? 1500;
               const holdingCost = deal.monthlyHoldingCostZAR ?? (bondPayment + holdingLevies + holdingRates + holdingInsurance + holdingOther);
+
+              // Strategy-aware DSCR & Buy Box Evaluation
+              const grossRent = deal.monthlyRentalEstimate || 0;
+              const vacLoss = (grossRent * (deal.vacancyRatePercent || 0)) / 100;
+              const effGross = grossRent - vacLoss;
+              const vatMult = deal.agencyVatApplicable !== false ? 1.15 : 1.0;
+              const agentMgt = (grossRent * ((deal.managementFeePercent ?? 8) / 100)) * vatMult;
+              const opex = holdingLevies + holdingRates + agentMgt + holdingInsurance + (deal.monthlyMaintenanceReserveZAR ?? 800) + (deal.monthlyPrepaidVendingFeeZAR ?? 150);
+              const noi = effGross - opex;
+              const dealDscr = bondPayment > 0 ? Number((noi / bondPayment).toFixed(2)) : (noi > 0 ? 99.0 : 0);
+
+              const buyBoxResult = evaluateDealCriteria(
+                {
+                  capRate: deal.capRate,
+                  grossYield: deal.grossYield,
+                  netRoi: deal.netRoi,
+                  monthlyCashFlow: deal.monthlyCashFlow,
+                  initialCapitalRequired: deal.initialCapitalRequired,
+                  projectedFlipRoi: deal.projectedFlipRoi,
+                  projectedFlipNetProfit: deal.projectedFlipNetProfit,
+                  dscr: dealDscr,
+                  monthlyBondPayment: bondPayment,
+                },
+                investorProfile,
+                deal.strategy ?? 'Rental'
+              );
 
               const displayDeal: OpportunityDeal = {
                 ...deal,
@@ -2625,16 +2826,16 @@ export default function OpportunityAnalyzerPage() {
               return (
               <div
                 key={deal.id}
-                className="p-4 rounded-xl border border-slate-200 hover:border-slate-300 bg-slate-50/50 transition-all"
+                className="p-4 sm:p-5 rounded-xl border border-slate-200 hover:border-slate-300 bg-white transition-all shadow-2xs space-y-3"
               >
-                <div className="flex flex-col xl:flex-row xl:items-start justify-between gap-3">
-                  {/* Property Header */}
+                {/* 1. Property Header & Top Utilities */}
+                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 pb-2.5 border-b border-slate-100">
                   <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-1.5 flex-wrap mb-1">
+                    <div className="flex items-center gap-1.5 flex-wrap">
                       <PropertyTypeBadge type={deal.propertyType} />
                       <AgmDateChip agmDate={deal.agmDate} />
-                      <h4 className="font-bold text-sm text-slate-900">{deal.title}</h4>
-                      <span className="text-[10px] font-semibold bg-slate-200 text-slate-800 px-2 py-0.5 rounded">
+                      <h4 className="font-bold text-sm sm:text-base text-slate-900 tracking-tight">{deal.title}</h4>
+                      <span className="text-[10px] font-semibold bg-slate-100 text-slate-700 px-2 py-0.5 rounded border border-slate-200">
                         {deal.source}
                       </span>
                       <span className={`text-[10px] font-semibold px-2 py-0.5 rounded border ${
@@ -2662,7 +2863,7 @@ export default function OpportunityAnalyzerPage() {
                         {deal.strategy === 'Flip' ? '🔄 Flip' : deal.strategy === 'BRRRR' ? '⚡ BRRRR' : '🏠 Rental'}
                       </span>
                     </div>
-                    <p className="text-xs text-slate-500 mt-0.5">
+                    <p className="text-xs text-slate-500 mt-1">
                       {deal.address}, {deal.city} ({deal.province})
                     </p>
 
@@ -2675,37 +2876,38 @@ export default function OpportunityAnalyzerPage() {
                         {deal.passedAt && <span className="text-slate-400 text-[10px]">({deal.passedAt})</span>}
                       </div>
                     )}
-
-                    {/* Built-in Equity & Location Grade Badges */}
-                    <div className="flex flex-wrap items-center gap-1.5 mt-2">
-                      <span
-                        className={`text-[10px] font-bold px-2 py-0.5 rounded-md border flex items-center gap-1 ${
-                          builtInEquity > 0
-                            ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
-                            : 'bg-slate-100 text-slate-700 border-slate-300'
-                        }`}
-                      >
-                        <TrendingUp className="w-3 h-3 text-emerald-600" />
-                        Built-in Equity: {formatZAR(builtInEquity)} ({builtInPercent >= 0 ? '+' : ''}{formatPercent(builtInPercent)} vs Val)
-                      </span>
-
-                      <span
-                        className={`text-[10px] font-bold px-2 py-0.5 rounded-md border flex items-center gap-1 ${
-                          scorecard.compositeGrade === 'A-Grade (Prime Hub)'
-                            ? 'bg-emerald-100/70 text-emerald-800 border-emerald-300'
-                            : scorecard.compositeGrade === 'B-Grade (Accessible)'
-                            ? 'bg-teal-100/70 text-teal-800 border-teal-300'
-                            : 'bg-amber-100/70 text-amber-800 border-amber-300'
-                        }`}
-                      >
-                        <MapPin className="w-3 h-3 text-emerald-700" />
-                        {scorecard.compositeGrade} ({scorecard.compositeScore}/12)
-                      </span>
-                    </div>
                   </div>
 
-                  {/* 1-Click Operational Actions */}
-                  <div className="flex flex-wrap items-center gap-1.5 w-full xl:w-auto xl:justify-end self-start">
+                  {/* Top-Level Quick Utilities */}
+                  <div className="flex flex-wrap items-center gap-1.5 shrink-0 self-start lg:self-center">
+                    {/* Compare Checkbox */}
+                    <label className="flex items-center gap-1 text-[11px] font-semibold text-slate-700 px-2.5 py-1.5 rounded-lg border border-slate-200 bg-slate-50 hover:bg-slate-100 cursor-pointer shadow-2xs select-none">
+                      <input
+                        type="checkbox"
+                        checked={selectedDealIds.includes(deal.id)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSelectedDealIds((prev) => [...prev, deal.id]);
+                          } else {
+                            setSelectedDealIds((prev) => prev.filter((id) => id !== deal.id));
+                          }
+                        }}
+                        className="w-3.5 h-3.5 rounded text-emerald-600 focus:ring-emerald-500"
+                      />
+                      <span>Compare</span>
+                    </label>
+
+                    {/* Duplicate Scenario Button */}
+                    <button
+                      type="button"
+                      onClick={() => duplicateOpportunity(deal.id)}
+                      title="Deep-clone this deal as a what-if scenario"
+                      className="px-2.5 py-1.5 text-xs font-semibold bg-purple-50 text-purple-700 hover:bg-purple-100 border border-purple-200 rounded-lg transition-colors flex items-center gap-1 shadow-2xs cursor-pointer"
+                    >
+                      <Copy className="w-3.5 h-3.5 text-purple-600" />
+                      <span>Duplicate Scenario</span>
+                    </button>
+
                     <button
                       onClick={() => {
                         const text = formatOpportunityForWhatsApp(displayDeal, investorProfile);
@@ -2714,7 +2916,7 @@ export default function OpportunityAnalyzerPage() {
                         setTimeout(() => setCopiedDealId(null), 2500);
                       }}
                       title="Copy WhatsApp deal summary with key metrics to clipboard"
-                      className="px-2.5 py-1.5 text-xs font-semibold bg-emerald-50 text-emerald-800 hover:bg-emerald-100 border border-emerald-300 rounded-lg transition-colors flex items-center gap-1 shadow-2xs"
+                      className="px-2.5 py-1.5 text-xs font-semibold bg-emerald-50 text-emerald-800 hover:bg-emerald-100 border border-emerald-300 rounded-lg transition-colors flex items-center gap-1 shadow-2xs cursor-pointer"
                     >
                       {copiedDealId === deal.id ? (
                         <Check className="w-3.5 h-3.5 text-emerald-600" />
@@ -2737,12 +2939,171 @@ export default function OpportunityAnalyzerPage() {
                     <button
                       onClick={() => handleEditDeal(displayDeal)}
                       title="Load deal parameters into calculator to edit or recalculate"
-                      className="px-2.5 py-1.5 text-xs font-semibold bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 rounded-lg transition-colors flex items-center gap-1 shadow-2xs"
+                      className="px-2.5 py-1.5 text-xs font-semibold bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 rounded-lg transition-colors flex items-center gap-1 shadow-2xs cursor-pointer"
                     >
                       <Edit3 className="w-3.5 h-3.5" />
-                      <span>Edit Deal</span>
+                      <span>Edit</span>
                     </button>
 
+                    <button
+                      onClick={() => {
+                        if (confirm(`Delete "${deal.title}" from pipeline?`)) {
+                          deleteOpportunity(deal.id);
+                        }
+                      }}
+                      title="Delete opportunity"
+                      className="p-1.5 text-slate-400 hover:text-rose-600 transition-colors rounded-lg hover:bg-rose-50 cursor-pointer"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+
+                {/* 2. Full-Width Underwriting Signals & Buy Box Badges Strip */}
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <span
+                    className={`text-[10px] font-bold px-2 py-0.5 rounded-md border flex items-center gap-1 ${
+                      builtInEquity > 0
+                        ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
+                        : 'bg-slate-100 text-slate-700 border-slate-300'
+                    }`}
+                  >
+                    <TrendingUp className="w-3 h-3 text-emerald-600" />
+                    Built-in Equity: {formatZAR(builtInEquity)} ({builtInPercent >= 0 ? '+' : ''}{formatPercent(builtInPercent)} vs Val)
+                  </span>
+
+                  {/* Buy Box Match Badge */}
+                  <span
+                    className={`text-[10px] font-bold px-2 py-0.5 rounded-md border flex items-center gap-1 ${
+                      buyBoxResult.meetsBuyBox
+                        ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
+                        : 'bg-amber-50 text-amber-800 border-amber-300'
+                    }`}
+                    title={`Buy Box criteria: ${buyBoxResult.passedCount} of ${buyBoxResult.totalCount} hurdles met (${deal.strategy ?? 'Rental'})`}
+                  >
+                    <Target className="w-3 h-3 text-emerald-600" />
+                    Buy Box Match ({buyBoxResult.passedCount}/{buyBoxResult.totalCount})
+                  </span>
+
+                  {/* DSCR Badge */}
+                  <span
+                    className={`text-[10px] font-bold px-2 py-0.5 rounded-md border flex items-center gap-1 ${
+                      dealDscr >= (investorProfile?.minDscr ?? 1.20)
+                        ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
+                        : 'bg-rose-50 text-rose-800 border-rose-300'
+                    }`}
+                    title={`Debt Service Coverage Ratio: ${dealDscr >= 99 ? 'No Bond (Cash Deal)' : `${dealDscr}x`} (Investor hurdle: ${investorProfile?.minDscr ?? 1.20}x)`}
+                  >
+                    DSCR: {dealDscr >= 99 ? 'Cash' : `${dealDscr.toFixed(2)}x`}
+                  </span>
+
+                  {/* Section 11(a) Tooltip Badge */}
+                  <span
+                    className="text-[10px] font-medium text-slate-600 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded-md flex items-center gap-1 cursor-help"
+                    title="Reflects interest-only deduction per SARS ITR12 guidelines."
+                  >
+                    <Info className="w-3 h-3 text-slate-400" />
+                    Sec 11(a) Compliant
+                  </span>
+
+                  <span
+                    className={`text-[10px] font-bold px-2 py-0.5 rounded-md border flex items-center gap-1 ${
+                      scorecard.compositeGrade === 'A-Grade (Prime Hub)'
+                        ? 'bg-emerald-100/70 text-emerald-800 border-emerald-300'
+                        : scorecard.compositeGrade === 'B-Grade (Accessible)'
+                        ? 'bg-teal-100/70 text-teal-800 border-teal-300'
+                        : 'bg-amber-100/70 text-amber-800 border-amber-300'
+                    }`}
+                  >
+                    <MapPin className="w-3 h-3 text-emerald-700" />
+                    {scorecard.compositeGrade} ({scorecard.compositeScore}/12)
+                  </span>
+                </div>
+
+                {/* 3. Financial Metric Badges - Full Width Responsive Grid */}
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 py-3 border-y border-slate-200/80 my-2 text-xs bg-slate-50/70 px-3.5 rounded-lg">
+                  <div>
+                    <span className="text-[10px] text-slate-400 block font-medium">Open Market Value</span>
+                    <span className="font-semibold text-slate-700">{formatZAR(openMarket)}</span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-slate-400 block font-medium">Target Purchase Bid</span>
+                    <span className="font-bold text-slate-900">{formatZAR(deal.purchasePrice)}</span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-slate-400 block font-medium">Financing / Deposit</span>
+                    <span className="font-semibold text-slate-800">
+                      {deal.bondLTV ?? deal.loanToValuePercent}% LTV ({formatZAR(deal.depositZAR ?? Math.round(deal.purchasePrice * (1 - (deal.bondLTV ?? deal.loanToValuePercent) / 100)))})
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-slate-400 block font-medium">Day-1 Capital Required</span>
+                    <span className="font-bold text-emerald-800">
+                      {formatZAR(
+                        deal.initialCapitalRequired ??
+                        ((deal.depositZAR ?? Math.round(deal.purchasePrice * (1 - (deal.bondLTV ?? deal.loanToValuePercent) / 100))) +
+                        (deal.costs.totalAcquisitionCost - deal.purchasePrice) +
+                        deal.estimatedRehabCost +
+                        (deal.auctioneerCommissionZAR || 0) +
+                        (deal.municipalArrearsZAR || 0))
+                      )}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-slate-400 block font-medium">Gross Yield / Cap Rate</span>
+                    <span className="font-bold text-emerald-700">
+                      {formatPercent(deal.grossYield)} / {formatPercent(deal.capRate)}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-slate-400 block font-medium">Flip Profit / ROI</span>
+                    <span className="font-bold text-indigo-700">
+                      {formatZAR(deal.projectedFlipNetProfit)} ({formatPercent(deal.projectedFlipRoi)})
+                    </span>
+                  </div>
+                </div>
+
+                {/* 4. Tax Breakdown Sub-Bar */}
+                <div className="pt-1 text-[11px] text-slate-500 flex flex-wrap items-center gap-x-4 gap-y-1.5">
+                  <span>SARS Transfer Duty: <strong className="text-slate-700">{formatZAR(deal.costs.transferDuty)}</strong></span>
+                  <span>Conveyancing: <strong className="text-slate-700">{formatZAR(deal.costs.conveyancingFee)}</strong></span>
+                  <span>Bond Reg: <strong className="text-slate-700">{formatZAR(deal.costs.bondRegistrationFee)}</strong></span>
+                  <span>Deeds Office: <strong className="text-slate-700">{formatZAR(deal.costs.deedsOfficeFee)}</strong></span>
+                  {deal.auctioneerCommissionZAR !== undefined && deal.auctioneerCommissionZAR > 0 && (
+                    <span className="text-amber-800 bg-amber-50 px-2 py-0.5 rounded font-semibold border border-amber-200">
+                      Auction Fee (10%+VAT): <strong>{formatZAR(deal.auctioneerCommissionZAR)}</strong>
+                    </span>
+                  )}
+                  {deal.municipalArrearsZAR !== undefined && deal.municipalArrearsZAR > 0 && (
+                    <span className="text-rose-800 bg-rose-50 px-2 py-0.5 rounded font-semibold border border-rose-200">
+                      Sec 118 Arrears: <strong>{formatZAR(deal.municipalArrearsZAR)}</strong>
+                    </span>
+                  )}
+                  <span>Net Monthly Cashflow: <strong className={deal.monthlyCashFlow >= 0 ? 'text-emerald-700' : 'text-rose-600'}>{formatZAR(deal.monthlyCashFlow)}</strong></span>
+                  {deal.section13sex?.isEligible && (
+                    <span className="text-emerald-800 bg-emerald-100/80 px-2 py-0.5 rounded font-semibold flex items-center gap-1 border border-emerald-200">
+                      <Sparkles className="w-3 h-3 text-emerald-700" />
+                      SARS Sec 13sex: +{formatZAR(deal.section13sex.annualTaxSavingsZAR)}/yr Shield (55% Base: {formatZAR(deal.section13sex.buildingDeductionBaseZAR)})
+                    </span>
+                  )}
+                </div>
+
+                {/* 5. Footer: Node Proximity & Pipeline Stage Progression Actions */}
+                <div className="pt-2.5 border-t border-slate-200/60 flex flex-col md:flex-row md:items-center justify-between gap-2.5">
+                  {/* Left: Amenity Scorecard Summary */}
+                  <div className="flex flex-wrap items-center gap-1.5 text-[10px] text-slate-500">
+                    <span className="font-bold text-slate-700 flex items-center gap-1">
+                      <MapPin className="w-3 h-3 text-emerald-600" />
+                      Node Proximity:
+                    </span>
+                    <span className="bg-white px-2 py-0.5 rounded border border-slate-200">🏫 Schools: <strong className="text-slate-700">{scorecard.schools}</strong></span>
+                    <span className="bg-white px-2 py-0.5 rounded border border-slate-200">👮 Police: <strong className="text-slate-700">{scorecard.policeStation}</strong></span>
+                    <span className="bg-white px-2 py-0.5 rounded border border-slate-200">🏥 Hospital: <strong className="text-slate-700">{scorecard.medicalClinic}</strong></span>
+                    <span className="bg-white px-2 py-0.5 rounded border border-slate-200">🛍️ Mall: <strong className="text-slate-700">{scorecard.shoppingMall}</strong></span>
+                  </div>
+
+                  {/* Right: Stage Advancement & Promotion Buttons */}
+                  <div className="flex flex-wrap items-center gap-1.5 shrink-0 self-start md:self-center">
                     {/* Stage Advancement Button */}
                     {(deal.status === 'Screening' || deal.status === 'Offer Submitted') && (
                       <button
@@ -2849,7 +3210,7 @@ export default function OpportunityAnalyzerPage() {
                         }
                       }}
                       title="Promote to Buy-and-Flip Manager"
-                      className="px-2.5 py-1.5 text-xs font-semibold bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200 rounded-lg transition-colors flex items-center gap-1"
+                      className="px-2.5 py-1.5 text-xs font-semibold bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200 rounded-lg transition-colors flex items-center gap-1 shadow-2xs cursor-pointer"
                     >
                       <Hammer className="w-3.5 h-3.5" />
                       <span>Promote to Flip</span>
@@ -2862,7 +3223,7 @@ export default function OpportunityAnalyzerPage() {
                         }
                       }}
                       title="Promote to Rental Portfolio"
-                      className="px-2.5 py-1.5 text-xs font-semibold bg-teal-50 text-teal-700 hover:bg-teal-100 border border-teal-200 rounded-lg transition-colors flex items-center gap-1"
+                      className="px-2.5 py-1.5 text-xs font-semibold bg-teal-50 text-teal-700 hover:bg-teal-100 border border-teal-200 rounded-lg transition-colors flex items-center gap-1 shadow-2xs cursor-pointer"
                     >
                       <Building className="w-3.5 h-3.5" />
                       <span>Promote to Rental</span>
@@ -2870,104 +3231,12 @@ export default function OpportunityAnalyzerPage() {
 
                     <Link
                       href={`/proposal?dealId=${deal.id}`}
-                      className="px-2.5 py-1.5 text-xs font-semibold bg-amber-50 text-amber-800 hover:bg-amber-100 border border-amber-200 rounded-lg transition-colors flex items-center gap-1"
+                      className="px-2.5 py-1.5 text-xs font-semibold bg-amber-50 text-amber-800 hover:bg-amber-100 border border-amber-200 rounded-lg transition-colors flex items-center gap-1 shadow-2xs"
                     >
                       <FileText className="w-3.5 h-3.5" />
                       <span>Pitch Deck</span>
                     </Link>
-
-                    <button
-                      onClick={() => {
-                        if (confirm(`Delete "${deal.title}" from pipeline?`)) {
-                          deleteOpportunity(deal.id);
-                        }
-                      }}
-                      title="Delete opportunity"
-                      className="p-1.5 text-slate-400 hover:text-rose-600 transition-colors rounded-lg hover:bg-rose-50"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
                   </div>
-                </div>
-
-                {/* Financial Metric Badges - Full Width Responsive Grid */}
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 py-3 border-y border-slate-200/80 my-3 text-xs bg-white/70 px-3 rounded-lg">
-                  <div>
-                    <span className="text-[10px] text-slate-400 block font-medium">Open Market Value</span>
-                    <span className="font-semibold text-slate-700">{formatZAR(openMarket)}</span>
-                  </div>
-                  <div>
-                    <span className="text-[10px] text-slate-400 block font-medium">Target Purchase Bid</span>
-                    <span className="font-bold text-slate-900">{formatZAR(deal.purchasePrice)}</span>
-                  </div>
-                  <div>
-                    <span className="text-[10px] text-slate-400 block font-medium">Financing / Deposit</span>
-                    <span className="font-semibold text-slate-800">
-                      {deal.bondLTV ?? deal.loanToValuePercent}% LTV ({formatZAR(deal.depositZAR ?? Math.round(deal.purchasePrice * (1 - (deal.bondLTV ?? deal.loanToValuePercent) / 100)))})
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-[10px] text-slate-400 block font-medium">Day-1 Capital Required</span>
-                    <span className="font-bold text-emerald-800">
-                      {formatZAR(
-                        deal.initialCapitalRequired ??
-                        ((deal.depositZAR ?? Math.round(deal.purchasePrice * (1 - (deal.bondLTV ?? deal.loanToValuePercent) / 100))) +
-                        (deal.costs.totalAcquisitionCost - deal.purchasePrice) +
-                        deal.estimatedRehabCost +
-                        (deal.auctioneerCommissionZAR || 0) +
-                        (deal.municipalArrearsZAR || 0))
-                      )}
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-[10px] text-slate-400 block font-medium">Gross Yield / Cap Rate</span>
-                    <span className="font-bold text-emerald-700">
-                      {formatPercent(deal.grossYield)} / {formatPercent(deal.capRate)}
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-[10px] text-slate-400 block font-medium">Flip Profit / ROI</span>
-                    <span className="font-bold text-indigo-700">
-                      {formatZAR(deal.projectedFlipNetProfit)} ({formatPercent(deal.projectedFlipRoi)})
-                    </span>
-                  </div>
-                </div>
-
-                {/* Tax Breakdown Sub-Bar */}
-                <div className="mt-3 pt-2 border-t border-slate-200/60 text-[11px] text-slate-500 flex flex-wrap items-center gap-4">
-                  <span>SARS Transfer Duty: <strong className="text-slate-700">{formatZAR(deal.costs.transferDuty)}</strong></span>
-                  <span>Conveyancing: <strong className="text-slate-700">{formatZAR(deal.costs.conveyancingFee)}</strong></span>
-                  <span>Bond Reg: <strong className="text-slate-700">{formatZAR(deal.costs.bondRegistrationFee)}</strong></span>
-                  <span>Deeds Office: <strong className="text-slate-700">{formatZAR(deal.costs.deedsOfficeFee)}</strong></span>
-                  {deal.auctioneerCommissionZAR !== undefined && deal.auctioneerCommissionZAR > 0 && (
-                    <span className="text-amber-800 bg-amber-50 px-2 py-0.5 rounded font-semibold border border-amber-200">
-                      Auction Fee (10%+VAT): <strong>{formatZAR(deal.auctioneerCommissionZAR)}</strong>
-                    </span>
-                  )}
-                  {deal.municipalArrearsZAR !== undefined && deal.municipalArrearsZAR > 0 && (
-                    <span className="text-rose-800 bg-rose-50 px-2 py-0.5 rounded font-semibold border border-rose-200">
-                      Sec 118 Arrears: <strong>{formatZAR(deal.municipalArrearsZAR)}</strong>
-                    </span>
-                  )}
-                  <span>Net Monthly Cashflow: <strong className={deal.monthlyCashFlow >= 0 ? 'text-emerald-700' : 'text-rose-600'}>{formatZAR(deal.monthlyCashFlow)}</strong></span>
-                  {deal.section13sex?.isEligible && (
-                    <span className="text-emerald-800 bg-emerald-100/80 px-2 py-0.5 rounded font-semibold flex items-center gap-1 border border-emerald-200">
-                      <Sparkles className="w-3 h-3 text-emerald-700" />
-                      SARS Sec 13sex: +{formatZAR(deal.section13sex.annualTaxSavingsZAR)}/yr Shield (55% Base: {formatZAR(deal.section13sex.buildingDeductionBaseZAR)})
-                    </span>
-                  )}
-                </div>
-
-                {/* Amenity Scorecard Summary Bar */}
-                <div className="mt-2 pt-2 border-t border-slate-200/40 text-[10px] text-slate-500 flex flex-wrap items-center gap-2">
-                  <span className="font-bold text-slate-700 flex items-center gap-1">
-                    <MapPin className="w-3 h-3 text-emerald-600" />
-                    Node Proximity:
-                  </span>
-                  <span className="bg-white px-2 py-0.5 rounded border border-slate-200">🏫 Schools: <strong className="text-slate-700">{scorecard.schools}</strong></span>
-                  <span className="bg-white px-2 py-0.5 rounded border border-slate-200">👮 Police: <strong className="text-slate-700">{scorecard.policeStation}</strong></span>
-                  <span className="bg-white px-2 py-0.5 rounded border border-slate-200">🏥 Hospital: <strong className="text-slate-700">{scorecard.medicalClinic}</strong></span>
-                  <span className="bg-white px-2 py-0.5 rounded border border-slate-200">🛍️ Mall: <strong className="text-slate-700">{scorecard.shoppingMall}</strong></span>
                 </div>
               </div>
             );
@@ -2975,6 +3244,289 @@ export default function OpportunityAnalyzerPage() {
         )}
         </div>
         </div>
+
+        {/* Side-by-Side Deal Comparison Floating Bar */}
+        {selectedDealIds.length > 0 && (
+          <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 bg-slate-900 text-white px-5 py-3 rounded-2xl shadow-2xl border border-slate-700 flex items-center gap-4 animate-in fade-in slide-in-from-bottom-4 duration-200">
+            <div className="flex items-center gap-2">
+              <ArrowRightLeft className="w-4 h-4 text-emerald-400" />
+              <span className="text-xs font-semibold">
+                {selectedDealIds.length} deal{selectedDealIds.length > 1 ? 's' : ''} selected
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                disabled={selectedDealIds.length < 2}
+                onClick={() => setShowComparisonModal(true)}
+                className="bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-bold px-3 py-1.5 rounded-lg transition-colors cursor-pointer shadow-xs flex items-center gap-1.5"
+              >
+                <Layers className="w-3.5 h-3.5" />
+                <span>Compare Side-by-Side {selectedDealIds.length < 2 ? '(Select 2+)' : ''}</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setSelectedDealIds([])}
+                className="text-slate-400 hover:text-white text-xs px-2 py-1 rounded cursor-pointer transition-colors"
+              >
+                Clear
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Side-by-Side Deal Comparison Modal */}
+        {showComparisonModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-xs animate-in fade-in duration-150">
+            <div className="fixed inset-0" onClick={() => setShowComparisonModal(false)} />
+            <div className="relative bg-white rounded-2xl max-w-5xl w-full p-6 shadow-2xl border border-slate-200 max-h-[92vh] overflow-y-auto z-10 animate-in slide-in-from-bottom-2 duration-200">
+              <div className="flex items-center justify-between pb-3 mb-4 border-b border-slate-100">
+                <div className="flex items-center gap-2.5">
+                  <div className="p-2 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-200">
+                    <Layers className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-bold text-slate-900">Side-by-Side Deal Comparison</h3>
+                    <p className="text-xs text-slate-500">
+                      Cross-compare purchase price, Day-1 capital, yields, DSCR, and strategy Buy Box hurdles.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowComparisonModal(false)}
+                  className="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Responsive Side-by-Side Comparison Table */}
+              <div className="overflow-x-auto border border-slate-200 rounded-xl">
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead>
+                    <tr className="bg-slate-50 border-b border-slate-200">
+                      <th className="p-3 font-bold text-slate-700 w-48 min-w-[180px]">Metric / Parameter</th>
+                      {opportunities
+                        .filter((d) => selectedDealIds.includes(d.id))
+                        .map((deal) => (
+                          <th key={deal.id} className="p-3 font-bold text-slate-900 min-w-[200px] border-l border-slate-200">
+                            <div className="space-y-1">
+                              <div className="font-extrabold text-sm text-slate-900 truncate" title={deal.title}>
+                                {deal.title}
+                              </div>
+                              <div className="flex items-center gap-1.5">
+                                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                                  deal.strategy === 'Flip' ? 'bg-amber-100 text-amber-900' : deal.strategy === 'BRRRR' ? 'bg-purple-100 text-purple-900' : 'bg-indigo-100 text-indigo-900'
+                                }`}>
+                                  {deal.strategy ?? 'Rental'}
+                                </span>
+                                <span className="text-[10px] text-slate-500">{deal.city}</span>
+                              </div>
+                            </div>
+                          </th>
+                        ))}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {/* 1. Target Purchase Price */}
+                    <tr className="hover:bg-slate-50/50">
+                      <td className="p-3 font-semibold text-slate-700 bg-slate-50/30">Target Purchase Bid</td>
+                      {opportunities
+                        .filter((d) => selectedDealIds.includes(d.id))
+                        .map((deal) => (
+                          <td key={deal.id} className="p-3 font-black text-slate-900 border-l border-slate-100 font-mono">
+                            {formatZAR(deal.purchasePrice)}
+                          </td>
+                        ))}
+                    </tr>
+
+                    {/* 2. Open Market Value & Built-in Equity */}
+                    <tr className="hover:bg-slate-50/50">
+                      <td className="p-3 font-semibold text-slate-700 bg-slate-50/30">Open Market Value</td>
+                      {opportunities
+                        .filter((d) => selectedDealIds.includes(d.id))
+                        .map((deal) => (
+                          <td key={deal.id} className="p-3 text-slate-700 border-l border-slate-100">
+                            {formatZAR(deal.openMarketValueZAR || deal.purchasePrice * 1.2)}
+                            <span className="block text-[10px] text-emerald-700 font-semibold">
+                              Built-in: {formatZAR(deal.builtInEquityZAR ?? ((deal.openMarketValueZAR || deal.purchasePrice * 1.2) - deal.purchasePrice))}
+                            </span>
+                          </td>
+                        ))}
+                    </tr>
+
+                    {/* 3. Day-1 Capital Required */}
+                    <tr className="hover:bg-slate-50/50">
+                      <td className="p-3 font-semibold text-slate-700 bg-slate-50/30">Day-1 Capital Required</td>
+                      {opportunities
+                        .filter((d) => selectedDealIds.includes(d.id))
+                        .map((deal) => {
+                          const effLtv = deal.bondLTV ?? deal.loanToValuePercent ?? 100;
+                          const dep = deal.depositZAR !== undefined ? deal.depositZAR : Math.max(0, Math.round(deal.purchasePrice * (1 - effLtv / 100)));
+                          const day1 = deal.initialCapitalRequired ?? (
+                            dep +
+                            ((deal.costs?.totalAcquisitionCost || deal.purchasePrice) - deal.purchasePrice) +
+                            (deal.estimatedRehabCost || 0) +
+                            (deal.auctioneerCommissionZAR || 0) +
+                            (deal.municipalArrearsZAR || 0)
+                          );
+                          return (
+                            <td key={deal.id} className="p-3 font-bold text-emerald-800 border-l border-slate-100 font-mono">
+                              {formatZAR(day1)}
+                            </td>
+                          );
+                        })}
+                    </tr>
+
+                    {/* 4. Monthly Net Cashflow */}
+                    <tr className="hover:bg-slate-50/50">
+                      <td className="p-3 font-semibold text-slate-700 bg-slate-50/30">Monthly Net Cash Flow</td>
+                      {opportunities
+                        .filter((d) => selectedDealIds.includes(d.id))
+                        .map((deal) => (
+                          <td key={deal.id} className={`p-3 font-bold border-l border-slate-100 font-mono ${deal.monthlyCashFlow >= 0 ? 'text-emerald-700' : 'text-rose-600'}`}>
+                            {formatZAR(deal.monthlyCashFlow)}/m
+                          </td>
+                        ))}
+                    </tr>
+
+                    {/* 5. Gross Yield / Cap Rate */}
+                    <tr className="hover:bg-slate-50/50">
+                      <td className="p-3 font-semibold text-slate-700 bg-slate-50/30">Gross Yield / Cap Rate</td>
+                      {opportunities
+                        .filter((d) => selectedDealIds.includes(d.id))
+                        .map((deal) => (
+                          <td key={deal.id} className="p-3 text-slate-800 border-l border-slate-100">
+                            <span className="font-semibold text-emerald-700">{formatPercent(deal.grossYield)}</span>
+                            {' / '}
+                            <span className="font-semibold text-teal-700">{formatPercent(deal.capRate)}</span>
+                          </td>
+                        ))}
+                    </tr>
+
+                    {/* 6. Cash-on-Cash ROI */}
+                    <tr className="hover:bg-slate-50/50">
+                      <td className="p-3 font-semibold text-slate-700 bg-slate-50/30">Cash-on-Cash Net ROI</td>
+                      {opportunities
+                        .filter((d) => selectedDealIds.includes(d.id))
+                        .map((deal) => (
+                          <td key={deal.id} className={`p-3 font-black border-l border-slate-100 ${deal.netRoi >= (investorProfile?.minNetRoiPercent ?? 8) ? 'text-emerald-700' : 'text-slate-800'}`}>
+                            {formatPercent(deal.netRoi)}
+                          </td>
+                        ))}
+                    </tr>
+
+                    {/* 7. Debt Service Coverage Ratio (DSCR) */}
+                    <tr className="hover:bg-slate-50/50">
+                      <td className="p-3 font-semibold text-slate-700 bg-slate-50/30">DSCR (Coverage Ratio)</td>
+                      {opportunities
+                        .filter((d) => selectedDealIds.includes(d.id))
+                        .map((deal) => {
+                          const dep = deal.depositZAR !== undefined ? deal.depositZAR : Math.max(0, Math.round(deal.purchasePrice * (1 - (deal.bondLTV ?? deal.loanToValuePercent ?? 100) / 100)));
+                          const debt = Math.max(0, deal.purchasePrice - dep);
+                          const prime = investorProfile?.defaultPrimeRatePercent ?? 10.75;
+                          const rate = deal.interestRateMargin !== undefined ? prime + deal.interestRateMargin : (deal.interestRatePercent ?? prime);
+                          const bondPmt = deal.monthlyBondPaymentZAR ?? (debt > 0 ? calculateMonthlyBondRepayment(debt, rate, deal.bondTermYears ?? deal.loanTermYears ?? 20) : 0);
+                          const gross = deal.monthlyRentalEstimate || 0;
+                          const effGross = gross * (1 - (deal.vacancyRatePercent || 0) / 100);
+                          const opex = (deal.propertyType === 'Freehold House' ? 0 : (deal.monthlyLevies || 0)) + (deal.monthlyRatesTaxes || 0) + (deal.monthlyMaintenanceReserveZAR || 800);
+                          const noi = effGross - opex;
+                          const dscr = bondPmt > 0 ? Number((noi / bondPmt).toFixed(2)) : (noi > 0 ? 99.0 : 0);
+                          const meetsHurdle = dscr >= (investorProfile?.minDscr ?? 1.20);
+                          return (
+                            <td key={deal.id} className="p-3 border-l border-slate-100">
+                              <span className={`font-bold px-2 py-0.5 rounded text-xs ${meetsHurdle ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'}`}>
+                                {dscr >= 99 ? 'Cash Deal' : `${dscr.toFixed(2)}x`}
+                              </span>
+                            </td>
+                          );
+                        })}
+                    </tr>
+
+                    {/* 8. Buy Box Match Status */}
+                    <tr className="hover:bg-slate-50/50">
+                      <td className="p-3 font-semibold text-slate-700 bg-slate-50/30">Buy Box Match Status</td>
+                      {opportunities
+                        .filter((d) => selectedDealIds.includes(d.id))
+                        .map((deal) => {
+                          const dep = deal.depositZAR !== undefined ? deal.depositZAR : Math.max(0, Math.round(deal.purchasePrice * (1 - (deal.bondLTV ?? deal.loanToValuePercent ?? 100) / 100)));
+                          const debt = Math.max(0, deal.purchasePrice - dep);
+                          const prime = investorProfile?.defaultPrimeRatePercent ?? 10.75;
+                          const rate = deal.interestRateMargin !== undefined ? prime + deal.interestRateMargin : (deal.interestRatePercent ?? prime);
+                          const bondPmt = deal.monthlyBondPaymentZAR ?? (debt > 0 ? calculateMonthlyBondRepayment(debt, rate, deal.bondTermYears ?? deal.loanTermYears ?? 20) : 0);
+                          const gross = deal.monthlyRentalEstimate || 0;
+                          const effGross = gross * (1 - (deal.vacancyRatePercent || 0) / 100);
+                          const opex = (deal.propertyType === 'Freehold House' ? 0 : (deal.monthlyLevies || 0)) + (deal.monthlyRatesTaxes || 0) + (deal.monthlyMaintenanceReserveZAR || 800);
+                          const noi = effGross - opex;
+                          const dscr = bondPmt > 0 ? Number((noi / bondPmt).toFixed(2)) : (noi > 0 ? 99.0 : 0);
+
+                          const evalResult = evaluateDealCriteria(
+                            {
+                              capRate: deal.capRate,
+                              grossYield: deal.grossYield,
+                              netRoi: deal.netRoi,
+                              monthlyCashFlow: deal.monthlyCashFlow,
+                              initialCapitalRequired: deal.initialCapitalRequired,
+                              projectedFlipRoi: deal.projectedFlipRoi,
+                              projectedFlipNetProfit: deal.projectedFlipNetProfit,
+                              dscr,
+                              monthlyBondPayment: bondPmt,
+                            },
+                            investorProfile,
+                            deal.strategy ?? 'Rental'
+                          );
+
+                          return (
+                            <td key={deal.id} className="p-3 border-l border-slate-100">
+                              <span className={`inline-flex items-center gap-1 font-bold px-2 py-0.5 rounded text-xs ${
+                                evalResult.meetsBuyBox ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
+                              }`}>
+                                <Target className="w-3 h-3" />
+                                {evalResult.meetsBuyBox ? 'PASSED' : 'MISSED'} ({evalResult.passedCount}/{evalResult.totalCount})
+                              </span>
+                            </td>
+                          );
+                        })}
+                    </tr>
+
+                    {/* 9. Section 13sex Tax Shield */}
+                    <tr className="hover:bg-slate-50/50">
+                      <td className="p-3 font-semibold text-slate-700 bg-slate-50/30">SARS Sec 13sex Shield</td>
+                      {opportunities
+                        .filter((d) => selectedDealIds.includes(d.id))
+                        .map((deal) => (
+                          <td key={deal.id} className="p-3 text-slate-700 border-l border-slate-100 text-[11px]">
+                            {deal.section13sex?.isEligible ? (
+                              <span className="font-bold text-emerald-700 flex items-center gap-1">
+                                <Sparkles className="w-3 h-3" />
+                                +{formatZAR(deal.section13sex.annualTaxSavingsZAR)}/yr
+                              </span>
+                            ) : (
+                              <span className="text-slate-400">Not eligible</span>
+                            )}
+                          </td>
+                        ))}
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between">
+                <span className="text-xs text-slate-500">
+                  Tip: Use sensitivity sliders to test stress scenarios across prime interest spread, vacancies, and holding burn.
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setShowComparisonModal(false)}
+                  className="bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold px-4 py-2 rounded-lg cursor-pointer transition-colors"
+                >
+                  Close Comparison
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Fee Reset Toast Notification */}
         {feeResetToast && (

@@ -2111,9 +2111,17 @@ export const INITIAL_INVESTOR_PROFILE: InvestorProfile = {
   physicalAddress: 'Suite 402, The Boulevard Office Park, Cape Town',
   logoBase64: '',
   bioSummary: 'Sole proprietor and syndication vehicle focusing on distressed residential asset acquisition, light-industrial repositioning, and high-yield sectional title developments across the Western Cape and Gauteng corridors.',
-  defaultPrimeRatePercent: 11.75,
+  defaultPrimeRatePercent: 10.75,
   baselineHurdleYieldPercent: 10.0,
   defaultAgentCommissionPercent: 5.0,
+  minNetYieldPercent: 8.0,
+  minMonthlyCashflowZAR: 1500,
+  minNetRoiPercent: 8.0,
+  minFlipRoiPercent: 18.0,
+  maxDay1CashZAR: 500000,
+  minDscr: 1.20,
+  vatExemptAgent: false,
+  marginalTaxRatePercent: 31.0,
 };
 
 export const INITIAL_ANALYZER_DRAFT: AnalyzerDraft = {
@@ -2137,6 +2145,9 @@ export const INITIAL_ANALYZER_DRAFT: AnalyzerDraft = {
   vacancyRatePercent: 6.0,
   managementFeePercent: 8.0,
   agencyVatApplicable: true,
+  interestRateMargin: 0,
+  vatExemptAgent: false,
+  holdingPeriodMonths: 6,
 };
 
 export const EMPTY_ANALYZER_DRAFT: AnalyzerDraft = {
@@ -2158,6 +2169,9 @@ export const EMPTY_ANALYZER_DRAFT: AnalyzerDraft = {
   bondTermYears: 20,
   source: 'High-Street Auction',
   vacancyRatePercent: 6.0,
+  interestRateMargin: 0,
+  vatExemptAgent: false,
+  holdingPeriodMonths: 6,
   managementFeePercent: 8.0,
   agencyVatApplicable: true,
 };

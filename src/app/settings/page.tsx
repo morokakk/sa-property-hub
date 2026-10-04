@@ -36,6 +36,7 @@ import {
   UserPlus,
   Lock,
   ArrowLeft,
+  Target,
 } from 'lucide-react';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabaseClient';
@@ -66,7 +67,7 @@ function SettingsContent() {
 
   // Default acquisition metrics
   const [defaultPrimeRate, setDefaultPrimeRate] = useState<number>(
-    investorProfile.defaultPrimeRatePercent || 11.75
+    investorProfile.defaultPrimeRatePercent || 10.75
   );
   const [baselineHurdleYield, setBaselineHurdleYield] = useState<number>(
     investorProfile.baselineHurdleYieldPercent || 10.0
@@ -76,6 +77,30 @@ function SettingsContent() {
   );
   const [defaultTaxEntity, setDefaultTaxEntity] = useState<'Company (27%)' | 'Individual (45%)' | 'Pre-Tax' | undefined>(
     investorProfile.defaultTaxEntityType
+  );
+  const [vatExemptAgent, setVatExemptAgent] = useState<boolean>(
+    investorProfile.vatExemptAgent ?? false
+  );
+  const [minNetYield, setMinNetYield] = useState<number>(
+    investorProfile.minNetYieldPercent ?? 8.0
+  );
+  const [minMonthlyCashflow, setMinMonthlyCashflow] = useState<number>(
+    investorProfile.minMonthlyCashflowZAR ?? 1500
+  );
+  const [minNetRoi, setMinNetRoi] = useState<number>(
+    investorProfile.minNetRoiPercent ?? 8.0
+  );
+  const [minFlipRoi, setMinFlipRoi] = useState<number>(
+    investorProfile.minFlipRoiPercent ?? 18.0
+  );
+  const [maxDay1Cash, setMaxDay1Cash] = useState<number>(
+    investorProfile.maxDay1CashZAR ?? 500000
+  );
+  const [minDscr, setMinDscr] = useState<number>(
+    investorProfile.minDscr ?? 1.20
+  );
+  const [marginalTaxRate, setMarginalTaxRate] = useState<number>(
+    investorProfile.marginalTaxRatePercent ?? 31.0
   );
 
   // Client-Side BYOK AI Settings
@@ -358,6 +383,14 @@ function SettingsContent() {
       baselineHurdleYieldPercent: baselineHurdleYield,
       defaultAgentCommissionPercent: defaultCommission,
       defaultTaxEntityType: defaultTaxEntity,
+      vatExemptAgent,
+      minNetYieldPercent: minNetYield,
+      minMonthlyCashflowZAR: minMonthlyCashflow,
+      minNetRoiPercent: minNetRoi,
+      minFlipRoiPercent: minFlipRoi,
+      maxDay1CashZAR: maxDay1Cash,
+      minDscr: minDscr,
+      marginalTaxRatePercent: marginalTaxRate,
     });
 
     updateAiSettings({
@@ -1139,7 +1172,7 @@ function SettingsContent() {
                   Default Exit Agent Sales Commission
                 </label>
                 <p className="text-[10px] text-slate-400 mb-2">Standard estate agency exit percentage</p>
-                <div className="flex items-center">
+                <div className="flex items-center mb-2">
                   <input
                     type="number"
                     name="defaultCommission"
@@ -1152,6 +1185,15 @@ function SettingsContent() {
                   />
                   <span className="ml-1.5 font-bold text-slate-600">%</span>
                 </div>
+                <label className="flex items-center gap-1.5 text-[11px] text-slate-600 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={vatExemptAgent}
+                    onChange={(e) => setVatExemptAgent(e.target.checked)}
+                    className="rounded text-emerald-600 focus:ring-emerald-500 h-3.5 w-3.5"
+                  />
+                  <span className="font-medium">Agency is VAT-Exempt (no 1.15x VAT)</span>
+                </label>
               </div>
 
               <div className="p-3.5 rounded-lg bg-slate-50 border border-slate-200">
@@ -1171,6 +1213,144 @@ function SettingsContent() {
                   <option value="Individual (45%)">Individual (45%)</option>
                   <option value="Pre-Tax">Pre-Tax</option>
                 </select>
+              </div>
+            </div>
+          </div>
+
+          {/* Section 4: Strategy-Aware Buy Box Hurdles & SARS Criteria */}
+          <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-xs space-y-4">
+            <div className="flex items-center gap-2.5 pb-3 border-b border-slate-100">
+              <div className="p-2 bg-emerald-50 rounded-lg text-emerald-700">
+                <Target className="w-5 h-5" />
+              </div>
+              <div>
+                <h2 className="text-base font-bold text-slate-900">Strategy-Aware Buy Box Hurdles &amp; SARS Criteria</h2>
+                <p className="text-xs text-slate-500">
+                  Automated pass/fail criteria matching pipeline deals against your investment mandate.
+                </p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
+              <div className="p-3.5 rounded-lg bg-slate-50 border border-slate-200">
+                <label className="block font-semibold text-slate-700 mb-1">
+                  Min Net Yield (Rental / BRRRR)
+                </label>
+                <p className="text-[10px] text-slate-400 mb-2">Minimum net cap rate yield hurdle</p>
+                <div className="flex items-center">
+                  <input
+                    type="number"
+                    step="any"
+                    value={minNetYield}
+                    onChange={(e) => setMinNetYield(Number(e.target.value))}
+                    className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg font-bold text-emerald-700 bg-white"
+                  />
+                  <span className="ml-1.5 font-bold text-slate-600">%</span>
+                </div>
+              </div>
+
+              <div className="p-3.5 rounded-lg bg-slate-50 border border-slate-200">
+                <label className="block font-semibold text-slate-700 mb-1">
+                  Min Monthly Cash Flow
+                </label>
+                <p className="text-[10px] text-slate-400 mb-2">Net rental cash flow after bond and opex</p>
+                <div className="flex items-center">
+                  <span className="mr-1.5 font-bold text-slate-500">R</span>
+                  <input
+                    type="number"
+                    step="100"
+                    value={minMonthlyCashflow}
+                    onChange={(e) => setMinMonthlyCashflow(Number(e.target.value))}
+                    className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg font-bold text-slate-900 bg-white"
+                  />
+                </div>
+              </div>
+
+              <div className="p-3.5 rounded-lg bg-slate-50 border border-slate-200">
+                <label className="block font-semibold text-slate-700 mb-1">
+                  Min Cash-on-Cash ROI
+                </label>
+                <p className="text-[10px] text-slate-400 mb-2">Net cashflow return on Day-1 capital</p>
+                <div className="flex items-center">
+                  <input
+                    type="number"
+                    step="any"
+                    value={minNetRoi}
+                    onChange={(e) => setMinNetRoi(Number(e.target.value))}
+                    className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg font-bold text-indigo-700 bg-white"
+                  />
+                  <span className="ml-1.5 font-bold text-slate-600">%</span>
+                </div>
+              </div>
+
+              <div className="p-3.5 rounded-lg bg-slate-50 border border-slate-200">
+                <label className="block font-semibold text-slate-700 mb-1">
+                  Min Flip ROI Hurdle
+                </label>
+                <p className="text-[10px] text-slate-400 mb-2">Minimum net ROI on flip project capital</p>
+                <div className="flex items-center">
+                  <input
+                    type="number"
+                    step="any"
+                    value={minFlipRoi}
+                    onChange={(e) => setMinFlipRoi(Number(e.target.value))}
+                    className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg font-bold text-amber-700 bg-white"
+                  />
+                  <span className="ml-1.5 font-bold text-slate-600">%</span>
+                </div>
+              </div>
+
+              <div className="p-3.5 rounded-lg bg-slate-50 border border-slate-200">
+                <label className="block font-semibold text-slate-700 mb-1">
+                  Max Day-1 Capital Required
+                </label>
+                <p className="text-[10px] text-slate-400 mb-2">Deposit + transfer duty + legal + initial capex</p>
+                <div className="flex items-center">
+                  <span className="mr-1.5 font-bold text-slate-500">R</span>
+                  <input
+                    type="number"
+                    step="10000"
+                    value={maxDay1Cash}
+                    onChange={(e) => setMaxDay1Cash(Number(e.target.value))}
+                    className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg font-bold text-slate-900 bg-white"
+                  />
+                </div>
+              </div>
+
+              <div className="p-3.5 rounded-lg bg-slate-50 border border-slate-200">
+                <label className="block font-semibold text-slate-700 mb-1">
+                  Min DSCR (Debt Service Coverage)
+                </label>
+                <p className="text-[10px] text-slate-400 mb-2">Net Operating Income / Bond Repayment</p>
+                <div className="flex items-center">
+                  <input
+                    type="number"
+                    step="0.05"
+                    value={minDscr}
+                    onChange={(e) => setMinDscr(Number(e.target.value))}
+                    className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg font-bold text-emerald-700 bg-white"
+                  />
+                  <span className="ml-1.5 font-bold text-slate-600">x</span>
+                </div>
+              </div>
+
+              <div className="p-3.5 rounded-lg bg-slate-50 border border-slate-200 sm:col-span-2">
+                <label className="block font-semibold text-slate-700 mb-1">
+                  Marginal Tax Rate (SARS Section 11(a) Individual)
+                </label>
+                <p className="text-[10px] text-slate-400 mb-2">
+                  Applied to taxable rental income (rates, levies, agent fees, and bond interest deducted)
+                </p>
+                <div className="flex items-center">
+                  <input
+                    type="number"
+                    step="any"
+                    value={marginalTaxRate}
+                    onChange={(e) => setMarginalTaxRate(Number(e.target.value))}
+                    className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg font-bold text-slate-900 bg-white"
+                  />
+                  <span className="ml-1.5 font-bold text-slate-600">%</span>
+                </div>
               </div>
             </div>
           </div>

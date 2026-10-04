@@ -70,6 +70,8 @@ import {
   MinusCircle,
 } from 'lucide-react';
 import { exportRentalsCSV } from '@/lib/export/csvExport';
+import { exportITR12TaxReport } from '@/lib/export/excelExport';
+import ActualVsBudgetKpiStrip from '@/components/dashboard/ActualVsBudgetKpiStrip';
 import ImportDropdown from '@/components/common/ImportDropdown';
 import TenantStatement from '@/components/rentals/TenantStatement';
 import MeterReadingsModal from '@/components/rentals/MeterReadingsModal';
@@ -1026,6 +1028,14 @@ export default function RentalPortfolioPage() {
               <span>Export CSV</span>
             </button>
             <button
+              onClick={() => exportITR12TaxReport(rentals, 2026)}
+              title="Download official SARS ITR12 Rental Tax Schedule (Sec 11(a) & 13sex) as Excel"
+              className="inline-flex items-center gap-1.5 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 text-xs font-semibold px-3 py-2 rounded-lg shadow-2xs transition-colors cursor-pointer shrink-0 whitespace-nowrap"
+            >
+              <FileSpreadsheet className="w-3.5 h-3.5 text-amber-700" />
+              <span>SARS ITR12 Export</span>
+            </button>
+            <button
               onClick={handleOpenAdd}
               className="inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold px-3 py-2 rounded-lg shadow-sm transition-colors cursor-pointer shrink-0 whitespace-nowrap"
             >
@@ -1079,6 +1089,9 @@ export default function RentalPortfolioPage() {
             </p>
           </div>
         </div>
+
+        {/* Actuals YTD vs. Budget KPI Strip (SA Tax Year) */}
+        <ActualVsBudgetKpiStrip rentals={rentals} />
 
         {/* Active vs Sold Archive Tab Toggle */}
         <div className="flex items-center justify-between bg-slate-100 p-1 rounded-xl max-w-md">

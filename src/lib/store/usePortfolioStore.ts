@@ -26,6 +26,7 @@ import {
   ArrearsWriteOff,
   PropertyMeter,
   MunicipalContact,
+  Transaction,
 } from '@/types';
 import {
   calculateMonthlyBondRepayment,
@@ -154,11 +155,16 @@ interface PortfolioState {
   bulkAddOpportunities: (opps: OpportunityDeal[]) => { addedCount: number; duplicateCount: number };
   updateOpportunity: (id: string, updates: Partial<OpportunityDeal>) => void;
   deleteOpportunity: (id: string) => void;
+  duplicateOpportunity: (oppId: string) => void;
   passOpportunity: (id: string, reason: PassReason, notes?: string) => void;
   reactivateOpportunity: (id: string) => void;
   advanceOpportunityStage: (id: string) => void;
   promoteOpportunityToFlip: (oppId: string) => void;
   promoteOpportunityToRental: (oppId: string) => void;
+
+  // Transaction Actions (SARS ITR12 Property Actuals)
+  addTransaction: (propertyId: string, transaction: Omit<Transaction, 'id'>) => void;
+  deleteTransaction: (propertyId: string, transactionId: string) => void;
 
   // Task Actions
   addTask: (task: Omit<TaskItem, 'id' | 'createdAt'>) => void;
@@ -1648,6 +1654,57 @@ export const usePortfolioStore = create<PortfolioState>()(
           };
         });
       },
+      duplicateOpportunity: (oppId) => {
+        set((state) => {
+          const original = state.opportunities.find((o) => o.id === oppId);
+          if (!original) return state;
+          const cloned = structuredClone(original);
+          cloned.id = `opp-scenario-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+          cloned.title = `${cloned.title} (Scenario)`;
+          cloned.createdAt = new Date().toISOString();
+          if ((cloned as any).boqItems && Array.isArray((cloned as any).boqItems)) {
+            (cloned as any).boqItems = (cloned as any).boqItems.map((item: any) => ({
+              ...item,
+              id: `boq-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+            }));
+          }
+          if (cloned.ancillaryIncomes && Array.isArray(cloned.ancillaryIncomes)) {
+            cloned.ancillaryIncomes = cloned.ancillaryIncomes.map((item) => ({
+              ...item,
+              id: `anc-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+            }));
+          }
+          return {
+            opportunities: [cloned, ...state.opportunities],
+          };
+        });
+      },
+      addTransaction: (propertyId, transaction) => {
+        set((state) => ({
+          rentals: state.rentals.map((r) => {
+            if (r.id !== propertyId) return r;
+            const newTx: Transaction = {
+              ...transaction,
+              id: `tx-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+            };
+            return {
+              ...r,
+              transactions: [newTx, ...(r.transactions || [])],
+            };
+          }),
+        }));
+      },
+      deleteTransaction: (propertyId, transactionId) => {
+        set((state) => ({
+          rentals: state.rentals.map((r) => {
+            if (r.id !== propertyId) return r;
+            return {
+              ...r,
+              transactions: (r.transactions || []).filter((tx) => tx.id !== transactionId),
+            };
+          }),
+        }));
+      },
 
       // Tasks
       addTask: (task) =>
@@ -2141,12 +2198,50 @@ export function computePortfolioSummary(state: {
     const propNetMonthly = totalGross - expenses;
 
     // Property-by-property SARS tax reserve aggregation (bad debt write-offs are tax-deductible losses)
-    const propAnnualCashflow = Math.max(0, propNetMonthly * 12);
+    // SARS Section 11(a) / ITR12 alignment:
+    // Deductible expenses = Rates + Levies + Agent Fees + Maintenance Reserve + Bond Interest (capital repayments strictly excluded)
+    const annualGrossRent = totalGross * 12;
+    const annualBondInterest = (r.outstandingBondBalanceZAR && r.bondInterestRatePercent)
+      ? Math.round(r.outstandingBondBalanceZAR * (r.bondInterestRatePercent / 100))
+      : 0;
+    const annualRates = (r.monthlyRatesTaxesZAR || 0) * 12;
+    const annualLevies = levies * 12;
+    const annualAgentFee = agentFee * 12;
+    const annualMaintenance = (r.monthlyMaintenanceReserveZAR || 0) * 12;
+    const annualInsurance = insuranceMonthly * 12;
+    const annualPrepaidVending = (r.monthlyPrepaidVendingFeeZAR || 0) * 12;
     const propBadDebt = (r.arrearsWriteOffs || []).reduce((sum, w) => sum + (w.amountZAR || 0), 0);
+
+    const deductibleExpenses =
+      annualRates +
+      annualLevies +
+      annualAgentFee +
+      annualMaintenance +
+      annualInsurance +
+      annualPrepaidVending +
+      propBadDebt +
+      annualBondInterest;
+
     const propSec13Shield = r.section13sexAnnualShieldZAR || 0;
-    const propTaxableIncome = Math.max(0, propAnnualCashflow - propBadDebt - propSec13Shield);
-    const propEntityType = r.taxEntityTypeOverride || state.investorProfile?.defaultTaxEntityType || 'Company (27%)';
-    const propTaxRate = propEntityType === 'Individual (45%)' ? 0.45 : propEntityType === 'Pre-Tax' ? 0 : 0.27;
+    const propTaxableIncome = Math.max(0, annualGrossRent - deductibleExpenses - propSec13Shield);
+
+    let propTaxRate = 0.31;
+    if (r.taxEntityTypeOverride === 'Individual (45%)') {
+      propTaxRate = 0.45;
+    } else if (r.taxEntityTypeOverride === 'Company (27%)') {
+      propTaxRate = 0.27;
+    } else if (r.taxEntityTypeOverride === 'Pre-Tax') {
+      propTaxRate = 0;
+    } else if (state.investorProfile?.defaultTaxEntityType === 'Company (27%)') {
+      propTaxRate = 0.27;
+    } else if (state.investorProfile?.defaultTaxEntityType === 'Individual (45%)') {
+      propTaxRate = 0.45;
+    } else if (state.investorProfile?.defaultTaxEntityType === 'Pre-Tax') {
+      propTaxRate = 0;
+    } else {
+      propTaxRate = (state.investorProfile?.marginalTaxRatePercent ?? 31.0) / 100;
+    }
+
     const propAnnualTax = Math.round(propTaxableIncome * propTaxRate);
     annualRentalTaxReserve += propAnnualTax;
 
