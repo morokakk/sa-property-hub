@@ -25,6 +25,7 @@ import {
   Link2,
   Calendar,
   ChevronDown,
+  Mail,
 } from 'lucide-react';
 import { usePortfolioStore } from '@/lib/store/usePortfolioStore';
 import { formatZAR, formatDate } from '@/lib/formatters';
@@ -45,6 +46,8 @@ import {
   getStatementLedgerOptions,
   StatementPeriodOption,
 } from '@/lib/calculations/arrears';
+import { sendStatementEmail } from '@/app/actions/sendStatementEmail';
+import { generateTenantStatementPdf } from '@/lib/pdf/generateTenantStatementPdf';
 import CloudPublishModal from './CloudPublishModal';
 
 interface TenantStatementProps {
@@ -81,6 +84,22 @@ export default function TenantStatement({
   const [copiedToastMessage, setCopiedToastMessage] = useState('WhatsApp Statement copied to clipboard!');
   const [showCloudPublishModal, setShowCloudPublishModal] = useState(false);
   const [isPublishingLink, setIsPublishingLink] = useState(false);
+  const [isSendingEmail, setIsSendingEmail] = useState(false);
+  const [isShareDropdownOpen, setIsShareDropdownOpen] = useState(false);
+  const shareDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Close share actions dropdown on outside click
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (shareDropdownRef.current && !shareDropdownRef.current.contains(event.target as Node)) {
+        setIsShareDropdownOpen(false);
+      }
+    }
+    if (isShareDropdownOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [isShareDropdownOpen]);
 
   // Multi-Target statement selection ('lease-{id}' | 'ancillary-{id}' | 'consolidated')
   const [selectedTargetId, setSelectedTargetId] = useState<string>('');
@@ -590,6 +609,136 @@ export default function TenantStatement({
     }
   };
 
+  const hasTenantEmail = Boolean(selectedLease?.tenantEmail && selectedLease.tenantEmail.trim().length > 0);
+
+  // Email PDF Statement directly to Tenant & Copy Link
+  const handleEmailStatement = async () => {
+    if (isSendingEmail || isPublishingLink) return;
+
+    if (!selectedLease?.id || !isResidential) {
+      setStatusMessage({
+        text: 'No residential lease unit selected. Please select a unit lease to email statement.',
+        isError: true,
+      });
+      setTimeout(() => setStatusMessage(null), 4000);
+      return;
+    }
+
+    const tenantEmail = selectedLease?.tenantEmail?.trim();
+    if (!tenantEmail) {
+      setStatusMessage({
+        text: 'Add tenant email in lease settings to enable sending.',
+        isError: true,
+      });
+      setTimeout(() => setStatusMessage(null), 4000);
+      return;
+    }
+
+    const origin = typeof window !== 'undefined' ? window.location.origin : '';
+    const shareUrl = `${origin}/statement/${selectedLease.id}?month=${activePeriodMonth}`;
+
+    // 1. Cloud Sync Guardrail for user-created properties
+    const isDemo = isDemoRentalProperty(rental.id);
+
+    if (!isDemo) {
+      setIsSendingEmail(true);
+      try {
+        let user = null;
+        try {
+          const { data: sessionData } = await supabase.auth.getSession();
+          user = sessionData?.session?.user ?? null;
+          if (!user) {
+            const { data: userData } = await supabase.auth.getUser();
+            user = userData?.user ?? null;
+          }
+        } catch {
+          user = null;
+        }
+
+        if (!user) {
+          setIsSendingEmail(false);
+          setIsShareDropdownOpen(false);
+          setShowCloudPublishModal(true);
+          return;
+        }
+
+        const res = await migrateToCloud({ state: usePortfolioStore.getState() });
+        if (!res.success) {
+          setIsSendingEmail(false);
+          setStatusMessage({
+            text: `Cloud publish failed: ${res.error || 'Unable to publish statement to cloud.'}`,
+            isError: true,
+          });
+          setTimeout(() => setStatusMessage(null), 5000);
+          return;
+        }
+      } catch (err: any) {
+        setIsSendingEmail(false);
+        setStatusMessage({
+          text: `Error publishing statement to cloud: ${err?.message || 'Unknown error'}`,
+          isError: true,
+        });
+        setTimeout(() => setStatusMessage(null), 5000);
+        return;
+      }
+    } else {
+      setIsSendingEmail(true);
+    }
+
+    // Close the dropdown immediately so user sees modal and action spinner
+    setIsShareDropdownOpen(false);
+
+    // 2. Generate PDF silently in background & send via Resend
+    try {
+      const { base64 } = await generateTenantStatementPdf('tenant-statement-print-root');
+
+      const periodLabel = formatMonthLabel(activePeriodMonth);
+      const finalAmountDue = !isNaN(periodNetOutstanding) ? periodNetOutstanding : currentGrandTotal;
+      const amountDueFormatted = formatZAR(finalAmountDue, { includeDecimals: true });
+
+      const emailRes = await sendStatementEmail({
+        to: tenantEmail,
+        tenantName: selectedLease.tenantName,
+        propertyName: rental.title,
+        unitName: selectedLease.unitName,
+        billingPeriod: periodLabel,
+        totalAmountDueFormatted: amountDueFormatted,
+        statementUrl: shareUrl,
+        pdfBase64: base64,
+        landlordName: investorProfile?.entityName || 'Landlord',
+      });
+
+      if (!emailRes.success) {
+        setStatusMessage({
+          text: `Failed to email statement: ${emailRes.error || 'Email delivery failed'}`,
+          isError: true,
+        });
+        setTimeout(() => setStatusMessage(null), 6000);
+        return;
+      }
+
+      // 3. Parallel events on success: copy link to clipboard & trigger green success toast
+      try {
+        if (navigator?.clipboard?.writeText) {
+          await navigator.clipboard.writeText(shareUrl);
+        }
+      } catch {}
+
+      setCopiedToastMessage('Statement emailed to tenant and link copied!');
+      setCopiedToast(true);
+      setTimeout(() => setCopiedToast(false), 4000);
+    } catch (err: any) {
+      setStatusMessage({
+        text: `Error generating PDF or sending email: ${err?.message || 'Unknown error'}`,
+        isError: true,
+      });
+      setTimeout(() => setStatusMessage(null), 5000);
+    } finally {
+      setIsSendingEmail(false);
+      setIsShareDropdownOpen(false);
+    }
+  };
+
   // Variance visual badge helper
   const renderVariance = (curr: number, prev: number | undefined) => {
     if (prev === undefined) {
@@ -761,26 +910,143 @@ export default function TenantStatement({
             {/* Right Tools: Share & Export Actions */}
             <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap ml-auto">
               {selectedLease?.id && isResidential && (
-                <button
-                  type="button"
-                  data-testid="copy-tenant-link-btn"
-                  onClick={handleCopySecureLink}
-                  disabled={isPublishingLink}
-                  className="inline-flex items-center gap-1.5 bg-sky-600 hover:bg-sky-700 active:bg-sky-800 disabled:opacity-60 disabled:cursor-not-allowed text-white text-[11px] sm:text-xs font-semibold px-3 py-1.5 rounded-lg shadow-xs transition-colors cursor-pointer shrink-0"
-                  title="Copy shareable secure public statement URL to clipboard"
-                >
-                  {isPublishingLink ? (
-                    <>
-                      <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" />
-                      <span>Publishing Link...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Link2 className="w-3.5 h-3.5 shrink-0" />
-                      <span>Copy Secure Tenant Link</span>
-                    </>
+                <div ref={shareDropdownRef} className="relative inline-flex items-center">
+                  {/* Split Button: Primary Copy Action + Dropdown Toggle */}
+                  <div className="inline-flex items-center rounded-lg shadow-xs overflow-hidden">
+                    <button
+                      type="button"
+                      data-testid="copy-tenant-link-btn"
+                      onClick={handleCopySecureLink}
+                      disabled={isPublishingLink || isSendingEmail}
+                      className="inline-flex items-center gap-1.5 bg-sky-600 hover:bg-sky-700 active:bg-sky-800 disabled:opacity-60 disabled:cursor-not-allowed text-white text-[11px] sm:text-xs font-semibold px-3 py-1.5 border-r border-sky-700 transition-colors cursor-pointer shrink-0"
+                      title="Copy shareable secure public statement URL to clipboard"
+                    >
+                      {isPublishingLink ? (
+                        <>
+                          <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" />
+                          <span>Publishing Link...</span>
+                        </>
+                      ) : isSendingEmail ? (
+                        <>
+                          <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" />
+                          <span>Sending Statement...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Link2 className="w-3.5 h-3.5 shrink-0" />
+                          <span>Copy Secure Tenant Link</span>
+                        </>
+                      )}
+                    </button>
+
+                    <button
+                      type="button"
+                      data-testid="share-statement-dropdown-toggle"
+                      aria-label="More share actions"
+                      aria-expanded={isShareDropdownOpen}
+                      onClick={() => setIsShareDropdownOpen((prev) => !prev)}
+                      disabled={isPublishingLink || isSendingEmail}
+                      className="inline-flex items-center justify-center bg-sky-600 hover:bg-sky-700 active:bg-sky-800 disabled:opacity-60 disabled:cursor-not-allowed text-white px-2 py-1.5 transition-colors cursor-pointer shrink-0"
+                      title="More share and distribution options"
+                    >
+                      {isSendingEmail ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" />
+                      ) : (
+                        <ChevronDown
+                          className={`w-3.5 h-3.5 transition-transform shrink-0 ${
+                            isShareDropdownOpen ? 'rotate-180' : ''
+                          }`}
+                        />
+                      )}
+                    </button>
+                  </div>
+
+                  {/* Dropdown Menu Popover */}
+                  {isShareDropdownOpen && (
+                    <div
+                      data-testid="share-statement-dropdown-menu"
+                      className="absolute right-0 top-full mt-1.5 w-72 sm:w-80 bg-white rounded-xl shadow-xl border border-slate-200 z-50 py-1.5 text-slate-800 animate-in fade-in zoom-in-95 duration-150"
+                    >
+                      {/* Notice: Manual Verification On-Demand */}
+                      <div className="px-3.5 py-2 border-b border-slate-100 bg-slate-50/80">
+                        <div className="flex items-center gap-1.5 text-[11px] font-bold text-slate-700">
+                          <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                          <span>Tenant Statement Distribution</span>
+                        </div>
+                        <p className="text-[10px] text-slate-500 mt-0.5 leading-tight">
+                          Manual on-demand action. Please verify ledger figures above before distributing.
+                        </p>
+                      </div>
+
+                      {/* Option A: Copy Secure Link */}
+                      <button
+                        type="button"
+                        data-testid="dropdown-copy-link-option"
+                        onClick={() => {
+                          setIsShareDropdownOpen(false);
+                          handleCopySecureLink();
+                        }}
+                        disabled={isPublishingLink || isSendingEmail}
+                        className="w-full text-left px-3.5 py-2.5 hover:bg-slate-50 active:bg-slate-100 flex items-start gap-2.5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                      >
+                        <div className="w-7 h-7 rounded-lg bg-sky-50 text-sky-600 flex items-center justify-center shrink-0 mt-0.5 border border-sky-100">
+                          <Link2 className="w-3.5 h-3.5" />
+                        </div>
+                        <div className="min-w-0">
+                          <span className="text-xs font-semibold text-slate-900 block">Copy Secure Link</span>
+                          <span className="text-[11px] text-slate-500 block leading-tight">
+                            Copies authenticated portal statement link to clipboard
+                          </span>
+                        </div>
+                      </button>
+
+                      {/* Option B: Email Statement & Copy Link */}
+                      <div className="relative" title={!hasTenantEmail ? 'Add tenant email in lease settings to enable sending.' : undefined}>
+                        <button
+                          type="button"
+                          data-testid="dropdown-email-statement-btn"
+                          onClick={handleEmailStatement}
+                          disabled={!hasTenantEmail || isSendingEmail || isPublishingLink}
+                          title={!hasTenantEmail ? 'Add tenant email in lease settings to enable sending.' : undefined}
+                          className="w-full text-left px-3.5 py-2.5 hover:bg-slate-50 active:bg-slate-100 flex items-start gap-2.5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                        >
+                          <div className="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0 mt-0.5 border border-emerald-100">
+                            {isSendingEmail ? (
+                              <Loader2 className="w-3.5 h-3.5 animate-spin text-emerald-600" />
+                            ) : (
+                              <Mail className="w-3.5 h-3.5" />
+                            )}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center justify-between gap-1">
+                              <span className="text-xs font-semibold text-slate-900">
+                                {isSendingEmail ? 'Sending Email & PDF...' : 'Email Statement & Copy Link'}
+                              </span>
+                              {isSendingEmail && (
+                                <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-full">
+                                  Sending
+                                </span>
+                              )}
+                            </div>
+                            <span className="text-[11px] text-slate-500 block leading-tight mt-0.5">
+                              {hasTenantEmail
+                                ? `Attaches PDF statement and emails to ${selectedLease?.tenantEmail}`
+                                : 'No tenant email registered on lease'}
+                            </span>
+                            {!hasTenantEmail && (
+                              <span
+                                className="text-[10px] font-medium text-amber-700 bg-amber-50 border border-amber-200/80 rounded px-1.5 py-0.5 mt-1.5 inline-block leading-tight"
+                                title="Add tenant email in lease settings to enable sending."
+                              >
+                                Add tenant email in lease settings to enable sending.
+                              </span>
+                            )}
+                          </div>
+                        </button>
+                      </div>
+                    </div>
                   )}
-                </button>
+                </div>
               )}
               <button
                 type="button"
