@@ -54,6 +54,7 @@ import {
   INITIAL_MUNICIPAL_DIRECTORY,
 } from './initialData';
 import type { PortfolioStateSnapshot } from '@/lib/db/mergePortfolioState';
+import { normalizeAiModel } from '@/lib/ai/modelConfig';
 
 interface PortfolioState {
   rentals: RentalProperty[];
@@ -2003,7 +2004,12 @@ export const usePortfolioStore = create<PortfolioState>()(
               ? snapshot.liquidCapitalReserve
               : state.liquidCapitalReserve,
           rentalForecastView: snapshot.rentalForecastView ?? state.rentalForecastView,
-          aiSettings: snapshot.aiSettings ?? state.aiSettings,
+          aiSettings: snapshot.aiSettings
+            ? {
+                ...snapshot.aiSettings,
+                model: normalizeAiModel(snapshot.aiSettings.model),
+              }
+            : state.aiSettings,
           analyzerDraft: snapshot.analyzerDraft ?? state.analyzerDraft,
         })),
       resetToDemoData: () => {
@@ -2073,12 +2079,7 @@ export const usePortfolioStore = create<PortfolioState>()(
       merge: (persistedState: unknown, currentState: PortfolioState): PortfolioState => {
         const pState = (persistedState && typeof persistedState === 'object' ? persistedState : {}) as Partial<PortfolioState>;
         const rawModel = pState.aiSettings?.model;
-        const isRetired =
-          !rawModel ||
-          rawModel.startsWith('claude-3-') ||
-          rawModel.includes('2024') ||
-          rawModel.includes('2025');
-        const migratedModel = isRetired ? 'claude-sonnet-5' : rawModel;
+        const migratedModel = normalizeAiModel(rawModel);
 
         const rawOpps = pState.opportunities || currentState.opportunities;
         const migratedOpportunities = (rawOpps || []).map((opp: any) => ({

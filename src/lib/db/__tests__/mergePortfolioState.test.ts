@@ -370,7 +370,7 @@ describe('mergePortfolioState Engine', () => {
       aiSettings: {
         provider: 'anthropic',
         apiKey: '', // Cloud profile has no key stored
-        model: 'claude-3-5-sonnet',
+        model: 'claude-sonnet-5',
       },
     };
 
@@ -384,7 +384,7 @@ describe('mergePortfolioState Engine', () => {
       aiSettings: {
         provider: 'anthropic',
         apiKey: 'sk-ant-my-local-secret-key-123',
-        model: 'claude-3-5-sonnet',
+        model: 'claude-sonnet-5',
       },
     };
 

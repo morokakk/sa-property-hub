@@ -844,7 +844,7 @@ export interface AnalyzerDraft {
 export interface AiSettings {
   provider: 'anthropic' | 'google';
   apiKey: string;
-  model: string; // e.g. 'claude-3-5-sonnet-20241022'
+  model: string; // e.g. 'claude-sonnet-5'
 }
 
 // Extracted Rental Unit from Visual Statement Parser

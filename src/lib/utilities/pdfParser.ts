@@ -10,6 +10,7 @@
 import { z } from 'zod';
 import { UtilityStatement, AiSettings, ExtractedRentalUnit, RentalProperty } from '@/types';
 import { parseStatementWithAnthropic } from '@/lib/ai/anthropicParser';
+import { normalizeAiModel } from '@/lib/ai/modelConfig';
 
 // ============================================================================
 // 1. Zod Validation Schema with Mathematical Cross-Check
@@ -1276,10 +1277,7 @@ Output pure JSON matching the schema without markdown or commentary.`;
     });
   } else {
     // Anthropic Messages API
-    const effectiveModel =
-      !model || model.startsWith('claude-3-') || model.includes('2024')
-        ? 'claude-sonnet-5'
-        : model.trim();
+    const effectiveModel = normalizeAiModel(model);
 
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',

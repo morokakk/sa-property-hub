@@ -45,7 +45,7 @@ describe('hydrateFromCloud Reverse Mappers', () => {
       default_tax_entity_type: 'Company (27%)',
       liquid_capital_reserve_zar: 850000,
       rental_forecast_view: 'cashflow-only',
-      ai_settings: { provider: 'anthropic', model: 'claude-3-5-sonnet' },
+      ai_settings: { provider: 'anthropic', model: 'claude-sonnet-5' },
       analyzer_draft: { purchasePrice: 1200000 },
       created_at: '2026-01-01',
       updated_at: '2026-01-01',
@@ -58,7 +58,7 @@ describe('hydrateFromCloud Reverse Mappers', () => {
     expect(result.profile?.defaultPrimeRatePercent).toBe(11.5);
     expect(result.liquidCapitalReserve).toBe(850000);
     expect(result.rentalForecastView).toBe('cashflow-only');
-    expect(result.aiSettings).toEqual({ provider: 'anthropic', model: 'claude-3-5-sonnet' });
+    expect(result.aiSettings).toEqual({ provider: 'anthropic', model: 'claude-sonnet-5' });
     expect(result.analyzerDraft).toEqual({ purchasePrice: 1200000 });
   });
 

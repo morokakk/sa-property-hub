@@ -44,6 +44,11 @@ import { supabase } from '@/lib/supabaseClient';
 import { migrateToCloud, MigrationResult } from '@/lib/db/migrateToCloud';
 import { hydrateFromCloud } from '@/lib/db/hydrateFromCloud';
 import { SOUTH_AFRICAN_BANKS, ACCOUNT_TYPES } from '@/lib/constants/banks';
+import {
+  DEFAULT_ANTHROPIC_MODEL,
+  SUPPORTED_ANTHROPIC_MODELS,
+  normalizeAiModel,
+} from '@/lib/ai/modelConfig';
 
 function SettingsContent() {
   const searchParams = useSearchParams();
@@ -118,7 +123,7 @@ function SettingsContent() {
   );
   const [aiApiKey, setAiApiKey] = useState<string>(aiSettings?.apiKey || '');
   const [aiModel, setAiModel] = useState<string>(
-    aiSettings?.model || 'claude-3-5-sonnet-20241022'
+    normalizeAiModel(aiSettings?.model)
   );
   const [showApiKey, setShowApiKey] = useState(false);
 
@@ -1574,7 +1579,7 @@ function SettingsContent() {
                 <label className="block font-semibold text-slate-700 mb-1">Extraction Model</label>
                 <select
                   value={
-                    ['claude-sonnet-5', 'claude-haiku-4-5', 'claude-opus-5', 'claude-fable-5-1', 'claude-sonnet-4-6'].includes(aiModel)
+                    (SUPPORTED_ANTHROPIC_MODELS as readonly string[]).includes(aiModel)
                       ? aiModel
                       : 'custom'
                   }
@@ -1592,7 +1597,7 @@ function SettingsContent() {
                   <option value="claude-sonnet-4-6">Claude Sonnet 4.6 (claude-sonnet-4-6)</option>
                   <option value="custom">Custom Model Identifier...</option>
                 </select>
-                {!['claude-sonnet-5', 'claude-haiku-4-5', 'claude-opus-5', 'claude-fable-5-1', 'claude-sonnet-4-6'].includes(aiModel) && (
+                {!(SUPPORTED_ANTHROPIC_MODELS as readonly string[]).includes(aiModel) && (
                   <input
                     type="text"
                     value={aiModel}

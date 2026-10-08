@@ -1,5 +1,6 @@
 import { ExtractedRentalUnit } from '@/types';
 import { validateExtractedStatementPayload } from './statementValidation';
+import { DEFAULT_ANTHROPIC_MODEL, normalizeAiModel } from './modelConfig';
 
 export interface ParseStatementResult {
   success: boolean;
@@ -55,7 +56,7 @@ export function getDemoStatementData(): ExtractedRentalUnit[] {
 export async function parseStatementWithAnthropic(
   file: File,
   apiKey: string,
-  model = 'claude-sonnet-5'
+  model: string = DEFAULT_ANTHROPIC_MODEL
 ): Promise<ParseStatementResult> {
   if (!apiKey || !apiKey.trim()) {
     return {
@@ -74,17 +75,7 @@ export async function parseStatementWithAnthropic(
     };
   }
 
-  // Auto-migrate retired Claude 3.x model strings to active Claude 5 generation
-  const RETIRED_MODELS = [
-    'claude-3-5-sonnet-20241022',
-    'claude-3-7-sonnet-20250219',
-    'claude-3-5-sonnet-latest',
-    'claude-3-haiku-20240307',
-  ];
-  const effectiveModel =
-    !model || RETIRED_MODELS.includes(model.trim())
-      ? 'claude-sonnet-5'
-      : model.trim();
+  const effectiveModel = normalizeAiModel(model);
 
   const base64Data = await fileToBase64(file);
   const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
