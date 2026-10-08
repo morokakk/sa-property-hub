@@ -128,6 +128,15 @@ export default function GetStartedPage() {
   const percent = TOTAL_STEPS > 0 ? Math.round((doneCount / TOTAL_STEPS) * 100) : 0;
   const allExpanded = ALL_FEATURE_IDS.every((id) => expandedIds.has(id));
 
+  const foundationFeatureIds = useMemo(() => stageFeatureIds(GET_STARTED_STAGES[0]), []);
+  const foundationTotal = foundationFeatureIds.length;
+  const foundationDone = useMemo(
+    () => foundationFeatureIds.filter((id) => completedSet.has(id)).length,
+    [foundationFeatureIds, completedSet]
+  );
+  const discoveryTotal = TOTAL_STEPS - foundationTotal;
+  const discoveryDone = doneCount - foundationDone;
+
   const toggleExpanded = (id: string) => {
     setExpandedIds((prev) => {
       const next = new Set(prev);
@@ -159,11 +168,9 @@ export default function GetStartedPage() {
                 <Compass className="w-5 h-5" aria-hidden="true" />
               </div>
               <div>
-                <h2 className="text-base sm:text-lg font-bold text-slate-900">Your 5-minute Quick Start</h2>
-                <p className="text-xs text-slate-500 mt-0.5 max-w-2xl">
-                  Start with <strong className="text-slate-700">Step 0 – Foundation</strong> (Settings), then work through
-                  Find → Fund → Execute → Pitch → Monitor. Expand a feature for a 3-step How to, an SA Pro Tip and a
-                  direct link. Tick the box yourself when you are done.
+                <h2 className="text-base sm:text-lg font-bold text-slate-900">Operator Roadmap &amp; Quick Start</h2>
+                <p className="text-xs text-slate-500 mt-0.5 max-w-2xl leading-relaxed">
+                  Start with <strong className="text-slate-700">Step 0 – Foundation</strong> (3 steps to lock in your entity &amp; deal hurdles in ~5 mins). The remaining 24 feature guides serve as an on-demand reference desk to explore at your own pace as you scale.
                 </p>
               </div>
             </div>
@@ -178,12 +185,81 @@ export default function GetStartedPage() {
             </button>
           </div>
 
+          {/* Two-Tier Progress Cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+            {/* Tier 1: Foundation (Primary) */}
+            <div
+              className={`p-3.5 rounded-xl border transition-all ${
+                foundationDone === foundationTotal
+                  ? 'bg-emerald-50/70 border-emerald-200'
+                  : 'bg-amber-50/60 border-amber-200'
+              }`}
+            >
+              <div className="flex items-center justify-between mb-1.5">
+                <div className="flex items-center gap-2">
+                  <span
+                    className={`w-2 h-2 rounded-full ${
+                      foundationDone === foundationTotal ? 'bg-emerald-500' : 'bg-amber-500 animate-pulse'
+                    }`}
+                  />
+                  <span className="text-xs font-bold text-slate-800">
+                    Foundation Setup (5 mins)
+                  </span>
+                </div>
+                <span
+                  className={`text-xs font-bold ${
+                    foundationDone === foundationTotal ? 'text-emerald-700' : 'text-amber-700'
+                  }`}
+                >
+                  {foundationDone} of {foundationTotal} complete
+                </span>
+              </div>
+              <div className="h-1.5 w-full rounded-full bg-slate-200/80 overflow-hidden">
+                <div
+                  className={`h-full transition-all ${
+                    foundationDone === foundationTotal ? 'bg-emerald-500' : 'bg-amber-500'
+                  }`}
+                  style={{ width: `${(foundationDone / foundationTotal) * 100}%` }}
+                />
+              </div>
+              <p className="text-[11px] text-slate-600 mt-2">
+                {foundationDone === foundationTotal
+                  ? '✓ Core entity, finance & buy-box rules configured in Settings.'
+                  : 'Configure entity, finance defaults & buy-box hurdles in Settings.'}
+              </p>
+            </div>
+
+            {/* Tier 2: Feature Hub (Secondary / Self-Paced) */}
+            <div className="p-3.5 rounded-xl border border-slate-200 bg-slate-50/70">
+              <div className="flex items-center justify-between mb-1.5">
+                <div className="flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-slate-400" />
+                  <span className="text-xs font-bold text-slate-800">
+                    Feature Hub &amp; Reference
+                  </span>
+                </div>
+                <span className="text-xs font-semibold text-slate-600">
+                  {discoveryDone} of {discoveryTotal} explored
+                </span>
+              </div>
+              <div className="h-1.5 w-full rounded-full bg-slate-200 overflow-hidden">
+                <div
+                  className="h-full bg-slate-500 transition-all"
+                  style={{ width: `${discoveryTotal > 0 ? (discoveryDone / discoveryTotal) * 100 : 0}%` }}
+                />
+              </div>
+              <p className="text-[11px] text-slate-500 mt-2">
+                On-demand guides for pipeline analysis, flips, funding &amp; monitoring.
+              </p>
+            </div>
+          </div>
+
           <div>
             <div className="flex items-center justify-between text-xs mb-1.5">
               <span className="font-semibold text-slate-700" data-testid="guide-progress-text">
                 {doneCount} of {TOTAL_STEPS} steps complete
               </span>
-              <span className="font-bold text-emerald-700">{percent}%</span>
+              <span className="font-bold text-emerald-700">{percent}% overall</span>
             </div>
             <div
               role="progressbar"

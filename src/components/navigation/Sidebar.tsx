@@ -303,7 +303,7 @@ export default function Sidebar() {
           <div className="flex items-center justify-between mb-2">
             <span className="flex items-center gap-1.5 text-slate-300 font-medium">
               <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-              SARS Tax Engine v2025
+              SARS Tax Engine v2025/26
             </span>
             <span className="text-[10px] bg-slate-800 px-1.5 py-0.5 rounded text-slate-300">ZAR</span>
           </div>
@@ -491,7 +491,7 @@ export default function Sidebar() {
               <div className="flex items-center justify-between mb-1.5">
                 <span className="flex items-center gap-1.5 text-slate-300 font-medium text-[11px]">
                   <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-                  SARS Tax Engine Active
+                  SARS Tax Engine v2025/26
                 </span>
                 <span className="text-[10px] bg-slate-800 text-slate-300 px-1.5 py-0.2 rounded font-mono">
                   ZAR
