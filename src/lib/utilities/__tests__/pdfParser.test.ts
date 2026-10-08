@@ -2,8 +2,10 @@ import { describe, it, expect, vi } from 'vitest';
 import {
   UtilityStatementSchema,
   parseCojUtilityRegex,
+  parseCapeTownUtilityRegex,
   parseEskomUtilityRegex,
   parseIgrowUtilityRegex,
+  detectDocumentType,
   parseUtilityWithRegex,
   parseRentalPdfStatement,
   extractTextFromPdf,
@@ -65,6 +67,59 @@ describe('Dual-Pipeline Utility Parser', () => {
       };
 
       expect(() => UtilityStatementSchema.parse(roundedPayload)).not.toThrow();
+    });
+
+    it('validates City of Cape Town mock values with isolated 15% VAT and passes mathematical refinement', () => {
+      // Mock CCT values from directive: Rates R 2033.86, Water R 284.56, Refuse R 185.22, Sewerage R 148.61, VAT R 92.75, Total Due R 2745.00
+      const cctPayload = {
+        statementDate: '2025-05-15',
+        billingPeriod: 'May 2025',
+        accountNumber: '987654321',
+        provider: 'City of Cape Town',
+        electricityZAR: 0,
+        propertyRatesZAR: 2033.86,
+        waterZAR: 284.56,
+        refuseZAR: 185.22,
+        sewerageZAR: 148.61,
+        municipalVatZAR: 92.75,
+        totalDueZAR: 2745.00,
+      };
+
+      const result = UtilityStatementSchema.parse(cctPayload);
+      expect(result.propertyRatesZAR).toBe(2033.86);
+      expect(result.waterZAR).toBe(284.56);
+      expect(result.refuseZAR).toBe(185.22);
+      expect(result.sewerageZAR).toBe(148.61);
+      expect(result.municipalVatZAR).toBe(92.75);
+      expect(result.totalDueZAR).toBe(2745.00);
+
+      const lineSum =
+        result.electricityZAR +
+        result.waterZAR +
+        result.refuseZAR +
+        result.sewerageZAR +
+        (result.propertyRatesZAR || 0) +
+        (result.municipalVatZAR || 0);
+      expect(lineSum).toBe(2745.00);
+    });
+
+    it('rejects CCT payload when VAT or line item mismatch exceeds tolerance', () => {
+      const mismatchedCctPayload = {
+        statementDate: '2025-05-15',
+        billingPeriod: 'May 2025',
+        provider: 'City of Cape Town',
+        electricityZAR: 0,
+        propertyRatesZAR: 2033.86,
+        waterZAR: 284.56,
+        refuseZAR: 185.22,
+        sewerageZAR: 148.61,
+        municipalVatZAR: 92.75,
+        totalDueZAR: 3000.00, // actual sum is 2745.00
+      };
+
+      expect(() => UtilityStatementSchema.parse(mismatchedCctPayload)).toThrow(
+        /Mathematical cross-check failed/
+      );
     });
   });
 
@@ -564,6 +619,219 @@ IGrow Rentals 2014/186623/07 Powered by WeconnectU Page 1 of 3 OWNER STATEMENT C
       expect(parsed.tenantName).toBe('Bongani June Mwale');
       expect(parsed.bundledUtilitiesZAR).toBe(477.07);
       expect(parsed.propertyRatesZAR).toBe(1021.00);
+    });
+  });
+
+  describe('detectDocumentType Router', () => {
+    it('returns cct for City of Cape Town statements in English, Afrikaans, and Xhosa', () => {
+      expect(detectDocumentType('INVOICE FROM CITY OF CAPE TOWN')).toBe('cct');
+      expect(detectDocumentType('STAD KAAPSTAD MUNISIPALITEIT')).toBe('cct');
+      expect(detectDocumentType('ISIXEKO SASEKAPA MUNICIPALITY')).toBe('cct');
+    });
+
+    it('returns coj for City of Johannesburg statements, even when containing Eskom supply notes', () => {
+      expect(detectDocumentType('CITY OF JOHANNESBURG TAX INVOICE')).toBe('coj');
+      expect(detectDocumentType('JOBURG PIKITUP REFUSE')).toBe('coj');
+      expect(detectDocumentType('VAT NO: CITY OF JOHANNESBURG: 4760117194')).toBe('coj');
+      expect(
+        detectDocumentType(
+          'VAT NO: CITY OF JOHANNESBURG: 4760117194\nCity Power Electricity\nUnbilled Electricity: Eskom supply 0.00'
+        )
+      ).toBe('coj');
+    });
+
+    it('returns eskom for Eskom statements', () => {
+      expect(detectDocumentType('ESKOM HOLDINGS SOC LTD')).toBe('eskom');
+      expect(detectDocumentType('csonline.co.za Eskom customer portal')).toBe('eskom');
+      expect(
+        detectDocumentType(
+          'ESKOM HOLDINGS SOC LTD\nYOUR ACCOUNT NO 7270492027\nCENTRAL REGION PO BOX 8610 Johannesburg 2000'
+        )
+      ).toBe('eskom');
+    });
+
+    it('returns igrow for iGrow statements', () => {
+      expect(detectDocumentType('IGROW RENTALS OWNER STATEMENT')).toBe('igrow');
+      expect(detectDocumentType('WeconnectU Property Management')).toBe('igrow');
+      expect(detectDocumentType('Water, Sewerage, Refuse & Common 477.07')).toBe('igrow');
+    });
+
+    it('returns unknown for unrecognized documents', () => {
+      expect(detectDocumentType('Some Random Bank Statement')).toBe('unknown');
+    });
+  });
+
+  describe('City of Cape Town Regex Parser', () => {
+    const mockCctRawText = `
+CITY OF CAPE TOWN / STAD KAAPSTAD / ISIXEKO SASEKAPA
+TAX INVOICE
+Date: 2025-05-15
+Statement for May 2025
+Account Number: 987654321
+Physical Address: 15 KLOOF ROAD, SEA POINT
+Erf: 4521
+
+PROPERTY RATES
+Residential Rates: 2,033.86
+WATER (Domestic)
+Fixed Basic Charge and Consumption: 284.56
+SEWERAGE (Domestic)
+Fixed Basic Charge: 148.61
+REFUSE (Domestic)
+Refuse charge: 185.22
+Add 15% VAT: 92.75
+Current account: Total due 2,745.00
+
+Meter details
+Meter number: W998877
+Previous reading: 450.00
+New reading: 462.50
+Consumption: 12.50
+    `;
+
+    it('extracts all itemized charges exclusive of VAT and isolated 15% VAT for CCT', () => {
+      const parsed = parseCapeTownUtilityRegex(mockCctRawText);
+
+      expect(parsed.provider).toBe('City of Cape Town');
+      expect(parsed.accountNumber).toBe('987654321');
+      expect(parsed.statementDate).toBe('2025-05-15');
+      expect(parsed.billingPeriod).toBe('May 2025');
+      expect(parsed.propertyRatesZAR).toBe(2033.86);
+      expect(parsed.waterZAR).toBe(284.56);
+      expect(parsed.refuseZAR).toBe(185.22);
+      expect(parsed.sewerageZAR).toBe(148.61);
+      expect(parsed.municipalVatZAR).toBe(92.75);
+      expect(parsed.totalDueZAR).toBe(2745.00);
+
+      // Verify water meter reading under Meter details
+      expect(parsed.extractedMeterReadings).toBeDefined();
+      expect(parsed.extractedMeterReadings?.length).toBe(1);
+      const reading = parsed.extractedMeterReadings![0];
+      expect(reading.utilityType).toBe('water');
+      expect(reading.meterNumber).toBe('W998877');
+      expect(reading.readingValue).toBe(462.50);
+      expect(reading.previousReadingValue).toBe(450.00);
+      expect(reading.consumption).toBe(12.50);
+      expect(reading.readingType).toBe('Actual');
+    });
+
+    it('routes CCT statement via master parseUtilityWithRegex function', () => {
+      const parsed = parseUtilityWithRegex(mockCctRawText);
+      expect(parsed.provider).toBe('City of Cape Town');
+      expect(parsed.propertyRatesZAR).toBe(2033.86);
+      expect(parsed.waterZAR).toBe(284.56);
+      expect(parsed.refuseZAR).toBe(185.22);
+      expect(parsed.sewerageZAR).toBe(148.61);
+      expect(parsed.municipalVatZAR).toBe(92.75);
+      expect(parsed.totalDueZAR).toBe(2745.00);
+    });
+
+    it('auto-detects and extracts CCT statements via parseRentalPdfStatement', async () => {
+      const result = await parseRentalPdfStatement(mockCctRawText);
+      expect(result.success).toBe(true);
+      expect(result.docType).toBe('municipal_utility');
+      expect(result.provider).toBe('City of Cape Town');
+      expect(result.utilityStatement).toBeDefined();
+      expect(result.utilityStatement?.propertyRatesZAR).toBe(2033.86);
+      expect(result.utilityStatement?.waterZAR).toBe(284.56);
+      expect(result.utilityStatement?.refuseZAR).toBe(185.22);
+      expect(result.utilityStatement?.sewerageZAR).toBe(148.61);
+      expect(result.utilityStatement?.municipalVatZAR).toBe(92.75);
+      expect(result.utilityStatement?.totalDueZAR).toBe(2745.00);
+      expect(result.utilityStatement?.extractedMeterReadings?.[0].readingValue).toBe(462.50);
+    });
+
+    it('extracts zero meter reading without dropping the record', () => {
+      const mockCctZeroReading = `
+CITY OF CAPE TOWN
+Date: 2025-06-01
+Account Number: 112233445
+PROPERTY RATES 1,000.00 WATER (Domestic) Fixed Basic Charge 200.00
+REFUSE (Domestic) Refuse charge 100.00
+SEWERAGE (Domestic) Fixed Basic Charge 100.00
+Add 15% VAT 60.00
+Current account: Total due 1,460.00
+
+Meter details
+Meter number: W0001
+Previous reading: 0.00
+New reading: 0.00
+Consumption: 0.00
+      `;
+
+      const parsed = parseCapeTownUtilityRegex(mockCctZeroReading);
+      expect(parsed.totalDueZAR).toBe(1460.00);
+      expect(parsed.extractedMeterReadings).toBeDefined();
+      expect(parsed.extractedMeterReadings?.length).toBe(1);
+      expect(parsed.extractedMeterReadings![0].readingValue).toBe(0);
+      expect(parsed.extractedMeterReadings![0].previousReadingValue).toBe(0);
+    });
+
+    it('extracts estimated meter reading flag correctly from CCT meter block', () => {
+      const mockCctEstimated = `
+CITY OF CAPE TOWN
+Date: 2025-06-01
+Account Number: 112233445
+PROPERTY RATES 1,000.00 WATER (Domestic) Fixed Basic Charge 200.00
+REFUSE (Domestic) Refuse charge 100.00
+SEWERAGE (Domestic) Fixed Basic Charge 100.00
+Add 15% VAT 60.00
+Current account: Total due 1,460.00
+
+Meter details
+Water Meter: W554433
+Reading type: Estimated
+Previous reading: 400.00
+New reading (Estimated): 420.00
+Consumption: 20.00
+      `;
+
+      const parsed = parseCapeTownUtilityRegex(mockCctEstimated);
+      expect(parsed.extractedMeterReadings).toBeDefined();
+      expect(parsed.extractedMeterReadings?.length).toBe(1);
+      const mr = parsed.extractedMeterReadings![0];
+      expect(mr.meterNumber).toBe('W554433');
+      expect(mr.readingValue).toBe(420.00);
+      expect(mr.previousReadingValue).toBe(400.00);
+      expect(mr.readingType).toBe('Estimated');
+    });
+
+    it('handles multi-page CCT document layout with page separator markers', () => {
+      const mockMultiPageCct = `
+--- Page 1 ---
+CITY OF CAPE TOWN / STAD KAAPSTAD
+TAX INVOICE
+Date: 2025-05-15
+Statement for May 2025
+Account Number: 987654321
+Physical Address: 15 KLOOF ROAD, SEA POINT
+
+PROPERTY RATES
+Residential Rates: 2,033.86
+WATER (Domestic)
+Fixed Basic Charge and Consumption: 284.56
+SEWERAGE (Domestic)
+Fixed Basic Charge: 148.61
+REFUSE (Domestic)
+Refuse charge: 185.22
+Add 15% VAT: 92.75
+Current account: Total due 2,745.00
+
+--- Page 2 ---
+Meter details
+Meter number: W998877
+Previous reading: 450.00
+New reading: 462.50
+Consumption: 12.50
+      `;
+
+      const parsed = parseCapeTownUtilityRegex(mockMultiPageCct);
+      expect(parsed.provider).toBe('City of Cape Town');
+      expect(parsed.propertyRatesZAR).toBe(2033.86);
+      expect(parsed.municipalVatZAR).toBe(92.75);
+      expect(parsed.totalDueZAR).toBe(2745.00);
+      expect(parsed.extractedMeterReadings?.[0].readingValue).toBe(462.50);
+      expect(parsed.extractedMeterReadings?.[0].meterNumber).toBe('W998877');
     });
   });
 });

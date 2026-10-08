@@ -267,6 +267,13 @@ export function mapProfile(
     rental_forecast_view: extra.rentalForecastView || 'wealth-only',
     ai_settings: (extra.aiSettings as any) || null,
     analyzer_draft: (extra.analyzerDraft as any) || null,
+    bank_name: profile.bankName || null,
+    account_holder: profile.accountHolder || null,
+    account_number: profile.accountNumber || null,
+    account_type: profile.accountType || 'Cheque / Current',
+    branch_code: profile.branchCode || null,
+    swift_code: profile.swiftCode || null,
+    remittance_instructions: profile.remittanceInstructions || null,
     updated_at: new Date().toISOString(),
   };
 }

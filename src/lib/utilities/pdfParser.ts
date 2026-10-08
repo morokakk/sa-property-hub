@@ -41,6 +41,7 @@ export const UtilityStatementSchema = z
     refuseZAR: z.number().nonnegative().default(0),
     sewerageZAR: z.number().nonnegative().default(0),
     propertyRatesZAR: z.number().nonnegative().default(0),
+    municipalVatZAR: z.number().nonnegative().optional(),
     totalDueZAR: z.number().nonnegative(),
     bodyCorporateLeviesZAR: z.number().nonnegative().optional(),
     agencyCommissionZAR: z.number().nonnegative().optional(),
@@ -57,8 +58,9 @@ export const UtilityStatementSchema = z
   .refine(
     (data) => {
       if (data.billingType === 'bundled' || data.bundledUtilitiesZAR !== undefined) {
-        // Bundled recovery cross-check: bundledUtilitiesZAR + (propertyRatesZAR || 0) must equal totalDueZAR within R1.50
-        const bundledSum = (data.bundledUtilitiesZAR || 0) + (data.propertyRatesZAR || 0);
+        // Bundled recovery cross-check: bundledUtilitiesZAR + (propertyRatesZAR || 0) + (municipalVatZAR || 0) must equal totalDueZAR within R1.50
+        const bundledSum =
+          (data.bundledUtilitiesZAR || 0) + (data.propertyRatesZAR || 0) + (data.municipalVatZAR || 0);
         return Math.abs(bundledSum - data.totalDueZAR) <= 1.5;
       }
 
@@ -68,7 +70,8 @@ export const UtilityStatementSchema = z
         data.waterZAR +
         data.refuseZAR +
         data.sewerageZAR +
-        (data.propertyRatesZAR || 0);
+        (data.propertyRatesZAR || 0) +
+        (data.municipalVatZAR || 0);
 
       return Math.abs(lineSum - data.totalDueZAR) <= 1.5;
     },
@@ -830,25 +833,311 @@ export function parseIgrowUtilityRegex(rawText: string): ValidatedUtilityStateme
 }
 
 /**
+ * Parses City of Cape Town (CCT) municipal utility invoices.
+ * CCT isolates its 15% VAT at the bottom of the invoice rather than including it in line items.
+ */
+export function parseCapeTownUtilityRegex(rawText: string): ValidatedUtilityStatement {
+  // Statement Date
+  const dateMatch =
+    rawText.match(/Date[:\s]*(\d{4}[/-]\d{2}[/-]\d{2})/i) ||
+    rawText.match(/Account date[:\s]*(\d{4}[/-]\d{2}[/-]\d{2})/i) ||
+    rawText.match(/(\d{4}[/-]\d{2}[/-]\d{2})/);
+  const statementDate = dateMatch
+    ? dateMatch[1].replace(/\//g, '-')
+    : new Date().toISOString().split('T')[0];
+
+  // Billing Period (e.g. "Statement for May 2025" or "May 2025")
+  let billingPeriod: string | undefined;
+  const periodMatch =
+    rawText.match(/Statement for\s*([A-Za-z]+\s+\d{4})/i) ||
+    rawText.match(/Billing Period[:\s]*([A-Za-z]+\s+\d{4})/i);
+  if (periodMatch) {
+    billingPeriod = periodMatch[1].trim();
+  }
+
+  // Account Number
+  const accMatch =
+    rawText.match(/Account Number[:\s]*(\d+)/i) ||
+    rawText.match(/Acc\.?\s*No\.?[:\s]*(\d+)/i) ||
+    rawText.match(/Account[:\s]*(\d{8,12})/i);
+  const accountNumber = accMatch ? accMatch[1].trim() : undefined;
+
+  // Property Address & Scheme/Erf details
+  let propertyName: string | undefined;
+  let propertyAddress: string | undefined;
+  const erfMatch = rawText.match(/Erf\s*[:\s]*([A-Za-z0-9_-]+)/i);
+  const addrMatch = rawText.match(
+    /Physical Address[:\s]+(.*?)(?=\s*(?:Erf|Stand|Account|Date|Invoice|Sub Total|Property Rates|WATER|[\r\n]))/i
+  );
+  if (addrMatch) {
+    propertyAddress = addrMatch[1].trim();
+    propertyName = propertyAddress;
+  } else if (erfMatch) {
+    propertyName = `Erf ${erfMatch[1]}`;
+    propertyAddress = `Erf ${erfMatch[1]}, Cape Town`;
+  }
+
+  // Municipal Valuation (Market Value)
+  let municipalValuationZAR: number | undefined;
+  const valMatch =
+    rawText.match(/Municipal\s*Valuation[\s\S]{0,60}?(?:R\s*)?([\d,]+(?:\.\d{2})?)/i) ||
+    rawText.match(/Market\s*Value[\s\S]{0,60}?(?:R\s*)?([\d,]+(?:\.\d{2})?)/i);
+  if (valMatch) {
+    const val = cleanNumeric(valMatch[1]);
+    if (val > 0) municipalValuationZAR = val;
+  }
+
+  // 1. Rates: /PROPERTY RATES[\s\S]*?([\d,]+\.\d{2})(?=\s*WATER)/i
+  let propertyRatesZAR = 0;
+  const ratesMatch =
+    rawText.match(/PROPERTY RATES[\s\S]*?([\d,]+\.\d{2})(?=\s*WATER)/i) ||
+    rawText.match(/PROPERTY RATES[\s\S]*?([\d,]+\.\d{2})/i);
+  if (ratesMatch) {
+    propertyRatesZAR = cleanNumeric(ratesMatch[1]);
+  }
+
+  // 2. Water: /WATER \([\s\S]*?Fixed Basic Charge[\s\S]*?([\d,]+\.\d{2})/i
+  let waterZAR = 0;
+  const waterMatch =
+    rawText.match(/WATER \([\s\S]*?Fixed Basic Charge[\s\S]*?([\d,]+\.\d{2})/i) ||
+    rawText.match(/WATER[\s\S]*?Fixed Basic Charge[\s\S]*?([\d,]+\.\d{2})/i) ||
+    rawText.match(/WATER \([\s\S]*?([\d,]+\.\d{2})/i);
+  if (waterMatch) {
+    waterZAR = cleanNumeric(waterMatch[1]);
+  }
+
+  // 3. Refuse: /REFUSE \([\s\S]*?Refuse charge[\s\S]*?([\d,]+\.\d{2})/i
+  let refuseZAR = 0;
+  const refuseMatch =
+    rawText.match(/REFUSE \([\s\S]*?Refuse charge[\s\S]*?([\d,]+\.\d{2})/i) ||
+    rawText.match(/REFUSE[\s\S]*?Refuse charge[\s\S]*?([\d,]+\.\d{2})/i) ||
+    rawText.match(/REFUSE \([\s\S]*?([\d,]+\.\d{2})/i);
+  if (refuseMatch) {
+    refuseZAR = cleanNumeric(refuseMatch[1]);
+  }
+
+  // 4. Sewerage: /SEWERAGE \([\s\S]*?Fixed Basic Charge[\s\S]*?([\d,]+\.\d{2})/i
+  let sewerageZAR = 0;
+  const sewerMatch =
+    rawText.match(/SEWERAGE \([\s\S]*?Fixed Basic Charge[\s\S]*?([\d,]+\.\d{2})/i) ||
+    rawText.match(/SEWERAGE[\s\S]*?Fixed Basic Charge[\s\S]*?([\d,]+\.\d{2})/i) ||
+    rawText.match(/SEWERAGE \([\s\S]*?([\d,]+\.\d{2})/i);
+  if (sewerMatch) {
+    sewerageZAR = cleanNumeric(sewerMatch[1]);
+  }
+
+  // 5. Electricity (optional for CCT bills with direct electricity)
+  let electricityZAR = 0;
+  const elecMatch =
+    rawText.match(/ELECTRICITY \([\s\S]*?([\d,]+\.\d{2})/i) ||
+    rawText.match(/ELECTRICITY[\s\S]*?Total Charge[\s\S]*?([\d,]+\.\d{2})/i);
+  if (elecMatch) {
+    electricityZAR = cleanNumeric(elecMatch[1]);
+  }
+
+  // 6. VAT: /Add 15% VAT[\s\S]*?([\d,]+\.\d{2})/i
+  let municipalVatZAR = 0;
+  const vatMatch =
+    rawText.match(/Add 15% VAT[\s\S]*?([\d,]+\.\d{2})/i) ||
+    rawText.match(/15%\s*VAT[\s\S]*?([\d,]+\.\d{2})/i) ||
+    rawText.match(/VAT[\s\S]*?15%[\s\S]*?([\d,]+\.\d{2})/i);
+  if (vatMatch) {
+    municipalVatZAR = cleanNumeric(vatMatch[1]);
+  }
+
+  // 7. Total Due: /Current account:\s*Total due\s*([\d,]+\.\d{2})/i
+  let totalDueZAR = 0;
+  const totalMatch =
+    rawText.match(/Current account:\s*Total due\s*([\d,]+\.\d{2})/i) ||
+    rawText.match(/Current account[\s\S]*?Total due\s*([\d,]+\.\d{2})/i) ||
+    rawText.match(/Total due\s*([\d,]+\.\d{2})/i);
+  if (totalMatch) {
+    totalDueZAR = cleanNumeric(totalMatch[1]);
+  } else {
+    totalDueZAR =
+      Math.round(
+        (propertyRatesZAR + waterZAR + refuseZAR + sewerageZAR + electricityZAR + municipalVatZAR) *
+          100
+      ) / 100;
+  }
+
+  // Cross-check & double-count safety guard:
+  const lineSum =
+    propertyRatesZAR +
+    electricityZAR +
+    refuseZAR +
+    waterZAR +
+    sewerageZAR +
+    municipalVatZAR;
+  if (totalDueZAR > 0 && Math.abs(lineSum - totalDueZAR) > 1.5) {
+    const diff = Math.round((totalDueZAR - lineSum) * 100) / 100;
+    if (municipalVatZAR === 0 && diff > 0) {
+      municipalVatZAR = diff;
+    }
+  }
+
+  // 8. Water Meter Reading: Extract the "New reading" under the Meter details section
+  const extractedMeterReadings: z.infer<typeof ExtractedMeterReadingSchema>[] = [];
+  const meterSectionIndex = rawText.search(/Meter details/i);
+  const meterBlock = meterSectionIndex !== -1 ? rawText.slice(meterSectionIndex) : rawText;
+
+  let readingVal: number | undefined;
+  let prevReading: number | undefined;
+  let meterNumber: string | undefined;
+  let consumption: number | undefined;
+
+  const directMatch =
+    meterBlock.match(/New reading(?:\s*date)?(?:\s*[:\s]\s*(?:\d{4}[/-]\d{2}[/-]\d{2}))?(?:\s*\([A-Za-z]+\))?[:\s]+([\d,]+(?:\.\d+)?)/i) ||
+    meterBlock.match(/New reading[:\s]+([\d,]+(?:\.\d+)?)/i) ||
+    rawText.match(/New reading[:\s]+([\d,]+(?:\.\d+)?)/i);
+
+  if (directMatch) {
+    readingVal = cleanNumeric(directMatch[1]);
+    const prevMatch =
+      meterBlock.match(/Previous reading[:\s]+([\d,]+(?:\.\d+)?)/i) ||
+      meterBlock.match(/Prev reading[:\s]+([\d,]+(?:\.\d+)?)/i) ||
+      rawText.match(/Previous reading[:\s]+([\d,]+(?:\.\d+)?)/i);
+    if (prevMatch) prevReading = cleanNumeric(prevMatch[1]);
+
+    const numMatch =
+      meterBlock.match(/Meter (?:no\.?|number)[:\s]*([A-Za-z0-9_-]+)/i) ||
+      meterBlock.match(/Water Meter[:\s]*([A-Za-z0-9_-]+)/i) ||
+      meterBlock.match(/Meter[:\s]*([A-Za-z0-9_-]+)/i) ||
+      rawText.match(/Meter (?:no\.?|number)[:\s]*([A-Za-z0-9_-]+)/i);
+    if (numMatch) meterNumber = numMatch[1].trim();
+
+    const consMatch =
+      meterBlock.match(/Consumption[:\s]*([\d,]+(?:\.\d+)?)/i) ||
+      rawText.match(/Consumption[:\s]*([\d,]+(?:\.\d+)?)/i);
+    if (consMatch) consumption = cleanNumeric(consMatch[1]);
+  } else {
+    const tableMatch = meterBlock.match(
+      /(?:Previous reading|Prev reading)\s+(?:New reading)\s*(?:Consumption)?[\s\S]*?\n\s*([A-Za-z0-9_-]+)?\s+([\d,.]+)\s+([\d,.]+)(?:\s+([\d,.]+))?/i
+    );
+    if (tableMatch) {
+      if (tableMatch[1] && isNaN(Number(tableMatch[1].replace(/[,.]/g, '')))) {
+        meterNumber = tableMatch[1];
+      }
+      prevReading = cleanNumeric(tableMatch[2]);
+      readingVal = cleanNumeric(tableMatch[3]);
+      if (tableMatch[4]) consumption = cleanNumeric(tableMatch[4]);
+    }
+
+    if (!meterNumber) {
+      const numMatch =
+        meterBlock.match(/Meter (?:no\.?|number)[:\s]*([A-Za-z0-9_-]+)/i) ||
+        meterBlock.match(/Water Meter[:\s]*([A-Za-z0-9_-]+)/i) ||
+        meterBlock.match(/Meter[:\s]*([A-Za-z0-9_-]+)/i) ||
+        rawText.match(/Meter (?:no\.?|number)[:\s]*([A-Za-z0-9_-]+)/i);
+      if (numMatch) meterNumber = numMatch[1].trim();
+    }
+  }
+
+  const isEstimated =
+    /New reading[\s\S]{0,40}?(?:Estimated|Est)/i.test(meterBlock) ||
+    /Reading type[:\s]*Estimated/i.test(meterBlock);
+  const readingType: 'Actual' | 'Estimated' = isEstimated ? 'Estimated' : 'Actual';
+
+  if (readingVal !== undefined && readingVal >= 0) {
+    extractedMeterReadings.push({
+      date: statementDate,
+      utilityType: 'water',
+      readingValue: readingVal,
+      previousReadingValue: prevReading,
+      consumption:
+        consumption !== undefined && consumption >= 0
+          ? consumption
+          : prevReading !== undefined && readingVal >= prevReading
+          ? Math.round((readingVal - prevReading) * 1000) / 1000
+          : undefined,
+      meterNumber,
+      readingType,
+      source: 'pdf-extracted',
+    });
+  }
+
+  return UtilityStatementSchema.parse({
+    statementDate,
+    billingPeriod,
+    accountNumber,
+    provider: 'City of Cape Town',
+    billingType: 'itemized',
+    electricityZAR,
+    waterZAR,
+    refuseZAR,
+    sewerageZAR,
+    propertyRatesZAR,
+    municipalVatZAR,
+    totalDueZAR,
+    propertyName,
+    propertyAddress,
+    municipalValuationZAR,
+    extractedMeterReadings: extractedMeterReadings.length > 0 ? extractedMeterReadings : undefined,
+  });
+}
+
+/**
+ * Master document type detector for South African municipal and managing agent bills.
+ * Returns 'cct' if text contains "CITY OF CAPE TOWN", "STAD KAAPSTAD", or "ISIXEKO SASEKAPA".
+ */
+export function detectDocumentType(rawText: string): 'cct' | 'coj' | 'eskom' | 'igrow' | 'unknown' {
+  const upperText = rawText.toUpperCase();
+  if (
+    upperText.includes('CITY OF CAPE TOWN') ||
+    upperText.includes('STAD KAAPSTAD') ||
+    upperText.includes('ISIXEKO SASEKAPA')
+  ) {
+    return 'cct';
+  }
+
+  if (
+    upperText.includes('IGROW') ||
+    upperText.includes('WECONNECTU') ||
+    upperText.includes('WATER,SEWERAGE,REFUSE & COMMON') ||
+    upperText.includes('WATER, SEWERAGE, REFUSE & COMMON')
+  ) {
+    return 'igrow';
+  }
+
+  if (
+    upperText.includes('CITY OF JOHANNESBURG') ||
+    upperText.includes('JOBURG') ||
+    upperText.includes('PIKITUP') ||
+    upperText.includes('4760117194')
+  ) {
+    return 'coj';
+  }
+
+  if (
+    upperText.includes('ESKOM') ||
+    upperText.includes('ESKOM HOLDINGS') ||
+    upperText.includes('CSONLINE.CO.ZA')
+  ) {
+    return 'eskom';
+  }
+
+  return 'unknown';
+}
+
+/**
  * Master Regex router: detects bill provider and parses accordingly.
  */
 export function parseUtilityWithRegex(rawText: string): ValidatedUtilityStatement {
-  const isIgrow =
-    rawText.includes('IGROW') ||
-    rawText.includes('WeconnectU') ||
-    rawText.includes('Water,Sewerage,Refuse & Common') ||
-    rawText.includes('Water, Sewerage, Refuse & Common');
+  const docType = detectDocumentType(rawText);
 
-  if (isIgrow) {
+  if (docType === 'cct') {
+    return parseCapeTownUtilityRegex(rawText);
+  }
+
+  if (docType === 'igrow') {
     return parseIgrowUtilityRegex(rawText);
   }
 
-  const isEskom =
-    rawText.includes('ESKOM') ||
-    rawText.includes('ESKOM HOLDINGS') ||
-    rawText.includes('csonline.co.za');
+  if (docType === 'coj') {
+    return parseCojUtilityRegex(rawText);
+  }
 
-  if (isEskom) {
+  if (docType === 'eskom') {
     return parseEskomUtilityRegex(rawText);
   }
 
@@ -868,32 +1157,36 @@ export async function parseUtilityWithAi(
   const base64Data = await fileToBase64(file);
 
   const systemPrompt = `You are a precision South African municipal and utility bill extraction engine.
-Extract the exact numeric charges in South African Rand (ZAR) from this municipal, electricity tax invoice (City of Johannesburg or Eskom), or managing agent statement (iGrow Rentals / WeconnectU).
+Extract the exact numeric charges in South African Rand (ZAR) from this municipal, electricity tax invoice (City of Johannesburg, City of Cape Town, or Eskom), or managing agent statement (iGrow Rentals / WeconnectU).
 
 Strict extraction guidelines:
 1. "electricityZAR": electricity consumption, network charges, or Eskom supply charges.
-2. "waterZAR": water consumption, demand management charges, and meter charges (including 15% VAT).
-3. "refuseZAR": PIKITUP refuse residential removal including 15% VAT.
-4. "sewerageZAR": municipal sanitation / sewerage residential charges including 15% VAT.
-5. "propertyRatesZAR": City of Johannesburg or municipal Property Rates Residential charge (0% VAT).
-6. "bundledUtilitiesZAR": For iGrow Rentals / WeconnectU statements, extract the combined "Water, Sewerage, Refuse & Common" billed recovery (e.g. 477.07).
-7. "billingType": Set to "bundled" for iGrow statements, otherwise "itemized".
-8. "totalDueZAR": The Current Charges for the billing period (including VAT). For bundled statements, totalDueZAR = bundledUtilitiesZAR + propertyRatesZAR. For itemized statements, totalDueZAR = electricityZAR + waterZAR + refuseZAR + sewerageZAR + propertyRatesZAR.
-9. "statementDate": The invoice / statement date (format YYYY-MM-DD).
-10. "billingPeriod": e.g. "April 2025" or "10 Aug 2026 - 09 Sep 2026".
-11. "accountNumber": The municipal, Eskom, or iGrow payment reference number.
-12. "provider": "City of Johannesburg", "Eskom", or "iGrow Rentals".
-13. "extractedMeterReadings": Optional list of meter readings found on the statement (leave undefined for iGrow statements).
-14. "municipalValuationZAR": Optional municipal property valuation / market value (e.g. "Market Value R 3,180,000.00" on City of Johannesburg bills).
-15. "propertyName": Scheme, complex, or property name if visible.
-16. "propertyAddress": Physical street address or stand description if visible.
-17. "bodyCorporateLeviesZAR": Body Corporate / HOA levies if itemized.
-18. "agencyCommissionZAR": Managing agent commission if deducted.
-19. "agencyCommissionVatZAR": VAT on managing agent commission if itemized.
-20. "tenantName": Full name of tenant if listed on statement.
-21. "tenantRentBilledZAR": Gross rent billed to tenant if listed.
-22. "depositHeldZAR": Deposit held in trust if listed.
-23. "netDisbursementZAR": Net owner payout if listed.
+2. "waterZAR": water consumption, demand management charges, and meter charges (exclusive of VAT for City of Cape Town, inclusive for CoJ).
+3. "refuseZAR": PIKITUP refuse residential removal or Cape Town refuse charge (exclusive of VAT for City of Cape Town, inclusive for CoJ).
+4. "sewerageZAR": municipal sanitation / sewerage residential charges (exclusive of VAT for City of Cape Town, inclusive for CoJ).
+5. "propertyRatesZAR": City of Johannesburg, City of Cape Town, or municipal Property Rates Residential charge (0% VAT).
+6. "municipalVatZAR": For City of Cape Town statements, the isolated 15% VAT line item.
+7. "bundledUtilitiesZAR": For iGrow Rentals / WeconnectU statements, extract the combined "Water, Sewerage, Refuse & Common" billed recovery (e.g. 477.07).
+8. "billingType": Set to "bundled" for iGrow statements, otherwise "itemized".
+9. "totalDueZAR": The Current Charges for the billing period (including VAT). For bundled statements, totalDueZAR = bundledUtilitiesZAR + propertyRatesZAR. For itemized statements, totalDueZAR = electricityZAR + waterZAR + refuseZAR + sewerageZAR + propertyRatesZAR + (municipalVatZAR || 0).
+10. "statementDate": The invoice / statement date (format YYYY-MM-DD).
+11. "billingPeriod": e.g. "April 2025" or "10 Aug 2026 - 09 Sep 2026".
+12. "accountNumber": The municipal, Eskom, or iGrow payment reference number.
+13. "provider": "City of Johannesburg", "City of Cape Town", "Eskom", or "iGrow Rentals".
+14. "extractedMeterReadings": Optional list of meter readings found on the statement (leave undefined for iGrow statements).
+15. "municipalValuationZAR": Optional municipal property valuation / market value (e.g. "Market Value R 3,180,000.00" on City of Johannesburg bills).
+16. "propertyName": Scheme, complex, or property name if visible.
+17. "propertyAddress": Physical street address or stand description if visible.
+18. "bodyCorporateLeviesZAR": Body Corporate / HOA levies if itemized.
+19. "agencyCommissionZAR": Managing agent commission if deducted.
+20. "agencyCommissionVatZAR": VAT on managing agent commission if itemized.
+21. "tenantName": Full name of tenant if listed on statement.
+22. "tenantRentBilledZAR": Gross rent billed to tenant if listed.
+23. "depositHeldZAR": Deposit held in trust if listed.
+24. "netDisbursementZAR": Net owner payout if listed.
+
+IMPORTANT FOR CITY OF CAPE TOWN:
+If the document is a City of Cape Town statement, extract the itemized costs exclusive of VAT, and extract the isolated 15% VAT line into the municipalVatZAR field. Ensure you extract the physical Water Meter Reading from the Meter Details table.
 
 IMPORTANT FOR IGROW RENTALS / WECONNECTU:
 iGrow statements do NOT contain meter readings. They bundle recoveries into "Water,Sewerage,Refuse & Common". Set provider: "iGrow Rentals", billingType: "bundled", and do NOT require meter readings.
@@ -959,6 +1252,7 @@ Output pure JSON matching the schema without markdown or commentary.`;
       refuseZAR: cleanNumeric(parsedJson.refuseZAR),
       sewerageZAR: cleanNumeric(parsedJson.sewerageZAR),
       propertyRatesZAR: cleanNumeric(parsedJson.propertyRatesZAR),
+      municipalVatZAR: parsedJson.municipalVatZAR !== undefined ? cleanNumeric(parsedJson.municipalVatZAR) : undefined,
       totalDueZAR: cleanNumeric(parsedJson.totalDueZAR),
       municipalValuationZAR: parsedJson.municipalValuationZAR !== undefined ? cleanNumeric(parsedJson.municipalValuationZAR) : undefined,
       bodyCorporateLeviesZAR: parsedJson.bodyCorporateLeviesZAR !== undefined ? cleanNumeric(parsedJson.bodyCorporateLeviesZAR) : undefined,
@@ -1010,7 +1304,7 @@ Output pure JSON matching the schema without markdown or commentary.`;
                 statementDate: { type: 'string', description: 'YYYY-MM-DD' },
                 billingPeriod: { type: 'string', description: 'e.g. April 2025 or 10 Aug 2026 - 09 Sep 2026' },
                 accountNumber: { type: 'string', description: 'Account number' },
-                provider: { type: 'string', enum: ['City of Johannesburg', 'Eskom', 'iGrow Rentals'] },
+                provider: { type: 'string', enum: ['City of Johannesburg', 'City of Cape Town', 'Eskom', 'iGrow Rentals'] },
                 propertyName: { type: 'string', description: 'Scheme, complex or property name if visible on statement' },
                 propertyAddress: { type: 'string', description: 'Full physical address or stand description' },
                 billingType: { type: 'string', enum: ['itemized', 'bundled'] },
@@ -1021,6 +1315,7 @@ Output pure JSON matching the schema without markdown or commentary.`;
                 refuseZAR: { type: 'number', description: 'Refuse in ZAR' },
                 sewerageZAR: { type: 'number', description: 'Sewerage in ZAR' },
                 propertyRatesZAR: { type: 'number', description: 'Property rates in ZAR' },
+                municipalVatZAR: { type: 'number', description: 'City of Cape Town isolated 15% VAT in ZAR' },
                 totalDueZAR: { type: 'number', description: 'Current charges total in ZAR' },
                 municipalValuationZAR: { type: 'number', description: 'Municipal property valuation / market value (e.g. Market Value R 3,180,000.00)' },
                 bodyCorporateLeviesZAR: { type: 'number', description: 'Body corporate or HOA monthly levies deducted in ZAR' },
@@ -1099,6 +1394,7 @@ Output pure JSON matching the schema without markdown or commentary.`;
       refuseZAR: cleanNumeric(input.refuseZAR),
       sewerageZAR: cleanNumeric(input.sewerageZAR),
       propertyRatesZAR: cleanNumeric(input.propertyRatesZAR),
+      municipalVatZAR: input.municipalVatZAR !== undefined ? cleanNumeric(input.municipalVatZAR) : undefined,
       totalDueZAR: cleanNumeric(input.totalDueZAR),
       municipalValuationZAR: input.municipalValuationZAR !== undefined ? cleanNumeric(input.municipalValuationZAR) : undefined,
       bodyCorporateLeviesZAR: input.bodyCorporateLeviesZAR !== undefined ? cleanNumeric(input.bodyCorporateLeviesZAR) : undefined,
@@ -1214,14 +1510,29 @@ export async function parseRentalPdfStatement(
     const rawText = typeof fileOrText === 'string' ? fileOrText : await extractTextFromPdf(fileOrText);
     const upperText = rawText.toUpperCase();
 
-    // 1. Check for iGrow / WeconnectU managing agent statement
-    const isIgrow =
-      upperText.includes('IGROW') ||
-      upperText.includes('WECONNECTU') ||
-      upperText.includes('WATER,SEWERAGE,REFUSE & COMMON') ||
-      upperText.includes('WATER, SEWERAGE, REFUSE & COMMON');
+    // 0. Check for City of Cape Town (CCT) municipal tax invoice
+    const detectedType = detectDocumentType(rawText);
+    if (detectedType === 'cct') {
+      const stmt = parseCapeTownUtilityRegex(rawText);
+      const utilityStatement: UtilityStatement = {
+        ...stmt,
+        id: `util-${Date.now()}`,
+        rawText,
+        parsedVia: 'regex-fallback',
+        createdAt: new Date().toISOString(),
+      };
 
-    if (isIgrow) {
+      return {
+        success: true,
+        docType: 'municipal_utility',
+        provider: 'City of Cape Town',
+        utilityStatement,
+        rawText,
+      };
+    }
+
+    // 1. Check for iGrow / WeconnectU managing agent statement
+    if (detectedType === 'igrow') {
       const stmt = parseIgrowUtilityRegex(rawText);
       const utilityStatement: UtilityStatement = {
         ...stmt,
@@ -1268,13 +1579,7 @@ export async function parseRentalPdfStatement(
     }
 
     // 2. Check for City of Johannesburg (CoJ) municipal tax invoice
-    const isCoj =
-      upperText.includes('CITY OF JOHANNESBURG') ||
-      upperText.includes('JOBURG') ||
-      upperText.includes('PIKITUP') ||
-      upperText.includes('4760117194');
-
-    if (isCoj) {
+    if (detectedType === 'coj') {
       const stmt = parseCojUtilityRegex(rawText);
       const utilityStatement: UtilityStatement = {
         ...stmt,
@@ -1294,11 +1599,7 @@ export async function parseRentalPdfStatement(
     }
 
     // 3. Check for Eskom electricity tax invoice
-    const isEskom =
-      upperText.includes('ESKOM') ||
-      upperText.includes('CSONLINE.CO.ZA');
-
-    if (isEskom) {
+    if (detectedType === 'eskom') {
       const stmt = parseEskomUtilityRegex(rawText);
       const utilityStatement: UtilityStatement = {
         ...stmt,
@@ -1364,7 +1665,7 @@ export async function parseRentalPdfStatement(
       docType: 'agent_payout',
       provider: 'Unknown',
       error:
-        'Could not automatically match statement with local zero-token parsers (iGrow, City of Johannesburg, Eskom). For other managing agent formats, please configure your BYOK AI API Key in Settings.',
+        'Could not automatically match statement with local zero-token parsers (iGrow, City of Johannesburg, City of Cape Town, Eskom). For other managing agent formats, please configure your BYOK AI API Key in Settings.',
     };
   } catch (err: any) {
     return {

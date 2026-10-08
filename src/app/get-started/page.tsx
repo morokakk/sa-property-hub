@@ -170,7 +170,7 @@ export default function GetStartedPage() {
               <div>
                 <h2 className="text-base sm:text-lg font-bold text-slate-900">Operator Roadmap &amp; Quick Start</h2>
                 <p className="text-xs text-slate-500 mt-0.5 max-w-2xl leading-relaxed">
-                  Start with <strong className="text-slate-700">Step 0 – Foundation</strong> (3 steps to lock in your entity &amp; deal hurdles in ~5 mins). The remaining 24 feature guides serve as an on-demand reference desk to explore at your own pace as you scale.
+                  Start with <strong className="text-slate-700">Step 0 – Foundation</strong> ({foundationTotal} steps to lock in your entity &amp; deal hurdles in ~5 mins). The remaining {discoveryTotal} feature guides serve as an on-demand reference desk to explore at your own pace as you scale.
                 </p>
               </div>
             </div>

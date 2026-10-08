@@ -128,6 +128,7 @@ export default function UnifiedPdfVerificationModal({
   const [refuseZAR, setRefuseZAR] = useState(0);
   const [sewerageZAR, setSewerageZAR] = useState(0);
   const [utilRatesZAR, setUtilRatesZAR] = useState(0);
+  const [municipalVatZAR, setMunicipalVatZAR] = useState(0);
   const [totalDueZAR, setTotalDueZAR] = useState(0);
 
   // Initialize and Auto-match on Data Change
@@ -221,6 +222,7 @@ export default function UnifiedPdfVerificationModal({
       setRefuseZAR(s.refuseZAR || 0);
       setSewerageZAR(s.sewerageZAR || 0);
       setUtilRatesZAR(s.propertyRatesZAR || 0);
+      setMunicipalVatZAR(s.municipalVatZAR || 0);
       setTotalDueZAR(s.totalDueZAR || 0);
       setPropertyName(s.propertyName || '');
       setPropertyAddress(s.propertyAddress || '');
@@ -457,6 +459,7 @@ export default function UnifiedPdfVerificationModal({
           refuseZAR,
           sewerageZAR,
           propertyRatesZAR: utilRatesZAR,
+          municipalVatZAR: municipalVatZAR > 0 ? municipalVatZAR : data.utilityStatement?.municipalVatZAR,
           totalDueZAR,
           propertyName,
           propertyAddress,
@@ -468,7 +471,7 @@ export default function UnifiedPdfVerificationModal({
           const newId = `rental-util-${Date.now()}`;
           finalPropId = newId;
 
-          let detectedCity = 'Johannesburg';
+          let detectedCity = data.provider === 'City of Cape Town' ? 'Cape Town' : 'Johannesburg';
           if (propertyAddress) {
             const parts = propertyAddress.split(',').map((p) => p.trim());
             if (parts.length >= 3) {
@@ -1244,7 +1247,7 @@ export default function UnifiedPdfVerificationModal({
                   </div>
                 </div>
 
-                <div className="pt-2 border-t border-slate-200 grid grid-cols-1 sm:grid-cols-2 gap-3 items-center">
+                <div className={`pt-2 border-t border-slate-200 grid grid-cols-1 ${municipalVatZAR > 0 || data.utilityStatement?.municipalVatZAR !== undefined || data.provider === 'City of Cape Town' ? 'sm:grid-cols-3' : 'sm:grid-cols-2'} gap-3 items-center`}>
                   <div>
                     <label className="block text-[10px] font-semibold text-slate-600 mb-1">
                       Municipal Rates & Taxes (Owner)
@@ -1256,6 +1259,20 @@ export default function UnifiedPdfVerificationModal({
                       className="w-full text-xs font-mono font-bold px-2.5 py-1.5 border border-slate-300 rounded-lg bg-white text-slate-900 focus:ring-1 focus:ring-teal-500 focus:outline-none"
                     />
                   </div>
+
+                  {(municipalVatZAR > 0 || data.utilityStatement?.municipalVatZAR !== undefined || data.provider === 'City of Cape Town') && (
+                    <div>
+                      <label className="block text-[10px] font-semibold text-slate-600 mb-1">
+                        Municipal VAT (15%)
+                      </label>
+                      <input
+                        type="number"
+                        value={municipalVatZAR}
+                        onChange={(e) => setMunicipalVatZAR(Number(e.target.value) || 0)}
+                        className="w-full text-xs font-mono font-bold px-2.5 py-1.5 border border-slate-300 rounded-lg bg-white text-slate-900 focus:ring-1 focus:ring-teal-500 focus:outline-none"
+                      />
+                    </div>
+                  )}
 
                   <div>
                     <label className="block text-[10px] font-semibold text-slate-600 mb-1">

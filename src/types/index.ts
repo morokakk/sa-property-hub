@@ -641,7 +641,7 @@ export interface UtilityStatement {
   statementDate: string; // YYYY-MM-DD (e.g. '2025-04-03')
   billingPeriod?: string; // e.g. 'April 2025' or '10 Aug 2026 - 09 Sep 2026'
   accountNumber?: string;
-  provider: 'City of Johannesburg' | 'Eskom' | 'City Power' | 'iGrow Rentals' | 'Other' | string;
+  provider: 'City of Johannesburg' | 'City of Cape Town' | 'Eskom' | 'City Power' | 'iGrow Rentals' | 'Other' | string;
   billingType?: 'itemized' | 'bundled'; // 'bundled' for iGrow / Body Corporate single recovery
   bundledUtilitiesZAR?: number; // e.g. 477.07 for "Water, Sewerage, Refuse & Common"
   bundledUtilityLabel?: string; // default: "Water, Sewerage, Refuse & Common"
@@ -650,6 +650,7 @@ export interface UtilityStatement {
   refuseZAR: number;
   sewerageZAR: number;
   propertyRatesZAR?: number;
+  municipalVatZAR?: number;
   totalDueZAR: number; // Current charges (rates + utilities)
   // Managing agent statement metadata & sync
   propertyName?: string; // Scheme or complex title extracted from statement (e.g. "Clearwater Village 128", "The Blyde 402")

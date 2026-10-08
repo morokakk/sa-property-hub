@@ -103,6 +103,13 @@ export function unmapProfile(row?: Database['public']['Tables']['profiles']['Row
     minDscr: toNum((row as any).min_dscr, 1.20),
     vatExemptAgent: Boolean((row as any).vat_exempt_agent ?? false),
     marginalTaxRatePercent: toNum((row as any).marginal_tax_rate_percent, 31.0),
+    bankName: row.bank_name || undefined,
+    accountHolder: row.account_holder || undefined,
+    accountNumber: row.account_number || undefined,
+    accountType: (row.account_type as any) || undefined,
+    branchCode: row.branch_code || undefined,
+    swiftCode: row.swift_code || undefined,
+    remittanceInstructions: row.remittance_instructions || undefined,
   };
 
   return {

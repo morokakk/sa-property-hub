@@ -100,15 +100,15 @@ export const GET_STARTED_STAGES: readonly JourneyStage[] = [
           {
             id: 'settings-entity-branding',
             title: '0a · Entity & Branding',
-            summary: 'Your legal entity, contact details, logo and investor bio.',
-            powers: 'Proposal pitch decks (cover page, contact block, logo and track-record bio).',
+            summary: 'Your legal entity, contact details, remittance bank details, logo and investor bio.',
+            powers: 'Proposal pitch decks (cover page, bio) and tenant statement remittance (banking details on statements and PDFs).',
             howTo: [
               'Open Settings → Entity & Legal Representation and enter your trading entity, representative and contact details.',
-              'In Custom Brand Logo & Investor Bio, upload your logo and write a short track-record bio.',
-              'Click Save Profile & Settings at the bottom of the page.',
+              'In Banking / Remittance Details, add your bank name, account number and branch code for tenant payments.',
+              'In Custom Brand Logo & Investor Bio, upload your logo and write a short track-record bio, then click Save.',
             ],
             proTip:
-              'Use the entity name exactly as registered with CIPC (e.g. "Acme Property Holdings (Pty) Ltd" or the trust name on the Letters of Authority). Funders and conveyancers will check that it matches the offer to purchase.',
+              'Use the entity name exactly as registered with CIPC. Adding your remittance bank details embeds payment instructions directly onto tenant statement portals and emailed PDFs.',
             href: '/settings#settings-entity',
             ctaLabel: 'Go to Entity & Branding',
           },
@@ -395,6 +395,20 @@ export const GET_STARTED_STAGES: readonly JourneyStage[] = [
             href: '/rentals#rentals-portfolio',
             ctaLabel: 'Log a meter reading',
           },
+          {
+            id: 'rentals-tenant-statements',
+            title: 'Tenant Statements & Sharing',
+            summary: 'Verify monthly rental and utility ledgers, email PDF statements via Resend, and share secure portal links.',
+            howTo: [
+              'On a rental card, click Utilities & Statement to inspect the current period ledger, utility recoveries and arrears.',
+              'Click Share Statement to open the distribution menu: choose "Email Statement & Copy Link" or "Copy Secure Link".',
+              'Once verified, dispatch the statement to email the PDF directly to the tenant and copy the live link to your clipboard.',
+            ],
+            proTip:
+              'Ensure your landlord banking details are saved in Settings and the tenant has an email on file. Generated PDFs hide variance badges for a clean, professional print layout.',
+            href: '/rentals#rentals-portfolio',
+            ctaLabel: 'View rental statements',
+          },
         ],
       },
     ],
@@ -553,7 +567,7 @@ export const GET_STARTED_STAGES: readonly JourneyStage[] = [
               'Tick it off when done. Urgent items also appear on the Dashboard.',
             ],
             proTip:
-              'Create a task for every lease renewal 2 months ahead. Notice periods in SA leases are commonly 1–2 calendar months, and the CPA requires notice of expiry to the tenant.',
+              'The Task Engine automatically generates a High-Priority reminder 60 days before any lease expiry date. Use manual tasks for tenant inspections, maintenance callouts, and bespoke milestones.',
             href: '/tasks#tasks-list',
             ctaLabel: 'Open Tasks',
           },

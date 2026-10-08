@@ -590,6 +590,13 @@ export type Database = {
           min_dscr?: number | null
           vat_exempt_agent?: boolean | null
           marginal_tax_rate_percent?: number | null
+          bank_name?: string | null
+          account_holder?: string | null
+          account_number?: string | null
+          account_type?: string | null
+          branch_code?: string | null
+          swift_code?: string | null
+          remittance_instructions?: string | null
         }
         Insert: {
           ai_settings?: Json | null
@@ -621,6 +628,13 @@ export type Database = {
           min_dscr?: number | null
           vat_exempt_agent?: boolean | null
           marginal_tax_rate_percent?: number | null
+          bank_name?: string | null
+          account_holder?: string | null
+          account_number?: string | null
+          account_type?: string | null
+          branch_code?: string | null
+          swift_code?: string | null
+          remittance_instructions?: string | null
         }
         Update: {
           ai_settings?: Json | null
@@ -652,6 +666,13 @@ export type Database = {
           min_dscr?: number | null
           vat_exempt_agent?: boolean | null
           marginal_tax_rate_percent?: number | null
+          bank_name?: string | null
+          account_holder?: string | null
+          account_number?: string | null
+          account_type?: string | null
+          branch_code?: string | null
+          swift_code?: string | null
+          remittance_instructions?: string | null
         }
         Relationships: []
       }
