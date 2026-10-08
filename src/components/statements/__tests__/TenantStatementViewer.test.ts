@@ -220,4 +220,74 @@ describe('Tenant Statement Ledger & Calculation Engine', () => {
       expect(aprTiers.totalAmountDue).toBeLessThanOrEqual(0); // Paid up
     });
   });
+
+  describe('Landlord EFT Banking Details Payload & Configuration', () => {
+    it('verifies INITIAL_INVESTOR_PROFILE provides valid SA banking details for public statement', async () => {
+      const { INITIAL_INVESTOR_PROFILE } = await import('@/lib/store/initialData');
+
+      expect(INITIAL_INVESTOR_PROFILE.bankName).toBe('First National Bank (FNB)');
+      expect(INITIAL_INVESTOR_PROFILE.accountNumber).toBe('62891044321');
+      expect(INITIAL_INVESTOR_PROFILE.branchCode).toBe('250655');
+      expect(INITIAL_INVESTOR_PROFILE.accountType).toBe('Cheque / Current');
+      expect(INITIAL_INVESTOR_PROFILE.remittanceInstructions).toContain('POP');
+    });
+
+    it('verifies PublicTenantStatementPayload supports full banking configuration', () => {
+      const payloadWithBank: PublicTenantStatementPayload = {
+        ...mockStatementData,
+        landlord: {
+          ...mockStatementData.landlord,
+          bank_name: 'Nedbank',
+          account_holder: 'Apex Capital Holdings',
+          account_number: '1987654321',
+          branch_code: '198765',
+          account_type: 'Cheque / Current',
+          swift_code: 'NEDSZAJJ',
+          remittance_instructions: 'Immediate EFT only',
+        },
+      };
+
+      expect(payloadWithBank.landlord.bank_name).toBe('Nedbank');
+      expect(payloadWithBank.landlord.account_number).toBe('1987654321');
+      expect(payloadWithBank.landlord.branch_code).toBe('198765');
+      expect(payloadWithBank.landlord.swift_code).toBe('NEDSZAJJ');
+      expect(payloadWithBank.landlord.remittance_instructions).toBe('Immediate EFT only');
+    });
+  });
+
+  describe('Statement Declutter, Remaining Term Display & Print Isolation', () => {
+    it('computes remaining lease term for statement headers', async () => {
+      const { calculateRemainingLeaseTerm } = await import('@/lib/calculations/arrears');
+
+      // March 2026 billing period with lease ending 2026-12-31: 10 full months (March to Dec)
+      const remainingTerm = calculateRemainingLeaseTerm('2026-03', mockStatementData.lease.leaseEndDate);
+      expect(remainingTerm).toBe('10 Months');
+    });
+
+    it('verifies TenantStatementViewer component source enforces declutter and print rules', async () => {
+      const fs = await import('fs');
+      const path = await import('path');
+      const componentPath = path.resolve(__dirname, '../TenantStatementViewer.tsx');
+      const fileContent = fs.readFileSync(componentPath, 'utf-8');
+
+      // 1. Must contain "Remaining Lease Term" header
+      expect(fileContent).toContain('Remaining Lease Term:');
+      expect(fileContent).toContain('data-testid="remaining-lease-term"');
+
+      // 2. Must NOT have a dedicated "Previous Month" or "Previous Period" <th> in the ledger
+      expect(fileContent).not.toMatch(/<th[^>]*>\s*Previous Month\s*<\/th>/i);
+      expect(fileContent).not.toMatch(/<th[^>]*>\s*Previous Period\s*<\/th>/i);
+
+      // 3. Must retain Month-over-Month Variance tagged with variance-badge
+      expect(fileContent).toContain('Month-over-Month Variance');
+      expect(fileContent).toContain('variance-badge');
+
+      // 4. Print rules must hide variance badges
+      expect(fileContent).toContain('.variance-badge {');
+      expect(fileContent).toContain('display: none !important;');
+
+      // 5. Comparison note must be hidden in print
+      expect(fileContent).toMatch(/<span[^>]*className="[^"]*variance-badge[^"]*"[^>]*>\s*Comparing/);
+    });
+  });
 });

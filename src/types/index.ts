@@ -775,6 +775,25 @@ export interface InvestorProfile {
   minDscr?: number; // default 1.20
   vatExemptAgent?: boolean; // default false
   marginalTaxRatePercent?: number; // default 31.0%
+  // Remittance & Banking Details for Statements
+  bankName?: string;
+  accountHolder?: string;
+  accountNumber?: string;
+  accountType?: 'Cheque / Current' | 'Savings' | 'Transmission' | string;
+  branchCode?: string;
+  swiftCode?: string;
+  remittanceInstructions?: string;
+}
+
+export interface StatementBankingDetails {
+  bankName: string;
+  accountHolder: string;
+  accountNumber: string;
+  accountType?: string;
+  branchCode: string;
+  swiftCode?: string;
+  paymentReference?: string;
+  remittanceInstructions?: string;
 }
 
 // Long-Term Financial & Wealth Projection Yearly Snapshot

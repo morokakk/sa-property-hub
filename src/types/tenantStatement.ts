@@ -33,6 +33,13 @@ export interface PublicTenantStatementPayload {
     website?: string | null;
     physical_address?: string | null;
     logo_base64?: string | null;
+    bank_name?: string | null;
+    account_holder?: string | null;
+    account_number?: string | null;
+    account_type?: string | null;
+    branch_code?: string | null;
+    swift_code?: string | null;
+    remittance_instructions?: string | null;
   };
   utility_statements: UtilityStatement[];
   meter_readings?: MeterReading[];

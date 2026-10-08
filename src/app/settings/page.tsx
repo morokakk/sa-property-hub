@@ -37,11 +37,13 @@ import {
   Lock,
   ArrowLeft,
   Target,
+  CreditCard,
 } from 'lucide-react';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabaseClient';
 import { migrateToCloud, MigrationResult } from '@/lib/db/migrateToCloud';
 import { hydrateFromCloud } from '@/lib/db/hydrateFromCloud';
+import { SOUTH_AFRICAN_BANKS, ACCOUNT_TYPES } from '@/lib/constants/banks';
 
 function SettingsContent() {
   const searchParams = useSearchParams();
@@ -64,6 +66,13 @@ function SettingsContent() {
   const [physicalAddress, setPhysicalAddress] = useState(investorProfile.physicalAddress || '');
   const [bioSummary, setBioSummary] = useState(investorProfile.bioSummary || '');
   const [logoBase64, setLogoBase64] = useState<string>(investorProfile.logoBase64 || '');
+  const [bankName, setBankName] = useState(investorProfile.bankName || '');
+  const [accountHolder, setAccountHolder] = useState(investorProfile.accountHolder || '');
+  const [accountNumber, setAccountNumber] = useState(investorProfile.accountNumber || '');
+  const [accountType, setAccountType] = useState<string>(investorProfile.accountType || 'Cheque / Current');
+  const [branchCode, setBranchCode] = useState(investorProfile.branchCode || '');
+  const [swiftCode, setSwiftCode] = useState(investorProfile.swiftCode || '');
+  const [remittanceInstructions, setRemittanceInstructions] = useState(investorProfile.remittanceInstructions || '');
 
   // Default acquisition metrics
   const [defaultPrimeRate, setDefaultPrimeRate] = useState<number>(
@@ -366,6 +375,14 @@ function SettingsContent() {
     }
   };
 
+  const handleBankSelect = (selectedBank: string) => {
+    setBankName(selectedBank);
+    const preset = SOUTH_AFRICAN_BANKS.find((b) => b.name === selectedBank);
+    if (preset) {
+      setBranchCode(preset.universalBranchCode);
+    }
+  };
+
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -379,6 +396,13 @@ function SettingsContent() {
       physicalAddress,
       logoBase64,
       bioSummary,
+      bankName,
+      accountHolder: accountHolder || entityName,
+      accountNumber,
+      accountType,
+      branchCode,
+      swiftCode,
+      remittanceInstructions,
       defaultPrimeRatePercent: defaultPrimeRate,
       baselineHurdleYieldPercent: baselineHurdleYield,
       defaultAgentCommissionPercent: defaultCommission,
@@ -1013,6 +1037,162 @@ function SettingsContent() {
                 onChange={(e) => setPhysicalAddress(e.target.value)}
                 className="w-full text-xs px-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-emerald-500 text-slate-900"
               />
+            </div>
+          </div>
+
+          {/* Section: Banking & Remittance Information */}
+          <div id="settings-banking" className="scroll-mt-20 bg-white rounded-xl border border-slate-200 p-6 shadow-xs space-y-4">
+            <div className="flex items-center gap-2.5 pb-3 border-b border-slate-100">
+              <div className="p-2 bg-emerald-50 rounded-lg text-emerald-700">
+                <CreditCard className="w-5 h-5" />
+              </div>
+              <div>
+                <h2 className="text-base font-bold text-slate-900">Banking & Remittance Details</h2>
+                <p className="text-xs text-slate-500">
+                  Account information displayed on monthly tenant statements, tax invoices, and payment receipts.
+                </p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 text-xs">
+              {/* Bank Selection */}
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">
+                  Bank Name (South Africa) *
+                </label>
+                <div className="space-y-1.5">
+                  <select
+                    value={SOUTH_AFRICAN_BANKS.some((b) => b.name === bankName) ? bankName : bankName ? 'Other' : ''}
+                    onChange={(e) => {
+                      if (e.target.value === 'Other') {
+                        setBankName('');
+                      } else {
+                        handleBankSelect(e.target.value);
+                      }
+                    }}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-emerald-500 bg-white text-slate-900 font-medium"
+                  >
+                    <option value="">Select a South African Bank...</option>
+                    {SOUTH_AFRICAN_BANKS.map((b) => (
+                      <option key={b.name} value={b.name}>
+                        {b.name} ({b.universalBranchCode})
+                      </option>
+                    ))}
+                    <option value="Other">Other / Custom Bank</option>
+                  </select>
+
+                  {(!SOUTH_AFRICAN_BANKS.some((b) => b.name === bankName) || bankName === '') && (
+                    <input
+                      type="text"
+                      placeholder="Enter custom bank name"
+                      value={bankName}
+                      onChange={(e) => setBankName(e.target.value)}
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-emerald-500 text-slate-900"
+                    />
+                  )}
+                </div>
+              </div>
+
+              {/* Account Holder */}
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">
+                  Account Holder / Beneficiary Name *
+                </label>
+                <input
+                  type="text"
+                  placeholder={entityName || 'e.g. L&M Property Investments (Pty) Ltd'}
+                  value={accountHolder}
+                  onChange={(e) => setAccountHolder(e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-emerald-500 text-slate-900 font-medium"
+                />
+                <span className="text-[10px] text-slate-400 mt-1 block">
+                  Defaults to entity name if left blank
+                </span>
+              </div>
+
+              {/* Account Number */}
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">
+                  Account Number *
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. 62891044321"
+                  value={accountNumber}
+                  onChange={(e) => setAccountNumber(e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-emerald-500 font-mono text-slate-900 font-bold"
+                />
+              </div>
+
+              {/* Account Type */}
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">
+                  Account Type *
+                </label>
+                <select
+                  value={accountType}
+                  onChange={(e) => setAccountType(e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-emerald-500 bg-white text-slate-900 font-medium"
+                >
+                  {ACCOUNT_TYPES.map((t) => (
+                    <option key={t} value={t}>
+                      {t}
+                    </option>
+                  ))}
+                  <option value="Transmission">Transmission</option>
+                </select>
+              </div>
+
+              {/* Branch Code */}
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">
+                  Branch / Clearing Code *
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. 250655"
+                  value={branchCode}
+                  onChange={(e) => setBranchCode(e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-emerald-500 font-mono text-slate-900 font-bold"
+                />
+                <span className="text-[10px] text-slate-400 mt-1 block">
+                  Universal electronic code (auto-filled on bank selection)
+                </span>
+              </div>
+
+              {/* SWIFT / BIC Code (Optional) */}
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">
+                  SWIFT / BIC Code (Optional)
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. FIRNZAJJ"
+                  value={swiftCode}
+                  onChange={(e) => setSwiftCode(e.target.value.toUpperCase())}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-emerald-500 font-mono text-slate-900"
+                />
+                <span className="text-[10px] text-slate-400 mt-1 block">
+                  Required only for international cross-border EFTs
+                </span>
+              </div>
+            </div>
+
+            {/* Custom Remittance Instructions */}
+            <div className="pt-2 border-t border-slate-100">
+              <label className="block font-semibold text-slate-700 mb-1 text-xs">
+                Custom Remittance Instructions / Payment Terms Note
+              </label>
+              <textarea
+                rows={2}
+                value={remittanceInstructions}
+                onChange={(e) => setRemittanceInstructions(e.target.value)}
+                placeholder="e.g. Please use the statement payment reference as your bank beneficiary reference. Email POP to invest@lmtrading.co.za."
+                className="w-full text-xs p-2.5 border border-slate-300 rounded-lg focus:ring-1 focus:ring-emerald-500 leading-relaxed resize-none text-slate-900"
+              />
+              <p className="text-[10px] text-slate-400 mt-0.5">
+                Printed beneath bank account details on generated statements and PDF invoices.
+              </p>
             </div>
           </div>
 

@@ -15,6 +15,9 @@ import {
   CreditCard,
   Download,
   ChevronDown,
+  Landmark,
+  Copy,
+  Check,
 } from 'lucide-react';
 import { PublicTenantStatementPayload } from '@/types/tenantStatement';
 import { RentalProperty, TenantPaymentRecord, ArrearsWriteOff } from '@/types';
@@ -26,6 +29,7 @@ import {
   getMonthKey,
   getPreviousMonthKey,
   formatMonthLabel,
+  calculateRemainingLeaseTerm,
 } from '@/lib/calculations/arrears';
 
 interface TenantStatementViewerProps {
@@ -107,6 +111,14 @@ export default function TenantStatementViewer({
 
   const [selectedPeriodMonth, setSelectedPeriodMonth] = useState<string>(initialMonth || '');
   const [isBroughtForwardExpanded, setIsBroughtForwardExpanded] = useState<boolean>(false);
+  const [copiedBankField, setCopiedBankField] = useState<string | null>(null);
+
+  const handleCopyAccount = (text: string) => {
+    if (!text) return;
+    navigator.clipboard.writeText(text);
+    setCopiedBankField('account');
+    setTimeout(() => setCopiedBankField(null), 2500);
+  };
 
   // Active period month: defaults to initialMonth, or first ledger option (e.g. October 2026), or current month
   const activeMonth = useMemo(() => {
@@ -273,7 +285,7 @@ export default function TenantStatementViewer({
   const renderVariance = (curr: number, prev: number | undefined) => {
     if (prev === undefined) {
       return (
-        <span className="text-slate-400 text-[11px] font-mono">
+        <span className="variance-badge text-slate-400 text-[11px] font-mono">
           — (Baseline Period)
         </span>
       );
@@ -281,7 +293,7 @@ export default function TenantStatementViewer({
     const diff = curr - prev;
     if (Math.abs(diff) < 0.01) {
       return (
-        <span className="text-slate-400 text-xs font-mono font-medium">
+        <span className="variance-badge text-slate-400 text-xs font-mono font-medium">
           0.00 (0%)
         </span>
       );
@@ -291,7 +303,7 @@ export default function TenantStatementViewer({
 
     return (
       <span
-        className={`inline-flex items-center gap-1 font-bold text-xs ${
+        className={`variance-badge inline-flex items-center gap-1 font-bold text-xs ${
           isIncrease ? 'text-rose-600' : 'text-emerald-600'
         }`}
       >
@@ -343,6 +355,9 @@ export default function TenantStatementViewer({
                 z-index: 99999 !important;
               }
               .print-hidden-element {
+                display: none !important;
+              }
+              .variance-badge {
                 display: none !important;
               }
               @page {
@@ -522,6 +537,12 @@ export default function TenantStatementViewer({
               <p className="text-slate-400 text-[11px] pt-0.5">
                 Lease Term: {formatDate(lease.leaseStartDate)} — {formatDate(lease.leaseEndDate)}
               </p>
+              <p className="text-slate-600 text-[11px] font-medium pt-0.5">
+                Remaining Lease Term:{' '}
+                <strong className="text-slate-900 font-bold" data-testid="remaining-lease-term">
+                  {calculateRemainingLeaseTerm(activeMonth, lease.leaseEndDate)}
+                </strong>
+              </p>
             </div>
           </div>
 
@@ -536,7 +557,7 @@ export default function TenantStatementViewer({
                   Scroll horizontally for variance →
                 </span>
                 {previousStatement && (
-                  <span className="text-[11px] font-medium text-slate-500">
+                  <span className="variance-badge text-[11px] font-medium text-slate-500">
                     Comparing {previousPeriodLabel} vs {billingPeriodLabel}
                   </span>
                 )}
@@ -544,17 +565,14 @@ export default function TenantStatementViewer({
             </div>
 
             <div className="overflow-x-auto rounded-2xl border border-slate-200 shadow-2xs">
-              <table className="w-full min-w-[620px] text-left text-xs border-collapse">
+              <table className="w-full min-w-[540px] text-left text-xs border-collapse">
                 <thead>
                   <tr className="bg-slate-900 text-white uppercase font-semibold text-[10px] tracking-wider">
                     <th className="p-3 pl-4">Billing Item / Municipal Line</th>
                     <th className="p-3 text-right whitespace-nowrap">
-                      {previousPeriodLabel}
-                    </th>
-                    <th className="p-3 text-right whitespace-nowrap">
                       {billingPeriodLabel}
                     </th>
-                    <th className="p-3 pr-4 text-right whitespace-nowrap">
+                    <th className="variance-badge p-3 pr-4 text-right whitespace-nowrap">
                       Month-over-Month Variance
                     </th>
                   </tr>
@@ -601,11 +619,10 @@ export default function TenantStatementViewer({
                         </div>
                       )}
                     </td>
-                    <td className="p-3 text-right font-mono text-slate-400 whitespace-nowrap">—</td>
                     <td className={`p-3 text-right font-mono font-bold whitespace-nowrap ${balanceBroughtForward > 0 ? 'text-rose-700' : 'text-slate-800'}`}>
                       {formatZAR(balanceBroughtForward, { includeDecimals: true })}
                     </td>
-                    <td className="p-3 pr-4 text-right text-[10px] whitespace-nowrap font-medium">
+                    <td className="variance-badge p-3 pr-4 text-right text-[10px] whitespace-nowrap font-medium">
                       {balanceBroughtForward > 0 ? (
                         <span className="text-rose-700 font-bold bg-rose-50 px-1.5 py-0.5 rounded border border-rose-200">
                           Prior Arrears
@@ -628,15 +645,10 @@ export default function TenantStatementViewer({
                         Unit: {lease.unitName} • Fixed monthly residential lease fee
                       </div>
                     </td>
-                    <td className="p-3 text-right font-mono text-slate-600 whitespace-nowrap">
-                      {previousStatement
-                        ? formatZAR(baseRent, { includeDecimals: true })
-                        : <span className="text-slate-400 font-mono">— (Baseline Period)</span>}
-                    </td>
                     <td className="p-3 text-right font-mono font-bold text-slate-900 whitespace-nowrap">
                       {formatZAR(baseRent, { includeDecimals: true })}
                     </td>
-                    <td className="p-3 pr-4 text-right text-slate-400 font-mono text-xs whitespace-nowrap">
+                    <td className="variance-badge p-3 pr-4 text-right text-slate-400 font-mono text-xs whitespace-nowrap">
                       — (Contract Fixed)
                     </td>
                   </tr>
@@ -644,7 +656,7 @@ export default function TenantStatementViewer({
                   {/* 2. Prepaid Submeter Notice (if applicable) */}
                   {isPrepaid ? (
                     <tr className="bg-sky-50/40">
-                      <td colSpan={4} className="p-3.5 pl-4">
+                      <td colSpan={3} className="p-3.5 pl-4">
                         <div className="flex items-start gap-2.5">
                           <Zap className="w-4 h-4 text-sky-600 shrink-0 mt-0.5" />
                           <div>
@@ -670,22 +682,17 @@ export default function TenantStatementViewer({
                           Source: {activeStatement?.provider || 'Body Corporate'} • Consolidated Recovery (Unmetered)
                         </div>
                       </td>
-                      <td className="p-3 text-right font-mono text-slate-600 whitespace-nowrap">
-                        {prevBundledZAR !== undefined
-                          ? formatZAR(prevBundledZAR, { includeDecimals: true })
-                          : <span className="text-slate-400 font-mono">— (Baseline Period)</span>}
-                      </td>
                       <td className="p-3 text-right font-mono font-bold text-slate-800 whitespace-nowrap">
                         {formatZAR(bundledZAR, { includeDecimals: true })}
                       </td>
-                      <td className="p-3 pr-4 text-right whitespace-nowrap">
+                      <td className="variance-badge p-3 pr-4 text-right whitespace-nowrap">
                         {renderVariance(bundledZAR, prevBundledZAR)}
                       </td>
                     </tr>
                   ) : !activeStatement ? (
                     /* Municipal Utility Notice Row when Statement is Pending Upload */
                     <tr className="bg-slate-50/60 border-y border-slate-200">
-                      <td colSpan={4} className="p-3.5 pl-4">
+                      <td colSpan={3} className="p-3.5 pl-4">
                         <div className="flex items-center gap-2.5">
                           <FileText className="w-4 h-4 text-slate-500 shrink-0" />
                           <div>
@@ -712,7 +719,7 @@ export default function TenantStatementViewer({
                             <div className="mt-1 flex items-center gap-1.5 flex-wrap text-[10px]">
                               {elecMeterReading.meterNumber && (
                                 <span className="font-mono font-bold text-amber-800 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded">
-                                  Meter #{elecMeterReading.meterNumber}
+                                   Meter #{elecMeterReading.meterNumber}
                                 </span>
                               )}
                               <span className="text-slate-600 font-mono">
@@ -733,15 +740,10 @@ export default function TenantStatementViewer({
                             </div>
                           )}
                         </td>
-                        <td className="p-3 text-right font-mono text-slate-600 whitespace-nowrap">
-                          {prevElecZAR !== undefined
-                            ? formatZAR(prevElecZAR, { includeDecimals: true })
-                            : <span className="text-slate-400 font-mono">— (Baseline Period)</span>}
-                        </td>
                         <td className="p-3 text-right font-mono font-bold text-slate-900 whitespace-nowrap">
                           {formatZAR(elecZAR, { includeDecimals: true })}
                         </td>
-                        <td className="p-3 pr-4 text-right whitespace-nowrap">
+                        <td className="variance-badge p-3 pr-4 text-right whitespace-nowrap">
                           {renderVariance(elecZAR, prevElecZAR)}
                         </td>
                       </tr>
@@ -778,15 +780,10 @@ export default function TenantStatementViewer({
                             </div>
                           )}
                         </td>
-                        <td className="p-3 text-right font-mono text-slate-600 whitespace-nowrap">
-                          {prevWaterZAR !== undefined
-                            ? formatZAR(prevWaterZAR, { includeDecimals: true })
-                            : <span className="text-slate-400 font-mono">— (Baseline Period)</span>}
-                        </td>
                         <td className="p-3 text-right font-mono font-bold text-slate-900 whitespace-nowrap">
                           {formatZAR(waterZAR, { includeDecimals: true })}
                         </td>
-                        <td className="p-3 pr-4 text-right whitespace-nowrap">
+                        <td className="variance-badge p-3 pr-4 text-right whitespace-nowrap">
                           {renderVariance(waterZAR, prevWaterZAR)}
                         </td>
                       </tr>
@@ -798,15 +795,10 @@ export default function TenantStatementViewer({
                             <div className="font-semibold text-slate-800">Refuse Removal</div>
                             <div className="text-[10px] text-slate-500 mt-0.5">Municipal waste collection tariff</div>
                           </td>
-                          <td className="p-3 text-right font-mono text-slate-600 whitespace-nowrap">
-                            {prevRefuseZAR !== undefined
-                              ? formatZAR(prevRefuseZAR, { includeDecimals: true })
-                              : <span className="text-slate-400 font-mono">— (Baseline Period)</span>}
-                          </td>
                           <td className="p-3 text-right font-mono font-bold text-slate-900 whitespace-nowrap">
                             {formatZAR(refuseZAR, { includeDecimals: true })}
                           </td>
-                          <td className="p-3 pr-4 text-right whitespace-nowrap">
+                          <td className="variance-badge p-3 pr-4 text-right whitespace-nowrap">
                             {renderVariance(refuseZAR, prevRefuseZAR)}
                           </td>
                         </tr>
@@ -819,15 +811,10 @@ export default function TenantStatementViewer({
                             <div className="font-semibold text-slate-800">Sewerage & Effluent</div>
                             <div className="text-[10px] text-slate-500 mt-0.5">City infrastructure domestic sewerage charge</div>
                           </td>
-                          <td className="p-3 text-right font-mono text-slate-600 whitespace-nowrap">
-                            {prevSewerageZAR !== undefined
-                              ? formatZAR(prevSewerageZAR, { includeDecimals: true })
-                              : <span className="text-slate-400 font-mono">— (Baseline Period)</span>}
-                          </td>
                           <td className="p-3 text-right font-mono font-bold text-slate-900 whitespace-nowrap">
                             {formatZAR(sewerageZAR, { includeDecimals: true })}
                           </td>
-                          <td className="p-3 pr-4 text-right whitespace-nowrap">
+                          <td className="variance-badge p-3 pr-4 text-right whitespace-nowrap">
                             {renderVariance(sewerageZAR, prevSewerageZAR)}
                           </td>
                         </tr>
@@ -841,13 +828,10 @@ export default function TenantStatementViewer({
                       2. Subtotal Current Period Charges
                       <div className="text-[10px] font-normal text-slate-500">Base Rent + itemized utility recoveries</div>
                     </td>
-                    <td className="p-2.5 text-right font-mono text-xs text-slate-700 whitespace-nowrap">
-                      {prevTotalDue !== undefined ? formatZAR(prevTotalDue, { includeDecimals: true }) : '—'}
-                    </td>
                     <td className="p-2.5 text-right font-mono text-xs font-bold text-slate-900 whitespace-nowrap">
                       {formatZAR(totalDue, { includeDecimals: true })}
                     </td>
-                    <td className="p-2.5 pr-4 text-right whitespace-nowrap text-xs">
+                    <td className="variance-badge p-2.5 pr-4 text-right whitespace-nowrap text-xs">
                       {renderVariance(totalDue, prevTotalDue)}
                     </td>
                   </tr>
@@ -872,11 +856,10 @@ export default function TenantStatementViewer({
                               )}
                             </div>
                           </td>
-                          <td className="p-3 text-right font-mono text-slate-400 whitespace-nowrap">—</td>
                           <td className="p-3 text-right font-mono font-bold text-emerald-700 whitespace-nowrap">
                             -{formatZAR(p.allocatedAmountForPeriod, { includeDecimals: true })}
                           </td>
-                          <td className="p-3 pr-4 text-right whitespace-nowrap text-[10px] text-emerald-700 font-semibold">
+                          <td className="variance-badge p-3 pr-4 text-right whitespace-nowrap text-[10px] text-emerald-700 font-semibold">
                             {isDeposit ? 'Deposit Applied' : 'Payment Applied'}
                           </td>
                         </tr>
@@ -891,9 +874,8 @@ export default function TenantStatementViewer({
                         </div>
                         <div className="text-[10px] text-slate-400">No payments recorded for this billing period yet</div>
                       </td>
-                      <td className="p-3 text-right font-mono text-slate-400 whitespace-nowrap">—</td>
                       <td className="p-3 text-right font-mono text-slate-500 whitespace-nowrap">R 0.00</td>
-                      <td className="p-3 pr-4 text-right whitespace-nowrap text-[10px] text-slate-400">Pending</td>
+                      <td className="variance-badge p-3 pr-4 text-right whitespace-nowrap text-[10px] text-slate-400">Pending</td>
                     </tr>
                   )}
 
@@ -910,11 +892,10 @@ export default function TenantStatementViewer({
                             Date: {formatDate(w.date)}
                           </div>
                         </td>
-                        <td className="p-3 text-right font-mono text-slate-400 whitespace-nowrap">—</td>
                         <td className="p-3 text-right font-mono font-bold text-slate-600 whitespace-nowrap">
                           -{formatZAR(w.allocatedAmountForPeriod, { includeDecimals: true })}
                         </td>
-                        <td className="p-3 pr-4 text-right whitespace-nowrap text-[10px] text-slate-500 font-semibold">
+                        <td className="variance-badge p-3 pr-4 text-right whitespace-nowrap text-[10px] text-slate-500 font-semibold">
                           Credit Applied
                         </td>
                       </tr>
@@ -941,17 +922,12 @@ export default function TenantStatementViewer({
                         TOTAL AMOUNT PAYABLE • Balance Brought Forward + Current Charges - Payments Received
                       </div>
                     </td>
-                    <td className="p-3.5 text-right font-mono text-xs text-slate-700 whitespace-nowrap font-bold">
-                      {prevGrandTotalDue !== undefined
-                        ? formatZAR(prevGrandTotalDue, { includeDecimals: true })
-                        : <span className="text-slate-500 font-normal">— (Baseline Period)</span>}
-                    </td>
                     <td className="p-3.5 text-right font-mono text-base text-emerald-950 font-black whitespace-nowrap">
                       <span data-testid="total-due-amount">
                         {formatZAR(grandTotalDue, { includeDecimals: true })}
                       </span>
                     </td>
-                    <td className="p-3.5 pr-4 text-right whitespace-nowrap">
+                    <td className="variance-badge p-3.5 pr-4 text-right whitespace-nowrap">
                       {renderVariance(grandTotalDue, prevGrandTotalDue)}
                     </td>
                   </tr>
@@ -961,17 +937,86 @@ export default function TenantStatementViewer({
           </div>
 
           {/* 4. Payment Remittance & Instructions */}
-          <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 sm:p-5 space-y-3 text-xs">
-            <div className="flex items-center gap-2 text-slate-900 font-bold">
-              <CreditCard className="w-4 h-4 text-emerald-600" />
-              <span>Remittance & Payment Details</span>
+          <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 sm:p-5 space-y-3.5 text-xs">
+            <div className="flex items-center justify-between gap-2 border-b border-slate-200/80 pb-2">
+              <div className="flex items-center gap-2 text-slate-900 font-bold">
+                <CreditCard className="w-4 h-4 text-emerald-600" />
+                <span>Remittance & Payment Details</span>
+              </div>
+              {landlord.account_number && (
+                <button
+                  type="button"
+                  data-testid="copy-bank-account-btn"
+                  onClick={() => handleCopyAccount(landlord.account_number || '')}
+                  className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 px-2 py-0.5 rounded transition-colors cursor-pointer print-hidden-element"
+                  title="Copy Account Number to Clipboard"
+                >
+                  {copiedBankField === 'account' ? (
+                    <>
+                      <Check className="w-3 h-3 text-emerald-600" />
+                      <span>Copied!</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="w-3 h-3 text-emerald-600" />
+                      <span>Copy Account No</span>
+                    </>
+                  )}
+                </button>
+              )}
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-slate-600 text-[11px]">
+            {landlord.account_number ? (
+              <div data-testid="statement-banking-details" className="p-3.5 bg-white rounded-xl border border-slate-200 space-y-2.5 shadow-2xs">
+                <div className="flex items-center gap-1.5 font-bold text-slate-800 text-xs border-b border-slate-100 pb-2">
+                  <Landmark className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                  <span>Electronic Funds Transfer (EFT) Banking Details</span>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+                  <div>
+                    <span className="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">Bank Name</span>
+                    <span className="font-semibold text-slate-900">{landlord.bank_name || 'Standard Bank'}</span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">Account Holder</span>
+                    <span className="font-semibold text-slate-900 truncate block" title={landlord.account_holder || landlord.entity_name}>
+                      {landlord.account_holder || landlord.entity_name}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">Account Number</span>
+                    <span className="font-mono font-black text-slate-900 tracking-wide text-xs">{landlord.account_number}</span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">Branch / Type</span>
+                    <span className="font-mono font-medium text-slate-800 text-[11px]">
+                      {landlord.branch_code || 'Universal'} ({landlord.account_type || 'Current'})
+                    </span>
+                  </div>
+                </div>
+
+                {landlord.swift_code && (
+                  <div className="text-[10px] text-slate-500 font-mono pt-1.5 border-t border-slate-50 flex items-center gap-2">
+                    <span className="font-semibold text-slate-400">SWIFT / BIC:</span>
+                    <span className="font-bold text-slate-700">{landlord.swift_code}</span>
+                  </div>
+                )}
+
+                {landlord.remittance_instructions && (
+                  <div className="text-[11px] text-slate-600 bg-slate-50 p-2 rounded-lg border border-slate-200/80 italic">
+                    {landlord.remittance_instructions}
+                  </div>
+                )}
+              </div>
+            ) : null}
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-slate-600 text-[11px] pt-1">
               <div>
-                <p>
-                  <strong>Account Name:</strong> {landlord.entity_name}
-                </p>
+                {!landlord.account_number && (
+                  <p>
+                    <strong>Account Name:</strong> {landlord.entity_name}
+                  </p>
+                )}
                 <p>
                   <strong>Payment Due Date:</strong> 1st of every calendar month
                 </p>

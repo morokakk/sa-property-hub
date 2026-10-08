@@ -1,3 +1,5 @@
+import { StatementBankingDetails } from '@/types';
+
 export interface GenerateEmailHtmlParams {
   tenantName?: string;
   propertyName: string;
@@ -7,6 +9,8 @@ export interface GenerateEmailHtmlParams {
   statementUrl: string;
   landlordName?: string;
   filename: string;
+  remainingLeaseTerm?: string;
+  bankingDetails?: StatementBankingDetails;
 }
 
 /**
@@ -22,6 +26,8 @@ export function generateStatementEmailHtml(params: GenerateEmailHtmlParams): str
     statementUrl,
     landlordName,
     filename,
+    remainingLeaseTerm,
+    bankingDetails,
   } = params;
 
   return `<!DOCTYPE html>
@@ -89,6 +95,11 @@ export function generateStatementEmailHtml(params: GenerateEmailHtmlParams): str
                   <td style="padding: 10px 0; color: #64748b; font-weight: 500;">Unit / Section:</td>
                   <td style="padding: 10px 0; color: #0f172a; font-weight: 600; text-align: right;">${unitName}</td>
                 </tr>` : ''}
+                ${remainingLeaseTerm ? `
+                <tr style="border-bottom: 1px solid #f1f5f9;">
+                  <td style="padding: 10px 0; color: #64748b; font-weight: 500;">Remaining Lease Term:</td>
+                  <td style="padding: 10px 0; color: #0f172a; font-weight: 600; text-align: right;">${remainingLeaseTerm}</td>
+                </tr>` : ''}
                 ${landlordName ? `
                 <tr style="border-bottom: 1px solid #f1f5f9;">
                   <td style="padding: 10px 0; color: #64748b; font-weight: 500;">Landlord / Lessor:</td>
@@ -99,6 +110,50 @@ export function generateStatementEmailHtml(params: GenerateEmailHtmlParams): str
                   <td style="padding: 10px 0; color: #0f172a; font-weight: 600; text-align: right;">${filename}</td>
                 </tr>
               </table>
+
+              ${bankingDetails && bankingDetails.accountNumber ? `
+              <!-- Remittance Banking Details Card -->
+              <table role="presentation" width="100%" border="0" cellpadding="0" cellspacing="0" style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; margin-bottom: 28px; padding: 18px; font-size: 13px;">
+                <tr>
+                  <td>
+                    <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: #0f172a; margin-bottom: 12px; border-bottom: 1px solid #e2e8f0; padding-bottom: 6px;">
+                      🏦 Remittance Banking Details (EFT)
+                    </div>
+                    <table role="presentation" width="100%" border="0" cellpadding="0" cellspacing="0" style="font-size: 12px; border-collapse: collapse;">
+                      <tr>
+                        <td style="padding: 4px 0; color: #64748b; font-weight: 500; width: 40%;">Bank:</td>
+                        <td style="padding: 4px 0; color: #0f172a; font-weight: 700;">${bankingDetails.bankName}</td>
+                      </tr>
+                      <tr>
+                        <td style="padding: 4px 0; color: #64748b; font-weight: 500;">Account Holder:</td>
+                        <td style="padding: 4px 0; color: #0f172a; font-weight: 600;">${bankingDetails.accountHolder}</td>
+                      </tr>
+                      <tr>
+                        <td style="padding: 4px 0; color: #64748b; font-weight: 500;">Account Number:</td>
+                        <td style="padding: 4px 0; color: #0f172a; font-weight: 700; font-family: monospace; font-size: 13px;">${bankingDetails.accountNumber}</td>
+                      </tr>
+                      <tr>
+                        <td style="padding: 4px 0; color: #64748b; font-weight: 500;">Branch / Code:</td>
+                        <td style="padding: 4px 0; color: #0f172a; font-weight: 600; font-family: monospace;">${bankingDetails.branchCode}${bankingDetails.accountType ? ` (${bankingDetails.accountType})` : ''}</td>
+                      </tr>
+                      ${bankingDetails.swiftCode ? `
+                      <tr>
+                        <td style="padding: 4px 0; color: #64748b; font-weight: 500;">SWIFT / BIC:</td>
+                        <td style="padding: 4px 0; color: #0f172a; font-weight: 600; font-family: monospace;">${bankingDetails.swiftCode}</td>
+                      </tr>` : ''}
+                      ${bankingDetails.paymentReference ? `
+                      <tr style="border-top: 1px dashed #cbd5e1;">
+                        <td style="padding: 8px 0 4px 0; color: #059669; font-weight: 700;">Beneficiary Reference:</td>
+                        <td style="padding: 8px 0 4px 0; color: #059669; font-weight: 800; font-family: monospace; font-size: 13px;">${bankingDetails.paymentReference}</td>
+                      </tr>` : ''}
+                    </table>
+                    ${bankingDetails.remittanceInstructions ? `
+                    <div style="font-size: 11px; color: #64748b; font-style: italic; margin-top: 10px; padding-top: 8px; border-top: 1px solid #f1f5f9;">
+                      ${bankingDetails.remittanceInstructions}
+                    </div>` : ''}
+                  </td>
+                </tr>
+              </table>` : ''}
 
               <!-- Prominent CTA Button -->
               <table role="presentation" width="100%" border="0" cellpadding="0" cellspacing="0" style="margin-bottom: 24px;">

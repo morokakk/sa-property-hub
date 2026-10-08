@@ -209,7 +209,7 @@ describe('sendStatementEmail Server Action', () => {
   });
 
   describe('3. Branded HTML Email Template Generation', () => {
-    it('injects all required landlord, property, unit, and URL branding fields with direct link fallback', () => {
+    it('injects all required landlord, property, unit, remainingLeaseTerm, and URL branding fields with direct link fallback', () => {
       const html = generateStatementEmailHtml({
         tenantName: 'Priya Pillay',
         propertyName: 'Umhlanga Arch Penthouse',
@@ -219,6 +219,7 @@ describe('sendStatementEmail Server Action', () => {
         statementUrl: 'https://propertyhub.co.za/statement/lease-456?month=2026-11',
         landlordName: 'Oceanic Holdings Ltd',
         filename: 'Statement_November_2026.pdf',
+        remainingLeaseTerm: '5 Months',
       });
 
       expect(html).toContain('Priya Pillay');
@@ -229,11 +230,13 @@ describe('sendStatementEmail Server Action', () => {
       expect(html).toContain('https://propertyhub.co.za/statement/lease-456?month=2026-11');
       expect(html).toContain('Oceanic Holdings Ltd');
       expect(html).toContain('Statement_November_2026.pdf');
+      expect(html).toContain('Remaining Lease Term:');
+      expect(html).toContain('5 Months');
       expect(html).toContain('View Secure Online Statement');
       expect(html).toContain('Direct portal link:');
     });
 
-    it('falls back gracefully when unitName or landlordName are omitted', () => {
+    it('falls back gracefully when unitName, landlordName, or remainingLeaseTerm are omitted', () => {
       const html = generateStatementEmailHtml({
         tenantName: '',
         propertyName: 'Cottage Rosebank',
@@ -248,6 +251,113 @@ describe('sendStatementEmail Server Action', () => {
       expect(html).toContain('R 6,500.00');
       expect(html).toContain('https://propertyhub.co.za/statement/lease-99');
       expect(html).toContain('Statement_October_2026.pdf');
+      expect(html).not.toContain('Remaining Lease Term:');
+    });
+
+    it('passes remainingLeaseTerm through sendStatementEmail into html output', async () => {
+      process.env.RESEND_API_KEY = 're_test_12345';
+      mockSend.mockResolvedValueOnce({
+        data: { id: 'msg_term_test' },
+        error: null,
+      });
+
+      const result = await sendStatementEmail({
+        ...validPayload,
+        remainingLeaseTerm: '7 Months',
+      });
+
+      expect(result.success).toBe(true);
+      const callArgs = mockSend.mock.calls[0][0];
+      expect(callArgs.html).toContain('Remaining Lease Term:');
+      expect(callArgs.html).toContain('7 Months');
+    });
+
+    it('renders structured EFT banking details table in email HTML when bankingDetails is provided', () => {
+      const html = generateStatementEmailHtml({
+        tenantName: 'Thabo Mokoena',
+        propertyName: 'Sandhurst Executive Suite',
+        unitName: 'Unit 4B',
+        billingPeriod: 'October 2026',
+        totalAmountDueFormatted: 'R 18,500.00',
+        statementUrl: 'https://propertyhub.co.za/statement/lease-1?month=2026-10',
+        landlordName: 'Apex Properties Ltd',
+        filename: 'Statement_October_2026.pdf',
+        bankingDetails: {
+          bankName: 'First National Bank (FNB)',
+          accountHolder: 'Apex Properties Ltd',
+          accountNumber: '62891044321',
+          branchCode: '250655',
+          accountType: 'Cheque / Current',
+          swiftCode: 'FIRNZAJJ',
+          paymentReference: 'UNIT4B-MOKOENA',
+          remittanceInstructions: 'Email POP to accounts@apex.co.za within 24 hours of EFT transfer.',
+        },
+      });
+
+      expect(html).toContain('Remittance Banking Details (EFT)');
+      expect(html).toContain('First National Bank (FNB)');
+      expect(html).toContain('Apex Properties Ltd');
+      expect(html).toContain('62891044321');
+      expect(html).toContain('250655 (Cheque / Current)');
+      expect(html).toContain('FIRNZAJJ');
+      expect(html).toContain('UNIT4B-MOKOENA');
+      expect(html).toContain('Email POP to accounts@apex.co.za within 24 hours of EFT transfer.');
+    });
+
+    it('omits banking details table when bankingDetails is omitted or has empty accountNumber', () => {
+      const htmlWithoutBank = generateStatementEmailHtml({
+        tenantName: 'Thabo Mokoena',
+        propertyName: 'Sandhurst Executive Suite',
+        billingPeriod: 'October 2026',
+        totalAmountDueFormatted: 'R 18,500.00',
+        statementUrl: 'https://propertyhub.co.za/statement/lease-1',
+        filename: 'Statement_October_2026.pdf',
+      });
+
+      expect(htmlWithoutBank).not.toContain('Remittance Banking Details (EFT)');
+
+      const htmlWithEmptyAccount = generateStatementEmailHtml({
+        tenantName: 'Thabo Mokoena',
+        propertyName: 'Sandhurst Executive Suite',
+        billingPeriod: 'October 2026',
+        totalAmountDueFormatted: 'R 18,500.00',
+        statementUrl: 'https://propertyhub.co.za/statement/lease-1',
+        filename: 'Statement_October_2026.pdf',
+        bankingDetails: {
+          bankName: 'FNB',
+          accountHolder: 'Apex',
+          accountNumber: '',
+          branchCode: '250655',
+        },
+      });
+
+      expect(htmlWithEmptyAccount).not.toContain('Remittance Banking Details (EFT)');
+    });
+
+    it('passes bankingDetails through sendStatementEmail into Resend send html call', async () => {
+      process.env.RESEND_API_KEY = 're_test_12345';
+      mockSend.mockResolvedValueOnce({
+        data: { id: 'msg_bank_test' },
+        error: null,
+      });
+
+      const result = await sendStatementEmail({
+        ...validPayload,
+        bankingDetails: {
+          bankName: 'Nedbank',
+          accountHolder: 'Apex Properties Ltd',
+          accountNumber: '1987654321',
+          branchCode: '198765',
+          paymentReference: 'UNIT4B-MOKOENA',
+        },
+      });
+
+      expect(result.success).toBe(true);
+      const callArgs = mockSend.mock.calls[0][0];
+      expect(callArgs.html).toContain('Remittance Banking Details (EFT)');
+      expect(callArgs.html).toContain('Nedbank');
+      expect(callArgs.html).toContain('1987654321');
+      expect(callArgs.html).toContain('UNIT4B-MOKOENA');
     });
   });
 });

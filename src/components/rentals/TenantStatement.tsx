@@ -26,6 +26,9 @@ import {
   Calendar,
   ChevronDown,
   Mail,
+  Copy,
+  Check,
+  CreditCard,
 } from 'lucide-react';
 import { usePortfolioStore } from '@/lib/store/usePortfolioStore';
 import { formatZAR, formatDate } from '@/lib/formatters';
@@ -45,6 +48,7 @@ import {
   formatAllocationsSummary,
   getStatementLedgerOptions,
   StatementPeriodOption,
+  calculateRemainingLeaseTerm,
 } from '@/lib/calculations/arrears';
 import { sendStatementEmail } from '@/app/actions/sendStatementEmail';
 import { generateTenantStatementPdf } from '@/lib/pdf/generateTenantStatementPdf';
@@ -86,7 +90,15 @@ export default function TenantStatement({
   const [isPublishingLink, setIsPublishingLink] = useState(false);
   const [isSendingEmail, setIsSendingEmail] = useState(false);
   const [isShareDropdownOpen, setIsShareDropdownOpen] = useState(false);
+  const [copiedBankField, setCopiedBankField] = useState<string | null>(null);
   const shareDropdownRef = useRef<HTMLDivElement>(null);
+
+  const handleCopyAccount = (accountNumber: string) => {
+    if (!accountNumber) return;
+    navigator.clipboard.writeText(accountNumber);
+    setCopiedBankField('account');
+    setTimeout(() => setCopiedBankField(null), 2500);
+  };
 
   // Close share actions dropdown on outside click
   useEffect(() => {
@@ -706,6 +718,17 @@ export default function TenantStatement({
         statementUrl: shareUrl,
         pdfBase64: base64,
         landlordName: investorProfile?.entityName || 'Landlord',
+        remainingLeaseTerm: calculateRemainingLeaseTerm(activePeriodMonth, selectedLease.leaseEndDate),
+        bankingDetails: investorProfile?.accountNumber ? {
+          bankName: investorProfile.bankName || 'First National Bank (FNB)',
+          accountHolder: investorProfile.accountHolder || investorProfile.entityName,
+          accountNumber: investorProfile.accountNumber,
+          accountType: investorProfile.accountType || 'Cheque / Current',
+          branchCode: investorProfile.branchCode || '250655',
+          swiftCode: investorProfile.swiftCode,
+          paymentReference: `${(selectedLease?.tenantName || 'TENANT').replace(/\s+/g, '-').toUpperCase()} - ${(selectedLease?.unitName || 'UNIT').replace(/\s+/g, '').toUpperCase()}`,
+          remittanceInstructions: investorProfile.remittanceInstructions,
+        } : undefined,
       });
 
       if (!emailRes.success) {
@@ -742,18 +765,18 @@ export default function TenantStatement({
   // Variance visual badge helper
   const renderVariance = (curr: number, prev: number | undefined) => {
     if (prev === undefined) {
-      return <span className="text-slate-400 text-xs font-mono">—</span>;
+      return <span className="variance-badge text-slate-400 text-xs font-mono">—</span>;
     }
     const diff = curr - prev;
     if (Math.abs(diff) < 0.01) {
-      return <span className="text-slate-400 text-xs font-mono font-medium">0.00 (0%)</span>;
+      return <span className="variance-badge text-slate-400 text-xs font-mono font-medium">0.00 (0%)</span>;
     }
     const pct = prev > 0 ? (diff / prev) * 100 : diff > 0 ? 100 : -100;
     const isIncrease = diff > 0;
 
     return (
       <span
-        className={`inline-flex items-center gap-1 font-bold text-xs ${
+        className={`variance-badge inline-flex items-center gap-1 font-bold text-xs ${
           isIncrease ? 'text-rose-600' : 'text-emerald-600'
         }`}
       >
@@ -810,6 +833,9 @@ export default function TenantStatement({
               }
               /* Hide modal header, toasts, and upload dropzones in print */
               .print-hidden-element {
+                display: none !important;
+              }
+              .variance-badge {
                 display: none !important;
               }
               @page {
@@ -1258,6 +1284,22 @@ export default function TenantStatement({
                         : (selectedLease?.tenantName || 'Vacant')}
                     </strong>
                   </div>
+                  {selectedLease && isResidential && (
+                    <div className="text-slate-600">
+                      <span className="text-slate-400">Remaining Lease Term:</span>{' '}
+                      <strong className="text-slate-900" data-testid="remaining-lease-term">
+                        {calculateRemainingLeaseTerm(activePeriodMonth, selectedLease.leaseEndDate)}
+                      </strong>
+                    </div>
+                  )}
+                  {selectedAncillary && isCommercial && (
+                    <div className="text-slate-600">
+                      <span className="text-slate-400">Remaining Lease Term:</span>{' '}
+                      <strong className="text-slate-900" data-testid="remaining-lease-term">
+                        {calculateRemainingLeaseTerm(activePeriodMonth, selectedAncillary.contractEndDate)}
+                      </strong>
+                    </div>
+                  )}
                   <div className="text-[11px] font-semibold text-rose-700">
                     {isCommercial ? 'Payment Due: 1st of month per commercial contract' : 'Payment Due Date: 1st of each month'}
                   </div>
@@ -1661,7 +1703,7 @@ export default function TenantStatement({
                   <span className="text-[10px] text-slate-400 font-medium sm:hidden">
                     Scroll horizontally for variance →
                   </span>
-                  <span className="text-[11px] font-medium text-slate-500">
+                  <span className="variance-badge text-[11px] font-medium text-slate-500">
                     Comparing {previousPeriodLabel} vs {billingPeriodLabel}
                   </span>
                 </div>
@@ -1673,12 +1715,9 @@ export default function TenantStatement({
                     <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase font-semibold text-[10px] tracking-wider">
                       <th className="p-3 pl-4">Billing Item / Municipal Line</th>
                       <th className="p-3 text-right whitespace-nowrap">
-                        {previousPeriodLabel}
-                      </th>
-                      <th className="p-3 text-right whitespace-nowrap">
                         {billingPeriodLabel}
                       </th>
-                      <th className="p-3 pr-4 text-right whitespace-nowrap">Month-over-Month Variance</th>
+                      <th className="variance-badge p-3 pr-4 text-right whitespace-nowrap">Month-over-Month Variance</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 text-slate-700">
@@ -1723,11 +1762,10 @@ export default function TenantStatement({
                           </div>
                         )}
                       </td>
-                      <td className="p-3 text-right font-mono text-slate-400 whitespace-nowrap">—</td>
                       <td className={`p-3 text-right font-mono font-bold whitespace-nowrap ${periodBroughtForward > 0 ? 'text-rose-700' : 'text-slate-800'}`}>
                         {formatZAR(periodBroughtForward, { includeDecimals: true })}
                       </td>
-                      <td className="p-3 pr-4 text-right text-[10px] whitespace-nowrap font-medium">
+                      <td className="variance-badge p-3 pr-4 text-right text-[10px] whitespace-nowrap font-medium">
                         {periodBroughtForward > 0 ? (
                           <span className="text-rose-700 font-bold bg-rose-50 px-1.5 py-0.5 rounded border border-rose-200">
                             Prior Arrears
@@ -1750,13 +1788,10 @@ export default function TenantStatement({
                           {selectedLease?.unitName ? `Unit: ${selectedLease.unitName} • Fixed monthly residential lease fee` : 'Monthly fixed residential lease fee'}
                         </div>
                       </td>
-                      <td className="p-3 text-right font-mono text-slate-700 whitespace-nowrap">
-                        {formatZAR(baseRent, { includeDecimals: true })}
-                      </td>
                       <td className="p-3 text-right font-mono font-bold text-slate-900 whitespace-nowrap">
                         {formatZAR(baseRent, { includeDecimals: true })}
                       </td>
-                      <td className="p-3 pr-4 text-right text-slate-400 font-mono text-xs whitespace-nowrap">
+                      <td className="variance-badge p-3 pr-4 text-right text-slate-400 font-mono text-xs whitespace-nowrap">
                         — (Contract Fixed)
                       </td>
                     </tr>
@@ -1764,7 +1799,7 @@ export default function TenantStatement({
                     {isSubmeteredUnit ? (
                       /* Prepaid Sub-Meter Notice Row */
                       <tr className="bg-blue-50/40">
-                        <td colSpan={4} className="p-3.5 pl-4">
+                        <td colSpan={3} className="p-3.5 pl-4">
                           <div className="flex items-start gap-2.5">
                             <Zap className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
                             <div>
@@ -1790,17 +1825,12 @@ export default function TenantStatement({
                             Source: {currentStatement?.provider || 'iGrow Rentals / WeconnectU'} • Body Corporate Consolidated Recovery (Unmetered)
                           </div>
                         </td>
-                        <td className="p-3 text-right font-mono text-slate-600 whitespace-nowrap">
-                          {previousStatement?.bundledUtilitiesZAR !== undefined
-                            ? formatZAR(previousStatement.bundledUtilitiesZAR, { includeDecimals: true })
-                            : '—'}
-                        </td>
                         <td className="p-3 text-right font-mono font-bold text-slate-800 whitespace-nowrap">
                           {currentStatement?.bundledUtilitiesZAR !== undefined
                             ? formatZAR(currentStatement.bundledUtilitiesZAR, { includeDecimals: true })
                             : 'R 0.00'}
                         </td>
-                        <td className="p-3 pr-4 text-right whitespace-nowrap">
+                        <td className="variance-badge p-3 pr-4 text-right whitespace-nowrap">
                           {currentStatement?.bundledUtilitiesZAR !== undefined
                             ? renderVariance(currentStatement.bundledUtilitiesZAR, previousStatement?.bundledUtilitiesZAR)
                             : '—'}
@@ -1809,7 +1839,7 @@ export default function TenantStatement({
                     ) : !currentStatement ? (
                       /* Municipal Utility Notice Row when Statement is Pending Upload */
                       <tr className="bg-slate-50/60 border-y border-slate-200">
-                        <td colSpan={4} className="p-3.5 pl-4">
+                        <td colSpan={3} className="p-3.5 pl-4">
                           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                             <div className="flex items-center gap-2.5">
                               <FileText className="w-4 h-4 text-slate-500 shrink-0" />
@@ -1905,9 +1935,6 @@ export default function TenantStatement({
                               </div>
                             )}
                           </td>
-                          <td className="p-3 text-right font-mono text-slate-600 whitespace-nowrap">
-                            {previousStatement ? formatZAR(Math.round(previousStatement.electricityZAR * splitRatio), { includeDecimals: true }) : '—'}
-                          </td>
                           <td className="p-3 text-right font-mono font-bold text-slate-800 whitespace-nowrap">
                             {currentStatement ? (
                               <div>
@@ -1922,7 +1949,7 @@ export default function TenantStatement({
                               'R 0.00'
                             )}
                           </td>
-                          <td className="p-3 pr-4 text-right whitespace-nowrap">
+                          <td className="variance-badge p-3 pr-4 text-right whitespace-nowrap">
                             {currentStatement
                               ? renderVariance(unitElecZAR, previousStatement ? Math.round(previousStatement.electricityZAR * splitRatio) : undefined)
                               : '—'}
@@ -1999,9 +2026,6 @@ export default function TenantStatement({
                               </div>
                             )}
                           </td>
-                          <td className="p-3 text-right font-mono text-slate-600 whitespace-nowrap">
-                            {previousStatement ? formatZAR(Math.round(previousStatement.waterZAR * splitRatio), { includeDecimals: true }) : '—'}
-                          </td>
                           <td className="p-3 text-right font-mono font-bold text-slate-800 whitespace-nowrap">
                             {currentStatement ? (
                               <div>
@@ -2016,7 +2040,7 @@ export default function TenantStatement({
                               'R 0.00'
                             )}
                           </td>
-                          <td className="p-3 pr-4 text-right whitespace-nowrap">
+                          <td className="variance-badge p-3 pr-4 text-right whitespace-nowrap">
                             {currentStatement
                               ? renderVariance(unitWaterZAR, previousStatement ? Math.round(previousStatement.waterZAR * splitRatio) : undefined)
                               : '—'}
@@ -2031,13 +2055,10 @@ export default function TenantStatement({
                               Source: {currentStatement?.provider || 'City of Johannesburg'} (PIKITUP Refuse Residential + 15% VAT) {occupiedCount > 1 && `• 1/${occupiedCount} Unit Share`}
                             </div>
                           </td>
-                          <td className="p-3 text-right font-mono text-slate-600 whitespace-nowrap">
-                            {previousStatement ? formatZAR(Math.round(previousStatement.refuseZAR * splitRatio), { includeDecimals: true }) : '—'}
-                          </td>
                           <td className="p-3 text-right font-mono font-bold text-slate-800 whitespace-nowrap">
                             {currentStatement ? formatZAR(unitRefuseZAR, { includeDecimals: true }) : 'R 0.00'}
                           </td>
-                          <td className="p-3 pr-4 text-right whitespace-nowrap">
+                          <td className="variance-badge p-3 pr-4 text-right whitespace-nowrap">
                             {currentStatement
                               ? renderVariance(unitRefuseZAR, previousStatement ? Math.round(previousStatement.refuseZAR * splitRatio) : undefined)
                               : '—'}
@@ -2052,13 +2073,10 @@ export default function TenantStatement({
                               Source: {currentStatement?.provider || 'City of Johannesburg'} (Stand Size Sanitation Charge + 15% VAT) {occupiedCount > 1 && `• 1/${occupiedCount} Unit Share`}
                             </div>
                           </td>
-                          <td className="p-3 text-right font-mono text-slate-600 whitespace-nowrap">
-                            {previousStatement ? formatZAR(Math.round(previousStatement.sewerageZAR * splitRatio), { includeDecimals: true }) : '—'}
-                          </td>
                           <td className="p-3 text-right font-mono font-bold text-slate-800 whitespace-nowrap">
                             {currentStatement ? formatZAR(unitSewerageZAR, { includeDecimals: true }) : 'R 0.00'}
                           </td>
-                          <td className="p-3 pr-4 text-right whitespace-nowrap">
+                          <td className="variance-badge p-3 pr-4 text-right whitespace-nowrap">
                             {currentStatement
                               ? renderVariance(unitSewerageZAR, previousStatement ? Math.round(previousStatement.sewerageZAR * splitRatio) : undefined)
                               : '—'}
@@ -2072,13 +2090,10 @@ export default function TenantStatement({
                       <td className="p-3 pl-4 text-slate-900">
                         {isBundled ? 'Total Body Corporate Utility Recoveries' : 'Total Municipal Utility Recoveries'}
                       </td>
-                      <td className="p-3 text-right font-mono text-slate-700 whitespace-nowrap">
-                        {previousTenantUtilities !== undefined ? formatZAR(previousTenantUtilities, { includeDecimals: true }) : '—'}
-                      </td>
                       <td className="p-3 text-right font-mono text-emerald-800 whitespace-nowrap">
                         {formatZAR(currentTenantUtilities, { includeDecimals: true })}
                       </td>
-                      <td className="p-3 pr-4 text-right whitespace-nowrap">
+                      <td className="variance-badge p-3 pr-4 text-right whitespace-nowrap">
                         {currentStatement
                           ? renderVariance(currentTenantUtilities, previousTenantUtilities)
                           : '—'}
@@ -2091,13 +2106,10 @@ export default function TenantStatement({
                         2. Subtotal Current Period Charges
                         <div className="text-[10px] font-normal text-slate-500">Base Rent + itemized utility recoveries</div>
                       </td>
-                      <td className="p-2.5 text-right font-mono text-xs text-slate-700 whitespace-nowrap">
-                        {previousGrandTotal !== undefined ? formatZAR(previousGrandTotal, { includeDecimals: true }) : '—'}
-                      </td>
                       <td className="p-2.5 text-right font-mono text-xs font-bold text-slate-900 whitespace-nowrap">
                         {formatZAR(currentGrandTotal, { includeDecimals: true })}
                       </td>
-                      <td className="p-2.5 pr-4 text-right whitespace-nowrap text-xs">
+                      <td className="variance-badge p-2.5 pr-4 text-right whitespace-nowrap text-xs">
                         {currentStatement
                           ? renderVariance(currentGrandTotal, previousGrandTotal)
                           : '—'}
@@ -2124,11 +2136,10 @@ export default function TenantStatement({
                                 )}
                               </div>
                             </td>
-                            <td className="p-3 text-right font-mono text-slate-400 whitespace-nowrap">—</td>
                             <td className="p-3 text-right font-mono font-bold text-emerald-700 whitespace-nowrap">
                               -{formatZAR(allocatedAmountZAR, { includeDecimals: true })}
                             </td>
-                            <td className="p-3 pr-4 text-right whitespace-nowrap text-[10px] text-emerald-700 font-semibold">
+                            <td className="variance-badge p-3 pr-4 text-right whitespace-nowrap text-[10px] text-emerald-700 font-semibold">
                               {isDeposit ? 'Deposit Applied' : 'Payment Applied'}
                             </td>
                           </tr>
@@ -2148,16 +2159,15 @@ export default function TenantStatement({
                                 Method: {isDeposit ? 'Deposit Applied' : p.paymentMethod} {p.reference ? `• Ref: ${p.reference}` : ''}
                                 {p.allocations && p.allocations.length > 1 && (
                                   <span className="ml-1 text-slate-600 font-medium">
-                                    • {p.reference ? `${p.reference} — ` : ''}{formatZAR(p.amountReceivedZAR)} ({formatAllocationsSummary(p.allocations)})
+                                    • {p.reference ? `${p.reference} — ` : ''}{formatZAR(p.amountReceivedZAR)} (${formatAllocationsSummary(p.allocations)})
                                   </span>
                                 )}
                               </div>
                             </td>
-                            <td className="p-3 text-right font-mono text-slate-400 whitespace-nowrap">—</td>
                             <td className="p-3 text-right font-mono font-bold text-emerald-700 whitespace-nowrap">
                               -{formatZAR(p.amountReceivedZAR, { includeDecimals: true })}
                             </td>
-                            <td className="p-3 pr-4 text-right whitespace-nowrap text-[10px] text-emerald-700 font-semibold">
+                            <td className="variance-badge p-3 pr-4 text-right whitespace-nowrap text-[10px] text-emerald-700 font-semibold">
                               {isDeposit ? 'Deposit Applied' : 'Payment Applied'}
                             </td>
                           </tr>
@@ -2172,9 +2182,8 @@ export default function TenantStatement({
                           </div>
                           <div className="text-[10px] text-slate-400">No payments recorded for this billing period yet</div>
                         </td>
-                        <td className="p-3 text-right font-mono text-slate-400 whitespace-nowrap">—</td>
                         <td className="p-3 text-right font-mono text-slate-500 whitespace-nowrap">R 0.00</td>
-                        <td className="p-3 pr-4 text-right whitespace-nowrap text-[10px] text-slate-400">Pending</td>
+                        <td className="variance-badge p-3 pr-4 text-right whitespace-nowrap text-[10px] text-slate-400">Pending</td>
                       </tr>
                     )}
 
@@ -2191,11 +2200,10 @@ export default function TenantStatement({
                               Date: {formatDate(w.date)}
                             </div>
                           </td>
-                          <td className="p-3 text-right font-mono text-slate-400 whitespace-nowrap">—</td>
                           <td className="p-3 text-right font-mono font-bold text-slate-600 whitespace-nowrap">
                             -{formatZAR(allocatedAmountZAR, { includeDecimals: true })}
                           </td>
-                          <td className="p-3 pr-4 text-right whitespace-nowrap text-[10px] text-slate-500 font-semibold">
+                          <td className="variance-badge p-3 pr-4 text-right whitespace-nowrap text-[10px] text-slate-500 font-semibold">
                             Credit Applied
                           </td>
                         </tr>
@@ -2221,13 +2229,10 @@ export default function TenantStatement({
                           Balance Brought Forward + Current Charges - Payments Received
                         </div>
                       </td>
-                      <td className="p-3.5 text-right font-mono text-sm text-slate-700 whitespace-nowrap">
-                        {previousGrandTotal !== undefined ? formatZAR(previousGrandTotal, { includeDecimals: true }) : '—'}
-                      </td>
                       <td className="p-3.5 text-right font-mono text-base text-emerald-950 font-black whitespace-nowrap">
                         {formatZAR(periodNetOutstanding, { includeDecimals: true })}
                       </td>
-                      <td className="p-3.5 pr-4 text-right whitespace-nowrap">
+                      <td className="variance-badge p-3.5 pr-4 text-right whitespace-nowrap">
                         {currentStatement
                           ? renderVariance(periodNetOutstanding, previousGrandTotal)
                           : '—'}
@@ -2283,6 +2288,80 @@ export default function TenantStatement({
                   ? 'Consolidated landlord master roll reconciling all residential unit leases, commercial ancillary covenants, and municipal tax invoices for this property.'
                   : 'Payment must reflect in full on or before the 1st of each month. Base contract rent is fixed per the residential lease agreement. Municipal utility recoveries (electricity, water, refuse, sewerage) reflect verified billing line items from local municipal/Eskom tax invoices. Landlord municipal rates & taxes are excluded from the tenant liability.'}
               </p>
+
+              {/* Structured Banking & Remittance Details Card */}
+              {investorProfile?.accountNumber ? (
+                <div data-testid="statement-banking-details" className="p-3.5 bg-white rounded-xl border border-slate-200 mt-2.5 shadow-2xs space-y-2.5">
+                  <div className="flex items-center justify-between gap-2 border-b border-slate-100 pb-2">
+                    <div className="flex items-center gap-1.5 font-bold text-slate-800 text-xs">
+                      <Landmark className="w-4 h-4 text-emerald-600 shrink-0" />
+                      <span>Electronic Funds Transfer (EFT) Banking Details</span>
+                    </div>
+                    <button
+                      type="button"
+                      data-testid="copy-bank-account-btn"
+                      onClick={() => handleCopyAccount(investorProfile.accountNumber || '')}
+                      className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 px-2 py-0.5 rounded transition-colors cursor-pointer print-hidden-element"
+                      title="Copy Account Number to Clipboard"
+                    >
+                      {copiedBankField === 'account' ? (
+                        <>
+                          <Check className="w-3 h-3 text-emerald-600" />
+                          <span>Copied!</span>
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="w-3 h-3 text-emerald-600" />
+                          <span>Copy Account No</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+                    <div>
+                      <span className="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">Bank Name</span>
+                      <span className="font-semibold text-slate-900">{investorProfile.bankName || 'First National Bank (FNB)'}</span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">Account Holder</span>
+                      <span className="font-semibold text-slate-900 truncate block" title={investorProfile.accountHolder || investorProfile.entityName}>
+                        {investorProfile.accountHolder || investorProfile.entityName}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">Account Number</span>
+                      <span className="font-mono font-black text-slate-900 tracking-wide text-xs">{investorProfile.accountNumber}</span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">Branch / Type</span>
+                      <span className="font-mono font-medium text-slate-800 text-[11px]">
+                        {investorProfile.branchCode || 'Universal'} ({investorProfile.accountType || 'Current'})
+                      </span>
+                    </div>
+                  </div>
+
+                  {investorProfile.swiftCode && (
+                    <div className="text-[10px] text-slate-500 font-mono pt-1.5 border-t border-slate-50 flex items-center gap-2">
+                      <span className="font-semibold text-slate-400">SWIFT / BIC:</span>
+                      <span className="font-bold text-slate-700">{investorProfile.swiftCode}</span>
+                    </div>
+                  )}
+
+                  {investorProfile.remittanceInstructions && (
+                    <div className="text-[11px] text-slate-600 bg-slate-50 p-2 rounded-lg border border-slate-200/80 italic">
+                      {investorProfile.remittanceInstructions}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="p-2.5 bg-amber-50/70 border border-amber-200 rounded-lg text-xs text-amber-900 flex items-center justify-between gap-2 print-hidden-element">
+                  <span>No banking details configured for statement remittance.</span>
+                  <a href="/settings" className="font-bold text-amber-800 hover:text-amber-950 underline shrink-0">
+                    Set up in Settings &rarr;
+                  </a>
+                </div>
+              )}
             </div>
 
             {/* Integrated Upload Box - Hidden on Print */}

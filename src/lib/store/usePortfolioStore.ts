@@ -10,6 +10,7 @@ import {
   LocalSupplier,
   TaskItem,
   TaskStatus,
+  Lease,
   PortfolioSummary,
   BOQItem,
   InvestorProfile,
@@ -36,6 +37,7 @@ import {
   calculatePropertyArrears,
   reconcileOpeningBalanceForTargetArrears,
   migrateNegativeArrearsToRental,
+  parseDateParts,
 } from '@/lib/calculations/arrears';
 import { handleTaskCompletionRecurrence } from '@/lib/calculations/recurrence';
 import {
@@ -242,6 +244,103 @@ function syncAgmReminderTask(
   return [agmTask, ...tasks];
 }
 
+export function syncLeaseExpiryTasks(
+  tasks: TaskItem[],
+  propertyId: string,
+  propertyTitle: string,
+  leases?: Lease[]
+): TaskItem[] {
+  let nextTasks = [...tasks];
+  const today = new Date().toISOString().split('T')[0];
+
+  const currentLeaseIds = new Set((leases || []).map((l) => l?.id).filter(Boolean));
+
+  // Clean up any pending expiry tasks for this property that are no longer in active leases
+  nextTasks = nextTasks.filter((t) => {
+    if (t.id.startsWith('task-lease-expiry-') && t.linkedEntity?.id === propertyId && t.status === 'Pending') {
+      const leaseIdFromTask = t.id.replace('task-lease-expiry-', '');
+      if (!currentLeaseIds.has(leaseIdFromTask)) {
+        return false;
+      }
+    }
+    return true;
+  });
+
+  if (!leases || leases.length === 0) {
+    return nextTasks;
+  }
+
+  for (const lease of leases) {
+    if (!lease || !lease.id) continue;
+    const taskId = `task-lease-expiry-${lease.id}`;
+    const existingIdx = nextTasks.findIndex(
+      (t) =>
+        t.id === taskId ||
+        (t.linkedEntity?.id === lease.id && t.title.startsWith('Lease Expiry:')) ||
+        (t.linkedEntity?.id === propertyId && t.id === taskId)
+    );
+
+    const leaseEndParts = parseDateParts(lease.leaseEndDate);
+
+    // If lease has no end date or is already expired (< today)
+    if (!leaseEndParts || leaseEndParts.isoDate < today) {
+      if (existingIdx >= 0 && nextTasks[existingIdx].status === 'Pending') {
+        nextTasks.splice(existingIdx, 1);
+      }
+      continue;
+    }
+
+    // Reminder date 60 days prior to leaseEndDate
+    const reminderDate = new Date(leaseEndParts.timestamp - 60 * 24 * 60 * 60 * 1000)
+      .toISOString()
+      .split('T')[0];
+    const dueDate = reminderDate > today ? reminderDate : today;
+
+    const tenantName = lease.tenantName || 'Tenant';
+    const unitPart = lease.unitName || 'Unit';
+    const title = `Lease Expiry: ${tenantName} at ${propertyTitle} - ${unitPart}`;
+    const description = `Lease expires on ${lease.leaseEndDate}. Initiate renewal discussions or begin marketing for a new tenant.`;
+
+    if (existingIdx >= 0) {
+      const existing = nextTasks[existingIdx];
+      // If leaseEndDate changed, re-open task to Pending; otherwise preserve existing status (e.g., Completed)
+      const dateChanged = existing.description ? !existing.description.includes(lease.leaseEndDate) : true;
+      nextTasks[existingIdx] = {
+        ...existing,
+        id: taskId,
+        title,
+        description,
+        dueDate,
+        priority: 'High',
+        status: dateChanged ? 'Pending' : existing.status,
+        linkedEntity: {
+          type: 'rental',
+          id: propertyId,
+          name: propertyTitle,
+        },
+      };
+    } else {
+      const newTask: TaskItem = {
+        id: taskId,
+        title,
+        description,
+        dueDate,
+        priority: 'High',
+        status: 'Pending',
+        linkedEntity: {
+          type: 'rental',
+          id: propertyId,
+          name: propertyTitle,
+        },
+        createdAt: today,
+      };
+      nextTasks = [newTask, ...nextTasks];
+    }
+  }
+
+  return nextTasks;
+}
+
 /**
  * Normalises persisted Get Started checklist data: keeps only non-empty strings, de-duplicated.
  * Anything else (undefined, null, objects, legacy shapes) collapses to an empty list.
@@ -308,12 +407,21 @@ export const usePortfolioStore = create<PortfolioState>()(
 
       // Rentals
       addRental: (rental) =>
-        set((state) => ({
-          rentals: [rental, ...state.rentals],
-          tasks: rental.agmDate
+        set((state) => {
+          let updatedTasks = rental.agmDate
             ? syncAgmReminderTask(state.tasks, 'rental', rental.id, rental.title, rental.agmDate)
-            : state.tasks,
-        })),
+            : state.tasks;
+          updatedTasks = syncLeaseExpiryTasks(
+            updatedTasks,
+            rental.id,
+            rental.title,
+            rental.leases
+          );
+          return {
+            rentals: [rental, ...state.rentals],
+            tasks: updatedTasks,
+          };
+        }),
       bulkAddRentals: (newRentals) => {
         let duplicateCount = 0;
         const currentRentals = get().rentals;
@@ -331,6 +439,7 @@ export const usePortfolioStore = create<PortfolioState>()(
           if (r.agmDate) {
             updatedTasks = syncAgmReminderTask(updatedTasks, 'rental', r.id, r.title, r.agmDate);
           }
+          updatedTasks = syncLeaseExpiryTasks(updatedTasks, r.id, r.title, r.leases);
         });
 
         set((state) => ({
@@ -511,9 +620,16 @@ export const usePortfolioStore = create<PortfolioState>()(
           }
         });
 
-        set((state) => ({
-          rentals: [...newlyCreatedRentals, ...updatedRentals],
-        }));
+        set((state) => {
+          let tasks = state.tasks;
+          [...newlyCreatedRentals, ...updatedRentals].forEach((r) => {
+            tasks = syncLeaseExpiryTasks(tasks, r.id, r.title, r.leases);
+          });
+          return {
+            rentals: [...newlyCreatedRentals, ...updatedRentals],
+            tasks,
+          };
+        });
 
         return { updatedCount, newCount, addedCount: newCount, varianceCount };
       },
@@ -550,9 +666,12 @@ export const usePortfolioStore = create<PortfolioState>()(
           });
           const target = updatedRentals.find((r) => r.id === id);
           const agmDate = updates.agmDate !== undefined ? updates.agmDate : target?.agmDate;
-          const tasks = target
+          let tasks = target
             ? syncAgmReminderTask(state.tasks, 'rental', id, target.title, agmDate)
             : state.tasks;
+          if (target) {
+            tasks = syncLeaseExpiryTasks(tasks, id, target.title, target.leases);
+          }
           return {
             rentals: updatedRentals,
             tasks,
@@ -561,6 +680,13 @@ export const usePortfolioStore = create<PortfolioState>()(
       deleteRental: (id) =>
         set((state) => ({
           rentals: state.rentals.filter((r) => r.id !== id),
+          tasks: state.tasks.filter(
+            (t) =>
+              !(
+                t.linkedEntity?.id === id &&
+                (t.id.startsWith('task-lease-expiry-') || t.id.startsWith('task-agm-'))
+              )
+          ),
         })),
       addMaintenanceLog: (rentalId, log) =>
         set((state) => ({
@@ -1355,6 +1481,12 @@ export const usePortfolioStore = create<PortfolioState>()(
             newRental.agmDate
           );
         }
+        updatedTasks = syncLeaseExpiryTasks(
+          updatedTasks,
+          newRental.id,
+          newRental.title,
+          newRental.leases
+        );
 
         set({
           rentals: [newRental, ...get().rentals],

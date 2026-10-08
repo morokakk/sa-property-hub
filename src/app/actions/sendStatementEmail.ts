@@ -3,6 +3,7 @@
 import { Resend } from 'resend';
 import { generateStatementEmailHtml } from '@/lib/email/statementEmailTemplate';
 import { formatMonthLabel } from '@/lib/calculations/arrears';
+import { StatementBankingDetails } from '@/types';
 
 export interface SendStatementEmailPayload {
   to: string;
@@ -14,6 +15,8 @@ export interface SendStatementEmailPayload {
   statementUrl: string;
   pdfBase64: string;
   landlordName?: string;
+  remainingLeaseTerm?: string;
+  bankingDetails?: StatementBankingDetails;
 }
 
 export interface SendStatementEmailResult {
@@ -39,6 +42,8 @@ export async function sendStatementEmail(
       statementUrl,
       pdfBase64,
       landlordName,
+      remainingLeaseTerm,
+      bankingDetails,
     } = payload;
 
     if (!to || !to.trim()) {
@@ -99,6 +104,8 @@ export async function sendStatementEmail(
       statementUrl,
       landlordName,
       filename,
+      remainingLeaseTerm,
+      bankingDetails,
     });
 
     const resend = new Resend(apiKey);

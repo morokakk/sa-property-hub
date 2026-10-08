@@ -443,6 +443,10 @@ export async function generateTenantStatementPdf(
   const hiddenElements = clone.querySelectorAll('.print-hidden-element');
   hiddenElements.forEach((el) => el.remove());
 
+  // Remove all variance badges and comparison elements for static clean PDF export
+  const varianceBadges = clone.querySelectorAll('.variance-badge');
+  varianceBadges.forEach((el) => el.remove());
+
   // Reset viewport bounds, shadows, borders and unroll scrolling containers for full multi-page PDF output.
   // Width is set to 100% to conform exactly to the A4 printable inner width (190mm / ~718px)
   // without clipping or right-edge overflow.

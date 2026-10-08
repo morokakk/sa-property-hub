@@ -1058,3 +1058,174 @@ export function getStatementLedgerOptions(
   });
 }
 
+export interface ParsedDateParts {
+  year: number;
+  month: number;
+  day: number;
+  isoDate: string; // YYYY-MM-DD
+  timestamp: number; // UTC ms
+}
+
+/**
+ * Normalizes and parses various date string formats into standard year, month, day,
+ * standardized ISO YYYY-MM-DD date, and UTC timestamp.
+ * Handles ISO (YYYY-MM-DD), slash-delimited (YYYY/MM/DD), South African (DD/MM/YYYY, DD-MM-YYYY),
+ * Month Year ("April 2026"), and standard date strings.
+ */
+export function parseDateParts(dateStr?: string | null): ParsedDateParts | null {
+  if (!dateStr || typeof dateStr !== 'string') return null;
+  const trimmed = dateStr.trim();
+  if (!trimmed) return null;
+
+  // 1. Check YYYY-MM-DD or YYYY/MM/DD (optional trailing time or day)
+  const ymdMatch = trimmed.match(/^(\d{4})[-/](\d{1,2})(?:[-/](\d{1,2}))?/);
+  if (ymdMatch) {
+    const year = parseInt(ymdMatch[1], 10);
+    const month = parseInt(ymdMatch[2], 10);
+    const day = ymdMatch[3] ? parseInt(ymdMatch[3], 10) : 1;
+    if (month >= 1 && month <= 12 && day >= 1 && day <= 31) {
+      const isoDate = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+      return {
+        year,
+        month,
+        day,
+        isoDate,
+        timestamp: Date.UTC(year, month - 1, day),
+      };
+    }
+  }
+
+  // 2. Check DD/MM/YYYY or DD-MM-YYYY (common South African format)
+  const dmyMatch = trimmed.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})/);
+  if (dmyMatch) {
+    const day = parseInt(dmyMatch[1], 10);
+    const month = parseInt(dmyMatch[2], 10);
+    const year = parseInt(dmyMatch[3], 10);
+    if (month >= 1 && month <= 12 && day >= 1 && day <= 31) {
+      const isoDate = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+      return {
+        year,
+        month,
+        day,
+        isoDate,
+        timestamp: Date.UTC(year, month - 1, day),
+      };
+    }
+  }
+
+  // 3. Check "Month Year" format e.g. "April 2026" or "Apr 2026"
+  const parsedMonthYear = Date.parse(`1 ${trimmed} UTC`);
+  if (!isNaN(parsedMonthYear)) {
+    const d = new Date(parsedMonthYear);
+    const year = d.getUTCFullYear();
+    const month = d.getUTCMonth() + 1;
+    const day = 1;
+    const isoDate = `${year}-${String(month).padStart(2, '0')}-01`;
+    return {
+      year,
+      month,
+      day,
+      isoDate,
+      timestamp: Date.UTC(year, month - 1, 1),
+    };
+  }
+
+  // 4. Standard Date.parse fallback
+  const d = new Date(trimmed);
+  if (!isNaN(d.getTime())) {
+    const year = d.getFullYear();
+    const month = d.getMonth() + 1;
+    const day = d.getDate();
+    const isoDate = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    return {
+      year,
+      month,
+      day,
+      isoDate,
+      timestamp: Date.UTC(year, month - 1, day),
+    };
+  }
+
+  return null;
+}
+
+/**
+ * Calculates remaining lease term relative to a billing period or date.
+ * E.g., "4 Months", "1 Month 12 Days", "28 Days", or "Expired (Month-to-Month)".
+ */
+export function calculateRemainingLeaseTerm(
+  billingPeriodOrDate: string,
+  leaseEndDate?: string
+): string {
+  if (!leaseEndDate || !leaseEndDate.trim()) {
+    return 'Expired (Month-to-Month)';
+  }
+
+  const endParts = parseDateParts(leaseEndDate);
+  if (!endParts) {
+    return 'Expired (Month-to-Month)';
+  }
+
+  const startParts =
+    parseDateParts(billingPeriodOrDate) ||
+    parseDateParts(new Date().toISOString());
+  if (!startParts) {
+    return 'Expired (Month-to-Month)';
+  }
+
+  const startDate = new Date(startParts.timestamp);
+  const endDate = new Date(endParts.timestamp);
+
+  if (endDate.getTime() < startDate.getTime()) {
+    return 'Expired (Month-to-Month)';
+  }
+
+  // Check if end date is the last calendar day of that month
+  const lastDayOfEndMonth = new Date(Date.UTC(endParts.year, endParts.month, 0)).getUTCDate();
+  const isEndOfMonth = endParts.day === lastDayOfEndMonth;
+
+  // Calendar month boundary alignment (e.g. 2026-04-01 to 2026-07-31 = 4 Months)
+  if (startParts.day === 1 && isEndOfMonth) {
+    const totalMonths = (endParts.year - startParts.year) * 12 + (endParts.month - startParts.month) + 1;
+    if (totalMonths <= 0) return 'Expired (Month-to-Month)';
+    if (totalMonths === 1) return '1 Month';
+    return `${totalMonths} Months`;
+  }
+
+  // Difference in calendar days
+  const diffTime = endDate.getTime() - startDate.getTime();
+  const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+
+  if (diffDays <= 0) {
+    return 'Expired (Month-to-Month)';
+  }
+
+  if (diffDays < 30) {
+    return `${diffDays} Day${diffDays === 1 ? '' : 's'}`;
+  }
+
+  // Multi-month breakdown
+  let months = (endParts.year - startParts.year) * 12 + (endParts.month - startParts.month);
+  let days = endParts.day - startParts.day;
+
+  if (days < 0) {
+    months -= 1;
+    const prevMonthDays = new Date(Date.UTC(endParts.year, endParts.month - 1, 0)).getUTCDate();
+    days += prevMonthDays;
+  }
+
+  if (months <= 0 && days > 0) {
+    return `${days} Day${days === 1 ? '' : 's'}`;
+  }
+
+  if (months > 0 && days === 0) {
+    return `${months} Month${months === 1 ? '' : 's'}`;
+  }
+
+  if (months > 0 && days > 0) {
+    return `${months} Month${months === 1 ? '' : 's'} ${days} Day${days === 1 ? '' : 's'}`;
+  }
+
+  return 'Expired (Month-to-Month)';
+}
+

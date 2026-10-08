@@ -2122,6 +2122,13 @@ export const INITIAL_INVESTOR_PROFILE: InvestorProfile = {
   minDscr: 1.20,
   vatExemptAgent: false,
   marginalTaxRatePercent: 31.0,
+  bankName: 'First National Bank (FNB)',
+  accountHolder: 'L&M Property Investments (Pty) Ltd',
+  accountNumber: '62891044321',
+  accountType: 'Cheque / Current',
+  branchCode: '250655',
+  swiftCode: 'FIRNZAJJ',
+  remittanceInstructions: 'Use payment reference on statement. Email proof of payment (POP) to invest@lmtrading.co.za.',
 };
 
 export const INITIAL_ANALYZER_DRAFT: AnalyzerDraft = {
