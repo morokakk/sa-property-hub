@@ -182,6 +182,7 @@ export function unmapRentals(rows: Database['public']['Tables']['properties']['R
     utilityType: (r.utility_type as any) || undefined,
     prepaidVendorName: r.prepaid_vendor_name || undefined,
     monthlyPrepaidVendingFeeZAR: toNullableNum(r.monthly_prepaid_vending_fee_zar),
+    monthlyCommunalServicesZAR: toNullableNum(r.monthly_communal_services_zar) ?? undefined,
     ancillaryIncomes: parseJson(r.ancillary_incomes, []),
   }));
 }
@@ -318,6 +319,7 @@ export function unmapOpportunities(
     monthlyRentalEstimate: toNum(opp.monthly_rental_estimate_zar, 0),
     monthlyLevies: toNum(opp.monthly_levies_zar, 0),
     monthlyRatesTaxes: toNum(opp.monthly_rates_taxes_zar, 0),
+    monthlyCommunalServicesZAR: toNullableNum(opp.monthly_communal_services_zar) ?? undefined,
     annualInsurance: toNum(opp.annual_insurance_zar, 0),
     managementFeePercent: toNum(opp.management_fee_percent, 8.0),
     agencyVatApplicable: opp.agency_vat_applicable ?? true,

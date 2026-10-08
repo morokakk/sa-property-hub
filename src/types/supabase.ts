@@ -377,6 +377,7 @@ export type Database = {
           management_fee_percent: number | null
           monthly_bond_payment_zar: number | null
           monthly_cash_flow_zar: number | null
+          monthly_communal_services_zar: number | null
           monthly_holding_cost_zar: number | null
           monthly_levies_zar: number | null
           monthly_other_holding_cost_zar: number | null
@@ -450,6 +451,7 @@ export type Database = {
           management_fee_percent?: number | null
           monthly_bond_payment_zar?: number | null
           monthly_cash_flow_zar?: number | null
+          monthly_communal_services_zar?: number | null
           monthly_holding_cost_zar?: number | null
           monthly_levies_zar?: number | null
           monthly_other_holding_cost_zar?: number | null
@@ -523,6 +525,7 @@ export type Database = {
           management_fee_percent?: number | null
           monthly_bond_payment_zar?: number | null
           monthly_cash_flow_zar?: number | null
+          monthly_communal_services_zar?: number | null
           monthly_holding_cost_zar?: number | null
           monthly_levies_zar?: number | null
           monthly_other_holding_cost_zar?: number | null
@@ -561,10 +564,15 @@ export type Database = {
       }
       profiles: {
         Row: {
+          account_holder: string | null
+          account_number: string | null
+          account_type: string | null
           ai_settings: Json | null
           analyzer_draft: Json | null
+          bank_name: string | null
           baseline_hurdle_yield_percent: number | null
           bio_summary: string | null
+          branch_code: string | null
           contact_number: string | null
           created_at: string
           default_agent_commission_percent: number | null
@@ -577,7 +585,9 @@ export type Database = {
           logo_base64: string | null
           physical_address: string | null
           registration_or_id: string | null
+          remittance_instructions: string | null
           rental_forecast_view: string | null
+          swift_code: string | null
           trading_as: string | null
           updated_at: string
           user_id: string
@@ -590,19 +600,17 @@ export type Database = {
           min_dscr?: number | null
           vat_exempt_agent?: boolean | null
           marginal_tax_rate_percent?: number | null
-          bank_name?: string | null
+        }
+        Insert: {
           account_holder?: string | null
           account_number?: string | null
           account_type?: string | null
-          branch_code?: string | null
-          swift_code?: string | null
-          remittance_instructions?: string | null
-        }
-        Insert: {
           ai_settings?: Json | null
           analyzer_draft?: Json | null
+          bank_name?: string | null
           baseline_hurdle_yield_percent?: number | null
           bio_summary?: string | null
+          branch_code?: string | null
           contact_number?: string | null
           created_at?: string
           default_agent_commission_percent?: number | null
@@ -615,7 +623,9 @@ export type Database = {
           logo_base64?: string | null
           physical_address?: string | null
           registration_or_id?: string | null
+          remittance_instructions?: string | null
           rental_forecast_view?: string | null
+          swift_code?: string | null
           trading_as?: string | null
           updated_at?: string
           user_id?: string
@@ -628,19 +638,17 @@ export type Database = {
           min_dscr?: number | null
           vat_exempt_agent?: boolean | null
           marginal_tax_rate_percent?: number | null
-          bank_name?: string | null
+        }
+        Update: {
           account_holder?: string | null
           account_number?: string | null
           account_type?: string | null
-          branch_code?: string | null
-          swift_code?: string | null
-          remittance_instructions?: string | null
-        }
-        Update: {
           ai_settings?: Json | null
           analyzer_draft?: Json | null
+          bank_name?: string | null
           baseline_hurdle_yield_percent?: number | null
           bio_summary?: string | null
+          branch_code?: string | null
           contact_number?: string | null
           created_at?: string
           default_agent_commission_percent?: number | null
@@ -653,7 +661,9 @@ export type Database = {
           logo_base64?: string | null
           physical_address?: string | null
           registration_or_id?: string | null
+          remittance_instructions?: string | null
           rental_forecast_view?: string | null
+          swift_code?: string | null
           trading_as?: string | null
           updated_at?: string
           user_id?: string
@@ -666,13 +676,6 @@ export type Database = {
           min_dscr?: number | null
           vat_exempt_agent?: boolean | null
           marginal_tax_rate_percent?: number | null
-          bank_name?: string | null
-          account_holder?: string | null
-          account_number?: string | null
-          account_type?: string | null
-          branch_code?: string | null
-          swift_code?: string | null
-          remittance_instructions?: string | null
         }
         Relationships: []
       }
@@ -687,6 +690,8 @@ export type Database = {
           agm_date: string | null
           ancillary_incomes: Json
           annual_building_insurance_zar: number | null
+          arrears_opening_balance_zar: number | null
+          arrears_write_offs: Json | null
           bond_interest_rate_percent: number | null
           bond_payment_effective_date: string | null
           bond_revision_note: string | null
@@ -705,6 +710,7 @@ export type Database = {
           meter_readings: Json
           monthly_agent_fee_zar: number | null
           monthly_bond_payment_zar: number | null
+          monthly_communal_services_zar: number | null
           monthly_gross_rent_zar: number | null
           monthly_levies_zar: number | null
           monthly_maintenance_reserve_zar: number | null
@@ -713,6 +719,7 @@ export type Database = {
           net_cash_proceeds_zar: number | null
           notes: string | null
           outstanding_bond_balance_zar: number | null
+          payment_records: Json | null
           prepaid_vendor_name: string | null
           property_type: string | null
           purchase_date: string | null
@@ -725,10 +732,8 @@ export type Database = {
           tax_entity_type_override: string | null
           title: string
           total_equity_extracted_zar: number | null
+          transactions: Json | null
           unpaid_utility_arrears_zar: number | null
-          arrears_opening_balance_zar?: number | null
-          arrears_write_offs?: Json | null
-          payment_records?: Json | null
           updated_at: string
           user_id: string
           utility_statements: Json
@@ -744,6 +749,8 @@ export type Database = {
           agm_date?: string | null
           ancillary_incomes?: Json
           annual_building_insurance_zar?: number | null
+          arrears_opening_balance_zar?: number | null
+          arrears_write_offs?: Json | null
           bond_interest_rate_percent?: number | null
           bond_payment_effective_date?: string | null
           bond_revision_note?: string | null
@@ -762,6 +769,7 @@ export type Database = {
           meter_readings?: Json
           monthly_agent_fee_zar?: number | null
           monthly_bond_payment_zar?: number | null
+          monthly_communal_services_zar?: number | null
           monthly_gross_rent_zar?: number | null
           monthly_levies_zar?: number | null
           monthly_maintenance_reserve_zar?: number | null
@@ -770,6 +778,7 @@ export type Database = {
           net_cash_proceeds_zar?: number | null
           notes?: string | null
           outstanding_bond_balance_zar?: number | null
+          payment_records?: Json | null
           prepaid_vendor_name?: string | null
           property_type?: string | null
           purchase_date?: string | null
@@ -782,10 +791,8 @@ export type Database = {
           tax_entity_type_override?: string | null
           title: string
           total_equity_extracted_zar?: number | null
+          transactions?: Json | null
           unpaid_utility_arrears_zar?: number | null
-          arrears_opening_balance_zar?: number | null
-          arrears_write_offs?: Json | null
-          payment_records?: Json | null
           updated_at?: string
           user_id?: string
           utility_statements?: Json
@@ -801,6 +808,8 @@ export type Database = {
           agm_date?: string | null
           ancillary_incomes?: Json
           annual_building_insurance_zar?: number | null
+          arrears_opening_balance_zar?: number | null
+          arrears_write_offs?: Json | null
           bond_interest_rate_percent?: number | null
           bond_payment_effective_date?: string | null
           bond_revision_note?: string | null
@@ -819,6 +828,7 @@ export type Database = {
           meter_readings?: Json
           monthly_agent_fee_zar?: number | null
           monthly_bond_payment_zar?: number | null
+          monthly_communal_services_zar?: number | null
           monthly_gross_rent_zar?: number | null
           monthly_levies_zar?: number | null
           monthly_maintenance_reserve_zar?: number | null
@@ -827,6 +837,7 @@ export type Database = {
           net_cash_proceeds_zar?: number | null
           notes?: string | null
           outstanding_bond_balance_zar?: number | null
+          payment_records?: Json | null
           prepaid_vendor_name?: string | null
           property_type?: string | null
           purchase_date?: string | null
@@ -839,10 +850,8 @@ export type Database = {
           tax_entity_type_override?: string | null
           title?: string
           total_equity_extracted_zar?: number | null
+          transactions?: Json | null
           unpaid_utility_arrears_zar?: number | null
-          arrears_opening_balance_zar?: number | null
-          arrears_write_offs?: Json | null
-          payment_records?: Json | null
           updated_at?: string
           user_id?: string
           utility_statements?: Json
@@ -942,7 +951,99 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      investor_profiles: {
+        Row: {
+          account_holder: string | null
+          account_number: string | null
+          account_type: string | null
+          ai_settings: Json | null
+          analyzer_draft: Json | null
+          bank_name: string | null
+          baseline_hurdle_yield_percent: number | null
+          bio_summary: string | null
+          branch_code: string | null
+          contact_number: string | null
+          created_at: string | null
+          default_agent_commission_percent: number | null
+          default_prime_rate_percent: number | null
+          default_tax_entity_type: string | null
+          email: string | null
+          entity_name: string | null
+          id: string | null
+          liquid_capital_reserve_zar: number | null
+          logo_base64: string | null
+          physical_address: string | null
+          registration_or_id: string | null
+          remittance_instructions: string | null
+          rental_forecast_view: string | null
+          swift_code: string | null
+          trading_as: string | null
+          updated_at: string | null
+          user_id: string | null
+          website: string | null
+        }
+        Insert: {
+          account_holder?: string | null
+          account_number?: string | null
+          account_type?: string | null
+          ai_settings?: Json | null
+          analyzer_draft?: Json | null
+          bank_name?: string | null
+          baseline_hurdle_yield_percent?: number | null
+          bio_summary?: string | null
+          branch_code?: string | null
+          contact_number?: string | null
+          created_at?: string | null
+          default_agent_commission_percent?: number | null
+          default_prime_rate_percent?: number | null
+          default_tax_entity_type?: string | null
+          email?: string | null
+          entity_name?: string | null
+          id?: string | null
+          liquid_capital_reserve_zar?: number | null
+          logo_base64?: string | null
+          physical_address?: string | null
+          registration_or_id?: string | null
+          remittance_instructions?: string | null
+          rental_forecast_view?: string | null
+          swift_code?: string | null
+          trading_as?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+          website?: string | null
+        }
+        Update: {
+          account_holder?: string | null
+          account_number?: string | null
+          account_type?: string | null
+          ai_settings?: Json | null
+          analyzer_draft?: Json | null
+          bank_name?: string | null
+          baseline_hurdle_yield_percent?: number | null
+          bio_summary?: string | null
+          branch_code?: string | null
+          contact_number?: string | null
+          created_at?: string | null
+          default_agent_commission_percent?: number | null
+          default_prime_rate_percent?: number | null
+          default_tax_entity_type?: string | null
+          email?: string | null
+          entity_name?: string | null
+          id?: string | null
+          liquid_capital_reserve_zar?: number | null
+          logo_base64?: string | null
+          physical_address?: string | null
+          registration_or_id?: string | null
+          remittance_instructions?: string | null
+          rental_forecast_view?: string | null
+          swift_code?: string | null
+          trading_as?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+          website?: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       get_public_tenant_statement: {

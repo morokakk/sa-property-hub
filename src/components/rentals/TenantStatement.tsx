@@ -881,7 +881,7 @@ export default function TenantStatement({
                     ? `${selectedAncillary?.tenantName} (${selectedAncillary?.type.replace('_', ' ')})`
                     : isConsolidated
                     ? 'All Units & Commercial Covenants'
-                    : `${selectedLease?.unitName || 'Main'}: ${selectedLease?.tenantName || 'Vacant'}`}
+                    : `${selectedLease?.unitName || 'Main'}${selectedLease?.roomType ? ` — ${selectedLease.roomType}` : ''}: ${selectedLease?.tenantName || 'Vacant'}`}
                 </p>
               </div>
             </div>
@@ -1246,7 +1246,7 @@ export default function TenantStatement({
                       ? `${selectedAncillary?.tenantName} — Site Lease`
                       : isConsolidated
                       ? `${rental.title} (Master Roll)`
-                      : `${rental.title} — ${selectedLease?.unitName || 'Main Unit'}`}
+                      : `${rental.title} — ${selectedLease?.unitName || 'Main Unit'}${selectedLease?.roomType ? ` (${selectedLease.roomType})` : ''}`}
                   </h1>
                   <p className="text-xs text-slate-600 mt-0.5 font-medium">
                     {rental.address}, {rental.city}
@@ -1283,7 +1283,21 @@ export default function TenantStatement({
                         ? `${occupiedLeases.length} Occupied Units • ${(rental.ancillaryIncomes?.length || 0)} Commercial`
                         : (selectedLease?.tenantName || 'Vacant')}
                     </strong>
+                    {selectedLease?.roomType && isResidential && (
+                      <span className="text-[11px] font-medium text-slate-500 ml-1">
+                        ({selectedLease.roomType})
+                      </span>
+                    )}
                   </div>
+                  {(selectedLease?.guarantorName || selectedLease?.guarantorContact) && isResidential && (
+                    <div className="text-slate-600 text-[11px]">
+                      <span className="text-slate-400">Guarantor / Sponsor:</span>{' '}
+                      <strong className="text-indigo-900">{selectedLease.guarantorName || 'Guarantor on file'}</strong>
+                      {selectedLease.guarantorContact && (
+                        <span className="text-slate-500 ml-1">({selectedLease.guarantorContact})</span>
+                      )}
+                    </div>
+                  )}
                   {selectedLease && isResidential && (
                     <div className="text-slate-600">
                       <span className="text-slate-400">Remaining Lease Term:</span>{' '}

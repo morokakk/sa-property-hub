@@ -99,6 +99,7 @@ export interface DealDscrParams {
   annualInsurance?: number;
   monthlyMaintenanceReserveZAR?: number;
   monthlyPrepaidVendingFeeZAR?: number;
+  monthlyCommunalServicesZAR?: number;
   propertyType?: PropertyTitleType;
   depositZAR?: number;
   bondLTV?: number;
@@ -146,8 +147,9 @@ export function calculateDealDscr(
   const insurance = Math.round((deal.annualInsurance || 0) / 12);
   const maintenance = deal.monthlyMaintenanceReserveZAR ?? 0;
   const vending = deal.monthlyPrepaidVendingFeeZAR ?? 0;
+  const communal = deal.monthlyCommunalServicesZAR ?? 0;
 
-  const operatingExpenses = levies + rates + agentMgt + insurance + maintenance + vending;
+  const operatingExpenses = levies + rates + agentMgt + insurance + maintenance + vending + communal;
   const monthlyNoi = effectiveGrossRent - operatingExpenses;
   const annualNetOperatingIncome = monthlyNoi * 12;
 
@@ -227,6 +229,7 @@ export function calculateDealMetrics(params: {
   agencyVatApplicable?: boolean;
   monthlyMaintenanceReserveZAR?: number;
   monthlyPrepaidVendingFeeZAR?: number;
+  monthlyCommunalServicesZAR?: number;
   vacancyRatePercent: number;
   targetExitPrice: number;
   holdingPeriodMonths: number;
@@ -254,6 +257,7 @@ export function calculateDealMetrics(params: {
     agencyVatApplicable,
     monthlyMaintenanceReserveZAR,
     monthlyPrepaidVendingFeeZAR,
+    monthlyCommunalServicesZAR,
     vacancyRatePercent,
     targetExitPrice,
     holdingPeriodMonths,
@@ -310,7 +314,8 @@ export function calculateDealMetrics(params: {
     managementFee + 
     monthlyInsurance + 
     (monthlyMaintenanceReserveZAR || 0) + 
-    (monthlyPrepaidVendingFeeZAR || 0);
+    (monthlyPrepaidVendingFeeZAR || 0) +
+    (monthlyCommunalServicesZAR || 0);
 
   const monthlyNetOperatingIncome = effectiveGrossRent - totalMonthlyOperatingExpenses;
   const annualNetOperatingIncome = monthlyNetOperatingIncome * 12;
@@ -457,6 +462,21 @@ export function evaluateDealCriteria(
   };
 }
 
+export interface RentalPropertyMetricsResult {
+  grossMonthlyRentZAR: number;
+  ancillaryIncomeZAR: number;
+  totalGrossIncomeZAR: number;
+  monthlyOperatingExpensesZAR: number;
+  totalMonthlyExpensesZAR: number;
+  monthlyNOI: number;
+  annualizedNOI: number;
+  annualNetOperatingIncome: number;
+  netMonthlyCashflowZAR: number;
+  annualNetCashflowZAR: number;
+  capRatePercent: number;
+  cashOnCashPercent: number;
+}
+
 /**
  * Computes monthly agency commission and net cash flow for a rental property
  */
@@ -476,15 +496,21 @@ export function calculateRentalCashflow(property: {
   leases?: Lease[];
   ancillaryIncomes?: AncillaryIncome[];
   monthlyPrepaidVendingFeeZAR?: number;
+  monthlyCommunalServicesZAR?: number;
 }): {
   agencyCommissionZAR: number;
   monthlyInsuranceZAR: number;
+  monthlyCommunalServicesZAR: number;
+  communalServicesZAR: number;
   totalMonthlyExpensesZAR: number;
   unpaidUtilityArrearsZAR: number;
   netMonthlyCashflowZAR: number;
   grossRentZAR: number;
   ancillaryIncomeZAR: number;
   totalGrossIncomeZAR: number;
+  monthlyNOI: number;
+  annualizedNOI: number;
+  annualNetOperatingIncome: number;
 } {
   const leaseGross = (property.leases && property.leases.length > 0)
     ? property.leases.filter(l => l.status !== 'Vacant').reduce((sum, l) => sum + (l.monthlyRentZAR || 0), 0)
@@ -513,6 +539,7 @@ export function calculateRentalCashflow(property: {
   // Freehold properties have 0 body corporate levies
   const effectiveLevies = isFreehold ? 0 : (property.monthlyLeviesZAR || 0);
   const prepaidVendingFee = property.monthlyPrepaidVendingFeeZAR || 0;
+  const communalServicesZAR = property.monthlyCommunalServicesZAR || 0;
 
   const totalMonthlyExpensesZAR =
     effectiveLevies +
@@ -521,20 +548,124 @@ export function calculateRentalCashflow(property: {
     (property.monthlyMaintenanceReserveZAR || 0) +
     monthlyInsuranceZAR +
     (property.monthlyBondPaymentZAR || 0) +
-    prepaidVendingFee;
+    prepaidVendingFee +
+    communalServicesZAR;
 
   const unpaidUtilityArrearsZAR = property.unpaidUtilityArrearsZAR || 0;
   const netMonthlyCashflowZAR = totalGrossIncomeZAR - totalMonthlyExpensesZAR;
 
+  // Monthly operating expenses (excluding bond debt service)
+  const monthlyOperatingExpensesZAR =
+    effectiveLevies +
+    (property.monthlyRatesTaxesZAR || 0) +
+    agencyCommissionZAR +
+    (property.monthlyMaintenanceReserveZAR || 0) +
+    monthlyInsuranceZAR +
+    prepaidVendingFee +
+    communalServicesZAR;
+  const monthlyNOI = totalGrossIncomeZAR - monthlyOperatingExpensesZAR;
+  const annualizedNOI = monthlyNOI * 12;
+
   return {
     agencyCommissionZAR,
     monthlyInsuranceZAR,
+    monthlyCommunalServicesZAR: communalServicesZAR,
+    communalServicesZAR,
     totalMonthlyExpensesZAR,
     unpaidUtilityArrearsZAR,
     netMonthlyCashflowZAR,
     grossRentZAR: leaseGross,
     ancillaryIncomeZAR,
     totalGrossIncomeZAR,
+    monthlyNOI,
+    annualizedNOI,
+    annualNetOperatingIncome: annualizedNOI,
+  };
+}
+
+/**
+ * Computes comprehensive financial metrics for a rental property,
+ * including Net Operating Income (NOI), cap rate, debt service, and cash flow.
+ */
+export function computeRentalPropertyMetrics(property: {
+  monthlyGrossRentZAR?: number;
+  monthlyLeviesZAR?: number;
+  monthlyRatesTaxesZAR?: number;
+  monthlyAgentFeeZAR?: number;
+  monthlyMaintenanceReserveZAR?: number;
+  monthlyBondPaymentZAR?: number;
+  monthlyPrepaidVendingFeeZAR?: number;
+  monthlyCommunalServicesZAR?: number;
+  propertyType?: PropertyTitleType;
+  annualBuildingInsuranceZAR?: number;
+  managementType?: 'Self-Managed' | 'Agency';
+  agencyCommissionPercent?: number;
+  agencyVatApplicable?: boolean;
+  leases?: Lease[];
+  ancillaryIncomes?: AncillaryIncome[];
+  marketValueZAR?: number;
+  purchasePriceZAR?: number;
+}): RentalPropertyMetricsResult {
+  const leaseGross = (property.leases && property.leases.length > 0)
+    ? property.leases.filter(l => l.status !== 'Vacant').reduce((sum, l) => sum + (l.monthlyRentZAR || 0), 0)
+    : (property.monthlyGrossRentZAR || 0);
+  const ancillaryIncomeZAR = (property.ancillaryIncomes || []).reduce((sum, a) => sum + (a.monthlyRentZAR || 0), 0);
+  const totalGrossIncomeZAR = leaseGross + ancillaryIncomeZAR;
+
+  let agentFee = property.monthlyAgentFeeZAR || 0;
+  if (!agentFee && property.managementType === 'Agency' && property.agencyCommissionPercent) {
+    const baseComm = totalGrossIncomeZAR * (property.agencyCommissionPercent / 100);
+    const vatMult = property.agencyVatApplicable !== false ? 1.15 : 1.0;
+    agentFee = Math.round(baseComm * vatMult);
+  }
+
+  const isFreehold = property.propertyType === 'Freehold House';
+  const insuranceMonthly = isFreehold && property.annualBuildingInsuranceZAR
+    ? Math.round(property.annualBuildingInsuranceZAR / 12)
+    : 0;
+  const effectiveLevies = isFreehold ? 0 : (property.monthlyLeviesZAR || 0);
+
+  const totalMonthlyExpensesZAR =
+    (property.monthlyRatesTaxesZAR || 0) +
+    effectiveLevies +
+    agentFee +
+    (property.monthlyMaintenanceReserveZAR || 0) +
+    insuranceMonthly +
+    (property.monthlyBondPaymentZAR || 0) +
+    (property.monthlyPrepaidVendingFeeZAR || 0) +
+    (property.monthlyCommunalServicesZAR || 0);
+
+  const monthlyOperatingExpensesZAR =
+    (property.monthlyRatesTaxesZAR || 0) +
+    effectiveLevies +
+    agentFee +
+    (property.monthlyMaintenanceReserveZAR || 0) +
+    insuranceMonthly +
+    (property.monthlyPrepaidVendingFeeZAR || 0) +
+    (property.monthlyCommunalServicesZAR || 0);
+
+  const monthlyNOI = totalGrossIncomeZAR - monthlyOperatingExpensesZAR;
+  const annualizedNOI = monthlyNOI * 12;
+  const netMonthlyCashflowZAR = totalGrossIncomeZAR - totalMonthlyExpensesZAR;
+  const annualNetCashflowZAR = netMonthlyCashflowZAR * 12;
+
+  const propertyVal = property.marketValueZAR || property.purchasePriceZAR || 0;
+  const capRatePercent = propertyVal > 0 ? (annualizedNOI / propertyVal) * 100 : 0;
+  const cashOnCashPercent = propertyVal > 0 ? (annualNetCashflowZAR / propertyVal) * 100 : 0;
+
+  return {
+    grossMonthlyRentZAR: leaseGross,
+    ancillaryIncomeZAR,
+    totalGrossIncomeZAR,
+    monthlyOperatingExpensesZAR,
+    totalMonthlyExpensesZAR,
+    monthlyNOI,
+    annualizedNOI,
+    annualNetOperatingIncome: annualizedNOI,
+    netMonthlyCashflowZAR,
+    annualNetCashflowZAR,
+    capRatePercent,
+    cashOnCashPercent,
   };
 }
 
@@ -563,6 +694,9 @@ export function generateLongTermProjection(
     managementFeePercent?: number;
     agencyVatApplicable?: boolean;
     vacancyRatePercent?: number;
+    monthlyCommunalServicesZAR?: number;
+    monthlyMaintenanceReserveZAR?: number;
+    monthlyPrepaidVendingFeeZAR?: number;
   }
 ): LongTermProjectionYear[] {
   const purchasePrice = deal.purchasePrice ?? 0;
@@ -640,8 +774,19 @@ export function generateLongTermProjection(
   const monthlyInsurance = (deal.annualInsurance ?? 7_200) / 12;
   const monthlyLevies = deal.monthlyLevies ?? 0;
   const monthlyRates = deal.monthlyRatesTaxes ?? 0;
+  const monthlyCommunal = deal.monthlyCommunalServicesZAR ?? 0;
+  const monthlyMaintenance = deal.monthlyMaintenanceReserveZAR ?? 0;
+  const monthlyVending = deal.monthlyPrepaidVendingFeeZAR ?? 0;
 
-  const totalMonthlyCosts = monthlyLevies + monthlyRates + managementFee + monthlyInsurance + vacancyLoss;
+  const totalMonthlyCosts =
+    monthlyLevies +
+    monthlyRates +
+    managementFee +
+    monthlyInsurance +
+    vacancyLoss +
+    monthlyCommunal +
+    monthlyMaintenance +
+    monthlyVending;
 
   const baseAnnualRent = monthlyRent * 12;
   const baseAnnualCosts = totalMonthlyCosts * 12;
@@ -702,7 +847,7 @@ export function generateRentalLongTermProjection(property: RentalProperty): Long
 
   const managementFeePercent = grossRent > 0 ? (agencyFeeMonthly / grossRent) * 100 : 0;
   const isFreehold = property.propertyType === 'Freehold House';
-  const monthlyLevies = (isFreehold ? 0 : (property.monthlyLeviesZAR || 0)) + (property.monthlyMaintenanceReserveZAR || 0);
+  const monthlyLevies = isFreehold ? 0 : (property.monthlyLeviesZAR || 0);
   const monthlyRatesTaxes = property.monthlyRatesTaxesZAR || 0;
   const annualInsurance = isFreehold ? (property.annualBuildingInsuranceZAR || 0) : 0;
 
@@ -721,6 +866,9 @@ export function generateRentalLongTermProjection(property: RentalProperty): Long
     annualInsurance,
     managementFeePercent,
     vacancyRatePercent: property.status === 'Vacant' ? 10 : 0,
+    monthlyMaintenanceReserveZAR: property.monthlyMaintenanceReserveZAR || 0,
+    monthlyPrepaidVendingFeeZAR: property.monthlyPrepaidVendingFeeZAR || 0,
+    monthlyCommunalServicesZAR: property.monthlyCommunalServicesZAR || 0,
   });
 }
 

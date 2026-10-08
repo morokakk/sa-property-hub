@@ -101,6 +101,7 @@ export default function OpportunityAnalyzerPage() {
   const [agencyVatApplicable, setAgencyVatApplicable] = useState<boolean>(analyzerDraft?.agencyVatApplicable ?? true);
   const [monthlyMaintenanceReserve, setMonthlyMaintenanceReserve] = useState<number>(analyzerDraft?.monthlyMaintenanceReserveZAR ?? 800);
   const [monthlyPrepaidVendingFee, setMonthlyPrepaidVendingFee] = useState<number>(analyzerDraft?.monthlyPrepaidVendingFeeZAR ?? 150);
+  const [monthlyCommunalServices, setMonthlyCommunalServices] = useState<number>(analyzerDraft?.monthlyCommunalServicesZAR ?? 0);
 
   // Exit VAT & Holding Sensitivity State
   const [holdingPeriodMonths, setHoldingPeriodMonths] = useState<number>(analyzerDraft?.holdingPeriodMonths ?? 6);
@@ -186,6 +187,7 @@ export default function OpportunityAnalyzerPage() {
       if (analyzerDraft.agencyVatApplicable !== undefined) setAgencyVatApplicable(analyzerDraft.agencyVatApplicable);
       if (analyzerDraft.monthlyMaintenanceReserveZAR !== undefined) setMonthlyMaintenanceReserve(analyzerDraft.monthlyMaintenanceReserveZAR);
       if (analyzerDraft.monthlyPrepaidVendingFeeZAR !== undefined) setMonthlyPrepaidVendingFee(analyzerDraft.monthlyPrepaidVendingFeeZAR);
+      if (analyzerDraft.monthlyCommunalServicesZAR !== undefined) setMonthlyCommunalServices(analyzerDraft.monthlyCommunalServicesZAR);
       if (analyzerDraft.interestRateMargin !== undefined) {
         setInterestRateMargin(analyzerDraft.interestRateMargin);
         setInterestRate(Number(((investorProfile?.defaultPrimeRatePercent ?? 10.75) + analyzerDraft.interestRateMargin).toFixed(2)));
@@ -401,6 +403,7 @@ export default function OpportunityAnalyzerPage() {
       exitCommissionPercent: effectiveExitCommissionPercent,
       monthlyMaintenanceReserveZAR: monthlyMaintenanceReserve,
       monthlyPrepaidVendingFeeZAR: monthlyPrepaidVendingFee,
+      monthlyCommunalServicesZAR: monthlyCommunalServices,
     });
   }, [
     purchasePrice,
@@ -413,6 +416,7 @@ export default function OpportunityAnalyzerPage() {
     agencyVatApplicable,
     monthlyMaintenanceReserve,
     monthlyPrepaidVendingFee,
+    monthlyCommunalServices,
     vacancyRate,
     propertyType,
     targetExitPrice,
@@ -460,6 +464,7 @@ export default function OpportunityAnalyzerPage() {
       managementFeePercent: managementFee,
       agencyVatApplicable,
       vacancyRatePercent: vacancyRate,
+      monthlyCommunalServicesZAR: monthlyCommunalServices,
     });
   }, [
     purchasePrice,
@@ -477,6 +482,7 @@ export default function OpportunityAnalyzerPage() {
     annualInsurance,
     managementFee,
     agencyVatApplicable,
+    monthlyCommunalServices,
     vacancyRate,
     propertyType,
   ]);
@@ -514,11 +520,12 @@ export default function OpportunityAnalyzerPage() {
       annualInsurance: propertyType === 'Freehold House' ? annualInsurance : 0,
       monthlyMaintenanceReserve,
       monthlyPrepaidVendingFee,
+      monthlyCommunalServicesZAR: monthlyCommunalServices,
       rehabCost,
       estimatedAcquisitionCostRate: 0.05,
       targetNetYieldPercent: maoTargetYield,
     });
-  }, [monthlyRent, vacancyRate, managementFee, agencyVatApplicable, propertyType, monthlyLevies, monthlyRates, annualInsurance, monthlyMaintenanceReserve, monthlyPrepaidVendingFee, rehabCost, maoTargetYield]);
+  }, [monthlyRent, vacancyRate, managementFee, agencyVatApplicable, propertyType, monthlyLevies, monthlyRates, annualInsurance, monthlyMaintenanceReserve, monthlyPrepaidVendingFee, monthlyCommunalServices, rehabCost, maoTargetYield]);
 
   const handleApplyMaoBid = (bidAmount: number) => {
     if (bidAmount <= 0) return;
@@ -555,6 +562,7 @@ export default function OpportunityAnalyzerPage() {
       monthlyLevies: finalLevies,
       monthlyRatesTaxes: monthlyRates,
       annualInsurance: finalInsurance,
+      monthlyCommunalServicesZAR: monthlyCommunalServices,
       managementFeePercent: managementFee,
       agencyVatApplicable,
       vacancyRatePercent: vacancyRate,
@@ -625,6 +633,7 @@ export default function OpportunityAnalyzerPage() {
     setVatExemptAgent(deal.vatExemptAgent ?? (investorProfile?.vatExemptAgent ?? false));
     setMonthlyMaintenanceReserve(deal.monthlyMaintenanceReserveZAR !== undefined ? deal.monthlyMaintenanceReserveZAR : (analyzerDraft?.monthlyMaintenanceReserveZAR ?? 800));
     setMonthlyPrepaidVendingFee(deal.monthlyPrepaidVendingFeeZAR !== undefined ? deal.monthlyPrepaidVendingFeeZAR : (analyzerDraft?.monthlyPrepaidVendingFeeZAR ?? 150));
+    setMonthlyCommunalServices(deal.monthlyCommunalServicesZAR !== undefined ? deal.monthlyCommunalServicesZAR : (analyzerDraft?.monthlyCommunalServicesZAR ?? 0));
     const effectiveLtv = deal.bondLTV !== undefined ? deal.bondLTV : (deal.loanToValuePercent ?? 100);
     setLoanToValue(effectiveLtv);
     const effectiveDep = deal.depositZAR !== undefined ? deal.depositZAR : Math.max(0, Math.round(deal.purchasePrice * (1 - effectiveLtv / 100)));
@@ -664,6 +673,7 @@ export default function OpportunityAnalyzerPage() {
     setVatExemptAgent(investorProfile?.vatExemptAgent ?? false);
     setMonthlyMaintenanceReserve(analyzerDraft?.monthlyMaintenanceReserveZAR ?? 800);
     setMonthlyPrepaidVendingFee(analyzerDraft?.monthlyPrepaidVendingFeeZAR ?? 150);
+    setMonthlyCommunalServices(analyzerDraft?.monthlyCommunalServicesZAR ?? 0);
     setAnnualCapitalGrowth(5.0);
     setAnnualRentalEscalation(6.0);
     setAnnualExpenseInflation(6.0);
@@ -716,10 +726,11 @@ export default function OpportunityAnalyzerPage() {
         vatExemptAgent,
         interestRateMargin,
         monthlyBondPaymentZAR: calculatedMetrics.monthlyBondPayment,
-        monthlyOtherHoldingCostZAR: (monthlyMaintenanceReserve || 0) + (monthlyPrepaidVendingFee || 0),
+        monthlyOtherHoldingCostZAR: (monthlyMaintenanceReserve || 0) + (monthlyPrepaidVendingFee || 0) + (monthlyCommunalServices || 0),
         monthlyMaintenanceReserveZAR: monthlyMaintenanceReserve,
         monthlyPrepaidVendingFeeZAR: monthlyPrepaidVendingFee,
-        monthlyHoldingCostZAR: (finalLevies || 0) + (monthlyRates || 0) + monthlyInsurance + (calculatedMetrics.monthlyBondPayment || 0) + (monthlyMaintenanceReserve || 0) + (monthlyPrepaidVendingFee || 0),
+        monthlyCommunalServicesZAR: monthlyCommunalServices || undefined,
+        monthlyHoldingCostZAR: (finalLevies || 0) + (monthlyRates || 0) + monthlyInsurance + (calculatedMetrics.monthlyBondPayment || 0) + (monthlyMaintenanceReserve || 0) + (monthlyPrepaidVendingFee || 0) + (monthlyCommunalServices || 0),
         auctioneerCommissionZAR: auctioneerCommission,
         municipalArrearsZAR: municipalArrears,
         loanToValuePercent: loanToValue,
@@ -761,6 +772,7 @@ export default function OpportunityAnalyzerPage() {
       setVatExemptAgent(investorProfile?.vatExemptAgent ?? false);
       setMonthlyMaintenanceReserve(analyzerDraft?.monthlyMaintenanceReserveZAR ?? 800);
       setMonthlyPrepaidVendingFee(analyzerDraft?.monthlyPrepaidVendingFeeZAR ?? 150);
+      setMonthlyCommunalServices(analyzerDraft?.monthlyCommunalServicesZAR ?? 0);
       setAnnualCapitalGrowth(5.0);
       setAnnualRentalEscalation(6.0);
       setAnnualExpenseInflation(6.0);
@@ -801,10 +813,11 @@ export default function OpportunityAnalyzerPage() {
       interestRateMargin,
       holdingPeriodMonths,
       monthlyBondPaymentZAR: calculatedMetrics.monthlyBondPayment,
-      monthlyOtherHoldingCostZAR: (monthlyMaintenanceReserve || 0) + (monthlyPrepaidVendingFee || 0),
+      monthlyOtherHoldingCostZAR: (monthlyMaintenanceReserve || 0) + (monthlyPrepaidVendingFee || 0) + (monthlyCommunalServices || 0),
       monthlyMaintenanceReserveZAR: monthlyMaintenanceReserve,
       monthlyPrepaidVendingFeeZAR: monthlyPrepaidVendingFee,
-      monthlyHoldingCostZAR: (finalLevies || 0) + (monthlyRates || 0) + monthlyInsurance + (calculatedMetrics.monthlyBondPayment || 0) + (monthlyMaintenanceReserve || 0) + (monthlyPrepaidVendingFee || 0),
+      monthlyCommunalServicesZAR: monthlyCommunalServices || undefined,
+      monthlyHoldingCostZAR: (finalLevies || 0) + (monthlyRates || 0) + monthlyInsurance + (calculatedMetrics.monthlyBondPayment || 0) + (monthlyMaintenanceReserve || 0) + (monthlyPrepaidVendingFee || 0) + (monthlyCommunalServices || 0),
       auctioneerCommissionZAR: auctioneerCommission,
       municipalArrearsZAR: municipalArrears,
       loanToValuePercent: loanToValue,
@@ -844,6 +857,7 @@ export default function OpportunityAnalyzerPage() {
     setVatExemptAgent(investorProfile?.vatExemptAgent ?? false);
     setMonthlyMaintenanceReserve(analyzerDraft?.monthlyMaintenanceReserveZAR ?? 800);
     setMonthlyPrepaidVendingFee(analyzerDraft?.monthlyPrepaidVendingFeeZAR ?? 150);
+    setMonthlyCommunalServices(analyzerDraft?.monthlyCommunalServicesZAR ?? 0);
     setVacancyRate(analyzerDraft?.vacancyRatePercent ?? 6.0);
     setManagementFee(analyzerDraft?.managementFeePercent ?? 8.0);
     setAgencyVatApplicable(analyzerDraft?.agencyVatApplicable ?? true);
@@ -1876,6 +1890,38 @@ export default function OpportunityAnalyzerPage() {
                     </div>
                     <p className="text-[10px] text-slate-500 mt-1">
                       CitiQ / Recharger monthly fixed admin fee for prepaid electricity/water recovery. Default: R 150.
+                    </p>
+                  </div>
+
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="block text-[11px] font-semibold text-slate-700">
+                        Communal / Serviced OpEx (ZAR)
+                      </label>
+                      <span className="text-[10px] font-bold text-slate-700 bg-slate-200 px-1.5 py-0.5 rounded">
+                        -{formatZAR(monthlyCommunalServices)}/pm
+                      </span>
+                    </div>
+                    <div className="relative">
+                      <span className="absolute left-3 top-2 text-xs text-slate-400 font-bold">R</span>
+                      <input
+                        type="number"
+                        name="monthlyCommunalServicesZAR"
+                        autoComplete="off"
+                        min="0"
+                        step="50"
+                        value={monthlyCommunalServices || ''}
+                        onChange={(e) => {
+                          const val = Number(e.target.value);
+                          setMonthlyCommunalServices(val);
+                          updateAnalyzerDraft({ monthlyCommunalServicesZAR: val });
+                        }}
+                        placeholder="0"
+                        className="w-full text-xs pl-7 pr-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-emerald-500 font-semibold text-slate-900 bg-white"
+                      />
+                    </div>
+                    <p className="text-[10px] text-slate-500 mt-1">
+                      Consolidated communal amenities (uncapped Wi-Fi, communal cleaning, security armed response, garden care). Default: R 0.
                     </p>
                   </div>
                 </>

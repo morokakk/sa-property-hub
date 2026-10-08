@@ -35,6 +35,7 @@ export interface RentalMaoParams {
   annualInsurance: number;
   monthlyMaintenanceReserve?: number;
   monthlyPrepaidVendingFee?: number;
+  monthlyCommunalServicesZAR?: number;
   rehabCost?: number;
   estimatedAcquisitionCostRate?: number;
   targetNetYieldPercent: number; // Target Cap Rate, e.g. 8.5%
@@ -133,6 +134,7 @@ export function calculateRentalMao(params: RentalMaoParams): RentalMaoResult {
     annualInsurance,
     monthlyMaintenanceReserve = 0,
     monthlyPrepaidVendingFee = 0,
+    monthlyCommunalServicesZAR = 0,
     rehabCost = 0,
     estimatedAcquisitionCostRate = 0,
     targetNetYieldPercent,
@@ -148,13 +150,15 @@ export function calculateRentalMao(params: RentalMaoParams): RentalMaoResult {
   const annualInsuranceClean = Math.max(0, annualInsurance);
   const maintenanceAnnual = Math.max(0, monthlyMaintenanceReserve) * 12;
   const vendingAnnual = Math.max(0, monthlyPrepaidVendingFee) * 12;
+  const communalAnnual = Math.max(0, monthlyCommunalServicesZAR) * 12;
 
   const annualOperatingExpenses =
     statutoryAndLeviesAnnual +
     annualInsuranceClean +
     managementFeeAnnual +
     maintenanceAnnual +
-    vendingAnnual;
+    vendingAnnual +
+    communalAnnual;
 
   const stressTestedNoi = effectiveGrossRentAnnual - annualOperatingExpenses;
 

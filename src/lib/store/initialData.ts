@@ -917,6 +917,7 @@ export const INITIAL_RENTALS: RentalProperty[] = [
     outstandingBondBalanceZAR: 520_000,
     bondInterestRatePercent: 11.5,
     monthlyBondPaymentZAR: 5_620,
+    monthlyCommunalServicesZAR: 2500,
     isBrrrrProperty: true,
     leases: [
       {
@@ -931,6 +932,9 @@ export const INITIAL_RENTALS: RentalProperty[] = [
         depositHeldZAR: 5_500,
         annualEscalationPercent: 7.0,
         status: 'Occupied',
+        roomType: 'Executive Suite',
+        guarantorName: 'Ndlovu Holdings (Pty) Ltd',
+        guarantorContact: '+27 11 555 4321',
       },
       {
         id: 'lease-4b',
@@ -944,6 +948,9 @@ export const INITIAL_RENTALS: RentalProperty[] = [
         depositHeldZAR: 3_200,
         annualEscalationPercent: 6.5,
         status: 'Occupied',
+        roomType: 'Garden Cottage',
+        guarantorName: 'Sarah Mokoena (Parent Guarantee)',
+        guarantorContact: 'sarah.mokoena@gmail.com',
       },
       {
         id: 'lease-4c',
@@ -955,6 +962,7 @@ export const INITIAL_RENTALS: RentalProperty[] = [
         depositHeldZAR: 0,
         annualEscalationPercent: 6.5,
         status: 'Vacant',
+        roomType: 'Standard Room',
       },
     ],
     ancillaryIncomes: [

@@ -70,6 +70,9 @@ async function fetchStatementData(leaseId: string): Promise<PublicTenantStatemen
         annualEscalationPercent: demoLease.annualEscalationPercent,
         status: demoLease.status,
         arrears_opening_balance_zar: demoLease.arrearsOpeningBalanceZAR ?? null,
+        roomType: demoLease.roomType,
+        guarantorName: demoLease.guarantorName,
+        guarantorContact: demoLease.guarantorContact,
       },
       property: {
         id: demoRental.id,

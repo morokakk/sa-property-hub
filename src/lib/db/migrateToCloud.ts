@@ -333,6 +333,7 @@ export function mapRentals(rentals: RentalProperty[] = [], userId: string): Prop
     utility_type: r.utilityType || null,
     prepaid_vendor_name: r.prepaidVendorName || null,
     monthly_prepaid_vending_fee_zar: toNullableNumeric(r.monthlyPrepaidVendingFeeZAR),
+    monthly_communal_services_zar: toNullableNumeric(r.monthlyCommunalServicesZAR),
     ancillary_incomes: (r.ancillaryIncomes ? JSON.parse(JSON.stringify(r.ancillaryIncomes)) : []) as any,
     updated_at: new Date().toISOString(),
   }));
@@ -485,6 +486,7 @@ export function mapOpportunities(opportunities: OpportunityDeal[] = [], userId: 
     monthly_rental_estimate_zar: toNumeric(opp.monthlyRentalEstimate, 0),
     monthly_levies_zar: toNumeric(opp.monthlyLevies, 0),
     monthly_rates_taxes_zar: toNumeric(opp.monthlyRatesTaxes, 0),
+    monthly_communal_services_zar: toNullableNumeric(opp.monthlyCommunalServicesZAR),
     annual_insurance_zar: toNumeric(opp.annualInsurance, 0),
     management_fee_percent: toNumeric(opp.managementFeePercent, 8.0),
     agency_vat_applicable: opp.agencyVatApplicable ?? true,

@@ -1791,6 +1791,8 @@ export const usePortfolioStore = create<PortfolioState>()(
             (opp.agencyVatApplicable !== false ? 1.15 : 1.0)
           ),
           monthlyMaintenanceReserveZAR: 500,
+          monthlyPrepaidVendingFeeZAR: opp.monthlyPrepaidVendingFeeZAR,
+          monthlyCommunalServicesZAR: opp.monthlyCommunalServicesZAR,
           driveVault: opp.driveVault ? { ...opp.driveVault } : undefined,
           maintenanceHistory: [],
           status: 'Vacant',

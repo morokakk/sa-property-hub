@@ -14,6 +14,9 @@ export interface PublicTenantStatementPayload {
     annualEscalationPercent?: number;
     status?: string;
     arrears_opening_balance_zar?: number | null;
+    roomType?: string;
+    guarantorName?: string;
+    guarantorContact?: string;
   };
   property: {
     id: string;

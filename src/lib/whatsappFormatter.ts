@@ -163,7 +163,10 @@ export function formatOpportunityForWhatsApp(
     text += `\n*CASH FLOW & YIELD PERFORMANCE*\n`;
     text += `• Est. Gross Rent: *${formatZAR(deal.monthlyRentalEstimate)}/m*\n`;
     text += `• Gross Yield: *${formatPercent(deal.grossYield)}* | Cap Rate: *${formatPercent(deal.capRate)}*\n`;
-    text += `• Net Cash Flow: *${formatZAR(deal.monthlyCashFlow)}/m* (After bond, levies, rates)\n`;
+    text += `• Net Cash Flow: *${formatZAR(deal.monthlyCashFlow)}/m* (After bond, levies, rates${deal.monthlyCommunalServicesZAR ? ', communal services' : ''})\n`;
+    if (deal.monthlyCommunalServicesZAR) {
+      text += `• Communal / Serviced OpEx: *${formatZAR(deal.monthlyCommunalServicesZAR)}/m* (Wi-Fi, cleaning, security, garden)\n`;
+    }
 
     // Ancillary Commercial Covenant Lines (P4)
     if (deal.ancillaryIncomes?.length) {
@@ -191,6 +194,7 @@ export function formatOpportunityForWhatsApp(
       monthlyRentalEstimate: deal.monthlyRentalEstimate,
       monthlyLevies: deal.monthlyLevies,
       monthlyRatesTaxes: deal.monthlyRatesTaxes,
+      monthlyCommunalServicesZAR: deal.monthlyCommunalServicesZAR,
     });
 
     if (projections.length >= 10) {
@@ -549,6 +553,9 @@ export function formatTenantAccountStatementForWhatsApp(
     (rental.leases || []).find((l) => l.id === options?.leaseId) || tiers.targetLease || rental.leases?.[0];
   const tenantName = selectedLease?.tenantName || 'Valued Tenant';
   const unitName = selectedLease?.unitName || 'Main Unit';
+  const roomType = selectedLease?.roomType;
+  const guarantorName = selectedLease?.guarantorName;
+  const guarantorContact = selectedLease?.guarantorContact;
 
   const balanceBroughtForward = tiers.balanceBroughtForward;
   const periodPayments = tiers.periodPayments;
@@ -559,9 +566,12 @@ export function formatTenantAccountStatementForWhatsApp(
   let text = `🧾 *TENANT ACCOUNT STATEMENT & TAX INVOICE*\n`;
   text += `━━━━━━━━━━━━━━━━━━━━━\n`;
   text += `🏢 *Landlord:* ${entityName}\n`;
-  text += `🏠 *Property:* ${rental.title} — ${unitName}\n`;
+  text += `🏠 *Property:* ${rental.title} — ${unitName}${roomType ? ` (${roomType})` : ''}\n`;
   text += `📍 *Address:* ${rental.address}, ${rental.city}\n`;
   text += `👤 *Tenant:* ${tenantName}\n`;
+  if (guarantorName) {
+    text += `🛡️ *Guarantor / Sponsor:* ${guarantorName}${guarantorContact ? ` (${guarantorContact})` : ''}\n`;
+  }
   text += `📅 *Billing Period:* ${currentMonthItem.monthLabel}\n\n`;
 
   // 1. Balance Brought Forward

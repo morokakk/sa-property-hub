@@ -143,6 +143,7 @@ export interface OpportunityDeal {
   monthlyOtherHoldingCostZAR?: number;
   monthlyMaintenanceReserveZAR?: number; // e.g. R 800
   monthlyPrepaidVendingFeeZAR?: number; // e.g. R 150
+  monthlyCommunalServicesZAR?: number; // e.g. R 2500 (Wi-Fi, cleaning, security)
   // Financing
   loanToValuePercent: number; // e.g. 80% or 0% for cash
   bondLTV: number; // e.g. 100% or 80%
@@ -361,6 +362,9 @@ export interface Lease {
   status: 'Occupied' | 'Vacant' | 'Notice Given';
   arrearsOpeningBalanceZAR?: number;
   unpaidUtilityArrearsZAR?: number;
+  guarantorName?: string; // e.g. Parent/Guardian Deed of Suretyship, or Corporate Sponsor
+  guarantorContact?: string; // phone or corporate AP email
+  roomType?: string; // e.g. Executive Suite, En-Suite Single, Shared Room, Garden Cottage
 }
 
 export interface AncillaryIncome {
@@ -484,6 +488,7 @@ export interface RentalProperty {
   monthlyRatesTaxesZAR: number;
   monthlyAgentFeeZAR: number;
   monthlyMaintenanceReserveZAR: number;
+  monthlyCommunalServicesZAR?: number; // consolidated monthly OpEx for uncapped Wi-Fi, domestic cleaner, security armed response, and garden care
   annualBuildingInsuranceZAR?: number; // Homeowner structural insurance for Freehold properties
   // Tenant Payments & Calculated Arrears Ledger
   paymentRecords?: TenantPaymentRecord[];
@@ -835,6 +840,7 @@ export interface AnalyzerDraft {
   agencyVatApplicable?: boolean;
   monthlyMaintenanceReserveZAR?: number;
   monthlyPrepaidVendingFeeZAR?: number;
+  monthlyCommunalServicesZAR?: number;
   interestRateMargin?: number;
   vatExemptAgent?: boolean;
   holdingPeriodMonths?: number;

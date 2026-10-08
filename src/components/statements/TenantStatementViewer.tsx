@@ -93,6 +93,9 @@ export default function TenantStatementViewer({
           annualEscalationPercent: lease.annualEscalationPercent || 0,
           status: (lease.status as any) || 'Occupied',
           arrearsOpeningBalanceZAR: lease.arrears_opening_balance_zar ?? undefined,
+          roomType: lease.roomType,
+          guarantorName: lease.guarantorName,
+          guarantorContact: lease.guarantorContact,
         },
       ],
       utilityStatements: sortedStatements,
@@ -389,7 +392,7 @@ export default function TenantStatementViewer({
               </span>
             </div>
             <p className="text-xs text-slate-500 mt-1">
-              {property.title} • {lease.unitName}
+              {property.title} • {lease.unitName}{lease.roomType ? ` — ${lease.roomType}` : ''}
             </p>
           </div>
 
@@ -518,12 +521,21 @@ export default function TenantStatementViewer({
                 Billed To (Tenant)
               </span>
               <p className="text-sm font-bold text-slate-900">{lease.tenantName}</p>
-              <p className="text-slate-600 font-medium">Designated Unit: {lease.unitName}</p>
+              <p className="text-slate-600 font-medium">Designated Unit: {lease.unitName}{lease.roomType ? ` (${lease.roomType})` : ''}</p>
               {lease.tenantEmail && (
                 <p className="text-slate-500">{lease.tenantEmail}</p>
               )}
               {lease.tenantPhone && (
                 <p className="text-slate-500">{lease.tenantPhone}</p>
+              )}
+              {(lease.guarantorName || lease.guarantorContact) && (
+                <div className="pt-1.5 mt-1 border-t border-slate-200/60">
+                  <span className="text-[10px] font-semibold text-slate-400 block">Guarantor / Sponsor:</span>
+                  <p className="font-semibold text-indigo-900">{lease.guarantorName || 'Guarantor on file'}</p>
+                  {lease.guarantorContact && (
+                    <p className="text-slate-500 text-[11px]">{lease.guarantorContact}</p>
+                  )}
+                </div>
               )}
             </div>
 

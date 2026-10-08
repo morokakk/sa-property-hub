@@ -658,6 +658,7 @@ export default function RentalPortfolioPage() {
   const [utilityType, setUtilityType] = useState<'postpaid' | 'prepaid_submeter' | 'hybrid'>('postpaid');
   const [prepaidVendorName, setPrepaidVendorName] = useState('');
   const [monthlyPrepaidVendingFee, setMonthlyPrepaidVendingFee] = useState(0);
+  const [monthlyCommunalServices, setMonthlyCommunalServices] = useState<number>(0);
 
   // Per-Rental Tax Entity Override State
   const [taxEntityOverride, setTaxEntityOverride] = useState<'Company (27%)' | 'Individual (45%)' | 'Pre-Tax' | undefined>(undefined);
@@ -790,6 +791,7 @@ export default function RentalPortfolioPage() {
     setUtilityType('postpaid');
     setPrepaidVendorName('');
     setMonthlyPrepaidVendingFee(0);
+    setMonthlyCommunalServices(0);
     setTaxEntityOverride(undefined);
     setFormAncillaryIncomes([]);
     setShowRentalModal(true);
@@ -852,6 +854,7 @@ export default function RentalPortfolioPage() {
     setUtilityType(property.utilityType || 'postpaid');
     setPrepaidVendorName(property.prepaidVendorName || '');
     setMonthlyPrepaidVendingFee(property.monthlyPrepaidVendingFeeZAR || 0);
+    setMonthlyCommunalServices(property.monthlyCommunalServicesZAR || 0);
     setTaxEntityOverride(property.taxEntityTypeOverride);
     setFormAncillaryIncomes(property.ancillaryIncomes?.map(a => ({ ...a })) || []);
     setShowRentalModal(true);
@@ -939,6 +942,7 @@ export default function RentalPortfolioPage() {
       utilityType,
       prepaidVendorName: (utilityType === 'prepaid_submeter' || utilityType === 'hybrid') ? prepaidVendorName.trim() || undefined : undefined,
       monthlyPrepaidVendingFeeZAR: (utilityType === 'prepaid_submeter' || utilityType === 'hybrid') ? monthlyPrepaidVendingFee : undefined,
+      monthlyCommunalServicesZAR: monthlyCommunalServices > 0 ? monthlyCommunalServices : undefined,
       taxEntityTypeOverride: taxEntityOverride,
       ancillaryIncomes: formAncillaryIncomes.length > 0 ? formAncillaryIncomes : undefined,
     };
@@ -1379,11 +1383,31 @@ export default function RentalPortfolioPage() {
                                   </div>
                                   <div className="space-y-1 pl-5">
                                     {property.leases.map(l => (
-                                      <div key={l.id} className="flex items-center justify-between text-[11px]">
-                                        <span className={l.status === 'Occupied' ? 'text-slate-700' : 'text-slate-400'}>
-                                          {l.unitName}: {l.tenantName} ({l.status})
-                                        </span>
-                                        <span className="font-medium">{formatZAR(l.monthlyRentZAR)}/m</span>
+                                      <div key={l.id} className="flex items-center justify-between text-[11px] gap-2 flex-wrap sm:flex-nowrap">
+                                        <div className="flex items-center gap-1.5 flex-wrap">
+                                          <span className={l.status === 'Occupied' ? 'text-slate-700 font-medium' : 'text-slate-400'}>
+                                            {l.unitName}: {l.tenantName} ({l.status})
+                                          </span>
+                                          {l.roomType && (
+                                            <span className="text-[9px] font-medium bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded border border-slate-200 shrink-0">
+                                              {l.roomType}
+                                            </span>
+                                          )}
+                                          {l.guarantorName && (
+                                            <span className="inline-flex items-center gap-1 text-[9px] font-semibold text-indigo-700 bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-200 max-w-[220px] truncate" title={`Guarantor: ${l.guarantorName}${l.guarantorContact ? ` (${l.guarantorContact})` : ''}`}>
+                                              <span className="shrink-0">🛡️</span>
+                                              <span className="truncate">Guarantor: {l.guarantorName}</span>
+                                              {l.guarantorContact && (
+                                                l.guarantorContact.includes('@') ? (
+                                                  <a href={`mailto:${l.guarantorContact}`} className="text-indigo-600 hover:underline shrink-0" onClick={e => e.stopPropagation()} title={`Email guarantor: ${l.guarantorContact}`}>✉️</a>
+                                                ) : (
+                                                  <a href={`tel:${l.guarantorContact.replace(/\s+/g, '')}`} className="text-indigo-600 hover:underline shrink-0" onClick={e => e.stopPropagation()} title={`Call guarantor: ${l.guarantorContact}`}>📞</a>
+                                                )
+                                              )}
+                                            </span>
+                                          )}
+                                        </div>
+                                        <span className="font-medium shrink-0">{formatZAR(l.monthlyRentZAR)}/m</span>
                                       </div>
                                     ))}
                                   </div>
@@ -1395,7 +1419,27 @@ export default function RentalPortfolioPage() {
                                       <UserCheck className="w-3.5 h-3.5 text-slate-400" />
                                       Tenant:
                                     </span>
-                                    <strong className="text-slate-900">{property.leases?.[0]?.tenantName}</strong>
+                                    <div className="flex items-center gap-1.5 flex-wrap justify-end">
+                                      <strong className="text-slate-900">{property.leases?.[0]?.tenantName}</strong>
+                                      {property.leases?.[0]?.roomType && (
+                                        <span className="text-[10px] font-medium bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded border border-slate-200 shrink-0">
+                                          {property.leases[0].roomType}
+                                        </span>
+                                      )}
+                                      {property.leases?.[0]?.guarantorName && (
+                                        <span className="inline-flex items-center gap-1 text-[9px] font-semibold text-indigo-700 bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-200 max-w-[220px] truncate" title={`Guarantor: ${property.leases[0].guarantorName}${property.leases[0].guarantorContact ? ` (${property.leases[0].guarantorContact})` : ''}`}>
+                                          <span className="shrink-0">🛡️</span>
+                                          <span className="truncate">Guarantor: {property.leases[0].guarantorName}</span>
+                                          {property.leases[0].guarantorContact && (
+                                            property.leases[0].guarantorContact.includes('@') ? (
+                                              <a href={`mailto:${property.leases[0].guarantorContact}`} className="text-indigo-600 hover:underline shrink-0" onClick={e => e.stopPropagation()} title={`Email guarantor: ${property.leases[0].guarantorContact}`}>✉️</a>
+                                            ) : (
+                                              <a href={`tel:${property.leases[0].guarantorContact.replace(/\s+/g, '')}`} className="text-indigo-600 hover:underline shrink-0" onClick={e => e.stopPropagation()} title={`Call guarantor: ${property.leases[0].guarantorContact}`}>📞</a>
+                                            )
+                                          )}
+                                        </span>
+                                      )}
+                                    </div>
                                   </div>
 
                                   <div className="flex items-center justify-between text-slate-600">
@@ -1522,6 +1566,13 @@ export default function RentalPortfolioPage() {
                                 <div className="flex justify-between items-center text-slate-500">
                                   <span>Prepaid Sub-Meter Fee ({property.prepaidVendorName || 'Vendor'}):</span>
                                   <span>- {formatZAR(property.monthlyPrepaidVendingFeeZAR || 0)}</span>
+                                </div>
+                              )}
+
+                              {(property.monthlyCommunalServicesZAR || 0) > 0 && (
+                                <div className="flex justify-between items-center text-slate-500">
+                                  <span>Communal / Serviced:</span>
+                                  <span>- {formatZAR(property.monthlyCommunalServicesZAR || 0)}</span>
                                 </div>
                               )}
 
@@ -3707,6 +3758,35 @@ export default function RentalPortfolioPage() {
                 </div>
               </div>
 
+              {/* Communal / Serviced Services Section */}
+              <div className="p-3 bg-slate-50 rounded-lg border border-slate-200">
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block font-semibold text-slate-700 text-xs">
+                    Communal / Serviced Services (ZAR/mo)
+                  </label>
+                  <span className="text-[10px] font-bold text-slate-700 bg-slate-200 px-1.5 py-0.5 rounded">
+                    -{formatZAR(monthlyCommunalServices)}/pm
+                  </span>
+                </div>
+                <div className="relative">
+                  <span className="absolute left-3 top-2 text-xs text-slate-400 font-bold">R</span>
+                  <input
+                    type="number"
+                    name="monthlyCommunalServicesZAR"
+                    autoComplete="off"
+                    min="0"
+                    step="50"
+                    value={monthlyCommunalServices || ''}
+                    onChange={(e) => setMonthlyCommunalServices(Number(e.target.value))}
+                    placeholder="0"
+                    className="w-full pl-7 pr-3 py-1.5 border border-slate-300 rounded-lg bg-white font-semibold text-slate-900 text-xs"
+                  />
+                </div>
+                <p className="text-[10px] text-slate-500 mt-1">
+                  All-inclusive amenities: Uncapped Wi-Fi, communal cleaner, armed response, garden maintenance.
+                </p>
+              </div>
+
               {/* Bank Bond Repayment & Effective Month Inputs */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 bg-slate-50 rounded-lg border border-slate-200">
                 <div>
@@ -3846,7 +3926,7 @@ export default function RentalPortfolioPage() {
                         </button>
                       )}
                     </div>
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                       <div>
                         <label className="block text-[10px] font-semibold text-slate-600 mb-0.5">Unit Name</label>
                         <input
@@ -3854,6 +3934,17 @@ export default function RentalPortfolioPage() {
                           placeholder="e.g. Unit A"
                           value={lease.unitName}
                           onChange={(e) => setFormLeases(prev => prev.map(l => l.id === lease.id ? { ...l, unitName: e.target.value } : l))}
+                          className="w-full px-2 py-1 text-[11px] border border-slate-300 rounded-lg bg-white"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-semibold text-slate-600 mb-0.5">Room / Unit Classification</label>
+                        <input
+                          type="text"
+                          list="room-type-suggestions"
+                          placeholder="e.g. Executive Suite"
+                          value={lease.roomType || ''}
+                          onChange={(e) => setFormLeases(prev => prev.map(l => l.id === lease.id ? { ...l, roomType: e.target.value } : l))}
                           className="w-full px-2 py-1 text-[11px] border border-slate-300 rounded-lg bg-white"
                         />
                       </div>
@@ -3956,8 +4047,49 @@ export default function RentalPortfolioPage() {
                         />
                       </div>
                     </div>
+
+                    {/* Guarantor / Corporate Sponsor subsection */}
+                    <div className="p-2 bg-slate-50/80 rounded-lg border border-slate-200/80 space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1">
+                          <span>🛡️</span> Guarantor / Corporate Sponsor
+                        </span>
+                        <span className="text-[9px] text-slate-400">Optional third-party guarantee</span>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        <div>
+                          <label className="block text-[9px] font-semibold text-slate-600 mb-0.5">Guarantor / Sponsoring Company (Optional)</label>
+                          <input
+                            type="text"
+                            placeholder="e.g. Parent Name (Deed of Suretyship) or Employer Entity"
+                            value={lease.guarantorName || ''}
+                            onChange={(e) => setFormLeases(prev => prev.map(l => l.id === lease.id ? { ...l, guarantorName: e.target.value } : l))}
+                            className="w-full px-2 py-1 text-[11px] border border-slate-300 rounded bg-white"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[9px] font-semibold text-slate-600 mb-0.5">Guarantor Contact (Phone / Email)</label>
+                          <input
+                            type="text"
+                            autoComplete="tel email"
+                            placeholder="e.g. +27 82 111 2233 or legal@corp.co.za"
+                            value={lease.guarantorContact || ''}
+                            onChange={(e) => setFormLeases(prev => prev.map(l => l.id === lease.id ? { ...l, guarantorContact: e.target.value } : l))}
+                            className="w-full px-2 py-1 text-[11px] border border-slate-300 rounded bg-white"
+                          />
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 ))}
+
+                <datalist id="room-type-suggestions">
+                  <option value="Executive Suite" />
+                  <option value="En-Suite Room" />
+                  <option value="Standard Room" />
+                  <option value="Shared Ablution" />
+                  <option value="Garden Cottage" />
+                </datalist>
               </div>
 
               {/* Utility Type Selector */}
