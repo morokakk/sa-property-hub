@@ -34,6 +34,11 @@ import {
   calculateBondPrincipalFromRepayment,
 } from '@/lib/calculations/propertyMetrics';
 import {
+  calculateFlipFinancials,
+  calculateArchivedFlipFinancials,
+} from '@/lib/calculations/flips';
+import { calculateAgencyCommission } from '@/lib/calculations/rentals';
+import {
   calculatePropertyArrears,
   reconcileOpeningBalanceForTargetArrears,
   migrateNegativeArrearsToRental,
@@ -1374,25 +1379,21 @@ export const usePortfolioStore = create<PortfolioState>()(
         const flip = get().flips.find((f) => f.id === params.flipId);
         if (!flip) throw new Error(`Flip with id ${params.flipId} not found`);
 
-        const totalBoqActual = (flip.boq || []).reduce(
-          (s, item) => s + (item.actualCostZAR || item.baselineTotalZAR || 0),
-          0
-        );
-        const holdingMonths = flip.estimatedDurationMonths ?? 6;
-        const monthlyHolding = flip.monthlyHoldingCostZAR ?? 0;
-        const totalHoldingCost = holdingMonths * monthlyHolding;
+        const flipFin = calculateFlipFinancials(flip);
         const totalCostBasis =
           (flip.purchasePriceZAR || 0) +
           (flip.acquisitionCostsZAR || 0) +
-          totalBoqActual +
-          totalHoldingCost;
+          flipFin.totalBOQActualZAR +
+          flipFin.totalHoldingCostZAR;
 
         const newRentalId = `rental-brrrr-${Date.now()}`;
         const isHouse = flip.propertyType === 'Freehold House';
         const initialRent = params.initialGrossRentZAR;
         const commPercent = params.agencyCommissionPercent ?? 8.0;
         const isAgency = params.managementType !== 'Self-Managed';
-        const agentFee = isAgency ? Math.round(initialRent * (commPercent / 100) * 1.15) : 0;
+        const agentFee = isAgency
+          ? calculateAgencyCommission(initialRent, commPercent, true, params.agencyName).monthlyAgentFeeZAR
+          : 0;
         const marketVal = params.marketValuationZAR || flip.targetExitPriceZAR || totalCostBasis;
 
         const newRental: RentalProperty = {
@@ -2456,37 +2457,9 @@ export function computePortfolioSummary(state: {
   let totalSarsFlipTaxReserve = 0;
 
   activeFlips.forEach((f) => {
-    const boqSum = (f.boq || []).reduce(
-      (bSum, b) => bSum + (b.actualCostZAR || b.baselineTotalZAR || 0),
-      0
-    );
-    const renovationCost = boqSum > 0 ? boqSum : (f.baselineRenovationBudgetZAR || 0);
-    const totalHoldingCost = (f.estimatedDurationMonths || 0) * (f.monthlyHoldingCostZAR || 0);
-    const sec118Cost =
-      (f.municipalClearance?.sec118ArrearsZAR || 0) +
-      (f.municipalClearance?.advanceCouncilDepositZAR || 0);
-    const exitCommRate = typeof f.exitCommissionPercent === 'number' ? f.exitCommissionPercent : 5.75;
-    const exitCommission = Math.round((f.targetExitPriceZAR || 0) * (exitCommRate / 100));
-    const totalCost =
-      (f.purchasePriceZAR || 0) +
-      (f.acquisitionCostsZAR || 0) +
-      renovationCost +
-      totalHoldingCost +
-      sec118Cost +
-      exitCommission;
-    const grossProfit = (f.targetExitPriceZAR || 0) - totalCost;
-    totalGrossProjectedFlipProfits += grossProfit;
-
-    if (grossProfit > 0) {
-      // 27% corporate tax on company flips or 45% on individual flips
-      const taxRate =
-        f.taxEntityType === 'Individual (45%)'
-          ? 0.45
-          : f.taxEntityType === 'Pre-Tax'
-          ? 0
-          : 0.27; // Default 27% Corporate Income Tax
-      totalSarsFlipTaxReserve += Math.round(grossProfit * taxRate);
-    }
+    const fin = calculateFlipFinancials(f);
+    totalGrossProjectedFlipProfits += fin.projectedNetProfitZAR;
+    totalSarsFlipTaxReserve += fin.estimatedTaxProvisionZAR;
   });
 
   const totalSarsRentalTaxReserve = annualRentalTaxReserve;
@@ -2498,26 +2471,8 @@ export function computePortfolioSummary(state: {
   // Realized profit on completed/sold flips (excludes BRRRR converted rentals)
   const totalRealizedFlipProfits = completedFlips.reduce((sum, f) => {
     if (f.exitStrategy === 'BRRRR') return sum;
-    const boqSum = (f.boq || []).reduce(
-      (bSum, b) => bSum + (b.actualCostZAR || b.baselineTotalZAR || 0),
-      0
-    );
-    const renovationCost = boqSum > 0 ? boqSum : (f.baselineRenovationBudgetZAR || 0);
-    const totalHoldingCost = (f.estimatedDurationMonths || 0) * (f.monthlyHoldingCostZAR || 0);
-    const sec118Cost =
-      (f.municipalClearance?.sec118ArrearsZAR || 0) +
-      (f.municipalClearance?.advanceCouncilDepositZAR || 0);
-    const exitPrice = f.actualSalePriceZAR ?? f.targetExitPriceZAR ?? 0;
-    const exitCommRate = typeof f.exitCommissionPercent === 'number' ? f.exitCommissionPercent : 5.75;
-    const exitCommission = Math.round(exitPrice * (exitCommRate / 100));
-    const totalCost =
-      (f.purchasePriceZAR || 0) +
-      (f.acquisitionCostsZAR || 0) +
-      renovationCost +
-      totalHoldingCost +
-      sec118Cost +
-      exitCommission;
-    return sum + (exitPrice - totalCost);
+    const arch = calculateArchivedFlipFinancials(f);
+    return sum + arch.realizedNetProfitZAR;
   }, 0);
 
   const equityAlerts = computeEquityAlerts(activeRentals);

@@ -45,6 +45,13 @@ import { exportFlipBOQCSV } from '@/lib/export/csvExport';
 import ImportDropdown from '@/components/common/ImportDropdown';
 import { parseRentalPdfStatement } from '@/lib/utilities/pdfParser';
 import DelayMatrixModal from '@/components/flips/DelayMatrixModal';
+import {
+  calculateFlipFinancials,
+  calculateFundingCampaignSummary,
+  calculateArchivedFlipFinancials,
+  calculateMilestonePhaseTargets,
+} from '@/lib/calculations/flips';
+import { calculateGrossYield } from '@/lib/calculations/rentals';
 
 export default function FlipsManagerPage() {
   const flips = usePortfolioStore((state) => state.flips);
@@ -514,82 +521,50 @@ export default function FlipsManagerPage() {
     setViewTab('archive');
   };
 
-  // Calculations for active flip
+  // Calculations for active flip (delegated to pure calculations engine)
+  const flipFinancials = calculateFlipFinancials(activeFlip);
+  const {
+    totalBOQBaselineZAR: totalBOQBaseline,
+    totalBOQActualZAR: totalBOQActual,
+    totalBOQVarianceZAR: totalBOQVariance,
+    effectiveRenoCostZAR: effectiveRenoCost,
+    flipHoldingMonths,
+    flipMonthlyHoldingCostZAR: flipMonthlyHoldingCost,
+    totalHoldingCostZAR: totalHoldingCost,
+    totalCostBasisZAR: totalCostBasis,
+    sec118ArrearsZAR: sec118ArrearsVal,
+    advanceCouncilDepositZAR: advanceCouncilDepositVal,
+    totalMunicipalClearanceOutlayZAR: totalMunicipalClearanceOutlay,
+    rccStatus: rccStatusVal,
+    isRccDisputed,
+    exitCommissionPercent,
+    exitCommissionZAR,
+    totalAllInCostZAR: totalAllInCost,
+    projectedNetProfitZAR: projectedNetProfit,
+    projectedRoiPercent: projectedROI,
+    taxEntityType: currentTaxMode,
+    effectiveTaxRatePercent: effectiveTaxRate,
+    estimatedTaxProvisionZAR: estimatedTaxProvision,
+    netProfitAfterTaxZAR: netProfitAfterTax,
+    afterTaxRoiPercent: afterTaxROI,
+    totalSponsorItemsCount,
+    sponsorRetailTotalZAR: sponsorRetailTotal,
+    sponsorCashTotalZAR: sponsorCashTotal,
+    totalSponsorSavingsZAR: totalSponsorSavings,
+    totalRetailBOQZAR: totalRetailBOQ,
+    totalActualCashBOQZAR: totalActualCashBOQ,
+    milestoneDraws,
+    milestoneTargets,
+    totalRetentionHeldZAR,
+  } = flipFinancials;
   const activeFlipBoq = activeFlip?.boq || [];
-  const totalBOQBaseline = activeFlipBoq.reduce((s, i) => s + i.baselineTotalZAR, 0) || 0;
-  const totalBOQActual = activeFlipBoq.reduce((s, i) => s + (i.actualCostZAR || i.baselineTotalZAR), 0) || 0;
-  const totalBOQVariance = totalBOQActual - totalBOQBaseline;
-
-  // Empty BOQ baseline renovation budget fallback
-  const effectiveRenoCost = totalBOQActual > 0 ? totalBOQActual : (activeFlip?.baselineRenovationBudgetZAR || 0);
-
-  // Holding Period Carrying Costs (interim bond interest, rates, levies, security)
-  const flipHoldingMonths = activeFlip?.estimatedDurationMonths ?? 6;
-  const flipMonthlyHoldingCost = activeFlip?.monthlyHoldingCostZAR ?? 0;
-  const totalHoldingCost = flipHoldingMonths * flipMonthlyHoldingCost;
-
-  const totalCostBasis =
-    (activeFlip?.purchasePriceZAR || 0) +
-    (activeFlip?.acquisitionCostsZAR || 0) +
-    effectiveRenoCost;
-
-  // Section 118 Rates Clearance & Municipal Arrears (Requirement 3)
-  const sec118ArrearsVal = activeFlip?.municipalClearance?.sec118ArrearsZAR || 0;
-  const advanceCouncilDepositVal = activeFlip?.municipalClearance?.advanceCouncilDepositZAR || 0;
-  const totalMunicipalClearanceOutlay = sec118ArrearsVal + advanceCouncilDepositVal;
-  const rccStatusVal = activeFlip?.municipalClearance?.rccStatus || 'Pending Application';
-  const isRccDisputed = rccStatusVal === 'Disputed';
-
-  // Standard Exit Sales Commission (5.75% default or per-flip override)
-  const exitCommissionPercent = activeFlip?.exitCommissionPercent ?? 5.75;
-  const exitCommissionZAR = Math.round((activeFlip?.targetExitPriceZAR || 0) * (exitCommissionPercent / 100));
-
-  const totalAllInCost = totalCostBasis + totalHoldingCost + totalMunicipalClearanceOutlay + exitCommissionZAR;
-
-  const projectedNetProfit = (activeFlip?.targetExitPriceZAR || 0) - totalAllInCost;
-  const projectedROI = totalAllInCost > 0 ? (projectedNetProfit / totalAllInCost) * 100 : 0;
-
-  // After-Tax ROI & Entity Tax Toggle Calculations (Requirement 5)
-  const currentTaxMode = activeFlip?.taxEntityType || 'Company (27%)';
-  const effectiveTaxRate = currentTaxMode === 'Company (27%)' ? 27 : currentTaxMode === 'Individual (45%)' ? 45 : 0;
   const preTaxProfit = projectedNetProfit;
-  const estimatedTaxProvision = Math.max(0, Math.round(preTaxProfit * (effectiveTaxRate / 100)));
-  const netProfitAfterTax = preTaxProfit - estimatedTaxProvision;
-  const afterTaxROI = totalAllInCost > 0 ? (netProfitAfterTax / totalAllInCost) * 100 : 0;
-
-  // Sponsor / Barter Dual-Value BOQ Accounting (Requirement 6)
-  const sponsoredItems = activeFlipBoq.filter((i) => i.isSponsoredOrBarter);
-  const totalSponsorItemsCount = sponsoredItems.length;
-  const sponsorRetailTotal = sponsoredItems.reduce((s, i) => s + (i.commercialRetailValueZAR || i.baselineTotalZAR || 0), 0);
-  const sponsorCashTotal = sponsoredItems.reduce((s, i) => s + (i.actualCashOutflowZAR !== undefined ? i.actualCashOutflowZAR : (i.actualCostZAR || i.baselineTotalZAR || 0)), 0);
-  const totalSponsorSavings = Math.max(0, sponsorRetailTotal - sponsorCashTotal);
-
-  const totalRetailBOQ = activeFlipBoq.reduce((s, i) => {
-    if (i.isSponsoredOrBarter) return s + (i.commercialRetailValueZAR || i.baselineTotalZAR || 0);
-    return s + (i.actualCostZAR || i.baselineTotalZAR || 0);
-  }, 0);
-  const totalActualCashBOQ = totalBOQActual;
-
-  // Milestone Drawdown Allocations & Retention Pool (Requirement 1)
-  const milestoneDraws = {
-    deposit: activeFlipBoq.filter((i) => i.milestonePhase === 'Deposit').reduce((s, i) => s + (i.actualCostZAR || i.baselineTotalZAR), 0) || 0,
-    firstFix: activeFlipBoq.filter((i) => i.milestonePhase === 'First Fix / Wet Works').reduce((s, i) => s + (i.actualCostZAR || i.baselineTotalZAR), 0) || 0,
-    finishes: activeFlipBoq.filter((i) => i.milestonePhase === 'Finishes').reduce((s, i) => s + (i.actualCostZAR || i.baselineTotalZAR), 0) || 0,
-    retention: activeFlipBoq.filter((i) => i.milestonePhase === 'Retention').reduce((s, i) => s + (i.actualCostZAR || i.baselineTotalZAR), 0) || 0,
-  };
   const currentDrawSchedule = activeFlip?.drawSchedule || {
     depositPaid: false,
     firstFixApproved: false,
     finishesApproved: false,
     retentionReleased: false,
   };
-  const totalRetentionHeldZAR = activeFlipBoq.reduce((s, i) => {
-    if (i.milestonePhase === 'Retention') return s + (i.actualCostZAR || i.baselineTotalZAR);
-    if (i.retentionPercent && i.retentionPercent > 0) {
-      return s + Math.round((i.actualCostZAR || i.baselineTotalZAR) * (i.retentionPercent / 100));
-    }
-    return s;
-  }, 0) || Math.round(totalBOQActual * 0.2);
 
   const openConvertModal = () => {
     if (!activeFlip) return;
@@ -631,18 +606,21 @@ export default function FlipsManagerPage() {
   const linkedFunding = funding.filter(
     (f) => f.linkedDealId === activeFlip?.id || (activeFlip?.linkedFundingIds || []).includes(f.id)
   );
-  const totalCapitalSecured = linkedFunding.reduce((sum, f) => sum + f.capitalAmountZAR, 0);
 
-  // Funding Campaign Calculations
-  const fundingRequiredVal = activeFlip?.fundingRequiredZAR ?? Math.round(totalCostBasis * 0.7);
-  const capitalRaisedVal = activeFlip?.capitalRaisedZAR ?? totalCapitalSecured;
-  const capitalRemainingVal = Math.max(0, fundingRequiredVal - capitalRaisedVal);
-  const fundingProgressPercent = fundingRequiredVal > 0 ? Math.min(100, Math.round((capitalRaisedVal / fundingRequiredVal) * 100)) : 0;
+  // Funding Campaign Calculations (delegated to pure calculations engine)
+  const fundingSummary = calculateFundingCampaignSummary(activeFlip, linkedFunding, totalCostBasis);
+  const {
+    fundingRequiredZAR: fundingRequiredVal,
+    capitalRaisedZAR: capitalRaisedVal,
+    capitalRemainingZAR: capitalRemainingVal,
+    fundingProgressPercent,
+    totalCapitalSecuredZAR: totalCapitalSecured,
+  } = fundingSummary;
 
   const openFundingModal = () => {
     if (!activeFlip) return;
-    const defaultRequired = activeFlip.fundingRequiredZAR ?? Math.round(totalCostBasis * 0.7);
-    const defaultRaised = activeFlip.capitalRaisedZAR ?? totalCapitalSecured;
+    const defaultRequired = fundingSummary.fundingRequiredZAR;
+    const defaultRaised = fundingSummary.capitalRaisedZAR;
     setFundingRequired(defaultRequired);
     setCapitalRaised(defaultRaised);
     setPrimaryFunderName(activeFlip.primaryFunderName || '');
@@ -1444,9 +1422,9 @@ export default function FlipsManagerPage() {
                         </div>
                         <p className="text-[10px] text-slate-500 mb-2">Mobilization, prep & materials deposit</p>
                         <div className="text-base font-extrabold text-slate-900">
-                          {formatZAR(milestoneDraws.deposit || Math.round(activeFlip.baselineRenovationBudgetZAR * 0.2))}
+                          {formatZAR(milestoneDraws.deposit || milestoneTargets.deposit)}
                         </div>
-                        <span className="text-[10px] text-slate-400">Target: {formatZAR(Math.round(activeFlip.baselineRenovationBudgetZAR * 0.2))}</span>
+                        <span className="text-[10px] text-slate-400">Target: {formatZAR(milestoneTargets.deposit)}</span>
                       </div>
 
                       <div className="pt-3 mt-3 border-t border-slate-200/60">
@@ -1484,9 +1462,9 @@ export default function FlipsManagerPage() {
                         </div>
                         <p className="text-[10px] text-slate-500 mb-2">Plumbing rough-in, electrical conduit & wet works</p>
                         <div className="text-base font-extrabold text-slate-900">
-                          {formatZAR(milestoneDraws.firstFix || Math.round(activeFlip.baselineRenovationBudgetZAR * 0.3))}
+                          {formatZAR(milestoneDraws.firstFix || milestoneTargets.firstFix)}
                         </div>
-                        <span className="text-[10px] text-slate-400">Target: {formatZAR(Math.round(activeFlip.baselineRenovationBudgetZAR * 0.3))}</span>
+                        <span className="text-[10px] text-slate-400">Target: {formatZAR(milestoneTargets.firstFix)}</span>
                       </div>
 
                       <div className="pt-3 mt-3 border-t border-slate-200/60">
@@ -1524,9 +1502,9 @@ export default function FlipsManagerPage() {
                         </div>
                         <p className="text-[10px] text-slate-500 mb-2">Tiling, joinery, sanitaryware, ceilings & paint</p>
                         <div className="text-base font-extrabold text-slate-900">
-                          {formatZAR(milestoneDraws.finishes || Math.round(activeFlip.baselineRenovationBudgetZAR * 0.3))}
+                          {formatZAR(milestoneDraws.finishes || milestoneTargets.finishes)}
                         </div>
-                        <span className="text-[10px] text-slate-400">Target: {formatZAR(Math.round(activeFlip.baselineRenovationBudgetZAR * 0.3))}</span>
+                        <span className="text-[10px] text-slate-400">Target: {formatZAR(milestoneTargets.finishes)}</span>
                       </div>
 
                       <div className="pt-3 mt-3 border-t border-slate-200/60">
@@ -1564,7 +1542,7 @@ export default function FlipsManagerPage() {
                         </div>
                         <p className="text-[10px] text-slate-500 mb-2">Snag list completion, CoC delivery & handover</p>
                         <div className="text-base font-extrabold text-amber-900">
-                          {formatZAR(milestoneDraws.retention || Math.round(activeFlip.baselineRenovationBudgetZAR * 0.2))}
+                          {formatZAR(milestoneDraws.retention || milestoneTargets.retention)}
                         </div>
                         <span className="text-[10px] text-amber-800 font-semibold">Withheld until 100% snag-free</span>
                       </div>
@@ -1845,28 +1823,14 @@ export default function FlipsManagerPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                 {completedFlips.map((flip) => {
                   const isBrrrr = flip.exitStrategy === 'BRRRR';
-                  const totalBoqActual = (flip.boq || []).reduce(
-                    (sum, b) => sum + (b.actualCostZAR || b.baselineTotalZAR || 0),
-                    0
-                  );
-                  const renoCost = totalBoqActual > 0 ? totalBoqActual : (flip.baselineRenovationBudgetZAR || 0);
-                  const costBasis =
-                    (flip.purchasePriceZAR || 0) +
-                    (flip.acquisitionCostsZAR || 0) +
-                    renoCost;
-                  const holdingMonths = flip.estimatedDurationMonths ?? 6;
-                  const totalHoldingCost = holdingMonths * (flip.monthlyHoldingCostZAR ?? 0);
-                  const sec118Cost =
-                    (flip.municipalClearance?.sec118ArrearsZAR || 0) +
-                    (flip.municipalClearance?.advanceCouncilDepositZAR || 0);
-                  const salePrice = flip.actualSalePriceZAR || flip.targetExitPriceZAR || 0;
-                  const exitCommRate = typeof flip.exitCommissionPercent === 'number' ? flip.exitCommissionPercent : 5.75;
-                  const exitCommission = isBrrrr ? 0 : Math.round(salePrice * (exitCommRate / 100));
-                  const fullCostBasis = costBasis + totalHoldingCost + sec118Cost + exitCommission;
-                  const realizedNetProfit = salePrice - fullCostBasis;
-                  const realizedROI = fullCostBasis > 0 ? (realizedNetProfit / fullCostBasis) * 100 : 0;
-                  const brrrrTargetValuation = flip.targetExitPriceZAR || fullCostBasis;
-                  const brrrrEquityCreated = Math.max(0, brrrrTargetValuation - fullCostBasis);
+                  const {
+                    fullCostBasisZAR: fullCostBasis,
+                    realizedSalePriceZAR: salePrice,
+                    realizedNetProfitZAR: realizedNetProfit,
+                    realizedRoiPercent: realizedROI,
+                    brrrrTargetValuationZAR: brrrrTargetValuation,
+                    brrrrEquityCreatedZAR: brrrrEquityCreated,
+                  } = calculateArchivedFlipFinancials(flip);
 
                   return (
                     <div
@@ -2224,7 +2188,7 @@ export default function FlipsManagerPage() {
                     </label>
                     {convertGrossRent > 0 && totalAllInCost > 0 && (
                       <span className="text-[10px] font-bold text-emerald-600">
-                        {((convertGrossRent * 12 / totalAllInCost) * 100).toFixed(1)}% Gross Yield
+                        {calculateGrossYield(convertGrossRent, totalAllInCost).toFixed(1)}% Gross Yield
                       </span>
                     )}
                   </div>

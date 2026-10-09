@@ -32,6 +32,14 @@ import {
 import { formatTenantAccountStatementForWhatsApp, formatTenantPaymentReceiptForWhatsApp } from '@/lib/whatsappFormatter';
 import { PropertyTypeBadge, AgmDateChip, isAgmUpcoming } from '@/components/common/PropertyTypeBadge';
 import { calculateRentalCashflow, calculateMonthlyBondRepayment, generateRentalLongTermProjection } from '@/lib/calculations/propertyMetrics';
+import {
+  calculateRentalTaxProvision,
+  calculateGrossYield,
+  calculateBrrrrRefinanceProposal,
+  calculateAgencyCommission,
+  calculateDisposalMetrics,
+  calculateAggregateRentalKPIs,
+} from '@/lib/calculations/rentals';
 import LongTermProjectionChart from '@/components/analytics/LongTermProjectionChart';
 import {
   Building2,
@@ -705,21 +713,20 @@ export default function RentalPortfolioPage() {
 
   const handleOpenRefinance = (property: RentalProperty) => {
     setSelectedRentalForRefinance(property);
-    const currentVal = property.marketValueZAR || property.purchasePriceZAR;
-    const estNewVal = Math.round((currentVal * 1.15) / 50000) * 50000;
-    const currentBond = property.outstandingBondBalanceZAR || 0;
-    // Target 70% LTV bond
-    const targetBond = Math.round((estNewVal * 0.7) / 10000) * 10000;
-    const defaultCashOut = Math.max(0, targetBond - currentBond);
-    const newBond = currentBond + defaultCashOut;
-    const estPmt = calculateMonthlyBondRepayment(newBond, property.bondInterestRatePercent || 11.5, 20);
+    const proposal = calculateBrrrrRefinanceProposal(
+      property.marketValueZAR || property.purchasePriceZAR,
+      property.outstandingBondBalanceZAR || 0,
+      property.bondInterestRatePercent || 11.5,
+      20,
+      0.70
+    );
 
-    setRefinanceNewValuation(estNewVal);
-    setRefinanceCashPulledOut(defaultCashOut);
-    setRefinanceNewBondBalance(newBond);
-    setRefinanceNewBondPayment(estPmt);
+    setRefinanceNewValuation(proposal.estimatedNewValuationZAR);
+    setRefinanceCashPulledOut(proposal.cashEquityPulledOutZAR);
+    setRefinanceNewBondBalance(proposal.newBondBalanceZAR);
+    setRefinanceNewBondPayment(proposal.estimatedMonthlyBondRepaymentZAR);
     setRefinanceDate(new Date().toISOString().split('T')[0]);
-    setRefinanceNotes(`BRRRR Refinance: Released R ${defaultCashOut.toLocaleString('en-ZA')} equity at 70% LTV`);
+    setRefinanceNotes(`BRRRR Refinance: Released R ${proposal.cashEquityPulledOutZAR.toLocaleString('en-ZA')} equity at 70% LTV`);
     setShowRefinanceModal(true);
   };
 
@@ -864,8 +871,8 @@ export default function RentalPortfolioPage() {
     setSelectedRentalForExit(property);
     const estSale = property.marketValueZAR || property.purchasePriceZAR || 0;
     setExitSalePrice(estSale);
-    const estProceeds = Math.max(0, estSale - (property.outstandingBondBalanceZAR || 0));
-    setExitNetProceeds(estProceeds);
+    const metrics = calculateDisposalMetrics(estSale, property.purchasePriceZAR || 0, property.outstandingBondBalanceZAR || 0);
+    setExitNetProceeds(metrics.netCashProceedsZAR);
     setExitSoldDate(new Date().toISOString().split('T')[0]);
     setExitNotes('');
     setShowExitModal(true);
@@ -894,8 +901,9 @@ export default function RentalPortfolioPage() {
       .reduce((sum, l) => sum + (l.monthlyRentZAR || 0), 0);
     const finalGrossRent = computedGrossRent > 0 ? computedGrossRent : monthlyGrossRent;
 
-    const baseComm = managementType === 'Agency' ? finalGrossRent * (agencyCommissionPercent / 100) : 0;
-    const agentFee = Math.round(baseComm * (agencyVatApplicable !== false ? 1.15 : 1.0));
+    const agentFee = managementType === 'Agency'
+      ? calculateAgencyCommission(finalGrossRent, agencyCommissionPercent, agencyVatApplicable !== false, agencyName).monthlyAgentFeeZAR
+      : 0;
 
     const finalLevies = propertyType === 'Freehold House' ? 0 : monthlyLevies;
     const finalInsurance = propertyType === 'Freehold House' ? annualBuildingInsurance : 0;
@@ -986,7 +994,8 @@ export default function RentalPortfolioPage() {
     if (updated) setSelectedRentalForMaint(updated);
   };
 
-  const totalGrossMonthlyRent = activeRentals.reduce((s, r) => s + r.monthlyGrossRentZAR, 0);
+  const aggregateKPIs = calculateAggregateRentalKPIs(rentals);
+  const totalGrossMonthlyRent = aggregateKPIs.totalGrossMonthlyRentZAR;
   const totalNetMonthlyRent = summary.monthlyNetRentalCashflow;
 
   return (
@@ -1181,23 +1190,26 @@ export default function RentalPortfolioPage() {
                     ancillaryIncomeZAR,
                   } = calculateRentalCashflow(property);
 
-                  const yieldGross =
-                    property.marketValueZAR > 0
-                      ? ((totalGrossIncomeZAR * 12) / property.marketValueZAR) * 100
-                      : 0;
+                  const yieldGross = calculateGrossYield(totalGrossIncomeZAR, property.marketValueZAR);
 
-                  const entityType = property.taxEntityTypeOverride || investorProfile?.defaultTaxEntityType || 'Company (27%)';
-                  const taxRate = entityType === 'Individual (45%)' ? 0.45 : entityType === 'Pre-Tax' ? 0 : 0.27;
-                  const taxRateLabel = entityType === 'Individual (45%)' ? 'Individual 45%' : entityType === 'Pre-Tax' ? 'Pre-Tax 0%' : 'Company 27%';
-                  const annualCashflow = Math.max(0, netCashflow * 12);
-                  const sec13Shield = property.section13sexAnnualShieldZAR || 0;
-                  const totalBadDebt = (property.arrearsWriteOffs || []).reduce((sum, w) => sum + (w.amountZAR || 0), 0);
-                  const taxableIncome = Math.max(0, annualCashflow - totalBadDebt - sec13Shield);
-                  const annualTaxZAR = Math.round(taxableIncome * taxRate);
-                  const monthlyTaxZAR = Math.round(annualTaxZAR / 12);
-                  const taxSavingsZAR = sec13Shield > 0 ? Math.round(Math.min(annualCashflow, sec13Shield) * taxRate) : 0;
-                  const postTaxCashflow = netCashflow - monthlyTaxZAR;
-                  const yieldPostTax = property.marketValueZAR > 0 ? ((postTaxCashflow * 12) / property.marketValueZAR) * 100 : 0;
+                  const {
+                    entityType,
+                    taxRate,
+                    taxRateLabel,
+                    annualCashflow,
+                    sec13Shield,
+                    totalBadDebt,
+                    taxableIncome,
+                    annualTaxZAR,
+                    monthlyTaxZAR,
+                    taxSavingsZAR,
+                    postTaxCashflow,
+                    yieldPostTax,
+                  } = calculateRentalTaxProvision(
+                    property,
+                    netCashflow,
+                    investorProfile?.defaultTaxEntityType || 'Company (27%)'
+                  );
                   const arrearsInfo = calculatePropertyArrears(property);
 
                   return (
@@ -2728,8 +2740,14 @@ export default function RentalPortfolioPage() {
                 {soldRentals.map((property) => {
                   const salePrice = property.actualSalePriceZAR || property.marketValueZAR || 0;
                   const purchasePrice = property.purchasePriceZAR || 0;
-                  const grossCapitalGain = salePrice - purchasePrice;
-                  const gainPercent = purchasePrice > 0 ? (grossCapitalGain / purchasePrice) * 100 : 0;
+                  const {
+                    grossCapitalGainZAR: grossCapitalGain,
+                    capitalGainPercent: gainPercent,
+                  } = calculateDisposalMetrics(
+                    salePrice,
+                    purchasePrice,
+                    property.outstandingBondBalanceZAR || 0
+                  );
 
                   return (
                     <div
@@ -2878,7 +2896,13 @@ export default function RentalPortfolioPage() {
                   onChange={(e) => {
                     const price = Number(e.target.value);
                     setExitSalePrice(price);
-                    setExitNetProceeds(Math.max(0, price - (selectedRentalForExit.outstandingBondBalanceZAR || 0)));
+                    setExitNetProceeds(
+                      calculateDisposalMetrics(
+                        price,
+                        selectedRentalForExit.purchasePriceZAR || 0,
+                        selectedRentalForExit.outstandingBondBalanceZAR || 0
+                      ).netCashProceedsZAR
+                    );
                   }}
                   className="w-full px-3 py-2 border border-slate-300 rounded-lg font-bold text-emerald-700 text-sm"
                   placeholder="e.g. 2100000"
@@ -3633,7 +3657,7 @@ export default function RentalPortfolioPage() {
                       </div>
                       <div className="text-right">
                         <strong className="text-rose-600 font-bold text-sm block">
-                          - {formatZAR(Math.round(monthlyGrossRent * (agencyCommissionPercent / 100) * (agencyVatApplicable ? 1.15 : 1.0)))}/m
+                          - {formatZAR(calculateAgencyCommission(monthlyGrossRent, agencyCommissionPercent, agencyVatApplicable, agencyName).monthlyAgentFeeZAR)}/m
                         </strong>
                         <span className="text-[10px] text-slate-500">Deducted from gross rent</span>
                       </div>
