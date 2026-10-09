@@ -92,7 +92,13 @@ import ImportDropdown from '@/components/common/ImportDropdown';
 import TenantStatement from '@/components/rentals/TenantStatement';
 import MeterReadingsModal from '@/components/rentals/MeterReadingsModal';
 import UnifiedPdfVerificationModal from '@/components/rentals/UnifiedPdfVerificationModal';
-import { parseRentalPdfStatement, UnifiedParsedStatementResult } from '@/lib/utilities/pdfParser';
+import {
+  useRentalModalState,
+  useRentalForm,
+  usePaymentModal,
+  useWriteOffModal,
+  useDirectPdfUpload,
+} from '@/hooks/rentals';
 
 export function renderPropertyTypeBadge(type?: PropertyTitleType) {
   switch (type) {
@@ -288,64 +294,13 @@ export default function RentalPortfolioPage() {
   const activeRentals = rentals.filter((r) => r.status !== 'Sold');
   const soldRentals = rentals.filter((r) => r.status === 'Sold');
 
-  // Direct PDF Import & Unified Verification State
+  // Headless Custom Hooks & Modal State Controllers (Phase 4B)
+  const rentalModals = useRentalModalState();
+  const rentalForm = useRentalForm(rentalModals.editingProperty);
+  const paymentModal = usePaymentModal();
+  const writeOffModal = useWriteOffModal();
+  const directPdf = useDirectPdfUpload(aiSettings);
   const smartPdfInputRef = useRef<HTMLInputElement>(null);
-  const [unifiedPdfQueue, setUnifiedPdfQueue] = useState<(UnifiedParsedStatementResult & { fileName?: string })[]>([]);
-  const [isParsingDirectPdf, setIsParsingDirectPdf] = useState(false);
-  const [parsingProgress, setParsingProgress] = useState<{ current: number; total: number; filename: string } | null>(null);
-
-  const handleDirectPdfUpload = async (files: File[]) => {
-    if (!files || files.length === 0) return;
-    setIsParsingDirectPdf(true);
-    const parsedResults: (UnifiedParsedStatementResult & { fileName?: string })[] = [];
-
-    try {
-      for (let i = 0; i < files.length; i++) {
-        const file = files[i];
-        setParsingProgress({ current: i + 1, total: files.length, filename: file.name });
-        const result = await parseRentalPdfStatement(file, aiSettings);
-
-        if (!result.success) {
-          // Strict failure policy: block modal from opening and display detailed alert
-          setParsingProgress(null);
-          setIsParsingDirectPdf(false);
-          alert(
-            `Failed to parse "${file.name}":\n\n${result.error || 'Unrecognized document structure'}\n\nPlease check this file and re-upload.`
-          );
-          return;
-        }
-
-        // Attach original file name for tabs and tracking
-        parsedResults.push({
-          ...result,
-          fileName: file.name,
-        });
-      }
-
-      setUnifiedPdfQueue(parsedResults);
-    } catch (err: unknown) {
-      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
-      alert(`Error processing PDF upload:\n\n${errorMessage}`);
-    } finally {
-      setIsParsingDirectPdf(false);
-      setParsingProgress(null);
-    }
-  };
-
-  // Refinance & Pull Out Equity (BRRRR) Modal State
-  const [showRefinanceModal, setShowRefinanceModal] = useState(false);
-  const [selectedRentalForRefinance, setSelectedRentalForRefinance] = useState<RentalProperty | null>(null);
-  const [refinanceNewValuation, setRefinanceNewValuation] = useState<number>(0);
-  const [refinanceNewBondPayment, setRefinanceNewBondPayment] = useState<number>(0);
-  const [refinanceCashPulledOut, setRefinanceCashPulledOut] = useState<number>(0);
-  const [refinanceNewBondBalance, setRefinanceNewBondBalance] = useState<number>(0);
-  const [refinanceDate, setRefinanceDate] = useState<string>(new Date().toISOString().split('T')[0]);
-  const [refinanceNotes, setRefinanceNotes] = useState<string>('');
-  const [refinanceSuccessBanner, setRefinanceSuccessBanner] = useState<{ amount: number; propertyTitle: string } | null>(null);
-
-  // Selected property for viewing refinance audit history modal
-  const [showAuditHistoryModal, setShowAuditHistoryModal] = useState(false);
-  const [selectedRentalForAudit, setSelectedRentalForAudit] = useState<RentalProperty | null>(null);
 
   // Per-card 20-Year forecast accordion expansion
   const [expandedForecasts, setExpandedForecasts] = useState<Record<string, boolean>>({});
@@ -357,41 +312,11 @@ export default function RentalPortfolioPage() {
     }));
   };
 
-  // Historical Tenant Utility Variance & Statement Modal State
-  const [statementModalPropertyId, setStatementModalPropertyId] = useState<string | null>(null);
-
-  // Physical & Municipal Meter Readings Modal State
-  const [meterModalPropertyId, setMeterModalPropertyId] = useState<string | null>(null);
-
   // Per-card tab selection ('financials' | 'payments' | 'coc' | 'vault')
   const [cardTab, setCardTab] = useState<Record<string, 'financials' | 'payments' | 'coc' | 'vault'>>({});
 
   // Per-property tenant selector sub-tab within Payments ('all' | leaseId)
   const [selectedTenantTab, setSelectedTenantTab] = useState<Record<string, string>>({});
-
-  // Payment Modal State
-  const [showPaymentModal, setShowPaymentModal] = useState(false);
-  const [paymentPropertyId, setPaymentPropertyId] = useState<string | null>(null);
-  const [paymentLeaseId, setPaymentLeaseId] = useState<string>('');
-  const [editingPayment, setEditingPayment] = useState<TenantPaymentRecord | null>(null);
-  const [paymentPeriodMonth, setPaymentPeriodMonth] = useState<string>(getMonthKey());
-  const [paymentDate, setPaymentDate] = useState<string>(new Date().toISOString().split('T')[0]);
-  const [paymentAmount, setPaymentAmount] = useState<number>(0);
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('EFT');
-  const [paymentReference, setPaymentReference] = useState<string>('');
-  const [paymentNotes, setPaymentNotes] = useState<string>('');
-  const [paymentAllocations, setPaymentAllocations] = useState<PaymentAllocation[]>([]);
-  const [showAllocationsEditor, setShowAllocationsEditor] = useState<boolean>(false);
-
-  // Arrears Write-Off Modal State
-  const [showWriteOffModal, setShowWriteOffModal] = useState(false);
-  const [writeOffPropertyId, setWriteOffPropertyId] = useState<string | null>(null);
-  const [writeOffLeaseId, setWriteOffLeaseId] = useState<string>('');
-  const [writeOffAmount, setWriteOffAmount] = useState<number>(0);
-  const [writeOffDate, setWriteOffDate] = useState<string>(new Date().toISOString().split('T')[0]);
-  const [writeOffReason, setWriteOffReason] = useState<ArrearsWriteOffReason>('Tenant absconded');
-  const [writeOffNotes, setWriteOffNotes] = useState<string>('');
-  const [writeOffAllocations, setWriteOffAllocations] = useState<PaymentAllocation[]>([]);
 
   // Toast feedback state
   const [copyFeedbackToast, setCopyFeedbackToast] = useState<string | null>(null);
@@ -400,610 +325,6 @@ export default function RentalPortfolioPage() {
     const t = setTimeout(() => setCopyFeedbackToast(null), 3500);
     return () => clearTimeout(t);
   }, [copyFeedbackToast]);
-
-  const handleOpenLogPaymentModal = (
-    property: RentalProperty,
-    targetMonth?: string,
-    suggestedAmount?: number,
-    leaseId?: string,
-    isArrearsPayment?: boolean
-  ) => {
-    const month = targetMonth || getMonthKey();
-    const activeTab = selectedTenantTab[property.id] || 'all';
-    const effectiveLeaseId =
-      leaseId ||
-      (activeTab !== 'all'
-        ? activeTab
-        : (property.leases && property.leases.length === 1 ? property.leases[0].id : ''));
-
-    const targetLease = property.leases?.find((l) => l.id === effectiveLeaseId);
-
-    let amount = 0;
-    if (suggestedAmount !== undefined && suggestedAmount > 0) {
-      amount = suggestedAmount;
-    } else if (isArrearsPayment) {
-      const arrears = calculatePropertyArrears(property, undefined, effectiveLeaseId ? { leaseId: effectiveLeaseId } : undefined);
-      amount = Math.max(0, arrears.totalArrearsZAR);
-    } else if (targetLease) {
-      amount = targetLease.monthlyRentZAR || 0;
-    } else {
-      amount = property.monthlyGrossRentZAR || 0;
-    }
-
-    setPaymentPropertyId(property.id);
-    setPaymentLeaseId(effectiveLeaseId);
-    setEditingPayment(null);
-    setPaymentPeriodMonth(month);
-    setPaymentDate(new Date().toISOString().split('T')[0]);
-    setPaymentAmount(amount);
-    setPaymentMethod('EFT');
-    setPaymentReference(isArrearsPayment ? 'Arrears Settlement' : '');
-    setPaymentNotes('');
-
-    // Pre-calculate allocations
-    if (isArrearsPayment) {
-      const unpaid = getUnpaidLedgerMonths(property, effectiveLeaseId ? { leaseId: effectiveLeaseId } : undefined);
-      const allocs = allocateOldestFirst(unpaid, amount);
-      setPaymentAllocations(allocs);
-      setShowAllocationsEditor(allocs.length > 1);
-    } else if (targetMonth) {
-      setPaymentAllocations([{ periodMonth: targetMonth, amountZAR: amount }]);
-      setShowAllocationsEditor(false);
-    } else {
-      setPaymentAllocations([{ periodMonth: month, amountZAR: amount }]);
-      setShowAllocationsEditor(false);
-    }
-
-    setShowPaymentModal(true);
-  };
-
-  const handleEditPayment = (property: RentalProperty, payment: TenantPaymentRecord) => {
-    setPaymentPropertyId(property.id);
-    setPaymentLeaseId(payment.leaseId || '');
-    setEditingPayment(payment);
-    const periodMonth = payment.periodMonth || getMonthKey(payment.paymentDate);
-    setPaymentPeriodMonth(periodMonth);
-    setPaymentDate(payment.paymentDate);
-    setPaymentAmount(payment.amountReceivedZAR);
-    setPaymentMethod(payment.paymentMethod);
-    setPaymentReference(payment.reference || '');
-    setPaymentNotes(payment.notes || '');
-
-    const allocs = payment.allocations && payment.allocations.length > 0
-      ? payment.allocations
-      : [{ periodMonth, amountZAR: payment.amountReceivedZAR }];
-    setPaymentAllocations(allocs);
-    setShowAllocationsEditor(allocs.length > 1);
-
-    setShowPaymentModal(true);
-  };
-
-  const handleSavePayment = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!paymentPropertyId || paymentAmount <= 0) return;
-
-    const prop = rentals.find((r) => r.id === paymentPropertyId);
-    const targetLease = prop?.leases?.find((l) => l.id === paymentLeaseId);
-
-    // Validate 'Deposit Applied'
-    if (paymentMethod === 'Deposit Applied') {
-      if (!targetLease) {
-        alert('Please select a specific tenant / lease to apply the held deposit from.');
-        return;
-      }
-      const existingDepositRefund = editingPayment && editingPayment.paymentMethod === 'Deposit Applied'
-        ? editingPayment.amountReceivedZAR
-        : 0;
-      const availableDeposit = (targetLease.depositHeldZAR || 0) + existingDepositRefund;
-      if (paymentAmount > availableDeposit) {
-        alert(
-          `Cannot apply ${formatZAR(paymentAmount)}: only ${formatZAR(availableDeposit)} deposit is held in trust for ${targetLease.tenantName}.`
-        );
-        return;
-      }
-    }
-
-    // Clean allocations
-    const validAllocations = paymentAllocations.filter((a) => a.periodMonth && a.amountZAR > 0);
-    const finalAllocations = validAllocations.length > 0
-      ? validAllocations
-      : [{ periodMonth: paymentPeriodMonth, amountZAR: Number(paymentAmount) }];
-
-    const paymentPayload = {
-      paymentDate,
-      amountReceivedZAR: Number(paymentAmount),
-      periodMonth: paymentPeriodMonth,
-      paymentMethod,
-      leaseId: paymentLeaseId || undefined,
-      reference: paymentReference.trim() || undefined,
-      notes: paymentNotes.trim() || undefined,
-      allocations: finalAllocations,
-    };
-
-    if (editingPayment) {
-      updateTenantPayment(paymentPropertyId, editingPayment.id, paymentPayload);
-      setCopyFeedbackToast('Payment updated successfully');
-    } else {
-      recordTenantPayment(paymentPropertyId, paymentPayload);
-      setCopyFeedbackToast('Payment recorded successfully');
-    }
-
-    setShowPaymentModal(false);
-    setEditingPayment(null);
-  };
-
-  const handleOpenWriteOffModal = (
-    property: RentalProperty,
-    suggestedAmount?: number,
-    leaseId?: string
-  ) => {
-    const activeTab = selectedTenantTab[property.id] || 'all';
-    const effectiveLeaseId =
-      leaseId ||
-      (activeTab !== 'all'
-        ? activeTab
-        : (property.leases && property.leases.length === 1 ? property.leases[0].id : ''));
-
-    const arrears = calculatePropertyArrears(property, undefined, effectiveLeaseId ? { leaseId: effectiveLeaseId } : undefined);
-    const maxBalance = Math.max(0, arrears.totalArrearsZAR);
-    const amount = suggestedAmount !== undefined && suggestedAmount > 0
-      ? Math.min(suggestedAmount, maxBalance)
-      : maxBalance;
-
-    setWriteOffPropertyId(property.id);
-    setWriteOffLeaseId(effectiveLeaseId);
-    setWriteOffAmount(amount);
-    setWriteOffDate(new Date().toISOString().split('T')[0]);
-    setWriteOffReason('Tenant absconded');
-    setWriteOffNotes('');
-
-    const unpaid = getUnpaidLedgerMonths(property, effectiveLeaseId ? { leaseId: effectiveLeaseId } : undefined);
-    const allocs = allocateOldestFirst(unpaid, amount);
-    setWriteOffAllocations(allocs);
-
-    setShowWriteOffModal(true);
-  };
-
-  const handleSaveWriteOff = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!writeOffPropertyId || writeOffAmount <= 0) return;
-
-    const prop = rentals.find((r) => r.id === writeOffPropertyId);
-    if (!prop) return;
-
-    if (prop.leases && prop.leases.length > 1 && !writeOffLeaseId) {
-      alert('Please select a specific lease for this write-off.');
-      return;
-    }
-
-    const arrears = calculatePropertyArrears(prop, undefined, writeOffLeaseId ? { leaseId: writeOffLeaseId } : undefined);
-    const maxBalance = Math.max(0, arrears.totalArrearsZAR);
-    if (writeOffAmount > maxBalance) {
-      alert(`Write-off amount (${formatZAR(writeOffAmount)}) cannot exceed outstanding balance of ${formatZAR(maxBalance)}.`);
-      return;
-    }
-
-    const validAllocations = writeOffAllocations.filter((a) => a.periodMonth && a.amountZAR > 0);
-    const finalAllocations = validAllocations.length > 0
-      ? validAllocations
-      : [{ periodMonth: getMonthKey(writeOffDate), amountZAR: Number(writeOffAmount) }];
-
-    recordArrearsWriteOff(writeOffPropertyId, {
-      date: writeOffDate,
-      amountZAR: Number(writeOffAmount),
-      reason: writeOffReason,
-      notes: writeOffNotes.trim() || undefined,
-      leaseId: writeOffLeaseId || undefined,
-      allocations: finalAllocations,
-    });
-
-    setCopyFeedbackToast(`Written off ${formatZAR(writeOffAmount)} (${writeOffReason})`);
-    setShowWriteOffModal(false);
-  };
-
-  // Selected Unit for Maintenance Log
-  const [selectedRentalForMaint, setSelectedRentalForMaint] = useState<RentalProperty | null>(null);
-  
-  // Add / Edit Rental Modal State
-  const [showRentalModal, setShowRentalModal] = useState(false);
-  const [editingRentalId, setEditingRentalId] = useState<string | null>(null);
-
-  // Mark as Sold Exit Modal State
-  const [showExitModal, setShowExitModal] = useState(false);
-  const [selectedRentalForExit, setSelectedRentalForExit] = useState<RentalProperty | null>(null);
-  const [exitSalePrice, setExitSalePrice] = useState<number>(0);
-  const [exitNetProceeds, setExitNetProceeds] = useState<number>(0);
-  const [exitSoldDate, setExitSoldDate] = useState<string>(new Date().toISOString().split('T')[0]);
-  const [exitNotes, setExitNotes] = useState('');
-
-  // New Maintenance Form State
-  const [maintIssue, setMaintIssue] = useState('');
-  const [maintCategory, setMaintCategory] = useState<MaintenanceLog['category']>('Plumbing');
-  const [maintContractor, setMaintContractor] = useState('Rapid Response Plumbing');
-  const [maintCost, setMaintCost] = useState(1500);
-
-  // Rental Property Form State
-  const [title, setTitle] = useState('');
-  const [address, setAddress] = useState('');
-  const [city, setCity] = useState('Johannesburg');
-  const [propertyType, setPropertyType] = useState<PropertyTitleType>('Sectional Title Apartment');
-  const [agmDate, setAgmDate] = useState('');
-  const [marketValue, setMarketValue] = useState(1800000);
-  const [purchasePrice, setPurchasePrice] = useState(1650000);
-  const [bondBalance, setBondBalance] = useState(1100000);
-  const [monthlyGrossRent, setMonthlyGrossRent] = useState(15000);
-  const [monthlyLevies, setMonthlyLevies] = useState(1850);
-  const [annualBuildingInsurance, setAnnualBuildingInsurance] = useState(0);
-  const [monthlyRates, setMonthlyRates] = useState(1100);
-  const [monthlyBondPayment, setMonthlyBondPayment] = useState(0);
-  const [bondPaymentEffectiveDate, setBondPaymentEffectiveDate] = useState('');
-  const [bondRevisionNote, setBondRevisionNote] = useState('');
-  const [tenantName, setTenantName] = useState('');
-  const [tenantPhone, setTenantPhone] = useState('');
-  const [tenantEmail, setTenantEmail] = useState('');
-  const [leaseEnd, setLeaseEnd] = useState(
-    new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
-  );
-  const [depositHeld, setDepositHeld] = useState(30000);
-  const [unpaidUtilityArrears, setUnpaidUtilityArrears] = useState(0);
-  const [rentalMasterFolderUrl, setRentalMasterFolderUrl] = useState('');
-  const [rentalOtpUrl, setRentalOtpUrl] = useState('');
-  const [rentalRatesBillUrl, setRentalRatesBillUrl] = useState('');
-  const [rentalTitleDeedUrl, setRentalTitleDeedUrl] = useState('');
-
-  // Agency Management Form State
-  const [managementType, setManagementType] = useState<'Self-Managed' | 'Agency'>('Agency');
-  const [agencyName, setAgencyName] = useState('Pam Golding Sandton');
-  const [agencyCommissionPercent, setAgencyCommissionPercent] = useState(8.0);
-  const [agencyVatApplicable, setAgencyVatApplicable] = useState(true);
-  const [agencyContact, setAgencyContact] = useState('+27 82 555 1234');
-
-  // Multi-Let Lease Management State
-  const [formLeases, setFormLeases] = useState<Lease[]>([{
-    id: crypto.randomUUID(),
-    unitName: 'Main Unit',
-    tenantName: '',
-    tenantPhone: '',
-    tenantEmail: '',
-    leaseStartDate: new Date().toISOString().split('T')[0],
-    leaseEndDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-    monthlyRentZAR: 15000,
-    depositHeldZAR: 30000,
-    annualEscalationPercent: 7,
-    status: 'Occupied',
-  }]);
-
-  // Utility Type State
-  const [utilityType, setUtilityType] = useState<'postpaid' | 'prepaid_submeter' | 'hybrid'>('postpaid');
-  const [prepaidVendorName, setPrepaidVendorName] = useState('');
-  const [monthlyPrepaidVendingFee, setMonthlyPrepaidVendingFee] = useState(0);
-  const [monthlyCommunalServices, setMonthlyCommunalServices] = useState<number>(0);
-
-  // Per-Rental Tax Entity Override State
-  const [taxEntityOverride, setTaxEntityOverride] = useState<'Company (27%)' | 'Individual (45%)' | 'Pre-Tax' | undefined>(undefined);
-
-  // Ancillary Income State
-  const [formAncillaryIncomes, setFormAncillaryIncomes] = useState<AncillaryIncome[]>([]);
-
-  // SARB Repo Rate PMT Calculator State
-  const [pmtTargetProperty, setPmtTargetProperty] = useState<RentalProperty | null>(null);
-  const [pmtInterestRate, setPmtInterestRate] = useState<number>(11.5);
-  const [pmtLoanBalance, setPmtLoanBalance] = useState<number>(0);
-  const [pmtLoanYears, setPmtLoanYears] = useState<number>(20);
-  const [pmtEffectiveMonth, setPmtEffectiveMonth] = useState<string>('');
-  const [pmtRevisionNote, setPmtRevisionNote] = useState<string>('SARB 25bps repo rate cut');
-
-  const handleOpenPmtCalculator = (property: RentalProperty) => {
-    setPmtTargetProperty(property);
-    setPmtInterestRate(property.bondInterestRatePercent || 11.5);
-    setPmtLoanBalance(property.outstandingBondBalanceZAR || 0);
-    setPmtLoanYears(20);
-
-    const now = new Date();
-    const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
-    const monthStr = nextMonth.toLocaleString('en-ZA', { month: 'short', year: 'numeric' });
-
-    setPmtEffectiveMonth(property.bondPaymentEffectiveDate || monthStr);
-    setPmtRevisionNote(property.bondRevisionNote || 'SARB 25bps repo rate cut');
-  };
-
-  const handleApplyPmt = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!pmtTargetProperty) return;
-
-    const newPayment = calculateMonthlyBondRepayment(pmtLoanBalance, pmtInterestRate, pmtLoanYears);
-    updateRental(pmtTargetProperty.id, {
-      monthlyBondPaymentZAR: newPayment,
-      outstandingBondBalanceZAR: pmtLoanBalance,
-      bondInterestRatePercent: pmtInterestRate,
-      bondPaymentEffectiveDate: pmtEffectiveMonth.trim() || undefined,
-      bondRevisionNote: pmtRevisionNote.trim() || undefined,
-    });
-    setPmtTargetProperty(null);
-  };
-
-  const handleOpenRefinance = (property: RentalProperty) => {
-    setSelectedRentalForRefinance(property);
-    const proposal = calculateBrrrrRefinanceProposal(
-      property.marketValueZAR || property.purchasePriceZAR,
-      property.outstandingBondBalanceZAR || 0,
-      property.bondInterestRatePercent || 11.5,
-      20,
-      0.70
-    );
-
-    setRefinanceNewValuation(proposal.estimatedNewValuationZAR);
-    setRefinanceCashPulledOut(proposal.cashEquityPulledOutZAR);
-    setRefinanceNewBondBalance(proposal.newBondBalanceZAR);
-    setRefinanceNewBondPayment(proposal.estimatedMonthlyBondRepaymentZAR);
-    setRefinanceDate(new Date().toISOString().split('T')[0]);
-    setRefinanceNotes(`BRRRR Refinance: Released R ${proposal.cashEquityPulledOutZAR.toLocaleString('en-ZA')} equity at 70% LTV`);
-    setShowRefinanceModal(true);
-  };
-
-  const handleSaveRefinance = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedRentalForRefinance) return;
-    refinanceRental({
-      rentalId: selectedRentalForRefinance.id,
-      newBankValuationZAR: Number(refinanceNewValuation),
-      newMonthlyBondPaymentZAR: Number(refinanceNewBondPayment),
-      cashEquityPulledOutZAR: Number(refinanceCashPulledOut),
-      newBondBalanceZAR: Number(refinanceNewBondBalance),
-      refinanceDate,
-      notes: refinanceNotes.trim() || undefined,
-    });
-    setRefinanceSuccessBanner({
-      amount: Number(refinanceCashPulledOut),
-      propertyTitle: selectedRentalForRefinance.title,
-    });
-    setShowRefinanceModal(false);
-    setSelectedRentalForRefinance(null);
-  };
-
-  const handleOpenAdd = () => {
-    setEditingRentalId(null);
-    setTitle('');
-    setAddress('');
-    setCity('Johannesburg');
-    setPropertyType('Sectional Title Apartment');
-    setAgmDate('');
-    setMarketValue(1800000);
-    setPurchasePrice(1650000);
-    setBondBalance(1100000);
-    setMonthlyGrossRent(15000);
-    setMonthlyLevies(1850);
-    setAnnualBuildingInsurance(0);
-    setMonthlyRates(1100);
-    setMonthlyBondPayment(0);
-    setBondPaymentEffectiveDate('');
-    setBondRevisionNote('');
-    setTenantName('');
-    setTenantPhone('');
-    setTenantEmail('');
-    setLeaseEnd(new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]);
-    setDepositHeld(30000);
-    setUnpaidUtilityArrears(0);
-    setRentalMasterFolderUrl('');
-    setRentalOtpUrl('');
-    setRentalRatesBillUrl('');
-    setRentalTitleDeedUrl('');
-    setManagementType('Agency');
-    setAgencyName('Pam Golding Sandton');
-    setAgencyCommissionPercent(8.0);
-    setAgencyVatApplicable(true);
-    setAgencyContact('+27 82 555 1234');
-    setFormLeases([{
-      id: crypto.randomUUID(),
-      unitName: 'Main Unit',
-      tenantName: '',
-      tenantPhone: '',
-      tenantEmail: '',
-      leaseStartDate: new Date().toISOString().split('T')[0],
-      leaseEndDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-      monthlyRentZAR: 15000,
-      depositHeldZAR: 30000,
-      annualEscalationPercent: 7,
-      status: 'Occupied',
-    }]);
-    setUtilityType('postpaid');
-    setPrepaidVendorName('');
-    setMonthlyPrepaidVendingFee(0);
-    setMonthlyCommunalServices(0);
-    setTaxEntityOverride(undefined);
-    setFormAncillaryIncomes([]);
-    setShowRentalModal(true);
-  };
-
-  const handleOpenEdit = (property: RentalProperty) => {
-    setEditingRentalId(property.id);
-    setTitle(property.title);
-    setAddress(property.address);
-    setCity(property.city);
-    setPropertyType(property.propertyType || 'Sectional Title Apartment');
-    setAgmDate(property.agmDate || '');
-    setMarketValue(property.marketValueZAR);
-    setPurchasePrice(property.purchasePriceZAR);
-    setBondBalance(property.outstandingBondBalanceZAR);
-    setMonthlyGrossRent(property.monthlyGrossRentZAR);
-    setMonthlyLevies(property.propertyType === 'Freehold House' ? 0 : property.monthlyLeviesZAR);
-    setAnnualBuildingInsurance(property.annualBuildingInsuranceZAR || (property.propertyType === 'Freehold House' ? 7_200 : 0));
-    setMonthlyRates(property.monthlyRatesTaxesZAR);
-    const estEditBond =
-      property.monthlyBondPaymentZAR ||
-      (property.outstandingBondBalanceZAR > 0
-        ? calculateMonthlyBondRepayment(
-            property.outstandingBondBalanceZAR,
-            property.bondInterestRatePercent || 11.75,
-            20
-          )
-        : 0);
-    setMonthlyBondPayment(estEditBond);
-    setBondPaymentEffectiveDate(property.bondPaymentEffectiveDate || '');
-    setBondRevisionNote(property.bondRevisionNote || '');
-    setTenantName(property.leases?.[0]?.tenantName || '');
-    setTenantPhone(property.leases?.[0]?.tenantPhone || '');
-    setTenantEmail(property.leases?.[0]?.tenantEmail || '');
-    setLeaseEnd(property.leases?.[0]?.leaseEndDate || '');
-    setDepositHeld(property.leases?.[0]?.depositHeldZAR || 0);
-    setUnpaidUtilityArrears(property.unpaidUtilityArrearsZAR || 0);
-    setRentalMasterFolderUrl(property.driveVault?.masterFolderUrl || '');
-    setRentalOtpUrl(property.driveVault?.otpDocumentUrl || '');
-    setRentalRatesBillUrl(property.driveVault?.ratesBillUrl || '');
-    setRentalTitleDeedUrl(property.driveVault?.titleDeedUrl || '');
-    setManagementType(property.managementType || 'Self-Managed');
-    setAgencyName(property.agencyName || 'Pam Golding');
-    setAgencyCommissionPercent(property.agencyCommissionPercent ?? 8.0);
-    setAgencyVatApplicable(property.agencyVatApplicable !== false);
-    setAgencyContact(property.agencyContact || '');
-    setFormLeases(property.leases?.length > 0 ? property.leases.map(l => ({ ...l })) : [{
-      id: crypto.randomUUID(),
-      unitName: 'Main Unit',
-      tenantName: '',
-      tenantPhone: '',
-      tenantEmail: '',
-      leaseStartDate: new Date().toISOString().split('T')[0],
-      leaseEndDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-      monthlyRentZAR: property.monthlyGrossRentZAR,
-      depositHeldZAR: 0,
-      annualEscalationPercent: 7,
-      status: 'Occupied',
-    }]);
-    setUtilityType(property.utilityType || 'postpaid');
-    setPrepaidVendorName(property.prepaidVendorName || '');
-    setMonthlyPrepaidVendingFee(property.monthlyPrepaidVendingFeeZAR || 0);
-    setMonthlyCommunalServices(property.monthlyCommunalServicesZAR || 0);
-    setTaxEntityOverride(property.taxEntityTypeOverride);
-    setFormAncillaryIncomes(property.ancillaryIncomes?.map(a => ({ ...a })) || []);
-    setShowRentalModal(true);
-  };
-
-  const handleOpenExit = (property: RentalProperty) => {
-    setSelectedRentalForExit(property);
-    const estSale = property.marketValueZAR || property.purchasePriceZAR || 0;
-    setExitSalePrice(estSale);
-    const metrics = calculateDisposalMetrics(estSale, property.purchasePriceZAR || 0, property.outstandingBondBalanceZAR || 0);
-    setExitNetProceeds(metrics.netCashProceedsZAR);
-    setExitSoldDate(new Date().toISOString().split('T')[0]);
-    setExitNotes('');
-    setShowExitModal(true);
-  };
-
-  const handleCompleteRentalSale = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedRentalForExit || exitSalePrice <= 0) return;
-    markRentalAsSold(selectedRentalForExit.id, exitSalePrice, exitNetProceeds, exitSoldDate, exitNotes);
-    setShowExitModal(false);
-    setSelectedRentalForExit(null);
-    setViewTab('archive');
-  };
-
-  const handleSaveRental = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!title) return;
-
-    // Calculate monthly bond payment (or use user-specified debit order)
-    const calcBond = bondBalance > 0 ? calculateMonthlyBondRepayment(bondBalance, 11.75, 20) : 0;
-    const finalBondPayment = monthlyBondPayment > 0 ? monthlyBondPayment : calcBond;
-
-    // Compute gross rent from sum of occupied leases
-    const computedGrossRent = formLeases
-      .filter(l => l.status === 'Occupied')
-      .reduce((sum, l) => sum + (l.monthlyRentZAR || 0), 0);
-    const finalGrossRent = computedGrossRent > 0 ? computedGrossRent : monthlyGrossRent;
-
-    const agentFee = managementType === 'Agency'
-      ? calculateAgencyCommission(finalGrossRent, agencyCommissionPercent, agencyVatApplicable !== false, agencyName).monthlyAgentFeeZAR
-      : 0;
-
-    const finalLevies = propertyType === 'Freehold House' ? 0 : monthlyLevies;
-    const finalInsurance = propertyType === 'Freehold House' ? annualBuildingInsurance : 0;
-    const isScheme = propertyType === 'Sectional Title Apartment' || propertyType === 'Townhouse / Cluster';
-    const finalAgmDate = isScheme && agmDate ? agmDate : undefined;
-
-    // Prepare leases with defaults
-    const finalLeases = formLeases.map(l => ({
-      ...l,
-      tenantName: l.tenantName || 'Tenant Unassigned',
-    }));
-
-    // Common fields for both create and update
-    const commonFields = {
-      title,
-      address: address || `${city} Property`,
-      city,
-      propertyType,
-      agmDate: finalAgmDate,
-      marketValueZAR: marketValue,
-      purchasePriceZAR: purchasePrice,
-      outstandingBondBalanceZAR: bondBalance,
-      monthlyBondPaymentZAR: finalBondPayment,
-      bondPaymentEffectiveDate: bondPaymentEffectiveDate.trim() || undefined,
-      bondRevisionNote: bondRevisionNote.trim() || undefined,
-      leases: finalLeases,
-      unpaidUtilityArrearsZAR: unpaidUtilityArrears,
-      monthlyGrossRentZAR: finalGrossRent,
-      monthlyLeviesZAR: finalLevies,
-      annualBuildingInsuranceZAR: finalInsurance,
-      monthlyRatesTaxesZAR: monthlyRates,
-      managementType,
-      agencyName: managementType === 'Agency' ? agencyName : undefined,
-      agencyCommissionPercent: managementType === 'Agency' ? agencyCommissionPercent : 0,
-      agencyVatApplicable: managementType === 'Agency' ? agencyVatApplicable : false,
-      agencyContact: managementType === 'Agency' ? agencyContact : undefined,
-      monthlyAgentFeeZAR: agentFee,
-      driveVault: {
-        masterFolderUrl: rentalMasterFolderUrl.trim() || undefined,
-        otpDocumentUrl: rentalOtpUrl.trim() || undefined,
-        ratesBillUrl: rentalRatesBillUrl.trim() || undefined,
-        titleDeedUrl: rentalTitleDeedUrl.trim() || undefined,
-      },
-      utilityType,
-      prepaidVendorName: (utilityType === 'prepaid_submeter' || utilityType === 'hybrid') ? prepaidVendorName.trim() || undefined : undefined,
-      monthlyPrepaidVendingFeeZAR: (utilityType === 'prepaid_submeter' || utilityType === 'hybrid') ? monthlyPrepaidVendingFee : undefined,
-      monthlyCommunalServicesZAR: monthlyCommunalServices > 0 ? monthlyCommunalServices : undefined,
-      taxEntityTypeOverride: taxEntityOverride,
-      ancillaryIncomes: formAncillaryIncomes.length > 0 ? formAncillaryIncomes : undefined,
-    };
-
-    if (editingRentalId) {
-      updateRental(editingRentalId, commonFields);
-    } else {
-      const newUnit: RentalProperty = {
-        id: `rental-${Date.now()}`,
-        ...commonFields,
-        purchaseDate: new Date().toISOString().split('T')[0],
-        bondInterestRatePercent: 11.75,
-        monthlyMaintenanceReserveZAR: 600,
-        maintenanceHistory: [],
-        status: finalLeases.some(l => l.status === 'Occupied') ? 'Occupied' : 'Vacant',
-      };
-      addRental(newUnit);
-    }
-
-    setShowRentalModal(false);
-  };
-
-  const handleAddMaintenance = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedRentalForMaint || !maintIssue) return;
-
-    addMaintenanceLog(selectedRentalForMaint.id, {
-      dateLogged: new Date().toISOString().split('T')[0],
-      issueDescription: maintIssue,
-      category: maintCategory,
-      contractorName: maintContractor,
-      costZAR: maintCost,
-      status: 'Resolved',
-      invoiceRef: `INV-${Math.floor(1000 + Math.random() * 9000)}`,
-    });
-
-    setMaintIssue('');
-    setMaintCost(1500);
-    // Refresh modal
-    const updated = rentals.find((r) => r.id === selectedRentalForMaint.id);
-    if (updated) setSelectedRentalForMaint(updated);
-  };
 
   const aggregateKPIs = calculateAggregateRentalKPIs(rentals);
   const totalGrossMonthlyRent = aggregateKPIs.totalGrossMonthlyRentZAR;
@@ -1025,7 +346,7 @@ export default function RentalPortfolioPage() {
               onChange={(e) => {
                 const files = Array.from(e.target.files || []);
                 if (files.length > 0) {
-                  handleDirectPdfUpload(files.slice(0, 3));
+                  directPdf.enqueueFiles(files.slice(0, 3));
                 }
                 e.target.value = '';
               }}
@@ -1042,7 +363,7 @@ export default function RentalPortfolioPage() {
             </button>
             <ImportDropdown
               type="rentals"
-              onPdfSelected={handleDirectPdfUpload}
+              onPdfSelected={directPdf.enqueueFiles}
             />
             <button
               onClick={() => exportRentalsCSV(activeRentals)}
@@ -1062,7 +383,7 @@ export default function RentalPortfolioPage() {
               <span>SARS ITR12 Export</span>
             </button>
             <button
-              onClick={handleOpenAdd}
+              onClick={rentalModals.openAddRental}
               className="inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold px-3 py-2 rounded-lg shadow-sm transition-colors cursor-pointer shrink-0 whitespace-nowrap"
             >
               <PlusCircle className="w-3.5 h-3.5" />
@@ -1150,7 +471,7 @@ export default function RentalPortfolioPage() {
         {/* ACTIVE PORTFOLIO VIEW */}
         {viewTab === 'active' && (
           <>
-            {refinanceSuccessBanner && (
+            {rentalModals.refinanceSuccessBanner && (
               <div className="bg-purple-50 border border-purple-200 rounded-xl p-4 flex items-center justify-between gap-3 animate-in fade-in">
                 <div className="flex items-center gap-2.5">
                   <div className="w-8 h-8 rounded-full bg-purple-600 text-white flex items-center justify-center font-bold">
@@ -1161,13 +482,13 @@ export default function RentalPortfolioPage() {
                       Equity Pulled Out & Deposited into Seed Capital!
                     </h4>
                     <p className="text-[11px] text-purple-700">
-                      <strong>{formatZAR(refinanceSuccessBanner.amount)}</strong> cash equity from {refinanceSuccessBanner.propertyTitle} is now instantly available in your global Liquid Capital Reserve for your next acquisition.
+                      <strong>{formatZAR(rentalModals.refinanceSuccessBanner.amount)}</strong> cash equity from {rentalModals.refinanceSuccessBanner.propertyTitle} is now instantly available in your global Liquid Capital Reserve for your next acquisition.
                     </p>
                   </div>
                 </div>
                 <button
                   type="button"
-                  onClick={() => setRefinanceSuccessBanner(null)}
+                  onClick={rentalModals.clearRefinanceBanner}
                   className="text-purple-400 hover:text-purple-700 text-xs px-2 py-1 cursor-pointer"
                 >
                   ✕
@@ -1246,10 +567,7 @@ export default function RentalPortfolioPage() {
                                 {(property.totalEquityExtractedZAR || 0) > 0 && (
                                   <button
                                     type="button"
-                                    onClick={() => {
-                                      setSelectedRentalForAudit(property);
-                                      setShowAuditHistoryModal(true);
-                                    }}
+                                    onClick={() => rentalModals.openAuditHistory(property)}
                                     className="inline-flex items-center gap-1 text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-purple-100 text-purple-900 border border-purple-200 hover:bg-purple-200 transition-colors cursor-pointer"
                                     title="View timestamped refinance and equity extraction history"
                                   >
@@ -1612,7 +930,7 @@ export default function RentalPortfolioPage() {
                                   )}
                                   <button
                                     type="button"
-                                    onClick={() => handleOpenPmtCalculator(property)}
+                                    onClick={() => rentalModals.openPmtCalculator(property)}
                                     className="inline-flex items-center gap-1 text-[10px] font-semibold text-indigo-700 hover:text-indigo-900 bg-white hover:bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-200 shadow-2xs transition-colors cursor-pointer"
                                     title="SARB Repo Rate PMT Calculator - forward-only bond adjustment"
                                   >
@@ -1621,7 +939,7 @@ export default function RentalPortfolioPage() {
                                   </button>
                                   <button
                                     type="button"
-                                    onClick={() => handleOpenRefinance(property)}
+                                    onClick={() => rentalModals.openRefinance(property)}
                                     className="inline-flex items-center gap-1 text-[10px] font-bold text-purple-700 hover:text-purple-900 bg-white hover:bg-purple-50 px-1.5 py-0.5 rounded border border-purple-200 shadow-2xs transition-colors cursor-pointer"
                                     title="BRRRR: Refinance and pull out equity into seed capital"
                                   >
@@ -1769,7 +1087,7 @@ export default function RentalPortfolioPage() {
                                 <div className="flex items-center gap-2">
                                   <button
                                     type="button"
-                                    onClick={() => setStatementModalPropertyId(property.id)}
+                                    onClick={() => rentalModals.openStatementModal(property.id)}
                                     className="text-[10px] text-teal-700 hover:text-teal-900 font-bold hover:underline inline-flex items-center gap-0.5 cursor-pointer"
                                     title="View tenant utility recovery and month-over-month variance statement"
                                   >
@@ -2016,7 +1334,7 @@ export default function RentalPortfolioPage() {
                                     <button
                                       type="button"
                                       onClick={() =>
-                                        handleOpenLogPaymentModal(
+                                        paymentModal.openLogPayment(
                                           property,
                                           currentTabArrearsInfo.currentMonth,
                                           currentTabArrearsInfo.currentMonthDueZAR > 0
@@ -2209,7 +1527,7 @@ export default function RentalPortfolioPage() {
                                         <button
                                           type="button"
                                           onClick={() =>
-                                            handleOpenLogPaymentModal(
+                                            paymentModal.openLogPayment(
                                               property,
                                               undefined,
                                               currentTabArrearsInfo.totalArrearsZAR,
@@ -2227,7 +1545,7 @@ export default function RentalPortfolioPage() {
                                         <button
                                           type="button"
                                           onClick={() =>
-                                            handleOpenWriteOffModal(
+                                            writeOffModal.openWriteOff(
                                               property,
                                               currentTabArrearsInfo.totalArrearsZAR,
                                               activeTenantLease?.id
@@ -2278,7 +1596,7 @@ export default function RentalPortfolioPage() {
                                     </button>
                                     <button
                                       type="button"
-                                      onClick={() => setStatementModalPropertyId(property.id)}
+                                      onClick={() => rentalModals.openStatementModal(property.id)}
                                       className="inline-flex items-center gap-1 text-[10px] font-bold text-teal-700 hover:text-teal-900 bg-teal-50 hover:bg-teal-100 px-2 py-0.5 rounded border border-teal-200 transition-colors cursor-pointer"
                                       title="Open interactive tenant statement modal"
                                     >
@@ -2409,7 +1727,7 @@ export default function RentalPortfolioPage() {
                                                     </button>
                                                     <button
                                                       type="button"
-                                                      onClick={() => handleEditPayment(property, p)}
+                                                      onClick={() => paymentModal.openEditPayment(property, p)}
                                                       className="p-1 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded transition-colors cursor-pointer"
                                                       title="Edit payment"
                                                     >
@@ -2506,7 +1824,7 @@ export default function RentalPortfolioPage() {
                                         <button
                                           type="button"
                                           onClick={() =>
-                                            handleOpenLogPaymentModal(
+                                            paymentModal.openLogPayment(
                                               property,
                                               item.month,
                                               item.netVariance > 0 ? item.netVariance : item.totalBilled,
@@ -2627,7 +1945,7 @@ export default function RentalPortfolioPage() {
                       <div className="p-4 bg-slate-50 border-t border-slate-100 flex items-center justify-between gap-2">
                         <button
                           type="button"
-                          onClick={() => setSelectedRentalForMaint(property)}
+                          onClick={() => rentalModals.openMaintenance(property)}
                           className="text-xs font-semibold text-slate-700 hover:text-emerald-700 flex items-center gap-1.5 transition-colors cursor-pointer"
                         >
                           <Wrench className="w-3.5 h-3.5" />
@@ -2637,7 +1955,7 @@ export default function RentalPortfolioPage() {
                         <div className="flex items-center gap-1.5 flex-wrap justify-end">
                           <button
                             type="button"
-                            onClick={() => setMeterModalPropertyId(property.id)}
+                            onClick={() => rentalModals.openMeterModal(property.id)}
                             className="inline-flex items-center gap-1 text-[11px] font-bold text-cyan-700 hover:text-cyan-900 bg-cyan-50 hover:bg-cyan-100 px-2.5 py-1 rounded-md border border-cyan-200 transition-colors cursor-pointer"
                             title="View physical meter readings and log field inspections"
                           >
@@ -2651,7 +1969,7 @@ export default function RentalPortfolioPage() {
                           </button>
                           <button
                             type="button"
-                            onClick={() => setStatementModalPropertyId(property.id)}
+                            onClick={() => rentalModals.openStatementModal(property.id)}
                             className="inline-flex items-center gap-1 text-[11px] font-bold text-teal-700 hover:text-teal-900 bg-teal-50 hover:bg-teal-100 px-2.5 py-1 rounded-md border border-teal-200 transition-colors cursor-pointer"
                             title="View tenant utility recovery and month-over-month variance statement"
                           >
@@ -2665,7 +1983,7 @@ export default function RentalPortfolioPage() {
                           </button>
                           <button
                             type="button"
-                            onClick={() => handleOpenRefinance(property)}
+                            onClick={() => rentalModals.openRefinance(property)}
                             className="inline-flex items-center gap-1 text-[11px] font-bold text-purple-700 hover:text-purple-900 bg-purple-50 hover:bg-purple-100 px-2.5 py-1 rounded-md border border-purple-200 transition-colors cursor-pointer"
                             title="BRRRR: Refinance and pull out equity into seed capital pool"
                           >
@@ -2674,7 +1992,7 @@ export default function RentalPortfolioPage() {
                           </button>
                           <button
                             type="button"
-                            onClick={() => handleOpenExit(property)}
+                            onClick={() => rentalModals.openExit(property)}
                             className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700 hover:text-emerald-900 bg-emerald-50 hover:bg-emerald-100 px-2.5 py-1 rounded-md border border-emerald-300 transition-colors cursor-pointer"
                             title="Mark rental property as sold"
                           >
@@ -2683,7 +2001,7 @@ export default function RentalPortfolioPage() {
                           </button>
                           <button
                             type="button"
-                            onClick={() => handleOpenEdit(property)}
+                            onClick={() => rentalModals.openEditRental(property)}
                             className="inline-flex items-center gap-1 text-[11px] font-semibold text-indigo-700 hover:text-indigo-900 bg-indigo-50 hover:bg-indigo-100 px-2.5 py-1 rounded-md border border-indigo-200 transition-colors cursor-pointer"
                             title="Edit property & agency mandate"
                           >
@@ -2854,87 +2172,50 @@ export default function RentalPortfolioPage() {
 
       {/* Mark Rental as Sold Exit Modal */}
       <ExitSaleModal
-        isOpen={showExitModal && Boolean(selectedRentalForExit)}
-        property={selectedRentalForExit}
-        onClose={() => {
-          setShowExitModal(false);
-          setSelectedRentalForExit(null);
-        }}
+        isOpen={rentalModals.isExitOpen}
+        property={rentalModals.exitProperty}
+        onClose={rentalModals.closeExit}
         onComplete={() => {
-          setShowExitModal(false);
-          setSelectedRentalForExit(null);
+          rentalModals.closeExit();
           setViewTab('archive');
         }}
-        exitSalePrice={exitSalePrice}
-        setExitSalePrice={setExitSalePrice}
-        exitNetProceeds={exitNetProceeds}
-        setExitNetProceeds={setExitNetProceeds}
-        exitSoldDate={exitSoldDate}
-        setExitSoldDate={setExitSoldDate}
-        exitNotes={exitNotes}
-        setExitNotes={setExitNotes}
-        onSubmit={handleCompleteRentalSale}
       />
 
       {/* Refinance & Pull Out Equity (BRRRR) Modal */}
       <RefinanceModal
-        isOpen={showRefinanceModal && Boolean(selectedRentalForRefinance)}
-        property={selectedRentalForRefinance}
+        isOpen={rentalModals.isRefinanceOpen}
+        property={rentalModals.refinanceProperty}
         currentLiquidReserve={summary.liquidCapitalReserve}
-        onClose={() => {
-          setShowRefinanceModal(false);
-          setSelectedRentalForRefinance(null);
+        onClose={rentalModals.closeRefinance}
+        onSave={(params) => {
+          refinanceRental(params);
+          rentalModals.setRefinanceSuccessBanner({
+            amount: params.cashEquityPulledOutZAR,
+            propertyTitle: rentalModals.refinanceProperty?.title || 'Rental Property',
+          });
+          rentalModals.closeRefinance();
         }}
-        onSave={(params) => refinanceRental(params)}
-        newValuation={refinanceNewValuation}
-        setNewValuation={setRefinanceNewValuation}
-        newBondPayment={refinanceNewBondPayment}
-        setNewBondPayment={setRefinanceNewBondPayment}
-        cashPulledOut={refinanceCashPulledOut}
-        setCashPulledOut={setRefinanceCashPulledOut}
-        newBondBalance={refinanceNewBondBalance}
-        setNewBondBalance={setRefinanceNewBondBalance}
-        refinanceDate={refinanceDate}
-        setRefinanceDate={setRefinanceDate}
-        notes={refinanceNotes}
-        setNotes={setRefinanceNotes}
-        onSubmit={handleSaveRefinance}
       />
 
       {/* Refinance Audit History Modal */}
       <RefinanceAuditModal
-        isOpen={showAuditHistoryModal && Boolean(selectedRentalForAudit)}
-        property={selectedRentalForAudit}
-        onClose={() => {
-          setShowAuditHistoryModal(false);
-          setSelectedRentalForAudit(null);
-        }}
+        isOpen={rentalModals.isAuditHistoryOpen}
+        property={rentalModals.auditProperty}
+        onClose={rentalModals.closeAuditHistory}
       />
 
       {/* Maintenance Log Modal */}
       <MaintenanceModal
-        isOpen={Boolean(selectedRentalForMaint)}
-        property={selectedRentalForMaint}
-        onClose={() => setSelectedRentalForMaint(null)}
-        maintIssue={maintIssue}
-        setMaintIssue={setMaintIssue}
-        maintCategory={maintCategory}
-        setMaintCategory={setMaintCategory}
-        maintContractor={maintContractor}
-        setMaintContractor={setMaintContractor}
-        maintCost={maintCost}
-        setMaintCost={setMaintCost}
-        onAddMaintenance={handleAddMaintenance}
+        isOpen={rentalModals.isMaintenanceOpen}
+        property={rentalModals.maintenanceProperty}
+        onClose={rentalModals.closeMaintenance}
       />
 
       {/* Add / Edit Rental Property Modal */}
       <RentalFormModal
-        isOpen={showRentalModal}
-        editingProperty={editingRentalId ? rentals.find((r) => r.id === editingRentalId) || null : null}
-        onClose={() => {
-          setShowRentalModal(false);
-          setEditingRentalId(null);
-        }}
+        isOpen={rentalModals.isRentalFormOpen}
+        editingProperty={rentalModals.editingProperty}
+        onClose={rentalModals.closeRentalForm}
         onSave={(payload, isNew) => {
           if (isNew) {
             const newUnit: RentalProperty = {
@@ -2985,119 +2266,44 @@ export default function RentalPortfolioPage() {
               transactions: payload.transactions,
             };
             addRental(newUnit);
-          } else if (editingRentalId) {
-            updateRental(editingRentalId, payload);
+          } else if (rentalModals.editingProperty) {
+            updateRental(rentalModals.editingProperty.id, payload);
           }
+          rentalModals.closeRentalForm();
         }}
-        title={title}
-        setTitle={setTitle}
-        address={address}
-        setAddress={setAddress}
-        city={city}
-        setCity={setCity}
-        propertyType={propertyType}
-        setPropertyType={setPropertyType}
-        agmDate={agmDate}
-        setAgmDate={setAgmDate}
-        marketValue={marketValue}
-        setMarketValue={setMarketValue}
-        purchasePrice={purchasePrice}
-        setPurchasePrice={setPurchasePrice}
-        bondBalance={bondBalance}
-        setBondBalance={setBondBalance}
-        monthlyGrossRent={monthlyGrossRent}
-        setMonthlyGrossRent={setMonthlyGrossRent}
-        monthlyLevies={monthlyLevies}
-        setMonthlyLevies={setMonthlyLevies}
-        annualBuildingInsurance={annualBuildingInsurance}
-        setAnnualBuildingInsurance={setAnnualBuildingInsurance}
-        monthlyRates={monthlyRates}
-        setMonthlyRates={setMonthlyRates}
-        monthlyBondPayment={monthlyBondPayment}
-        setMonthlyBondPayment={setMonthlyBondPayment}
-        bondPaymentEffectiveDate={bondPaymentEffectiveDate}
-        setBondPaymentEffectiveDate={setBondPaymentEffectiveDate}
-        bondRevisionNote={bondRevisionNote}
-        setBondRevisionNote={setBondRevisionNote}
-        unpaidUtilityArrears={unpaidUtilityArrears}
-        setUnpaidUtilityArrears={setUnpaidUtilityArrears}
-        managementType={managementType}
-        setManagementType={setManagementType}
-        agencyName={agencyName}
-        setAgencyName={setAgencyName}
-        agencyCommissionPercent={agencyCommissionPercent}
-        setAgencyCommissionPercent={setAgencyCommissionPercent}
-        agencyVatApplicable={agencyVatApplicable}
-        setAgencyVatApplicable={setAgencyVatApplicable}
-        agencyContact={agencyContact}
-        setAgencyContact={setAgencyContact}
-        formLeases={formLeases}
-        setFormLeases={setFormLeases}
-        utilityType={utilityType}
-        setUtilityType={setUtilityType}
-        prepaidVendorName={prepaidVendorName}
-        setPrepaidVendorName={setPrepaidVendorName}
-        monthlyPrepaidVendingFee={monthlyPrepaidVendingFee}
-        setMonthlyPrepaidVendingFee={setMonthlyPrepaidVendingFee}
-        monthlyCommunalServices={monthlyCommunalServices}
-        setMonthlyCommunalServices={setMonthlyCommunalServices}
-        taxEntityOverride={taxEntityOverride}
-        setTaxEntityOverride={setTaxEntityOverride}
-        formAncillaryIncomes={formAncillaryIncomes}
-        setFormAncillaryIncomes={setFormAncillaryIncomes}
-        rentalMasterFolderUrl={rentalMasterFolderUrl}
-        setRentalMasterFolderUrl={setRentalMasterFolderUrl}
-        rentalOtpUrl={rentalOtpUrl}
-        setRentalOtpUrl={setRentalOtpUrl}
-        rentalRatesBillUrl={rentalRatesBillUrl}
-        setRentalRatesBillUrl={setRentalRatesBillUrl}
-        rentalTitleDeedUrl={rentalTitleDeedUrl}
-        setRentalTitleDeedUrl={setRentalTitleDeedUrl}
-        onSubmit={handleSaveRental}
       />
 
       {/* SARB Repo Rate PMT Calculator Modal */}
       <SarbPmtModal
-        isOpen={Boolean(pmtTargetProperty)}
-        property={pmtTargetProperty}
-        onClose={() => setPmtTargetProperty(null)}
-        interestRate={pmtInterestRate}
-        setInterestRate={setPmtInterestRate}
-        loanBalance={pmtLoanBalance}
-        setLoanBalance={setPmtLoanBalance}
-        loanYears={pmtLoanYears}
-        setLoanYears={setPmtLoanYears}
-        effectiveMonth={pmtEffectiveMonth}
-        setEffectiveMonth={setPmtEffectiveMonth}
-        revisionNote={pmtRevisionNote}
-        setRevisionNote={setPmtRevisionNote}
-        onApply={handleApplyPmt}
+        isOpen={rentalModals.isPmtOpen}
+        property={rentalModals.pmtProperty}
+        onClose={rentalModals.closePmtCalculator}
       />
 
       {/* Direct PDF Import Unified Verification Modal */}
       <UnifiedPdfVerificationModal
-        isOpen={unifiedPdfQueue.length > 0}
-        onClose={() => setUnifiedPdfQueue([])}
-        queue={unifiedPdfQueue}
+        isOpen={directPdf.queue.length > 0}
+        onClose={directPdf.clearQueue}
+        queue={directPdf.queue}
         onOpenTenantStatement={(propertyId: string) => {
-          setUnifiedPdfQueue([]);
-          setStatementModalPropertyId(propertyId);
+          directPdf.clearQueue();
+          rentalModals.openStatementModal(propertyId);
         }}
       />
 
       {/* Floating Processing Toast for Direct PDF Import */}
-      {isParsingDirectPdf && (
+      {directPdf.isProcessing && (
         <div className="fixed bottom-6 right-6 z-50 bg-slate-900 text-white text-xs px-4 py-3 rounded-xl shadow-2xl border border-purple-500/30 flex items-center gap-3 animate-in fade-in slide-in-from-bottom-2">
           <Loader2 className="w-4 h-4 text-purple-400 animate-spin shrink-0" />
           <div>
             <div className="font-bold">
-              {parsingProgress
-                ? `Analyzing Statement (${parsingProgress.current} of ${parsingProgress.total})...`
+              {directPdf.parsingProgress
+                ? `Analyzing Statement (${directPdf.parsingProgress.current} of ${directPdf.parsingProgress.total})...`
                 : 'Analyzing PDF Statement...'}
             </div>
             <div className="text-[10px] text-slate-400">
-              {parsingProgress
-                ? parsingProgress.filename
+              {directPdf.parsingProgress
+                ? directPdf.parsingProgress.filename
                 : 'Running auto-detection for iGrow, CoJ, Eskom, or managing agent'}
             </div>
           </div>
@@ -3106,80 +2312,61 @@ export default function RentalPortfolioPage() {
 
       {/* Historical Tenant Utility Variance & Statement Modal */}
       <TenantStatement
-        propertyId={statementModalPropertyId}
-        isOpen={Boolean(statementModalPropertyId)}
-        onClose={() => setStatementModalPropertyId(null)}
+        propertyId={rentalModals.statementPropertyId}
+        isOpen={Boolean(rentalModals.statementPropertyId)}
+        onClose={rentalModals.closeStatementModal}
         onOpenMeterReadings={() => {
-          const currentId = statementModalPropertyId;
-          setStatementModalPropertyId(null);
-          setMeterModalPropertyId(currentId);
+          const currentId = rentalModals.statementPropertyId;
+          rentalModals.closeStatementModal();
+          if (currentId) {
+            rentalModals.openMeterModal(currentId);
+          }
         }}
       />
 
       {/* Physical & Municipal Meter Readings Modal */}
       <MeterReadingsModal
-        propertyId={meterModalPropertyId}
-        isOpen={Boolean(meterModalPropertyId)}
-        onClose={() => setMeterModalPropertyId(null)}
+        propertyId={rentalModals.meterPropertyId}
+        isOpen={Boolean(rentalModals.meterPropertyId)}
+        onClose={rentalModals.closeMeterModal}
       />
 
       {/* Payment & Write-Off Modals */}
       <PaymentModal
-        isOpen={showPaymentModal && Boolean(paymentPropertyId)}
-        property={rentals.find((r) => r.id === paymentPropertyId) || null}
-        editingPayment={editingPayment}
-        onClose={() => setShowPaymentModal(false)}
+        isOpen={paymentModal.isOpen && Boolean(paymentModal.property)}
+        property={paymentModal.property}
+        editingPayment={paymentModal.editingPayment}
+        initialLeaseId={paymentModal.initialLeaseId}
+        initialMonth={paymentModal.initialMonth}
+        initialAmount={paymentModal.initialAmount}
+        initialAllocations={paymentModal.initialAllocations}
+        onClose={paymentModal.closePaymentModal}
         onSave={(payload, editingId) => {
-          if (!paymentPropertyId) return;
+          if (!paymentModal.property) return;
           if (editingId) {
-            updateTenantPayment(paymentPropertyId, editingId, payload);
+            updateTenantPayment(paymentModal.property.id, editingId, payload);
             setCopyFeedbackToast('Payment updated successfully');
           } else {
-            recordTenantPayment(paymentPropertyId, payload);
+            recordTenantPayment(paymentModal.property.id, payload);
             setCopyFeedbackToast('Payment recorded successfully');
           }
+          paymentModal.closePaymentModal();
         }}
-        paymentLeaseId={paymentLeaseId}
-        setPaymentLeaseId={setPaymentLeaseId}
-        paymentPeriodMonth={paymentPeriodMonth}
-        setPaymentPeriodMonth={setPaymentPeriodMonth}
-        paymentDate={paymentDate}
-        setPaymentDate={setPaymentDate}
-        paymentAmount={paymentAmount}
-        setPaymentAmount={setPaymentAmount}
-        paymentMethod={paymentMethod}
-        setPaymentMethod={setPaymentMethod}
-        paymentReference={paymentReference}
-        setPaymentReference={setPaymentReference}
-        paymentNotes={paymentNotes}
-        setPaymentNotes={setPaymentNotes}
-        paymentAllocations={paymentAllocations}
-        setPaymentAllocations={setPaymentAllocations}
-        showAllocationsEditor={showAllocationsEditor}
-        setShowAllocationsEditor={setShowAllocationsEditor}
       />
 
       <WriteOffModal
-        isOpen={showWriteOffModal && Boolean(writeOffPropertyId)}
-        property={rentals.find((r) => r.id === writeOffPropertyId) || null}
-        onClose={() => setShowWriteOffModal(false)}
+        isOpen={writeOffModal.isOpen && Boolean(writeOffModal.property)}
+        property={writeOffModal.property}
+        initialLeaseId={writeOffModal.initialLeaseId}
+        initialAmount={writeOffModal.initialAmount}
+        initialAllocations={writeOffModal.initialAllocations}
+        onClose={writeOffModal.closeWriteOffModal}
         onSave={(payload) => {
-          if (!writeOffPropertyId) return;
-          recordArrearsWriteOff(writeOffPropertyId, payload);
+          if (!writeOffModal.property) return;
+          recordArrearsWriteOff(writeOffModal.property.id, payload);
           setCopyFeedbackToast(`Written off ${formatZAR(payload.amountZAR)} (${payload.reason})`);
+          writeOffModal.closeWriteOffModal();
         }}
-        writeOffLeaseId={writeOffLeaseId}
-        setWriteOffLeaseId={setWriteOffLeaseId}
-        writeOffDate={writeOffDate}
-        setWriteOffDate={setWriteOffDate}
-        writeOffAmount={writeOffAmount}
-        setWriteOffAmount={setWriteOffAmount}
-        writeOffReason={writeOffReason}
-        setWriteOffReason={setWriteOffReason}
-        writeOffNotes={writeOffNotes}
-        setWriteOffNotes={setWriteOffNotes}
-        writeOffAllocations={writeOffAllocations}
-        setWriteOffAllocations={setWriteOffAllocations}
       />
 
       {/* Floating Action / Clipboard Feedback Toast */}

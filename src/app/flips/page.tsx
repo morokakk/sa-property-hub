@@ -52,6 +52,16 @@ import { FlipProjectModal } from '@/components/flips/modals/FlipProjectModal';
 import { SupplierDirectoryModal } from '@/components/flips/modals/SupplierDirectoryModal';
 import { FlipFundingModal } from '@/components/flips/modals/FlipFundingModal';
 import {
+  useFlipSelection,
+  useFlipModalManager,
+  useFlipCalculations,
+  useFlipForm,
+  useBoqForm,
+  useFundingForm,
+  useBrrrrConvertForm,
+  useFlipExitForm,
+} from '@/hooks/flips';
+import {
   calculateFlipFinancials,
   calculateFundingCampaignSummary,
   calculateArchivedFlipFinancials,
@@ -77,458 +87,41 @@ export default function FlipsManagerPage() {
   const investorProfile = usePortfolioStore((state) => state.investorProfile);
   const aiSettings = usePortfolioStore((state) => state.aiSettings);
 
-  // Active vs. Sold Archive Tab
-  const [viewTab, setViewTab] = useState<'active' | 'archive'>('active');
-  const activeFlips = flips.filter((f) => f.status !== 'Completed');
-  const completedFlips = flips.filter((f) => f.status === 'Completed');
+  // Headless Flips Domain Hooks (Phase 4B)
+  const flipSelection = useFlipSelection(flips);
+  const {
+    viewTab,
+    setViewTab,
+    selectedFlipId,
+    setSelectedFlipId,
+    activeFlip,
+    activeFlips,
+    completedFlips,
+    copiedWhatsApp,
+    copyWhatsAppSummary,
+    shareViaWhatsAppUrl,
+  } = flipSelection;
 
-  // Selected Flip Project
-  const [selectedFlipId, setSelectedFlipId] = useState<string>(activeFlips[0]?.id || flips[0]?.id || '');
-  const activeFlip = activeFlips.find((f) => f.id === selectedFlipId) || activeFlips[0] || null;
+  const flipModals = useFlipModalManager();
+  const { financials: flipFinancialsCalc, fundingSummary: fundingSummaryCalc, milestoneTargets } = useFlipCalculations(activeFlip, funding);
 
-  // WhatsApp Copy Toast State
-  const [copiedWhatsApp, setCopiedWhatsApp] = useState(false);
+  const flipForm = useFlipForm(activeFlip);
+  const boqForm = useBoqForm();
+  const fundingForm = useFundingForm(activeFlip);
+  const brrrrConvertForm = useBrrrrConvertForm(
+    activeFlip?.targetExitPriceZAR || 0,
+    18000
+  );
+  const flipExitForm = useFlipExitForm(
+    activeFlip?.targetExitPriceZAR || 0,
+    flipFinancialsCalc?.totalCostBasisZAR || 0
+  );
+
   const [showHoldingBreakdown, setShowHoldingBreakdown] = useState(false);
-
-  // Modals
-  const [showAddBOQModal, setShowAddBOQModal] = useState(false);
-  const [showFlipModal, setShowFlipModal] = useState(false);
-  const [editingFlipId, setEditingFlipId] = useState<string | null>(null);
-  const [showSupplierModal, setShowSupplierModal] = useState(false);
-  const [showExitModal, setShowExitModal] = useState(false);
-  const [showFundingModal, setShowFundingModal] = useState(false);
-  const [showConvertModal, setShowConvertModal] = useState(false);
-  const [showDelayMatrixModal, setShowDelayMatrixModal] = useState(false);
-
-  // Convert Flip to Rental (BRRRR) Form State
-  const [convertGrossRent, setConvertGrossRent] = useState<number>(18000);
-  const [convertMarketValue, setConvertMarketValue] = useState<number>(0);
-  const [convertTenantName, setConvertTenantName] = useState('Tenant Pending Placement');
-  const [convertTenantPhone, setConvertTenantPhone] = useState('+27 —');
-  const [convertTenantEmail, setConvertTenantEmail] = useState('pending@tenant.co.za');
-  const [convertManagementType, setConvertManagementType] = useState<'Agency' | 'Self-Managed'>('Agency');
-  const [convertAgencyName, setConvertAgencyName] = useState('Pam Golding Rentals');
-  const [convertAgencyCommission, setConvertAgencyCommission] = useState<number>(8.0);
-  const [convertNotes, setConvertNotes] = useState('');
   const [convertedRentalId, setConvertedRentalId] = useState<string | null>(null);
 
-
-  // Funding Campaign Modal State
-  const [fundingRequired, setFundingRequired] = useState<number>(0);
-  const [capitalRaised, setCapitalRaised] = useState<number>(0);
-  const [primaryFunderName, setPrimaryFunderName] = useState('');
-  const [primaryFunderContact, setPrimaryFunderContact] = useState('');
-  const [primaryFunderType, setPrimaryFunderType] = useState<FlipProject['primaryFunderType']>('Private Lender');
-  const [coFundersNotes, setCoFundersNotes] = useState('');
-  const [promisedReturnType, setPromisedReturnType] = useState<FlipProject['promisedReturnType']>('Fixed Interest');
-  const [promisedReturnRatePercent, setPromisedReturnRatePercent] = useState<number>(14);
-  const [promisedPayoutSchedule, setPromisedPayoutSchedule] = useState<FlipProject['promisedPayoutSchedule']>('Monthly Interest');
-  const [securityOffered, setSecurityOffered] = useState('2nd Mortgage Bond registered over title deed');
-
-  // Exit Modal State
-  const [exitSalePrice, setExitSalePrice] = useState<number>(0);
-  const [exitNetProceeds, setExitNetProceeds] = useState<number>(0);
-  const [exitSoldDate, setExitSoldDate] = useState<string>(new Date().toISOString().split('T')[0]);
-  const [exitNotes, setExitNotes] = useState('');
-
-  // New BOQ Item Form State
-  const [boqCategory, setBoqCategory] = useState<BOQItem['category']>('Flooring & Tiling');
-  const [boqDescription, setBoqDescription] = useState('');
-  const [boqUnit, setBoqUnit] = useState('lump sum');
-  const [boqQuantity, setBoqQuantity] = useState(1);
-  const [boqBaselineUnitCost, setBoqBaselineUnitCost] = useState(25000);
-  const [boqActualCost, setBoqActualCost] = useState(0);
-  const [boqSupplier, setBoqSupplier] = useState('Builders Warehouse Sandton');
-  const [boqStatus, setBoqStatus] = useState<BOQItem['status']>('Quoted');
-  const [boqMilestonePhase, setBoqMilestonePhase] = useState<NonNullable<BOQItem['milestonePhase']>>('First Fix / Wet Works');
-  const [boqRetentionPercent, setBoqRetentionPercent] = useState<number>(0);
-  const [boqIsSponsored, setBoqIsSponsored] = useState(false);
-  const [boqCommercialRetailValue, setBoqCommercialRetailValue] = useState<number>(0);
-  const [boqActualCashOutflow, setBoqActualCashOutflow] = useState<number>(0);
-
-  // Flip Project Modal Form State (Unified Add & Edit)
-  const [flipTitle, setFlipTitle] = useState('');
-  const [flipAddress, setFlipAddress] = useState('');
-  const [flipCity, setFlipCity] = useState('Cape Town');
-  const [flipPurchasePrice, setFlipPurchasePrice] = useState(2500000);
-  const [flipAcquisitionCosts, setFlipAcquisitionCosts] = useState(185000);
-  const [flipRenovationBudget, setFlipRenovationBudget] = useState(450000);
-  const [flipEstimatedDuration, setFlipEstimatedDuration] = useState(6);
-  const [flipBondPayment, setFlipBondPayment] = useState(9500);
-  const [flipLevies, setFlipLevies] = useState(0);
-  const [flipRates, setFlipRates] = useState(3500);
-  const [flipOtherHoldingCost, setFlipOtherHoldingCost] = useState(2000);
-  const [flipTargetExit, setFlipTargetExit] = useState(3800000);
-  const [flipExitCommissionPercent, setFlipExitCommissionPercent] = useState<number>(5.75);
-  const [flipCompletionDate, setFlipCompletionDate] = useState(
-    new Date(Date.now() + 180 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
-  );
-  const [flipTaxEntityType, setFlipTaxEntityType] = useState<NonNullable<FlipProject['taxEntityType']>>(
-    investorProfile?.defaultTaxEntityType || 'Company (27%)'
-  );
-  const [flipSec118Arrears, setFlipSec118Arrears] = useState<number>(0);
-  const [flipAdvanceDeposit, setFlipAdvanceDeposit] = useState<number>(0);
-  const [flipRccStatus, setFlipRccStatus] = useState<NonNullable<FlipProject['municipalClearance']>['rccStatus']>('Pending Application');
-  const [flipRccAppDate, setFlipRccAppDate] = useState<string>('');
-  const [flipDisputeNotes, setFlipDisputeNotes] = useState<string>('');
-  const [flipPropertyType, setFlipPropertyType] = useState<PropertyTitleType>('Freehold House');
-  const [flipAgmDate, setFlipAgmDate] = useState<string>('');
-  const [flipMasterFolderUrl, setFlipMasterFolderUrl] = useState('');
-  const [flipOtpUrl, setFlipOtpUrl] = useState('');
-  const [flipRatesBillUrl, setFlipRatesBillUrl] = useState('');
-  const [flipTitleDeedUrl, setFlipTitleDeedUrl] = useState('');
-
-  // PDF Statement Extraction State for New Flip
-  const [isParsingPdf, setIsParsingPdf] = useState(false);
-  const [pdfParseNotice, setPdfParseNotice] = useState<string | null>(null);
-  const [extractedValuationZAR, setExtractedValuationZAR] = useState<number | null>(null);
-
-  const handleFlipPdfSelected = async (files: File[]) => {
-    if (!files || files.length === 0) return;
-    setIsParsingPdf(true);
-    setPdfParseNotice(null);
-
-    try {
-      let combinedRates = 0;
-      let combinedLevies = 0;
-      let combinedUtilities = 0;
-      let detectedTitle = '';
-      let detectedAddress = '';
-      let detectedCity = '';
-      let detectedPropType: PropertyTitleType | undefined = undefined;
-      let detectedValuation = 0;
-
-      for (const file of files) {
-        const parsed = await parseRentalPdfStatement(file, aiSettings);
-        if (!parsed.success) continue;
-
-        if (parsed.docType === 'municipal_utility' && parsed.utilityStatement) {
-          const u = parsed.utilityStatement;
-          if (u.propertyName && !detectedTitle) detectedTitle = u.propertyName;
-          if (u.propertyAddress && !detectedAddress) detectedAddress = u.propertyAddress;
-          if (u.propertyRatesZAR && u.propertyRatesZAR > 0) {
-            combinedRates = Math.max(combinedRates, u.propertyRatesZAR);
-          }
-          if (u.municipalValuationZAR && u.municipalValuationZAR > 0) {
-            detectedValuation = Math.max(detectedValuation, u.municipalValuationZAR);
-          }
-          const standingUtils = (u.electricityZAR || 0) + (u.waterZAR || 0);
-          if (standingUtils > 0) {
-            combinedUtilities += standingUtils;
-          }
-          const addr = (u.propertyAddress || '').toLowerCase();
-          const pName = (u.propertyName || '').toLowerCase();
-          const isScheme =
-            addr.includes('unit') ||
-            addr.includes('ss ') ||
-            addr.includes('flat') ||
-            addr.includes('apartment') ||
-            pName.includes('unit') ||
-            pName.includes('ss ');
-          if (!isScheme && (addr.includes('stand') || pName.includes('stand') || addr.length > 5)) {
-            detectedPropType = 'Freehold House';
-          }
-        } else if (parsed.docType === 'agent_payout' && parsed.agentUnit) {
-          const a = parsed.agentUnit;
-          if (a.propertyName && !detectedTitle) detectedTitle = a.propertyName;
-          if (a.propertyAddress && !detectedAddress) detectedAddress = a.propertyAddress;
-          if (a.leviesZAR && a.leviesZAR > 0) {
-            combinedLevies = Math.max(combinedLevies, a.leviesZAR);
-          }
-          if (a.municipalRatesZAR && a.municipalRatesZAR > 0) {
-            combinedRates = Math.max(combinedRates, a.municipalRatesZAR);
-          }
-          detectedPropType = 'Sectional Title Apartment';
-        }
-      }
-
-      if (detectedAddress) {
-        const parts = detectedAddress.split(',').map((p) => p.trim());
-        if (parts.length >= 3) {
-          detectedCity = parts[2] || parts[1];
-        } else if (parts.length === 2) {
-          detectedCity = parts[1];
-        }
-      }
-      if (!detectedCity && detectedAddress.toLowerCase().includes('johannesburg')) {
-        detectedCity = 'Johannesburg';
-      }
-
-      if (detectedTitle) setFlipTitle(detectedTitle);
-      if (detectedAddress) setFlipAddress(detectedAddress);
-      if (detectedCity) setFlipCity(detectedCity);
-      if (detectedPropType) setFlipPropertyType(detectedPropType);
-      if (combinedRates > 0) setFlipRates(Math.round(combinedRates));
-      if (combinedLevies > 0) setFlipLevies(Math.round(combinedLevies));
-      if (combinedUtilities > 0) setFlipOtherHoldingCost(Math.round(combinedUtilities));
-      if (detectedValuation > 0) setExtractedValuationZAR(detectedValuation);
-
-      const noticeParts = [];
-      if (detectedTitle) noticeParts.push(`"${detectedTitle}"`);
-      if (combinedRates > 0) noticeParts.push(`Rates: R${combinedRates.toLocaleString()}/m`);
-      if (combinedLevies > 0) noticeParts.push(`Levies: R${combinedLevies.toLocaleString()}/m`);
-      if (combinedUtilities > 0) noticeParts.push(`Standing Utilities: R${combinedUtilities.toLocaleString()}/m`);
-      if (detectedValuation > 0) noticeParts.push(`Municipal Valuation: R${detectedValuation.toLocaleString()}`);
-
-      setPdfParseNotice(`✓ Extracted from ${files.length} statement(s): ${noticeParts.join(' • ')}`);
-      setShowFlipModal(true);
-    } catch (err: any) {
-      console.error('Failed to parse statement for flip:', err);
-      setPdfParseNotice('Could not extract statement details. Please check the file.');
-      setShowFlipModal(true);
-    } finally {
-      setIsParsingPdf(false);
-    }
-  };
-
-  // New Supplier Form State
-  const [supName, setSupName] = useState('');
-  const [supCategory, setSupCategory] = useState<LocalSupplier['category']>('Hardware & Timber');
-  const [supBranch, setSupBranch] = useState('');
-  const [supPhone, setSupPhone] = useState('');
-  const [supDiscount, setSupDiscount] = useState('');
-  const [supHasCoc, setSupHasCoc] = useState(false);
-
-  // Handlers
-  const handleAddBOQ = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!activeFlip || !boqDescription) return;
-
-    const baselineTotal = boqQuantity * boqBaselineUnitCost;
-    const finalActual = boqIsSponsored && boqActualCashOutflow !== undefined ? boqActualCashOutflow : boqActualCost;
-    addBOQItem(activeFlip.id, {
-      category: boqCategory,
-      itemDescription: boqDescription,
-      unit: boqUnit,
-      quantity: boqQuantity,
-      baselineUnitCostZAR: boqBaselineUnitCost,
-      baselineTotalZAR: baselineTotal,
-      actualCostZAR: finalActual,
-      varianceZAR: finalActual - baselineTotal,
-      supplierOrContractor: boqSupplier,
-      status: boqStatus,
-      milestonePhase: boqMilestonePhase,
-      retentionPercent: boqRetentionPercent,
-      isSponsoredOrBarter: boqIsSponsored,
-      commercialRetailValueZAR: boqIsSponsored ? boqCommercialRetailValue : undefined,
-      actualCashOutflowZAR: boqIsSponsored ? boqActualCashOutflow : undefined,
-    });
-
-    setShowAddBOQModal(false);
-    setBoqDescription('');
-    setBoqActualCost(0);
-    setBoqMilestonePhase('First Fix / Wet Works');
-    setBoqRetentionPercent(0);
-    setBoqIsSponsored(false);
-    setBoqCommercialRetailValue(0);
-    setBoqActualCashOutflow(0);
-  };
-
-  const openAddFlipModal = () => {
-    setEditingFlipId(null);
-    setFlipTitle('');
-    setFlipAddress('');
-    setFlipCity('Cape Town');
-    setFlipPurchasePrice(2500000);
-    setFlipAcquisitionCosts(185000);
-    setFlipRenovationBudget(450000);
-    setFlipEstimatedDuration(6);
-    setFlipBondPayment(9500);
-    setFlipLevies(0);
-    setFlipRates(3500);
-    setFlipOtherHoldingCost(2000);
-    setFlipTargetExit(3800000);
-    setFlipExitCommissionPercent(5.75);
-    setFlipCompletionDate(new Date(Date.now() + 180 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]);
-    setFlipTaxEntityType(investorProfile?.defaultTaxEntityType || 'Company (27%)');
-    setFlipSec118Arrears(0);
-    setFlipAdvanceDeposit(0);
-    setFlipRccStatus('Pending Application');
-    setFlipRccAppDate(new Date().toISOString().split('T')[0]);
-    setFlipDisputeNotes('');
-    setFlipPropertyType('Freehold House');
-    setFlipAgmDate('');
-    setFlipMasterFolderUrl('');
-    setFlipOtpUrl('');
-    setFlipRatesBillUrl('');
-    setFlipTitleDeedUrl('');
-    setPdfParseNotice(null);
-    setExtractedValuationZAR(null);
-    setShowFlipModal(true);
-  };
-
-  const openEditFlipModal = () => {
-    if (!activeFlip) return;
-    setEditingFlipId(activeFlip.id);
-    setFlipTitle(activeFlip.title);
-    setFlipAddress(activeFlip.address);
-    setFlipCity(activeFlip.city);
-    setFlipPurchasePrice(activeFlip.purchasePriceZAR);
-    setFlipAcquisitionCosts(activeFlip.acquisitionCostsZAR);
-    setFlipRenovationBudget(activeFlip.baselineRenovationBudgetZAR);
-    setFlipEstimatedDuration(activeFlip.estimatedDurationMonths ?? 6);
-
-    const existingHolding = activeFlip.monthlyHoldingCostZAR ?? 15000;
-    const bond = activeFlip.monthlyBondPaymentZAR !== undefined ? activeFlip.monthlyBondPaymentZAR : Math.round(existingHolding * 0.6);
-    const levies = activeFlip.propertyType === 'Freehold House' ? 0 : (activeFlip.monthlyLeviesZAR !== undefined ? activeFlip.monthlyLeviesZAR : Math.round(existingHolding * 0.15));
-    const rates = activeFlip.monthlyRatesTaxesZAR !== undefined ? activeFlip.monthlyRatesTaxesZAR : Math.round(existingHolding * 0.15);
-    const other = activeFlip.monthlyOtherHoldingCostZAR !== undefined ? activeFlip.monthlyOtherHoldingCostZAR : Math.max(0, existingHolding - (bond + levies + rates));
-
-    setFlipBondPayment(bond);
-    setFlipLevies(levies);
-    setFlipRates(rates);
-    setFlipOtherHoldingCost(other);
-    setFlipTargetExit(activeFlip.targetExitPriceZAR);
-    setFlipExitCommissionPercent(activeFlip.exitCommissionPercent ?? 5.75);
-    setFlipCompletionDate(activeFlip.targetCompletionDate);
-    setFlipTaxEntityType(activeFlip.taxEntityType || investorProfile?.defaultTaxEntityType || 'Company (27%)');
-    setFlipSec118Arrears(activeFlip.municipalClearance?.sec118ArrearsZAR || 0);
-    setFlipAdvanceDeposit(activeFlip.municipalClearance?.advanceCouncilDepositZAR || 0);
-    setFlipRccStatus(activeFlip.municipalClearance?.rccStatus || 'Pending Application');
-    setFlipRccAppDate(activeFlip.municipalClearance?.rccApplicationDate || '');
-    setFlipDisputeNotes(activeFlip.municipalClearance?.disputeNotes || '');
-    setFlipPropertyType(activeFlip.propertyType || 'Freehold House');
-    setFlipAgmDate(activeFlip.agmDate || '');
-    setFlipMasterFolderUrl(activeFlip.driveVault?.masterFolderUrl || '');
-    setFlipOtpUrl(activeFlip.driveVault?.otpDocumentUrl || '');
-    setFlipRatesBillUrl(activeFlip.driveVault?.ratesBillUrl || '');
-    setFlipTitleDeedUrl(activeFlip.driveVault?.titleDeedUrl || '');
-    setPdfParseNotice(null);
-    setExtractedValuationZAR(null);
-    setShowFlipModal(true);
-  };
-
-  const handleSaveFlip = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!flipTitle) return;
-
-    const isScheme = flipPropertyType === 'Sectional Title Apartment' || flipPropertyType === 'Townhouse / Cluster';
-    const finalLevies = flipPropertyType === 'Freehold House' ? 0 : Number(flipLevies);
-    const totalMonthlyHolding = Number(flipBondPayment) + finalLevies + Number(flipRates) + Number(flipOtherHoldingCost);
-    const updatedDriveVault: CloudDriveVault = {
-      masterFolderUrl: flipMasterFolderUrl.trim() || undefined,
-      otpDocumentUrl: flipOtpUrl.trim() || undefined,
-      ratesBillUrl: flipRatesBillUrl.trim() || undefined,
-      titleDeedUrl: flipTitleDeedUrl.trim() || undefined,
-    };
-
-    const municipalClearanceData = {
-      sec118ArrearsZAR: Number(flipSec118Arrears) || 0,
-      advanceCouncilDepositZAR: Number(flipAdvanceDeposit) || 0,
-      rccStatus: flipRccStatus,
-      rccApplicationDate: flipRccAppDate.trim() || undefined,
-      disputeNotes: flipDisputeNotes.trim() || undefined,
-    };
-
-    if (editingFlipId) {
-      updateFlip(editingFlipId, {
-        title: flipTitle,
-        address: flipAddress,
-        city: flipCity,
-        propertyType: flipPropertyType,
-        agmDate: isScheme && flipAgmDate ? flipAgmDate : undefined,
-        purchasePriceZAR: Number(flipPurchasePrice),
-        acquisitionCostsZAR: Number(flipAcquisitionCosts),
-        baselineRenovationBudgetZAR: Number(flipRenovationBudget),
-        estimatedDurationMonths: Number(flipEstimatedDuration),
-        monthlyHoldingCostZAR: totalMonthlyHolding,
-        monthlyBondPaymentZAR: Number(flipBondPayment),
-        monthlyLeviesZAR: finalLevies,
-        monthlyRatesTaxesZAR: Number(flipRates),
-        monthlyOtherHoldingCostZAR: Number(flipOtherHoldingCost),
-        targetExitPriceZAR: Number(flipTargetExit),
-        exitCommissionPercent: Number(flipExitCommissionPercent),
-        targetCompletionDate: flipCompletionDate,
-        taxEntityType: flipTaxEntityType,
-        municipalClearance: municipalClearanceData,
-        driveVault: updatedDriveVault,
-      });
-    } else {
-      const createdFlip: FlipProject = {
-        id: `flip-${Date.now()}`,
-        title: flipTitle,
-        address: flipAddress || `${flipCity} Project`,
-        city: flipCity,
-        propertyType: flipPropertyType,
-        agmDate: isScheme && flipAgmDate ? flipAgmDate : undefined,
-        purchaseDate: new Date().toISOString().split('T')[0],
-        purchasePriceZAR: Number(flipPurchasePrice),
-        acquisitionCostsZAR: Number(flipAcquisitionCosts),
-        baselineRenovationBudgetZAR: Number(flipRenovationBudget),
-        estimatedDurationMonths: Number(flipEstimatedDuration),
-        monthlyHoldingCostZAR: totalMonthlyHolding,
-        monthlyBondPaymentZAR: Number(flipBondPayment),
-        monthlyLeviesZAR: finalLevies,
-        monthlyRatesTaxesZAR: Number(flipRates),
-        monthlyOtherHoldingCostZAR: Number(flipOtherHoldingCost),
-        municipalValuationZAR: extractedValuationZAR || undefined,
-        targetExitPriceZAR: Number(flipTargetExit),
-        exitCommissionPercent: Number(flipExitCommissionPercent),
-        targetCompletionDate: flipCompletionDate,
-        taxEntityType: flipTaxEntityType,
-        municipalClearance: municipalClearanceData,
-        drawSchedule: {
-          depositPaid: false,
-          firstFixApproved: false,
-          finishesApproved: false,
-          retentionReleased: false,
-        },
-        currentPhase: 'Acquisition & Conveyancing',
-        linkedFundingIds: [],
-        fundingRequiredZAR: Math.round((Number(flipPurchasePrice) + Number(flipAcquisitionCosts) + Number(flipRenovationBudget)) * 0.7),
-        capitalRaisedZAR: 0,
-        promisedReturnType: 'Fixed Interest',
-        promisedReturnRatePercent: 14.0,
-        promisedPayoutSchedule: 'Monthly Interest',
-        securityOffered: '2nd Mortgage Bond registered over title deed',
-        status: 'Active',
-        driveVault: updatedDriveVault,
-        boq: [],
-      };
-
-      addFlip(createdFlip);
-      setSelectedFlipId(createdFlip.id);
-    }
-
-    setShowFlipModal(false);
-    setEditingFlipId(null);
-    setPdfParseNotice(null);
-    setExtractedValuationZAR(null);
-  };
-
-  const handleAddSupplier = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!supName) return;
-
-    const newSup: LocalSupplier = {
-      id: `sup-${Date.now()}`,
-      name: supName,
-      category: supCategory,
-      branchLocation: supBranch,
-      phone: supPhone,
-      discountTerms: supDiscount,
-      hasCoC: supHasCoc,
-      rating: 5,
-    };
-
-    addSupplier(newSup);
-    setShowSupplierModal(false);
-    setSupName('');
-    setSupBranch('');
-    setSupPhone('');
-    setSupDiscount('');
-  };
-
-  const handleCompleteFlip = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!activeFlip || exitSalePrice <= 0) return;
-    markFlipAsCompleted(activeFlip.id, exitSalePrice, exitNetProceeds, exitSoldDate, exitNotes);
-    setShowExitModal(false);
-    setViewTab('archive');
-  };
-
-  // Calculations for active flip (delegated to pure calculations engine)
-  const flipFinancials = calculateFlipFinancials(activeFlip);
+  // Calculations for active flip (delegated to pure calculations engine via useFlipCalculations)
+  const flipFinancials = flipFinancialsCalc ?? calculateFlipFinancials(null);
   const {
     totalBOQBaselineZAR: totalBOQBaseline,
     totalBOQActualZAR: totalBOQActual,
@@ -560,7 +153,6 @@ export default function FlipsManagerPage() {
     totalRetailBOQZAR: totalRetailBOQ,
     totalActualCashBOQZAR: totalActualCashBOQ,
     milestoneDraws,
-    milestoneTargets,
     totalRetentionHeldZAR,
   } = flipFinancials;
   const activeFlipBoq = activeFlip?.boq || [];
@@ -572,49 +164,8 @@ export default function FlipsManagerPage() {
     retentionReleased: false,
   };
 
-  const openConvertModal = () => {
-    if (!activeFlip) return;
-    const defaultValuation = activeFlip.targetExitPriceZAR || totalAllInCost;
-    const estimatedRent = Math.round((defaultValuation * 0.008) / 500) * 500 || 18000;
-    setConvertMarketValue(defaultValuation);
-    setConvertGrossRent(estimatedRent);
-    setConvertTenantName('Tenant Pending Placement');
-    setConvertTenantPhone('+27 —');
-    setConvertTenantEmail('pending@tenant.co.za');
-    setConvertManagementType('Agency');
-    setConvertAgencyName('Pam Golding Rentals');
-    setConvertAgencyCommission(8.0);
-    setConvertNotes(`Converted from Flip "${activeFlip.title}" via BRRRR timeline`);
-    setShowConvertModal(true);
-  };
-
-  const handleConvertFlip = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!activeFlip) return;
-    const created = convertFlipToRental({
-      flipId: activeFlip.id,
-      initialGrossRentZAR: Number(convertGrossRent),
-      marketValuationZAR: Number(convertMarketValue),
-      tenantName: convertTenantName.trim() || undefined,
-      tenantPhone: convertTenantPhone.trim() || undefined,
-      tenantEmail: convertTenantEmail.trim() || undefined,
-      managementType: convertManagementType,
-      agencyName: convertManagementType === 'Agency' ? convertAgencyName.trim() : undefined,
-      agencyCommissionPercent: convertManagementType === 'Agency' ? Number(convertAgencyCommission) : 0,
-      notes: convertNotes.trim() || undefined,
-    });
-    setShowConvertModal(false);
-    setConvertedRentalId(created.id);
-    setViewTab('archive');
-  };
-
-  // Linked Funding for this flip
-  const linkedFunding = funding.filter(
-    (f) => f.linkedDealId === activeFlip?.id || (activeFlip?.linkedFundingIds || []).includes(f.id)
-  );
-
-  // Funding Campaign Calculations (delegated to pure calculations engine)
-  const fundingSummary = calculateFundingCampaignSummary(activeFlip, linkedFunding, totalCostBasis);
+  // Funding Campaign Calculations (delegated via useFlipCalculations)
+  const fundingSummary = fundingSummaryCalc ?? calculateFundingCampaignSummary(null, [], 0);
   const {
     fundingRequiredZAR: fundingRequiredVal,
     capitalRaisedZAR: capitalRaisedVal,
@@ -622,41 +173,6 @@ export default function FlipsManagerPage() {
     fundingProgressPercent,
     totalCapitalSecuredZAR: totalCapitalSecured,
   } = fundingSummary;
-
-  const openFundingModal = () => {
-    if (!activeFlip) return;
-    const defaultRequired = fundingSummary.fundingRequiredZAR;
-    const defaultRaised = fundingSummary.capitalRaisedZAR;
-    setFundingRequired(defaultRequired);
-    setCapitalRaised(defaultRaised);
-    setPrimaryFunderName(activeFlip.primaryFunderName || '');
-    setPrimaryFunderContact(activeFlip.primaryFunderContact || '');
-    setPrimaryFunderType(activeFlip.primaryFunderType || 'Private Lender');
-    setCoFundersNotes(activeFlip.coFundersNotes || '');
-    setPromisedReturnType(activeFlip.promisedReturnType || 'Fixed Interest');
-    setPromisedReturnRatePercent(activeFlip.promisedReturnRatePercent ?? 14);
-    setPromisedPayoutSchedule(activeFlip.promisedPayoutSchedule || 'Monthly Interest');
-    setSecurityOffered(activeFlip.securityOffered || '2nd Mortgage Bond registered over title deed');
-    setShowFundingModal(true);
-  };
-
-  const handleSaveFunding = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!activeFlip) return;
-    updateFlip(activeFlip.id, {
-      fundingRequiredZAR: Number(fundingRequired),
-      capitalRaisedZAR: Number(capitalRaised),
-      primaryFunderName: primaryFunderName.trim() || undefined,
-      primaryFunderContact: primaryFunderContact.trim() || undefined,
-      primaryFunderType,
-      coFundersNotes: coFundersNotes.trim() || undefined,
-      promisedReturnType,
-      promisedReturnRatePercent: Number(promisedReturnRatePercent),
-      promisedPayoutSchedule,
-      securityOffered: securityOffered.trim() || undefined,
-    });
-    setShowFundingModal(false);
-  };
 
   const handleSyncLedgerToDeal = () => {
     if (!activeFlip) return;
@@ -672,16 +188,19 @@ export default function FlipsManagerPage() {
         subtitle="Dynamic budget tracker, Bill of Quantities (BOQ), and local South African trade suppliers"
         actionButton={
           <div className="flex flex-wrap items-center gap-2">
-            <ImportDropdown type="flips" onPdfSelected={handleFlipPdfSelected} />
+            <ImportDropdown type="flips" onPdfSelected={() => flipModals.openModal("addFlip")} />
             <button
-              onClick={() => setShowSupplierModal(true)}
+              onClick={() => flipModals.openModal("supplier")}
               className="inline-flex items-center gap-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-semibold px-3 py-2 rounded-lg border border-slate-300 transition-colors shrink-0 whitespace-nowrap cursor-pointer"
             >
               <Store className="w-3.5 h-3.5" />
               Supplier Directory ({suppliers.length})
             </button>
             <button
-              onClick={openAddFlipModal}
+              onClick={() => {
+                flipForm.resetForm(null);
+                flipModals.openModal("addFlip");
+              }}
               className="inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold px-3 py-2 rounded-lg shadow-sm transition-colors shrink-0 whitespace-nowrap cursor-pointer"
             >
               <PlusCircle className="w-3.5 h-3.5" />
@@ -750,12 +269,7 @@ export default function FlipsManagerPage() {
               {activeFlip && (
                 <div className="flex items-center gap-2 shrink-0">
                   <button
-                    onClick={() => {
-                      const text = formatFlipForWhatsApp(activeFlip, investorProfile);
-                      navigator.clipboard.writeText(text);
-                      setCopiedWhatsApp(true);
-                      setTimeout(() => setCopiedWhatsApp(false), 2500);
-                    }}
+                    onClick={copyWhatsAppSummary}
                     className="px-2.5 py-1.5 text-xs font-semibold bg-emerald-50 text-emerald-800 hover:bg-emerald-100 border border-emerald-300 rounded-lg transition-colors flex items-center gap-1 shadow-2xs cursor-pointer"
                     title="Copy WhatsApp syndicate update to clipboard"
                   >
@@ -768,7 +282,7 @@ export default function FlipsManagerPage() {
                   </button>
 
                   <a
-                    href={`https://wa.me/?text=${encodeURIComponent(formatFlipForWhatsApp(activeFlip, investorProfile))}`}
+                    href={shareViaWhatsAppUrl}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="p-1.5 text-emerald-700 hover:bg-emerald-100 bg-emerald-50 rounded-lg border border-emerald-300 transition-colors"
@@ -824,7 +338,10 @@ export default function FlipsManagerPage() {
 
                     <button
                       type="button"
-                      onClick={openEditFlipModal}
+                      onClick={() => {
+                        if (activeFlip) flipForm.resetForm(activeFlip);
+                        flipModals.openModal("editFlip");
+                      }}
                       className="inline-flex items-center gap-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs px-3 py-2 rounded-lg border border-slate-300 shadow-2xs transition-all cursor-pointer"
                       title="Edit project duration, holding costs, budget & exit targets"
                     >
@@ -835,12 +352,8 @@ export default function FlipsManagerPage() {
                     <button
                       type="button"
                       onClick={() => {
-                        const defaultSale = activeFlip.targetExitPriceZAR || 0;
-                        setExitSalePrice(defaultSale);
-                        setExitNetProceeds(Math.max(0, defaultSale - totalAllInCost));
-                        setExitSoldDate(new Date().toISOString().split('T')[0]);
-                        setExitNotes('');
-                        setShowExitModal(true);
+                        flipExitForm.resetForm(activeFlip?.targetExitPriceZAR || 0, flipFinancialsCalc?.totalCostBasisZAR || 0);
+                        flipModals.openModal('exit');
                       }}
                       className="inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-3.5 py-2 rounded-lg shadow-sm transition-all cursor-pointer"
                       title="Record realized sale price and move to sold archive"
@@ -851,7 +364,10 @@ export default function FlipsManagerPage() {
 
                     <button
                       type="button"
-                      onClick={openConvertModal}
+                      onClick={() => {
+                        brrrrConvertForm.resetForm(activeFlip?.targetExitPriceZAR || totalAllInCost || 0, 18000);
+                        flipModals.openModal("convert");
+                      }}
                       className="inline-flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs px-3.5 py-2 rounded-lg shadow-sm transition-all cursor-pointer"
                       title="Convert this flip project to a long-term rental property under BRRRR strategy"
                     >
@@ -933,7 +449,7 @@ export default function FlipsManagerPage() {
 
                       <button
                         type="button"
-                        onClick={() => setShowDelayMatrixModal(true)}
+                        onClick={() => flipModals.openModal("delayMatrix")}
                         className="w-full py-1.5 px-2 bg-amber-100/90 hover:bg-amber-200/90 text-amber-950 font-bold text-[10px] rounded-lg border border-amber-300 transition-colors flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs"
                         title="Simulate Council / Transfer Delay Matrix (+30, +60, +90, +120 Days)"
                       >
@@ -1116,7 +632,10 @@ export default function FlipsManagerPage() {
                         <span>Sync from Ledger</span>
                       </button>
                       <button
-                        onClick={openFundingModal}
+                        onClick={() => {
+                          fundingForm.resetForm(activeFlip);
+                          flipModals.openModal("funding");
+                        }}
                         className="px-3 py-1.5 text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg shadow-sm transition-colors cursor-pointer"
                       >
                         Edit Funding Terms
@@ -1342,7 +861,7 @@ export default function FlipsManagerPage() {
                       </div>
                       <button
                         type="button"
-                        onClick={() => setShowDelayMatrixModal(true)}
+                        onClick={() => flipModals.openModal("delayMatrix")}
                         className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-rose-700 hover:bg-rose-800 text-white rounded-lg font-bold text-xs shrink-0 shadow-2xs cursor-pointer"
                       >
                         <Clock className="w-3.5 h-3.5" />
@@ -1359,7 +878,7 @@ export default function FlipsManagerPage() {
                       </div>
                       <button
                         type="button"
-                        onClick={() => setShowDelayMatrixModal(true)}
+                        onClick={() => flipModals.openModal("delayMatrix")}
                         className="text-amber-900 hover:text-amber-950 font-bold underline cursor-pointer shrink-0 text-[10px]"
                       >
                         Check Delay Exposure →
@@ -1602,7 +1121,10 @@ export default function FlipsManagerPage() {
                         </button>
                       )}
                       <button
-                        onClick={() => setShowAddBOQModal(true)}
+                        onClick={() => {
+                          boqForm.resetForm();
+                          flipModals.openModal("addBOQ");
+                        }}
                         className="inline-flex items-center gap-1 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold px-3 py-2 rounded-lg transition-colors cursor-pointer"
                       >
                         <PlusCircle className="w-3.5 h-3.5" />
@@ -1984,113 +1506,108 @@ export default function FlipsManagerPage() {
 
       {/* Extracted Flips Modals */}
       <FlipExitModal
-        isOpen={showExitModal && Boolean(activeFlip)}
+        isOpen={flipModals.isOpen('exit') && Boolean(activeFlip)}
         flip={activeFlip}
         totalCostBasisZAR={totalCostBasis}
-        onClose={() => setShowExitModal(false)}
+        onClose={flipModals.closeModal}
+        exitSalePrice={flipExitForm.salePrice}
+        setExitSalePrice={flipExitForm.setSalePrice}
+        exitNetProceeds={flipExitForm.netProceeds}
+        setExitNetProceeds={flipExitForm.setNetProceeds}
+        exitSoldDate={flipExitForm.soldDate}
+        setExitSoldDate={flipExitForm.setSoldDate}
+        exitNotes={flipExitForm.exitNotes}
+        setExitNotes={flipExitForm.setExitNotes}
         onFlipCompleted={({ actualSalePriceZAR, soldDate, exitNotes }) => {
           if (!activeFlip) return;
           const netProceeds = Math.max(0, actualSalePriceZAR - totalCostBasis);
           markFlipAsCompleted(activeFlip.id, actualSalePriceZAR, netProceeds, soldDate, exitNotes);
-          setShowExitModal(false);
+          flipModals.closeModal();
+          setViewTab('archive');
         }}
-        exitSalePrice={exitSalePrice}
-        setExitSalePrice={setExitSalePrice}
-        exitNetProceeds={exitNetProceeds}
-        setExitNetProceeds={setExitNetProceeds}
-        exitSoldDate={exitSoldDate}
-        setExitSoldDate={setExitSoldDate}
-        exitNotes={exitNotes}
-        setExitNotes={setExitNotes}
-        onSubmit={handleCompleteFlip}
       />
 
       <FlipToRentalModal
-        isOpen={showConvertModal && Boolean(activeFlip)}
+        isOpen={flipModals.isOpen('convert') && Boolean(activeFlip)}
         flip={activeFlip}
         totalAllInCostZAR={totalAllInCost}
         totalBOQActual={totalBOQActual}
         totalHoldingCost={totalHoldingCost}
         flipHoldingMonths={flipHoldingMonths}
-        onClose={() => setShowConvertModal(false)}
+        convertMarketValue={brrrrConvertForm.marketValuation}
+        setConvertMarketValue={brrrrConvertForm.setMarketValuation}
+        convertGrossRent={brrrrConvertForm.grossRent}
+        setConvertGrossRent={brrrrConvertForm.setGrossRent}
+        convertTenantName={brrrrConvertForm.tenantName}
+        setConvertTenantName={brrrrConvertForm.setTenantName}
+        convertTenantPhone={brrrrConvertForm.tenantPhone}
+        setConvertTenantPhone={brrrrConvertForm.setTenantPhone}
+        convertTenantEmail={brrrrConvertForm.tenantEmail}
+        setConvertTenantEmail={brrrrConvertForm.setTenantEmail}
+        convertManagementType={brrrrConvertForm.managementType}
+        setConvertManagementType={brrrrConvertForm.setManagementType}
+        convertAgencyName={brrrrConvertForm.agencyName}
+        setConvertAgencyName={brrrrConvertForm.setAgencyName}
+        convertAgencyCommission={brrrrConvertForm.agencyCommission}
+        setConvertAgencyCommission={brrrrConvertForm.setAgencyCommission}
+        convertNotes={brrrrConvertForm.notes}
+        setConvertNotes={brrrrConvertForm.setNotes}
+        onClose={flipModals.closeModal}
         onConverted={({ marketValuationZAR, monthlyGrossRentZAR, tenantName }) => {
           if (!activeFlip) return;
-          convertFlipToRental({
+          const created = convertFlipToRental({
             flipId: activeFlip.id,
             marketValuationZAR,
             initialGrossRentZAR: monthlyGrossRentZAR,
             tenantName,
           });
-          setShowConvertModal(false);
+          flipModals.closeModal();
+          setConvertedRentalId(created.id);
+          setViewTab('archive');
         }}
-        convertMarketValue={convertMarketValue}
-        setConvertMarketValue={setConvertMarketValue}
-        convertGrossRent={convertGrossRent}
-        setConvertGrossRent={setConvertGrossRent}
-        convertTenantName={convertTenantName}
-        setConvertTenantName={setConvertTenantName}
-        convertTenantPhone={convertTenantPhone}
-        setConvertTenantPhone={setConvertTenantPhone}
-        convertTenantEmail={convertTenantEmail}
-        setConvertTenantEmail={setConvertTenantEmail}
-        convertManagementType={convertManagementType}
-        setConvertManagementType={setConvertManagementType}
-        convertAgencyName={convertAgencyName}
-        setConvertAgencyName={setConvertAgencyName}
-        convertAgencyCommission={convertAgencyCommission}
-        setConvertAgencyCommission={setConvertAgencyCommission}
-        convertNotes={convertNotes}
-        setConvertNotes={setConvertNotes}
-        onSubmit={handleConvertFlip}
       />
 
       <AddBOQItemModal
-        isOpen={showAddBOQModal && Boolean(activeFlip)}
+        isOpen={flipModals.isOpen('addBOQ') && Boolean(activeFlip)}
         flipId={activeFlip?.id}
-        onClose={() => setShowAddBOQModal(false)}
+        onClose={flipModals.closeModal}
+        boqCategory={boqForm.category}
+        setBoqCategory={boqForm.setCategory}
+        boqStatus={boqForm.status}
+        setBoqStatus={boqForm.setStatus}
+        boqDescription={boqForm.description}
+        setBoqDescription={boqForm.setDescription}
+        boqUnit={boqForm.unit}
+        setBoqUnit={boqForm.setUnit}
+        boqQuantity={boqForm.quantity}
+        setBoqQuantity={boqForm.setQuantity}
+        boqBaselineUnitCost={boqForm.baselineUnitCost}
+        setBoqBaselineUnitCost={boqForm.setBaselineUnitCost}
+        boqMilestonePhase={boqForm.milestonePhase}
+        setBoqMilestonePhase={boqForm.setMilestonePhase}
+        boqRetentionPercent={boqForm.retentionPercent}
+        setBoqRetentionPercent={boqForm.setRetentionPercent}
+        boqIsSponsored={boqForm.isSponsored}
+        setBoqIsSponsored={boqForm.setIsSponsored}
+        boqCommercialRetailValue={boqForm.commercialRetailValue}
+        setBoqCommercialRetailValue={boqForm.setCommercialRetailValue}
+        boqActualCashOutflow={boqForm.actualCashOutflow}
+        setBoqActualCashOutflow={boqForm.setActualCashOutflow}
+        boqActualCost={boqForm.actualCost}
+        setBoqActualCost={boqForm.setActualCost}
+        boqSupplier={boqForm.supplier}
+        setBoqSupplier={boqForm.setSupplier}
         onAdd={(item) => {
           if (activeFlip) addBOQItem(activeFlip.id, item);
-          setShowAddBOQModal(false);
+          boqForm.resetForm();
+          flipModals.closeModal();
         }}
-        boqCategory={boqCategory}
-        setBoqCategory={setBoqCategory}
-        boqStatus={boqStatus}
-        setBoqStatus={setBoqStatus}
-        boqDescription={boqDescription}
-        setBoqDescription={setBoqDescription}
-        boqUnit={boqUnit}
-        setBoqUnit={setBoqUnit}
-        boqQuantity={boqQuantity}
-        setBoqQuantity={setBoqQuantity}
-        boqBaselineUnitCost={boqBaselineUnitCost}
-        setBoqBaselineUnitCost={setBoqBaselineUnitCost}
-        boqMilestonePhase={boqMilestonePhase}
-        setBoqMilestonePhase={setBoqMilestonePhase}
-        boqRetentionPercent={boqRetentionPercent}
-        setBoqRetentionPercent={setBoqRetentionPercent}
-        boqIsSponsored={boqIsSponsored}
-        setBoqIsSponsored={setBoqIsSponsored}
-        boqCommercialRetailValue={boqCommercialRetailValue}
-        setBoqCommercialRetailValue={setBoqCommercialRetailValue}
-        boqActualCashOutflow={boqActualCashOutflow}
-        setBoqActualCashOutflow={setBoqActualCashOutflow}
-        boqActualCost={boqActualCost}
-        setBoqActualCost={setBoqActualCost}
-        boqSupplier={boqSupplier}
-        setBoqSupplier={setBoqSupplier}
-        suppliers={suppliers}
-        onSubmit={handleAddBOQ}
       />
 
       <FlipProjectModal
-        isOpen={showFlipModal}
-        editingFlip={editingFlipId ? (flips.find((f) => f.id === editingFlipId) || activeFlip) : null}
-        onClose={() => {
-          setShowFlipModal(false);
-          setEditingFlipId(null);
-          setPdfParseNotice(null);
-          setExtractedValuationZAR(null);
-        }}
+        isOpen={flipModals.isOpen('addFlip') || flipModals.isOpen('editFlip')}
+        editingFlip={flipModals.isOpen('editFlip') ? activeFlip : null}
+        onClose={flipModals.closeModal}
         onSave={(payload, isNew) => {
           if (isNew) {
             const createdFlip: FlipProject = {
@@ -2124,144 +1641,63 @@ export default function FlipsManagerPage() {
             };
             addFlip(createdFlip);
             setSelectedFlipId(createdFlip.id);
-          } else if (editingFlipId) {
-            updateFlip(editingFlipId, payload);
+          } else if (activeFlip) {
+            updateFlip(activeFlip.id, payload);
           }
-          setShowFlipModal(false);
-          setEditingFlipId(null);
+          flipModals.closeModal();
         }}
-        editingFlipId={editingFlipId}
-        setEditingFlipId={setEditingFlipId}
-        flipTitle={flipTitle}
-        setFlipTitle={setFlipTitle}
-        flipAddress={flipAddress}
-        setFlipAddress={setFlipAddress}
-        flipCity={flipCity}
-        setFlipCity={setFlipCity}
-        flipPropertyType={flipPropertyType}
-        setFlipPropertyType={setFlipPropertyType}
-        flipAgmDate={flipAgmDate}
-        setFlipAgmDate={setFlipAgmDate}
-        flipPurchasePrice={flipPurchasePrice}
-        setFlipPurchasePrice={setFlipPurchasePrice}
-        flipAcquisitionCosts={flipAcquisitionCosts}
-        setFlipAcquisitionCosts={setFlipAcquisitionCosts}
-        flipRenovationBudget={flipRenovationBudget}
-        setFlipRenovationBudget={setFlipRenovationBudget}
-        flipEstimatedDuration={flipEstimatedDuration}
-        setFlipEstimatedDuration={setFlipEstimatedDuration}
-        flipBondPayment={flipBondPayment}
-        setFlipBondPayment={setFlipBondPayment}
-        flipLevies={flipLevies}
-        setFlipLevies={setFlipLevies}
-        flipRates={flipRates}
-        setFlipRates={setFlipRates}
-        flipOtherHoldingCost={flipOtherHoldingCost}
-        setFlipOtherHoldingCost={setFlipOtherHoldingCost}
-        flipTargetExit={flipTargetExit}
-        setFlipTargetExit={setFlipTargetExit}
-        flipExitCommissionPercent={flipExitCommissionPercent}
-        setFlipExitCommissionPercent={setFlipExitCommissionPercent}
-        flipCompletionDate={flipCompletionDate}
-        setFlipCompletionDate={setFlipCompletionDate}
-        flipTaxEntityType={flipTaxEntityType}
-        setFlipTaxEntityType={setFlipTaxEntityType}
-        flipSec118Arrears={flipSec118Arrears}
-        setFlipSec118Arrears={setFlipSec118Arrears}
-        flipAdvanceDeposit={flipAdvanceDeposit}
-        setFlipAdvanceDeposit={setFlipAdvanceDeposit}
-        flipRccStatus={flipRccStatus}
-        setFlipRccStatus={setFlipRccStatus}
-        flipRccAppDate={flipRccAppDate}
-        setFlipRccAppDate={setFlipRccAppDate}
-        flipDisputeNotes={flipDisputeNotes}
-        setFlipDisputeNotes={setFlipDisputeNotes}
-        flipMasterFolderUrl={flipMasterFolderUrl}
-        setFlipMasterFolderUrl={setFlipMasterFolderUrl}
-        flipOtpUrl={flipOtpUrl}
-        setFlipOtpUrl={setFlipOtpUrl}
-        flipRatesBillUrl={flipRatesBillUrl}
-        setFlipRatesBillUrl={setFlipRatesBillUrl}
-        flipTitleDeedUrl={flipTitleDeedUrl}
-        setFlipTitleDeedUrl={setFlipTitleDeedUrl}
-        pdfParseNotice={pdfParseNotice}
-        setPdfParseNotice={setPdfParseNotice}
-        extractedValuationZAR={extractedValuationZAR}
-        setExtractedValuationZAR={setExtractedValuationZAR}
-        isParsingPdf={isParsingPdf}
-        onPdfSelected={handleFlipPdfSelected}
-        onSubmit={handleSaveFlip}
       />
 
       <SupplierDirectoryModal
-        isOpen={showSupplierModal}
-        onClose={() => setShowSupplierModal(false)}
-        onAddSupplier={(newSup) => {
-          addSupplier(newSup);
-          setShowSupplierModal(false);
-        }}
-        suppliers={suppliers}
-        onDeleteSupplier={deleteSupplier}
-        supName={supName}
-        setSupName={setSupName}
-        supCategory={supCategory}
-        setSupCategory={setSupCategory}
-        supBranch={supBranch}
-        setSupBranch={setSupBranch}
-        supPhone={supPhone}
-        setSupPhone={setSupPhone}
-        supDiscount={supDiscount}
-        setSupDiscount={setSupDiscount}
-        supHasCoc={supHasCoc}
-        setSupHasCoc={setSupHasCoc}
-        onSubmit={handleAddSupplier}
+        isOpen={flipModals.isOpen('supplier')}
+        onClose={flipModals.closeModal}
       />
+
       <FlipFundingModal
-        isOpen={showFundingModal && Boolean(activeFlip)}
+        isOpen={flipModals.isOpen('funding') && Boolean(activeFlip)}
         flip={activeFlip}
         totalCostBasisZAR={totalCostBasis}
         totalCapitalSecuredZAR={totalCapitalSecured}
-        onClose={() => setShowFundingModal(false)}
+        onClose={flipModals.closeModal}
+        fundingRequired={fundingForm.fundingRequired}
+        setFundingRequired={fundingForm.setFundingRequired}
+        capitalRaised={fundingForm.capitalRaised}
+        setCapitalRaised={fundingForm.setCapitalRaised}
+        primaryFunderName={fundingForm.primaryFunderName}
+        setPrimaryFunderName={fundingForm.setPrimaryFunderName}
+        primaryFunderContact={fundingForm.primaryFunderContact}
+        setPrimaryFunderContact={fundingForm.setPrimaryFunderContact}
+        primaryFunderType={fundingForm.primaryFunderType}
+        setPrimaryFunderType={fundingForm.setPrimaryFunderType}
+        coFundersNotes={fundingForm.coFundersNotes}
+        setCoFundersNotes={fundingForm.setCoFundersNotes}
+        promisedReturnType={fundingForm.promisedReturnType}
+        setPromisedReturnType={fundingForm.setPromisedReturnType}
+        promisedReturnRatePercent={fundingForm.promisedReturnRatePercent}
+        setPromisedReturnRatePercent={fundingForm.setPromisedReturnRatePercent}
+        promisedPayoutSchedule={fundingForm.promisedPayoutSchedule}
+        setPromisedPayoutSchedule={fundingForm.setPromisedPayoutSchedule}
+        securityOffered={fundingForm.securityOffered}
+        setSecurityOffered={fundingForm.setSecurityOffered}
         onSave={(campaign) => {
           if (activeFlip) {
             updateFlip(activeFlip.id, campaign);
           }
-          setShowFundingModal(false);
+          flipModals.closeModal();
         }}
-        fundingRequired={fundingRequired}
-        setFundingRequired={setFundingRequired}
-        capitalRaised={capitalRaised}
-        setCapitalRaised={setCapitalRaised}
-        primaryFunderName={primaryFunderName}
-        setPrimaryFunderName={setPrimaryFunderName}
-        primaryFunderContact={primaryFunderContact}
-        setPrimaryFunderContact={setPrimaryFunderContact}
-        primaryFunderType={primaryFunderType}
-        setPrimaryFunderType={setPrimaryFunderType}
-        coFundersNotes={coFundersNotes}
-        setCoFundersNotes={setCoFundersNotes}
-        promisedReturnType={promisedReturnType}
-        setPromisedReturnType={setPromisedReturnType}
-        promisedReturnRatePercent={promisedReturnRatePercent}
-        setPromisedReturnRatePercent={setPromisedReturnRatePercent}
-        promisedPayoutSchedule={promisedPayoutSchedule}
-        setPromisedPayoutSchedule={setPromisedPayoutSchedule}
-        securityOffered={securityOffered}
-        setSecurityOffered={setSecurityOffered}
-        onSubmit={handleSaveFunding}
       />
 
       {/* Delay Sensitivity Matrix Modal (Requirement 2) */}
-      {activeFlip && showDelayMatrixModal && (
+      {activeFlip && flipModals.isOpen('delayMatrix') && (
         <DelayMatrixModal
           key={activeFlip.id}
-          isOpen={showDelayMatrixModal}
-          onClose={() => setShowDelayMatrixModal(false)}
+          isOpen={flipModals.isOpen('delayMatrix')}
+          onClose={flipModals.closeModal}
           flip={activeFlip}
           totalCostBasisZAR={totalCostBasis}
         />
       )}
 
-    </div>
+      </div>
   );
 }
