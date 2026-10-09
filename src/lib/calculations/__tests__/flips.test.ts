@@ -4,6 +4,7 @@ import {
   calculateFundingCampaignSummary,
   calculateArchivedFlipFinancials,
   calculateMilestonePhaseTargets,
+  calculateRingFencedWorkingCapital,
 } from '../flips';
 import { FlipProject, BOQItem, FundingSource } from '@/types';
 
@@ -415,6 +416,101 @@ describe('Flips Pure Calculations Engine', () => {
       const summary = calculateFundingCampaignSummary(sampleFlip, undefined as any, 2_000_000);
       expect(summary.totalCapitalSecuredZAR).toBe(0);
       expect(summary.fundingRequiredZAR).toBeGreaterThan(0);
+    });
+  });
+
+  describe('calculateRingFencedWorkingCapital', () => {
+    it('aggregates advance council deposits, retentions on completed/in-progress items, and pending draws on in-progress items', () => {
+      const flip1: FlipProject = {
+        ...sampleFlip,
+        municipalClearance: {
+          advanceCouncilDepositZAR: 30_000,
+          sec118ArrearsZAR: 20_000,
+          rccStatus: 'Certificate Issued',
+        },
+        drawSchedule: {
+          depositPaid: true,
+          firstFixApproved: true,
+          finishesApproved: true,
+          retentionReleased: false,
+        },
+        boq: [
+          {
+            id: 'b-1',
+            itemDescription: 'Plumbing',
+            category: 'Plumbing & Wet Works',
+            unit: 'sum',
+            quantity: 1,
+            baselineUnitCostZAR: 100_000,
+            baselineTotalZAR: 100_000,
+            actualCostZAR: 100_000,
+            varianceZAR: 0,
+            supplierOrContractor: 'Plumbers',
+            status: 'Completed',
+            retentionPercent: 10, // 10k retention
+          },
+          {
+            id: 'b-2',
+            itemDescription: 'Kitchen',
+            category: 'Kitchen & Cabinetry',
+            unit: 'sum',
+            quantity: 1,
+            baselineUnitCostZAR: 200_000,
+            baselineTotalZAR: 200_000,
+            actualCostZAR: 200_000,
+            varianceZAR: 0,
+            supplierOrContractor: 'Joiners',
+            status: 'In Progress',
+            retentionPercent: 10, // 20k retention + 180k pending draw
+          },
+        ],
+      };
+
+      // Council = 30k, Retentions = 10k + 20k = 30k, Pending draws = 180k -> Total = 240,000
+      const ringFenced = calculateRingFencedWorkingCapital([flip1]);
+      expect(ringFenced).toBe(240_000);
+    });
+
+    it('excludes retentions when retentionReleased is true on drawSchedule', () => {
+      const flipReleased: FlipProject = {
+        ...sampleFlip,
+        municipalClearance: {
+          advanceCouncilDepositZAR: 30_000,
+          sec118ArrearsZAR: 0,
+          rccStatus: 'Certificate Issued',
+        },
+        drawSchedule: {
+          depositPaid: true,
+          firstFixApproved: true,
+          finishesApproved: true,
+          retentionReleased: true,
+        },
+        boq: [
+          {
+            id: 'b-2',
+            itemDescription: 'Kitchen',
+            category: 'Kitchen & Cabinetry',
+            unit: 'sum',
+            quantity: 1,
+            baselineUnitCostZAR: 200_000,
+            baselineTotalZAR: 200_000,
+            actualCostZAR: 200_000,
+            varianceZAR: 0,
+            supplierOrContractor: 'Joiners',
+            status: 'In Progress',
+            retentionPercent: 10, // 20k retention excluded, only 180k pending draw remains
+          },
+        ],
+      };
+
+      // 30k council + 180k pending draw = 210,000
+      const ringFenced = calculateRingFencedWorkingCapital([flipReleased]);
+      expect(ringFenced).toBe(210_000);
+    });
+
+    it('returns 0 for empty active flips array or flips without BOQ', () => {
+      expect(calculateRingFencedWorkingCapital([])).toBe(0);
+      expect(calculateRingFencedWorkingCapital(undefined as any)).toBe(0);
     });
   });
 });

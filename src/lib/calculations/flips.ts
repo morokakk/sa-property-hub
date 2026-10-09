@@ -308,3 +308,37 @@ export function calculateArchivedFlipFinancials(flip?: FlipProject | null): Arch
     brrrrEquityCreatedZAR,
   };
 }
+
+/**
+ * Pure calculation of ring-fenced project working capital across active flip projects:
+ * Sum of active retention pools, committed pending contractor milestone draws (items in progress excluding retention),
+ * and advance municipal council deposits.
+ */
+export function calculateRingFencedWorkingCapital(activeFlips: FlipProject[]): number {
+  return (activeFlips || []).reduce((sum, f) => {
+    const advanceCouncil = f.municipalClearance?.advanceCouncilDepositZAR || 0;
+    const isRetentionReleased = f.drawSchedule?.retentionReleased === true;
+
+    let retentionPool = 0;
+    let pendingMilestoneDraws = 0;
+
+    (f.boq || []).forEach((b) => {
+      const itemCost = b.actualCostZAR || b.baselineTotalZAR || 0;
+      const retentionPct = b.retentionPercent || 0;
+      const retentionAmount = Math.round(itemCost * (retentionPct / 100));
+
+      if (!isRetentionReleased && retentionAmount > 0) {
+        if (b.status === 'Completed' || b.status === 'In Progress') {
+          retentionPool += retentionAmount;
+        }
+      }
+
+      if (b.status === 'In Progress') {
+        // Committed contractor draw payable upon milestone sign-off (excluding retention portion)
+        pendingMilestoneDraws += (itemCost - retentionAmount);
+      }
+    });
+
+    return sum + advanceCouncil + retentionPool + pendingMilestoneDraws;
+  }, 0);
+}

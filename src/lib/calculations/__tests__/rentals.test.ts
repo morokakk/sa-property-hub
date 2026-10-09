@@ -6,6 +6,7 @@ import {
   calculateAgencyCommission,
   calculateDisposalMetrics,
   calculateAggregateRentalKPIs,
+  calculateRentalSec11aTax,
 } from '../rentals';
 import { RentalProperty } from '@/types';
 
@@ -393,6 +394,113 @@ describe('Rentals Pure Calculations Engine', () => {
       expect(result.taxableIncomeZAR).toBe(0);
       expect(result.annualTaxZAR).toBe(0);
       expect(result.postTaxCashflowZAR).toBe(0);
+    });
+  });
+
+  describe('calculateRentalSec11aTax (SARS Section 11(a) Deductions)', () => {
+    it('calculates Section 11(a) tax strictly deducting bond interest and allowable expenses', () => {
+      const prop: RentalProperty = {
+        ...baseRental,
+        outstandingBondBalanceZAR: 100_000,
+        bondInterestRatePercent: 11.5,
+        monthlyRatesTaxesZAR: 1_000,
+        monthlyMaintenanceReserveZAR: 500,
+      };
+
+      const result = calculateRentalSec11aTax({
+        rental: prop,
+        totalGrossZAR: 15_000, // 180,000 / yr
+        leviesZAR: 2_000,      // 24,000 / yr
+        insuranceMonthlyZAR: 0,
+        agentFeeZAR: 0,
+        defaultTaxEntityType: 'Company (27%)',
+      });
+
+      // Deductibles = 24k + 12k + 6k + 11.5k = 53,500
+      // Taxable = 180k - 53.5k = 126,500
+      // Tax @ 27% = 34,155
+      expect(result.annualGrossRentZAR).toBe(180_000);
+      expect(result.annualBondInterestZAR).toBe(11_500);
+      expect(result.deductibleExpensesZAR).toBe(53_500);
+      expect(result.taxableIncomeZAR).toBe(126_500);
+      expect(result.taxRate).toBe(0.27);
+      expect(result.annualTaxZAR).toBe(34_155);
+      expect(result.annualTax).toBe(34_155);
+    });
+
+    it('respects tax entity overrides: Individual 45% and Pre-Tax 0%', () => {
+      const indProp: RentalProperty = {
+        ...baseRental,
+        monthlyRatesTaxesZAR: 0,
+        monthlyMaintenanceReserveZAR: 0,
+        taxEntityTypeOverride: 'Individual (45%)',
+        outstandingBondBalanceZAR: 0,
+      };
+
+      const indResult = calculateRentalSec11aTax({
+        rental: indProp,
+        totalGrossZAR: 10_000, // 120k / yr
+        leviesZAR: 0,
+        insuranceMonthlyZAR: 0,
+        agentFeeZAR: 0,
+      });
+
+      expect(indResult.taxRate).toBe(0.45);
+      expect(indResult.annualTaxZAR).toBe(Math.round(120_000 * 0.45));
+
+      const preTaxProp: RentalProperty = {
+        ...baseRental,
+        monthlyRatesTaxesZAR: 0,
+        monthlyMaintenanceReserveZAR: 0,
+        taxEntityTypeOverride: 'Pre-Tax',
+      };
+
+      const preResult = calculateRentalSec11aTax({
+        rental: preTaxProp,
+        totalGrossZAR: 10_000,
+        leviesZAR: 0,
+        insuranceMonthlyZAR: 0,
+        agentFeeZAR: 0,
+      });
+
+      expect(preResult.taxRate).toBe(0);
+      expect(preResult.annualTaxZAR).toBe(0);
+    });
+
+    it('deducts Section 13sex shield and bad debt write-offs', () => {
+      const shieldedProp: RentalProperty = {
+        ...baseRental,
+        monthlyRatesTaxesZAR: 0,
+        monthlyMaintenanceReserveZAR: 0,
+        outstandingBondBalanceZAR: 0,
+        section13sexAnnualShieldZAR: 20_000,
+        arrearsWriteOffs: [
+          {
+            id: 'wo-1',
+            date: '2026-01-01',
+            amountZAR: 10_000,
+            reason: 'Uncollectable',
+            allocations: [],
+            createdAt: '2026-01-01',
+          },
+        ],
+      };
+
+      const result = calculateRentalSec11aTax({
+        rental: shieldedProp,
+        totalGrossZAR: 10_000, // 120k gross
+        leviesZAR: 0,
+        insuranceMonthlyZAR: 0,
+        agentFeeZAR: 0,
+        defaultTaxEntityType: 'Company (27%)',
+      });
+
+      // Deductibles = 10,000 (bad debt)
+      // Taxable = 120,000 - 10,000 - 20,000 (shield) = 90,000
+      // Tax = 90,000 * 0.27 = 24,300
+      expect(result.deductibleExpensesZAR).toBe(10_000);
+      expect(result.taxableIncomeZAR).toBe(90_000);
+      expect(result.annualTaxZAR).toBe(24_300);
     });
   });
 });

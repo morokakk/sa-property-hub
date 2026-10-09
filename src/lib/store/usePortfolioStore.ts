@@ -1,7 +1,5 @@
-import { useMemo } from 'react';
 import { create } from 'zustand';
-import { persist, createJSONStorage } from 'zustand/middleware';
-import { useShallow } from 'zustand/react/shallow';
+import { persist } from 'zustand/middleware';
 import {
   RentalProperty,
   FlipProject,
@@ -33,15 +31,11 @@ import {
   calculateMonthlyBondRepayment,
   calculateBondPrincipalFromRepayment,
 } from '@/lib/calculations/propertyMetrics';
-import {
-  calculateFlipFinancials,
-  calculateArchivedFlipFinancials,
-} from '@/lib/calculations/flips';
+import { calculateFlipFinancials } from '@/lib/calculations/flips';
 import { calculateAgencyCommission } from '@/lib/calculations/rentals';
 import {
   calculatePropertyArrears,
   reconcileOpeningBalanceForTargetArrears,
-  migrateNegativeArrearsToRental,
   parseDateParts,
 } from '@/lib/calculations/arrears';
 import { handleTaskCompletionRecurrence } from '@/lib/calculations/recurrence';
@@ -60,6 +54,12 @@ import {
 } from './initialData';
 import type { PortfolioStateSnapshot } from '@/lib/db/mergePortfolioState';
 import { normalizeAiModel } from '@/lib/ai/modelConfig';
+import {
+  portfolioPersistConfig,
+  registerStoreForMigration,
+} from './persistence/portfolioMigrations';
+import { sanitizeCompletedGuideSteps } from './persistence/hydrationHelpers';
+import { computePortfolioSummary } from './selectors/portfolioSummarySelector';
 
 interface PortfolioState {
   rentals: RentalProperty[];
@@ -347,21 +347,8 @@ export function syncLeaseExpiryTasks(
   return nextTasks;
 }
 
-/**
- * Normalises persisted Get Started checklist data: keeps only non-empty strings, de-duplicated.
- * Anything else (undefined, null, objects, legacy shapes) collapses to an empty list.
- */
-export function sanitizeCompletedGuideSteps(raw: unknown): string[] {
-  if (!Array.isArray(raw)) return [];
-  const seen = new Set<string>();
-  for (const item of raw) {
-    if (typeof item === 'string' && item.trim().length > 0) seen.add(item);
-  }
-  return Array.from(seen);
-}
-
 export const usePortfolioStore = create<PortfolioState>()(
-  persist(
+  persist<PortfolioState>(
     (set, get) => ({
       rentals: INITIAL_RENTALS,
       flips: INITIAL_FLIPS,
@@ -2076,459 +2063,17 @@ export const usePortfolioStore = create<PortfolioState>()(
         }
       },
     }),
-    {
-      name: 'sa_property_portfolio_hub_v1',
-      storage: createJSONStorage(() => localStorage),
-      merge: (persistedState: unknown, currentState: PortfolioState): PortfolioState => {
-        const pState = (persistedState && typeof persistedState === 'object' ? persistedState : {}) as Partial<PortfolioState>;
-        const rawModel = pState.aiSettings?.model;
-        const migratedModel = normalizeAiModel(rawModel);
-
-        const rawOpps = pState.opportunities || currentState.opportunities;
-        const migratedOpportunities = (rawOpps || []).map((opp: any) => ({
-          ...opp,
-          status:
-            opp.status === 'Analyzing'
-              ? 'Screening'
-              : opp.status === 'Under Due Diligence'
-              ? 'Due Diligence'
-              : opp.status,
-          vacancyRatePercent: opp.vacancyRatePercent ?? 6,
-          managementFeePercent: opp.managementFeePercent ?? 8,
-        }));
-
-        const rawRentals = pState.rentals || currentState.rentals;
-        const migratedRentals = (rawRentals || []).map((rental: any) => {
-          const defaultStatements =
-            currentState.rentals.find((r) => r.id === rental.id)?.utilityStatements || [];
-          const defaultMeterReadings =
-            currentState.rentals.find((r) => r.id === rental.id)?.meterReadings || [];
-
-          let monthlyAgentFeeZAR = rental.monthlyAgentFeeZAR;
-          let agencyVatApplicable = rental.agencyVatApplicable;
-          let agencyCommissionPercent = rental.agencyCommissionPercent;
-
-          // Auto-heal legacy iGrow import with artificial R635 estimate to actual R851 invoiced deduction
-          if (
-            (rental.agencyName === 'iGrow Rentals' || String(rental.title || '').toLowerCase().includes('clearwater')) &&
-            (monthlyAgentFeeZAR === 635 || monthlyAgentFeeZAR === 634.8 || Math.round(monthlyAgentFeeZAR || 0) === 635)
-          ) {
-            monthlyAgentFeeZAR = 851;
-            agencyVatApplicable = false;
-            agencyCommissionPercent =
-              rental.monthlyGrossRentZAR > 0
-                ? Number(((850.54 / rental.monthlyGrossRentZAR) * 100).toFixed(1))
-                : 12.3;
-          }
-
-          // Auto-heal legacy 2025 statements or statements with missing/zero utility values
-          const hasLegacy2025Statements = (rental.utilityStatements || []).some(
-            (s: any) =>
-              s.statementDate?.startsWith('2025') ||
-              s.billingPeriod?.includes('2025') ||
-              (s.electricityZAR === 0 && s.waterZAR === 0)
-          );
-
-          const needsStatementMigration =
-            !rental.utilityStatements ||
-            rental.utilityStatements.length === 0 ||
-            hasLegacy2025Statements;
-
-          const healedStatements = needsStatementMigration
-            ? defaultStatements
-            : rental.utilityStatements.map((stmt: any) => {
-                const defaultMatch = defaultStatements.find((ds) => ds.id === stmt.id);
-                return {
-                  ...stmt,
-                  extractedMeterReadings:
-                    stmt.extractedMeterReadings && stmt.extractedMeterReadings.length > 0
-                      ? stmt.extractedMeterReadings
-                      : defaultMatch?.extractedMeterReadings || [],
-                };
-              });
-
-          const needsReadingsMigration =
-            !rental.meterReadings ||
-            rental.meterReadings.length === 0 ||
-            hasLegacy2025Statements;
-
-          const healedMeterReadings = needsReadingsMigration
-            ? defaultMeterReadings
-            : [
-                ...defaultMeterReadings,
-                ...(rental.meterReadings || []).filter(
-                  (mr: any) => !defaultMeterReadings.some((dmr) => dmr.id === mr.id)
-                ),
-              ];
-
-          let leases = rental.leases;
-          if (!leases || !Array.isArray(leases) || leases.length === 0) {
-            leases = [{
-              id: rental.id ? `lease-${rental.id}-${Date.now()}` : `lease-${Date.now()}`,
-              unitName: 'Main Unit',
-              tenantName: rental.tenantName || 'Tenant Unassigned',
-              tenantPhone: rental.tenantPhone,
-              tenantEmail: rental.tenantEmail,
-              leaseStartDate: rental.leaseStartDate || new Date().toISOString().split('T')[0],
-              leaseEndDate: rental.leaseEndDate || new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-              monthlyRentZAR: rental.monthlyGrossRentZAR || 0,
-              depositHeldZAR: rental.depositHeldZAR || 0,
-              annualEscalationPercent: rental.annualEscalationPercent || 7.0,
-              status: rental.status === 'Occupied' ? 'Occupied' : 'Vacant'
-            }];
-          }
-
-          const defaultMeterRegistry =
-            currentState.rentals.find((r) => r.id === rental.id)?.meterRegistry || [];
-          const healedMeterRegistry =
-            rental.meterRegistry && rental.meterRegistry.length > 0
-              ? rental.meterRegistry
-              : defaultMeterRegistry;
-
-          const migrated = {
-            ...rental,
-            monthlyAgentFeeZAR,
-            agencyVatApplicable,
-            agencyCommissionPercent,
-            utilityStatements: healedStatements,
-            meterReadings: healedMeterReadings,
-            meterRegistry: healedMeterRegistry,
-            leases
-          };
-          delete migrated.tenantName;
-          delete migrated.tenantPhone;
-          delete migrated.tenantEmail;
-          delete migrated.leaseStartDate;
-          delete migrated.leaseEndDate;
-          delete migrated.depositHeldZAR;
-          delete migrated.annualEscalationPercent;
-
-          return migrated;
-        });
-
-        const finalRentals = migratedRentals.map((r: RentalProperty) => migrateNegativeArrearsToRental(r));
-
-        return {
-          ...currentState,
-          ...pState,
-          rentals: finalRentals,
-          opportunities: migratedOpportunities,
-          municipalDirectory:
-            pState.municipalDirectory && pState.municipalDirectory.length > 0
-              ? pState.municipalDirectory
-              : currentState.municipalDirectory,
-          aiSettings: {
-            ...DEFAULT_AI_SETTINGS,
-            ...(pState.aiSettings || {}),
-            model: migratedModel,
-          },
-          completedGuideSteps: sanitizeCompletedGuideSteps(pState.completedGuideSteps),
-        };
-      },
-      onRehydrateStorage: () => (state) => {
-        if (state && Array.isArray(state.rentals)) {
-          const hasNegative = state.rentals.some(
-            (r) =>
-              (typeof r.arrearsOpeningBalanceZAR === 'number' && r.arrearsOpeningBalanceZAR < 0) ||
-              (r.leases || []).some(
-                (l) => typeof l.arrearsOpeningBalanceZAR === 'number' && l.arrearsOpeningBalanceZAR < 0
-              )
-          );
-          if (hasNegative) {
-            usePortfolioStore.setState({
-              rentals: state.rentals.map((r) => migrateNegativeArrearsToRental(r)),
-            });
-          }
-        }
-      },
-    }
+    portfolioPersistConfig
   )
 );
 
-function computeEquityAlerts(rentals: RentalProperty[]): EquityExtractionAlert[] {
-  const now = new Date();
-  return rentals
-    .filter(r => r.status !== 'Sold' && r.isBrrrrProperty)
-    .map(r => {
-      const ltv = (r.outstandingBondBalanceZAR || 0) / (r.marketValueZAR || 1);
-      const purchaseDate = new Date(r.purchaseDate);
-      const months = (now.getFullYear() - purchaseDate.getFullYear()) * 12 + (now.getMonth() - purchaseDate.getMonth());
-      const extractable = Math.max(0, (r.marketValueZAR * 0.80) - (r.outstandingBondBalanceZAR || 0));
-      return {
-        propertyId: r.id,
-        propertyTitle: r.title,
-        currentLTV: ltv,
-        extractableEquityZAR: extractable,
-        monthsStabilized: months,
-        isRipe: ltv < 0.70 && months >= 6,
-      };
-    })
-    .filter(a => a.isRipe);
-}
+registerStoreForMigration(usePortfolioStore);
 
-export function computePortfolioSummary(state: {
-  rentals: RentalProperty[];
-  flips: FlipProject[];
-  funding: FundingSource[];
-  liquidCapitalReserve: number;
-  investorProfile?: InvestorProfile;
-  opportunities?: OpportunityDeal[];
-}): PortfolioSummary {
-  const activeRentals = (state.rentals || []).filter((r) => r.status !== 'Sold');
-  const soldRentals = (state.rentals || []).filter((r) => r.status === 'Sold');
-  const activeFlips = (state.flips || []).filter((f) => f.status === 'Active' || f.status === 'Delayed');
-  const completedFlips = (state.flips || []).filter((f) => f.status === 'Completed');
-
-  const totalRentalValue = activeRentals.reduce(
-    (sum, r) => sum + (r.marketValueZAR || 0),
-    0
-  );
-  const totalBondLiabilities = activeRentals.reduce(
-    (sum, r) => sum + (r.outstandingBondBalanceZAR || 0),
-    0
-  );
-  const totalFlipValue = activeFlips.reduce(
-    (sum, f) => sum + (f.targetExitPriceZAR || 0),
-    0
-  );
-  const liquidCapitalReserve = state.liquidCapitalReserve || 0;
-  const totalGrossAssetValue = totalRentalValue + totalFlipValue + liquidCapitalReserve;
-
-  // Unallocated private funding facilities for next acquisitions (Standby facilities + undrawn tranches of unallocated lines)
-  const unallocatedFundingReserve = (state.funding || [])
-    .filter(
-      (f) =>
-        (f.status === 'Active' || f.status === 'Accruing' || f.status === 'Standby') &&
-        (!f.linkedDealId || f.linkedDealName === 'General Portfolio Liquidity')
-    )
-    .reduce((sum, f) => {
-      if (f.status === 'Standby') {
-        // Full facility is available undrawn
-        return sum + Math.max(0, (f.capitalAmountZAR || 0) - (f.totalRepaidZAR || 0));
-      }
-      if (f.tranches && f.tranches.length > 0) {
-        // Only undrawn tranches are available
-        return sum + f.tranches.filter((t) => !t.isDisbursed).reduce((s, t) => s + t.amountZAR, 0);
-      }
-      // If active with no tranches, it is already drawn into cash
-      return sum;
-    }, 0);
-
-  // totalAvailablePurchasingPower computed after freeUnallocatedCash below
-
-  // Private funding liability calculated strictly from drawn capital minus repayments (undrawn tranches, standby lines, and settled facilities carry R 0 debt)
-  const totalPrivateFundingLiability = (state.funding || [])
-    .filter((f) => f.status !== 'Settled')
-    .reduce((sum, f) => {
-      let drawn = 0;
-      if (f.status === 'Standby') {
-        drawn = 0;
-      } else if (f.tranches && f.tranches.length > 0) {
-        drawn = f.tranches.filter((t) => t.isDisbursed).reduce((s, t) => s + t.amountZAR, 0);
-      } else if (f.status === 'Active' || f.status === 'Accruing' || f.status === 'Matured') {
-        drawn = f.capitalAmountZAR || 0;
-      }
-      return sum + Math.max(0, drawn - (f.totalRepaidZAR || 0));
-    }, 0);
-
-  const totalFundingLiabilities = totalPrivateFundingLiability + totalBondLiabilities;
-  const netEquity = totalGrossAssetValue - totalFundingLiabilities;
-
-  // Monthly rental cash flow and property-by-property SARS provisional tax reserve
-  let annualRentalTaxReserve = 0;
-  const monthlyNetRentalCashflow = activeRentals.reduce((sum, r) => {
-    const gross = r.leases?.filter(l => l.status !== 'Vacant').reduce((s, l) => s + (l.monthlyRentZAR || 0), 0) || r.monthlyGrossRentZAR || 0;
-    const ancillaryTotal = (r.ancillaryIncomes || []).reduce((sum, a) => sum + a.monthlyRentZAR, 0);
-    const totalGross = gross + ancillaryTotal;
-    let agentFee = 0;
-    if (r.managementType === 'Agency') {
-      if (typeof r.agencyCommissionPercent === 'number' && r.agencyCommissionPercent > 0) {
-        const base = totalGross * (r.agencyCommissionPercent / 100);
-        const vat = r.agencyVatApplicable !== false ? 1.15 : 1.0;
-        agentFee = Math.round(base * vat);
-      } else {
-        agentFee = r.monthlyAgentFeeZAR || 0;
-      }
-    }
-    const isFreehold = r.propertyType === 'Freehold House';
-    const insuranceMonthly = isFreehold ? Math.round((r.annualBuildingInsuranceZAR || 0) / 12) : 0;
-    const levies = isFreehold ? 0 : (r.monthlyLeviesZAR || 0);
-    const expenses =
-      levies +
-      insuranceMonthly +
-      (r.monthlyRatesTaxesZAR || 0) +
-      agentFee +
-      (r.monthlyMaintenanceReserveZAR || 0) +
-      (r.monthlyBondPaymentZAR || 0) +
-      (r.monthlyPrepaidVendingFeeZAR || 0);
-    const propNetMonthly = totalGross - expenses;
-
-    // Property-by-property SARS tax reserve aggregation (bad debt write-offs are tax-deductible losses)
-    // SARS Section 11(a) / ITR12 alignment:
-    // Deductible expenses = Rates + Levies + Agent Fees + Maintenance Reserve + Bond Interest (capital repayments strictly excluded)
-    const annualGrossRent = totalGross * 12;
-    const annualBondInterest = (r.outstandingBondBalanceZAR && r.bondInterestRatePercent)
-      ? Math.round(r.outstandingBondBalanceZAR * (r.bondInterestRatePercent / 100))
-      : 0;
-    const annualRates = (r.monthlyRatesTaxesZAR || 0) * 12;
-    const annualLevies = levies * 12;
-    const annualAgentFee = agentFee * 12;
-    const annualMaintenance = (r.monthlyMaintenanceReserveZAR || 0) * 12;
-    const annualInsurance = insuranceMonthly * 12;
-    const annualPrepaidVending = (r.monthlyPrepaidVendingFeeZAR || 0) * 12;
-    const propBadDebt = (r.arrearsWriteOffs || []).reduce((sum, w) => sum + (w.amountZAR || 0), 0);
-
-    const deductibleExpenses =
-      annualRates +
-      annualLevies +
-      annualAgentFee +
-      annualMaintenance +
-      annualInsurance +
-      annualPrepaidVending +
-      propBadDebt +
-      annualBondInterest;
-
-    const propSec13Shield = r.section13sexAnnualShieldZAR || 0;
-    const propTaxableIncome = Math.max(0, annualGrossRent - deductibleExpenses - propSec13Shield);
-
-    let propTaxRate = 0.31;
-    if (r.taxEntityTypeOverride === 'Individual (45%)') {
-      propTaxRate = 0.45;
-    } else if (r.taxEntityTypeOverride === 'Company (27%)') {
-      propTaxRate = 0.27;
-    } else if (r.taxEntityTypeOverride === 'Pre-Tax') {
-      propTaxRate = 0;
-    } else if (state.investorProfile?.defaultTaxEntityType === 'Company (27%)') {
-      propTaxRate = 0.27;
-    } else if (state.investorProfile?.defaultTaxEntityType === 'Individual (45%)') {
-      propTaxRate = 0.45;
-    } else if (state.investorProfile?.defaultTaxEntityType === 'Pre-Tax') {
-      propTaxRate = 0;
-    } else {
-      propTaxRate = (state.investorProfile?.marginalTaxRatePercent ?? 31.0) / 100;
-    }
-
-    const propAnnualTax = Math.round(propTaxableIncome * propTaxRate);
-    annualRentalTaxReserve += propAnnualTax;
-
-    return sum + propNetMonthly;
-  }, 0);
-
-  // 1. Ring-Fenced Project Working Capital:
-  // Sum of active retention pools, committed pending contractor milestone draws, and advance council deposits
-  const ringFencedWorkingCapital = activeFlips.reduce((sum, f) => {
-    const advanceCouncil = f.municipalClearance?.advanceCouncilDepositZAR || 0;
-    const isRetentionReleased = f.drawSchedule?.retentionReleased === true;
-
-    let retentionPool = 0;
-    let pendingMilestoneDraws = 0;
-
-    (f.boq || []).forEach((b) => {
-      const itemCost = b.actualCostZAR || b.baselineTotalZAR || 0;
-      const retentionPct = b.retentionPercent || 0;
-      const retentionAmount = Math.round(itemCost * (retentionPct / 100));
-
-      if (!isRetentionReleased && retentionAmount > 0) {
-        if (b.status === 'Completed' || b.status === 'In Progress') {
-          retentionPool += retentionAmount;
-        }
-      }
-
-      if (b.status === 'In Progress') {
-        // Committed contractor draw payable upon milestone sign-off (excluding retention portion)
-        pendingMilestoneDraws += (itemCost - retentionAmount);
-      }
-    });
-
-    return sum + advanceCouncil + retentionPool + pendingMilestoneDraws;
-  }, 0);
-
-  // 2. Free Unallocated Cash:
-  const freeUnallocatedCash = Math.max(0, liquidCapitalReserve - ringFencedWorkingCapital);
-
-  // Deployable War Chest: Total cash reserve + pre-approved standby lines (ready for immediate deal acquisition)
-  const deployableWarChest = liquidCapitalReserve + unallocatedFundingReserve;
-
-  // Deployable purchasing power = free cash (after ring-fencing) + unallocated funding facilities
-  const totalAvailablePurchasingPower = freeUnallocatedCash + unallocatedFundingReserve;
-
-  // 3. Projected Flip Profits & SARS Provisional Tax Reserve:
-  let totalGrossProjectedFlipProfits = 0;
-  let totalSarsFlipTaxReserve = 0;
-
-  activeFlips.forEach((f) => {
-    const fin = calculateFlipFinancials(f);
-    totalGrossProjectedFlipProfits += fin.projectedNetProfitZAR;
-    totalSarsFlipTaxReserve += fin.estimatedTaxProvisionZAR;
-  });
-
-  const totalSarsRentalTaxReserve = annualRentalTaxReserve;
-  const totalSarsProvisionalTaxReserve = totalSarsFlipTaxReserve + totalSarsRentalTaxReserve;
-
-  const totalNetProjectedFlipProfits = totalGrossProjectedFlipProfits - totalSarsFlipTaxReserve;
-  const totalProjectedFlipProfits = totalGrossProjectedFlipProfits;
-
-  // Realized profit on completed/sold flips (excludes BRRRR converted rentals)
-  const totalRealizedFlipProfits = completedFlips.reduce((sum, f) => {
-    if (f.exitStrategy === 'BRRRR') return sum;
-    const arch = calculateArchivedFlipFinancials(f);
-    return sum + arch.realizedNetProfitZAR;
-  }, 0);
-
-  const equityAlerts = computeEquityAlerts(activeRentals);
-
-  return {
-    totalGrossAssetValue,
-    totalRentalValue,
-    totalFlipValue,
-    liquidCapitalReserve,
-    ringFencedWorkingCapital,
-    freeUnallocatedCash,
-    unallocatedFundingReserve,
-    deployableWarChest,
-    totalAvailablePurchasingPower,
-    totalFundingLiabilities,
-    totalPrivateFundingLiability,
-    totalBondLiabilities,
-    netEquity,
-    monthlyNetRentalCashflow,
-    totalProjectedFlipProfits,
-    totalGrossProjectedFlipProfits,
-    totalSarsFlipTaxReserve,
-    totalSarsRentalTaxReserve,
-    totalSarsProvisionalTaxReserve,
-    totalNetProjectedFlipProfits,
-    totalRealizedFlipProfits,
-    activeRentalsCount: activeRentals.length,
-    soldRentalsCount: soldRentals.length,
-    activeFlipsCount: activeFlips.length,
-    completedFlipsCount: completedFlips.length,
-    pendingOpportunitiesCount: (state.opportunities || []).length,
-    annualRentalTaxReserve,
-    monthlyRentalTaxReserve: Math.round(annualRentalTaxReserve / 12),
-    equityAlerts,
-  };
-}
-
-export function usePortfolioSummary(): PortfolioSummary {
-  // Extract all scalar (primitive) fields via useShallow — stable comparison
-  const scalars = usePortfolioStore(
-    useShallow((state) => {
-      const summary = computePortfolioSummary(state);
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const { equityAlerts, ...rest } = summary;
-      return rest;
-    })
-  );
-
-  // Compute equityAlerts with JSON-based referential stability
-  const alertsJson = usePortfolioStore(
-    (state) => {
-      const activeRentals = (state.rentals || []).filter((r) => r.status !== 'Sold');
-      return JSON.stringify(computeEquityAlerts(activeRentals));
-    }
-  );
-  const equityAlerts: EquityExtractionAlert[] = useMemo(() => JSON.parse(alertsJson), [alertsJson]);
-
-  return useMemo(() => ({ ...scalars, equityAlerts }), [scalars, equityAlerts]);
-}
+// Re-export extracted selectors, persistence helpers, and types for 100% backward compatibility
+export {
+  computePortfolioSummary,
+  usePortfolioSummary,
+  computeEquityAlerts,
+} from './selectors/portfolioSummarySelector';
+export { sanitizeCompletedGuideSteps } from './persistence/hydrationHelpers';
+export type { PortfolioState };

@@ -227,3 +227,93 @@ export function calculateAggregateRentalKPIs(rentals: RentalProperty[] = []): Ag
     soldCount: soldRentals.length,
   };
 }
+
+/**
+ * 7. SARS Section 11(a) Property Annual Tax Provision Calculator
+ * Computes taxable income and tax liability strictly deducting bond interest (capital repayment excluded),
+ * rates, levies, agency fees, maintenance reserve, insurance, prepaid vending fees, and bad debt write-offs,
+ * minus Section 13sex allowances.
+ */
+export interface RentalSec11aTaxParams {
+  rental: RentalProperty;
+  totalGrossZAR: number;
+  leviesZAR: number;
+  insuranceMonthlyZAR: number;
+  agentFeeZAR: number;
+  defaultTaxEntityType?: 'Company (27%)' | 'Individual (45%)' | 'Pre-Tax';
+  marginalTaxRatePercent?: number;
+}
+
+export interface RentalSec11aTaxResult {
+  annualGrossRentZAR: number;
+  annualBondInterestZAR: number;
+  deductibleExpensesZAR: number;
+  taxableIncomeZAR: number;
+  taxRate: number;
+  annualTaxZAR: number;
+  annualTax: number;
+}
+
+export function calculateRentalSec11aTax({
+  rental,
+  totalGrossZAR,
+  leviesZAR,
+  insuranceMonthlyZAR,
+  agentFeeZAR,
+  defaultTaxEntityType,
+  marginalTaxRatePercent = 31.0,
+}: RentalSec11aTaxParams): RentalSec11aTaxResult {
+  const annualGrossRentZAR = totalGrossZAR * 12;
+  const annualBondInterestZAR = (rental.outstandingBondBalanceZAR && rental.bondInterestRatePercent)
+    ? Math.round(rental.outstandingBondBalanceZAR * (rental.bondInterestRatePercent / 100))
+    : 0;
+  const annualRates = (rental.monthlyRatesTaxesZAR || 0) * 12;
+  const annualLevies = leviesZAR * 12;
+  const annualAgentFee = agentFeeZAR * 12;
+  const annualMaintenance = (rental.monthlyMaintenanceReserveZAR || 0) * 12;
+  const annualInsurance = insuranceMonthlyZAR * 12;
+  const annualPrepaidVending = (rental.monthlyPrepaidVendingFeeZAR || 0) * 12;
+  const propBadDebt = (rental.arrearsWriteOffs || []).reduce((sum, w) => sum + (w.amountZAR || 0), 0);
+
+  const deductibleExpensesZAR =
+    annualRates +
+    annualLevies +
+    annualAgentFee +
+    annualMaintenance +
+    annualInsurance +
+    annualPrepaidVending +
+    propBadDebt +
+    annualBondInterestZAR;
+
+  const propSec13Shield = rental.section13sexAnnualShieldZAR || 0;
+  const taxableIncomeZAR = Math.max(0, annualGrossRentZAR - deductibleExpensesZAR - propSec13Shield);
+
+  let taxRate = 0.31;
+  if (rental.taxEntityTypeOverride === 'Individual (45%)') {
+    taxRate = 0.45;
+  } else if (rental.taxEntityTypeOverride === 'Company (27%)') {
+    taxRate = 0.27;
+  } else if (rental.taxEntityTypeOverride === 'Pre-Tax') {
+    taxRate = 0;
+  } else if (defaultTaxEntityType === 'Company (27%)') {
+    taxRate = 0.27;
+  } else if (defaultTaxEntityType === 'Individual (45%)') {
+    taxRate = 0.45;
+  } else if (defaultTaxEntityType === 'Pre-Tax') {
+    taxRate = 0;
+  } else {
+    taxRate = marginalTaxRatePercent / 100;
+  }
+
+  const annualTaxZAR = Math.round(taxableIncomeZAR * taxRate);
+
+  return {
+    annualGrossRentZAR,
+    annualBondInterestZAR,
+    deductibleExpensesZAR,
+    taxableIncomeZAR,
+    taxRate,
+    annualTaxZAR,
+    annualTax: annualTaxZAR,
+  };
+}
