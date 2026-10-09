@@ -12,7 +12,7 @@ import {
   sanitizeCompletedGuideSteps,
   healClearwaterAgencyFee,
 } from './hydrationHelpers';
-import type { PortfolioState } from '../usePortfolioStore';
+import type { PortfolioState } from '../types';
 
 export const PORTFOLIO_STORAGE_KEY = 'sa_property_portfolio_hub_v1';
 
