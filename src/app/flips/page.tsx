@@ -45,6 +45,12 @@ import { exportFlipBOQCSV } from '@/lib/export/csvExport';
 import ImportDropdown from '@/components/common/ImportDropdown';
 import { parseRentalPdfStatement } from '@/lib/utilities/pdfParser';
 import DelayMatrixModal from '@/components/flips/DelayMatrixModal';
+import { FlipExitModal } from '@/components/flips/modals/FlipExitModal';
+import { FlipToRentalModal } from '@/components/flips/modals/FlipToRentalModal';
+import { AddBOQItemModal } from '@/components/flips/modals/AddBOQItemModal';
+import { FlipProjectModal } from '@/components/flips/modals/FlipProjectModal';
+import { SupplierDirectoryModal } from '@/components/flips/modals/SupplierDirectoryModal';
+import { FlipFundingModal } from '@/components/flips/modals/FlipFundingModal';
 import {
   calculateFlipFinancials,
   calculateFundingCampaignSummary,
@@ -793,7 +799,7 @@ export default function FlipsManagerPage() {
                       {/* Interactive Phase Selector */}
                       <select
                         value={activeFlip.currentPhase}
-                        onChange={(e) => updateFlip(activeFlip.id, { currentPhase: e.target.value as any })}
+                        onChange={(e) => updateFlip(activeFlip.id, { currentPhase: e.target.value as FlipProject['currentPhase'] })}
                         className="text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-300 px-2 py-0.5 rounded-full cursor-pointer hover:bg-emerald-100 transition-colors"
                         title="Change current project phase"
                       >
@@ -1267,7 +1273,7 @@ export default function FlipsManagerPage() {
                             municipalClearance: {
                               sec118ArrearsZAR: sec118ArrearsVal,
                               advanceCouncilDepositZAR: advanceCouncilDepositVal,
-                              rccStatus: e.target.value as any,
+                              rccStatus: e.target.value as NonNullable<FlipProject['municipalClearance']>['rccStatus'],
                               rccApplicationDate: activeFlip.municipalClearance?.rccApplicationDate,
                               disputeNotes: activeFlip.municipalClearance?.disputeNotes,
                             },
@@ -1632,7 +1638,7 @@ export default function FlipsManagerPage() {
                                 value={item.milestonePhase || 'First Fix / Wet Works'}
                                 onChange={(e) =>
                                   updateBOQItem(activeFlip.id, item.id, {
-                                    milestonePhase: e.target.value as any,
+                                    milestonePhase: e.target.value as NonNullable<BOQItem['milestonePhase']>,
                                   })
                                 }
                                 className="text-[10px] font-semibold px-2 py-1 rounded-md border border-slate-200 cursor-pointer bg-slate-50 text-slate-700 hover:bg-white shadow-2xs block"
@@ -1696,7 +1702,7 @@ export default function FlipsManagerPage() {
                                 value={item.status}
                                 onChange={(e) =>
                                   updateBOQItem(activeFlip.id, item.id, {
-                                    status: e.target.value as any,
+                                    status: e.target.value as BOQItem['status'],
                                   })
                                 }
                                 className={`text-[11px] font-semibold px-2 py-0.5 rounded-md border border-slate-200 cursor-pointer ${
@@ -1976,1486 +1982,274 @@ export default function FlipsManagerPage() {
         )}
       </main>
 
-      {/* Mark as Flipped / Sold Exit Modal (Mobile Bottom-Sheet / Desktop Centered Dialog) */}
-      {showExitModal && activeFlip && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 z-50">
-          <div className="bg-white rounded-t-3xl sm:rounded-xl max-w-lg w-full p-5 sm:p-6 shadow-xl border border-slate-200 animate-in fade-in max-h-[92vh] sm:max-h-none overflow-y-auto">
-            <div className="w-12 h-1.5 bg-slate-300 rounded-full mx-auto mb-3 sm:hidden" />
-            <div className="flex items-center justify-between pb-3 mb-4 border-b border-slate-100">
-              <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
-                <CheckCircle2 className="w-5 h-5 text-emerald-600" />
-                <span>Mark Project as Flipped & Record Sale</span>
-              </h3>
-              <button
-                type="button"
-                onClick={() => setShowExitModal(false)}
-                className="text-slate-400 hover:text-slate-700 font-bold cursor-pointer"
-              >
-                ✕
-              </button>
-            </div>
+      {/* Extracted Flips Modals */}
+      <FlipExitModal
+        isOpen={showExitModal && Boolean(activeFlip)}
+        flip={activeFlip}
+        totalCostBasisZAR={totalCostBasis}
+        onClose={() => setShowExitModal(false)}
+        onFlipCompleted={({ actualSalePriceZAR, soldDate, exitNotes }) => {
+          if (!activeFlip) return;
+          const netProceeds = Math.max(0, actualSalePriceZAR - totalCostBasis);
+          markFlipAsCompleted(activeFlip.id, actualSalePriceZAR, netProceeds, soldDate, exitNotes);
+          setShowExitModal(false);
+        }}
+        exitSalePrice={exitSalePrice}
+        setExitSalePrice={setExitSalePrice}
+        exitNetProceeds={exitNetProceeds}
+        setExitNetProceeds={setExitNetProceeds}
+        exitSoldDate={exitSoldDate}
+        setExitSoldDate={setExitSoldDate}
+        exitNotes={exitNotes}
+        setExitNotes={setExitNotes}
+        onSubmit={handleCompleteFlip}
+      />
 
-            <p className="text-xs text-slate-500 mb-4">
-              Finalize <strong>{activeFlip.title}</strong>. This records your realized sale price, archives the flip into historical records, and automatically deposits the net cash proceeds directly into your <strong>Liquid Cash Reserve / Seed Capital</strong> for your next deal.
-            </p>
+      <FlipToRentalModal
+        isOpen={showConvertModal && Boolean(activeFlip)}
+        flip={activeFlip}
+        totalAllInCostZAR={totalAllInCost}
+        totalBOQActual={totalBOQActual}
+        totalHoldingCost={totalHoldingCost}
+        flipHoldingMonths={flipHoldingMonths}
+        onClose={() => setShowConvertModal(false)}
+        onConverted={({ marketValuationZAR, monthlyGrossRentZAR, tenantName }) => {
+          if (!activeFlip) return;
+          convertFlipToRental({
+            flipId: activeFlip.id,
+            marketValuationZAR,
+            initialGrossRentZAR: monthlyGrossRentZAR,
+            tenantName,
+          });
+          setShowConvertModal(false);
+        }}
+        convertMarketValue={convertMarketValue}
+        setConvertMarketValue={setConvertMarketValue}
+        convertGrossRent={convertGrossRent}
+        setConvertGrossRent={setConvertGrossRent}
+        convertTenantName={convertTenantName}
+        setConvertTenantName={setConvertTenantName}
+        convertTenantPhone={convertTenantPhone}
+        setConvertTenantPhone={setConvertTenantPhone}
+        convertTenantEmail={convertTenantEmail}
+        setConvertTenantEmail={setConvertTenantEmail}
+        convertManagementType={convertManagementType}
+        setConvertManagementType={setConvertManagementType}
+        convertAgencyName={convertAgencyName}
+        setConvertAgencyName={setConvertAgencyName}
+        convertAgencyCommission={convertAgencyCommission}
+        setConvertAgencyCommission={setConvertAgencyCommission}
+        convertNotes={convertNotes}
+        setConvertNotes={setConvertNotes}
+        onSubmit={handleConvertFlip}
+      />
 
-            <form onSubmit={handleCompleteFlip} noValidate className="space-y-4 text-xs">
-              <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 grid grid-cols-2 gap-3">
-                <div>
-                  <span className="text-[10px] text-slate-400 uppercase font-semibold block">Total Cost Basis</span>
-                  <strong className="text-sm text-slate-800">{formatZAR(totalCostBasis)}</strong>
-                  <span className="text-[10px] text-slate-500 block mt-0.5">Purchase + BOQ Spend</span>
-                </div>
-                <div>
-                  <span className="text-[10px] text-slate-400 uppercase font-semibold block">Target Exit (Estimate)</span>
-                  <strong className="text-sm text-indigo-600">{formatZAR(activeFlip.targetExitPriceZAR)}</strong>
-                  <span className="text-[10px] text-slate-500 block mt-0.5">Target Completion</span>
-                </div>
-              </div>
+      <AddBOQItemModal
+        isOpen={showAddBOQModal && Boolean(activeFlip)}
+        flipId={activeFlip?.id}
+        onClose={() => setShowAddBOQModal(false)}
+        onAdd={(item) => {
+          if (activeFlip) addBOQItem(activeFlip.id, item);
+          setShowAddBOQModal(false);
+        }}
+        boqCategory={boqCategory}
+        setBoqCategory={setBoqCategory}
+        boqStatus={boqStatus}
+        setBoqStatus={setBoqStatus}
+        boqDescription={boqDescription}
+        setBoqDescription={setBoqDescription}
+        boqUnit={boqUnit}
+        setBoqUnit={setBoqUnit}
+        boqQuantity={boqQuantity}
+        setBoqQuantity={setBoqQuantity}
+        boqBaselineUnitCost={boqBaselineUnitCost}
+        setBoqBaselineUnitCost={setBoqBaselineUnitCost}
+        boqMilestonePhase={boqMilestonePhase}
+        setBoqMilestonePhase={setBoqMilestonePhase}
+        boqRetentionPercent={boqRetentionPercent}
+        setBoqRetentionPercent={setBoqRetentionPercent}
+        boqIsSponsored={boqIsSponsored}
+        setBoqIsSponsored={setBoqIsSponsored}
+        boqCommercialRetailValue={boqCommercialRetailValue}
+        setBoqCommercialRetailValue={setBoqCommercialRetailValue}
+        boqActualCashOutflow={boqActualCashOutflow}
+        setBoqActualCashOutflow={setBoqActualCashOutflow}
+        boqActualCost={boqActualCost}
+        setBoqActualCost={setBoqActualCost}
+        boqSupplier={boqSupplier}
+        setBoqSupplier={setBoqSupplier}
+        suppliers={suppliers}
+        onSubmit={handleAddBOQ}
+      />
 
-              <div>
-                <label className="block font-semibold text-slate-700 mb-1">
-                  Actual Realized Sale Price (ZAR) *
-                </label>
-                <input
-                  type="number"
-                  required
-                  min="0"
-                  step="any"
-                  value={exitSalePrice || ''}
-                  onChange={(e) => {
-                    const price = Number(e.target.value);
-                    setExitSalePrice(price);
-                    setExitNetProceeds(Math.max(0, price - totalCostBasis));
-                  }}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg font-bold text-emerald-700 text-sm"
-                  placeholder="e.g. 3850000"
-                />
-              </div>
+      <FlipProjectModal
+        isOpen={showFlipModal}
+        editingFlip={editingFlipId ? (flips.find((f) => f.id === editingFlipId) || activeFlip) : null}
+        onClose={() => {
+          setShowFlipModal(false);
+          setEditingFlipId(null);
+          setPdfParseNotice(null);
+          setExtractedValuationZAR(null);
+        }}
+        onSave={(payload, isNew) => {
+          if (isNew) {
+            const createdFlip: FlipProject = {
+              id: `flip-${Date.now()}`,
+              title: payload.title || 'New Flip Project',
+              address: payload.address || `${payload.city || 'Cape Town'} Project`,
+              city: payload.city || 'Cape Town',
+              propertyType: payload.propertyType || 'Freehold House',
+              agmDate: payload.agmDate,
+              purchaseDate: new Date().toISOString().split('T')[0],
+              purchasePriceZAR: payload.purchasePriceZAR || 0,
+              acquisitionCostsZAR: payload.acquisitionCostsZAR || 0,
+              baselineRenovationBudgetZAR: payload.baselineRenovationBudgetZAR || 0,
+              estimatedDurationMonths: payload.estimatedDurationMonths || 6,
+              monthlyHoldingCostZAR: payload.monthlyHoldingCostZAR || 0,
+              monthlyBondPaymentZAR: payload.monthlyBondPaymentZAR,
+              monthlyLeviesZAR: payload.monthlyLeviesZAR,
+              monthlyRatesTaxesZAR: payload.monthlyRatesTaxesZAR,
+              monthlyOtherHoldingCostZAR: payload.monthlyOtherHoldingCostZAR,
+              targetExitPriceZAR: payload.targetExitPriceZAR || 0,
+              exitCommissionPercent: payload.exitCommissionPercent ?? 5.75,
+              targetCompletionDate: payload.targetCompletionDate || '',
+              currentPhase: 'Acquisition & Conveyancing',
+              boq: [],
+              linkedFundingIds: [],
+              status: 'Active',
+              taxEntityType: payload.taxEntityType || investorProfile?.defaultTaxEntityType || 'Company (27%)',
+              municipalClearance: payload.municipalClearance,
+              driveVault: payload.driveVault,
+              municipalValuationZAR: payload.municipalValuationZAR,
+            };
+            addFlip(createdFlip);
+            setSelectedFlipId(createdFlip.id);
+          } else if (editingFlipId) {
+            updateFlip(editingFlipId, payload);
+          }
+          setShowFlipModal(false);
+          setEditingFlipId(null);
+        }}
+        editingFlipId={editingFlipId}
+        setEditingFlipId={setEditingFlipId}
+        flipTitle={flipTitle}
+        setFlipTitle={setFlipTitle}
+        flipAddress={flipAddress}
+        setFlipAddress={setFlipAddress}
+        flipCity={flipCity}
+        setFlipCity={setFlipCity}
+        flipPropertyType={flipPropertyType}
+        setFlipPropertyType={setFlipPropertyType}
+        flipAgmDate={flipAgmDate}
+        setFlipAgmDate={setFlipAgmDate}
+        flipPurchasePrice={flipPurchasePrice}
+        setFlipPurchasePrice={setFlipPurchasePrice}
+        flipAcquisitionCosts={flipAcquisitionCosts}
+        setFlipAcquisitionCosts={setFlipAcquisitionCosts}
+        flipRenovationBudget={flipRenovationBudget}
+        setFlipRenovationBudget={setFlipRenovationBudget}
+        flipEstimatedDuration={flipEstimatedDuration}
+        setFlipEstimatedDuration={setFlipEstimatedDuration}
+        flipBondPayment={flipBondPayment}
+        setFlipBondPayment={setFlipBondPayment}
+        flipLevies={flipLevies}
+        setFlipLevies={setFlipLevies}
+        flipRates={flipRates}
+        setFlipRates={setFlipRates}
+        flipOtherHoldingCost={flipOtherHoldingCost}
+        setFlipOtherHoldingCost={setFlipOtherHoldingCost}
+        flipTargetExit={flipTargetExit}
+        setFlipTargetExit={setFlipTargetExit}
+        flipExitCommissionPercent={flipExitCommissionPercent}
+        setFlipExitCommissionPercent={setFlipExitCommissionPercent}
+        flipCompletionDate={flipCompletionDate}
+        setFlipCompletionDate={setFlipCompletionDate}
+        flipTaxEntityType={flipTaxEntityType}
+        setFlipTaxEntityType={setFlipTaxEntityType}
+        flipSec118Arrears={flipSec118Arrears}
+        setFlipSec118Arrears={setFlipSec118Arrears}
+        flipAdvanceDeposit={flipAdvanceDeposit}
+        setFlipAdvanceDeposit={setFlipAdvanceDeposit}
+        flipRccStatus={flipRccStatus}
+        setFlipRccStatus={setFlipRccStatus}
+        flipRccAppDate={flipRccAppDate}
+        setFlipRccAppDate={setFlipRccAppDate}
+        flipDisputeNotes={flipDisputeNotes}
+        setFlipDisputeNotes={setFlipDisputeNotes}
+        flipMasterFolderUrl={flipMasterFolderUrl}
+        setFlipMasterFolderUrl={setFlipMasterFolderUrl}
+        flipOtpUrl={flipOtpUrl}
+        setFlipOtpUrl={setFlipOtpUrl}
+        flipRatesBillUrl={flipRatesBillUrl}
+        setFlipRatesBillUrl={setFlipRatesBillUrl}
+        flipTitleDeedUrl={flipTitleDeedUrl}
+        setFlipTitleDeedUrl={setFlipTitleDeedUrl}
+        pdfParseNotice={pdfParseNotice}
+        setPdfParseNotice={setPdfParseNotice}
+        extractedValuationZAR={extractedValuationZAR}
+        setExtractedValuationZAR={setExtractedValuationZAR}
+        isParsingPdf={isParsingPdf}
+        onPdfSelected={handleFlipPdfSelected}
+        onSubmit={handleSaveFlip}
+      />
 
-              <div>
-                <div className="flex items-center justify-between mb-1">
-                  <label className="block font-semibold text-slate-700">
-                    Net Cash Proceeds Received (ZAR) *
-                  </label>
-                  <span className="text-[10px] text-emerald-600 font-semibold">
-                    Deposited 100% to Cash in Reserve
-                  </span>
-                </div>
-                <input
-                  type="number"
-                  required
-                  min="0"
-                  step="any"
-                  value={exitNetProceeds || ''}
-                  onChange={(e) => setExitNetProceeds(Number(e.target.value))}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg font-bold text-slate-900 text-sm"
-                  placeholder="Net cash received after commissions/settlement"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Sale / Transfer Date *</label>
-                  <input
-                    type="date"
-                    required
-                    value={exitSoldDate}
-                    onChange={(e) => setExitSoldDate(e.target.value)}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg"
-                  />
-                </div>
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Realized Net Profit</label>
-                  <div className="w-full px-3 py-2 bg-slate-100 border border-slate-200 rounded-lg font-bold text-slate-800">
-                    {formatZAR((exitSalePrice || 0) - totalCostBasis)}
-                  </div>
-                </div>
-              </div>
-
-              <div>
-                <label className="block font-semibold text-slate-700 mb-1">Exit Notes (Optional)</label>
-                <input
-                  type="text"
-                  placeholder="e.g. Sold via Pam Golding private buyer, 45 days on market"
-                  value={exitNotes}
-                  onChange={(e) => setExitNotes(e.target.value)}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg"
-                />
-              </div>
-
-              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-200">
-                <button
-                  type="button"
-                  onClick={() => setShowExitModal(false)}
-                  className="px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50 font-semibold cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-semibold flex items-center gap-1.5 cursor-pointer"
-                >
-                  <CheckCircle2 className="w-4 h-4" />
-                  <span>Confirm Sale & Credit Reserve</span>
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Convert Flip to Rental (BRRRR Transition) Modal (Mobile Bottom-Sheet / Desktop Centered Dialog) */}
-      {showConvertModal && activeFlip && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 z-50 overflow-y-auto">
-          <div className="bg-white rounded-t-3xl sm:rounded-xl max-w-xl w-full p-5 sm:p-6 shadow-xl border border-slate-200 animate-in fade-in sm:my-8 max-h-[92vh] sm:max-h-[90vh] overflow-y-auto">
-            <div className="w-12 h-1.5 bg-slate-300 rounded-full mx-auto mb-3 sm:hidden" />
-            <div className="flex items-center justify-between pb-3 mb-4 border-b border-slate-100">
-              <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
-                <ArrowRightLeft className="w-5 h-5 text-indigo-600" />
-                <span>Convert to Rental (BRRRR Transition)</span>
-              </h3>
-              <button
-                type="button"
-                onClick={() => setShowConvertModal(false)}
-                className="text-slate-400 hover:text-slate-700 font-bold cursor-pointer"
-              >
-                ✕
-              </button>
-            </div>
-
-            <p className="text-xs text-slate-500 mb-4">
-              Transition <strong>{activeFlip.title}</strong> into a long-term cashflowing rental asset. This marks the Flip phase as Completed, copies over all CoCs and drive documents, and passes the <strong>total accumulated cost</strong> (Purchase + BOQ + Carrying Costs) as the rental&apos;s initial capital basis.
-            </p>
-
-            <form onSubmit={handleConvertFlip} noValidate className="space-y-4 text-xs">
-              {/* Cost Basis Breakdown Card */}
-              <div className="p-3.5 bg-indigo-50/60 rounded-xl border border-indigo-100 space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-[11px] font-bold text-indigo-900 uppercase tracking-wide">
-                    Initial Capital Basis Breakdown
-                  </span>
-                  <span className="text-[10px] bg-indigo-200/60 text-indigo-900 font-semibold px-2 py-0.5 rounded-full">
-                    BRRRR Step 3: Rent
-                  </span>
-                </div>
-
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1 text-slate-700">
-                  <div className="bg-white p-2 rounded-lg border border-indigo-100/80">
-                    <span className="text-[10px] text-slate-400 block font-medium">Purchase + Duty</span>
-                    <strong className="text-xs text-slate-900">{formatZAR(activeFlip.purchasePriceZAR + activeFlip.acquisitionCostsZAR)}</strong>
-                  </div>
-                  <div className="bg-white p-2 rounded-lg border border-indigo-100/80">
-                    <span className="text-[10px] text-slate-400 block font-medium">BOQ Rehab Spend</span>
-                    <strong className="text-xs text-indigo-700">{formatZAR(totalBOQActual)}</strong>
-                  </div>
-                  <div className="bg-white p-2 rounded-lg border border-indigo-100/80">
-                    <span className="text-[10px] text-slate-400 block font-medium">Holding ({flipHoldingMonths} mos)</span>
-                    <strong className="text-xs text-amber-700">{formatZAR(totalHoldingCost)}</strong>
-                  </div>
-                  <div className="bg-indigo-600 text-white p-2 rounded-lg shadow-2xs">
-                    <span className="text-[10px] text-indigo-100 block font-medium">Total Capital Basis</span>
-                    <strong className="text-xs text-white font-extrabold">{formatZAR(totalAllInCost)}</strong>
-                  </div>
-                </div>
-              </div>
-
-              {/* Target Valuation & Gross Rent Inputs */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">
-                    Market Valuation on Handover (ZAR) *
-                  </label>
-                  <input
-                    type="number"
-                    required
-                    min="0"
-                    step="any"
-                    value={convertMarketValue || ''}
-                    onChange={(e) => setConvertMarketValue(Number(e.target.value))}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg font-bold text-slate-900 text-sm focus:ring-1 focus:ring-indigo-500"
-                    placeholder="e.g. 3200000"
-                  />
-                  <span className="text-[10px] text-slate-400 mt-0.5 block">
-                    Target exit valuation from flip analysis
-                  </span>
-                </div>
-
-                <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <label className="block font-semibold text-slate-700">
-                      Estimated Monthly Gross Rent (ZAR) *
-                    </label>
-                    {convertGrossRent > 0 && totalAllInCost > 0 && (
-                      <span className="text-[10px] font-bold text-emerald-600">
-                        {calculateGrossYield(convertGrossRent, totalAllInCost).toFixed(1)}% Gross Yield
-                      </span>
-                    )}
-                  </div>
-                  <input
-                    type="number"
-                    required
-                    min="0"
-                    step="any"
-                    value={convertGrossRent || ''}
-                    onChange={(e) => setConvertGrossRent(Number(e.target.value))}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg font-bold text-emerald-700 text-sm focus:ring-1 focus:ring-emerald-500"
-                    placeholder="e.g. 24000"
-                  />
-                  <span className="text-[10px] text-slate-400 mt-0.5 block">
-                    Starting rental rate for incoming lease
-                  </span>
-                </div>
-              </div>
-
-              {/* Tenant Details */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Tenant Name</label>
-                  <input
-                    type="text"
-                    value={convertTenantName}
-                    onChange={(e) => setConvertTenantName(e.target.value)}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg"
-                    placeholder="Tenant Pending Placement"
-                  />
-                </div>
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Tenant Phone</label>
-                  <input
-                    type="text"
-                    value={convertTenantPhone}
-                    onChange={(e) => setConvertTenantPhone(e.target.value)}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg"
-                    placeholder="+27 82 000 0000"
-                  />
-                </div>
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Tenant Email</label>
-                  <input
-                    type="email"
-                    value={convertTenantEmail}
-                    onChange={(e) => setConvertTenantEmail(e.target.value)}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg"
-                    placeholder="tenant@email.co.za"
-                  />
-                </div>
-              </div>
-
-              {/* Management Model */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Management Type</label>
-                  <select
-                    value={convertManagementType}
-                    onChange={(e) => setConvertManagementType(e.target.value as any)}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg"
-                  >
-                    <option value="Agency">Agency Managed</option>
-                    <option value="Self-Managed">Self-Managed (0%)</option>
-                  </select>
-                </div>
-                {convertManagementType === 'Agency' && (
-                  <>
-                    <div>
-                      <label className="block font-semibold text-slate-700 mb-1">Agency Name</label>
-                      <input
-                        type="text"
-                        value={convertAgencyName}
-                        onChange={(e) => setConvertAgencyName(e.target.value)}
-                        className="w-full px-3 py-2 border border-slate-300 rounded-lg"
-                        placeholder="Pam Golding Sandton"
-                      />
-                    </div>
-                    <div>
-                      <label className="block font-semibold text-slate-700 mb-1">Commission % (excl. VAT)</label>
-                      <input
-                        type="number"
-                        step="any"
-                        min="0"
-                        max="20"
-                        value={convertAgencyCommission}
-                        onChange={(e) => setConvertAgencyCommission(Number(e.target.value))}
-                        className="w-full px-3 py-2 border border-slate-300 rounded-lg"
-                      />
-                    </div>
-                  </>
-                )}
-              </div>
-
-              {/* Transition Notes */}
-              <div>
-                <label className="block font-semibold text-slate-700 mb-1">Transition Notes (Optional)</label>
-                <input
-                  type="text"
-                  value={convertNotes}
-                  onChange={(e) => setConvertNotes(e.target.value)}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg"
-                  placeholder="e.g. Completed luxury finishes, placed executive tenant at R24k/mo"
-                />
-              </div>
-
-              <div className="p-3 bg-amber-50 rounded-lg border border-amber-200 text-amber-900 text-[11px] flex items-start gap-2">
-                <Sparkles className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
-                <div>
-                  <span className="font-bold">Next BRRRR Step: Refinance & Repeat</span>
-                  <p className="text-amber-800 mt-0.5">
-                    Once the tenant is placed and rental income is seasoned, go to the <strong>Rentals</strong> module and click <strong>&quot;Refinance / Pull Out Equity&quot;</strong> to recycle your capital into your Seed Capital reserve for the next property.
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-200">
-                <button
-                  type="button"
-                  onClick={() => setShowConvertModal(false)}
-                  className="px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50 font-semibold cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-semibold flex items-center gap-1.5 cursor-pointer shadow-sm"
-                >
-                  <ArrowRightLeft className="w-4 h-4 text-indigo-200" />
-                  <span>Finalize Conversion to Rental</span>
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Add BOQ Item Modal (Mobile Bottom-Sheet / Desktop Centered Dialog) */}
-      {showAddBOQModal && activeFlip && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 z-50">
-          <div className="bg-white rounded-t-3xl sm:rounded-xl max-w-lg w-full p-5 sm:p-6 shadow-xl border border-slate-200 max-h-[92vh] sm:max-h-none overflow-y-auto">
-            <div className="w-12 h-1.5 bg-slate-300 rounded-full mx-auto mb-3 sm:hidden" />
-            <h3 className="text-base font-bold text-slate-900 mb-4 flex items-center gap-2">
-              <PlusCircle className="w-5 h-5 text-emerald-600" />
-              Add Bill of Quantities (BOQ) Line Item
-            </h3>
-
-            <form onSubmit={handleAddBOQ} noValidate className="space-y-4 text-xs">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Trade Category</label>
-                  <select
-                    value={boqCategory}
-                    onChange={(e) => setBoqCategory(e.target.value as any)}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white"
-                  >
-                    <option value="Demolition & Prep">Demolition & Prep</option>
-                    <option value="Plumbing & Wet Works">Plumbing & Wet Works</option>
-                    <option value="Electrical & Lighting">Electrical & Lighting</option>
-                    <option value="Ceilings & Drywall">Ceilings & Drywall</option>
-                    <option value="Kitchen & Cabinetry">Kitchen & Cabinetry</option>
-                    <option value="Bathrooms">Bathrooms</option>
-                    <option value="Flooring & Tiling">Flooring & Tiling</option>
-                    <option value="Painting & Finishes">Painting & Finishes</option>
-                    <option value="Roofing & Structural">Roofing & Structural</option>
-                    <option value="Security & Exterior">Security & Exterior</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Status</label>
-                  <select
-                    value={boqStatus}
-                    onChange={(e) => setBoqStatus(e.target.value as any)}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white"
-                  >
-                    <option value="Not Started">Not Started</option>
-                    <option value="Quoted">Quoted</option>
-                    <option value="In Progress">In Progress</option>
-                    <option value="Completed">Completed</option>
-                  </select>
-                </div>
-              </div>
-
-              <div>
-                <label className="block font-semibold text-slate-700 mb-1">Scope / Item Description *</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. 1200x600 Rectified Polished Porcelain Floor Tiles"
-                  value={boqDescription}
-                  onChange={(e) => setBoqDescription(e.target.value)}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg"
-                />
-              </div>
-
-              <div className="grid grid-cols-3 gap-3">
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Unit</label>
-                  <input
-                    type="text"
-                    placeholder="m2, linear m, units"
-                    value={boqUnit}
-                    onChange={(e) => setBoqUnit(e.target.value)}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg"
-                  />
-                </div>
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Quantity</label>
-                  <input
-                    type="number"
-                    min="0"
-                    step="any"
-                    value={boqQuantity}
-                    onChange={(e) => setBoqQuantity(Number(e.target.value))}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg"
-                  />
-                </div>
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Baseline Cost (ZAR)</label>
-                  <input
-                    type="number"
-                    min="0"
-                    step="any"
-                    value={boqBaselineUnitCost}
-                    onChange={(e) => setBoqBaselineUnitCost(Number(e.target.value))}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Contractor Milestone Draw Phase</label>
-                  <select
-                    value={boqMilestonePhase}
-                    onChange={(e) => setBoqMilestonePhase(e.target.value as any)}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white"
-                  >
-                    <option value="Deposit">Phase 1: Deposit (20%)</option>
-                    <option value="First Fix / Wet Works">Phase 2: First Fix / Wet Works (30%)</option>
-                    <option value="Finishes">Phase 3: Finishes & Tiling (30%)</option>
-                    <option value="Retention">Phase 4: Practical Completion Retention (20%)</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Retention Withheld (%)</label>
-                  <input
-                    type="number"
-                    min="0"
-                    max="100"
-                    step="5"
-                    value={boqRetentionPercent}
-                    onChange={(e) => setBoqRetentionPercent(Number(e.target.value))}
-                    placeholder="e.g. 20"
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg"
-                  />
-                  <span className="text-[10px] text-slate-400 mt-0.5 block">Held until practical completion</span>
-                </div>
-              </div>
-
-              {/* Sponsor / Barter Accounting Section */}
-              <div className="p-3 bg-purple-50/70 border border-purple-200 rounded-xl space-y-2">
-                <label className="flex items-center gap-2 cursor-pointer font-bold text-xs text-purple-950">
-                  <input
-                    type="checkbox"
-                    checked={boqIsSponsored}
-                    onChange={(e) => setBoqIsSponsored(e.target.checked)}
-                    className="rounded border-purple-300 text-purple-600 focus:ring-purple-500 cursor-pointer"
-                  />
-                  <span className="flex items-center gap-1.5">
-                    <Gift className="w-3.5 h-3.5 text-purple-700" />
-                    <span>Sponsor Barter / Trade Partner Item (Builders Warehouse, Saint-Gobain, Sonae Arauco)</span>
-                  </span>
-                </label>
-
-                {boqIsSponsored && (
-                  <div className="grid grid-cols-2 gap-3 pt-1 animate-in fade-in">
-                    <div>
-                      <label className="block font-semibold text-slate-700 mb-1 text-[11px]">
-                        Commercial Retail Value (ZAR)
-                      </label>
-                      <input
-                        type="number"
-                        min="0"
-                        step="any"
-                        value={boqCommercialRetailValue}
-                        onChange={(e) => setBoqCommercialRetailValue(Number(e.target.value))}
-                        placeholder="e.g. 45000"
-                        className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg bg-white"
-                      />
-                      <span className="text-[9px] text-slate-500 mt-0.5 block">Full store retail price</span>
-                    </div>
-
-                    <div>
-                      <label className="block font-semibold text-slate-700 mb-1 text-[11px]">
-                        Net Cash Outflow (ZAR)
-                      </label>
-                      <input
-                        type="number"
-                        min="0"
-                        step="any"
-                        value={boqActualCashOutflow}
-                        onChange={(e) => {
-                          const val = Number(e.target.value);
-                          setBoqActualCashOutflow(val);
-                          setBoqActualCost(val);
-                        }}
-                        placeholder="e.g. 15000"
-                        className="w-full px-2.5 py-1.5 border border-purple-300 rounded-lg bg-white font-bold text-purple-900"
-                      />
-                      <span className="text-[9px] text-emerald-700 font-bold mt-0.5 block">
-                        Saved: {formatZAR(Math.max(0, boqCommercialRetailValue - boqActualCashOutflow))}
-                      </span>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Actual Invoice Cost (ZAR)</label>
-                  <input
-                    type="number"
-                    min="0"
-                    step="any"
-                    value={boqActualCost}
-                    onChange={(e) => setBoqActualCost(Number(e.target.value))}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg font-bold"
-                  />
-                </div>
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Supplier / Contractor</label>
-                  <select
-                    value={boqSupplier}
-                    onChange={(e) => setBoqSupplier(e.target.value)}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white"
-                  >
-                    {suppliers.map((s) => (
-                      <option key={s.id} value={s.name}>
-                        {s.name} ({s.branchLocation})
-                      </option>
-                    ))}
-                    <option value="Builders Warehouse Sandton">Builders Warehouse Sandton</option>
-                    <option value="Saint-Gobain Gyproc">Saint-Gobain Gyproc</option>
-                    <option value="Sonae Arauco Panels">Sonae Arauco Panels</option>
-                    <option value="Independent Contractor">Independent Contractor</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-200">
-                <button
-                  type="button"
-                  onClick={() => setShowAddBOQModal(false)}
-                  className="px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50 font-semibold"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-semibold"
-                >
-                  Add Item
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Unified Flip Project Modal (Add & Edit) (Mobile Bottom-Sheet / Desktop Centered Dialog) */}
-      {showFlipModal && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 z-50">
-          <div className="bg-white rounded-t-3xl sm:rounded-xl max-w-lg w-full p-5 sm:p-6 shadow-xl border border-slate-200 max-h-[92vh] overflow-y-auto">
-            <div className="w-12 h-1.5 bg-slate-300 rounded-full mx-auto mb-3 sm:hidden" />
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
-                {editingFlipId ? (
-                  <>
-                    <Edit3 className="w-5 h-5 text-indigo-600" />
-                    <span>Edit Buy-and-Flip Parameters</span>
-                  </>
-                ) : (
-                  <>
-                    <Hammer className="w-5 h-5 text-indigo-600" />
-                    <span>Scaffold New Buy-and-Flip Project</span>
-                  </>
-                )}
-              </h3>
-              <button
-                type="button"
-                onClick={() => {
-                  setShowFlipModal(false);
-                  setEditingFlipId(null);
-                  setPdfParseNotice(null);
-                  setExtractedValuationZAR(null);
-                }}
-                className="text-slate-400 hover:text-slate-600 p-1 rounded-lg text-sm font-bold cursor-pointer"
-              >
-                ✕
-              </button>
-            </div>
-
-            {/* Quick Auto-fill from PDF statement button / dropzone */}
-            <div className="relative mb-3">
-              <input
-                type="file"
-                id="flip-pdf-upload-modal"
-                accept=".pdf"
-                multiple
-                className="hidden"
-                disabled={isParsingPdf}
-                onChange={(e) => {
-                  const files = Array.from(e.target.files || []).slice(0, 3);
-                  if (files.length > 0) handleFlipPdfSelected(files);
-                }}
-              />
-              <label
-                htmlFor="flip-pdf-upload-modal"
-                className="flex items-center justify-between p-3 bg-purple-50/70 hover:bg-purple-100/70 border border-dashed border-purple-300 rounded-xl cursor-pointer transition-all group"
-              >
-                <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-lg bg-purple-600 text-white flex items-center justify-center shrink-0">
-                    <FileText className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <span className="text-xs font-bold text-purple-950 block group-hover:text-purple-700">
-                      Auto-fill from Municipal or Levy Statement (PDF)
-                    </span>
-                    <span className="text-[10px] text-purple-600">
-                      Upload CoJ, Eskom, or Body Corporate bill to extract address, carrying costs & valuation
-                    </span>
-                  </div>
-                </div>
-                <span className="text-[10px] font-bold uppercase tracking-wider bg-white text-purple-700 px-2 py-1 rounded border border-purple-200 shrink-0">
-                  {isParsingPdf ? 'Parsing...' : 'Upload PDF'}
-                </span>
-              </label>
-            </div>
-
-            {pdfParseNotice && (
-              <div className="mb-3 p-2.5 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs flex items-start gap-2">
-                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-                <span className="font-medium">{pdfParseNotice}</span>
-              </div>
-            )}
-
-            <form onSubmit={handleSaveFlip} noValidate className="space-y-4 text-xs">
-              <div>
-                <label className="block font-semibold text-slate-700 mb-1">Project Name *</label>
-                <input
-                  type="text"
-                  name="projectName"
-                  autoComplete="off"
-                  required
-                  placeholder="e.g. Camps Bay Sunset Redesign"
-                  value={flipTitle}
-                  onChange={(e) => setFlipTitle(e.target.value)}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg font-bold text-slate-900"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Street Address</label>
-                  <input
-                    type="text"
-                    name="propertyAddress"
-                    autoComplete="off"
-                    placeholder="e.g. 18 Victoria Road"
-                    value={flipAddress}
-                    onChange={(e) => setFlipAddress(e.target.value)}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg"
-                  />
-                </div>
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">City</label>
-                  <input
-                    type="text"
-                    name="propertyCity"
-                    autoComplete="off"
-                    value={flipCity}
-                    onChange={(e) => setFlipCity(e.target.value)}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg"
-                  />
-                </div>
-              </div>
-
-              {/* Property Title Type & Body Corporate AGM Section */}
-              <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 space-y-3">
-                <div>
-                  <div className="flex items-center justify-between mb-1.5">
-                    <label className="block font-bold text-slate-800 text-[11px] uppercase tracking-wider">
-                      Property Title Type
-                    </label>
-                    <span className="text-[10px] text-slate-500">STSMA & Governance Classification</span>
-                  </div>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
-                    {(
-                      [
-                        { id: 'Freehold House', label: '🏡 Freehold House' },
-                        { id: 'Townhouse / Cluster', label: '🏘️ Townhouse / Cluster' },
-                        { id: 'Sectional Title Apartment', label: '🏢 Sectional Title' },
-                        { id: 'Multi-unit Commercial', label: '🏬 Commercial' },
-                      ] as const
-                    ).map((pt) => (
-                      <button
-                        key={pt.id}
-                        type="button"
-                        onClick={() => setFlipPropertyType(pt.id)}
-                        className={`py-1.5 px-2 rounded-lg text-[11px] font-semibold transition-all text-center border ${
-                          flipPropertyType === pt.id
-                            ? 'bg-slate-900 text-white border-slate-900 shadow-2xs font-bold'
-                            : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100'
-                        }`}
-                      >
-                        {pt.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {(flipPropertyType === 'Sectional Title Apartment' || flipPropertyType === 'Townhouse / Cluster') && (
-                  <div className="pt-2 border-t border-slate-200">
-                    <div className="flex items-center justify-between mb-1">
-                      <label className="block font-semibold text-slate-700 text-xs">
-                        📅 Scheduled Body Corporate AGM Date
-                      </label>
-                      <span className="text-[10px] text-indigo-600 font-medium">
-                        Auto-schedules reminder task 14 days prior
-                      </span>
-                    </div>
-                    <input
-                      type="date"
-                      value={flipAgmDate}
-                      onChange={(e) => setFlipAgmDate(e.target.value)}
-                      className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg bg-white text-xs"
-                    />
-                  </div>
-                )}
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Purchase Price (ZAR)</label>
-                  <input
-                    type="number"
-                    name="purchasePriceZAR"
-                    autoComplete="off"
-                    min="0"
-                    step="any"
-                    value={flipPurchasePrice}
-                    onChange={(e) => setFlipPurchasePrice(Number(e.target.value))}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg font-semibold"
-                  />
-                </div>
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Acquisition Costs (Duty + Fees)</label>
-                  <input
-                    type="number"
-                    name="acquisitionCostsZAR"
-                    autoComplete="off"
-                    min="0"
-                    step="any"
-                    value={flipAcquisitionCosts}
-                    onChange={(e) => setFlipAcquisitionCosts(Number(e.target.value))}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg font-semibold"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Baseline Reno Budget (ZAR)</label>
-                  <input
-                    type="number"
-                    name="renovationBudgetZAR"
-                    autoComplete="off"
-                    min="0"
-                    step="any"
-                    value={flipRenovationBudget}
-                    onChange={(e) => setFlipRenovationBudget(Number(e.target.value))}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg font-semibold"
-                  />
-                </div>
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Target Exit Price (ZAR)</label>
-                  <input
-                    type="number"
-                    name="targetExitPriceZAR"
-                    autoComplete="off"
-                    min="0"
-                    step="any"
-                    value={flipTargetExit}
-                    onChange={(e) => setFlipTargetExit(Number(e.target.value))}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg font-bold text-emerald-700"
-                  />
-                </div>
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Exit Commission (%)</label>
-                  <input
-                    type="number"
-                    name="exitCommissionPercent"
-                    autoComplete="off"
-                    min="0"
-                    max="100"
-                    step="0.05"
-                    value={flipExitCommissionPercent}
-                    onChange={(e) => setFlipExitCommissionPercent(Number(e.target.value))}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg font-semibold text-slate-900"
-                    placeholder="5.75"
-                  />
-                </div>
-              </div>
-
-              {/* Municipal Valuation Benchmark Chip (if extracted) */}
-              {extractedValuationZAR && extractedValuationZAR > 0 ? (
-                <div className="flex items-center justify-between p-2.5 bg-purple-50 rounded-lg border border-purple-200">
-                  <div className="flex items-center gap-1.5 flex-wrap">
-                    <span className="text-xs font-semibold text-purple-900 inline-flex items-center gap-1.5">
-                      <Landmark className="w-3.5 h-3.5 text-purple-700" />
-                      <span>Municipal Valuation: <strong>{formatZAR(extractedValuationZAR)}</strong></span>
-                    </span>
-                    <span className="text-[10px] text-purple-700 bg-purple-100 px-1.5 py-0.5 rounded border border-purple-200 font-medium">
-                      CoJ Benchmark
-                    </span>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setFlipTargetExit(extractedValuationZAR)}
-                    className="text-[11px] font-bold text-purple-700 bg-white hover:bg-purple-100 px-2 py-1 rounded border border-purple-300 shadow-2xs transition-colors cursor-pointer shrink-0"
-                  >
-                    Use as Target Exit (ARV) →
-                  </button>
-                </div>
-              ) : null}
-
-              {/* Holding Period Carrying Costs Inputs (Itemized) */}
-              <div className="p-3 bg-amber-50/60 rounded-lg border border-amber-200/90 space-y-2.5">
-                <div className="flex items-center justify-between">
-                  <span className="font-bold text-[11px] text-amber-900 uppercase tracking-wider">
-                    Holding Period Carrying Costs (Itemized)
-                  </span>
-                  <span className="text-xs font-bold text-amber-800 bg-amber-100 px-2 py-0.5 rounded border border-amber-300">
-                    Total: {formatZAR(flipEstimatedDuration * (Number(flipBondPayment) + (flipPropertyType === 'Freehold House' ? 0 : Number(flipLevies)) + Number(flipRates) + Number(flipOtherHoldingCost)))}
-                  </span>
-                </div>
-
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1 text-xs">Estimated Duration (Months)</label>
-                  <input
-                    type="number"
-                    name="durationMonths"
-                    autoComplete="off"
-                    min="1"
-                    max="36"
-                    value={flipEstimatedDuration}
-                    onChange={(e) => setFlipEstimatedDuration(Number(e.target.value))}
-                    className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg bg-white font-medium text-xs"
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-xs">
-                  <div>
-                    <label className="block font-semibold text-slate-700 mb-1 text-[11px]">Interim Bond (ZAR/m)</label>
-                    <input
-                      type="number"
-                      name="interimBondPaymentZAR"
-                      autoComplete="off"
-                      min="0"
-                      step="any"
-                      value={flipBondPayment}
-                      onChange={(e) => setFlipBondPayment(Number(e.target.value))}
-                      className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg bg-white font-medium text-xs"
-                    />
-                  </div>
-                  <div>
-                    <div className="flex items-center justify-between mb-1">
-                      <label className="block font-semibold text-slate-700 text-[11px]">
-                        {flipPropertyType === 'Freehold House' ? 'Levies (N/A)' : 'Levies (ZAR/m)'}
-                      </label>
-                      {flipPropertyType === 'Freehold House' && (
-                        <span className="text-[9px] font-bold text-emerald-700 bg-emerald-100 px-1 rounded">R0</span>
-                      )}
-                    </div>
-                    <input
-                      type="number"
-                      name="holdingLeviesZAR"
-                      autoComplete="off"
-                      min="0"
-                      step="any"
-                      disabled={flipPropertyType === 'Freehold House'}
-                      value={flipPropertyType === 'Freehold House' ? 0 : flipLevies}
-                      onChange={(e) => setFlipLevies(Number(e.target.value))}
-                      className={`w-full px-2.5 py-1.5 border rounded-lg text-xs font-medium ${
-                        flipPropertyType === 'Freehold House'
-                          ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'
-                          : 'bg-white border-slate-300'
-                      }`}
-                    />
-                  </div>
-                  <div>
-                    <label className="block font-semibold text-slate-700 mb-1 text-[11px]">Rates & Taxes (ZAR/m)</label>
-                    <input
-                      type="number"
-                      name="holdingRatesZAR"
-                      autoComplete="off"
-                      min="0"
-                      step="any"
-                      value={flipRates}
-                      onChange={(e) => setFlipRates(Number(e.target.value))}
-                      className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg bg-white font-medium text-xs"
-                    />
-                  </div>
-                  <div>
-                    <label className="block font-semibold text-slate-700 mb-1 text-[11px]">Other Costs (ZAR/m)</label>
-                    <input
-                      type="number"
-                      name="holdingOtherCostsZAR"
-                      autoComplete="off"
-                      min="0"
-                      step="any"
-                      value={flipOtherHoldingCost}
-                      onChange={(e) => setFlipOtherHoldingCost(Number(e.target.value))}
-                      placeholder="Security, ins."
-                      className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg bg-white font-medium text-xs"
-                    />
-                  </div>
-                </div>
-
-                <div className="p-2 bg-amber-100/70 rounded-lg flex items-center justify-between text-xs text-amber-950 font-semibold">
-                  <span>Total Monthly Carrying Burn:</span>
-                  <span className="font-bold text-sm text-amber-800">
-                    {formatZAR(Number(flipBondPayment) + (flipPropertyType === 'Freehold House' ? 0 : Number(flipLevies)) + Number(flipRates) + Number(flipOtherHoldingCost))}/mo
-                  </span>
-                </div>
-              </div>
-
-              {/* Entity Tax Structure (Requirement 5) */}
-              <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 space-y-2">
-                <div className="flex items-center justify-between">
-                  <label className="font-bold text-[11px] text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
-                    <Scale className="w-3.5 h-3.5 text-indigo-600" />
-                    <span>Tax Entity & Provisional Tax Structure</span>
-                  </label>
-                  <span className="text-[10px] text-slate-500">Corporate vs Individual</span>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
-                  <div>
-                    <label className="block text-[11px] font-semibold text-slate-600 mb-1">Tax Entity Type</label>
-                    <select
-                      value={flipTaxEntityType}
-                      onChange={(e) => setFlipTaxEntityType(e.target.value as any)}
-                      className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg bg-white font-medium text-xs text-slate-800 cursor-pointer"
-                    >
-                      <option value="Company (27%)">Company / PTY Ltd (27% Corporate Tax)</option>
-                      <option value="Individual (45%)">Individual / Sole Prop (45% Marginal Tax)</option>
-                      <option value="Pre-Tax">Pre-Tax / Gross Model (0%)</option>
-                    </select>
-                  </div>
-                  <div className="flex items-center p-2 bg-indigo-50/60 rounded-lg border border-indigo-100 text-[11px] text-indigo-900 leading-snug">
-                    <span>
-                      {flipTaxEntityType === 'Company (27%)' && 'Applies SARS 27% corporate income tax rate to net trading flip upside.'}
-                      {flipTaxEntityType === 'Individual (45%)' && 'Applies top marginal individual tax rate of 45% for high-bracket investors.'}
-                      {flipTaxEntityType === 'Pre-Tax' && 'Excludes provisional tax provision; models pre-tax gross operational return.'}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Section 118 Rates Clearance & Municipal Arrears (Requirement 3) */}
-              <div className="p-3 bg-amber-50/60 rounded-lg border border-amber-200/90 space-y-2.5">
-                <div className="flex items-center justify-between">
-                  <span className="font-bold text-[11px] text-amber-950 uppercase tracking-wider flex items-center gap-1.5">
-                    <Landmark className="w-3.5 h-3.5 text-amber-700" />
-                    <span>Section 118 Municipal Arrears & Clearance (RCC)</span>
-                  </span>
-                  <span className="text-[10px] font-semibold text-amber-800 bg-amber-100 px-2 py-0.5 rounded-full border border-amber-300">
-                    Municipal Systems Act
-                  </span>
-                </div>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
-                  <div>
-                    <label className="block font-semibold text-slate-700 mb-1 text-[11px]">Sec 118(1) Arrears (ZAR)</label>
-                    <input
-                      type="number"
-                      min="0"
-                      step="any"
-                      value={flipSec118Arrears}
-                      onChange={(e) => setFlipSec118Arrears(Number(e.target.value))}
-                      placeholder="0"
-                      className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg bg-white font-medium text-xs"
-                    />
-                    <span className="text-[9px] text-slate-500">2-yr historic municipal debt</span>
-                  </div>
-                  <div>
-                    <label className="block font-semibold text-slate-700 mb-1 text-[11px]">Advance Council Deposit (ZAR)</label>
-                    <input
-                      type="number"
-                      min="0"
-                      step="any"
-                      value={flipAdvanceDeposit}
-                      onChange={(e) => setFlipAdvanceDeposit(Number(e.target.value))}
-                      placeholder="0"
-                      className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg bg-white font-medium text-xs"
-                    />
-                    <span className="text-[9px] text-slate-500">4-6 mos forward deposit</span>
-                  </div>
-                  <div>
-                    <label className="block font-semibold text-slate-700 mb-1 text-[11px]">RCC Clearance Status</label>
-                    <select
-                      value={flipRccStatus}
-                      onChange={(e) => setFlipRccStatus(e.target.value as any)}
-                      className="w-full px-2 py-1.5 border border-slate-300 rounded-lg bg-white font-medium text-xs text-slate-800 cursor-pointer"
-                    >
-                      <option value="Pending Application">Pending Application</option>
-                      <option value="Figures Issued">Figures Issued</option>
-                      <option value="Paid & Awaiting Certificate">Paid & Awaiting Certificate</option>
-                      <option value="Disputed">Disputed (CoJ Billing Query)</option>
-                      <option value="Certificate Issued">Certificate Issued (Clear for Transfer)</option>
-                    </select>
-                    <span className="text-[9px] text-slate-500">Council certificate phase</span>
-                  </div>
-                  <div>
-                    <label className="block font-semibold text-slate-700 mb-1 text-[11px]">RCC Application Date</label>
-                    <input
-                      type="date"
-                      value={flipRccAppDate}
-                      onChange={(e) => setFlipRccAppDate(e.target.value)}
-                      className="w-full px-2 py-1.5 border border-slate-300 rounded-lg bg-white font-medium text-xs"
-                    />
-                    <span className="text-[9px] text-slate-500">Lodge date with council</span>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1 text-[11px]">
-                    Municipal Billing Query / Dispute Notes
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="e.g. City of Joburg estimated meter dispute logged (Ref #...)"
-                    value={flipDisputeNotes}
-                    onChange={(e) => setFlipDisputeNotes(e.target.value)}
-                    className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg bg-white text-xs"
-                  />
-                </div>
-              </div>
-
-              {/* Cloud & Web Document Vault Section */}
-              <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 space-y-2.5">
-                <div className="flex items-center justify-between">
-                  <span className="font-bold text-[11px] text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
-                    <span>☁️ Cloud & Web Document Vault</span>
-                  </span>
-                  <span className="text-[10px] text-slate-500">OneDrive • GDrive • Dropbox</span>
-                </div>
-                <div className="grid grid-cols-2 gap-2 text-xs">
-                  <div>
-                    <label className="block text-[11px] font-semibold text-slate-600 mb-1">Deal Folder URL</label>
-                    <input
-                      type="url"
-                      placeholder="https://1drv.ms/... or drive.google.com/..."
-                      value={flipMasterFolderUrl}
-                      onChange={(e) => setFlipMasterFolderUrl(e.target.value)}
-                      className="w-full px-2 py-1 text-[11px] border border-slate-300 rounded-lg bg-white"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[11px] font-semibold text-slate-600 mb-1">Signed OTP PDF URL</label>
-                    <input
-                      type="url"
-                      placeholder="https://..."
-                      value={flipOtpUrl}
-                      onChange={(e) => setFlipOtpUrl(e.target.value)}
-                      className="w-full px-2 py-1 text-[11px] border border-slate-300 rounded-lg bg-white"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[11px] font-semibold text-slate-600 mb-1">Rates & Levies Statement</label>
-                    <input
-                      type="url"
-                      placeholder="https://..."
-                      value={flipRatesBillUrl}
-                      onChange={(e) => setFlipRatesBillUrl(e.target.value)}
-                      className="w-full px-2 py-1 text-[11px] border border-slate-300 rounded-lg bg-white"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[11px] font-semibold text-slate-600 mb-1">Title Deed / SG Diagram</label>
-                    <input
-                      type="url"
-                      placeholder="https://..."
-                      value={flipTitleDeedUrl}
-                      onChange={(e) => setFlipTitleDeedUrl(e.target.value)}
-                      className="w-full px-2 py-1 text-[11px] border border-slate-300 rounded-lg bg-white"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div>
-                <label className="block font-semibold text-slate-700 mb-1">Target Completion Date</label>
-                <input
-                  type="date"
-                  value={flipCompletionDate}
-                  onChange={(e) => setFlipCompletionDate(e.target.value)}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg"
-                />
-              </div>
-
-              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-200">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowFlipModal(false);
-                    setEditingFlipId(null);
-                    setPdfParseNotice(null);
-                    setExtractedValuationZAR(null);
-                  }}
-                  className="px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50 font-semibold cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className={`px-4 py-2 ${
-                    editingFlipId ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-emerald-600 hover:bg-emerald-700'
-                  } text-white rounded-lg font-semibold cursor-pointer flex items-center gap-1.5`}
-                >
-                  {editingFlipId && <CheckCircle2 className="w-4 h-4" />}
-                  <span>{editingFlipId ? 'Update Flip Project' : 'Create Flip'}</span>
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Supplier Directory Modal (Mobile Bottom-Sheet / Desktop Centered Dialog) */}
-      {showSupplierModal && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 z-50">
-          <div className="bg-white rounded-t-3xl sm:rounded-xl max-w-2xl w-full p-5 sm:p-6 shadow-xl border border-slate-200 max-h-[92vh] sm:max-h-[85vh] overflow-y-auto">
-            <div className="w-12 h-1.5 bg-slate-300 rounded-full mx-auto mb-3 sm:hidden" />
-            <div className="flex items-center justify-between mb-4 border-b border-slate-200 pb-3">
-              <div>
-                <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
-                  <Store className="w-5 h-5 text-indigo-600" />
-                  Local South African Supplier & Contractor Book
-                </h3>
-                <p className="text-xs text-slate-500">
-                  Builders Warehouse, Chamberlains, Plumblink, Tile Africa, and certified Wireman electricians.
-                </p>
-              </div>
-              <button
-                onClick={() => setShowSupplierModal(false)}
-                className="text-slate-400 hover:text-slate-700 text-sm font-bold"
-              >
-                ✕
-              </button>
-            </div>
-
-            {/* List Suppliers */}
-            <div className="space-y-3 mb-6">
-              {suppliers.map((sup) => (
-                <div
-                  key={sup.id}
-                  className="p-3 rounded-lg border border-slate-200 bg-slate-50 flex items-start justify-between gap-3 text-xs"
-                >
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="font-bold text-slate-900">{sup.name}</span>
-                      <span className="text-[10px] bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded font-semibold">
-                        {sup.category}
-                      </span>
-                      {sup.hasCoC && (
-                        <span className="text-[10px] bg-emerald-100 text-emerald-800 px-1.5 py-0.2 rounded font-bold">
-                          Wireman CoC Certified
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-slate-500 text-[11px] mt-0.5">
-                      {sup.branchLocation} {sup.contactPerson && `• Contact: ${sup.contactPerson}`}
-                    </p>
-                    <div className="text-slate-600 text-[11px] mt-1 flex items-center gap-3">
-                      <span>Phone: <strong className="text-slate-800">{sup.phone}</strong></span>
-                      {sup.discountTerms && (
-                        <span className="text-emerald-700 font-semibold">{sup.discountTerms}</span>
-                      )}
-                    </div>
-                  </div>
-                  <button
-                    onClick={() => deleteSupplier(sup.id)}
-                    className="p-1 text-slate-400 hover:text-rose-600 rounded"
-                    title="Remove supplier"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              ))}
-            </div>
-
-            {/* Add New Supplier Form */}
-            <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/50">
-              <h4 className="font-bold text-xs text-slate-800 mb-3">Add Local Supplier / Contractor</h4>
-              <form onSubmit={handleAddSupplier} noValidate className="space-y-3 text-xs">
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-[11px] font-semibold text-slate-600 mb-1">Supplier / Contractor Name *</label>
-                    <input
-                      type="text"
-                      name="supplierCompany"
-                      autoComplete="organization"
-                      required
-                      placeholder="e.g. Buco Menlyn"
-                      value={supName}
-                      onChange={(e) => setSupName(e.target.value)}
-                      className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg bg-white"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[11px] font-semibold text-slate-600 mb-1">Category</label>
-                    <select
-                      value={supCategory}
-                      onChange={(e) => setSupCategory(e.target.value as any)}
-                      className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg bg-white"
-                    >
-                      <option value="General Building Merchant">General Building Merchant</option>
-                      <option value="Hardware & Timber">Hardware & Timber</option>
-                      <option value="Plumbing Supplies">Plumbing Supplies</option>
-                      <option value="Electrical Supplies">Electrical Supplies</option>
-                      <option value="Tiles & Sanitary">Tiles & Sanitary</option>
-                      <option value="Specialist Contractor">Specialist Contractor</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-3 gap-3">
-                  <div>
-                    <label className="block text-[11px] font-semibold text-slate-600 mb-1">Branch / Location</label>
-                    <input
-                      type="text"
-                      name="supplierBranch"
-                      autoComplete="off"
-                      placeholder="e.g. Paarden Eiland"
-                      value={supBranch}
-                      onChange={(e) => setSupBranch(e.target.value)}
-                      className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg bg-white"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[11px] font-semibold text-slate-600 mb-1">Contact Phone</label>
-                    <input
-                      type="tel"
-                      name="phone"
-                      autoComplete="tel"
-                      placeholder="+27 11 000 0000"
-                      value={supPhone}
-                      onChange={(e) => setSupPhone(e.target.value)}
-                      className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg bg-white"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[11px] font-semibold text-slate-600 mb-1">Trade Discount Terms</label>
-                    <input
-                      type="text"
-                      name="tradeDiscount"
-                      autoComplete="off"
-                      placeholder="e.g. 5% Cash Discount"
-                      value={supDiscount}
-                      onChange={(e) => setSupDiscount(e.target.value)}
-                      className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg bg-white"
-                    />
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between pt-2">
-                  <label className="flex items-center gap-1.5 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={supHasCoc}
-                      onChange={(e) => setSupHasCoc(e.target.checked)}
-                      className="rounded border-slate-300 text-emerald-600"
-                    />
-                    <span className="text-[11px] font-medium text-slate-700">Has CoC Accreditation (Electrical / Plumbing)</span>
-                  </label>
-                  <button
-                    type="submit"
-                    className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-lg text-xs"
-                  >
-                    Save Supplier
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        </div>
-      )}
-      {/* Edit Funding Campaign Modal (Mobile Bottom-Sheet / Desktop Centered Dialog) */}
-      {showFundingModal && activeFlip && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 z-50">
-          <div className="bg-white rounded-t-3xl sm:rounded-xl max-w-lg w-full p-5 sm:p-6 shadow-xl border border-slate-200 max-h-[92vh] sm:max-h-none overflow-y-auto">
-            <div className="w-12 h-1.5 bg-slate-300 rounded-full mx-auto mb-3 sm:hidden" />
-            <h3 className="text-base font-bold text-slate-900 mb-4 flex items-center gap-2">
-              <Coins className="w-5 h-5 text-emerald-600" />
-              Edit Deal Funding Campaign & Investor Terms
-            </h3>
-
-            <form onSubmit={handleSaveFunding} noValidate className="space-y-4 text-xs">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Target Facility (ZAR) *</label>
-                  <input
-                    type="number"
-                    name="targetFacilityZAR"
-                    autoComplete="off"
-                    min="0"
-                    step="any"
-                    required
-                    value={fundingRequired}
-                    onChange={(e) => setFundingRequired(Number(e.target.value))}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg font-bold text-slate-900"
-                  />
-                  <span className="text-[10px] text-slate-400">Total capital needed</span>
-                </div>
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Capital Raised to Date (ZAR)</label>
-                  <input
-                    type="number"
-                    name="capitalRaisedZAR"
-                    autoComplete="off"
-                    min="0"
-                    step="any"
-                    value={capitalRaised}
-                    onChange={(e) => setCapitalRaised(Number(e.target.value))}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg font-bold text-emerald-700"
-                  />
-                  <span className="text-[10px] text-slate-400">Managed to raise so far</span>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Primary Funder Name</label>
-                  <input
-                    type="text"
-                    name="contactPerson"
-                    autoComplete="name"
-                    placeholder="e.g. Johan Meyer"
-                    value={primaryFunderName}
-                    onChange={(e) => setPrimaryFunderName(e.target.value)}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg"
-                  />
-                </div>
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Funder Category</label>
-                  <select
-                    value={primaryFunderType}
-                    onChange={(e) => setPrimaryFunderType(e.target.value as any)}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white"
-                  >
-                    <option value="Private Lender">Private Lender (Angel / HNW)</option>
-                    <option value="Syndicate JV Partner">Syndicate JV Partner</option>
-                    <option value="Friends & Family">Friends & Family</option>
-                    <option value="Equity Partner">Equity Partner</option>
-                  </select>
-                </div>
-              </div>
-
-              <div>
-                <label className="block font-semibold text-slate-700 mb-1">Funder Contact / Trust Info</label>
-                <input
-                  type="text"
-                  name="funderContact"
-                  autoComplete="off"
-                  placeholder="e.g. Meyer Family Trust / +27 82 555 1234"
-                  value={primaryFunderContact}
-                  onChange={(e) => setPrimaryFunderContact(e.target.value)}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Promised Return Structure</label>
-                  <select
-                    value={promisedReturnType}
-                    onChange={(e) => setPromisedReturnType(e.target.value as any)}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white"
-                  >
-                    <option value="Fixed Interest">Fixed Interest (% p.a.)</option>
-                    <option value="Equity Profit Split">Equity Profit Split (% of Net Flip)</option>
-                    <option value="Monthly Coupon">Monthly Coupon</option>
-                    <option value="Bullet Repayment">Bullet Repayment</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Promised Rate / Split (%)</label>
-                  <input
-                    type="number"
-                    name="returnRatePercent"
-                    autoComplete="off"
-                    min="0"
-                    step="any"
-                    value={promisedReturnRatePercent}
-                    onChange={(e) => setPromisedReturnRatePercent(Number(e.target.value))}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg font-bold text-emerald-700"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Payout Schedule</label>
-                  <select
-                    value={promisedPayoutSchedule}
-                    onChange={(e) => setPromisedPayoutSchedule(e.target.value as any)}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white"
-                  >
-                    <option value="Monthly Interest">Monthly Interest</option>
-                    <option value="Quarterly">Quarterly</option>
-                    <option value="At Exit (Maturity)">At Exit (Maturity / Transfer)</option>
-                    <option value="Bi-Annual">Bi-Annual</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Security / Collateral Offered</label>
-                  <input
-                    type="text"
-                    value={securityOffered}
-                    onChange={(e) => setSecurityOffered(e.target.value)}
-                    placeholder="e.g. 2nd Mortgage Bond registered"
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block font-semibold text-slate-700 mb-1">Co-Funders / Syndicate Notes</label>
-                <input
-                  type="text"
-                  placeholder="e.g. R300k open tranche or co-funded with Piet"
-                  value={coFundersNotes}
-                  onChange={(e) => setCoFundersNotes(e.target.value)}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg"
-                />
-              </div>
-
-              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-200">
-                <button
-                  type="button"
-                  onClick={() => setShowFundingModal(false)}
-                  className="px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50 font-semibold cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-semibold cursor-pointer"
-                >
-                  Save Funding Campaign
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      <SupplierDirectoryModal
+        isOpen={showSupplierModal}
+        onClose={() => setShowSupplierModal(false)}
+        onAddSupplier={(newSup) => {
+          addSupplier(newSup);
+          setShowSupplierModal(false);
+        }}
+        suppliers={suppliers}
+        onDeleteSupplier={deleteSupplier}
+        supName={supName}
+        setSupName={setSupName}
+        supCategory={supCategory}
+        setSupCategory={setSupCategory}
+        supBranch={supBranch}
+        setSupBranch={setSupBranch}
+        supPhone={supPhone}
+        setSupPhone={setSupPhone}
+        supDiscount={supDiscount}
+        setSupDiscount={setSupDiscount}
+        supHasCoc={supHasCoc}
+        setSupHasCoc={setSupHasCoc}
+        onSubmit={handleAddSupplier}
+      />
+      <FlipFundingModal
+        isOpen={showFundingModal && Boolean(activeFlip)}
+        flip={activeFlip}
+        totalCostBasisZAR={totalCostBasis}
+        totalCapitalSecuredZAR={totalCapitalSecured}
+        onClose={() => setShowFundingModal(false)}
+        onSave={(campaign) => {
+          if (activeFlip) {
+            updateFlip(activeFlip.id, campaign);
+          }
+          setShowFundingModal(false);
+        }}
+        fundingRequired={fundingRequired}
+        setFundingRequired={setFundingRequired}
+        capitalRaised={capitalRaised}
+        setCapitalRaised={setCapitalRaised}
+        primaryFunderName={primaryFunderName}
+        setPrimaryFunderName={setPrimaryFunderName}
+        primaryFunderContact={primaryFunderContact}
+        setPrimaryFunderContact={setPrimaryFunderContact}
+        primaryFunderType={primaryFunderType}
+        setPrimaryFunderType={setPrimaryFunderType}
+        coFundersNotes={coFundersNotes}
+        setCoFundersNotes={setCoFundersNotes}
+        promisedReturnType={promisedReturnType}
+        setPromisedReturnType={setPromisedReturnType}
+        promisedReturnRatePercent={promisedReturnRatePercent}
+        setPromisedReturnRatePercent={setPromisedReturnRatePercent}
+        promisedPayoutSchedule={promisedPayoutSchedule}
+        setPromisedPayoutSchedule={setPromisedPayoutSchedule}
+        securityOffered={securityOffered}
+        setSecurityOffered={setSecurityOffered}
+        onSubmit={handleSaveFunding}
+      />
 
       {/* Delay Sensitivity Matrix Modal (Requirement 2) */}
       {activeFlip && showDelayMatrixModal && (

@@ -41,6 +41,14 @@ import {
   calculateAggregateRentalKPIs,
 } from '@/lib/calculations/rentals';
 import LongTermProjectionChart from '@/components/analytics/LongTermProjectionChart';
+import { ExitSaleModal } from '@/components/rentals/modals/ExitSaleModal';
+import { RefinanceModal } from '@/components/rentals/modals/RefinanceModal';
+import { RefinanceAuditModal } from '@/components/rentals/modals/RefinanceAuditModal';
+import { MaintenanceModal } from '@/components/rentals/modals/MaintenanceModal';
+import { RentalFormModal } from '@/components/rentals/modals/RentalFormModal';
+import { SarbPmtModal } from '@/components/rentals/modals/SarbPmtModal';
+import { PaymentModal } from '@/components/rentals/modals/PaymentModal';
+import { WriteOffModal } from '@/components/rentals/modals/WriteOffModal';
 import {
   Building2,
   PlusCircle,
@@ -308,13 +316,16 @@ export default function RentalPortfolioPage() {
         }
 
         // Attach original file name for tabs and tracking
-        (result as any).fileName = file.name;
-        parsedResults.push(result as any);
+        parsedResults.push({
+          ...result,
+          fileName: file.name,
+        });
       }
 
       setUnifiedPdfQueue(parsedResults);
-    } catch (err: any) {
-      alert(`Error processing PDF upload:\n\n${err?.message || 'Unknown error'}`);
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+      alert(`Error processing PDF upload:\n\n${errorMessage}`);
     } finally {
       setIsParsingDirectPdf(false);
       setParsingProgress(null);
@@ -2841,1696 +2852,227 @@ export default function RentalPortfolioPage() {
         )}
       </main>
 
-      {/* Mark Rental as Sold Exit Modal (Mobile Bottom-Sheet / Desktop Centered Dialog) */}
-      {showExitModal && selectedRentalForExit && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 z-50">
-          <div className="bg-white rounded-t-3xl sm:rounded-xl max-w-lg w-full p-5 sm:p-6 shadow-xl border border-slate-200 animate-in fade-in max-h-[92vh] sm:max-h-none overflow-y-auto">
-            <div className="w-12 h-1.5 bg-slate-300 rounded-full mx-auto mb-3 sm:hidden" />
-            <div className="flex items-center justify-between pb-3 mb-4 border-b border-slate-100">
-              <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
-                <CheckCircle2 className="w-5 h-5 text-emerald-600" />
-                <span>Mark Rental Property as Sold</span>
-              </h3>
-              <button
-                type="button"
-                onClick={() => {
-                  setShowExitModal(false);
-                  setSelectedRentalForExit(null);
-                }}
-                className="text-slate-400 hover:text-slate-700 font-bold cursor-pointer"
-              >
-                ✕
-              </button>
-            </div>
+      {/* Mark Rental as Sold Exit Modal */}
+      <ExitSaleModal
+        isOpen={showExitModal && Boolean(selectedRentalForExit)}
+        property={selectedRentalForExit}
+        onClose={() => {
+          setShowExitModal(false);
+          setSelectedRentalForExit(null);
+        }}
+        onComplete={() => {
+          setShowExitModal(false);
+          setSelectedRentalForExit(null);
+          setViewTab('archive');
+        }}
+        exitSalePrice={exitSalePrice}
+        setExitSalePrice={setExitSalePrice}
+        exitNetProceeds={exitNetProceeds}
+        setExitNetProceeds={setExitNetProceeds}
+        exitSoldDate={exitSoldDate}
+        setExitSoldDate={setExitSoldDate}
+        exitNotes={exitNotes}
+        setExitNotes={setExitNotes}
+        onSubmit={handleCompleteRentalSale}
+      />
 
-            <p className="text-xs text-slate-500 mb-4">
-              Disposal of <strong>{selectedRentalForExit.title}</strong>. This records your realized exit price, removes the unit and its bond from active portfolio liabilities, and automatically deposits the net cash proceeds directly into your <strong>Liquid Cash Reserve / Seed Capital</strong>.
-            </p>
+      {/* Refinance & Pull Out Equity (BRRRR) Modal */}
+      <RefinanceModal
+        isOpen={showRefinanceModal && Boolean(selectedRentalForRefinance)}
+        property={selectedRentalForRefinance}
+        currentLiquidReserve={summary.liquidCapitalReserve}
+        onClose={() => {
+          setShowRefinanceModal(false);
+          setSelectedRentalForRefinance(null);
+        }}
+        onSave={(params) => refinanceRental(params)}
+        newValuation={refinanceNewValuation}
+        setNewValuation={setRefinanceNewValuation}
+        newBondPayment={refinanceNewBondPayment}
+        setNewBondPayment={setRefinanceNewBondPayment}
+        cashPulledOut={refinanceCashPulledOut}
+        setCashPulledOut={setRefinanceCashPulledOut}
+        newBondBalance={refinanceNewBondBalance}
+        setNewBondBalance={setRefinanceNewBondBalance}
+        refinanceDate={refinanceDate}
+        setRefinanceDate={setRefinanceDate}
+        notes={refinanceNotes}
+        setNotes={setRefinanceNotes}
+        onSubmit={handleSaveRefinance}
+      />
 
-            <form onSubmit={handleCompleteRentalSale} noValidate className="space-y-4 text-xs">
-              <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 grid grid-cols-2 gap-3">
-                <div>
-                  <span className="text-[10px] text-slate-400 uppercase font-semibold block">Original Purchase Price</span>
-                  <strong className="text-sm text-slate-800">{formatZAR(selectedRentalForExit.purchasePriceZAR)}</strong>
-                  <span className="text-[10px] text-slate-500 block mt-0.5">Purchased {formatDate(selectedRentalForExit.purchaseDate)}</span>
-                </div>
-                <div>
-                  <span className="text-[10px] text-slate-400 uppercase font-semibold block">Outstanding Bond Debt</span>
-                  <strong className="text-sm text-rose-600">{formatZAR(selectedRentalForExit.outstandingBondBalanceZAR)}</strong>
-                  <span className="text-[10px] text-slate-500 block mt-0.5">Cancelled / Settled upon transfer</span>
-                </div>
-              </div>
+      {/* Refinance Audit History Modal */}
+      <RefinanceAuditModal
+        isOpen={showAuditHistoryModal && Boolean(selectedRentalForAudit)}
+        property={selectedRentalForAudit}
+        onClose={() => {
+          setShowAuditHistoryModal(false);
+          setSelectedRentalForAudit(null);
+        }}
+      />
 
-              <div>
-                <label className="block font-semibold text-slate-700 mb-1">
-                  Actual Realized Sale Price (ZAR) *
-                </label>
-                <input
-                  type="number"
-                  name="exitSalePriceZAR"
-                  autoComplete="off"
-                  required
-                  min="0"
-                  step="any"
-                  value={exitSalePrice || ''}
-                  onChange={(e) => {
-                    const price = Number(e.target.value);
-                    setExitSalePrice(price);
-                    setExitNetProceeds(
-                      calculateDisposalMetrics(
-                        price,
-                        selectedRentalForExit.purchasePriceZAR || 0,
-                        selectedRentalForExit.outstandingBondBalanceZAR || 0
-                      ).netCashProceedsZAR
-                    );
-                  }}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg font-bold text-emerald-700 text-sm"
-                  placeholder="e.g. 2100000"
-                />
-              </div>
+      {/* Maintenance Log Modal */}
+      <MaintenanceModal
+        isOpen={Boolean(selectedRentalForMaint)}
+        property={selectedRentalForMaint}
+        onClose={() => setSelectedRentalForMaint(null)}
+        maintIssue={maintIssue}
+        setMaintIssue={setMaintIssue}
+        maintCategory={maintCategory}
+        setMaintCategory={setMaintCategory}
+        maintContractor={maintContractor}
+        setMaintContractor={setMaintContractor}
+        maintCost={maintCost}
+        setMaintCost={setMaintCost}
+        onAddMaintenance={handleAddMaintenance}
+      />
 
-              <div>
-                <div className="flex items-center justify-between mb-1">
-                  <label className="block font-semibold text-slate-700">
-                    Net Cash Proceeds Received (ZAR) *
-                  </label>
-                  <span className="text-[10px] text-emerald-600 font-semibold">
-                    Deposited 100% to Cash in Reserve
-                  </span>
-                </div>
-                <input
-                  type="number"
-                  name="exitNetProceedsZAR"
-                  autoComplete="off"
-                  required
-                  min="0"
-                  step="any"
-                  value={exitNetProceeds || ''}
-                  onChange={(e) => setExitNetProceeds(Number(e.target.value))}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg font-bold text-slate-900 text-sm"
-                  placeholder="Net cash received after bond settlement & agent fee"
-                />
-              </div>
+      {/* Add / Edit Rental Property Modal */}
+      <RentalFormModal
+        isOpen={showRentalModal}
+        editingProperty={editingRentalId ? rentals.find((r) => r.id === editingRentalId) || null : null}
+        onClose={() => {
+          setShowRentalModal(false);
+          setEditingRentalId(null);
+        }}
+        onSave={(payload, isNew) => {
+          if (isNew) {
+            const newUnit: RentalProperty = {
+              id: `rental-${Date.now()}`,
+              title: payload.title || 'New Rental Property',
+              address: payload.address || `${payload.city || 'Johannesburg'} Property`,
+              city: payload.city || 'Johannesburg',
+              propertyType: payload.propertyType || 'Sectional Title Apartment',
+              source: payload.source,
+              agmDate: payload.agmDate,
+              marketValueZAR: payload.marketValueZAR ?? 0,
+              purchasePriceZAR: payload.purchasePriceZAR ?? 0,
+              purchaseDate: payload.purchaseDate || new Date().toISOString().split('T')[0],
+              outstandingBondBalanceZAR: payload.outstandingBondBalanceZAR ?? 0,
+              bondInterestRatePercent: payload.bondInterestRatePercent ?? 11.75,
+              monthlyBondPaymentZAR: payload.monthlyBondPaymentZAR ?? 0,
+              bondPaymentEffectiveDate: payload.bondPaymentEffectiveDate,
+              bondRevisionNote: payload.bondRevisionNote,
+              leases: payload.leases || [],
+              managementType: payload.managementType,
+              agencyName: payload.agencyName,
+              agencyCommissionPercent: payload.agencyCommissionPercent,
+              agencyVatApplicable: payload.agencyVatApplicable,
+              agencyContact: payload.agencyContact,
+              monthlyGrossRentZAR: payload.monthlyGrossRentZAR ?? 0,
+              monthlyLeviesZAR: payload.monthlyLeviesZAR ?? 0,
+              monthlyRatesTaxesZAR: payload.monthlyRatesTaxesZAR ?? 0,
+              monthlyAgentFeeZAR: payload.monthlyAgentFeeZAR ?? 0,
+              monthlyMaintenanceReserveZAR: payload.monthlyMaintenanceReserveZAR ?? 600,
+              monthlyCommunalServicesZAR: payload.monthlyCommunalServicesZAR,
+              annualBuildingInsuranceZAR: payload.annualBuildingInsuranceZAR,
+              paymentRecords: payload.paymentRecords,
+              arrearsWriteOffs: payload.arrearsWriteOffs,
+              arrearsOpeningBalanceZAR: payload.arrearsOpeningBalanceZAR,
+              unpaidUtilityArrearsZAR: payload.unpaidUtilityArrearsZAR,
+              maintenanceHistory: payload.maintenanceHistory || [],
+              status: payload.status || (payload.leases?.some((l) => l.status === 'Occupied') ? 'Occupied' : 'Vacant'),
+              cocChecklist: payload.cocChecklist,
+              driveVault: payload.driveVault,
+              notes: payload.notes,
+              taxEntityTypeOverride: payload.taxEntityTypeOverride,
+              section13sexAnnualShieldZAR: payload.section13sexAnnualShieldZAR,
+              utilityType: payload.utilityType,
+              prepaidVendorName: payload.prepaidVendorName,
+              monthlyPrepaidVendingFeeZAR: payload.monthlyPrepaidVendingFeeZAR,
+              ancillaryIncomes: payload.ancillaryIncomes,
+              meterRegistry: payload.meterRegistry,
+              transactions: payload.transactions,
+            };
+            addRental(newUnit);
+          } else if (editingRentalId) {
+            updateRental(editingRentalId, payload);
+          }
+        }}
+        title={title}
+        setTitle={setTitle}
+        address={address}
+        setAddress={setAddress}
+        city={city}
+        setCity={setCity}
+        propertyType={propertyType}
+        setPropertyType={setPropertyType}
+        agmDate={agmDate}
+        setAgmDate={setAgmDate}
+        marketValue={marketValue}
+        setMarketValue={setMarketValue}
+        purchasePrice={purchasePrice}
+        setPurchasePrice={setPurchasePrice}
+        bondBalance={bondBalance}
+        setBondBalance={setBondBalance}
+        monthlyGrossRent={monthlyGrossRent}
+        setMonthlyGrossRent={setMonthlyGrossRent}
+        monthlyLevies={monthlyLevies}
+        setMonthlyLevies={setMonthlyLevies}
+        annualBuildingInsurance={annualBuildingInsurance}
+        setAnnualBuildingInsurance={setAnnualBuildingInsurance}
+        monthlyRates={monthlyRates}
+        setMonthlyRates={setMonthlyRates}
+        monthlyBondPayment={monthlyBondPayment}
+        setMonthlyBondPayment={setMonthlyBondPayment}
+        bondPaymentEffectiveDate={bondPaymentEffectiveDate}
+        setBondPaymentEffectiveDate={setBondPaymentEffectiveDate}
+        bondRevisionNote={bondRevisionNote}
+        setBondRevisionNote={setBondRevisionNote}
+        unpaidUtilityArrears={unpaidUtilityArrears}
+        setUnpaidUtilityArrears={setUnpaidUtilityArrears}
+        managementType={managementType}
+        setManagementType={setManagementType}
+        agencyName={agencyName}
+        setAgencyName={setAgencyName}
+        agencyCommissionPercent={agencyCommissionPercent}
+        setAgencyCommissionPercent={setAgencyCommissionPercent}
+        agencyVatApplicable={agencyVatApplicable}
+        setAgencyVatApplicable={setAgencyVatApplicable}
+        agencyContact={agencyContact}
+        setAgencyContact={setAgencyContact}
+        formLeases={formLeases}
+        setFormLeases={setFormLeases}
+        utilityType={utilityType}
+        setUtilityType={setUtilityType}
+        prepaidVendorName={prepaidVendorName}
+        setPrepaidVendorName={setPrepaidVendorName}
+        monthlyPrepaidVendingFee={monthlyPrepaidVendingFee}
+        setMonthlyPrepaidVendingFee={setMonthlyPrepaidVendingFee}
+        monthlyCommunalServices={monthlyCommunalServices}
+        setMonthlyCommunalServices={setMonthlyCommunalServices}
+        taxEntityOverride={taxEntityOverride}
+        setTaxEntityOverride={setTaxEntityOverride}
+        formAncillaryIncomes={formAncillaryIncomes}
+        setFormAncillaryIncomes={setFormAncillaryIncomes}
+        rentalMasterFolderUrl={rentalMasterFolderUrl}
+        setRentalMasterFolderUrl={setRentalMasterFolderUrl}
+        rentalOtpUrl={rentalOtpUrl}
+        setRentalOtpUrl={setRentalOtpUrl}
+        rentalRatesBillUrl={rentalRatesBillUrl}
+        setRentalRatesBillUrl={setRentalRatesBillUrl}
+        rentalTitleDeedUrl={rentalTitleDeedUrl}
+        setRentalTitleDeedUrl={setRentalTitleDeedUrl}
+        onSubmit={handleSaveRental}
+      />
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Sale / Registration Date *</label>
-                  <input
-                    type="date"
-                    name="exitSoldDate"
-                    autoComplete="off"
-                    required
-                    value={exitSoldDate}
-                    onChange={(e) => setExitSoldDate(e.target.value)}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg"
-                  />
-                </div>
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Gross Capital Gain</label>
-                  <div className="w-full px-3 py-2 bg-slate-100 border border-slate-200 rounded-lg font-bold text-slate-800">
-                    {formatZAR((exitSalePrice || 0) - selectedRentalForExit.purchasePriceZAR)}
-                  </div>
-                </div>
-              </div>
-
-              <div>
-                <label className="block font-semibold text-slate-700 mb-1">Disposal Notes (Optional)</label>
-                <input
-                  type="text"
-                  name="exitNotes"
-                  autoComplete="off"
-                  placeholder="e.g. Sold with sitting tenant, conveyanced by STBB"
-                  value={exitNotes}
-                  onChange={(e) => setExitNotes(e.target.value)}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg"
-                />
-              </div>
-
-              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-200">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowExitModal(false);
-                    setSelectedRentalForExit(null);
-                  }}
-                  className="px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50 font-semibold cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-semibold flex items-center gap-1.5 cursor-pointer"
-                >
-                  <CheckCircle2 className="w-4 h-4" />
-                  <span>Confirm Sale & Credit Reserve</span>
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Refinance & Pull Out Equity (BRRRR) Modal (Mobile Bottom-Sheet / Desktop Centered Dialog) */}
-      {showRefinanceModal && selectedRentalForRefinance && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 z-50 overflow-y-auto">
-          <div className="bg-white rounded-t-3xl sm:rounded-xl max-w-lg w-full p-5 sm:p-6 shadow-xl border border-slate-200 animate-in fade-in sm:my-8 max-h-[92vh] sm:max-h-[90vh] overflow-y-auto">
-            <div className="w-12 h-1.5 bg-slate-300 rounded-full mx-auto mb-3 sm:hidden" />
-            <div className="flex items-center justify-between pb-3 mb-4 border-b border-slate-100">
-              <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
-                <ArrowUpRight className="w-5 h-5 text-purple-600" />
-                <span>Refinance & Pull Out Equity (BRRRR)</span>
-              </h3>
-              <button
-                type="button"
-                onClick={() => {
-                  setShowRefinanceModal(false);
-                  setSelectedRentalForRefinance(null);
-                }}
-                className="text-slate-400 hover:text-slate-700 font-bold cursor-pointer"
-              >
-                ✕
-              </button>
-            </div>
-
-            <p className="text-xs text-slate-500 mb-4">
-              Refinance <strong>{selectedRentalForRefinance.title}</strong> based on its updated bank valuation. The cash equity pulled out is immediately credited into your <strong>Liquid Capital Reserve (Seed Capital pool)</strong> to acquire your next property.
-            </p>
-
-            <form onSubmit={handleSaveRefinance} noValidate className="space-y-4 text-xs">
-              {/* Previous Financial Baseline */}
-              <div className="p-3 bg-purple-50/60 rounded-xl border border-purple-100 grid grid-cols-3 gap-2 text-center">
-                <div>
-                  <span className="text-[10px] text-slate-400 uppercase font-semibold block">Current Market Value</span>
-                  <strong className="text-xs text-slate-800">{formatZAR(selectedRentalForRefinance.marketValueZAR)}</strong>
-                </div>
-                <div>
-                  <span className="text-[10px] text-slate-400 uppercase font-semibold block">Current Bond Balance</span>
-                  <strong className="text-xs text-slate-800">{formatZAR(selectedRentalForRefinance.outstandingBondBalanceZAR || 0)}</strong>
-                </div>
-                <div>
-                  <span className="text-[10px] text-slate-400 uppercase font-semibold block">Current Bond Repayment</span>
-                  <strong className="text-xs text-slate-800">{formatZAR(selectedRentalForRefinance.monthlyBondPaymentZAR)}/m</strong>
-                </div>
-              </div>
-
-              {/* Metric 1: New Bank Valuation */}
-              <div>
-                <label className="block font-semibold text-slate-700 mb-1">
-                  1. New Bank Valuation (ZAR) *
-                </label>
-                <input
-                  type="number"
-                  name="refinanceNewValuationZAR"
-                  autoComplete="off"
-                  required
-                  min="0"
-                  step="any"
-                  value={refinanceNewValuation || ''}
-                  onChange={(e) => {
-                    const val = Number(e.target.value);
-                    setRefinanceNewValuation(val);
-                  }}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg font-bold text-slate-900 text-sm focus:ring-1 focus:ring-purple-500"
-                  placeholder="e.g. 2800000"
-                />
-                <span className="text-[10px] text-slate-400 mt-0.5 block">
-                  Official bank / Lightstone appraisal valuation
-                </span>
-              </div>
-
-              {/* Metric 2: New Monthly Bond Repayment */}
-              <div>
-                <label className="block font-semibold text-slate-700 mb-1">
-                  2. New Monthly Bond Repayment (ZAR) *
-                </label>
-                <input
-                  type="number"
-                  name="refinanceNewBondPaymentZAR"
-                  autoComplete="off"
-                  required
-                  min="0"
-                  step="any"
-                  value={refinanceNewBondPayment || ''}
-                  onChange={(e) => setRefinanceNewBondPayment(Number(e.target.value))}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg font-bold text-slate-900 text-sm focus:ring-1 focus:ring-purple-500"
-                  placeholder="e.g. 19500"
-                />
-                <span className="text-[10px] text-slate-400 mt-0.5 block">
-                  New debit order installment quoted by the financing bank
-                </span>
-              </div>
-
-              {/* Metric 3: Cash Equity Pulled Out */}
-              <div>
-                <div className="flex items-center justify-between mb-1">
-                  <label className="block font-semibold text-slate-700">
-                    3. Cash Equity Pulled Out (ZAR) *
-                  </label>
-                  <span className="text-[10px] font-bold text-emerald-600">
-                    + Deposited directly to Seed Capital
-                  </span>
-                </div>
-                <input
-                  type="number"
-                  name="refinanceCashPulledOutZAR"
-                  autoComplete="off"
-                  required
-                  min="0"
-                  step="any"
-                  value={refinanceCashPulledOut || ''}
-                  onChange={(e) => {
-                    const cashOut = Number(e.target.value);
-                    setRefinanceCashPulledOut(cashOut);
-                    setRefinanceNewBondBalance((selectedRentalForRefinance.outstandingBondBalanceZAR || 0) + cashOut);
-                  }}
-                  className="w-full px-3 py-2 border border-emerald-300 rounded-lg font-bold text-emerald-700 text-base focus:ring-1 focus:ring-emerald-500 bg-emerald-50/30"
-                  placeholder="e.g. 450000"
-                />
-                <span className="text-[10px] text-slate-400 mt-0.5 block">
-                  Net liquid cash released from home loan advance
-                </span>
-              </div>
-
-              {/* Updated Outstanding Bond Balance */}
-              <div>
-                <div className="flex items-center justify-between mb-1">
-                  <label className="block font-semibold text-slate-700">
-                    New Outstanding Mortgage Debt (ZAR) *
-                  </label>
-                  {refinanceNewValuation > 0 && refinanceNewBondBalance > 0 && (
-                    <span className="text-[10px] text-slate-500 font-medium">
-                      Bank LTV: {((refinanceNewBondBalance / refinanceNewValuation) * 100).toFixed(1)}%
-                    </span>
-                  )}
-                </div>
-                <input
-                  type="number"
-                  name="refinanceNewBondBalanceZAR"
-                  autoComplete="off"
-                  required
-                  min="0"
-                  step="any"
-                  value={refinanceNewBondBalance || ''}
-                  onChange={(e) => setRefinanceNewBondBalance(Number(e.target.value))}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg font-bold text-slate-800 text-sm"
-                  placeholder="Auto-calculated (Previous Balance + Cash Out)"
-                />
-                <span className="text-[10px] text-slate-400 mt-0.5 block">
-                  Balance sheet liability recorded against the property
-                </span>
-              </div>
-
-              {/* Date & Facility Notes */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Refinance Date</label>
-                  <input
-                    type="date"
-                    required
-                    value={refinanceDate}
-                    onChange={(e) => setRefinanceDate(e.target.value)}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg"
-                  />
-                </div>
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Bank / Facility Notes</label>
-                  <input
-                    type="text"
-                    value={refinanceNotes}
-                    onChange={(e) => setRefinanceNotes(e.target.value)}
-                    placeholder="e.g. Standard Bank 70% LTV, Prime - 0.25%"
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg"
-                  />
-                </div>
-              </div>
-
-              {/* Impact Banner */}
-              <div className="p-3 bg-purple-50 rounded-lg border border-purple-200 flex items-center justify-between">
-                <div>
-                  <span className="text-[10px] font-bold text-purple-900 uppercase block">
-                    Capital Available for Next Deal:
-                  </span>
-                  <span className="text-[11px] text-purple-700">
-                    Seed Capital pool: {formatZAR(summary.liquidCapitalReserve)} → {formatZAR(summary.liquidCapitalReserve + (Number(refinanceCashPulledOut) || 0))}
-                  </span>
-                </div>
-                <strong className="text-sm font-black text-purple-900">
-                  +{formatZAR(Number(refinanceCashPulledOut) || 0)}
-                </strong>
-              </div>
-
-              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-200">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowRefinanceModal(false);
-                    setSelectedRentalForRefinance(null);
-                  }}
-                  className="px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50 font-semibold cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-4 py-2 bg-purple-700 hover:bg-purple-800 text-white rounded-lg font-semibold flex items-center gap-1.5 cursor-pointer shadow-sm"
-                >
-                  <ArrowUpRight className="w-4 h-4" />
-                  <span>Save Refinance & Credit Reserve</span>
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Refinance Audit History Modal (Mobile Bottom-Sheet / Desktop Centered Dialog) */}
-      {showAuditHistoryModal && selectedRentalForAudit && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 z-50">
-          <div className="bg-white rounded-t-3xl sm:rounded-xl max-w-lg w-full p-5 sm:p-6 shadow-xl border border-slate-200 animate-in fade-in max-h-[92vh] sm:max-h-[85vh] overflow-y-auto">
-            <div className="w-12 h-1.5 bg-slate-300 rounded-full mx-auto mb-3 sm:hidden" />
-            <div className="flex items-center justify-between pb-3 mb-4 border-b border-slate-100">
-              <div>
-                <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
-                  <History className="w-5 h-5 text-purple-600" />
-                  <span>Refinance & Equity Extraction History</span>
-                </h3>
-                <p className="text-xs text-slate-500 mt-0.5">{selectedRentalForAudit.title}</p>
-              </div>
-              <button
-                type="button"
-                onClick={() => {
-                  setShowAuditHistoryModal(false);
-                  setSelectedRentalForAudit(null);
-                }}
-                className="text-slate-400 hover:text-slate-700 font-bold cursor-pointer"
-              >
-                ✕
-              </button>
-            </div>
-
-            <div className="p-3 bg-purple-50/70 rounded-xl border border-purple-200 flex items-center justify-between mb-4">
-              <div>
-                <span className="text-[10px] font-bold text-purple-900 uppercase block">Total Equity Recycled to Date</span>
-                <span className="text-xs text-purple-700">Cumulative capital extracted via BRRRR</span>
-              </div>
-              <strong className="text-lg font-extrabold text-purple-900">
-                {formatZAR(selectedRentalForAudit.totalEquityExtractedZAR || 0)}
-              </strong>
-            </div>
-
-            {(!selectedRentalForAudit.refinanceHistory || selectedRentalForAudit.refinanceHistory.length === 0) ? (
-              <p className="text-xs text-slate-400 text-center py-6">No refinance records logged for this property.</p>
-            ) : (
-              <div className="space-y-3">
-                {selectedRentalForAudit.refinanceHistory.map((rec, idx) => (
-                  <div key={rec.id || idx} className="p-3 bg-slate-50 rounded-lg border border-slate-200 text-xs space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="font-bold text-slate-900">{formatDate(rec.refinanceDate)}</span>
-                      <span className="font-extrabold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded">
-                        +{formatZAR(rec.cashEquityPulledOutZAR)} Pulled Out
-                      </span>
-                    </div>
-                    <div className="grid grid-cols-3 gap-2 text-[11px] text-slate-600 pt-1 border-t border-slate-200">
-                      <div>
-                        <span className="text-[10px] text-slate-400 block">Bank Valuation</span>
-                        <strong>{formatZAR(rec.newBankValuationZAR)}</strong>
-                      </div>
-                      <div>
-                        <span className="text-[10px] text-slate-400 block">New Bond Balance</span>
-                        <strong>{formatZAR(rec.newBondBalanceZAR)}</strong>
-                      </div>
-                      <div>
-                        <span className="text-[10px] text-slate-400 block">New Monthly Bond</span>
-                        <strong>{formatZAR(rec.newMonthlyBondPaymentZAR)}/m</strong>
-                      </div>
-                    </div>
-                    {rec.notes && (
-                      <p className="text-[11px] text-slate-500 italic bg-white p-2 rounded border border-slate-100">
-                        {rec.notes}
-                      </p>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-
-            <div className="flex justify-end pt-4 mt-4 border-t border-slate-100">
-              <button
-                type="button"
-                onClick={() => {
-                  setShowAuditHistoryModal(false);
-                  setSelectedRentalForAudit(null);
-                }}
-                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-lg text-xs font-semibold cursor-pointer"
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Maintenance Log Modal (Mobile Bottom-Sheet / Desktop Centered Dialog) */}
-      {selectedRentalForMaint && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 z-50">
-          <div className="bg-white rounded-t-3xl sm:rounded-xl max-w-xl w-full p-5 sm:p-6 shadow-xl border border-slate-200 max-h-[92vh] sm:max-h-[85vh] overflow-y-auto">
-            <div className="w-12 h-1.5 bg-slate-300 rounded-full mx-auto mb-3 sm:hidden" />
-            <div className="flex items-center justify-between pb-3 border-b border-slate-200 mb-4">
-              <div>
-                <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
-                  <Wrench className="w-5 h-5 text-emerald-600" />
-                  Maintenance History: {selectedRentalForMaint.title}
-                </h3>
-                <p className="text-xs text-slate-500">
-                  Track plumbing, electrical, and appliance work orders.
-                </p>
-              </div>
-              <button
-                onClick={() => setSelectedRentalForMaint(null)}
-                className="text-slate-400 hover:text-slate-700 text-sm font-bold"
-              >
-                ✕
-              </button>
-            </div>
-
-            {/* List Existing Logs */}
-            <div className="space-y-2.5 mb-6">
-              {selectedRentalForMaint.maintenanceHistory?.length === 0 ? (
-                <p className="text-xs text-slate-400 py-4 text-center">No maintenance logs recorded for this unit.</p>
-              ) : (
-                selectedRentalForMaint.maintenanceHistory.map((item) => (
-                  <div
-                    key={item.id}
-                    className="p-3 rounded-lg border border-slate-200 bg-slate-50/70 text-xs flex items-start justify-between gap-3"
-                  >
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-semibold text-slate-900">{item.issueDescription}</span>
-                        <span className="text-[10px] bg-slate-200 px-1.5 py-0.2 rounded font-medium">
-                          {item.category}
-                        </span>
-                      </div>
-                      <p className="text-[11px] text-slate-500 mt-0.5">
-                        Contractor: <strong className="text-slate-700">{item.contractorName}</strong> • {formatDate(item.dateLogged)}
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      <strong className="text-slate-900 block">{formatZAR(item.costZAR)}</strong>
-                      <span className="text-[10px] text-emerald-700 font-bold">{item.status}</span>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-
-            {/* Log New Maintenance Form */}
-            <form onSubmit={handleAddMaintenance} noValidate className="p-4 rounded-xl border border-slate-200 bg-slate-50/50 space-y-3 text-xs">
-              <h4 className="font-bold text-xs text-slate-800">Log New Work Order / Expense</h4>
-              <div>
-                <label className="block text-[11px] font-semibold text-slate-600 mb-1">Issue Description *</label>
-                <input
-                  type="text"
-                  name="maintenanceDescription"
-                  autoComplete="off"
-                  required
-                  placeholder="e.g. Inverter battery firmware inspection & cable replacement"
-                  value={maintIssue}
-                  onChange={(e) => setMaintIssue(e.target.value)}
-                  className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg bg-white"
-                />
-              </div>
-
-              <div className="grid grid-cols-3 gap-3">
-                <div>
-                  <label className="block text-[11px] font-semibold text-slate-600 mb-1">Category</label>
-                  <select
-                    value={maintCategory}
-                    onChange={(e) => setMaintCategory(e.target.value as any)}
-                    className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg bg-white"
-                  >
-                    <option value="Plumbing">Plumbing</option>
-                    <option value="Electrical">Electrical</option>
-                    <option value="Appliance">Appliance</option>
-                    <option value="Structural">Structural</option>
-                    <option value="General Wear">General Wear</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-[11px] font-semibold text-slate-600 mb-1">Cost (ZAR)</label>
-                  <input
-                    type="number"
-                    name="maintenanceCostZAR"
-                    autoComplete="off"
-                    min="0"
-                    step="any"
-                    value={maintCost}
-                    onChange={(e) => setMaintCost(Number(e.target.value))}
-                    className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg bg-white font-bold"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[11px] font-semibold text-slate-600 mb-1">Contractor</label>
-                  <input
-                    type="text"
-                    name="contractorName"
-                    autoComplete="name"
-                    value={maintContractor}
-                    onChange={(e) => setMaintContractor(e.target.value)}
-                    className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg bg-white"
-                  />
-                </div>
-              </div>
-
-              <div className="flex justify-end pt-1">
-                <button
-                  type="submit"
-                  className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-lg text-xs"
-                >
-                  Log Maintenance
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Add / Edit Rental Property Modal (Mobile Bottom-Sheet / Desktop Centered Dialog) */}
-      {showRentalModal && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 z-50">
-          <div className="bg-white rounded-t-3xl sm:rounded-xl max-w-lg w-full p-5 sm:p-6 shadow-xl border border-slate-200 max-h-[92vh] sm:max-h-[90vh] overflow-y-auto">
-            <div className="w-12 h-1.5 bg-slate-300 rounded-full mx-auto mb-3 sm:hidden" />
-            <div className="flex items-center justify-between pb-3 mb-3 border-b border-slate-100">
-              <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
-                <Building2 className="w-5 h-5 text-emerald-600" />
-                <span>{editingRentalId ? 'Edit Rental Property & Agency Mandate' : 'Add Rental Property to Portfolio'}</span>
-              </h3>
-              {editingRentalId && (
-                <span className="text-[10px] font-semibold bg-indigo-100 text-indigo-800 px-2 py-0.5 rounded-full">
-                  Editing Active Unit
-                </span>
-              )}
-            </div>
-
-            <form onSubmit={handleSaveRental} noValidate className="space-y-4 text-xs">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Property Name *</label>
-                  <input
-                    type="text"
-                    name="rentalTitle"
-                    autoComplete="off"
-                    required
-                    placeholder="e.g. Melrose Arch Luxury Loft"
-                    value={title}
-                    onChange={(e) => setTitle(e.target.value)}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg"
-                  />
-                </div>
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">City</label>
-                  <input
-                    type="text"
-                    name="propertyCity"
-                    autoComplete="off"
-                    value={city}
-                    onChange={(e) => setCity(e.target.value)}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block font-semibold text-slate-700 mb-1">Address</label>
-                <input
-                  type="text"
-                  name="propertyAddress"
-                  autoComplete="off"
-                  placeholder="e.g. 10 High Street, Melrose"
-                  value={address}
-                  onChange={(e) => setAddress(e.target.value)}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg"
-                />
-              </div>
-
-              {/* Property Title Type & Body Corporate AGM Section */}
-              <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 space-y-3">
-                <div>
-                  <div className="flex items-center justify-between mb-1.5">
-                    <label className="block font-bold text-slate-800 text-[11px] uppercase tracking-wider">
-                      Property Title Type
-                    </label>
-                    <span className="text-[10px] text-slate-500">STSMA & Governance Classification</span>
-                  </div>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
-                    {(
-                      [
-                        { id: 'Sectional Title Apartment', label: '🏢 Sectional Title' },
-                        { id: 'Freehold House', label: '🏡 Freehold House' },
-                        { id: 'Townhouse / Cluster', label: '🏘️ Townhouse / Cluster' },
-                        { id: 'Multi-unit Commercial', label: '🏬 Commercial' },
-                      ] as const
-                    ).map((pt) => (
-                      <button
-                        key={pt.id}
-                        type="button"
-                        onClick={() => {
-                          setPropertyType(pt.id);
-                          if (pt.id === 'Freehold House') {
-                            setMonthlyLevies(0);
-                            setAnnualBuildingInsurance((prev) => (prev > 0 ? prev : 7_200));
-                          } else {
-                            setAnnualBuildingInsurance(0);
-                          }
-                        }}
-                        className={`py-1.5 px-2 rounded-lg text-[11px] font-semibold transition-all text-center border ${
-                          propertyType === pt.id
-                            ? 'bg-slate-900 text-white border-slate-900 shadow-2xs font-bold'
-                            : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100'
-                        }`}
-                      >
-                        {pt.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {(propertyType === 'Sectional Title Apartment' || propertyType === 'Townhouse / Cluster') && (
-                  <div className="pt-2 border-t border-slate-200">
-                    <div className="flex items-center justify-between mb-1">
-                      <label className="block font-semibold text-slate-700">
-                        📅 Body Corporate AGM Date
-                      </label>
-                      <span className="text-[10px] text-indigo-600 font-medium">
-                        Auto-schedules reminder task 14 days prior
-                      </span>
-                    </div>
-                    <input
-                      type="date"
-                      value={agmDate}
-                      onChange={(e) => setAgmDate(e.target.value)}
-                      className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg bg-white"
-                    />
-                  </div>
-                )}
-              </div>
-
-              {/* Property Management Mandate Section */}
-              <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="font-bold text-slate-800 text-[11px] uppercase tracking-wider">Property Management Mandate</span>
-                  <div className="flex bg-slate-200 p-0.5 rounded-lg text-xs font-semibold">
-                    <button
-                      type="button"
-                      onClick={() => setManagementType('Self-Managed')}
-                      className={`px-3 py-1 rounded-md transition-all ${
-                        managementType === 'Self-Managed'
-                          ? 'bg-white text-slate-900 shadow-2xs font-bold'
-                          : 'text-slate-600 hover:text-slate-900'
-                      }`}
-                    >
-                      👤 Self-Managed
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setManagementType('Agency')}
-                      className={`px-3 py-1 rounded-md transition-all ${
-                        managementType === 'Agency'
-                          ? 'bg-white text-indigo-900 shadow-2xs font-bold'
-                          : 'text-slate-600 hover:text-slate-900'
-                      }`}
-                    >
-                      🏢 Agency Managed
-                    </button>
-                  </div>
-                </div>
-
-                {managementType === 'Agency' ? (
-                  <div className="space-y-3 pt-1">
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className="block font-semibold text-slate-700 mb-1">Managing Agency Name *</label>
-                        <input
-                          type="text"
-                          required={managementType === 'Agency'}
-                          placeholder="e.g. Pam Golding, RE/MAX, Seeff"
-                          value={agencyName}
-                          onChange={(e) => setAgencyName(e.target.value)}
-                          className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg bg-white font-medium"
-                        />
-                      </div>
-                      <div>
-                        <label className="block font-semibold text-slate-700 mb-1">Agent Contact (Tel / WhatsApp)</label>
-                        <input
-                          type="text"
-                          placeholder="e.g. +27 82 555 1234"
-                          value={agencyContact}
-                          onChange={(e) => setAgencyContact(e.target.value)}
-                          className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg bg-white"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-center">
-                      <div>
-                        <div className="flex items-center justify-between mb-1">
-                          <label className="block font-semibold text-slate-700">Commission Rate (%)</label>
-                          <div className="flex gap-1 text-[10px]">
-                            <button
-                              type="button"
-                              onClick={() => setAgencyCommissionPercent(8.0)}
-                              className={`px-1.5 py-0.5 rounded border ${
-                                agencyCommissionPercent === 8.0 ? 'bg-indigo-600 text-white border-indigo-600 font-bold' : 'bg-white text-slate-600'
-                              }`}
-                            >
-                              8%
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => setAgencyCommissionPercent(10.0)}
-                              className={`px-1.5 py-0.5 rounded border ${
-                                agencyCommissionPercent === 10.0 ? 'bg-indigo-600 text-white border-indigo-600 font-bold' : 'bg-white text-slate-600'
-                              }`}
-                            >
-                              10%
-                            </button>
-                          </div>
-                        </div>
-                        <input
-                          type="number"
-                          name="agencyCommissionPercent"
-                          autoComplete="off"
-                          min="0"
-                          max="30"
-                          step="any"
-                          value={agencyCommissionPercent}
-                          onChange={(e) => setAgencyCommissionPercent(Number(e.target.value))}
-                          className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg bg-white font-bold"
-                        />
-                      </div>
-
-                      <div className="pt-2">
-                        <label className="flex items-center gap-2 cursor-pointer select-none">
-                          <input
-                            type="checkbox"
-                            checked={agencyVatApplicable}
-                            onChange={(e) => setAgencyVatApplicable(e.target.checked)}
-                            className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 w-4 h-4"
-                          />
-                          <span className="text-slate-700 font-medium text-[11px]">
-                            Subject to 15% SARS VAT (+15%)
-                          </span>
-                        </label>
-                        <p className="text-[10px] text-slate-400 mt-0.5">
-                          Standard SA estate agency mandate structure
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* Commission Calculation Preview */}
-                    <div className="p-2.5 bg-indigo-50/80 rounded-lg border border-indigo-100 flex items-center justify-between text-xs">
-                      <div>
-                        <span className="text-[10px] text-indigo-800 font-semibold block uppercase">Calculated Monthly Fee</span>
-                        <span className="text-slate-600 text-[11px]">
-                          {agencyCommissionPercent}% of {formatZAR(monthlyGrossRent)}
-                          {agencyVatApplicable ? ' + 15% VAT (effective ' + (agencyCommissionPercent * 1.15).toFixed(2) + '%)' : ''}
-                        </span>
-                      </div>
-                      <div className="text-right">
-                        <strong className="text-rose-600 font-bold text-sm block">
-                          - {formatZAR(calculateAgencyCommission(monthlyGrossRent, agencyCommissionPercent, agencyVatApplicable, agencyName).monthlyAgentFeeZAR)}/m
-                        </strong>
-                        <span className="text-[10px] text-slate-500">Deducted from gross rent</span>
-                      </div>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="p-2.5 bg-slate-100 rounded-lg text-slate-600 text-xs flex items-center gap-2">
-                    <span className="text-sm">💡</span>
-                    <span><strong>Self-Managed Unit:</strong> Direct landlord administration. <strong>R 0</strong> agency commission deducted from cash flow.</span>
-                  </div>
-                )}
-              </div>
-
-              <div className="grid grid-cols-3 gap-3">
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Market Value (ZAR)</label>
-                  <input
-                    type="number"
-                    name="marketValueZAR"
-                    autoComplete="off"
-                    min="0"
-                    step="any"
-                    value={marketValue}
-                    onChange={(e) => setMarketValue(Number(e.target.value))}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg"
-                  />
-                </div>
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Purchase Price (ZAR)</label>
-                  <input
-                    type="number"
-                    name="purchasePriceZAR"
-                    autoComplete="off"
-                    min="0"
-                    step="any"
-                    value={purchasePrice}
-                    onChange={(e) => setPurchasePrice(Number(e.target.value))}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg"
-                  />
-                </div>
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Bond Balance (ZAR)</label>
-                  <input
-                    type="number"
-                    name="bondBalanceZAR"
-                    autoComplete="off"
-                    min="0"
-                    step="any"
-                    value={bondBalance}
-                    onChange={(e) => setBondBalance(Number(e.target.value))}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-3 gap-3">
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Gross Monthly Rent (ZAR)</label>
-                  <input
-                    type="number"
-                    name="grossRentZAR"
-                    autoComplete="off"
-                    min="0"
-                    step="any"
-                    value={monthlyGrossRent}
-                    onChange={(e) => setMonthlyGrossRent(Number(e.target.value))}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg font-bold"
-                  />
-                </div>
-                {propertyType === 'Freehold House' ? (
-                  <div>
-                    <div className="flex items-center justify-between mb-1">
-                      <label className="block font-semibold text-slate-700">
-                        Annual Building Insurance
-                      </label>
-                      <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-200">
-                        R {Math.round(annualBuildingInsurance / 12).toLocaleString()}/m
-                      </span>
-                    </div>
-                    <input
-                      type="number"
-                      name="annualInsuranceZAR"
-                      autoComplete="off"
-                      min="0"
-                      step="any"
-                      value={annualBuildingInsurance}
-                      onChange={(e) => setAnnualBuildingInsurance(Number(e.target.value))}
-                      className="w-full px-3 py-2 border border-slate-300 rounded-lg font-semibold"
-                    />
-                  </div>
-                ) : (
-                  <div>
-                    <div className="flex items-center justify-between mb-1">
-                      <label className="block font-semibold text-slate-700">
-                        Body Corporate Levies
-                      </label>
-                    </div>
-                    <input
-                      type="number"
-                      name="monthlyLeviesZAR"
-                      autoComplete="off"
-                      min="0"
-                      step="any"
-                      value={monthlyLevies}
-                      onChange={(e) => setMonthlyLevies(Number(e.target.value))}
-                      className="w-full px-3 py-2 border border-slate-300 rounded-lg"
-                    />
-                  </div>
-                )}
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Rates & Taxes</label>
-                  <input
-                    type="number"
-                    name="monthlyRatesZAR"
-                    autoComplete="off"
-                    min="0"
-                    step="any"
-                    value={monthlyRates}
-                    onChange={(e) => setMonthlyRates(Number(e.target.value))}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg"
-                  />
-                </div>
-              </div>
-
-              {/* Communal / Serviced Services Section */}
-              <div className="p-3 bg-slate-50 rounded-lg border border-slate-200">
-                <div className="flex items-center justify-between mb-1">
-                  <label className="block font-semibold text-slate-700 text-xs">
-                    Communal / Serviced Services (ZAR/mo)
-                  </label>
-                  <span className="text-[10px] font-bold text-slate-700 bg-slate-200 px-1.5 py-0.5 rounded">
-                    -{formatZAR(monthlyCommunalServices)}/pm
-                  </span>
-                </div>
-                <div className="relative">
-                  <span className="absolute left-3 top-2 text-xs text-slate-400 font-bold">R</span>
-                  <input
-                    type="number"
-                    name="monthlyCommunalServicesZAR"
-                    autoComplete="off"
-                    min="0"
-                    step="50"
-                    value={monthlyCommunalServices || ''}
-                    onChange={(e) => setMonthlyCommunalServices(Number(e.target.value))}
-                    placeholder="0"
-                    className="w-full pl-7 pr-3 py-1.5 border border-slate-300 rounded-lg bg-white font-semibold text-slate-900 text-xs"
-                  />
-                </div>
-                <p className="text-[10px] text-slate-500 mt-1">
-                  All-inclusive amenities: Uncapped Wi-Fi, communal cleaner, armed response, garden maintenance.
-                </p>
-              </div>
-
-              {/* Bank Bond Repayment & Effective Month Inputs */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 bg-slate-50 rounded-lg border border-slate-200">
-                <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <label className="block font-semibold text-slate-700 text-xs">Bank Bond Repayment (Debit Order)</label>
-                    {bondBalance > 0 && (
-                      <button
-                        type="button"
-                        onClick={() => setMonthlyBondPayment(calculateMonthlyBondRepayment(bondBalance, 11.75, 20))}
-                        className="text-[10px] text-indigo-600 hover:text-indigo-800 font-semibold cursor-pointer"
-                        title="Auto-calculate 20-year bond at 11.75%"
-                      >
-                        Auto-PMT: {formatZAR(calculateMonthlyBondRepayment(bondBalance, 11.75, 20))}
-                      </button>
-                    )}
-                  </div>
-                  <input
-                    type="number"
-                    name="monthlyBondPaymentZAR"
-                    autoComplete="off"
-                    min="0"
-                    step="any"
-                    value={monthlyBondPayment || ''}
-                    onChange={(e) => setMonthlyBondPayment(Number(e.target.value))}
-                    placeholder="e.g. 11800"
-                    className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg bg-white font-bold text-slate-900 text-xs"
-                  />
-                  <span className="text-[10px] text-slate-400 block mt-0.5">Owner-paid direct debit order</span>
-                </div>
-
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1 text-xs">Bond Effective Month (Forward-Only)</label>
-                  <input
-                    type="text"
-                    name="bondPaymentEffectiveDate"
-                    autoComplete="off"
-                    placeholder="e.g. Apr 2026 or 2026-04"
-                    value={bondPaymentEffectiveDate}
-                    onChange={(e) => setBondPaymentEffectiveDate(e.target.value)}
-                    className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg bg-white text-slate-900 text-xs font-semibold"
-                  />
-                  <span className="text-[10px] text-slate-400 block mt-0.5">Upcoming effective payment date</span>
-                </div>
-              </div>
-
-              {/* Tenant Utility Arrears Section */}
-              <div className={`p-3 rounded-lg border transition-colors ${
-                unpaidUtilityArrears > 0
-                  ? 'bg-rose-50/70 border-rose-200'
-                  : 'bg-slate-50 border-slate-200'
-              }`}>
-                <div className="flex items-center justify-between mb-1.5">
-                  <div className="flex items-center gap-1.5">
-                    <label className="block font-bold text-slate-800 text-[11px] uppercase tracking-wider">
-                      Tenant Utility Arrears (Water & Lights)
-                    </label>
-                    {unpaidUtilityArrears > 0 && (
-                      <span className="text-[10px] font-bold text-rose-700 bg-rose-100 px-1.5 py-0.5 rounded border border-rose-300">
-                        ⚠️ Tenant Default Risk
-                      </span>
-                    )}
-                  </div>
-                  <span className="text-[10px] text-slate-500">Deducts directly from Net Monthly Cashflow</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="relative flex-1">
-                    <span className="absolute left-3 top-2 text-slate-400 font-bold text-xs">R</span>
-                    <input
-                      type="number"
-                      name="unpaidUtilityArrearsZAR"
-                      autoComplete="off"
-                      min="0"
-                      step="any"
-                      value={unpaidUtilityArrears}
-                      onChange={(e) => setUnpaidUtilityArrears(Math.max(0, Number(e.target.value)))}
-                      className={`w-full pl-7 pr-3 py-1.5 border rounded-lg font-bold text-xs bg-white ${
-                        unpaidUtilityArrears > 0
-                          ? 'border-rose-300 text-rose-700 focus:ring-rose-400'
-                          : 'border-slate-300 text-slate-800 focus:ring-emerald-400'
-                      }`}
-                      placeholder="0"
-                    />
-                  </div>
-                  {unpaidUtilityArrears > 0 && (
-                    <button
-                      type="button"
-                      onClick={() => setUnpaidUtilityArrears(0)}
-                      className="text-xs px-2.5 py-1.5 bg-white text-slate-600 hover:text-emerald-700 border border-slate-200 rounded-lg hover:border-emerald-300 transition-colors cursor-pointer"
-                    >
-                      Clear to R 0
-                    </button>
-                  )}
-                </div>
-                <p className="text-[10px] text-slate-500 mt-1">
-                  SA municipal utility debt remains attached to the property. Unrecovered balances directly impair monthly net cashflow.
-                </p>
-              </div>
-
-              {/* Multi-Let Lease Management */}
-              <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="font-bold text-slate-800 block text-[11px] uppercase tracking-wider">Lease Units ({formLeases.length})</span>
-                  <button
-                    type="button"
-                    onClick={() => setFormLeases(prev => [...prev, {
-                      id: crypto.randomUUID(),
-                      unitName: `Unit ${prev.length + 1}`,
-                      tenantName: '',
-                      tenantPhone: '',
-                      tenantEmail: '',
-                      leaseStartDate: new Date().toISOString().split('T')[0],
-                      leaseEndDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-                      monthlyRentZAR: 0,
-                      depositHeldZAR: 0,
-                      annualEscalationPercent: 7,
-                      status: 'Vacant',
-                    }])}
-                    className="text-[10px] font-bold text-emerald-700 hover:text-emerald-900 bg-emerald-50 hover:bg-emerald-100 px-2 py-1 rounded border border-emerald-200 cursor-pointer transition-colors"
-                  >
-                    + Add Unit
-                  </button>
-                </div>
-
-                {formLeases.map((lease, idx) => (
-                  <div key={lease.id} className="p-2.5 bg-white rounded-lg border border-slate-200 space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-[10px] font-bold text-slate-600 uppercase">
-                        {lease.unitName || `Unit ${idx + 1}`}
-                      </span>
-                      {formLeases.length > 1 && (
-                        <button
-                          type="button"
-                          onClick={() => setFormLeases(prev => prev.filter(l => l.id !== lease.id))}
-                          className="text-[10px] text-rose-600 hover:text-rose-800 font-semibold cursor-pointer"
-                        >
-                          Remove
-                        </button>
-                      )}
-                    </div>
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                      <div>
-                        <label className="block text-[10px] font-semibold text-slate-600 mb-0.5">Unit Name</label>
-                        <input
-                          type="text"
-                          placeholder="e.g. Unit A"
-                          value={lease.unitName}
-                          onChange={(e) => setFormLeases(prev => prev.map(l => l.id === lease.id ? { ...l, unitName: e.target.value } : l))}
-                          className="w-full px-2 py-1 text-[11px] border border-slate-300 rounded-lg bg-white"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-[10px] font-semibold text-slate-600 mb-0.5">Room / Unit Classification</label>
-                        <input
-                          type="text"
-                          list="room-type-suggestions"
-                          placeholder="e.g. Executive Suite"
-                          value={lease.roomType || ''}
-                          onChange={(e) => setFormLeases(prev => prev.map(l => l.id === lease.id ? { ...l, roomType: e.target.value } : l))}
-                          className="w-full px-2 py-1 text-[11px] border border-slate-300 rounded-lg bg-white"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-[10px] font-semibold text-slate-600 mb-0.5">Tenant Name</label>
-                        <input
-                          type="text"
-                          placeholder="e.g. Sipho Dlamini"
-                          value={lease.tenantName}
-                          onChange={(e) => setFormLeases(prev => prev.map(l => l.id === lease.id ? { ...l, tenantName: e.target.value } : l))}
-                          className="w-full px-2 py-1 text-[11px] border border-slate-300 rounded-lg bg-white"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-[10px] font-semibold text-slate-600 mb-0.5">Status</label>
-                        <select
-                          value={lease.status}
-                          onChange={(e) => setFormLeases(prev => prev.map(l => l.id === lease.id ? { ...l, status: e.target.value as Lease['status'] } : l))}
-                          className="w-full px-2 py-1 text-[11px] border border-slate-300 rounded-lg bg-white"
-                        >
-                          <option value="Occupied">Occupied</option>
-                          <option value="Vacant">Vacant</option>
-                          <option value="Notice Given">Notice Given</option>
-                        </select>
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                      <div>
-                        <label className="block text-[10px] font-semibold text-slate-600 mb-0.5">Monthly Rent (ZAR)</label>
-                        <input
-                          type="number"
-                          min="0"
-                          step="any"
-                          value={lease.monthlyRentZAR}
-                          onChange={(e) => setFormLeases(prev => prev.map(l => l.id === lease.id ? { ...l, monthlyRentZAR: Number(e.target.value) } : l))}
-                          className="w-full px-2 py-1 text-[11px] border border-slate-300 rounded-lg bg-white font-bold"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-[10px] font-semibold text-slate-600 mb-0.5">Deposit (ZAR)</label>
-                        <input
-                          type="number"
-                          min="0"
-                          step="any"
-                          value={lease.depositHeldZAR}
-                          onChange={(e) => setFormLeases(prev => prev.map(l => l.id === lease.id ? { ...l, depositHeldZAR: Number(e.target.value) } : l))}
-                          className="w-full px-2 py-1 text-[11px] border border-slate-300 rounded-lg bg-white"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-[10px] font-semibold text-slate-600 mb-0.5">Lease Start</label>
-                        <input
-                          type="date"
-                          value={lease.leaseStartDate}
-                          onChange={(e) => setFormLeases(prev => prev.map(l => l.id === lease.id ? { ...l, leaseStartDate: e.target.value } : l))}
-                          className="w-full px-2 py-1 text-[11px] border border-slate-300 rounded-lg bg-white"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-[10px] font-semibold text-slate-600 mb-0.5">Lease End</label>
-                        <input
-                          type="date"
-                          value={lease.leaseEndDate}
-                          onChange={(e) => setFormLeases(prev => prev.map(l => l.id === lease.id ? { ...l, leaseEndDate: e.target.value } : l))}
-                          className="w-full px-2 py-1 text-[11px] border border-slate-300 rounded-lg bg-white"
-                        />
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                      <div>
-                        <label className="block text-[10px] font-semibold text-slate-600 mb-0.5">Phone</label>
-                        <input
-                          type="tel"
-                          placeholder="+27 82 000 0000"
-                          value={lease.tenantPhone || ''}
-                          onChange={(e) => setFormLeases(prev => prev.map(l => l.id === lease.id ? { ...l, tenantPhone: e.target.value } : l))}
-                          className="w-full px-2 py-1 text-[11px] border border-slate-300 rounded-lg bg-white"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-[10px] font-semibold text-slate-600 mb-0.5">Email</label>
-                        <input
-                          type="email"
-                          placeholder="tenant@email.co.za"
-                          value={lease.tenantEmail || ''}
-                          onChange={(e) => setFormLeases(prev => prev.map(l => l.id === lease.id ? { ...l, tenantEmail: e.target.value } : l))}
-                          className="w-full px-2 py-1 text-[11px] border border-slate-300 rounded-lg bg-white"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-[10px] font-semibold text-slate-600 mb-0.5">Annual Escalation %</label>
-                        <input
-                          type="number"
-                          min="0"
-                          max="30"
-                          step="any"
-                          value={lease.annualEscalationPercent}
-                          onChange={(e) => setFormLeases(prev => prev.map(l => l.id === lease.id ? { ...l, annualEscalationPercent: Number(e.target.value) } : l))}
-                          className="w-full px-2 py-1 text-[11px] border border-slate-300 rounded-lg bg-white"
-                        />
-                      </div>
-                    </div>
-
-                    {/* Guarantor / Corporate Sponsor subsection */}
-                    <div className="p-2 bg-slate-50/80 rounded-lg border border-slate-200/80 space-y-1.5">
-                      <div className="flex items-center justify-between">
-                        <span className="text-[10px] font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1">
-                          <span>🛡️</span> Guarantor / Corporate Sponsor
-                        </span>
-                        <span className="text-[9px] text-slate-400">Optional third-party guarantee</span>
-                      </div>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                        <div>
-                          <label className="block text-[9px] font-semibold text-slate-600 mb-0.5">Guarantor / Sponsoring Company (Optional)</label>
-                          <input
-                            type="text"
-                            placeholder="e.g. Parent Name (Deed of Suretyship) or Employer Entity"
-                            value={lease.guarantorName || ''}
-                            onChange={(e) => setFormLeases(prev => prev.map(l => l.id === lease.id ? { ...l, guarantorName: e.target.value } : l))}
-                            className="w-full px-2 py-1 text-[11px] border border-slate-300 rounded bg-white"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-[9px] font-semibold text-slate-600 mb-0.5">Guarantor Contact (Phone / Email)</label>
-                          <input
-                            type="text"
-                            autoComplete="tel email"
-                            placeholder="e.g. +27 82 111 2233 or legal@corp.co.za"
-                            value={lease.guarantorContact || ''}
-                            onChange={(e) => setFormLeases(prev => prev.map(l => l.id === lease.id ? { ...l, guarantorContact: e.target.value } : l))}
-                            className="w-full px-2 py-1 text-[11px] border border-slate-300 rounded bg-white"
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-
-                <datalist id="room-type-suggestions">
-                  <option value="Executive Suite" />
-                  <option value="En-Suite Room" />
-                  <option value="Standard Room" />
-                  <option value="Shared Ablution" />
-                  <option value="Garden Cottage" />
-                </datalist>
-              </div>
-
-              {/* Utility Type Selector */}
-              <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 space-y-3">
-                <span className="font-bold text-slate-800 block text-[11px] uppercase tracking-wider">Utility Type</span>
-                <select
-                  value={utilityType}
-                  onChange={(e) => setUtilityType(e.target.value as 'postpaid' | 'prepaid_submeter' | 'hybrid')}
-                  className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg bg-white text-xs font-semibold"
-                >
-                  <option value="postpaid">Post-Paid Municipal</option>
-                  <option value="prepaid_submeter">Prepaid Sub-Meter</option>
-                  <option value="hybrid">Hybrid</option>
-                </select>
-
-                {(utilityType === 'prepaid_submeter' || utilityType === 'hybrid') && (
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-[10px] font-semibold text-slate-600 mb-0.5">Prepaid Vendor Name</label>
-                      <input
-                        type="text"
-                        placeholder="e.g. Citiq, Recharger"
-                        value={prepaidVendorName}
-                        onChange={(e) => setPrepaidVendorName(e.target.value)}
-                        className="w-full px-2 py-1 text-[11px] border border-slate-300 rounded-lg bg-white"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[10px] font-semibold text-slate-600 mb-0.5">Monthly Vending Fee (ZAR)</label>
-                      <input
-                        type="number"
-                        min="0"
-                        step="any"
-                        value={monthlyPrepaidVendingFee}
-                        onChange={(e) => setMonthlyPrepaidVendingFee(Number(e.target.value))}
-                        className="w-full px-2 py-1 text-[11px] border border-slate-300 rounded-lg bg-white font-semibold"
-                      />
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Tax Entity Override */}
-              <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="font-bold text-slate-800 text-[11px] uppercase tracking-wider">Tax Entity (override)</span>
-                  <span className="text-[10px] text-slate-400">Inherits from Settings if not set</span>
-                </div>
-                <select
-                  value={taxEntityOverride || ''}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    setTaxEntityOverride(val === '' ? undefined : val as 'Company (27%)' | 'Individual (45%)' | 'Pre-Tax');
-                  }}
-                  className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg bg-white text-xs font-semibold"
-                >
-                  <option value="">Use Default ({investorProfile?.defaultTaxEntityType || 'Company (27%)'})</option>
-                  <option value="Company (27%)">Company (27%)</option>
-                  <option value="Individual (45%)">Individual (45%)</option>
-                  <option value="Pre-Tax">Pre-Tax</option>
-                </select>
-              </div>
-
-              {/* Ancillary Income Management */}
-              <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="font-bold text-slate-800 text-[11px] uppercase tracking-wider">Ancillary Income ({formAncillaryIncomes.length})</span>
-                  <button
-                    type="button"
-                    onClick={() => setFormAncillaryIncomes(prev => [...prev, {
-                      id: crypto.randomUUID(),
-                      type: 'cell_tower',
-                      tenantName: '',
-                      monthlyRentZAR: 0,
-                      annualEscalationPercent: 7,
-                      contractStartDate: new Date().toISOString().split('T')[0],
-                      contractEndDate: new Date(Date.now() + 5 * 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-                      vatApplicable: false,
-                    }])}
-                    className="text-[10px] font-bold text-teal-700 hover:text-teal-900 bg-teal-50 hover:bg-teal-100 px-2 py-1 rounded border border-teal-200 cursor-pointer transition-colors"
-                  >
-                    + Add Ancillary Income
-                  </button>
-                </div>
-
-                {formAncillaryIncomes.map((ai, idx) => (
-                  <div key={ai.id} className="p-2.5 bg-white rounded-lg border border-slate-200 space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-[10px] font-bold text-slate-600 uppercase">Ancillary #{idx + 1}</span>
-                      <button
-                        type="button"
-                        onClick={() => setFormAncillaryIncomes(prev => prev.filter(a => a.id !== ai.id))}
-                        className="text-[10px] text-rose-600 hover:text-rose-800 font-semibold cursor-pointer"
-                      >
-                        Remove
-                      </button>
-                    </div>
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                      <div>
-                        <label className="block text-[10px] font-semibold text-slate-600 mb-0.5">Type</label>
-                        <select
-                          value={ai.type}
-                          onChange={(e) => setFormAncillaryIncomes(prev => prev.map(a => a.id === ai.id ? { ...a, type: e.target.value as AncillaryIncome['type'] } : a))}
-                          className="w-full px-2 py-1 text-[11px] border border-slate-300 rounded-lg bg-white"
-                        >
-                          <option value="cell_tower">Cell Tower</option>
-                          <option value="billboard">Billboard</option>
-                          <option value="parking">Parking</option>
-                          <option value="storage">Storage</option>
-                          <option value="other">Other</option>
-                        </select>
-                      </div>
-                      <div>
-                        <label className="block text-[10px] font-semibold text-slate-600 mb-0.5">Tenant Name</label>
-                        <input
-                          type="text"
-                          placeholder="e.g. Vodacom, Primedia"
-                          value={ai.tenantName}
-                          onChange={(e) => setFormAncillaryIncomes(prev => prev.map(a => a.id === ai.id ? { ...a, tenantName: e.target.value } : a))}
-                          className="w-full px-2 py-1 text-[11px] border border-slate-300 rounded-lg bg-white"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-[10px] font-semibold text-slate-600 mb-0.5">Monthly Rent (ZAR)</label>
-                        <input
-                          type="number"
-                          min="0"
-                          step="any"
-                          value={ai.monthlyRentZAR}
-                          onChange={(e) => setFormAncillaryIncomes(prev => prev.map(a => a.id === ai.id ? { ...a, monthlyRentZAR: Number(e.target.value) } : a))}
-                          className="w-full px-2 py-1 text-[11px] border border-slate-300 rounded-lg bg-white font-bold"
-                        />
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                      <div>
-                        <label className="block text-[10px] font-semibold text-slate-600 mb-0.5">Escalation %</label>
-                        <input
-                          type="number"
-                          min="0"
-                          max="30"
-                          step="any"
-                          value={ai.annualEscalationPercent}
-                          onChange={(e) => setFormAncillaryIncomes(prev => prev.map(a => a.id === ai.id ? { ...a, annualEscalationPercent: Number(e.target.value) } : a))}
-                          className="w-full px-2 py-1 text-[11px] border border-slate-300 rounded-lg bg-white"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-[10px] font-semibold text-slate-600 mb-0.5">Contract Start</label>
-                        <input
-                          type="date"
-                          value={ai.contractStartDate}
-                          onChange={(e) => setFormAncillaryIncomes(prev => prev.map(a => a.id === ai.id ? { ...a, contractStartDate: e.target.value } : a))}
-                          className="w-full px-2 py-1 text-[11px] border border-slate-300 rounded-lg bg-white"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-[10px] font-semibold text-slate-600 mb-0.5">Contract End</label>
-                        <input
-                          type="date"
-                          value={ai.contractEndDate}
-                          onChange={(e) => setFormAncillaryIncomes(prev => prev.map(a => a.id === ai.id ? { ...a, contractEndDate: e.target.value } : a))}
-                          className="w-full px-2 py-1 text-[11px] border border-slate-300 rounded-lg bg-white"
-                        />
-                      </div>
-                      <div className="flex items-end pb-0.5">
-                        <label className="flex items-center gap-1.5 cursor-pointer select-none">
-                          <input
-                            type="checkbox"
-                            checked={ai.vatApplicable}
-                            onChange={(e) => setFormAncillaryIncomes(prev => prev.map(a => a.id === ai.id ? { ...a, vatApplicable: e.target.checked } : a))}
-                            className="rounded border-slate-300 text-teal-600 focus:ring-teal-500 w-3.5 h-3.5"
-                          />
-                          <span className="text-[10px] text-slate-700 font-medium">15% VAT</span>
-                        </label>
-                      </div>
-                    </div>
-                    <div>
-                      <label className="block text-[10px] font-semibold text-slate-600 mb-0.5">Notes (optional)</label>
-                      <input
-                        type="text"
-                        placeholder="Additional details..."
-                        value={ai.notes || ''}
-                        onChange={(e) => setFormAncillaryIncomes(prev => prev.map(a => a.id === ai.id ? { ...a, notes: e.target.value || undefined } : a))}
-                        className="w-full px-2 py-1 text-[11px] border border-slate-300 rounded-lg bg-white"
-                      />
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              {/* Cloud & Web Document Vault Section */}
-              <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 space-y-2.5">
-                <div className="flex items-center justify-between">
-                  <span className="font-bold text-[11px] text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
-                    <span>☁️ Cloud & Web Document Vault</span>
-                  </span>
-                  <span className="text-[10px] text-slate-500">OneDrive • GDrive • Dropbox</span>
-                </div>
-                <div className="grid grid-cols-2 gap-2 text-xs">
-                  <div>
-                    <label className="block text-[11px] font-semibold text-slate-600 mb-1">Deal Folder URL</label>
-                    <input
-                      type="url"
-                      placeholder="https://1drv.ms/... or drive.google.com/..."
-                      value={rentalMasterFolderUrl}
-                      onChange={(e) => setRentalMasterFolderUrl(e.target.value)}
-                      className="w-full px-2 py-1 text-[11px] border border-slate-300 rounded-lg bg-white"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[11px] font-semibold text-slate-600 mb-1">Signed Lease / OTP PDF URL</label>
-                    <input
-                      type="url"
-                      placeholder="https://..."
-                      value={rentalOtpUrl}
-                      onChange={(e) => setRentalOtpUrl(e.target.value)}
-                      className="w-full px-2 py-1 text-[11px] border border-slate-300 rounded-lg bg-white"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[11px] font-semibold text-slate-600 mb-1">Rates & Levies Statement</label>
-                    <input
-                      type="url"
-                      placeholder="https://..."
-                      value={rentalRatesBillUrl}
-                      onChange={(e) => setRentalRatesBillUrl(e.target.value)}
-                      className="w-full px-2 py-1 text-[11px] border border-slate-300 rounded-lg bg-white"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[11px] font-semibold text-slate-600 mb-1">Title Deed / Sectional Plan</label>
-                    <input
-                      type="url"
-                      placeholder="https://..."
-                      value={rentalTitleDeedUrl}
-                      onChange={(e) => setRentalTitleDeedUrl(e.target.value)}
-                      className="w-full px-2 py-1 text-[11px] border border-slate-300 rounded-lg bg-white"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex items-center justify-end gap-2 pt-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowRentalModal(false);
-                    setEditingRentalId(null);
-                  }}
-                  className="px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50 font-semibold"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-semibold"
-                >
-                  {editingRentalId ? 'Update Rental Property' : 'Save Rental Property'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* SARB Repo Rate PMT Calculator Modal (Mobile Bottom-Sheet / Desktop Centered Dialog) */}
-      {pmtTargetProperty && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 z-50 animate-in fade-in duration-150">
-          <div className="bg-white rounded-t-3xl sm:rounded-2xl max-w-lg w-full p-5 sm:p-6 shadow-2xl border border-slate-200 animate-in zoom-in-95 duration-200 max-h-[92vh] sm:max-h-none overflow-y-auto">
-            <div className="w-12 h-1.5 bg-slate-300 rounded-full mx-auto mb-3 sm:hidden" />
-            <div className="flex items-center justify-between pb-3 border-b border-slate-200 mb-4">
-              <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-xl bg-indigo-50 text-indigo-600 border border-indigo-200 flex items-center justify-center font-bold">
-                  <Calculator className="w-5 h-5" />
-                </div>
-                <div>
-                  <h3 className="text-base font-bold text-slate-900">
-                    SARB Repo Rate Bond Recalculator
-                  </h3>
-                  <p className="text-xs text-slate-500">
-                    Forward-only adjustment for &ldquo;{pmtTargetProperty.title}&rdquo;
-                  </p>
-                </div>
-              </div>
-              <button
-                onClick={() => setPmtTargetProperty(null)}
-                className="text-slate-400 hover:text-slate-700 text-sm font-bold p-1 rounded cursor-pointer"
-              >
-                ✕
-              </button>
-            </div>
-
-            <form onSubmit={handleApplyPmt} noValidate className="space-y-4 text-xs">
-              <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-amber-900 text-[11px] leading-relaxed">
-                💡 <strong>Forward-Only Guarantee:</strong> Modifying the bond repayment takes effect from the selected <strong>Effective Month</strong> for upcoming bank debit orders. Historical performance and past months remain uncorrupted.
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Outstanding Bond Balance (ZAR)</label>
-                  <input
-                    type="number"
-                    min="0"
-                    step="any"
-                    required
-                    value={pmtLoanBalance}
-                    onChange={(e) => setPmtLoanBalance(Number(e.target.value))}
-                    className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg font-bold bg-white text-slate-900"
-                  />
-                </div>
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">New Bond Interest Rate (%)</label>
-                  <div className="relative">
-                    <input
-                      type="number"
-                      step="any"
-                      min="0"
-                      max="30"
-                      required
-                      value={pmtInterestRate}
-                      onChange={(e) => setPmtInterestRate(Number(e.target.value))}
-                      className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg font-bold bg-white text-slate-900 pr-7"
-                    />
-                    <span className="absolute right-2.5 top-1.5 text-slate-400 font-bold">%</span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Remaining Term (Years)</label>
-                  <input
-                    type="number"
-                    min="1"
-                    max="30"
-                    required
-                    value={pmtLoanYears}
-                    onChange={(e) => setPmtLoanYears(Number(e.target.value))}
-                    className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg bg-white text-slate-900 font-medium"
-                  />
-                </div>
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Effective Month (Forward-Only)</label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="e.g. Apr 2026 or 2026-04"
-                    value={pmtEffectiveMonth}
-                    onChange={(e) => setPmtEffectiveMonth(e.target.value)}
-                    className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg bg-white text-slate-900 font-semibold"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block font-semibold text-slate-700 mb-1">Revision Note / Memo</label>
-                <input
-                  type="text"
-                  placeholder="e.g. SARB 25bps repo rate cut"
-                  value={pmtRevisionNote}
-                  onChange={(e) => setPmtRevisionNote(e.target.value)}
-                  className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg bg-white text-slate-900"
-                />
-              </div>
-
-              {/* Dynamic PMT Calculation Comparison Preview */}
-              {(() => {
-                const calculatedPmt = calculateMonthlyBondRepayment(pmtLoanBalance, pmtInterestRate, pmtLoanYears);
-                const currentPmt = pmtTargetProperty.monthlyBondPaymentZAR || 0;
-                const savings = currentPmt - calculatedPmt;
-
-                return (
-                  <div className="bg-indigo-50/70 border border-indigo-200 rounded-xl p-3.5 space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-[11px] font-bold text-indigo-900 uppercase">Recalculated Bond PMT</span>
-                      <span className="text-[10px] text-indigo-700 font-semibold bg-indigo-100 px-2 py-0.5 rounded">
-                        Standard SA Amortization Formula
-                      </span>
-                    </div>
-                    <div className="flex items-baseline justify-between">
-                      <span className="text-2xl font-black text-indigo-950 font-mono">
-                        {formatZAR(calculatedPmt)}/month
-                      </span>
-                      {currentPmt > 0 && (
-                        <div className="text-right">
-                          <span className="text-[10px] text-slate-500 block">Current: {formatZAR(currentPmt)}/m</span>
-                          <span className={`text-xs font-bold ${savings >= 0 ? 'text-emerald-700' : 'text-rose-600'}`}>
-                            {savings >= 0 ? `+${formatZAR(savings)}/m cashflow relief` : `${formatZAR(savings)}/m increase`}
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                );
-              })()}
-
-              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-200">
-                <button
-                  type="button"
-                  onClick={() => setPmtTargetProperty(null)}
-                  className="px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50 font-semibold cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-semibold flex items-center gap-1.5 cursor-pointer shadow-sm"
-                >
-                  <CheckCircle2 className="w-4 h-4" />
-                  <span>Apply Forward-Only ({pmtEffectiveMonth})</span>
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      {/* SARB Repo Rate PMT Calculator Modal */}
+      <SarbPmtModal
+        isOpen={Boolean(pmtTargetProperty)}
+        property={pmtTargetProperty}
+        onClose={() => setPmtTargetProperty(null)}
+        interestRate={pmtInterestRate}
+        setInterestRate={setPmtInterestRate}
+        loanBalance={pmtLoanBalance}
+        setLoanBalance={setPmtLoanBalance}
+        loanYears={pmtLoanYears}
+        setLoanYears={setPmtLoanYears}
+        effectiveMonth={pmtEffectiveMonth}
+        setEffectiveMonth={setPmtEffectiveMonth}
+        revisionNote={pmtRevisionNote}
+        setRevisionNote={setPmtRevisionNote}
+        onApply={handleApplyPmt}
+      />
 
       {/* Direct PDF Import Unified Verification Modal */}
       <UnifiedPdfVerificationModal
@@ -4581,607 +3123,64 @@ export default function RentalPortfolioPage() {
         onClose={() => setMeterModalPropertyId(null)}
       />
 
-      {/* Log / Edit Tenant Payment Modal */}
-      {showPaymentModal && paymentPropertyId && (() => {
-        const prop = rentals.find((r) => r.id === paymentPropertyId);
-        if (!prop) return null;
-        const targetLease = prop.leases?.find((l) => l.id === paymentLeaseId);
+      {/* Payment & Write-Off Modals */}
+      <PaymentModal
+        isOpen={showPaymentModal && Boolean(paymentPropertyId)}
+        property={rentals.find((r) => r.id === paymentPropertyId) || null}
+        editingPayment={editingPayment}
+        onClose={() => setShowPaymentModal(false)}
+        onSave={(payload, editingId) => {
+          if (!paymentPropertyId) return;
+          if (editingId) {
+            updateTenantPayment(paymentPropertyId, editingId, payload);
+            setCopyFeedbackToast('Payment updated successfully');
+          } else {
+            recordTenantPayment(paymentPropertyId, payload);
+            setCopyFeedbackToast('Payment recorded successfully');
+          }
+        }}
+        paymentLeaseId={paymentLeaseId}
+        setPaymentLeaseId={setPaymentLeaseId}
+        paymentPeriodMonth={paymentPeriodMonth}
+        setPaymentPeriodMonth={setPaymentPeriodMonth}
+        paymentDate={paymentDate}
+        setPaymentDate={setPaymentDate}
+        paymentAmount={paymentAmount}
+        setPaymentAmount={setPaymentAmount}
+        paymentMethod={paymentMethod}
+        setPaymentMethod={setPaymentMethod}
+        paymentReference={paymentReference}
+        setPaymentReference={setPaymentReference}
+        paymentNotes={paymentNotes}
+        setPaymentNotes={setPaymentNotes}
+        paymentAllocations={paymentAllocations}
+        setPaymentAllocations={setPaymentAllocations}
+        showAllocationsEditor={showAllocationsEditor}
+        setShowAllocationsEditor={setShowAllocationsEditor}
+      />
 
-        return (
-          <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-            <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-lg max-h-[90vh] overflow-y-auto animate-in fade-in zoom-in-95 duration-150">
-              <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/80 sticky top-0 bg-white z-10">
-                <div className="flex items-center gap-2">
-                  <div className="p-2 rounded-xl bg-emerald-100 text-emerald-800">
-                    <CreditCard className="w-5 h-5 text-emerald-600" />
-                  </div>
-                  <div>
-                    <h3 className="text-base font-bold text-slate-900">
-                      {editingPayment ? 'Edit Payment Record' : 'Log Tenant Payment'}
-                    </h3>
-                    <p className="text-xs text-slate-500">{prop.title}</p>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setShowPaymentModal(false)}
-                  className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
-                >
-                  ✕
-                </button>
-              </div>
-
-              <form onSubmit={handleSavePayment} className="p-6 space-y-4">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    Billing Period (Month)
-                  </label>
-                  <input
-                    type="month"
-                    required
-                    value={paymentPeriodMonth}
-                    onChange={(e) => setPaymentPeriodMonth(e.target.value)}
-                    className="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                  />
-                  <p className="text-[10px] text-slate-400 mt-0.5">
-                    Month towards which this payment will be allocated in the ledger.
-                  </p>
-                </div>
-
-                {prop.leases && prop.leases.length > 0 && (
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-700 mb-1">
-                      Tenant / Unit Allocation
-                    </label>
-                    <select
-                      value={paymentLeaseId}
-                      onChange={(e) => {
-                        const newLeaseId = e.target.value;
-                        setPaymentLeaseId(newLeaseId);
-                        if (!editingPayment) {
-                          const l = prop.leases?.find((x) => x.id === newLeaseId);
-                          if (l) {
-                            setPaymentAmount(l.monthlyRentZAR);
-                          } else {
-                            setPaymentAmount(prop.monthlyGrossRentZAR || 0);
-                          }
-                        }
-                      }}
-                      className="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white"
-                    >
-                      {prop.leases.length > 1 && (
-                        <option value="">-- All Units / Unallocated Property Account --</option>
-                      )}
-                      {prop.leases.map((l) => (
-                        <option key={l.id} value={l.id}>
-                          {l.unitName ? `${l.unitName} - ` : ''}{l.tenantName} ({formatZAR(l.monthlyRentZAR)}/mo)
-                        </option>
-                      ))}
-                    </select>
-                    <p className="text-[10px] text-slate-400 mt-0.5">
-                      Links this payment directly to the specific lease ledger and tenant statement.
-                    </p>
-                  </div>
-                )}
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-700 mb-1">
-                      Payment Date
-                    </label>
-                    <input
-                      type="date"
-                      required
-                      value={paymentDate}
-                      onChange={(e) => setPaymentDate(e.target.value)}
-                      className="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-700 mb-1">
-                      Amount Received (ZAR)
-                    </label>
-                    <div className="relative">
-                      <span className="absolute left-3 top-2 text-sm font-bold text-slate-400">R</span>
-                      <input
-                        type="number"
-                        min="0.01"
-                        step="any"
-                        required
-                        value={paymentAmount || ''}
-                        onChange={(e) => {
-                          const val = parseFloat(e.target.value) || 0;
-                          setPaymentAmount(val);
-                          if (paymentAllocations.length <= 1) {
-                            setPaymentAllocations([{ periodMonth: paymentPeriodMonth, amountZAR: val }]);
-                          }
-                        }}
-                        placeholder="0.00"
-                        className="w-full pl-8 pr-3 py-2 text-sm font-mono font-bold rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    Payment Method
-                  </label>
-                  <select
-                    value={paymentMethod}
-                    onChange={(e) => setPaymentMethod(e.target.value as PaymentMethod)}
-                    className="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white"
-                  >
-                    <option value="EFT">EFT (Electronic Funds Transfer)</option>
-                    <option value="Cash Deposit">Cash Deposit (Bank ATM / Branch)</option>
-                    <option value="Debit Order">Debit Order</option>
-                    <option value="Instant EFT / Card">Instant EFT / Card (PayFast / Ozow)</option>
-                    <option value="Deposit Applied">Deposit Applied (Deduct from Held Deposit)</option>
-                    <option value="Other">Other</option>
-                  </select>
-                </div>
-
-                {paymentMethod === 'Deposit Applied' && (
-                  <div
-                    className={`p-3 rounded-xl text-xs border ${
-                      targetLease && (targetLease.depositHeldZAR || 0) >= paymentAmount
-                        ? 'bg-amber-50 border-amber-200 text-amber-900'
-                        : 'bg-rose-50 border-rose-200 text-rose-900'
-                    }`}
-                  >
-                    <div className="font-semibold flex items-center justify-between">
-                      <span>Held Security Deposit in Trust:</span>
-                      <span className="font-mono text-sm font-bold">
-                        {targetLease ? formatZAR(targetLease.depositHeldZAR || 0) : 'R 0'}
-                      </span>
-                    </div>
-                    <p className="text-[11px] mt-1 leading-relaxed opacity-90">
-                      Applying this deposit directly settles rent/utility arrears and permanently deducts the amount from the tenant's held security deposit balance.
-                      {!targetLease && (
-                        <span className="block text-rose-600 font-bold mt-1">
-                          ⚠️ Please select a specific tenant / lease above to apply the deposit from.
-                        </span>
-                      )}
-                      {targetLease && (targetLease.depositHeldZAR || 0) < paymentAmount && (
-                        <span className="block text-rose-600 font-bold mt-1">
-                          ⚠️ Requested payment amount ({formatZAR(paymentAmount)}) exceeds available held deposit ({formatZAR(targetLease.depositHeldZAR || 0)}).
-                        </span>
-                      )}
-                    </p>
-                  </div>
-                )}
-
-                {/* Multi-Month Allocation Breakdown */}
-                <div className="border border-slate-200 rounded-xl p-3 bg-slate-50/70 space-y-2.5">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                        <span>Ledger Month Allocation</span>
-                        {paymentAllocations.length > 1 && (
-                          <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-100 text-emerald-800">
-                            {paymentAllocations.length} months
-                          </span>
-                        )}
-                      </label>
-                      <p className="text-[10px] text-slate-500">
-                        Allocate lump sum across specific billing months
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const unpaid = getUnpaidLedgerMonths(prop, paymentLeaseId ? { leaseId: paymentLeaseId } : undefined);
-                          const allocs = allocateOldestFirst(unpaid, paymentAmount);
-                          setPaymentAllocations(allocs);
-                          setShowAllocationsEditor(true);
-                        }}
-                        className="text-[11px] font-semibold text-emerald-700 hover:text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 px-2 py-1 rounded cursor-pointer transition-colors"
-                      >
-                        Auto-allocate (Oldest First)
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setShowAllocationsEditor(!showAllocationsEditor)}
-                        className="text-xs text-slate-500 hover:text-slate-700 underline cursor-pointer"
-                      >
-                        {showAllocationsEditor ? 'Hide Details' : 'Customize'}
-                      </button>
-                    </div>
-                  </div>
-
-                  {showAllocationsEditor && (
-                    <div className="space-y-2 pt-2 border-t border-slate-200">
-                      {paymentAllocations.map((alloc, idx) => (
-                        <div key={idx} className="flex items-center gap-2">
-                          <input
-                            type="month"
-                            value={alloc.periodMonth}
-                            onChange={(e) => {
-                              const updated = [...paymentAllocations];
-                              updated[idx] = { ...updated[idx], periodMonth: e.target.value };
-                              setPaymentAllocations(updated);
-                            }}
-                            className="px-2 py-1 text-xs rounded border border-slate-300 bg-white"
-                          />
-                          <div className="relative flex-1">
-                            <span className="absolute left-2 top-1 text-xs font-bold text-slate-400">R</span>
-                            <input
-                              type="number"
-                              min="0"
-                              step="any"
-                              value={alloc.amountZAR || ''}
-                              onChange={(e) => {
-                                const updated = [...paymentAllocations];
-                                updated[idx] = { ...updated[idx], amountZAR: parseFloat(e.target.value) || 0 };
-                                setPaymentAllocations(updated);
-                              }}
-                              className="w-full pl-6 pr-2 py-1 text-xs font-mono font-bold rounded border border-slate-300 bg-white"
-                              placeholder="0.00"
-                            />
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const updated = paymentAllocations.filter((_, i) => i !== idx);
-                              setPaymentAllocations(updated.length > 0 ? updated : [{ periodMonth: paymentPeriodMonth, amountZAR: paymentAmount }]);
-                            }}
-                            className="text-slate-400 hover:text-rose-600 text-sm px-1 cursor-pointer"
-                            title="Remove month allocation"
-                          >
-                            ✕
-                          </button>
-                        </div>
-                      ))}
-
-                      <div className="flex items-center justify-between pt-1">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const lastMonth = paymentAllocations[paymentAllocations.length - 1]?.periodMonth || paymentPeriodMonth;
-                            setPaymentAllocations([...paymentAllocations, { periodMonth: getNextMonthKey(lastMonth), amountZAR: 0 }]);
-                          }}
-                          className="text-[11px] font-semibold text-slate-600 hover:text-slate-900 cursor-pointer"
-                        >
-                          + Add Month Row
-                        </button>
-                        {(() => {
-                          const allocatedSum = paymentAllocations.reduce((s, a) => s + (a.amountZAR || 0), 0);
-                          const diff = Math.round((paymentAmount - allocatedSum) * 100) / 100;
-                          return (
-                            <span className={`text-[11px] font-mono ${diff === 0 ? 'text-emerald-600 font-bold' : 'text-amber-600 font-bold'}`}>
-                              Allocated: {formatZAR(allocatedSum)}
-                              {diff !== 0 && ` (${diff > 0 ? `+${formatZAR(diff)} unallocated` : `${formatZAR(Math.abs(diff))} over`})`}
-                            </span>
-                          );
-                        })()}
-                      </div>
-                    </div>
-                  )}
-
-                  {!showAllocationsEditor && paymentAllocations.length > 0 && (
-                    <div className="text-[11px] text-slate-600 font-mono bg-white px-2.5 py-1.5 rounded border border-slate-200">
-                      {paymentAllocations.map((a) => `${formatMonthLabel(a.periodMonth)}: ${formatZAR(a.amountZAR)} ✓`).join(', ')}
-                    </div>
-                  )}
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    Bank Reference / Proof
-                  </label>
-                  <input
-                    type="text"
-                    value={paymentReference}
-                    onChange={(e) => setPaymentReference(e.target.value)}
-                    placeholder="e.g. FNB-REF-98432 or April Rent"
-                    className="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    Internal Notes (Optional)
-                  </label>
-                  <textarea
-                    rows={2}
-                    value={paymentNotes}
-                    onChange={(e) => setPaymentNotes(e.target.value)}
-                    placeholder="Any notes about this payment..."
-                    className="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500 resize-none"
-                  />
-                </div>
-
-                <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
-                  <button
-                    type="button"
-                    onClick={() => setShowPaymentModal(false)}
-                    className="px-4 py-2 text-xs font-semibold text-slate-600 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    className="px-4 py-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg shadow-sm transition-colors cursor-pointer"
-                  >
-                    {editingPayment ? 'Save Changes' : 'Record Payment'}
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        );
-      })()}
-
-      {/* Arrears Write-Off Modal (Bad Debt Audit Record) */}
-      {showWriteOffModal && writeOffPropertyId && (() => {
-        const prop = rentals.find((r) => r.id === writeOffPropertyId);
-        if (!prop) return null;
-        const targetLease = prop.leases?.find((l) => l.id === writeOffLeaseId);
-
-        return (
-          <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-            <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-lg max-h-[90vh] overflow-y-auto animate-in fade-in zoom-in-95 duration-150">
-              <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-rose-50/70 sticky top-0 bg-white z-10">
-                <div className="flex items-center gap-2">
-                  <div className="p-2 rounded-xl bg-rose-100 text-rose-800">
-                    <Archive className="w-5 h-5 text-rose-600" />
-                  </div>
-                  <div>
-                    <h3 className="text-base font-bold text-slate-900">
-                      Write Off Tenant Arrears
-                    </h3>
-                    <p className="text-xs text-slate-500">
-                      {prop.title} {targetLease ? `• ${targetLease.tenantName}` : ''}
-                    </p>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setShowWriteOffModal(false)}
-                  className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
-                >
-                  ✕
-                </button>
-              </div>
-
-              <form onSubmit={handleSaveWriteOff} className="p-6 space-y-4">
-                <div className="p-3 bg-amber-50 rounded-xl border border-amber-200 text-xs text-amber-900 space-y-1">
-                  <div className="font-semibold flex items-center gap-1.5">
-                    <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
-                    <span>SARS Bad Debt & Audit Trail Notice</span>
-                  </div>
-                  <p className="text-[11px] leading-relaxed text-amber-800">
-                    Writing off arrears relieves the tenant debt in the operational ledger and enables bad debt deduction under Section 11(i) of the Income Tax Act. Internal reasons and audit notes are strictly confidential and will <strong>never</strong> appear on tenant-facing statements or WhatsApp messages.
-                  </p>
-                </div>
-
-                {prop.leases && prop.leases.length > 0 && (
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-700 mb-1">
-                      Tenant / Unit {prop.leases.length > 1 && <span className="text-rose-600 font-bold">*</span>}
-                    </label>
-                    <select
-                      required={prop.leases.length > 1}
-                      value={writeOffLeaseId}
-                      onChange={(e) => {
-                        const newLeaseId = e.target.value;
-                        setWriteOffLeaseId(newLeaseId);
-                        const leaseArrears = calculatePropertyArrears(prop, undefined, newLeaseId ? { leaseId: newLeaseId } : undefined);
-                        const maxForLease = Math.max(0, leaseArrears.totalArrearsZAR);
-                        const newAmount = Math.min(writeOffAmount || maxForLease, maxForLease);
-                        setWriteOffAmount(newAmount);
-                        const unpaid = getUnpaidLedgerMonths(prop, newLeaseId ? { leaseId: newLeaseId } : undefined);
-                        const allocs = allocateOldestFirst(unpaid, newAmount);
-                        setWriteOffAllocations(allocs);
-                      }}
-                      className="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-rose-500 bg-white"
-                    >
-                      {prop.leases.length > 1 && (
-                        <option value="" disabled>-- Select Lease (Required) --</option>
-                      )}
-                      {prop.leases.map((l) => (
-                        <option key={l.id} value={l.id}>
-                          {l.unitName ? `${l.unitName} - ` : ''}{l.tenantName} ({formatZAR(l.monthlyRentZAR)}/mo)
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                )}
-
-                {(() => {
-                  const leaseArrears = calculatePropertyArrears(prop, undefined, writeOffLeaseId ? { leaseId: writeOffLeaseId } : undefined);
-                  const maxEligible = Math.max(0, leaseArrears.totalArrearsZAR);
-                  return (
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className="block text-xs font-semibold text-slate-700 mb-1">
-                          Write-Off Date
-                        </label>
-                        <input
-                          type="date"
-                          required
-                          value={writeOffDate}
-                          onChange={(e) => setWriteOffDate(e.target.value)}
-                          className="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-rose-500"
-                        />
-                      </div>
-
-                      <div>
-                        <div className="flex items-center justify-between mb-1">
-                          <label className="block text-xs font-semibold text-slate-700">
-                            Amount to Write Off (ZAR)
-                          </label>
-                          {maxEligible > 0 && (
-                            <span className="text-[10px] text-slate-500">
-                              Max: <strong className="text-slate-700 font-mono">{formatZAR(maxEligible)}</strong>
-                            </span>
-                          )}
-                        </div>
-                        <div className="relative">
-                          <span className="absolute left-3 top-2 text-sm font-bold text-slate-400">R</span>
-                          <input
-                            type="number"
-                            min="0.01"
-                            max={maxEligible > 0 ? maxEligible : undefined}
-                            step="any"
-                            required
-                            value={writeOffAmount || ''}
-                            onChange={(e) => {
-                              const val = parseFloat(e.target.value) || 0;
-                              setWriteOffAmount(val);
-                              const unpaid = getUnpaidLedgerMonths(prop, writeOffLeaseId ? { leaseId: writeOffLeaseId } : undefined);
-                              setWriteOffAllocations(allocateOldestFirst(unpaid, val));
-                            }}
-                            placeholder="0.00"
-                            className="w-full pl-8 pr-3 py-2 text-sm font-mono font-bold rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-rose-500"
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })()}
-
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    Audit Reason (Tax / SARS Justification)
-                  </label>
-                  <select
-                    value={writeOffReason}
-                    onChange={(e) => setWriteOffReason(e.target.value as ArrearsWriteOffReason)}
-                    className="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-rose-500 bg-white"
-                  >
-                    <option value="Tenant absconded">Tenant absconded</option>
-                    <option value="Settlement / discount agreed">Settlement / discount agreed</option>
-                    <option value="Uncollectable / bad debt">Uncollectable / bad debt</option>
-                    <option value="Other">Other</option>
-                  </select>
-                </div>
-
-                {/* Month Allocation Breakdown for Write-Off */}
-                <div className="border border-slate-200 rounded-xl p-3 bg-slate-50/60 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <label className="text-xs font-bold text-slate-800">
-                        Target Billing Months to Clear
-                      </label>
-                      <p className="text-[10px] text-slate-500">
-                        Select which historical months' debt will be reduced
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const unpaid = getUnpaidLedgerMonths(prop, writeOffLeaseId ? { leaseId: writeOffLeaseId } : undefined);
-                        setWriteOffAllocations(allocateOldestFirst(unpaid, writeOffAmount));
-                      }}
-                      className="text-[11px] font-semibold text-rose-700 hover:text-rose-800 bg-rose-50 hover:bg-rose-100 border border-rose-200 px-2 py-1 rounded cursor-pointer transition-colors"
-                    >
-                      Auto-allocate (Oldest First)
-                    </button>
-                  </div>
-
-                  <div className="space-y-1.5 pt-1">
-                    {writeOffAllocations.map((alloc, idx) => (
-                      <div key={idx} className="flex items-center gap-2">
-                        <input
-                          type="month"
-                          value={alloc.periodMonth}
-                          onChange={(e) => {
-                            const updated = [...writeOffAllocations];
-                            updated[idx] = { ...updated[idx], periodMonth: e.target.value };
-                            setWriteOffAllocations(updated);
-                          }}
-                          className="px-2 py-1 text-xs rounded border border-slate-300 bg-white"
-                        />
-                        <div className="relative flex-1">
-                          <span className="absolute left-2 top-1 text-xs font-bold text-slate-400">R</span>
-                          <input
-                            type="number"
-                            min="0"
-                            step="any"
-                            value={alloc.amountZAR || ''}
-                            onChange={(e) => {
-                              const updated = [...writeOffAllocations];
-                              updated[idx] = { ...updated[idx], amountZAR: parseFloat(e.target.value) || 0 };
-                              setWriteOffAllocations(updated);
-                            }}
-                            className="w-full pl-6 pr-2 py-1 text-xs font-mono font-bold rounded border border-slate-300 bg-white"
-                            placeholder="0.00"
-                          />
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const updated = writeOffAllocations.filter((_, i) => i !== idx);
-                            setWriteOffAllocations(updated);
-                          }}
-                          className="text-slate-400 hover:text-rose-600 text-sm px-1 cursor-pointer"
-                        >
-                          ✕
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-
-                  <div className="flex items-center justify-between pt-1">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const lastMonth = writeOffAllocations[writeOffAllocations.length - 1]?.periodMonth || getMonthKey(writeOffDate);
-                        setWriteOffAllocations([...writeOffAllocations, { periodMonth: getNextMonthKey(lastMonth), amountZAR: 0 }]);
-                      }}
-                      className="text-[11px] font-semibold text-slate-600 hover:text-slate-900 cursor-pointer"
-                    >
-                      + Add Month Row
-                    </button>
-                    {(() => {
-                      const totalAlloc = writeOffAllocations.reduce((s, a) => s + (a.amountZAR || 0), 0);
-                      const diff = Math.round((writeOffAmount - totalAlloc) * 100) / 100;
-                      return (
-                        <span className={`text-[11px] font-mono ${diff === 0 ? 'text-emerald-600 font-bold' : 'text-amber-600 font-bold'}`}>
-                          Total Allocated: {formatZAR(totalAlloc)}
-                          {diff !== 0 && ` (${diff > 0 ? `+${formatZAR(diff)} unallocated` : `${formatZAR(Math.abs(diff))} over`})`}
-                        </span>
-                      );
-                    })()}
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    Internal Audit Notes (Confidential)
-                  </label>
-                  <textarea
-                    rows={2}
-                    value={writeOffNotes}
-                    onChange={(e) => setWriteOffNotes(e.target.value)}
-                    placeholder="Record debt recovery attempts, case numbers, attorney correspondence, or settlement terms..."
-                    className="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-rose-500 resize-none"
-                  />
-                </div>
-
-                <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
-                  <button
-                    type="button"
-                    onClick={() => setShowWriteOffModal(false)}
-                    className="px-4 py-2 text-xs font-semibold text-slate-600 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    className="px-4 py-2 text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 rounded-lg shadow-sm transition-colors cursor-pointer"
-                  >
-                    Confirm Write-Off
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        );
-      })()}
+      <WriteOffModal
+        isOpen={showWriteOffModal && Boolean(writeOffPropertyId)}
+        property={rentals.find((r) => r.id === writeOffPropertyId) || null}
+        onClose={() => setShowWriteOffModal(false)}
+        onSave={(payload) => {
+          if (!writeOffPropertyId) return;
+          recordArrearsWriteOff(writeOffPropertyId, payload);
+          setCopyFeedbackToast(`Written off ${formatZAR(payload.amountZAR)} (${payload.reason})`);
+        }}
+        writeOffLeaseId={writeOffLeaseId}
+        setWriteOffLeaseId={setWriteOffLeaseId}
+        writeOffDate={writeOffDate}
+        setWriteOffDate={setWriteOffDate}
+        writeOffAmount={writeOffAmount}
+        setWriteOffAmount={setWriteOffAmount}
+        writeOffReason={writeOffReason}
+        setWriteOffReason={setWriteOffReason}
+        writeOffNotes={writeOffNotes}
+        setWriteOffNotes={setWriteOffNotes}
+        writeOffAllocations={writeOffAllocations}
+        setWriteOffAllocations={setWriteOffAllocations}
+      />
 
       {/* Floating Action / Clipboard Feedback Toast */}
       {copyFeedbackToast && (
