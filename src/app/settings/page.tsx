@@ -428,6 +428,40 @@ function SettingsContent() {
       model: aiModel,
     });
 
+    if (currentUser?.id) {
+      supabase
+        .from('profiles')
+        .update({
+          entity_name: entityName,
+          trading_as: tradingAs || null,
+          registration_or_id: registrationOrId || null,
+          contact_number: contactNumber || null,
+          email: email || null,
+          website: website || null,
+          physical_address: physicalAddress || null,
+          logo_base64: logoBase64 || null,
+          bio_summary: bioSummary || null,
+          bank_name: bankName || null,
+          account_holder: (accountHolder || entityName) || null,
+          account_number: accountNumber || null,
+          account_type: accountType || null,
+          branch_code: branchCode || null,
+          swift_code: swiftCode || null,
+          remittance_instructions: remittanceInstructions || null,
+          default_prime_rate_percent: defaultPrimeRate,
+          baseline_hurdle_yield_percent: baselineHurdleYield,
+          default_agent_commission_percent: defaultCommission,
+          default_tax_entity_type: defaultTaxEntity,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('user_id', currentUser.id)
+        .then(({ error }) => {
+          if (error) {
+            console.error('Failed to sync profile changes to Supabase:', error.message);
+          }
+        });
+    }
+
     setSavedSuccess(true);
     setTimeout(() => setSavedSuccess(false), 3500);
   };
