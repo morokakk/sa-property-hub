@@ -23,9 +23,11 @@ import {
   FileCode2,
   CheckCircle2,
   Compass,
+  BookOpen,
 } from 'lucide-react';
 import { usePortfolioStore } from '@/lib/store/usePortfolioStore';
 import { exportPortfolioToExcel } from '@/lib/export/excelExport';
+import { exportAccountantJournalCSV } from '@/lib/export/csvExport';
 
 export default function Sidebar() {
   const pathname = usePathname();
@@ -88,6 +90,13 @@ export default function Sidebar() {
       investorProfile: currentState.investorProfile,
     });
     showDrawerNotice('Exported to Excel (.xlsx).');
+  };
+
+  const handleExportJournal = () => {
+    const lineCount = exportAccountantJournalCSV(usePortfolioStore.getState().rentals);
+    showDrawerNotice(
+      lineCount > 0 ? `Accountant GL journal exported (${lineCount} lines).` : 'Journal exported, but no rental lines found.'
+    );
   };
 
   const handleExportJSON = () => {
@@ -445,6 +454,14 @@ export default function Sidebar() {
                   >
                     <FileSpreadsheet className="w-4 h-4 text-emerald-400 shrink-0" />
                     <span>Export to Excel (.xlsx)</span>
+                  </button>
+
+                  <button
+                    onClick={handleExportJournal}
+                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition-colors cursor-pointer text-left"
+                  >
+                    <BookOpen className="w-4 h-4 text-amber-400 shrink-0" />
+                    <span className="min-w-0 flex-1 break-words">Accountant GL Journal (.csv)</span>
                   </button>
 
                   <button

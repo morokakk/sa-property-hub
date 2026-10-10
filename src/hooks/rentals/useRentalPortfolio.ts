@@ -3,7 +3,7 @@ import { RentalProperty } from '@/types';
 import { usePortfolioStore, usePortfolioSummary } from '@/lib/store/usePortfolioStore';
 import { calculateAggregateRentalKPIs } from '@/lib/calculations/rentals';
 import { calculatePropertyArrears } from '@/lib/calculations/arrears';
-import { exportRentalsCSV } from '@/lib/export/csvExport';
+import { exportRentalsCSV, exportAccountantJournalCSV } from '@/lib/export/csvExport';
 import { exportITR12TaxReport } from '@/lib/export/excelExport';
 import { formatZAR } from '@/lib/formatters';
 
@@ -28,6 +28,7 @@ export interface UseRentalPortfolioReturn {
   feedbackToast: string | null;
   showToast: (msg: string) => void;
   handleExportCsv: () => void;
+  handleExportAccountantJournal: () => void;
   handleExportItr12: (taxYear?: number) => void;
   handleDeleteProperty: (propertyId: string, title?: string) => void;
   handleReopenProperty: (propertyId: string, title?: string, proceedsToRevert?: number) => void;
@@ -69,6 +70,15 @@ export function useRentalPortfolio(): UseRentalPortfolioReturn {
     exportRentalsCSV(activeRentals);
     showToast('Exported active rentals register as CSV');
   }, [activeRentals, showToast]);
+
+  const handleExportAccountantJournal = useCallback(() => {
+    const count = exportAccountantJournalCSV(rentals);
+    showToast(
+      count > 0
+        ? `Exported Accountant GL journal (${count} lines, .csv)`
+        : 'Exported Accountant GL journal (no rental lines for this tax year)'
+    );
+  }, [rentals, showToast]);
 
   const handleExportItr12 = useCallback(
     (taxYear: number = 2026) => {
@@ -225,6 +235,7 @@ export function useRentalPortfolio(): UseRentalPortfolioReturn {
     feedbackToast,
     showToast,
     handleExportCsv,
+    handleExportAccountantJournal,
     handleExportItr12,
     handleDeleteProperty,
     handleReopenProperty,

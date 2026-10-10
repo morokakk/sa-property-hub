@@ -14,8 +14,10 @@ import {
   FileSpreadsheet,
   FileCode2,
   ChevronDown,
+  BookOpen,
 } from 'lucide-react';
 import { exportPortfolioToExcel } from '@/lib/export/excelExport';
+import { exportAccountantJournalCSV } from '@/lib/export/csvExport';
 
 interface TopHeaderProps {
   title: string;
@@ -85,6 +87,16 @@ export default function TopHeader({ title, subtitle, actionButton }: TopHeaderPr
       investorProfile: currentState.investorProfile,
     });
     showNotification('Multi-tab portfolio spreadsheet exported to Excel (.xlsx).');
+  };
+
+  const handleExportJournal = () => {
+    setShowExportMenu(false);
+    const lineCount = exportAccountantJournalCSV(usePortfolioStore.getState().rentals);
+    showNotification(
+      lineCount > 0
+        ? `Accountant GL journal exported (${lineCount} lines, .csv).`
+        : 'Accountant GL journal exported, but no rental lines were found for this tax year.'
+    );
   };
 
   const handleExportJSON = () => {
@@ -201,7 +213,7 @@ export default function TopHeader({ title, subtitle, actionButton }: TopHeaderPr
             <div className="relative" ref={exportMenuRef}>
               <button
                 onClick={() => setShowExportMenu(!showExportMenu)}
-                title="Export portfolio data to Excel or JSON"
+                title="Export portfolio data to Excel, accountant CSV journal or JSON"
                 className="p-1.5 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-md transition-colors flex items-center gap-1 text-xs font-medium min-h-[36px] min-w-[36px] justify-center cursor-pointer"
               >
                 <Download className="w-3.5 h-3.5" />
@@ -224,6 +236,19 @@ export default function TopHeader({ title, subtitle, actionButton }: TopHeaderPr
                     <div>
                       <div className="font-semibold text-slate-900">Excel Workbook (.xlsx)</div>
                       <div className="text-[10px] text-slate-500">Multi-tab financial model & tables</div>
+                    </div>
+                  </button>
+
+                  <button
+                    onClick={handleExportJournal}
+                    className="w-full px-3 py-2 text-left text-xs text-slate-700 hover:bg-amber-50 hover:text-amber-900 flex items-start gap-2.5 transition-colors cursor-pointer"
+                  >
+                    <div className="p-1 rounded bg-amber-100 text-amber-700 mt-0.5 shrink-0">
+                      <BookOpen className="w-3.5 h-3.5" />
+                    </div>
+                    <div className="min-w-0 break-words">
+                      <div className="font-semibold text-slate-900">Accountant GL Journal (.csv)</div>
+                      <div className="text-[10px] text-slate-500">Xero · QuickBooks · Sage, tax-year-to-date</div>
                     </div>
                   </button>
 
