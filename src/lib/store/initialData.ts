@@ -12,6 +12,8 @@ import {
   DealStrategy,
   MunicipalContact,
   PropertyMeter,
+  OccupantRiskProfile,
+  TenantVettingScorecard,
 } from '@/types';
 import { computeAcquisitionCosts, calculateSection13sex } from '@/lib/calculations/sarsTax';
 import {
@@ -19,6 +21,25 @@ import {
   computeBuiltInEquity,
   computeAmenityScore,
 } from '@/lib/calculations/propertyMetrics';
+import { calculateTenantVetting } from '@/lib/calculations/vettingEngine';
+
+function createSampleVettingScorecard(
+  monthlyRentZAR: number,
+  inputs: {
+    assessmentDate: string;
+    popiaConsentRecorded: boolean;
+    bureauCreditScore: number;
+    verifiedNetMonthlyIncomeZAR: number;
+    monthlyCpaDebtCommitmentsZAR: number;
+    hasOpenJudgmentsOrDefaults: boolean;
+    unpaidDebitOrderCount: number;
+  }
+): TenantVettingScorecard {
+  return {
+    ...inputs,
+    ...calculateTenantVetting(monthlyRentZAR, inputs),
+  };
+}
 
 export const INITIAL_RENTALS: RentalProperty[] = [
   {
@@ -46,7 +67,16 @@ export const INITIAL_RENTALS: RentalProperty[] = [
       monthlyRentZAR: 18_500,
       depositHeldZAR: 37_000,
       annualEscalationPercent: 7.0,
-      status: 'Occupied'
+      status: 'Occupied',
+      vettingScorecard: createSampleVettingScorecard(18_500, {
+        assessmentDate: '2023-03-25',
+        popiaConsentRecorded: true,
+        bureauCreditScore: 785,
+        verifiedNetMonthlyIncomeZAR: 68_000,
+        monthlyCpaDebtCommitmentsZAR: 14_500,
+        hasOpenJudgmentsOrDefaults: false,
+        unpaidDebitOrderCount: 0,
+      }),
     }],
     managementType: 'Agency',
     agencyName: 'Pam Golding Sandton',
@@ -381,7 +411,16 @@ export const INITIAL_RENTALS: RentalProperty[] = [
       monthlyRentZAR: 15_200,
       depositHeldZAR: 30_400,
       annualEscalationPercent: 6.5,
-      status: 'Occupied'
+      status: 'Occupied',
+      vettingScorecard: createSampleVettingScorecard(15_200, {
+        assessmentDate: '2023-09-15',
+        popiaConsentRecorded: true,
+        bureauCreditScore: 680,
+        verifiedNetMonthlyIncomeZAR: 48_000,
+        monthlyCpaDebtCommitmentsZAR: 18_000,
+        hasOpenJudgmentsOrDefaults: false,
+        unpaidDebitOrderCount: 1,
+      }),
     }],
     managementType: 'Self-Managed',
     agencyCommissionPercent: 0,
@@ -1448,6 +1487,16 @@ export const INITIAL_FLIPS: FlipProject[] = [
     promisedPayoutSchedule: 'At Exit (Maturity)',
     securityOffered: 'Personal suretyship over title deed',
     status: 'Delayed',
+    occupantRisk: {
+      occupancyStatus: 'vacant',
+      evictionRequired: false,
+      evictionJurisdiction: 'magistrates_court',
+      estimatedEvictionDelayDays: 120,
+      budgetedLegalEvictionCostZAR: 40_000,
+      monthlySiteSecurityZAR: 0,
+      totalEvictionCarryingCostZAR: 40_000,
+      possessionObtainedDate: '2026-07-15',
+    },
     notes: 'Classic Linden 1950s freehold sourced at auction below valuation. Structural wall removal requires RSJ lintels. CoJ Figures Issued — waiting on final clearance certificate.',
     boq: [
       {
@@ -1901,7 +1950,8 @@ function createSampleOpportunity(
   },
   auctioneerCommissionZAR?: number,
   municipalArrearsZAR?: number,
-  strategy: DealStrategy = 'Rental'
+  strategy: DealStrategy = 'Rental',
+  occupantRisk?: OccupantRiskProfile
 ): OpportunityDeal {
   const depositZAR = Math.round(purchasePrice * (1 - ltv / 100));
   const costs = computeAcquisitionCosts(purchasePrice, ltv);
@@ -1925,6 +1975,7 @@ function createSampleOpportunity(
     costs,
     auctioneerCommissionZAR,
     municipalArrearsZAR,
+    occupantRisk,
   });
 
   const { builtInEquityZAR, builtInEquityPercent } = computeBuiltInEquity(openMarketValue, purchasePrice);
@@ -1974,6 +2025,7 @@ function createSampleOpportunity(
     costs,
     auctioneerCommissionZAR,
     municipalArrearsZAR,
+    occupantRisk,
     section13sex: isSection13Eligible ? calculateSection13sex(purchasePrice, 27, true) : undefined,
     driveVault,
     grossYield: metrics.grossYield,
@@ -2040,7 +2092,16 @@ export const INITIAL_OPPORTUNITIES: OpportunityDeal[] = [
     },
     201_250, // Auctioneer commission (10% + 15% VAT on R1.75M)
     45_000,  // Municipal Section 118 clearance arrears
-    'Flip'   // Strategy
+    'Flip',   // Strategy
+    {
+      occupancyStatus: 'unlawful_occupant',
+      evictionRequired: true,
+      evictionJurisdiction: 'magistrates_court',
+      estimatedEvictionDelayDays: 120,
+      budgetedLegalEvictionCostZAR: 40_000,
+      monthlySiteSecurityZAR: 6_500,
+      totalEvictionCarryingCostZAR: 65_000,
+    }
   ),
   createSampleOpportunity(
     'opp-2',
