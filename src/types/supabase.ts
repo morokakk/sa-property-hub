@@ -127,6 +127,7 @@ export type Database = {
           municipal_valuation_zar: number | null
           net_cash_proceeds_zar: number | null
           notes: string | null
+          occupant_risk: Json | null
           primary_funder_contact: string | null
           primary_funder_name: string | null
           primary_funder_type: string | null
@@ -180,6 +181,7 @@ export type Database = {
           municipal_valuation_zar?: number | null
           net_cash_proceeds_zar?: number | null
           notes?: string | null
+          occupant_risk?: Json | null
           primary_funder_contact?: string | null
           primary_funder_name?: string | null
           primary_funder_type?: string | null
@@ -233,6 +235,7 @@ export type Database = {
           municipal_valuation_zar?: number | null
           net_cash_proceeds_zar?: number | null
           notes?: string | null
+          occupant_risk?: Json | null
           primary_funder_contact?: string | null
           primary_funder_name?: string | null
           primary_funder_type?: string | null
@@ -386,6 +389,7 @@ export type Database = {
           municipal_arrears_zar: number | null
           net_roi: number | null
           notes: string | null
+          occupant_risk: Json | null
           open_market_value_zar: number | null
           pass_notes: string | null
           pass_reason: string | null
@@ -460,6 +464,7 @@ export type Database = {
           municipal_arrears_zar?: number | null
           net_roi?: number | null
           notes?: string | null
+          occupant_risk?: Json | null
           open_market_value_zar?: number | null
           pass_notes?: string | null
           pass_reason?: string | null
@@ -534,6 +539,7 @@ export type Database = {
           municipal_arrears_zar?: number | null
           net_roi?: number | null
           notes?: string | null
+          occupant_risk?: Json | null
           open_market_value_zar?: number | null
           pass_notes?: string | null
           pass_reason?: string | null

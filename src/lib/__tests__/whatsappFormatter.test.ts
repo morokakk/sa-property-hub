@@ -4,9 +4,10 @@ import {
   formatFlipForWhatsApp,
   formatProposalPitchForWhatsApp,
   formatPaymentStatement,
+  formatPieActWhatsAppBlock,
 } from '../whatsappFormatter';
 import { formatZAR, formatDate } from '../formatters';
-import { OpportunityDeal, FlipProject, InvestorProfile } from '@/types';
+import { OpportunityDeal, FlipProject, InvestorProfile, OccupantRiskProfile } from '@/types';
 
 describe('whatsappFormatter - Strategy Adaptive Formatting', () => {
   const mockInvestorProfile: InvestorProfile = {
@@ -436,6 +437,189 @@ describe('whatsappFormatter - Strategy Adaptive Formatting', () => {
     expect(output).toContain(`• 12-Mo Collection Rate: 100% (${formatZAR(180_000)} of ${formatZAR(180_000)})`);
     expect(output).not.toContain('Tenant Arrears Receivable:');
     expect(output).not.toContain('Tenant Collection Risk flagged');
+  });
+
+  describe('PIE Act Statutory Eviction Risk & Contractor Gating Disclosures', () => {
+    const unlawfulRiskMagistrate: OccupantRiskProfile = {
+      occupancyStatus: 'unlawful_occupant',
+      evictionRequired: true,
+      evictionJurisdiction: 'magistrates_court',
+      estimatedEvictionDelayDays: 120,
+      budgetedLegalEvictionCostZAR: 40_000,
+      monthlySiteSecurityZAR: 6_500,
+      totalEvictionCarryingCostZAR: 65_000,
+    };
+
+    const unlawfulRiskHighCourt: OccupantRiskProfile = {
+      occupancyStatus: 'unlawful_occupant',
+      evictionRequired: true,
+      evictionJurisdiction: 'high_court',
+      estimatedEvictionDelayDays: 240,
+      budgetedLegalEvictionCostZAR: 85_000,
+      monthlySiteSecurityZAR: 8_500,
+      totalEvictionCarryingCostZAR: 155_000,
+    };
+
+    const vacantRisk: OccupantRiskProfile = {
+      occupancyStatus: 'vacant',
+      evictionRequired: false,
+      evictionJurisdiction: 'none',
+      estimatedEvictionDelayDays: 0,
+      budgetedLegalEvictionCostZAR: 0,
+      monthlySiteSecurityZAR: 0,
+      totalEvictionCarryingCostZAR: 0,
+    };
+
+    it('formatPieActWhatsAppBlock returns empty string for vacant or tenanted deals', () => {
+      expect(formatPieActWhatsAppBlock(undefined)).toBe('');
+      expect(formatPieActWhatsAppBlock(null)).toBe('');
+      expect(formatPieActWhatsAppBlock(vacantRisk)).toBe('');
+      expect(formatPieActWhatsAppBlock({
+        ...vacantRisk,
+        occupancyStatus: 'tenanted_verified',
+      })).toBe('');
+    });
+
+    it('formatPieActWhatsAppBlock renders formatted statutory risk block for Magistrate Court', () => {
+      const output = formatPieActWhatsAppBlock(unlawfulRiskMagistrate);
+
+      expect(output).toContain('*⚠️ SITE POSSESSION & STATUTORY RISK (PIE ACT)*');
+      expect(output).toContain('• Occupancy Status: *Unlawful Occupants Present*');
+      expect(output).toContain("• Legal Jurisdiction: *Magistrate's Court (Unopposed Proceedings)*");
+      expect(output).toContain('• Estimated Eviction Delay: *~120 Days*');
+      expect(output).toContain(`• Budgeted Legal Eviction Reserve: *${formatZAR(40_000)}*`);
+      expect(output).toContain(`• Monthly Armed Site Security: *${formatZAR(6_500)}/m*`);
+      expect(output).toContain('• Contractor Protection Gate: *Active*');
+      expect(output).toContain('Sheriff of the Court executes eviction order & issues return of service');
+      expect(output).toContain('Section 4(2) of Act 19 of 1998');
+    });
+
+    it('formatPieActWhatsAppBlock renders formatted statutory risk block for High Court', () => {
+      const output = formatPieActWhatsAppBlock(unlawfulRiskHighCourt);
+
+      expect(output).toContain('*⚠️ SITE POSSESSION & STATUTORY RISK (PIE ACT)*');
+      expect(output).toContain('• Legal Jurisdiction: *High Court (Opposed / Complex Proceedings)*');
+      expect(output).toContain('• Estimated Eviction Delay: *~240 Days*');
+      expect(output).toContain(`• Budgeted Legal Eviction Reserve: *${formatZAR(85_000)}*`);
+      expect(output).toContain(`• Monthly Armed Site Security: *${formatZAR(8_500)}/m*`);
+    });
+
+    it('formatOpportunityForWhatsApp injects eviction risk and capitalizes reserves when unlawful occupants exist', () => {
+      const oppWithEviction: OpportunityDeal = {
+        ...baseFlipDeal,
+        occupantRisk: unlawfulRiskMagistrate,
+      };
+
+      const output = formatOpportunityForWhatsApp(oppWithEviction, mockInvestorProfile);
+
+      expect(output).toContain('⚠️ SITE POSSESSION & STATUTORY RISK (PIE ACT)');
+      expect(output).toContain('Contractor Protection Gate: *Active*');
+      expect(output).toContain(`• PIE Act Legal Eviction Reserve: *${formatZAR(40_000)}*`);
+      expect(output).toContain('6m works + ~120d legal');
+      expect(output).toContain('Total Project Outlay:');
+    });
+
+    it('formatOpportunityForWhatsApp completely omits PIE Act block when vacant', () => {
+      const output = formatOpportunityForWhatsApp(baseFlipDeal, mockInvestorProfile);
+      expect(output).not.toContain('SITE POSSESSION & STATUTORY RISK');
+      expect(output).not.toContain('Contractor Protection Gate');
+    });
+
+    it('formatFlipForWhatsApp injects eviction risk block and adjusts holding reserve', () => {
+      const flipWithEviction: FlipProject = {
+        id: 'flip-evict-1',
+        title: 'Berea Foreclosure Flip',
+        address: '14 Lily Ave, Berea',
+        city: 'Johannesburg',
+        purchaseDate: '2026-06-01',
+        purchasePriceZAR: 700_000,
+        acquisitionCostsZAR: 40_000,
+        baselineRenovationBudgetZAR: 200_000,
+        targetExitPriceZAR: 1_400_000,
+        targetCompletionDate: '2026-12-31',
+        currentPhase: 'Acquisition & Conveyancing',
+        linkedFundingIds: [],
+        estimatedDurationMonths: 6,
+        monthlyHoldingCostZAR: 10_000,
+        monthlyBondPaymentZAR: 6_000,
+        monthlyLeviesZAR: 1_500,
+        monthlyRatesTaxesZAR: 1_000,
+        monthlyOtherHoldingCostZAR: 1_500,
+        status: 'Active',
+        strategy: 'Flip',
+        boq: [],
+        occupantRisk: unlawfulRiskHighCourt,
+      };
+
+      const output = formatFlipForWhatsApp(flipWithEviction, mockInvestorProfile);
+
+      expect(output).toContain('⚠️ SITE POSSESSION & STATUTORY RISK (PIE ACT)');
+      expect(output).toContain('High Court (Opposed / Complex Proceedings)');
+      expect(output).toContain(formatZAR(85_000));
+      expect(output).toContain('Contractor Protection Gate: *Active*');
+    });
+
+    it('formatProposalPitchForWhatsApp injects eviction risk block and updates total outlay and profit', () => {
+      const output = formatProposalPitchForWhatsApp({
+        deal: {
+          id: 'deal-pitch-evict-1',
+          title: 'Auction Foreclosure with Unlawful Occupants',
+          address: '55 End Street',
+          city: 'Johannesburg',
+          purchasePrice: 800_000,
+          acquisitionCosts: 50_000,
+          renovationBudget: 200_000,
+          targetExitPrice: 1_600_000,
+          completionDate: '2026-12-15',
+          strategy: 'Flip',
+          holdingDurationMonths: 6,
+          monthlyHoldingCost: 10_000,
+          monthlyBondHolding: 6_000,
+          monthlyLeviesHolding: 1_500,
+          monthlyRatesHolding: 1_000,
+          monthlyOtherHolding: 1_500,
+          occupantRisk: unlawfulRiskMagistrate,
+        },
+        strategy: 'Flip',
+        capitalRequested: 900_000,
+        fundingOfferType: 'Fixed Interest',
+        offeredRate: 14.5,
+        securityType: '2nd Mortgage Bond registered over title deed',
+        investorProfile: mockInvestorProfile,
+      });
+
+      expect(output).toContain('⚠️ SITE POSSESSION & STATUTORY RISK (PIE ACT)');
+      expect(output).toContain("Magistrate's Court (Unopposed Proceedings)");
+      expect(output).toContain(`• Budgeted Legal Eviction Reserve: *${formatZAR(40_000)}*`);
+      expect(output).toContain('• Contractor Protection Gate: *Active*');
+      expect(output).toContain('Total Project Outlay:');
+    });
+
+    it('formatProposalPitchForWhatsApp cleanly omits eviction block when deal is vacant', () => {
+      const output = formatProposalPitchForWhatsApp({
+        deal: {
+          id: 'deal-pitch-vacant',
+          title: 'Clean Vacant Apartment',
+          address: '10 Oxford Road',
+          city: 'Rosebank',
+          purchasePrice: 1_000_000,
+          acquisitionCosts: 50_000,
+          renovationBudget: 150_000,
+          targetExitPrice: 1_500_000,
+          strategy: 'Flip',
+          occupantRisk: vacantRisk,
+        },
+        strategy: 'Flip',
+        capitalRequested: 800_000,
+        fundingOfferType: 'Fixed Interest',
+        offeredRate: 14.0,
+        securityType: '1st Mortgage Bond',
+        investorProfile: mockInvestorProfile,
+      });
+
+      expect(output).not.toContain('SITE POSSESSION & STATUTORY RISK');
+      expect(output).not.toContain('Contractor Protection Gate');
+    });
   });
 
   describe('formatPaymentStatement - WhatsApp Payment Receipts', () => {

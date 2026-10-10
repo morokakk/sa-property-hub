@@ -8,7 +8,7 @@ import { formatZAR, formatPercent, formatDate } from '@/lib/formatters';
 import { generateLongTermProjection, calculateMonthlyBondRepayment } from '@/lib/calculations/propertyMetrics';
 import { formatProposalPitchForWhatsApp } from '@/lib/whatsappFormatter';
 import LongTermProjectionChart from '@/components/analytics/LongTermProjectionChart';
-import { DealStrategy, DealSource } from '@/types';
+import { DealStrategy, DealSource, OccupantRiskProfile } from '@/types';
 import {
   Printer,
   FileCheck2,
@@ -33,12 +33,19 @@ import {
   Repeat,
   AlertTriangle,
   Users,
+  Gavel,
+  Scale,
 } from 'lucide-react';
 import {
   calculateRentalHoldingCosts,
   calculate12MonthCollectionMetrics,
   maskTenantName,
 } from '@/lib/calculations/proposalMetrics';
+import {
+  isEvictionActive,
+  calculateEvictionCarryingCost,
+  DAYS_PER_MONTH,
+} from '@/lib/calculations/occupantRisk';
 
 function getSafeLogoUri(uri?: string): string {
   if (!uri) return '';
@@ -150,6 +157,7 @@ function ProposalGeneratorContent() {
       actualCollectedRentAvg: 0,
       adjustedVacancyRate: 5,
       rawRental: undefined,
+      occupantRisk: f.occupantRisk,
     })),
     ...opportunities.map((o) => {
       const openMarket = o.openMarketValueZAR || Math.round(o.purchasePrice * 1.2);
@@ -235,6 +243,7 @@ function ProposalGeneratorContent() {
         actualCollectedRentAvg: 0,
         adjustedVacancyRate: 5,
         rawRental: undefined,
+        occupantRisk: o.occupantRisk,
       };
     }),
     ...rentals.map((r) => {
@@ -315,6 +324,7 @@ function ProposalGeneratorContent() {
         actualCollectedRentAvg: collectionMetrics.actualCollectedRentAvg,
         adjustedVacancyRate: collectionMetrics.adjustedVacancyRate,
         rawRental: r,
+        occupantRisk: undefined,
       };
     }),
   ], [flips, opportunities, rentals, showTenantNames]);
@@ -381,10 +391,19 @@ function ProposalGeneratorContent() {
       const isDealFlip = initialStrategy === 'Flip';
       const duration = deal.holdingDurationMonths || 6;
       const burn = deal.monthlyHoldingCost || (deal.monthlyBondHolding + deal.monthlyLeviesHolding + deal.monthlyRatesHolding + deal.monthlyOtherHolding);
-      const reserve = isDealFlip ? burn * duration : 0;
+      const isDealEviction = isEvictionActive(deal.occupantRisk);
+      const dealEvictionCosts = calculateEvictionCarryingCost({
+        risk: deal.occupantRisk,
+        monthlyBondInterestZAR: deal.monthlyBondHolding,
+        monthlyRatesZAR: deal.monthlyRatesHolding,
+        monthlyLeviesZAR: deal.monthlyLeviesHolding,
+      });
+      const dealEvictionDelayBurn = isDealFlip && isDealEviction ? dealEvictionCosts.evictionDelayBurnZAR : 0;
+      const dealLegalReserve = isDealEviction ? Math.max(0, deal.occupantRisk?.budgetedLegalEvictionCostZAR || 0) : 0;
+      const reserve = isDealFlip ? (burn * duration) + dealEvictionDelayBurn : 0;
       const auctionFee = deal.auctioneerCommission || 0;
       const arrears = deal.municipalArrears || 0;
-      const fullProjectOutlay = deal.purchasePrice + deal.acquisitionCosts + deal.renovationBudget + reserve + auctionFee + arrears;
+      const fullProjectOutlay = deal.purchasePrice + deal.acquisitionCosts + deal.renovationBudget + dealLegalReserve + reserve + auctionFee + arrears;
 
       const defaultCapital =
         deal.fundingRequiredZAR ??
@@ -435,7 +454,23 @@ function ProposalGeneratorContent() {
   const monthlyRates = deal?.monthlyRatesHolding ?? 0;
   const monthlyOther = deal?.monthlyOtherHolding ?? 0;
   const monthlyBurnRate = deal?.monthlyHoldingCost || (monthlyBond + monthlyLevies + monthlyRates + monthlyOther);
-  const totalHoldingReserve = isFlip ? monthlyBurnRate * holdingDuration : 0;
+
+  const occupantRisk = deal?.occupantRisk;
+  const isEviction = isEvictionActive(occupantRisk);
+  const evictionCosts = calculateEvictionCarryingCost({
+    risk: occupantRisk,
+    monthlyBondInterestZAR: monthlyBond,
+    monthlyRatesZAR: monthlyRates,
+    monthlyLeviesZAR: monthlyLevies,
+  });
+  const evictionDelayDays = isEviction ? (occupantRisk?.estimatedEvictionDelayDays || 0) : 0;
+  const evictionDelayMonths = evictionDelayDays / DAYS_PER_MONTH;
+  const evictionDelayBurn = isFlip && isEviction ? evictionCosts.evictionDelayBurnZAR : 0;
+  const legalEvictionReserve = isEviction ? Math.max(0, occupantRisk?.budgetedLegalEvictionCostZAR || 0) : 0;
+  const worksHoldingReserve = isFlip ? monthlyBurnRate * holdingDuration : 0;
+  const totalHoldingReserve = worksHoldingReserve + evictionDelayBurn;
+  const totalHoldingDurationMonths = isFlip && isEviction ? Math.round((holdingDuration + evictionDelayMonths) * 10) / 10 : holdingDuration;
+
   const auctioneerCommission = deal?.auctioneerCommission ?? 0;
   const municipalArrears = deal?.municipalArrears ?? 0;
   const exitCommissionPercent = deal?.exitCommissionPercent ?? 5.75;
@@ -445,6 +480,7 @@ function ProposalGeneratorContent() {
     (deal?.purchasePrice || 0) +
     (deal?.acquisitionCosts || 0) +
     (deal?.renovationBudget || 0) +
+    legalEvictionReserve +
     totalHoldingReserve +
     auctioneerCommission +
     municipalArrears +
@@ -571,19 +607,7 @@ function ProposalGeneratorContent() {
               <label className="text-xs font-semibold text-slate-700 shrink-0">Active Pitch Deal:</label>
               <select
                 value={selectedDealId}
-                onChange={(e) => {
-                  setSelectedDealId(e.target.value);
-                  const selected = allDeals.find((d) => d.id === e.target.value);
-                  if (selected) {
-                    const selHold = selected.strategy === 'Flip' ? (selected.monthlyHoldingCost || 0) * (selected.holdingDurationMonths || 6) : 0;
-                    const selAuction = selected.auctioneerCommission || 0;
-                    const selArrears = selected.municipalArrears || 0;
-                    const selTotal = selected.purchasePrice + selected.acquisitionCosts + selected.renovationBudget + selHold + selAuction + selArrears;
-                    setCapitalRequested(
-                      selected.fundingRequiredZAR ?? Math.round(selTotal * 0.7)
-                    );
-                  }
-                }}
+                onChange={(e) => setSelectedDealId(e.target.value)}
                 className="w-full sm:w-auto max-w-full min-w-0 text-xs font-bold px-3 py-2 border border-slate-300 rounded-lg bg-white shadow-xs text-slate-900 truncate"
               >
                 {allDeals.map((d) => {
@@ -1293,6 +1317,19 @@ function ProposalGeneratorContent() {
                       <td className="p-2.5">{formatPercent((deal.acquisitionCosts / totalProjectCost) * 100)}</td>
                       <td className="p-2.5 text-slate-500">On Contract Signing (Conveyancers)</td>
                     </tr>
+                    {isEviction && legalEvictionReserve > 0 && (
+                      <tr className="bg-rose-50/60" data-testid="pie-act-legal-reserve-row">
+                        <td className="p-2.5 font-medium flex items-center gap-1.5 flex-wrap">
+                          <span className="text-rose-950 font-bold">PIE Act Legal Eviction Reserve</span>
+                          <span className="text-[10px] bg-rose-100 text-rose-900 font-bold px-1.5 py-0.2 rounded border border-rose-300">
+                            {deal.occupantRisk?.evictionJurisdiction === 'high_court' ? 'High Court (Opposed)' : "Magistrate's Court"}
+                          </span>
+                        </td>
+                        <td className="p-2.5 font-bold text-rose-900">{formatZAR(legalEvictionReserve)}</td>
+                        <td className="p-2.5 text-rose-900">{totalProjectCost > 0 ? formatPercent((legalEvictionReserve / totalProjectCost) * 100) : '0%'}</td>
+                        <td className="p-2.5 text-slate-600 font-medium">Day-1 Litigation Retainer &amp; Sheriff Execution</td>
+                      </tr>
+                    )}
                     <tr>
                       <td className="p-2.5 font-medium flex items-center gap-1.5 flex-wrap">
                         <span>
@@ -1317,13 +1354,13 @@ function ProposalGeneratorContent() {
                         <td className="p-2.5 font-medium text-amber-950 flex items-center gap-1.5 flex-wrap">
                           <span>Holding Period Carrying Costs & Operational Burn Reserve</span>
                           <span className="text-[10px] bg-amber-100 text-amber-900 font-bold px-1.5 py-0.2 rounded border border-amber-200">
-                            {holdingDuration} Months
+                            {isEviction ? `${totalHoldingDurationMonths} Months (Compounded)` : `${holdingDuration} Months`}
                           </span>
                         </td>
                         <td className="p-2.5 font-bold text-amber-900">{formatZAR(totalHoldingReserve)}</td>
                         <td className="p-2.5 text-amber-900">{totalProjectCost > 0 ? formatPercent((totalHoldingReserve / totalProjectCost) * 100) : '0%'}</td>
                         <td className="p-2.5 text-slate-600 font-medium">
-                          Escrow buffer ({formatZAR(monthlyBurnRate)}/mo)
+                          Escrow buffer ({formatZAR(monthlyBurnRate)}/mo{isEviction ? ` + R${Math.round(deal.occupantRisk?.monthlySiteSecurityZAR || 0).toLocaleString('en-ZA')}/mo sec` : ''})
                         </td>
                       </tr>
                     )}
@@ -1332,7 +1369,7 @@ function ProposalGeneratorContent() {
                       <td className="p-2.5 text-emerald-800">{formatZAR(totalProjectCost)}</td>
                       <td className="p-2.5">100.0%</td>
                       <td className="p-2.5 text-slate-700">
-                        {isFlip ? `${holdingDuration}-Month Flip Horizon` : 'Full Project Horizon'}
+                        {isFlip ? `${totalHoldingDurationMonths}-Month ${isEviction ? 'Compounded' : 'Flip'} Horizon` : 'Full Project Horizon'}
                       </td>
                     </tr>
                   </tbody>
@@ -1402,6 +1439,74 @@ function ProposalGeneratorContent() {
                 )}
               </div>
             </div>
+
+            {/* Statutory Risk & Security Module (PIE Act Compliance) */}
+            {isEviction && (
+              <div
+                data-testid="pie-act-safeguards-card"
+                className="p-4 rounded-xl border border-rose-300 bg-rose-50/70 text-xs text-rose-950 space-y-3 shadow-xs print:break-inside-avoid"
+              >
+                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-rose-200 pb-2">
+                  <div className="flex items-center gap-2 font-black text-rose-950 uppercase tracking-wider text-xs">
+                    <Gavel className="w-4 h-4 text-rose-700 shrink-0" />
+                    <span>Site Control &amp; Legal Safeguards (PIE Act Compliance)</span>
+                  </div>
+                  <span className="px-2 py-0.5 rounded text-[10px] font-extrabold bg-rose-200/80 text-rose-900 border border-rose-300">
+                    {deal.occupantRisk?.evictionJurisdiction === 'high_court'
+                      ? 'High Court • Opposed Proceeding (~240 Days)'
+                      : "Magistrate's Court • Unopposed Proceeding (~120 Days)"}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div className="p-3 bg-white/90 rounded-lg border border-rose-200">
+                    <span className="text-[10px] uppercase font-bold text-rose-800 block">Court Jurisdiction</span>
+                    <span className="text-sm font-extrabold text-slate-900 block mt-0.5">
+                      {deal.occupantRisk?.evictionJurisdiction === 'high_court' ? 'High Court' : "Magistrate's Court"}
+                    </span>
+                    <span className="text-[10px] text-slate-600 block mt-0.5">
+                      Est. Legal Delay: <strong>{deal.occupantRisk?.estimatedEvictionDelayDays || (deal.occupantRisk?.evictionJurisdiction === 'high_court' ? 240 : 120)} days</strong>
+                    </span>
+                  </div>
+
+                  <div className="p-3 bg-white/90 rounded-lg border border-rose-200">
+                    <span className="text-[10px] uppercase font-bold text-rose-800 block">Statutory Litigation Reserve</span>
+                    <span className="text-sm font-extrabold text-rose-900 block mt-0.5 font-mono">
+                      {formatZAR(legalEvictionReserve)}
+                    </span>
+                    <span className="text-[10px] text-slate-600 block mt-0.5">
+                      Legal counsel, advocate fees &amp; sheriff execution
+                    </span>
+                  </div>
+
+                  <div className="p-3 bg-white/90 rounded-lg border border-rose-200">
+                    <span className="text-[10px] uppercase font-bold text-rose-800 block">Interim Site Security &amp; Patrols</span>
+                    <span className="text-sm font-extrabold text-slate-900 block mt-0.5 font-mono">
+                      {formatZAR(deal.occupantRisk?.monthlySiteSecurityZAR || 0)}/mo
+                    </span>
+                    <span className="text-[10px] text-slate-600 block mt-0.5">
+                      Armed response to block secondary occupation
+                    </span>
+                  </div>
+                </div>
+
+                <div className="space-y-2 pt-1">
+                  <div className="flex items-start gap-2">
+                    <Scale className="w-4 h-4 text-rose-700 shrink-0 mt-0.5" />
+                    <p className="leading-relaxed text-slate-800 text-[11px]">
+                      <strong>Statutory Non-Self-Help Mandate:</strong> In strict compliance with <strong>Section 4(2) of the Prevention of Illegal Eviction from and Unlawful Occupation of Land Act 19 of 1998 (PIE Act)</strong>, eviction proceedings are handled exclusively by retained litigation attorneys. South African common law strictly prohibits self-help measures, including lock changing, intimidation, or utility disconnections.
+                    </p>
+                  </div>
+
+                  <div className="flex items-start gap-2">
+                    <ShieldAlert className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
+                    <p className="leading-relaxed text-slate-800 text-[11px]">
+                      <strong>Contractor Protection Gate:</strong> To safeguard funder equity and prevent site conflict, renovation capital drawdowns (Phases 1–4) remain strictly <strong>ring-fenced in escrow</strong> and will <strong>not disburse to contractors</strong> until the Sheriff of the Court lawfully executes the eviction warrant and issues an official Return of Service confirming vacant possession.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Ancillary Commercial Covenants */}
             {deal.ancillaryIncomes && deal.ancillaryIncomes.length > 0 && (
@@ -1500,21 +1605,31 @@ function ProposalGeneratorContent() {
             {isFlip ? (
               <div className="space-y-4 print:break-inside-avoid">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 border-b border-slate-200 pb-1">
-                  <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2">
                     <h2 className="text-sm uppercase tracking-wider font-extrabold text-slate-900">
-                      4. Holding Period Carrying Costs & Renovation Burn Rate ({holdingDuration}-Month Horizon)
+                      4. Holding Period Carrying Costs &amp; Renovation Burn Rate ({isEviction ? `${totalHoldingDurationMonths}-Month Compounded Horizon` : `${holdingDuration}-Month Horizon`})
                     </h2>
                     <span className="text-[10px] bg-amber-100 text-amber-800 font-bold px-2 py-0.5 rounded border border-amber-300">
                       Flip Liquidity Reserve
                     </span>
                   </div>
                   <span className="text-[10px] font-semibold text-slate-500">
-                    Monthly Burn: {formatZAR(monthlyBurnRate)}/mo • {holdingDuration} Months Holding
+                    {isEviction
+                      ? `Compounded Horizon: Stage 1 Eviction (${evictionDelayMonths} mo) + Stage 2 Works (${holdingDuration} mo) • Total Reserve: ${formatZAR(totalHoldingReserve)}`
+                      : `Monthly Burn: ${formatZAR(monthlyBurnRate)}/mo • ${holdingDuration} Months Holding`}
                   </span>
                 </div>
 
                 <p className="text-xs text-slate-600 leading-relaxed">
-                  During the active stripout, construction, and staging cycle, the property generates zero tenant revenue. To eliminate insolvency and completion risk, the project capitalizes an itemized carrying cost escrow of <strong>{formatZAR(totalHoldingReserve)}</strong> covering debt service, municipal rates, body corporate levies, and on-site builder risk insurance for the full {holdingDuration}-month flip horizon.
+                  {isEviction ? (
+                    <>
+                      During legal eviction and construction cycles, the property generates zero revenue. To eliminate insolvency and completion risk, the project capitalizes an itemized carrying cost escrow of <strong>{formatZAR(totalHoldingReserve)}</strong> spanning a compounded <strong>{totalHoldingDurationMonths}-month horizon</strong>: <strong>Stage 1 (Legal Eviction Delay: ~{evictionDelayDays} days / {evictionDelayMonths} mos)</strong> carrying burn of <strong>{formatZAR(evictionDelayBurn)}</strong> (including {formatZAR(deal.occupantRisk?.monthlySiteSecurityZAR || 0)}/mo armed site security), followed by <strong>Stage 2 (Renovation &amp; Fit-Out: {holdingDuration} mos)</strong> carrying burn of <strong>{formatZAR(worksHoldingReserve)}</strong>.
+                    </>
+                  ) : (
+                    <>
+                      During the active stripout, construction, and staging cycle, the property generates zero tenant revenue. To eliminate insolvency and completion risk, the project capitalizes an itemized carrying cost escrow of <strong>{formatZAR(totalHoldingReserve)}</strong> covering debt service, municipal rates, body corporate levies, and on-site builder risk insurance for the full {holdingDuration}-month flip horizon.
+                    </>
+                  )}
                 </p>
 
                 {/* 4 Summary Highlight Cards */}
@@ -1524,21 +1639,27 @@ function ProposalGeneratorContent() {
                     <span className="text-sm font-extrabold text-slate-900 block mt-0.5 font-mono">
                       {formatZAR(monthlyBurnRate)}/mo
                     </span>
-                    <span className="text-[9px] text-slate-400">All standing carrying lines</span>
+                    <span className="text-[9px] text-slate-400">
+                      {isEviction ? `Works burn (excl. R${Math.round(deal.occupantRisk?.monthlySiteSecurityZAR || 0).toLocaleString('en-ZA')}/mo sec)` : 'All standing carrying lines'}
+                    </span>
                   </div>
                   <div className="p-3 rounded-lg bg-amber-50/80 border border-amber-300">
                     <span className="text-[10px] uppercase font-bold text-amber-800 block">Total Holding Reserve</span>
                     <span className="text-sm font-extrabold text-amber-900 block mt-0.5 font-mono">
                       {formatZAR(totalHoldingReserve)}
                     </span>
-                    <span className="text-[9px] text-amber-700 font-semibold">{holdingDuration}-month pre-funded buffer</span>
+                    <span className="text-[9px] text-amber-700 font-semibold">
+                      {isEviction ? `${totalHoldingDurationMonths}-month compounded buffer` : `${holdingDuration}-month pre-funded buffer`}
+                    </span>
                   </div>
                   <div className="p-3 rounded-lg bg-slate-50 border border-slate-200">
                     <span className="text-[10px] uppercase font-bold text-slate-500 block">Flip Horizon</span>
                     <span className="text-sm font-extrabold text-slate-900 block mt-0.5">
-                      {holdingDuration} Months
+                      {totalHoldingDurationMonths} Months
                     </span>
-                    <span className="text-[9px] text-slate-400">Target exit: {formatDate(deal.completionDate)}</span>
+                    <span className="text-[9px] text-slate-400">
+                      {isEviction ? `Stage 1: ${evictionDelayMonths}mo | Stage 2: ${holdingDuration}mo` : `Target exit: ${formatDate(deal.completionDate)}`}
+                    </span>
                   </div>
                   <div className="p-3 rounded-lg bg-emerald-50 border border-emerald-300">
                     <span className="text-[10px] uppercase font-bold text-emerald-800 block">Lender Risk Protection</span>
@@ -1556,12 +1677,28 @@ function ProposalGeneratorContent() {
                       <tr>
                         <th className="p-2.5">Carrying Cost Component</th>
                         <th className="p-2.5">Monthly Outlay (ZAR)</th>
-                        <th className="p-2.5">{holdingDuration}-Month Reserve (ZAR)</th>
+                        <th className="p-2.5">{isEviction ? 'Horizon Reserve (ZAR)' : `${holdingDuration}-Month Reserve (ZAR)`}</th>
                         <th className="p-2.5">% of Burn</th>
-                        <th className="p-2.5">Obligation & Statutory Mandate</th>
+                        <th className="p-2.5">Obligation &amp; Statutory Mandate</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-200 text-slate-800">
+                      {isEviction && evictionDelayBurn > 0 && (
+                        <tr className="bg-rose-50/50" data-testid="eviction-delay-burn-row">
+                          <td className="p-2.5 font-medium flex items-center gap-1.5 flex-wrap">
+                            <span className="text-rose-950 font-bold">Stage 1: Eviction Delay Interim Holding Burn</span>
+                            <span className="text-[10px] bg-rose-100 text-rose-900 font-bold px-1.5 py-0.2 rounded border border-rose-300">
+                              ~{evictionDelayDays} Days ({evictionDelayMonths} Mos)
+                            </span>
+                          </td>
+                          <td className="p-2.5 font-bold font-mono text-rose-900">
+                            {formatZAR(evictionCosts?.monthlyFixedBurnZAR || 0)}/mo
+                          </td>
+                          <td className="p-2.5 font-bold font-mono text-rose-950">{formatZAR(evictionDelayBurn)}</td>
+                          <td className="p-2.5 text-rose-900">{totalHoldingReserve > 0 ? formatPercent((evictionDelayBurn / totalHoldingReserve) * 100) : '0%'}</td>
+                          <td className="p-2.5 text-slate-600 font-medium">Interim bond interest, municipal rates, levies &amp; armed security during litigation</td>
+                        </tr>
+                      )}
                       <tr>
                         <td className="p-2.5 font-medium">Interim Bond / Debt Facility Interest Service</td>
                         <td className="p-2.5 font-bold font-mono">{formatZAR(monthlyBond)}</td>
@@ -1579,14 +1716,14 @@ function ProposalGeneratorContent() {
                         </td>
                       </tr>
                       <tr>
-                        <td className="p-2.5 font-medium">Municipal Rates & Taxes (City Council)</td>
+                        <td className="p-2.5 font-medium">Municipal Rates &amp; Taxes (City Council)</td>
                         <td className="p-2.5 font-bold font-mono">{formatZAR(monthlyRates)}</td>
                         <td className="p-2.5 font-bold font-mono text-slate-900">{formatZAR(monthlyRates * holdingDuration)}</td>
                         <td className="p-2.5">{totalHoldingReserve > 0 ? formatPercent(((monthlyRates * holdingDuration) / totalHoldingReserve) * 100) : '0%'}</td>
-                        <td className="p-2.5 text-slate-500">Statutory municipal property rates & refuse service</td>
+                        <td className="p-2.5 text-slate-500">Statutory municipal property rates &amp; refuse service</td>
                       </tr>
                       <tr>
-                        <td className="p-2.5 font-medium">Site Operational Burn & Builder&apos;s Risk Insurance</td>
+                        <td className="p-2.5 font-medium">Site Operational Burn &amp; Builder&apos;s Risk Insurance</td>
                         <td className="p-2.5 font-bold font-mono">{formatZAR(monthlyOther)}</td>
                         <td className="p-2.5 font-bold font-mono text-slate-900">{formatZAR(monthlyOther * holdingDuration)}</td>
                         <td className="p-2.5">{totalHoldingReserve > 0 ? formatPercent(((monthlyOther * holdingDuration) / totalHoldingReserve) * 100) : '0%'}</td>
@@ -1597,7 +1734,9 @@ function ProposalGeneratorContent() {
                         <td className="p-2.5 text-amber-950 font-mono">{formatZAR(monthlyBurnRate)}/mo</td>
                         <td className="p-2.5 text-amber-950 font-mono">{formatZAR(totalHoldingReserve)}</td>
                         <td className="p-2.5 text-amber-950">100.0%</td>
-                        <td className="p-2.5 text-amber-900 font-semibold">Pre-funded and capitalized into Total Project Outlay</td>
+                        <td className="p-2.5 text-amber-900 font-semibold">
+                          {isEviction ? 'Pre-funded and capitalized into Total Project Outlay (Stages 1 & 2)' : 'Pre-funded and capitalized into Total Project Outlay'}
+                        </td>
                       </tr>
                     </tbody>
                   </table>

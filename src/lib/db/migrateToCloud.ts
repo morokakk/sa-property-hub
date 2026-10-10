@@ -390,6 +390,7 @@ export function mapFlips(flips: FlipProject[] = [], userId: string): FlipInsert[
     tax_entity_type: f.taxEntityType || null,
     municipal_clearance: (f.municipalClearance ? JSON.parse(JSON.stringify(f.municipalClearance)) : {}) as any,
     draw_schedule: (f.drawSchedule ? JSON.parse(JSON.stringify(f.drawSchedule)) : {}) as any,
+    occupant_risk: (f.occupantRisk ? JSON.parse(JSON.stringify(f.occupantRisk)) : null) as any,
     updated_at: new Date().toISOString(),
   }));
 }
@@ -536,6 +537,7 @@ export function mapOpportunities(opportunities: OpportunityDeal[] = [], userId: 
     section_13sex: (opp.section13sex ? JSON.parse(JSON.stringify(opp.section13sex)) : {}) as any,
     drive_vault: (opp.driveVault ? JSON.parse(JSON.stringify(opp.driveVault)) : {}) as any,
     ancillary_incomes: (opp.ancillaryIncomes ? JSON.parse(JSON.stringify(opp.ancillaryIncomes)) : []) as any,
+    occupant_risk: (opp.occupantRisk ? JSON.parse(JSON.stringify(opp.occupantRisk)) : null) as any,
     status: opp.status || 'Screening',
     pass_reason: opp.passReason || null,
     pass_notes: opp.passNotes || null,

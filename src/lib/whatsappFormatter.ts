@@ -1,7 +1,8 @@
 import { formatZAR, formatPercent, formatDate } from './formatters';
-import { OpportunityDeal, FlipProject, InvestorProfile, DealStrategy, DealSource, RentalProperty, TenantPaymentRecord } from '@/types';
+import { OpportunityDeal, FlipProject, InvestorProfile, DealStrategy, DealSource, RentalProperty, TenantPaymentRecord, OccupantRiskProfile } from '@/types';
 import { generateLongTermProjection, calculateMonthlyBondRepayment } from './calculations/propertyMetrics';
 import { calculatePropertyArrears, formatMonthLabel, getMonthKey, calculateTenantStatementTiers } from './calculations/arrears';
+import { isEvictionActive, calculateEvictionCarryingCost } from './calculations/occupantRisk';
 
 export interface ProposalPitchParams {
   deal: {
@@ -51,6 +52,7 @@ export interface ProposalPitchParams {
     totalBilled12m?: number;
     tenantArrears?: number;
     overdueMonths?: number;
+    occupantRisk?: OccupantRiskProfile;
   };
   strategy: DealStrategy;
   capitalRequested: number;
@@ -58,6 +60,29 @@ export interface ProposalPitchParams {
   offeredRate: number;
   securityType: string;
   investorProfile?: InvestorProfile;
+}
+
+/**
+ * Formats a high-priority PIE Act statutory risk and contractor protection block for WhatsApp pitch sharing.
+ */
+export function formatPieActWhatsAppBlock(risk?: OccupantRiskProfile | null): string {
+  if (!risk || risk.occupancyStatus !== 'unlawful_occupant') return '';
+  const courtLabel =
+    risk.evictionJurisdiction === 'high_court'
+      ? "High Court (Opposed / Complex Proceedings)"
+      : "Magistrate's Court (Unopposed Proceedings)";
+
+  let text = `*⚠️ SITE POSSESSION & STATUTORY RISK (PIE ACT)*\n`;
+  text += `• Occupancy Status: *Unlawful Occupants Present*\n`;
+  text += `• Legal Jurisdiction: *${courtLabel}*\n`;
+  text += `• Estimated Eviction Delay: *~${risk.estimatedEvictionDelayDays} Days*\n`;
+  text += `• Budgeted Legal Eviction Reserve: *${formatZAR(risk.budgetedLegalEvictionCostZAR)}*\n`;
+  if (risk.monthlySiteSecurityZAR > 0) {
+    text += `• Monthly Armed Site Security: *${formatZAR(risk.monthlySiteSecurityZAR)}/m*\n`;
+  }
+  text += `• Contractor Protection Gate: *Active* (Contractor site access and renovation capital draws gated until Sheriff of the Court executes eviction order & issues return of service)\n`;
+  text += `• Statutory Mandate: Governed under Section 4(2) of Act 19 of 1998 (Common-law prohibition against self-help, lock-outs, or utility cut-offs)\n\n`;
+  return text;
 }
 
 /**
@@ -90,6 +115,10 @@ export function formatOpportunityForWhatsApp(
   }
   text += `• Strategy: ${isFlip ? 'Buy & Flip' : isBrrrr ? 'Hybrid BRRRR' : 'Buy & Hold Rental'} • Sourcing: ${deal.source} • Status: ${deal.status}\n\n`;
 
+  if (deal.occupantRisk?.occupancyStatus === 'unlawful_occupant') {
+    text += formatPieActWhatsAppBlock(deal.occupantRisk);
+  }
+
   if (isFlip) {
     // BUY-AND-FLIP METRICS
     const holdingDuration = deal.holdingPeriodMonths || 6;
@@ -99,18 +128,28 @@ export function formatOpportunityForWhatsApp(
     const monthlyRates = deal.monthlyRatesTaxes ?? 0;
     const monthlyOther = deal.monthlyOtherHoldingCostZAR ?? 1500;
     const monthlyBurnRate = deal.monthlyHoldingCostZAR || (monthlyBond + monthlyLevies + monthlyRates + monthlyOther);
-    const totalHoldingReserve = monthlyBurnRate * holdingDuration;
+
+    const isEviction = isEvictionActive(deal.occupantRisk);
+    const evictionCosts = calculateEvictionCarryingCost({
+      risk: deal.occupantRisk,
+      monthlyBondInterestZAR: monthlyBond,
+      monthlyRatesZAR: monthlyRates,
+      monthlyLeviesZAR: monthlyLevies,
+    });
+    const evictionDelayBurn = isEviction ? evictionCosts.evictionDelayBurnZAR : 0;
+    const legalEvictionReserve = isEviction ? Math.max(0, deal.occupantRisk?.budgetedLegalEvictionCostZAR || 0) : 0;
+    const totalHoldingReserve = (monthlyBurnRate * holdingDuration) + evictionDelayBurn;
 
     const exitCommissionPercent = deal.exitCommissionPercent ?? 5.75;
     const exitCommission = (deal.targetExitPrice || 0) > 0 ? ((deal.targetExitPrice || 0) * exitCommissionPercent) / 100 : 0;
     const acquisitionLegalAndDuty = deal.costs.totalAcquisitionCost - deal.purchasePrice;
-    const totalProjectCost = deal.purchasePrice + acquisitionLegalAndDuty + deal.estimatedRehabCost + totalHoldingReserve + exitCommission;
+    const totalProjectCost = deal.purchasePrice + acquisitionLegalAndDuty + deal.estimatedRehabCost + legalEvictionReserve + totalHoldingReserve + exitCommission;
     const projectedNetProfit = (deal.targetExitPrice || 0) - totalProjectCost;
     const projectROI = totalProjectCost > 0 ? (projectedNetProfit / totalProjectCost) * 100 : 0;
 
     const ltvVal = deal.bondLTV ?? deal.loanToValuePercent ?? 100;
     const depositVal = deal.depositZAR !== undefined ? deal.depositZAR : Math.round(deal.purchasePrice * (1 - ltvVal / 100));
-    const initialCap = deal.initialCapitalRequired ?? (depositVal + acquisitionLegalAndDuty + deal.estimatedRehabCost);
+    const initialCap = deal.initialCapitalRequired ?? (depositVal + acquisitionLegalAndDuty + deal.estimatedRehabCost + legalEvictionReserve);
 
     text += `*CAPITAL & ACQUISITION BREAKDOWN (ZAR)*\n`;
     if (deal.openMarketValueZAR) {
@@ -121,8 +160,11 @@ export function formatOpportunityForWhatsApp(
       text += `• Purchase Price: *${formatZAR(deal.purchasePrice)}*\n`;
     }
     text += `• SARS Duty & Legal: ${formatZAR(acquisitionLegalAndDuty)}\n`;
+    if (legalEvictionReserve > 0) {
+      text += `• PIE Act Legal Eviction Reserve: *${formatZAR(legalEvictionReserve)}*\n`;
+    }
     text += `• Renovation / Capex (BOQ): *${formatZAR(deal.estimatedRehabCost)}*\n`;
-    text += `• Holding Period Reserve: *${formatZAR(totalHoldingReserve)}* (${holdingDuration} mos @ ${formatZAR(monthlyBurnRate)}/m)\n`;
+    text += `• Holding Period Reserve: *${formatZAR(totalHoldingReserve)}* (${isEviction ? `${holdingDuration}m works + ~${deal.occupantRisk?.estimatedEvictionDelayDays}d legal` : `${holdingDuration} mos`} @ ${formatZAR(monthlyBurnRate)}/m)\n`;
     text += `  ↳ Bond: ${formatZAR(monthlyBond)} | Levies: ${formatZAR(monthlyLevies)} | Rates: ${formatZAR(monthlyRates)} | Security: ${formatZAR(monthlyOther)}\n`;
     if (exitCommission > 0) {
       text += `• Exit Commission (${exitCommissionPercent}%): ${formatZAR(exitCommission)}\n`;
@@ -140,9 +182,11 @@ export function formatOpportunityForWhatsApp(
     text += `• Annualized Net ROI: *${formatPercent(annualizedRoi)}*\n`;
   } else {
     // BUY-AND-HOLD RENTAL / BRRRR METRICS
+    const isEviction = isEvictionActive(deal.occupantRisk);
+    const legalEvictionReserve = isEviction ? Math.max(0, deal.occupantRisk?.budgetedLegalEvictionCostZAR || 0) : 0;
     const ltvVal = deal.bondLTV ?? deal.loanToValuePercent ?? 100;
     const depositVal = deal.depositZAR !== undefined ? deal.depositZAR : Math.round(deal.purchasePrice * (1 - ltvVal / 100));
-    const initialCap = deal.initialCapitalRequired ?? (depositVal + (deal.costs.totalAcquisitionCost - deal.purchasePrice) + deal.estimatedRehabCost);
+    const initialCap = deal.initialCapitalRequired ?? (depositVal + (deal.costs.totalAcquisitionCost - deal.purchasePrice) + deal.estimatedRehabCost + legalEvictionReserve);
 
     text += `*FINANCIAL & ACQUISITION SUMMARY (ZAR)*\n`;
     if (deal.openMarketValueZAR) {
@@ -153,7 +197,10 @@ export function formatOpportunityForWhatsApp(
       text += `• Purchase Price: *${formatZAR(deal.purchasePrice)}*\n`;
     }
     text += `• SARS Duty & Legal: ${formatZAR(deal.costs.totalAcquisitionCost - deal.purchasePrice)}\n`;
-    text += `• Total Acquisition Cost: *${formatZAR(deal.costs.totalAcquisitionCost)}*\n`;
+    if (legalEvictionReserve > 0) {
+      text += `• PIE Act Legal Eviction Reserve: *${formatZAR(legalEvictionReserve)}*\n`;
+    }
+    text += `• Total Acquisition Cost: *${formatZAR(deal.costs.totalAcquisitionCost + legalEvictionReserve)}*\n`;
     text += `• Financing: *${ltvVal}% LTV* (Deposit: *${formatZAR(depositVal)}*)\n`;
     if (deal.estimatedRehabCost > 0) {
       text += `• Renovation / Capex: ${formatZAR(deal.estimatedRehabCost)}\n`;
@@ -256,7 +303,17 @@ export function formatFlipForWhatsApp(
   const monthlyRates = flip.monthlyRatesTaxesZAR ?? 0;
   const monthlyOther = flip.monthlyOtherHoldingCostZAR ?? 0;
   const monthlyHolding = flip.monthlyHoldingCostZAR || (monthlyBond + monthlyLevies + monthlyRates + monthlyOther);
-  const totalHoldingReserve = monthlyHolding * holdingDuration;
+
+  const isEviction = isEvictionActive(flip.occupantRisk);
+  const evictionCosts = calculateEvictionCarryingCost({
+    risk: flip.occupantRisk,
+    monthlyBondInterestZAR: monthlyBond,
+    monthlyRatesZAR: monthlyRates,
+    monthlyLeviesZAR: monthlyLevies,
+  });
+  const evictionDelayBurn = isEviction ? evictionCosts.evictionDelayBurnZAR : 0;
+  const legalEvictionReserve = isEviction ? Math.max(0, flip.occupantRisk?.budgetedLegalEvictionCostZAR || 0) : 0;
+  const totalHoldingReserve = (monthlyHolding * holdingDuration) + evictionDelayBurn;
 
   const boqSum = (flip.boq || []).reduce((s, i) => s + (i.actualCostZAR || i.baselineTotalZAR || 0), 0);
   const totalBoq = boqSum > 0 ? boqSum : flip.baselineRenovationBudgetZAR;
@@ -265,7 +322,7 @@ export function formatFlipForWhatsApp(
     (flip.municipalClearance?.advanceCouncilDepositZAR || 0);
   const exitCommissionPercent = flip.exitCommissionPercent ?? 5.75;
   const exitCommission = flip.targetExitPriceZAR > 0 ? (flip.targetExitPriceZAR * exitCommissionPercent) / 100 : 0;
-  const totalCost = flip.purchasePriceZAR + flip.acquisitionCostsZAR + totalBoq + totalHoldingReserve + sec118Cost + exitCommission;
+  const totalCost = flip.purchasePriceZAR + flip.acquisitionCostsZAR + totalBoq + legalEvictionReserve + totalHoldingReserve + sec118Cost + exitCommission;
   const netProfit = flip.targetExitPriceZAR - totalCost;
   const nominalRoi = totalCost > 0 ? (netProfit / totalCost) * 100 : 0;
   const annualizedRoi = holdingDuration > 0 ? nominalRoi * (12 / holdingDuration) : nominalRoi;
@@ -281,11 +338,18 @@ export function formatFlipForWhatsApp(
   text += `• Location: ${flip.address}, ${flip.city}\n`;
   text += `• Phase: ${flip.currentPhase} • Target Exit: ${flip.targetCompletionDate}\n\n`;
 
+  if (flip.occupantRisk?.occupancyStatus === 'unlawful_occupant') {
+    text += formatPieActWhatsAppBlock(flip.occupantRisk);
+  }
+
   text += `*CAPITAL & BUDGET BREAKDOWN (ZAR)*\n`;
   text += `• Purchase Price: *${formatZAR(flip.purchasePriceZAR)}*\n`;
   text += `• Acquisition Costs: ${formatZAR(flip.acquisitionCostsZAR)}\n`;
+  if (legalEvictionReserve > 0) {
+    text += `• PIE Act Legal Eviction Reserve: *${formatZAR(legalEvictionReserve)}*\n`;
+  }
   text += `• BOQ Renovation Spend: *${formatZAR(totalBoq)}* (Budget: ${formatZAR(flip.baselineRenovationBudgetZAR)})\n`;
-  text += `• Holding Period Reserve: *${formatZAR(totalHoldingReserve)}* (${holdingDuration} mos @ ${formatZAR(monthlyHolding)}/m)\n`;
+  text += `• Holding Period Reserve: *${formatZAR(totalHoldingReserve)}* (${isEviction ? `${holdingDuration}m works + ~${flip.occupantRisk?.estimatedEvictionDelayDays}d legal` : `${holdingDuration} mos`} @ ${formatZAR(monthlyHolding)}/m)\n`;
   text += `  ↳ Bond: ${formatZAR(monthlyBond)} | Levies: ${formatZAR(monthlyLevies)} | Rates: ${formatZAR(monthlyRates)} | Security: ${formatZAR(monthlyOther)}\n`;
   if (sec118Cost > 0) {
     text += `• Municipal Clearance (Sec 118): ${formatZAR(sec118Cost)}\n`;
@@ -343,7 +407,18 @@ export function formatProposalPitchForWhatsApp(
   const monthlyRates = deal.monthlyRatesHolding ?? 0;
   const monthlyOther = deal.monthlyOtherHolding ?? 0;
   const monthlyBurn = deal.monthlyHoldingCost || (monthlyBond + monthlyLevies + monthlyRates + monthlyOther);
-  const holdingReserve = isFlip ? monthlyBurn * holdingDuration : 0;
+
+  const isEviction = isEvictionActive(deal.occupantRisk);
+  const evictionCosts = calculateEvictionCarryingCost({
+    risk: deal.occupantRisk,
+    monthlyBondInterestZAR: monthlyBond,
+    monthlyRatesZAR: monthlyRates,
+    monthlyLeviesZAR: monthlyLevies,
+  });
+  const evictionDelayBurn = isFlip && isEviction ? evictionCosts.evictionDelayBurnZAR : 0;
+  const legalEvictionReserve = isEviction ? Math.max(0, deal.occupantRisk?.budgetedLegalEvictionCostZAR || 0) : 0;
+  const holdingReserve = isFlip ? (monthlyBurn * holdingDuration) + evictionDelayBurn : 0;
+
   const auctionFee = deal.auctioneerCommission ?? 0;
   const arrears = deal.municipalArrears ?? 0;
   const exitCommissionPercent = deal.exitCommissionPercent ?? 5.75;
@@ -353,6 +428,7 @@ export function formatProposalPitchForWhatsApp(
     deal.purchasePrice +
     deal.acquisitionCosts +
     deal.renovationBudget +
+    legalEvictionReserve +
     holdingReserve +
     auctionFee +
     arrears +
@@ -392,6 +468,10 @@ export function formatProposalPitchForWhatsApp(
   }
   text += `\n`;
 
+  if (deal.occupantRisk?.occupancyStatus === 'unlawful_occupant') {
+    text += formatPieActWhatsAppBlock(deal.occupantRisk);
+  }
+
   text += `*EXECUTIVE DEAL HIGHLIGHTS (ZAR)*\n`;
   text += `• Purchase Price: *${formatZAR(deal.purchasePrice)}*\n`;
   if (deal.builtInEquity && deal.builtInEquity > 0) {
@@ -410,8 +490,11 @@ export function formatProposalPitchForWhatsApp(
     text += `• SARS Tax Shield: *Section 13sex Eligible* (5% p.a. Building Deduction)\n`;
   }
   text += `• Capex & Legal: ${formatZAR(deal.acquisitionCosts + deal.renovationBudget)}\n`;
+  if (legalEvictionReserve > 0) {
+    text += `• PIE Act Legal Eviction Reserve: *${formatZAR(legalEvictionReserve)}*\n`;
+  }
   if (isFlip) {
-    text += `• Holding Cost Escrow: *${formatZAR(holdingReserve)}* (${holdingDuration} mos @ ${formatZAR(monthlyBurn)}/m)\n`;
+    text += `• Holding Cost Escrow: *${formatZAR(holdingReserve)}* (${isEviction ? `${holdingDuration}m works + ~${deal.occupantRisk?.estimatedEvictionDelayDays}d legal` : `${holdingDuration} mos`} @ ${formatZAR(monthlyBurn)}/m)\n`;
     if (exitCommission > 0) {
       text += `• Exit Commission (${exitCommissionPercent}%): ${formatZAR(exitCommission)}\n`;
     }

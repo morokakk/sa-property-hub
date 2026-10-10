@@ -267,6 +267,7 @@ export function unmapFlips(
     taxEntityType: (f.tax_entity_type as any) || undefined,
     municipalClearance: f.municipal_clearance ? (parseJson(f.municipal_clearance, undefined) as any) : undefined,
     drawSchedule: f.draw_schedule ? (parseJson(f.draw_schedule, undefined) as any) : undefined,
+    occupantRisk: f.occupant_risk ? (parseJson(f.occupant_risk, undefined) as any) : undefined,
     boq: boqByFlipId.get(f.id) || [],
   }));
 }
@@ -369,6 +370,7 @@ export function unmapOpportunities(
     section13sex: opp.section_13sex ? (parseJson(opp.section_13sex, undefined) as any) : undefined,
     driveVault: opp.drive_vault ? (parseJson(opp.drive_vault, undefined) as any) : undefined,
     ancillaryIncomes: parseJson(opp.ancillary_incomes, []),
+    occupantRisk: opp.occupant_risk ? (parseJson(opp.occupant_risk, undefined) as any) : undefined,
     status: (opp.status as any) || 'Screening',
     passReason: (opp.pass_reason as any) || undefined,
     passNotes: opp.pass_notes || undefined,

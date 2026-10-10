@@ -151,6 +151,15 @@ describe('hydrateFromCloud Reverse Mappers', () => {
         target_exit_price_zar: 3400000,
         status: 'Active',
         linked_funding_ids: ['fund-1'],
+        occupant_risk: {
+          occupancyStatus: 'unlawful_occupant',
+          evictionRequired: true,
+          evictionJurisdiction: 'magistrates_court',
+          estimatedEvictionDelayDays: 120,
+          budgetedLegalEvictionCostZAR: 40000,
+          monthlySiteSecurityZAR: 3000,
+          totalEvictionCarryingCostZAR: 58000,
+        },
         created_at: '2026-01-01',
         updated_at: '2026-01-01',
       },
@@ -199,11 +208,48 @@ describe('hydrateFromCloud Reverse Mappers', () => {
     expect(result[0].id).toBe('flip-c1');
     expect(result[0].title).toBe('Parkhurst Fixer Upper');
     expect(result[0].acquisitionCostsZAR).toBe(160000);
+    expect(result[0].occupantRisk?.occupancyStatus).toBe('unlawful_occupant');
+    expect(result[0].occupantRisk?.budgetedLegalEvictionCostZAR).toBe(40000);
     expect(result[0].boq).toHaveLength(2);
     expect(result[0].boq[0].id).toBe('boq-c1');
     expect(result[0].boq[0].actualCostZAR).toBe(38000);
     expect(result[0].boq[1].id).toBe('boq-c2');
     expect(result[0].boq[1].supplierOrContractor).toBe('Sparky Electric');
+  });
+
+  it('correctly reverse-maps opportunities and restores occupantRisk', () => {
+    const oppRows = [
+      {
+        id: 'opp-c1',
+        user_id: 'usr-1',
+        title: 'Auction Foreclosure with Unlawful Occupants',
+        address: '45 Oxford Rd',
+        city: 'Johannesburg',
+        province: 'Gauteng',
+        property_type: 'Freehold House',
+        purchase_price_zar: 1500000,
+        strategy: 'Flip',
+        occupant_risk: {
+          occupancyStatus: 'unlawful_occupant',
+          evictionRequired: true,
+          evictionJurisdiction: 'high_court',
+          estimatedEvictionDelayDays: 240,
+          budgetedLegalEvictionCostZAR: 85000,
+          monthlySiteSecurityZAR: 4500,
+          totalEvictionCarryingCostZAR: 135000,
+        },
+        status: 'Screening',
+        created_at: '2026-01-01',
+        updated_at: '2026-01-01',
+      },
+    ];
+
+    const result = unmapOpportunities(oppRows as any);
+    expect(result).toHaveLength(1);
+    expect(result[0].id).toBe('opp-c1');
+    expect(result[0].occupantRisk?.occupancyStatus).toBe('unlawful_occupant');
+    expect(result[0].occupantRisk?.evictionJurisdiction).toBe('high_court');
+    expect(result[0].occupantRisk?.budgetedLegalEvictionCostZAR).toBe(85000);
   });
 });
 

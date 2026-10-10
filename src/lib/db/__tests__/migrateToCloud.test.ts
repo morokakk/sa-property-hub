@@ -187,6 +187,15 @@ describe('migrateToCloud Payload Mappers', () => {
           currentPhase: 'Finishes & Tiling',
           status: 'Active',
           linkedFundingIds: ['fund-1'],
+          occupantRisk: {
+            occupancyStatus: 'unlawful_occupant',
+            evictionRequired: true,
+            evictionJurisdiction: 'magistrates_court',
+            estimatedEvictionDelayDays: 120,
+            budgetedLegalEvictionCostZAR: 40000,
+            monthlySiteSecurityZAR: 3500,
+            totalEvictionCarryingCostZAR: 65000,
+          },
           boq: [
             {
               id: 'boq-item-1',
@@ -238,6 +247,16 @@ describe('migrateToCloud Payload Mappers', () => {
       expect(mappedFlips).toHaveLength(2);
       expect(mappedFlips[0].id).toBe('flip-101');
       expect(mappedFlips[0].user_id).toBe(TEST_USER_ID);
+      expect(mappedFlips[0].occupant_risk).toEqual({
+        occupancyStatus: 'unlawful_occupant',
+        evictionRequired: true,
+        evictionJurisdiction: 'magistrates_court',
+        estimatedEvictionDelayDays: 120,
+        budgetedLegalEvictionCostZAR: 40000,
+        monthlySiteSecurityZAR: 3500,
+        totalEvictionCarryingCostZAR: 65000,
+      });
+      expect(mappedFlips[1].occupant_risk).toBeNull();
 
       const mappedBOQ = extractAndMapBOQItems(flips, TEST_USER_ID);
       expect(mappedBOQ).toHaveLength(2);
@@ -318,6 +337,15 @@ describe('migrateToCloud Payload Mappers', () => {
           monthlyCashFlow: 4500,
           projectedFlipNetProfit: 450000,
           projectedFlipRoi: 24.8,
+          occupantRisk: {
+            occupancyStatus: 'unlawful_occupant',
+            evictionRequired: true,
+            evictionJurisdiction: 'high_court',
+            estimatedEvictionDelayDays: 240,
+            budgetedLegalEvictionCostZAR: 85000,
+            monthlySiteSecurityZAR: 4500,
+            totalEvictionCarryingCostZAR: 135000,
+          },
           status: 'Screening',
           createdAt: '2025-03-01T10:00:00Z',
         },
@@ -328,6 +356,15 @@ describe('migrateToCloud Payload Mappers', () => {
       expect(mapped[0].user_id).toBe(TEST_USER_ID);
       expect(mapped[0].purchase_price_zar).toBe(1700000);
       expect(mapped[0].strategy).toBe('Flip');
+      expect(mapped[0].occupant_risk).toEqual({
+        occupancyStatus: 'unlawful_occupant',
+        evictionRequired: true,
+        evictionJurisdiction: 'high_court',
+        estimatedEvictionDelayDays: 240,
+        budgetedLegalEvictionCostZAR: 85000,
+        monthlySiteSecurityZAR: 4500,
+        totalEvictionCarryingCostZAR: 135000,
+      });
     });
 
     it('correctly maps tasks and suppliers', () => {
