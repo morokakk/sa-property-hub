@@ -166,14 +166,14 @@ export const GET_STARTED_STAGES: readonly JourneyStage[] = [
           {
             id: 'analyzer-deal-screening',
             title: 'Deal Screening & MAO',
-            summary: 'Model purchase price, source, bond and rent; see SARS transfer duty, fees and Day-1 capital.',
+            summary: 'Model purchase price, source, bond, rent and PIE Act eviction drag; see transfer duty and Day-1 capital.',
             howTo: [
               'Click Edit on a demo deal (or start fresh) to load it into the South African Acquisition & Yield Calculator.',
-              'Enter price, deal source, bond LTV and expected rent, then review transfer duty, conveyancing, bond registration and Day-1 capital.',
-              'Open the MAO Quick Solver to back-solve your Max Allowable Bid (MAO) for your target return, then save the deal to the pipeline.',
+              'Enter price, deal source, bond LTV and expected rent, and toggle Occupant & Eviction Risk on distressed deals to budget court litigation and security burn.',
+              'Open the MAO Quick Solver to back-solve your Max Allowable Bid (MAO) net of legal reserves and holding drag, then save the deal to the pipeline.',
             ],
             proTip:
-              'At auctions the buyer usually pays the auctioneer\'s commission (often up to 10% + VAT) on top of the hammer price, plus any municipal arrears needed for the Section 118 rates clearance certificate. Enter both as distressed costs so your MAO stays honest.',
+              'At auctions, the buyer pays auctioneer commission and Section 118 municipal arrears, but unlawful occupants carry statutory risk under the PIE Act. Budgeting Magistrate or High Court delays directly into your MAO protects your margin before bidding.',
             href: '/analyzer#analyzer-calculator',
             ctaLabel: 'Open the calculator',
           },
@@ -320,14 +320,14 @@ export const GET_STARTED_STAGES: readonly JourneyStage[] = [
           {
             id: 'flips-boq-draws',
             title: 'BOQ & Contractor Draws',
-            summary: 'Bill of Quantities line items, milestone drawdowns and retention.',
+            summary: 'Bill of Quantities line items, milestone drawdowns, retention and PIE Act contractor gates.',
             howTo: [
               'Select a flip, scroll to Bill of Quantities (BOQ) and add line items with contractor, cost and retention %.',
               'Track the Contractor Milestone Drawdown gates: deposit, first fix, finishes and practical completion.',
-              'Release retention only after snags are signed off.',
+              'Ensure unlawful occupant eviction orders are executed before disbursing draws, and release retention only after snags are signed off.',
             ],
             proTip:
-              'Hold back 5–10% retention until practical completion and snag sign-off. Never pay a contractor ahead of work done, and check that electrical work comes with a valid Certificate of Compliance (CoC).',
+              'Hold back 5–10% retention until practical completion, and never disburse contractor drawdowns if unlawful occupants remain on site — wait until the Sheriff executes the eviction order and issues a return of service under the PIE Act.',
             href: '/flips#flips-boq',
             ctaLabel: 'Open the BOQ',
           },
@@ -356,14 +356,14 @@ export const GET_STARTED_STAGES: readonly JourneyStage[] = [
           {
             id: 'rentals-tenants-ledger',
             title: 'Tenants, Ledger & Arrears',
-            summary: 'Lease details, monthly payments, write-offs and arrears per property.',
+            summary: 'Lease details, pre-lease tenant vetting scorecard, monthly payments and arrears per property.',
             howTo: [
-              'On a rental card, open the Lease & Costs tab to check the tenant, lease dates, deposit and escalation.',
-              'Switch to Payments & Arrears to log each payment as it lands.',
+              'On a rental card, open the Lease & Costs tab and expand Pre-Lease Tenant Vetting to score credit, debt-to-income and calculate deposit multipliers.',
+              'Switch to Payments & Arrears to log each payment as it lands and track utility cost recoveries.',
               'Record unrecoverable amounts as a write-off so arrears and the tax reserve stay accurate.',
             ],
             proTip:
-              'Under the Rental Housing Act the tenant\'s deposit must be held in an interest-bearing account, with the interest paid to the tenant at the end of the lease. Record the deposit here so you never mix it with operating cash.',
+              'Vet prospective tenants before signing: high debt ratios and judgment history are strong indicators of default under the PIE Act. Use the vetting scorecard to require a 1.5× to 2.0× deposit or guarantor when taking on moderate risks.',
             href: '/rentals#rentals-portfolio',
             ctaLabel: 'Open the portfolio',
           },
@@ -447,14 +447,14 @@ export const GET_STARTED_STAGES: readonly JourneyStage[] = [
           {
             id: 'proposal-tailor-terms',
             title: 'Tailor Pitch Terms',
-            summary: 'Set the facility size, return structure, rate and security you are offering the funder.',
+            summary: 'Set the facility size, return structure, rate, PIE Act statutory reserves and funder security.',
             howTo: [
               'In Select Deal & Tailor Pitch Terms, set the Capital Facility Requested.',
-              'Choose the Return Structure and Offered Return Rate (%), then describe the Security Offered.',
-              'Review the investor-return figures on the tear-sheet before you share it.',
+              'Choose the Return Structure and Offered Return Rate (%), and verify that PIE Act Legal Eviction Reserves appear in the capital stack for distressed deals.',
+              'Review the investor-return figures and copy the formatted WhatsApp pitch summary to share directly with prospective lenders.',
             ],
             proTip:
-              'Offer a clear, fixed return and a realistic term that covers transfer delays. A pitch that assumes a 3-month flip in SA often turns into 6, so build in slack.',
+              'Offer a clear return and realistic legal horizon: if buying at auction with unlawful occupants, disclose the PIE Act legal reserve and contractor disbursement gate up front to build credibility with institutional and private lenders.',
             href: '/proposal#proposal-deal-selector',
             ctaLabel: 'Tailor terms',
           },
