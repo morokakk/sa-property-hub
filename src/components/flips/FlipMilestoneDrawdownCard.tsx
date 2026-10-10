@@ -4,7 +4,8 @@ import React from 'react';
 import { FlipProject } from '@/types';
 import { formatZAR } from '@/lib/formatters';
 import { calculateMilestonePhaseTargets } from '@/lib/calculations/flips';
-import { Hammer } from 'lucide-react';
+import { Hammer, ShieldAlert, CheckCircle2 } from 'lucide-react';
+import { isEvictionActive } from '@/lib/calculations/occupantRisk';
 
 export interface FlipMilestoneDrawdownCardProps {
   flip: FlipProject;
@@ -13,6 +14,7 @@ export interface FlipMilestoneDrawdownCardProps {
   totalRetentionHeldZAR?: number;
   drawSchedule?: FlipProject['drawSchedule'];
   onToggleDrawPhase: (phaseKey: keyof NonNullable<FlipProject['drawSchedule']>) => void;
+  onUpdateFlip?: (updates: Partial<FlipProject>) => void;
 }
 
 export function FlipMilestoneDrawdownCard({
@@ -22,6 +24,7 @@ export function FlipMilestoneDrawdownCard({
   totalRetentionHeldZAR: explicitRetentionHeld,
   drawSchedule,
   onToggleDrawPhase,
+  onUpdateFlip,
 }: FlipMilestoneDrawdownCardProps) {
   const currentDrawSchedule =
     drawSchedule ||
@@ -42,6 +45,8 @@ export function FlipMilestoneDrawdownCard({
           const retPct = item.retentionPercent || 0;
           return sum + (item.actualCostZAR || item.baselineTotalZAR || 0) * (retPct / 100);
         }, 0);
+
+  const evictionActive = flip.occupantRisk ? isEvictionActive(flip.occupantRisk) : false;
 
   return (
     <div id="flips-drawdown" className="scroll-mt-20 bg-white rounded-xl border border-slate-200 p-4 sm:p-5 shadow-xs space-y-4">
@@ -82,6 +87,8 @@ export function FlipMilestoneDrawdownCard({
           className={`p-3.5 rounded-xl border transition-all text-xs flex flex-col justify-between ${
             currentDrawSchedule.depositPaid
               ? 'bg-emerald-50/70 border-emerald-300 text-emerald-950'
+              : evictionActive
+              ? 'bg-rose-50/50 border-rose-300 text-rose-950'
               : 'bg-slate-50 border-slate-200 text-slate-700'
           }`}
         >
@@ -97,6 +104,44 @@ export function FlipMilestoneDrawdownCard({
               {formatZAR(milestoneDraws.deposit || milestoneTargets.deposit)}
             </div>
             <span className="text-[10px] text-slate-400">Target: {formatZAR(milestoneTargets.deposit)}</span>
+
+            {/* Eviction Active Notice & Site Access Gating */}
+            {evictionActive && (
+              <div className="mt-2.5 p-2 rounded-lg bg-rose-100 border border-rose-300 text-rose-950 text-[10px] space-y-1.5">
+                <div className="font-bold flex items-center gap-1 text-rose-900">
+                  <ShieldAlert className="w-3.5 h-3.5 shrink-0 text-rose-700" />
+                  <span>Site Access Blocked: PIE Act Eviction</span>
+                </div>
+                <p className="text-rose-800 leading-tight">
+                  Unlawful occupants on site ({flip.occupantRisk?.estimatedEvictionDelayDays}d delay). Contractor site mobilization prohibited until vacant possession is secured.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!flip.occupantRisk) return;
+                    onUpdateFlip?.({
+                      occupantRisk: {
+                        ...flip.occupantRisk,
+                        occupancyStatus: 'vacant',
+                        evictionRequired: false,
+                        possessionObtainedDate: new Date().toISOString().split('T')[0],
+                      },
+                    });
+                  }}
+                  className="w-full py-1.5 px-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[10px] rounded transition-colors shadow-2xs cursor-pointer flex items-center justify-center gap-1"
+                >
+                  <CheckCircle2 className="w-3 h-3" />
+                  <span>Mark Vacant Possession Obtained</span>
+                </button>
+              </div>
+            )}
+
+            {flip.occupantRisk?.occupancyStatus === 'vacant' && flip.occupantRisk.possessionObtainedDate && (
+              <div className="mt-2 p-1.5 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-900 text-[10px] flex items-center gap-1">
+                <CheckCircle2 className="w-3 h-3 text-emerald-600 shrink-0" />
+                <span>Vacant possession secured ({flip.occupantRisk.possessionObtainedDate})</span>
+              </div>
+            )}
           </div>
 
           <div className="pt-3 mt-3 border-t border-slate-200/60">

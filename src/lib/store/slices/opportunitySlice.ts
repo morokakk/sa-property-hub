@@ -10,6 +10,7 @@ import { RootStoreState, OpportunitySlice } from '../types';
 import { INITIAL_OPPORTUNITIES } from '../initialData';
 import { syncAgmReminderTask } from '../utils/taskSync';
 import { calculateMonthlyBondRepayment } from '@/lib/calculations/propertyMetrics';
+import { isEvictionActive } from '@/lib/calculations/occupantRisk';
 
 export const createOpportunitySlice: StateCreator<
   RootStoreState,
@@ -123,6 +124,18 @@ export const createOpportunitySlice: StateCreator<
     const opp = get().opportunities.find((o) => o.id === oppId);
     if (!opp) return;
 
+    const hasEviction = opp.occupantRisk ? isEvictionActive(opp.occupantRisk) : false;
+    const legalEvictionCost = hasEviction ? opp.occupantRisk!.budgetedLegalEvictionCostZAR : 0;
+    const evictionDelayMs = hasEviction ? opp.occupantRisk!.estimatedEvictionDelayDays * 24 * 60 * 60 * 1000 : 0;
+
+    const baseAcquisitionCosts = opp.costs.totalAcquisitionCost - opp.purchasePrice;
+    const totalAcquisitionCosts = baseAcquisitionCosts + legalEvictionCost;
+
+    const baseDurationMs = (opp.holdingPeriodMonths || 6) * 30 * 24 * 60 * 60 * 1000;
+    const targetCompletionDate = new Date(Date.now() + baseDurationMs + evictionDelayMs)
+      .toISOString()
+      .split('T')[0];
+
     const newFlip: FlipProject = {
       id: `flip-${Date.now()}`,
       title: `${opp.title} (Flip)`,
@@ -132,7 +145,7 @@ export const createOpportunitySlice: StateCreator<
       agmDate: opp.agmDate,
       purchaseDate: new Date().toISOString().split('T')[0],
       purchasePriceZAR: opp.purchasePrice,
-      acquisitionCostsZAR: opp.costs.totalAcquisitionCost - opp.purchasePrice,
+      acquisitionCostsZAR: totalAcquisitionCosts,
       baselineRenovationBudgetZAR: opp.estimatedRehabCost || 250_000,
       estimatedDurationMonths: opp.holdingPeriodMonths || 6,
       monthlyHoldingCostZAR:
@@ -141,18 +154,15 @@ export const createOpportunitySlice: StateCreator<
         (opp.monthlyCashFlow < 0 ? Math.abs(opp.monthlyCashFlow) : 0),
       targetExitPriceZAR: opp.targetExitPrice || opp.purchasePrice * 1.35,
       exitCommissionPercent: opp.exitCommissionPercent ?? 5.75,
-      targetCompletionDate: new Date(
-        Date.now() + (opp.holdingPeriodMonths || 6) * 30 * 24 * 60 * 60 * 1000
-      )
-        .toISOString()
-        .split('T')[0],
+      targetCompletionDate,
+      occupantRisk: opp.occupantRisk ? { ...opp.occupantRisk } : undefined,
       currentPhase: 'Acquisition & Conveyancing',
       linkedFundingIds: [],
       fundingRequiredZAR:
         opp.fundingRequiredZAR ||
         Math.round(
           (opp.purchasePrice +
-            (opp.costs.totalAcquisitionCost - opp.purchasePrice) +
+            totalAcquisitionCosts +
             (opp.estimatedRehabCost || 250_000)) *
             0.7
         ),
@@ -166,7 +176,9 @@ export const createOpportunitySlice: StateCreator<
       promisedPayoutSchedule: opp.promisedPayoutSchedule || 'Monthly Interest',
       securityOffered: opp.securityOffered || '2nd Mortgage Bond registered over title deed',
       status: 'Active',
-      notes: `Promoted from Opportunity Analyzer. Source: ${opp.source}`,
+      notes: hasEviction
+        ? `Promoted from Opportunity Analyzer. Source: ${opp.source}. Includes R ${legalEvictionCost.toLocaleString('en-ZA')} legal reserve for PIE Act eviction litigation (${opp.occupantRisk!.estimatedEvictionDelayDays}d delay).`
+        : `Promoted from Opportunity Analyzer. Source: ${opp.source}`,
       driveVault: opp.driveVault ? { ...opp.driveVault } : undefined,
       boq: [
         {
@@ -215,8 +227,29 @@ export const createOpportunitySlice: StateCreator<
       createdAt: new Date().toISOString(),
     };
 
+    const evictionTask: TaskItem | null = hasEviction
+      ? {
+          id: `task-${Date.now()}-eviction`,
+          title: `Instruct litigation attorney for PIE Act Section 4(2) eviction on ${opp.title}`,
+          description: `Budgeted legal reserve R ${legalEvictionCost.toLocaleString('en-ZA')}. Jurisdiction: ${opp.occupantRisk!.evictionJurisdiction === 'high_court' ? 'High Court' : "Magistrate's Court"}. Estimated delay: ${opp.occupantRisk!.estimatedEvictionDelayDays} days.`,
+          dueDate: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000)
+            .toISOString()
+            .split('T')[0],
+          priority: 'Urgent',
+          status: 'Pending',
+          linkedEntity: {
+            type: 'flip',
+            id: newFlip.id,
+            name: newFlip.title,
+          },
+          createdAt: new Date().toISOString(),
+        }
+      : null;
+
     set((state) => {
-      let updatedTasks = [conveyancingTask, ...state.tasks];
+      let updatedTasks = evictionTask
+        ? [evictionTask, conveyancingTask, ...state.tasks]
+        : [conveyancingTask, ...state.tasks];
       if (newFlip.agmDate) {
         updatedTasks = syncAgmReminderTask(
           updatedTasks,

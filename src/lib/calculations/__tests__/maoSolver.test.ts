@@ -414,4 +414,113 @@ describe('MAO Solver Engine', () => {
       );
     });
   });
+
+  describe('PIE Act Eviction Risk Adjustments', () => {
+    const baseFlipParams = {
+      targetExitPrice: 2_500_000,
+      desiredRoiPercent: 18,
+      rehabCost: 300_000,
+      holdingCost: 90_000,
+      estimatedAcquisitionCostRate: 0.05,
+    };
+
+    it('Flip MAO solver returns lower bid limits for unlawful occupant properties', () => {
+      const vacantResult = calculateFlipMao(baseFlipParams);
+
+      const unlawfulResult = calculateFlipMao({
+        ...baseFlipParams,
+        evictionLegalCostZAR: 40_000,
+        evictionDelayDays: 120,
+        evictionMonthlyFixedBurnZAR: 4_000,
+        bondLtvPercent: 80,
+        interestRatePercent: 11.75,
+      });
+
+      expect(unlawfulResult.maxAllowableBid).toBeLessThan(vacantResult.maxAllowableBid);
+      expect(unlawfulResult.occupantRiskReductionZAR).toBeGreaterThan(0);
+      expect(unlawfulResult.riskFreeMaxBid).toBe(vacantResult.maxAllowableBid);
+      expect(unlawfulResult.evictionCostAtMaoZAR).toBeGreaterThan(40_000);
+    });
+
+    it('Flip MAO decreases monotonically as eviction delay days increase', () => {
+      const delays = [0, 30, 90, 120, 180, 240, 365];
+      let previousBid = Infinity;
+
+      for (const days of delays) {
+        const res = calculateFlipMao({
+          ...baseFlipParams,
+          evictionLegalCostZAR: 40_000,
+          evictionDelayDays: days,
+          evictionMonthlyFixedBurnZAR: 3_500,
+          bondLtvPercent: 80,
+          interestRatePercent: 11.75,
+        });
+
+        expect(res.maxAllowableBid).toBeLessThanOrEqual(previousBid);
+        previousBid = res.maxAllowableBid;
+      }
+    });
+
+    it('High Court eviction yields lower or equal MAO compared to Magistrates Court', () => {
+      const mc = calculateFlipMao({
+        ...baseFlipParams,
+        evictionLegalCostZAR: 40_000,
+        evictionDelayDays: 120,
+        evictionMonthlyFixedBurnZAR: 3_000,
+        bondLtvPercent: 80,
+        interestRatePercent: 11.75,
+      });
+
+      const hc = calculateFlipMao({
+        ...baseFlipParams,
+        evictionLegalCostZAR: 85_000,
+        evictionDelayDays: 240,
+        evictionMonthlyFixedBurnZAR: 3_000,
+        bondLtvPercent: 80,
+        interestRatePercent: 11.75,
+      });
+
+      expect(hc.maxAllowableBid).toBeLessThan(mc.maxAllowableBid);
+      expect(hc.occupantRiskReductionZAR).toBeGreaterThan(mc.occupantRiskReductionZAR!);
+    });
+
+    it('Rental MAO solver applies eviction penalties to target purchase price', () => {
+      const baseRentalParams = {
+        monthlyRent: 15_000,
+        vacancyRatePercent: 5,
+        managementFeePercent: 8,
+        monthlyLevies: 1_200,
+        monthlyRates: 1_000,
+        annualInsurance: 6_000,
+        targetNetYieldPercent: 9.0,
+      };
+
+      const vacant = calculateRentalMao(baseRentalParams);
+      const unlawful = calculateRentalMao({
+        ...baseRentalParams,
+        evictionLegalCostZAR: 40_000,
+        evictionDelayDays: 120,
+        evictionMonthlyFixedBurnZAR: 2_500,
+        bondLtvPercent: 80,
+        interestRatePercent: 11.75,
+      });
+
+      expect(unlawful.maxAllowablePrice).toBeLessThan(vacant.maxAllowablePrice);
+      expect(unlawful.occupantRiskReductionZAR).toBeGreaterThan(0);
+      expect(unlawful.riskFreeMaxPrice).toBe(vacant.maxAllowablePrice);
+    });
+
+    it('clamps MAO bid to 0 when eviction costs exceed allowable outlay', () => {
+      const clamped = calculateFlipMao({
+        targetExitPrice: 500_000,
+        desiredRoiPercent: 20,
+        rehabCost: 350_000,
+        evictionLegalCostZAR: 85_000,
+        evictionDelayDays: 240,
+        evictionMonthlyFixedBurnZAR: 5_000,
+      });
+
+      expect(clamped.maxAllowableBid).toBe(0);
+    });
+  });
 });

@@ -109,6 +109,21 @@ export type PassReason =
   | 'Funding Not Secured'
   | 'Other';
 
+// Occupancy & PIE Act Eviction Risk Profile
+export type OccupancyStatus = 'vacant' | 'tenanted_verified' | 'unlawful_occupant';
+export type EvictionJurisdiction = 'none' | 'magistrates_court' | 'high_court';
+
+export interface OccupantRiskProfile {
+  occupancyStatus: OccupancyStatus;
+  evictionRequired: boolean;
+  evictionJurisdiction: EvictionJurisdiction;
+  estimatedEvictionDelayDays: number; // Default: 0 for vacant/tenanted; 120 days for Magistrate's Court; 240 days for High Court
+  budgetedLegalEvictionCostZAR: number; // Default: R 0 for vacant; R 40,000 for Magistrate's Court; R 85,000 for High Court
+  monthlySiteSecurityZAR: number; // Default: R 0; editable armed guarding/patrol fee to prevent secondary unlawful occupation
+  totalEvictionCarryingCostZAR: number; // Sum of legal litigation fees + compounded interim holding burn across the eviction delay
+  possessionObtainedDate?: string; // ISO date string YYYY-MM-DD when physical possession is officially secured
+}
+
 // Opportunity Analyzer Model
 export interface OpportunityDeal {
   id: string;
@@ -162,6 +177,8 @@ export interface OpportunityDeal {
   // Auction Outlays & Distressed Arrears
   auctioneerCommissionZAR?: number;
   municipalArrearsZAR?: number;
+  // Occupancy & PIE Act Eviction Risk Profile
+  occupantRisk?: OccupantRiskProfile;
   // Section 13sex Tax Incentive
   section13sex?: Section13sexCalculation;
   // Cloud Drive Link Vault
@@ -333,6 +350,7 @@ export interface FlipProject {
     finishesApproved: boolean;
     retentionReleased: boolean;
   };
+  occupantRisk?: OccupantRiskProfile;
 }
 
 // Maintenance Log Item
@@ -883,6 +901,7 @@ export interface AnalyzerDraft {
   interestRateMargin?: number;
   vatExemptAgent?: boolean;
   holdingPeriodMonths?: number;
+  occupantRisk?: OccupantRiskProfile;
 }
 
 // Client-side BYOK AI Integration Settings

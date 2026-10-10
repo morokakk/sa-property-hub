@@ -151,6 +151,7 @@ export function FlipActivePipeline({
         totalRetentionHeldZAR={financials.totalRetentionHeldZAR}
         drawSchedule={activeFlip.drawSchedule}
         onToggleDrawPhase={onToggleDrawPhase}
+        onUpdateFlip={onUpdateFlip}
       />
 
       {/* 9. Bill of Quantities (BOQ) Table */}

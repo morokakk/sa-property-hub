@@ -1,4 +1,5 @@
-import { AcquisitionCostBreakdown, AmenityDistance, AmenityScorecard, AncillaryIncome, DealStrategy, InvestorProfile, Lease, LongTermProjectionYear, OpportunityDeal, PropertyTitleType, RentalProperty } from '@/types';
+import { AcquisitionCostBreakdown, AmenityDistance, AmenityScorecard, AncillaryIncome, DealStrategy, InvestorProfile, Lease, LongTermProjectionYear, OccupantRiskProfile, OpportunityDeal, PropertyTitleType, RentalProperty } from '@/types';
+import { calculateEvictionCarryingCost } from './occupantRisk';
 
 /**
  * Computes Built-in Equity and discount percentage
@@ -201,6 +202,9 @@ export interface OpportunityMetricsResult {
   projectedFlipRoi: number;
   dscr: number;
   rawDscr?: number;
+  evictionLegalCostZAR?: number;
+  evictionDelayBurnZAR?: number;
+  totalOccupantCostZAR?: number;
 }
 
 /**
@@ -245,6 +249,7 @@ export function calculateDealMetrics(params: {
   exitCommissionPercent?: number;
   defaultAgentCommissionPercent?: number;
   vatExemptAgent?: boolean;
+  occupantRisk?: OccupantRiskProfile;
 }): OpportunityMetricsResult {
   const {
     purchasePrice,
@@ -273,6 +278,7 @@ export function calculateDealMetrics(params: {
     exitCommissionPercent,
     defaultAgentCommissionPercent = 5.0,
     vatExemptAgent = false,
+    occupantRisk,
   } = params;
 
   // Effective LTV and Deposit
@@ -285,13 +291,27 @@ export function calculateDealMetrics(params: {
   // Financed principal must strictly equal purchasePrice - cashDeposit
   const bondAmount = Math.max(0, purchasePrice - cashDeposit);
 
+  // Holding bond cost reflects bond interest only (not double-counting principal repayment)
+  const monthlyBondInterest = bondAmount > 0 ? (bondAmount * (interestRatePercent / 100 / 12)) : 0;
+
+  // PIE Act Eviction Carrying Burn & Legal Reserve
+  const evictionCosts = calculateEvictionCarryingCost({
+    risk: occupantRisk,
+    monthlyBondInterestZAR: monthlyBondInterest,
+    monthlyRatesZAR: monthlyRatesTaxes,
+    monthlyLeviesZAR: monthlyLevies,
+  });
+  const evictionLegalFee = evictionCosts.totalOccupantCostZAR > 0 ? Math.max(0, occupantRisk?.budgetedLegalEvictionCostZAR || 0) : 0;
+  const evictionHoldingBurn = evictionCosts.evictionDelayBurnZAR;
+  const totalEvictionBurden = evictionCosts.totalOccupantCostZAR;
+
   // Auction & Distressed Municipal Outlays
   const auctionCosts = (auctioneerCommissionZAR || 0) + (municipalArrearsZAR || 0);
 
   // Total Capital Outlay & Day-1 Initial Capital Required
-  const totalCost = costs.totalAcquisitionCost + estimatedRehabCost + auctionCosts;
+  const totalCost = costs.totalAcquisitionCost + estimatedRehabCost + auctionCosts + totalEvictionBurden;
   const cashFees = costs.totalAcquisitionCost - purchasePrice;
-  const initialCapitalRequired = cashDeposit + cashFees + estimatedRehabCost + auctionCosts;
+  const initialCapitalRequired = cashDeposit + cashFees + estimatedRehabCost + auctionCosts + evictionLegalFee;
   const totalCashRequired = initialCapitalRequired;
 
   // Monthly Bond Repayment
@@ -344,8 +364,6 @@ export function calculateDealMetrics(params: {
 
   const commissionRate = effectiveCommissionPercent / 100;
   const exitCommission = targetExitPrice * commissionRate;
-  // Holding bond cost reflects bond interest only (not double-counting principal repayment)
-  const monthlyBondInterest = bondAmount > 0 ? (bondAmount * (interestRatePercent / 100 / 12)) : 0;
   const holdingBondInterest = monthlyBondInterest * holdingPeriodMonths;
   const holdingLeviesAndRates = (monthlyLevies + monthlyRatesTaxes) * holdingPeriodMonths;
   const totalHoldingCosts = holdingBondInterest + holdingLeviesAndRates;
@@ -355,11 +373,12 @@ export function calculateDealMetrics(params: {
     estimatedRehabCost +
     auctionCosts +
     totalHoldingCosts +
-    exitCommission;
+    exitCommission +
+    totalEvictionBurden;
 
   const projectedFlipNetProfit = targetExitPrice - totalFlipCosts;
-  // Flip ROI denominator (cash invested) includes holding cash requirements alongside Day-1 cash
-  const flipCashInvested = initialCapitalRequired + totalHoldingCosts;
+  // Flip ROI denominator (cash invested) includes holding cash requirements alongside Day-1 cash and eviction burn
+  const flipCashInvested = initialCapitalRequired + totalHoldingCosts + evictionHoldingBurn;
   const projectedFlipRoi = flipCashInvested > 0
     ? (projectedFlipNetProfit / flipCashInvested) * 100
     : (totalCost > 0 ? (projectedFlipNetProfit / totalCost) * 100 : 0);
@@ -379,6 +398,9 @@ export function calculateDealMetrics(params: {
     projectedFlipRoi: Number(projectedFlipRoi.toFixed(2)),
     dscr,
     rawDscr,
+    evictionLegalCostZAR: evictionLegalFee,
+    evictionDelayBurnZAR: evictionHoldingBurn,
+    totalOccupantCostZAR: totalEvictionBurden,
   };
 }
 

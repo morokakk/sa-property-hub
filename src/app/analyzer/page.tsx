@@ -17,9 +17,11 @@ import {
 import { calculateFlipMao, calculateRentalMao } from '@/lib/calculations/maoSolver';
 import { formatOpportunityForWhatsApp } from '@/lib/whatsappFormatter';
 import { formatZAR, formatPercent } from '@/lib/formatters';
-import { OpportunityDeal, DealSource, AmenityDistance, AmenityScorecard, PropertyTitleType, DealStrategy, PassReason } from '@/types';
+import { OpportunityDeal, DealSource, AmenityDistance, AmenityScorecard, PropertyTitleType, DealStrategy, PassReason, OccupantRiskProfile } from '@/types';
 import { PropertyTypeBadge, AgmDateChip } from '@/components/common/PropertyTypeBadge';
 import LongTermProjectionChart from '@/components/analytics/LongTermProjectionChart';
+import { OccupancyRiskCard } from '@/components/analyzer/OccupancyRiskCard';
+import { getOccupantRiskDefaults, isEvictionActive } from '@/lib/calculations/occupantRisk';
 import {
   Calculator,
   PlusCircle,
@@ -130,6 +132,11 @@ export default function OpportunityAnalyzerPage() {
   const [auctioneerCommission, setAuctioneerCommission] = useState<number>(analyzerDraft?.auctioneerCommission ?? 0);
   const [municipalArrears, setMunicipalArrears] = useState<number>(analyzerDraft?.municipalArrears ?? 0);
 
+  // Occupant & Eviction Risk State (PIE Act)
+  const [occupantRisk, setOccupantRisk] = useState<OccupantRiskProfile>(
+    analyzerDraft?.occupantRisk ?? getOccupantRiskDefaults('vacant')
+  );
+
   // Amenity Distance State
   const [schoolsDistance, setSchoolsDistance] = useState<AmenityDistance>('0-5km');
   const [policeDistance, setPoliceDistance] = useState<AmenityDistance>('0-5km');
@@ -198,6 +205,11 @@ export default function OpportunityAnalyzerPage() {
         setVatExemptAgent(investorProfile.vatExemptAgent);
       }
       if (analyzerDraft.holdingPeriodMonths !== undefined) setHoldingPeriodMonths(analyzerDraft.holdingPeriodMonths);
+      if (analyzerDraft.occupantRisk) {
+        setOccupantRisk(analyzerDraft.occupantRisk);
+      } else {
+        setOccupantRisk(getOccupantRiskDefaults('vacant'));
+      }
     }
   }, [analyzerDraft, investorProfile?.defaultPrimeRatePercent, investorProfile?.vatExemptAgent]);
 
@@ -404,6 +416,7 @@ export default function OpportunityAnalyzerPage() {
       monthlyMaintenanceReserveZAR: monthlyMaintenanceReserve,
       monthlyPrepaidVendingFeeZAR: monthlyPrepaidVendingFee,
       monthlyCommunalServicesZAR: monthlyCommunalServices,
+      occupantRisk,
     });
   }, [
     purchasePrice,
@@ -432,6 +445,7 @@ export default function OpportunityAnalyzerPage() {
     calculatedCosts,
     auctioneerCommission,
     municipalArrears,
+    occupantRisk,
   ]);
 
   // Day-1 Capital Required vs Liquid Capital Reserve comparison
@@ -506,8 +520,22 @@ export default function OpportunityAnalyzerPage() {
       estimatedAcquisitionCostRate: 0.05,
       exitCommissionPercent: effectiveExitCommissionPercent,
       municipalClearanceZAR: municipalArrears,
+      occupantRisk,
+      bondLtvPercent: loanToValue,
+      bondInterestRatePercent: interestRate,
     });
-  }, [maoTargetExitPrice, maoDesiredRoi, rehabCost, flipHoldingReserve, holdingPeriodMonths, effectiveExitCommissionPercent, municipalArrears]);
+  }, [
+    maoTargetExitPrice,
+    maoDesiredRoi,
+    rehabCost,
+    flipHoldingReserve,
+    holdingPeriodMonths,
+    effectiveExitCommissionPercent,
+    municipalArrears,
+    occupantRisk,
+    loanToValue,
+    interestRate,
+  ]);
 
   const computedRentalMao = useMemo(() => {
     return calculateRentalMao({
@@ -524,8 +552,28 @@ export default function OpportunityAnalyzerPage() {
       rehabCost,
       estimatedAcquisitionCostRate: 0.05,
       targetNetYieldPercent: maoTargetYield,
+      occupantRisk,
+      bondLtvPercent: loanToValue,
+      bondInterestRatePercent: interestRate,
     });
-  }, [monthlyRent, vacancyRate, managementFee, agencyVatApplicable, propertyType, monthlyLevies, monthlyRates, annualInsurance, monthlyMaintenanceReserve, monthlyPrepaidVendingFee, monthlyCommunalServices, rehabCost, maoTargetYield]);
+  }, [
+    monthlyRent,
+    vacancyRate,
+    managementFee,
+    agencyVatApplicable,
+    propertyType,
+    monthlyLevies,
+    monthlyRates,
+    annualInsurance,
+    monthlyMaintenanceReserve,
+    monthlyPrepaidVendingFee,
+    monthlyCommunalServices,
+    rehabCost,
+    maoTargetYield,
+    occupantRisk,
+    loanToValue,
+    interestRate,
+  ]);
 
   const handleApplyMaoBid = (bidAmount: number) => {
     if (bidAmount <= 0) return;
@@ -593,6 +641,10 @@ export default function OpportunityAnalyzerPage() {
       projectedFlipRoi: calculatedMetrics.projectedFlipRoi,
       status: 'Screening',
       section13sex: isSection13Eligible ? calculatedSection13 : undefined,
+      occupantRisk: {
+        ...occupantRisk,
+        totalEvictionCarryingCostZAR: calculatedMetrics.totalOccupantCostZAR ?? 0,
+      },
       createdAt: new Date().toISOString().split('T')[0],
     };
 
@@ -652,6 +704,7 @@ export default function OpportunityAnalyzerPage() {
       setClinicDistance(deal.amenityScorecard.medicalClinic);
       setMallDistance(deal.amenityScorecard.shoppingMall);
     }
+    setOccupantRisk(deal.occupantRisk ?? getOccupantRiskDefaults('vacant'));
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -682,6 +735,7 @@ export default function OpportunityAnalyzerPage() {
     setVacancyRate(analyzerDraft?.vacancyRatePercent ?? 6.0);
     setManagementFee(analyzerDraft?.managementFeePercent ?? 8.0);
     setAgencyVatApplicable(analyzerDraft?.agencyVatApplicable ?? true);
+    setOccupantRisk(analyzerDraft?.occupantRisk ?? getOccupantRiskDefaults('vacant'));
   };
 
   const handleSaveOpportunity = (e: React.FormEvent) => {
@@ -746,6 +800,10 @@ export default function OpportunityAnalyzerPage() {
         customConveyancing: overrideLegal ? customConveyancing : undefined,
         costs: calculatedCosts,
         section13sex: isSection13Eligible ? calculatedSection13 : undefined,
+        occupantRisk: {
+          ...occupantRisk,
+          totalEvictionCarryingCostZAR: calculatedMetrics.totalOccupantCostZAR ?? 0,
+        },
         grossYield: calculatedMetrics.grossYield,
         capRate: calculatedMetrics.capRate,
         netRoi: calculatedMetrics.netRoi,
@@ -781,6 +839,7 @@ export default function OpportunityAnalyzerPage() {
       setVacancyRate(analyzerDraft?.vacancyRatePercent ?? 6.0);
       setManagementFee(analyzerDraft?.managementFeePercent ?? 8.0);
       setAgencyVatApplicable(analyzerDraft?.agencyVatApplicable ?? true);
+      setOccupantRisk(getOccupantRiskDefaults('vacant'));
       return;
     }
 
@@ -833,6 +892,10 @@ export default function OpportunityAnalyzerPage() {
       customConveyancing: overrideLegal ? customConveyancing : undefined,
       costs: calculatedCosts,
       section13sex: isSection13Eligible ? calculatedSection13 : undefined,
+      occupantRisk: {
+        ...occupantRisk,
+        totalEvictionCarryingCostZAR: calculatedMetrics.totalOccupantCostZAR ?? 0,
+      },
       grossYield: calculatedMetrics.grossYield,
       capRate: calculatedMetrics.capRate,
       netRoi: calculatedMetrics.netRoi,
@@ -861,6 +924,7 @@ export default function OpportunityAnalyzerPage() {
     setVacancyRate(analyzerDraft?.vacancyRatePercent ?? 6.0);
     setManagementFee(analyzerDraft?.managementFeePercent ?? 8.0);
     setAgencyVatApplicable(analyzerDraft?.agencyVatApplicable ?? true);
+    setOccupantRisk(getOccupantRiskDefaults('vacant'));
     alert(`Deal "${title}" added to Deal Pipeline!`);
   };
 
@@ -1014,6 +1078,12 @@ export default function OpportunityAnalyzerPage() {
                               <span>Less BOQ, Holding & Exit Friction:</span>
                               <span className="text-rose-600 font-semibold">-{formatZAR(computedFlipMao.nonPurchaseCosts)}</span>
                             </div>
+                            {(computedFlipMao.occupantRiskReductionZAR ?? 0) > 0 && (
+                              <div className="flex justify-between text-xs text-rose-700 bg-rose-50/80 px-2 py-1 rounded border border-rose-200">
+                                <span>PIE Act Eviction Risk Reduction:</span>
+                                <span className="font-bold">-{formatZAR(computedFlipMao.occupantRiskReductionZAR ?? 0)}</span>
+                              </div>
+                            )}
                             <div className="border-t border-violet-200 pt-2 flex justify-between items-center">
                               <span className="font-bold text-violet-900">Max Allowable Bid (MAO):</span>
                               <span className="text-base font-black text-violet-800">{formatZAR(computedFlipMao.maxAllowableBid)}</span>
@@ -1066,6 +1136,12 @@ export default function OpportunityAnalyzerPage() {
                               <span>Agent Fee ({managementFee}%{agencyVatApplicable ? '+VAT' : ''}):</span>
                               <span>-{formatZAR(computedRentalMao.managementFeeAnnual)}/yr</span>
                             </div>
+                            {(computedRentalMao.occupantRiskReductionZAR ?? 0) > 0 && (
+                              <div className="flex justify-between text-xs text-rose-700 bg-rose-50/80 px-2 py-1 rounded border border-rose-200">
+                                <span>PIE Act Eviction Risk Reduction:</span>
+                                <span className="font-bold">-{formatZAR(computedRentalMao.occupantRiskReductionZAR ?? 0)}</span>
+                              </div>
+                            )}
                             <div className="border-t border-emerald-200 pt-2 flex justify-between items-center">
                               <span className="font-bold text-emerald-950">Max Purchase Price:</span>
                               <span className="text-base font-black text-emerald-800">{formatZAR(computedRentalMao.maxAllowablePrice)}</span>
@@ -2030,6 +2106,23 @@ export default function OpportunityAnalyzerPage() {
               </div>
             )}
 
+            {/* Occupancy & Site Possession (PIE Act Eviction Risk Engine) */}
+            <OccupancyRiskCard
+              value={occupantRisk}
+              onChange={(updated) => {
+                setOccupantRisk(updated);
+                updateAnalyzerDraft({ occupantRisk: updated });
+              }}
+              maoReductionZAR={
+                strategy === 'Flip'
+                  ? computedFlipMao.occupantRiskReductionZAR
+                  : computedRentalMao.occupantRiskReductionZAR
+              }
+              evictionDelayBurnZAR={calculatedMetrics.evictionDelayBurnZAR ?? 0}
+              totalOccupantCostZAR={calculatedMetrics.totalOccupantCostZAR ?? 0}
+              maoMode={strategy === 'Flip' ? 'Flip' : 'Rental'}
+            />
+
             {/* Mortgage / Bond Financing & Cash Deposit Sync Engine */}
             <div className="p-4 sm:p-5 rounded-xl border border-slate-200 bg-white shadow-2xs space-y-4">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-100">
@@ -2921,6 +3014,12 @@ export default function OpportunityAnalyzerPage() {
                       }`}>
                         {deal.strategy === 'Flip' ? '🔄 Flip' : deal.strategy === 'BRRRR' ? '⚡ BRRRR' : '🏠 Rental'}
                       </span>
+                      {deal.occupantRisk && isEvictionActive(deal.occupantRisk) && (
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded border bg-rose-100 text-rose-800 border-rose-300 flex items-center gap-1">
+                          <span>⛔ Eviction Pending</span>
+                          <span className="text-[9px] opacity-80">({deal.occupantRisk.estimatedEvictionDelayDays}d)</span>
+                        </span>
+                      )}
                     </div>
                     <p className="text-xs text-slate-500 mt-1">
                       {deal.address}, {deal.city} ({deal.province})

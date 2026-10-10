@@ -4,6 +4,7 @@ import React from 'react';
 import Link from 'next/link';
 import { FlipProject } from '@/types';
 import { Hammer, Copy, Check, Share2, ChevronRight } from 'lucide-react';
+import { isEvictionActive } from '@/lib/calculations/occupantRisk';
 
 export interface FlipProjectTabsProps {
   activeFlips: FlipProject[];
@@ -43,6 +44,14 @@ export function FlipProjectTabs({
             <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-slate-800 text-slate-300">
               {flip.city}
             </span>
+            {flip.occupantRisk && isEvictionActive(flip.occupantRisk) && (
+              <span
+                className="text-[9px] font-bold px-1.5 py-0.2 rounded-full bg-rose-600 text-white"
+                title="Section 4(2) PIE Act Eviction Pending"
+              >
+                PIE
+              </span>
+            )}
           </button>
         ))}
       </div>

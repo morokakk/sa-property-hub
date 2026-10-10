@@ -19,6 +19,7 @@ import {
   Scale,
   X,
 } from 'lucide-react';
+import { getFlipEvictionOffsetMonths } from '@/lib/calculations/occupantRisk';
 
 interface DelayMatrixModalProps {
   isOpen: boolean;
@@ -77,8 +78,13 @@ export default function DelayMatrixModal({
   const sec118Arrears = flip.municipalClearance?.sec118ArrearsZAR || 0;
   const advanceCouncil = flip.municipalClearance?.advanceCouncilDepositZAR || 0;
 
+  const evictionOffsetMonths = getFlipEvictionOffsetMonths(flip);
+  const effectiveBaselineDuration = Number(
+    ((flip.estimatedDurationMonths ?? 6) + evictionOffsetMonths).toFixed(2)
+  );
+
   const matrixInput: DelaySensitivityInput = {
-    baselineDurationMonths: flip.estimatedDurationMonths ?? 6,
+    baselineDurationMonths: effectiveBaselineDuration,
     monthlyHoldingBurnZAR: Number(monthlyHoldingBurn),
     syndicateDebtBalanceZAR: Number(debtPrincipal),
     syndicateInterestRatePercent: Number(debtInterestRate),
@@ -134,6 +140,21 @@ export default function DelayMatrixModal({
             <X className="w-5 h-5" />
           </button>
         </div>
+
+        {/* PIE Act Eviction Horizon Callout */}
+        {evictionOffsetMonths > 0 && (
+          <div className="mb-4 bg-rose-50 border border-rose-200 text-rose-900 rounded-xl p-3 text-xs flex items-center justify-between shadow-2xs">
+            <div className="flex items-center gap-2">
+              <ShieldAlert className="w-4 h-4 text-rose-600 shrink-0" />
+              <span>
+                Baseline duration adjusted to <strong>{effectiveBaselineDuration} months</strong> (includes +{evictionOffsetMonths} carrying months for {flip.occupantRisk?.estimatedEvictionDelayDays}d PIE Act eviction litigation under {flip.occupantRisk?.evictionJurisdiction === 'high_court' ? 'High Court' : "Magistrate's Court"}).
+              </span>
+            </div>
+            <span className="text-[10px] font-bold bg-rose-200 text-rose-950 px-2 py-0.5 rounded shrink-0 ml-2">
+              PIE Act Risk Active
+            </span>
+          </div>
+        )}
 
         {/* Interactive Simulation Controls */}
         <div className="bg-slate-50 rounded-xl p-3.5 border border-slate-200/80 mb-4 space-y-3">

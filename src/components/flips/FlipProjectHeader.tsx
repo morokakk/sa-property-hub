@@ -4,7 +4,8 @@ import React from 'react';
 import { FlipProject } from '@/types';
 import { formatDate } from '@/lib/formatters';
 import { PropertyTypeBadge, AgmDateChip } from '@/components/common/PropertyTypeBadge';
-import { Edit3, CheckCircle2, ArrowRightLeft } from 'lucide-react';
+import { Edit3, CheckCircle2, ArrowRightLeft, ShieldAlert, ShieldCheck } from 'lucide-react';
+import { isEvictionActive } from '@/lib/calculations/occupantRisk';
 
 export interface FlipProjectHeaderProps {
   flip: FlipProject;
@@ -43,6 +44,30 @@ export function FlipProjectHeader({
             <option value="Staging & Marketing">Staging & Marketing</option>
             <option value="Sold / Awaiting Transfer">Sold / Awaiting Transfer</option>
           </select>
+
+          {/* Eviction / Occupancy Status Badge */}
+          {flip.occupantRisk && isEvictionActive(flip.occupantRisk) && (
+            <span
+              className="text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-300 px-2 py-0.5 rounded-full flex items-center gap-1"
+              title={`Section 4(2) PIE Act Eviction Pending in ${flip.occupantRisk.evictionJurisdiction === 'high_court' ? 'High Court' : "Magistrate's Court"}`}
+            >
+              <ShieldAlert className="w-3 h-3 text-rose-600" />
+              <span>⛔ Unlawful Occupant • PIE Act Eviction Pending</span>
+              <span className="text-[9px] opacity-80">
+                ({flip.occupantRisk.evictionJurisdiction === 'high_court' ? 'High Court' : "Magistrate's Court"} • {flip.occupantRisk.estimatedEvictionDelayDays}d)
+              </span>
+            </span>
+          )}
+
+          {flip.occupantRisk?.occupancyStatus === 'vacant' && flip.occupantRisk.possessionObtainedDate && (
+            <span
+              className="text-[10px] font-semibold bg-emerald-100 text-emerald-800 border border-emerald-300 px-2 py-0.5 rounded-full flex items-center gap-1"
+              title={`Vacant possession obtained on ${flip.occupantRisk.possessionObtainedDate}`}
+            >
+              <ShieldCheck className="w-3 h-3 text-emerald-600" />
+              <span>✓ Vacant Possession Secured</span>
+            </span>
+          )}
         </div>
         <h2 className="text-base font-bold text-slate-900">{flip.title}</h2>
         <p className="text-xs text-slate-500">{flip.address}, {flip.city}</p>
