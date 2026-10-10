@@ -347,6 +347,43 @@ export interface MaintenanceLog {
   invoiceRef?: string;
 }
 
+// Pre-Lease Tenant Vetting & PIE Act Risk Assessment
+export type TenantRiskGrade =
+  | 'Grade A (Low Risk)'
+  | 'Grade B (Moderate Risk)'
+  | 'Grade C (High Risk)'
+  | 'Grade D (Decline)';
+
+export type DepositMultiplier = 0 | 1 | 1.5 | 2;
+
+export interface TenantVettingScorecardInputs {
+  assessmentDate: string; // YYYY-MM-DD
+  popiaConsentRecorded: boolean;
+  bureauCreditScore: number; // 0–999
+  verifiedNetMonthlyIncomeZAR: number;
+  monthlyCpaDebtCommitmentsZAR: number;
+  hasOpenJudgmentsOrDefaults: boolean;
+  unpaidDebitOrderCount: number;
+}
+
+export interface TenantVettingScorecardOutputs {
+  rentToIncomePercent: number;
+  totalDebtToIncomePercent: number;
+  creditScorePoints: number; // 0..35
+  rentToIncomePoints: number; // 0..25
+  debtToIncomePoints: number; // 0..20
+  adverseHistoryPoints: number; // 0..10
+  bankingStabilityPoints: number; // 0..10
+  compositeScore: number; // 0..100
+  riskGrade: TenantRiskGrade;
+  recommendedDepositMultiplier: DepositMultiplier;
+  isHardFailure: boolean;
+  hardFailureReasons?: string[];
+  isPendingInputs?: boolean;
+}
+
+export interface TenantVettingScorecard extends TenantVettingScorecardInputs, TenantVettingScorecardOutputs {}
+
 // Active Lease
 export interface Lease {
   id: string;
@@ -364,6 +401,8 @@ export interface Lease {
   unpaidUtilityArrearsZAR?: number;
   guarantorName?: string; // e.g. Parent/Guardian Deed of Suretyship, or Corporate Sponsor
   guarantorContact?: string; // phone or corporate AP email
+  deedOfSuretyshipRef?: string; // Reference to signed Deed of Suretyship doc / vault link
+  vettingScorecard?: TenantVettingScorecard;
   roomType?: string; // e.g. Executive Suite, En-Suite Single, Shared Room, Garden Cottage
 }
 

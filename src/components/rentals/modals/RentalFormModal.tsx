@@ -8,10 +8,11 @@ import {
   AncillaryIncome,
 } from '@/types';
 import { formatZAR } from '@/lib/formatters';
-import { Building2 } from 'lucide-react';
+import { Building2, ChevronDown, ChevronUp } from 'lucide-react';
 import { calculateMonthlyBondRepayment } from '@/lib/calculations/propertyMetrics';
 import { calculateAgencyCommission } from '@/lib/calculations/rentals';
 import { usePortfolioStore } from '@/lib/store/usePortfolioStore';
+import { TenantVettingDrawer } from './TenantVettingDrawer';
 
 export interface RentalFormModalProps {
   isOpen: boolean;
@@ -192,6 +193,7 @@ export const RentalFormModal: React.FC<RentalFormModalProps> = ({
   const [localMonthlyCommunalServices, setLocalMonthlyCommunalServices] = useState<number>(0);
   const [localTaxEntityOverride, setLocalTaxEntityOverride] = useState<'Company (27%)' | 'Individual (45%)' | 'Pre-Tax' | undefined>(undefined);
   const [localFormAncillaryIncomes, setLocalFormAncillaryIncomes] = useState<AncillaryIncome[]>([]);
+  const [expandedGuarantors, setExpandedGuarantors] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     if (isOpen && propTitle === undefined) {
@@ -222,6 +224,13 @@ export const RentalFormModal: React.FC<RentalFormModalProps> = ({
         setLocalAgencyVatApplicable(editingProperty.agencyVatApplicable !== false);
         setLocalAgencyContact(editingProperty.agencyContact || '');
         setLocalFormLeases(editingProperty.leases?.map(l => ({ ...l })) || []);
+        const initialGuarantors: Record<string, boolean> = {};
+        editingProperty.leases?.forEach((l) => {
+          if (l.guarantorName || l.guarantorContact || l.deedOfSuretyshipRef || l.vettingScorecard?.riskGrade === 'Grade C (High Risk)') {
+            initialGuarantors[l.id] = true;
+          }
+        });
+        setExpandedGuarantors(initialGuarantors);
         setLocalUtilityType(editingProperty.utilityType || 'postpaid');
         setLocalPrepaidVendorName(editingProperty.prepaidVendorName || '');
         setLocalMonthlyPrepaidVendingFee(editingProperty.monthlyPrepaidVendingFeeZAR || 0);
@@ -273,6 +282,7 @@ export const RentalFormModal: React.FC<RentalFormModalProps> = ({
         setLocalMonthlyCommunalServices(0);
         setLocalTaxEntityOverride(undefined);
         setLocalFormAncillaryIncomes([]);
+        setExpandedGuarantors({});
       }
     }
   }, [isOpen, editingProperty, propTitle]);
@@ -1073,38 +1083,165 @@ export const RentalFormModal: React.FC<RentalFormModalProps> = ({
                   </div>
                 </div>
 
-                {/* Guarantor / Corporate Sponsor subsection */}
-                <div className="p-2 bg-slate-50/80 rounded-lg border border-slate-200/80 space-y-1.5">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1">
-                      <span>🛡️</span> Guarantor / Corporate Sponsor
-                    </span>
-                    <span className="text-[9px] text-slate-400">Optional third-party guarantee</span>
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    <div>
-                      <label className="block text-[9px] font-semibold text-slate-600 mb-0.5">Guarantor / Sponsoring Company (Optional)</label>
-                      <input
-                        type="text"
-                        placeholder="e.g. Parent Name (Deed of Suretyship) or Employer Entity"
-                        value={lease.guarantorName || ''}
-                        onChange={(e) => setFormLeases((prev) => prev.map((l) => l.id === lease.id ? { ...l, guarantorName: e.target.value } : l))}
-                        className="w-full px-2 py-1 text-[11px] border border-slate-300 rounded bg-white"
-                      />
+                {/* Pre-Lease Tenant Vetting & PIE Act Risk Assessment Drawer */}
+                <TenantVettingDrawer
+                  scorecard={lease.vettingScorecard}
+                  monthlyRentZAR={lease.monthlyRentZAR}
+                  onUpdateScorecard={(scorecard) => {
+                    setFormLeases((prev) =>
+                      prev.map((l) =>
+                        l.id === lease.id ? { ...l, vettingScorecard: scorecard } : l
+                      )
+                    );
+                    // Automatically uncollapse guarantor accordion if Grade C (High Risk)
+                    if (scorecard.riskGrade === 'Grade C (High Risk)') {
+                      setExpandedGuarantors((prev) => ({ ...prev, [lease.id]: true }));
+                    }
+                  }}
+                  onApplyDeposit={(depositAmount) => {
+                    setFormLeases((prev) =>
+                      prev.map((l) =>
+                        l.id === lease.id ? { ...l, depositHeldZAR: depositAmount } : l
+                      )
+                    );
+                  }}
+                />
+
+                {/* Guarantor / Corporate Sponsor subsection (Collapsible Accordion) */}
+                {(() => {
+                  const isGuarantorMandated =
+                    lease.vettingScorecard?.riskGrade === 'Grade C (High Risk)';
+                  const isGuarantorExpanded =
+                    expandedGuarantors[lease.id] ??
+                    Boolean(
+                      lease.guarantorName ||
+                        lease.guarantorContact ||
+                        lease.deedOfSuretyshipRef ||
+                        isGuarantorMandated
+                    );
+
+                  return (
+                    <div
+                      className={`rounded-lg border transition-all ${
+                        isGuarantorMandated
+                          ? 'bg-amber-50/40 border-amber-300'
+                          : 'bg-slate-50/80 border-slate-200/80'
+                      }`}
+                    >
+                      <div
+                        onClick={() =>
+                          setExpandedGuarantors((prev) => ({
+                            ...prev,
+                            [lease.id]: !isGuarantorExpanded,
+                          }))
+                        }
+                        className="px-2.5 py-1.5 flex items-center justify-between cursor-pointer hover:bg-slate-100/60 rounded-t-lg transition-colors"
+                        role="button"
+                        tabIndex={0}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            setExpandedGuarantors((prev) => ({
+                              ...prev,
+                              [lease.id]: !isGuarantorExpanded,
+                            }));
+                          }
+                        }}
+                        aria-expanded={isGuarantorExpanded}
+                      >
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[10px] font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1">
+                            <span>🛡️</span> Guarantor / Corporate Sponsor
+                          </span>
+                          {isGuarantorMandated && (
+                            <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-100 text-amber-800 border border-amber-300">
+                              Mandatory (Grade C Tenant)
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-1.5 text-slate-400">
+                          <span className="text-[9px]">
+                            {isGuarantorMandated
+                              ? 'Required under PIE Act underwriting'
+                              : 'Optional third-party guarantee'}
+                          </span>
+                          {isGuarantorExpanded ? (
+                            <ChevronUp className="w-3.5 h-3.5" />
+                          ) : (
+                            <ChevronDown className="w-3.5 h-3.5" />
+                          )}
+                        </div>
+                      </div>
+
+                      {isGuarantorExpanded && (
+                        <div className="p-2 pt-1 border-t border-slate-200/60 space-y-2">
+                          {isGuarantorMandated && (
+                            <p className="text-[9px] text-amber-800 leading-tight">
+                              ⚠️ <strong>PIE Act Risk Mitigation:</strong> Prospective tenant requires a legally bound guarantor and signed Deed of Suretyship to enforce rent recovery in the event of default.
+                            </p>
+                          )}
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                            <div>
+                              <label className="block text-[9px] font-semibold text-slate-600 mb-0.5">
+                                Guarantor / Sponsoring Company {isGuarantorMandated && <span className="text-amber-600">*</span>}
+                              </label>
+                              <input
+                                type="text"
+                                placeholder="e.g. Parent Name or Employer Entity"
+                                value={lease.guarantorName || ''}
+                                onChange={(e) =>
+                                  setFormLeases((prev) =>
+                                    prev.map((l) =>
+                                      l.id === lease.id ? { ...l, guarantorName: e.target.value } : l
+                                    )
+                                  )
+                                }
+                                className="w-full px-2 py-1 text-[11px] border border-slate-300 rounded bg-white"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-[9px] font-semibold text-slate-600 mb-0.5">
+                                Guarantor Contact (Phone / Email) {isGuarantorMandated && <span className="text-amber-600">*</span>}
+                              </label>
+                              <input
+                                type="text"
+                                autoComplete="tel email"
+                                placeholder="e.g. +27 82 111 2233 or legal@corp.co.za"
+                                value={lease.guarantorContact || ''}
+                                onChange={(e) =>
+                                  setFormLeases((prev) =>
+                                    prev.map((l) =>
+                                      l.id === lease.id ? { ...l, guarantorContact: e.target.value } : l
+                                    )
+                                  )
+                                }
+                                className="w-full px-2 py-1 text-[11px] border border-slate-300 rounded bg-white"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-[9px] font-semibold text-slate-600 mb-0.5">
+                                Deed of Suretyship Reference {isGuarantorMandated && <span className="text-amber-600">*</span>}
+                              </label>
+                              <input
+                                type="text"
+                                placeholder="e.g. Suretyship Doc Vault URL or Ref #"
+                                value={lease.deedOfSuretyshipRef || ''}
+                                onChange={(e) =>
+                                  setFormLeases((prev) =>
+                                    prev.map((l) =>
+                                      l.id === lease.id ? { ...l, deedOfSuretyshipRef: e.target.value } : l
+                                    )
+                                  )
+                                }
+                                className="w-full px-2 py-1 text-[11px] border border-slate-300 rounded bg-white"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      )}
                     </div>
-                    <div>
-                      <label className="block text-[9px] font-semibold text-slate-600 mb-0.5">Guarantor Contact (Phone / Email)</label>
-                      <input
-                        type="text"
-                        autoComplete="tel email"
-                        placeholder="e.g. +27 82 111 2233 or legal@corp.co.za"
-                        value={lease.guarantorContact || ''}
-                        onChange={(e) => setFormLeases((prev) => prev.map((l) => l.id === lease.id ? { ...l, guarantorContact: e.target.value } : l))}
-                        className="w-full px-2 py-1 text-[11px] border border-slate-300 rounded bg-white"
-                      />
-                    </div>
-                  </div>
-                </div>
+                  );
+                })()}
               </div>
             ))}
 
