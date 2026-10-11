@@ -43,6 +43,12 @@ export interface UseRentalModalStateReturn {
   meterPropertyId: string | null;
   openMeterModal: (propertyId: string) => void;
   closeMeterModal: () => void;
+
+  isNoticeModalOpen: boolean;
+  noticeProperty: RentalProperty | null;
+  noticeLeaseId: string | null;
+  openNoticeModal: (property: RentalProperty, leaseId?: string) => void;
+  closeNoticeModal: () => void;
 }
 
 export function useRentalModalState(): UseRentalModalStateReturn {
@@ -162,6 +168,23 @@ export function useRentalModalState(): UseRentalModalStateReturn {
     setMeterPropertyId(null);
   }, []);
 
+  // Tenant Notice & Move-Out Modal
+  const [isNoticeModalOpen, setIsNoticeModalOpen] = useState(false);
+  const [noticeProperty, setNoticeProperty] = useState<RentalProperty | null>(null);
+  const [noticeLeaseId, setNoticeLeaseId] = useState<string | null>(null);
+
+  const openNoticeModal = useCallback((property: RentalProperty, leaseId?: string) => {
+    setNoticeProperty(property);
+    setNoticeLeaseId(leaseId || null);
+    setIsNoticeModalOpen(true);
+  }, []);
+
+  const closeNoticeModal = useCallback(() => {
+    setIsNoticeModalOpen(false);
+    setNoticeProperty(null);
+    setNoticeLeaseId(null);
+  }, []);
+
   return {
     isRentalFormOpen,
     editingProperty,
@@ -204,5 +227,11 @@ export function useRentalModalState(): UseRentalModalStateReturn {
     meterPropertyId,
     openMeterModal,
     closeMeterModal,
+
+    isNoticeModalOpen,
+    noticeProperty,
+    noticeLeaseId,
+    openNoticeModal,
+    closeNoticeModal,
   };
 }

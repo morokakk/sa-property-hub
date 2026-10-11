@@ -1,6 +1,7 @@
 import { StateCreator } from 'zustand';
 import {
   RentalProperty,
+  Lease,
   ExtractedRentalUnit,
   RentalRefinanceParams,
   FlipProject,
@@ -44,6 +45,28 @@ export interface RentalSliceActions {
   markRentalAsSold: (rentalId: string, actualSalePrice: number, netCashProceeds: number, soldDate: string, exitNotes?: string) => void;
   reopenRental: (rentalId: string) => void;
   refinanceRental: (params: RentalRefinanceParams) => void;
+  markTenantNotice: (
+    propertyId: string,
+    leaseId: string,
+    notice: {
+      noticeGivenDate: string;
+      vacationDate: string;
+      noticeReason: string;
+      noticeNotes?: string;
+    }
+  ) => void;
+  cancelTenantNotice: (propertyId: string, leaseId: string) => void;
+  finalizeTenantMoveOut: (
+    propertyId: string,
+    leaseId: string,
+    params: {
+      vacationDate: string;
+      departureReason: string;
+      forwardingNotes?: string;
+      action: 'vacant' | 'replacement';
+      replacementLease?: Partial<Lease>;
+    }
+  ) => void;
 }
 export type RentalSlice = RentalSliceState & RentalSliceActions;
 

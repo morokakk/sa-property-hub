@@ -126,7 +126,13 @@ export function RentalCardHeader({
             className={`text-[10px] font-semibold px-2 py-0.5 rounded-full shrink-0 ${
               property.status === 'Occupied'
                 ? 'bg-emerald-100 text-emerald-800'
-                : 'bg-amber-100 text-amber-800'
+                : property.status === 'Notice Given'
+                ? 'bg-amber-100 text-amber-900 border border-amber-200'
+                : property.status === 'Partially Vacant'
+                ? 'bg-orange-100 text-orange-800 border border-orange-200'
+                : property.status === 'Sold'
+                ? 'bg-slate-100 text-slate-600'
+                : 'bg-rose-100 text-rose-800'
             }`}
           >
             {property.status}

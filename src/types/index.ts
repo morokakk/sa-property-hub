@@ -417,6 +417,16 @@ export interface TenantVettingScorecardOutputs {
 
 export interface TenantVettingScorecard extends TenantVettingScorecardInputs, TenantVettingScorecardOutputs {}
 
+export type TenantDepartureReason =
+  | 'Relocating / work transfer'
+  | 'Lease expired / non-renewal'
+  | 'Purchased own home'
+  | 'Rent affordability / downsizing'
+  | 'Upsizing / larger property'
+  | 'Eviction / breach of lease'
+  | 'Notice by landlord'
+  | 'Other';
+
 // Active Lease
 export interface Lease {
   id: string;
@@ -437,6 +447,30 @@ export interface Lease {
   deedOfSuretyshipRef?: string; // Reference to signed Deed of Suretyship doc / vault link
   vettingScorecard?: TenantVettingScorecard;
   roomType?: string; // e.g. Executive Suite, En-Suite Single, Shared Room, Garden Cottage
+  noticeGivenDate?: string; // 'YYYY-MM-DD'
+  vacationDate?: string; // 'YYYY-MM-DD' (intended or target move-out date)
+  noticeReason?: TenantDepartureReason | string;
+  noticeNotes?: string;
+}
+
+// Archived / Past Tenant Lease Record
+export interface ArchivedLease {
+  id: string;
+  unitName: string;
+  tenantName: string;
+  tenantPhone?: string;
+  tenantEmail?: string;
+  leaseStartDate: string;
+  leaseEndDate: string;
+  monthlyRentZAR: number;
+  depositHeldZAR: number;
+  annualEscalationPercent?: number;
+  roomType?: string;
+  noticeGivenDate?: string;
+  vacationDate: string; // actual date vacated
+  departureReason: TenantDepartureReason | string;
+  forwardingNotes?: string;
+  archivedAt: string; // ISO timestamp
 }
 
 export interface AncillaryIncome {
@@ -569,7 +603,8 @@ export interface RentalProperty {
   arrearsOpeningBalanceZAR?: number;
   unpaidUtilityArrearsZAR?: number; // kept synchronized with calculated arrears for backward compatibility
   maintenanceHistory: MaintenanceLog[];
-  status: 'Occupied' | 'Vacant' | 'Notice Given' | 'Sold';
+  status: 'Occupied' | 'Vacant' | 'Notice Given' | 'Partially Vacant' | 'Sold';
+  archivedLeases?: ArchivedLease[];
   cocChecklist?: ComplianceCertificates;
   driveVault?: CloudDriveVault;
   notes?: string;

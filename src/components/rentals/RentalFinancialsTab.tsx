@@ -14,6 +14,8 @@ import {
   ArrowUpRight,
   AlertCircle,
   FileText,
+  Clock,
+  Archive,
 } from 'lucide-react';
 
 export interface RentalFinancialsTabProps {
@@ -30,6 +32,7 @@ export interface RentalFinancialsTabProps {
   onOpenPmtCalculator: () => void;
   onOpenRefinance: () => void;
   onOpenStatementModal: () => void;
+  onOpenNoticeModal?: (leaseId?: string) => void;
 }
 
 export function RentalFinancialsTab({
@@ -41,7 +44,9 @@ export function RentalFinancialsTab({
   onOpenPmtCalculator,
   onOpenRefinance,
   onOpenStatementModal,
+  onOpenNoticeModal,
 }: RentalFinancialsTabProps) {
+  const [showPastTenants, setShowPastTenants] = React.useState(false);
   const { agencyCommissionZAR, netMonthlyCashflowZAR: netCashflow, ancillaryIncomeZAR } = calculatedCashflow;
   const {
     taxRate,
@@ -69,11 +74,11 @@ export function RentalFinancialsTab({
                 {property.leases!.length} Units • {property.leases!.filter((l) => l.status === 'Occupied').length} Occupied • {formatZAR(property.leases!.filter((l) => l.status === 'Occupied').reduce((s, l) => s + l.monthlyRentZAR, 0))}/m
               </strong>
             </div>
-            <div className="space-y-1 pl-5">
+            <div className="space-y-1.5 pl-5">
               {property.leases!.map((l) => (
                 <div key={l.id} className="flex items-center justify-between text-[11px] gap-2 flex-wrap sm:flex-nowrap">
                   <div className="flex items-center gap-1.5 flex-wrap">
-                    <span className={l.status === 'Occupied' ? 'text-slate-700 font-medium' : 'text-slate-400'}>
+                    <span className={l.status === 'Occupied' ? 'text-slate-700 font-medium' : l.status === 'Notice Given' ? 'text-amber-800 font-bold' : 'text-slate-400'}>
                       {l.unitName}: {l.tenantName} ({l.status})
                     </span>
                     {l.roomType && (
@@ -112,7 +117,24 @@ export function RentalFinancialsTab({
                       </span>
                     )}
                   </div>
-                  <span className="font-medium shrink-0">{formatZAR(l.monthlyRentZAR)}/m</span>
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium shrink-0">{formatZAR(l.monthlyRentZAR)}/m</span>
+                    {onOpenNoticeModal && (
+                      <button
+                        type="button"
+                        onClick={() => onOpenNoticeModal(l.id)}
+                        className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded border transition-colors cursor-pointer shrink-0 ${
+                          l.status === 'Notice Given'
+                            ? 'bg-amber-100 hover:bg-amber-200 text-amber-900 border-amber-300'
+                            : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-200'
+                        }`}
+                        title="Manage notice or record move-out"
+                      >
+                        <Clock className="w-2.5 h-2.5" />
+                        <span>{l.status === 'Notice Given' ? 'Notice' : 'Notice/Exit'}</span>
+                      </button>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
@@ -169,7 +191,24 @@ export function RentalFinancialsTab({
                 <Calendar className="w-3.5 h-3.5 text-slate-400" />
                 Lease Expiry:
               </span>
-              <span>{formatDate(property.leases?.[0]?.leaseEndDate || '')}</span>
+              <div className="flex items-center gap-2">
+                <span>{formatDate(property.leases?.[0]?.leaseEndDate || '')}</span>
+                {onOpenNoticeModal && (
+                  <button
+                    type="button"
+                    onClick={() => onOpenNoticeModal(property.leases?.[0]?.id)}
+                    className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded border transition-colors cursor-pointer shrink-0 ${
+                      property.leases?.[0]?.status === 'Notice Given'
+                        ? 'bg-amber-100 hover:bg-amber-200 text-amber-900 border-amber-300'
+                        : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-200'
+                    }`}
+                    title="Manage notice or record move-out"
+                  >
+                    <Clock className="w-2.5 h-2.5" />
+                    <span>{property.leases?.[0]?.status === 'Notice Given' ? 'Notice Details' : 'Notice / Exit'}</span>
+                  </button>
+                )}
+              </div>
             </div>
 
             <div className="flex items-center justify-between text-slate-600">
@@ -524,6 +563,74 @@ export function RentalFinancialsTab({
             : 'No outstanding municipal utility debt on this unit.'}
         </p>
       </div>
+
+      {/* Collapsible Past Tenants & Historical Leases History */}
+      {(property.archivedLeases || []).length > 0 && (
+        <div className="p-4 border-b border-slate-100 bg-slate-50/50">
+          <button
+            type="button"
+            onClick={() => setShowPastTenants(!showPastTenants)}
+            className="w-full flex items-center justify-between text-xs font-bold text-slate-800 hover:text-slate-950 cursor-pointer"
+          >
+            <span className="flex items-center gap-2">
+              <Archive className="w-3.5 h-3.5 text-slate-500" />
+              <span>Past Tenants & Historical Leases</span>
+              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-slate-200 text-slate-700">
+                {property.archivedLeases!.length}
+              </span>
+            </span>
+            <span className="text-[11px] text-slate-500">{showPastTenants ? '▲ Hide' : '▼ View History'}</span>
+          </button>
+
+          {showPastTenants && (
+            <div className="mt-3 space-y-2 animate-in fade-in">
+              {property.archivedLeases!.map((archived) => (
+                <div
+                  key={archived.id}
+                  className="p-3 bg-white rounded-xl border border-slate-200 text-xs shadow-2xs space-y-1"
+                >
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <strong className="text-slate-900">{archived.tenantName}</strong>
+                      <span className="text-[11px] text-slate-500 ml-1.5">({archived.unitName})</span>
+                    </div>
+                    <span className="text-[10px] font-semibold bg-slate-100 text-slate-600 px-2 py-0.5 rounded border border-slate-200">
+                      {archived.departureReason}
+                    </span>
+                  </div>
+                  <div className="text-[11px] text-slate-500 flex items-center justify-between flex-wrap gap-1">
+                    <span>
+                      Tenancy: {formatDate(archived.leaseStartDate)} – {formatDate(archived.vacationDate || archived.leaseEndDate)}
+                    </span>
+                    <span className="font-semibold text-slate-700">
+                      {formatZAR(archived.monthlyRentZAR)}/m
+                    </span>
+                  </div>
+                  {archived.forwardingNotes && (
+                    <p className="text-[10px] text-slate-500 italic bg-slate-50 p-1.5 rounded mt-1 border border-slate-100">
+                      Notes: {archived.forwardingNotes}
+                    </p>
+                  )}
+                  <div className="pt-1 flex items-center justify-between text-[10px]">
+                    <span className="text-slate-400">
+                      Archived {formatDate(archived.archivedAt)}
+                    </span>
+                    <a
+                      href={`/statement/${archived.id}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="font-bold text-indigo-700 hover:text-indigo-900 underline flex items-center gap-0.5"
+                    >
+                      <span>View Historic Statement</span>
+                      <ArrowUpRight className="w-2.5 h-2.5" />
+                    </a>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
     </>
   );
 }

@@ -5,6 +5,7 @@ import { RentalProperty, TenantPaymentRecord } from '@/types';
 import { calculateRentalCashflow } from '@/lib/calculations/propertyMetrics';
 import { calculateGrossYield, calculateRentalTaxProvision } from '@/lib/calculations/rentals';
 import { calculatePropertyArrears } from '@/lib/calculations/arrears';
+import { formatDate } from '@/lib/formatters';
 import ComplianceChecklist from '@/components/common/ComplianceChecklist';
 import CloudDriveLinkVault from '@/components/common/CloudDriveLinkVault';
 import { RentalCardHeader } from './RentalCardHeader';
@@ -23,6 +24,7 @@ import {
   Coins,
   Edit3,
   Trash2,
+  Clock,
 } from 'lucide-react';
 
 export interface RentalCardProps {
@@ -39,6 +41,7 @@ export interface RentalCardProps {
   onOpenMeterModal: (propertyId: string) => void;
   onOpenStatementModal: (propertyId: string) => void;
   onOpenPmtCalculator: (property: RentalProperty) => void;
+  onOpenNoticeModal?: (property: RentalProperty, leaseId?: string) => void;
   onOpenLogPayment: (
     property: RentalProperty,
     targetMonth?: string,
@@ -71,6 +74,7 @@ export function RentalCard({
   onOpenMeterModal,
   onOpenStatementModal,
   onOpenPmtCalculator,
+  onOpenNoticeModal,
   onOpenLogPayment,
   onOpenEditPayment,
   onOpenWriteOff,
@@ -92,6 +96,7 @@ export function RentalCard({
     investorDefaultTaxType
   );
   const arrearsInfo = calculatePropertyArrears(property);
+  const noticeLease = (property.leases || []).find((l) => l.status === 'Notice Given');
 
   return (
     <div
@@ -112,6 +117,27 @@ export function RentalCard({
           onOpenMeterModal={() => onOpenMeterModal(property.id)}
           onDeleteProperty={() => onDeleteProperty(property.id, property.title)}
         />
+
+        {/* Tenant Notice Alert Banner */}
+        {noticeLease && (
+          <div className="bg-amber-50 border-b border-amber-200 px-4 py-2 flex items-center justify-between text-xs gap-2">
+            <span className="flex items-center gap-1.5 font-bold text-amber-900 truncate">
+              <Clock className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+              <span className="truncate">
+                ⚠️ Notice: {noticeLease.tenantName} vacating {formatDate(noticeLease.vacationDate || '')} ({noticeLease.noticeReason || 'Moving Out'})
+              </span>
+            </span>
+            {onOpenNoticeModal && (
+              <button
+                type="button"
+                onClick={() => onOpenNoticeModal(property, noticeLease.id)}
+                className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-900 bg-amber-200/80 hover:bg-amber-300 px-2 py-0.5 rounded shrink-0 transition-colors cursor-pointer"
+              >
+                <span>Move-Out</span>
+              </button>
+            )}
+          </div>
+        )}
 
         {/* Card Tab Switcher */}
         <div className="flex border-b border-slate-200 bg-slate-100/70 p-1 gap-1 text-[11px] font-semibold">
@@ -186,6 +212,7 @@ export function RentalCard({
             onOpenPmtCalculator={() => onOpenPmtCalculator(property)}
             onOpenRefinance={() => onOpenRefinance(property)}
             onOpenStatementModal={() => onOpenStatementModal(property.id)}
+            onOpenNoticeModal={(leaseId) => onOpenNoticeModal?.(property, leaseId)}
           />
         )}
 

@@ -139,6 +139,7 @@ export function unmapRentals(rows: Database['public']['Tables']['properties']['R
     bondPaymentEffectiveDate: r.bond_payment_effective_date || undefined,
     bondRevisionNote: r.bond_revision_note || undefined,
     leases: parseJson(r.leases, []),
+    archivedLeases: parseJson((r as any).archived_leases, []),
     managementType: (r.management_type as any) || undefined,
     agencyName: r.agency_name || undefined,
     agencyCommissionPercent: toNullableNum(r.agency_commission_percent),

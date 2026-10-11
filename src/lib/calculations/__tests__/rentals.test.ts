@@ -8,8 +8,10 @@ import {
   calculateAggregateRentalKPIs,
   calculateRentalSec11aTax,
   calculatePortfolioOccupancyYtd,
+  reconcilePropertyStatus,
+  isArchivedLeaseActiveInMonth,
 } from '../rentals';
-import { RentalProperty } from '@/types';
+import { RentalProperty, Lease, ArchivedLease } from '@/types';
 
 describe('Rentals Pure Calculations Engine', () => {
   const baseRental: RentalProperty = {
@@ -667,6 +669,140 @@ describe('Rentals Pure Calculations Engine', () => {
       expect(result.vacantUnitMonths).toBe(8);
       expect(result.occupancyRatePercent).toBe(0);
       expect(result.variancePercent).toBe(-95.0);
+    });
+
+    it('de-duplicates unit-months when outgoing and replacement tenants overlap in the same month (Feedback 1 Guardrail)', () => {
+      // Outgoing tenant vacated 2026-10-10 (ArchivedLease)
+      // Incoming replacement tenant moved in 2026-10-15 (active Lease)
+      // Without unit-level de-duplication, October would count twice for Unit 1, inflating occupiedUnitMonths.
+      const properties: RentalProperty[] = [
+        {
+          ...baseRental,
+          id: 'rental-turnover',
+          purchaseDate: '2024-01-01',
+          leases: [
+            {
+              id: 'l-new',
+              unitName: 'Unit 101',
+              tenantName: 'Incoming Tenant',
+              leaseStartDate: '2026-10-15',
+              leaseEndDate: '2027-09-30',
+              monthlyRentZAR: 12_000,
+              depositHeldZAR: 12_000,
+              annualEscalationPercent: 6,
+              status: 'Occupied',
+            },
+          ],
+          archivedLeases: [
+            {
+              id: 'l-old',
+              unitName: 'Unit 101',
+              tenantName: 'Outgoing Tenant',
+              leaseStartDate: '2025-01-01',
+              leaseEndDate: '2026-10-31',
+              vacationDate: '2026-10-10',
+              monthlyRentZAR: 11_500,
+              depositHeldZAR: 11_500,
+              annualEscalationPercent: 6,
+              archivedAt: '2026-10-10T12:00:00Z',
+              departureReason: 'lease_expired_vacated',
+            },
+          ],
+        },
+      ];
+
+      const result = calculatePortfolioOccupancyYtd(properties, oct2026, 95.0);
+
+      // 8 months elapsed (Mar to Oct).
+      // Unit 101 was tenanted in Mar, Apr, May, Jun, Jul, Aug, Sep (by outgoing) and Oct (by outgoing and incoming).
+      // Guardrail asserts October is clamped to 1, yielding exactly 8 unit-months and 8 occupied months (100%), NOT 9 (112.5%).
+      expect(result.totalUnitMonths).toBe(8);
+      expect(result.occupiedUnitMonths).toBe(8);
+      expect(result.vacantUnitMonths).toBe(0);
+      expect(result.occupancyRatePercent).toBe(100.0);
+    });
+  });
+
+  describe('isArchivedLeaseActiveInMonth', () => {
+    const sampleArchived: ArchivedLease = {
+      id: 'archived-1',
+      unitName: 'Unit 1',
+      tenantName: 'Prior Tenant',
+      leaseStartDate: '2026-03-01',
+      leaseEndDate: '2026-12-31',
+      vacationDate: '2026-08-15',
+      monthlyRentZAR: 10_000,
+      depositHeldZAR: 10_000,
+      annualEscalationPercent: 6,
+      archivedAt: '2026-08-15T10:00:00Z',
+      departureReason: 'tenant_notice_early_termination',
+    };
+
+    it('returns true for months between leaseStartDate and vacationDate', () => {
+      expect(isArchivedLeaseActiveInMonth(sampleArchived, '2026-03')).toBe(true);
+      expect(isArchivedLeaseActiveInMonth(sampleArchived, '2026-06')).toBe(true);
+      expect(isArchivedLeaseActiveInMonth(sampleArchived, '2026-08')).toBe(true);
+    });
+
+    it('returns false for months before leaseStartDate or after vacationDate', () => {
+      expect(isArchivedLeaseActiveInMonth(sampleArchived, '2026-02')).toBe(false);
+      expect(isArchivedLeaseActiveInMonth(sampleArchived, '2026-09')).toBe(false);
+      expect(isArchivedLeaseActiveInMonth(sampleArchived, '2026-10')).toBe(false);
+    });
+
+    it('falls back to leaseEndDate if vacationDate is not specified', () => {
+      const { vacationDate, ...withoutVacationDate } = sampleArchived;
+      expect(isArchivedLeaseActiveInMonth(withoutVacationDate, '2026-10')).toBe(true);
+      expect(isArchivedLeaseActiveInMonth(withoutVacationDate, '2026-12')).toBe(true);
+      expect(isArchivedLeaseActiveInMonth(withoutVacationDate, '2027-01')).toBe(false);
+    });
+  });
+
+  describe('reconcilePropertyStatus (Multi-Let Status Reconciliation Guardrail)', () => {
+    const makeLease = (id: string, status: Lease['status']): Lease => ({
+      id,
+      unitName: `Unit ${id}`,
+      tenantName: `Tenant ${id}`,
+      leaseStartDate: '2026-01-01',
+      leaseEndDate: '2026-12-31',
+      monthlyRentZAR: 10_000,
+      depositHeldZAR: 10_000,
+      annualEscalationPercent: 6,
+      status,
+    });
+
+    it('returns Vacant when leases array is empty or undefined', () => {
+      expect(reconcilePropertyStatus(undefined)).toBe('Vacant');
+      expect(reconcilePropertyStatus([])).toBe('Vacant');
+    });
+
+    it('handles single-unit property correctly', () => {
+      expect(reconcilePropertyStatus([makeLease('1', 'Occupied')])).toBe('Occupied');
+      expect(reconcilePropertyStatus([makeLease('1', 'Notice Given')])).toBe('Notice Given');
+      expect(reconcilePropertyStatus([makeLease('1', 'Vacant')])).toBe('Vacant');
+    });
+
+    it('returns Occupied for multi-unit property when all units are occupied', () => {
+      const leases = [makeLease('1', 'Occupied'), makeLease('2', 'Occupied')];
+      expect(reconcilePropertyStatus(leases)).toBe('Occupied');
+    });
+
+    it('returns Notice Given when at least one unit is on notice and none are vacant', () => {
+      const leases = [makeLease('1', 'Occupied'), makeLease('2', 'Notice Given')];
+      expect(reconcilePropertyStatus(leases)).toBe('Notice Given');
+    });
+
+    it('returns Partially Vacant for multi-unit property when one unit is vacant and others are occupied or notice given', () => {
+      const leases1 = [makeLease('1', 'Occupied'), makeLease('2', 'Vacant')];
+      expect(reconcilePropertyStatus(leases1)).toBe('Partially Vacant');
+
+      const leases2 = [makeLease('1', 'Notice Given'), makeLease('2', 'Vacant')];
+      expect(reconcilePropertyStatus(leases2)).toBe('Partially Vacant');
+    });
+
+    it('returns Vacant for multi-unit property when ALL units are vacant', () => {
+      const leases = [makeLease('1', 'Vacant'), makeLease('2', 'Vacant')];
+      expect(reconcilePropertyStatus(leases)).toBe('Vacant');
     });
   });
 });

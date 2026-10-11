@@ -1,4 +1,4 @@
-import { RentalProperty } from '@/types';
+import { RentalProperty, Lease, ArchivedLease } from '@/types';
 import { calculateMonthlyBondRepayment } from '@/lib/calculations/propertyMetrics';
 import { getMonthKey, isLeaseActiveInMonth } from '@/lib/calculations/arrears';
 
@@ -320,9 +320,50 @@ export function calculateRentalSec11aTax({
 }
 
 /**
- * 6. Portfolio Time-Weighted Physical Occupancy Rate YTD Calculator
+ * 6. Historical / Archived Lease Active Month Checker
+ * Evaluates whether an archived tenant lease was active in a given billing month ('YYYY-MM').
+ */
+export function isArchivedLeaseActiveInMonth(lease: Partial<ArchivedLease>, monthKey: string): boolean {
+  if (lease.leaseStartDate) {
+    const startKey = getMonthKey(lease.leaseStartDate);
+    if (monthKey < startKey) return false;
+  }
+  // Vacation date marks actual move-out cutoff; fallback to leaseEndDate
+  const exitDateStr = lease.vacationDate || lease.leaseEndDate;
+  if (exitDateStr) {
+    const endKey = getMonthKey(exitDateStr);
+    if (monthKey > endKey) return false;
+  }
+  return true;
+}
+
+/**
+ * 7. Multi-Let Property Status Reconciliation Engine
+ * Automatically sets aggregate property.status based on multi-unit occupancy states:
+ * - 'Occupied': All units are occupied.
+ * - 'Notice Given': At least one unit on notice, but none fully vacant.
+ * - 'Partially Vacant': At least one unit vacant in a multi-unit property (with others occupied/notice).
+ * - 'Vacant': All units vacant (or single unit vacant).
+ */
+export function reconcilePropertyStatus(leases?: Lease[]): RentalProperty['status'] {
+  if (!leases || leases.length === 0) return 'Vacant';
+  const total = leases.length;
+  const vacantCount = leases.filter((l) => l.status === 'Vacant').length;
+  const noticeCount = leases.filter((l) => l.status === 'Notice Given').length;
+
+  if (vacantCount === total) return 'Vacant';
+  if (vacantCount > 0) return total > 1 ? 'Partially Vacant' : 'Vacant';
+  if (noticeCount > 0) return 'Notice Given';
+  return 'Occupied';
+}
+
+/**
+ * 8. Portfolio Time-Weighted Physical Occupancy Rate YTD Calculator
  * Calculates the percentage of active lettable unit-months tenanted vs. available
  * across elapsed months of the current South African tax year (starting 1 March).
+ *
+ * Guardrail (Feedback 1): De-duplicates unit-months across active and archived leases by
+ * grouping on unit identifier and clamping each physical unit's tenanted count to at most 1 per month.
  */
 export interface PortfolioOccupancyResult {
   totalUnitMonths: number;
@@ -361,22 +402,54 @@ export function calculatePortfolioOccupancyYtd(
   activeRentals.forEach((rental) => {
     const purchaseMonth = rental.purchaseDate ? getMonthKey(rental.purchaseDate) : undefined;
 
+    // Group active and archived leases by normalized unit identifier (unitName or unit index)
+    const unitMap = new Map<string, { activeLeases: Lease[]; archivedLeases: ArchivedLease[] }>();
+
+    if (rental.leases && rental.leases.length > 0) {
+      rental.leases.forEach((l, idx) => {
+        const key = (l.unitName || `Unit ${idx + 1}`).trim().toLowerCase();
+        if (!unitMap.has(key)) {
+          unitMap.set(key, { activeLeases: [], archivedLeases: [] });
+        }
+        unitMap.get(key)!.activeLeases.push(l);
+      });
+    }
+
+    if (rental.archivedLeases && rental.archivedLeases.length > 0) {
+      rental.archivedLeases.forEach((al, idx) => {
+        const key = (al.unitName || `Unit ${idx + 1}`).trim().toLowerCase();
+        if (!unitMap.has(key)) {
+          unitMap.set(key, { activeLeases: [], archivedLeases: [] });
+        }
+        unitMap.get(key)!.archivedLeases.push(al);
+      });
+    }
+
     elapsedMonthKeys.forEach((monthKey) => {
       // If property was acquired after this month, it was not yet owned/available
       if (purchaseMonth && monthKey < purchaseMonth) {
         return;
       }
 
-      if (rental.leases && rental.leases.length > 0) {
-        rental.leases.forEach((lease) => {
+      if (unitMap.size > 0) {
+        unitMap.forEach((unitData) => {
           totalUnitMonths += 1;
-          if (isLeaseActiveInMonth(lease, monthKey)) {
+          // Clamped boolean: evaluated at most once per physical unit-month
+          const isTenanted =
+            unitData.activeLeases.some((l) => isLeaseActiveInMonth(l, monthKey)) ||
+            unitData.archivedLeases.some((al) => isArchivedLeaseActiveInMonth(al, monthKey));
+
+          if (isTenanted) {
             occupiedUnitMonths += 1;
           }
         });
       } else {
         totalUnitMonths += 1;
-        if (rental.status === 'Occupied' || rental.status === 'Notice Given') {
+        if (
+          rental.status === 'Occupied' ||
+          rental.status === 'Notice Given' ||
+          rental.status === 'Partially Vacant'
+        ) {
           occupiedUnitMonths += 1;
         }
       }

@@ -49,13 +49,16 @@ async function fetchStatementData(leaseId: string): Promise<PublicTenantStatemen
     }
   }
 
-  // Demo fallback for initial mock portfolio data (e.g. lease-1)
+  // Demo fallback for initial mock portfolio data (e.g. lease-1) or archived tenants
   const demoRental = INITIAL_RENTALS.find((r) =>
-    (r.leases || []).some((l) => l.id === leaseId)
+    (r.leases || []).some((l) => l.id === leaseId) ||
+    (r.archivedLeases || []).some((l) => l.id === leaseId)
   );
 
   if (demoRental) {
-    const demoLease = (demoRental.leases || []).find((l) => l.id === leaseId)!;
+    const activeMatch = (demoRental.leases || []).find((l) => l.id === leaseId);
+    const archivedMatch = (demoRental.archivedLeases || []).find((l) => l.id === leaseId);
+    const demoLease = activeMatch || archivedMatch!;
     return {
       lease: {
         id: demoLease.id,
@@ -68,11 +71,11 @@ async function fetchStatementData(leaseId: string): Promise<PublicTenantStatemen
         monthlyRentZAR: demoLease.monthlyRentZAR,
         depositHeldZAR: demoLease.depositHeldZAR,
         annualEscalationPercent: demoLease.annualEscalationPercent,
-        status: demoLease.status,
-        arrears_opening_balance_zar: demoLease.arrearsOpeningBalanceZAR ?? null,
+        status: (activeMatch ? activeMatch.status : 'Archived / Vacated'),
+        arrears_opening_balance_zar: ('arrearsOpeningBalanceZAR' in demoLease ? demoLease.arrearsOpeningBalanceZAR : null) ?? null,
         roomType: demoLease.roomType,
-        guarantorName: demoLease.guarantorName,
-        guarantorContact: demoLease.guarantorContact,
+        guarantorName: ('guarantorName' in demoLease ? demoLease.guarantorName : undefined),
+        guarantorContact: ('guarantorContact' in demoLease ? demoLease.guarantorContact : undefined),
       },
       property: {
         id: demoRental.id,

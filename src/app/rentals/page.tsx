@@ -21,6 +21,7 @@ import { ExitSaleModal } from '@/components/rentals/modals/ExitSaleModal';
 import { SarbPmtModal } from '@/components/rentals/modals/SarbPmtModal';
 import { PaymentModal } from '@/components/rentals/modals/PaymentModal';
 import { WriteOffModal } from '@/components/rentals/modals/WriteOffModal';
+import { TenantNoticeModal } from '@/components/rentals/modals/TenantNoticeModal';
 import { Sparkles, FileSpreadsheet, PlusCircle, CheckCircle2, Building2, Archive, Loader2 } from 'lucide-react';
 import { usePortfolioStore } from '@/lib/store/usePortfolioStore';
 import { formatZAR } from '@/lib/formatters';
@@ -77,7 +78,7 @@ export default function RentalPortfolioPage() {
             ) : (
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {activeRentals.map((property) => (
-                  <RentalCard key={property.id} property={property} investorDefaultTaxType={investorProfile?.defaultTaxEntityType} investorProfile={investorProfile} forecastView={forecastView} onForecastViewChange={setForecastView} onOpenEdit={modals.openEditRental} onOpenExit={modals.openExit} onOpenRefinance={modals.openRefinance} onOpenAuditHistory={modals.openAuditHistory} onOpenMaintenance={modals.openMaintenance} onOpenMeterModal={modals.openMeterModal} onOpenStatementModal={modals.openStatementModal} onOpenPmtCalculator={modals.openPmtCalculator} onOpenLogPayment={paymentModal.openLogPayment} onOpenEditPayment={(p) => paymentModal.openEditPayment(property, p)} onOpenWriteOff={writeOffModal.openWriteOff} onUpdateOpeningBalance={(id, amt, lId) => store.updateArrearsOpeningBalance(id, amt, lId)} onDeletePayment={(id, pId) => store.deleteTenantPayment(id, pId)} onDeleteWriteOff={(id, wId) => store.deleteArrearsWriteOff(id, wId)} onMarkMonthPaid={handleMarkMonthPaid} onShowToast={showToast} onDeleteProperty={handleDeleteProperty} onUpdateProperty={(id, u) => store.updateRental(id, u)} />
+                  <RentalCard key={property.id} property={property} investorDefaultTaxType={investorProfile?.defaultTaxEntityType} investorProfile={investorProfile} forecastView={forecastView} onForecastViewChange={setForecastView} onOpenEdit={modals.openEditRental} onOpenExit={modals.openExit} onOpenRefinance={modals.openRefinance} onOpenAuditHistory={modals.openAuditHistory} onOpenMaintenance={modals.openMaintenance} onOpenMeterModal={modals.openMeterModal} onOpenStatementModal={modals.openStatementModal} onOpenPmtCalculator={modals.openPmtCalculator} onOpenNoticeModal={modals.openNoticeModal} onOpenLogPayment={paymentModal.openLogPayment} onOpenEditPayment={(p) => paymentModal.openEditPayment(property, p)} onOpenWriteOff={writeOffModal.openWriteOff} onUpdateOpeningBalance={(id, amt, lId) => store.updateArrearsOpeningBalance(id, amt, lId)} onDeletePayment={(id, pId) => store.deleteTenantPayment(id, pId)} onDeleteWriteOff={(id, wId) => store.deleteArrearsWriteOff(id, wId)} onMarkMonthPaid={handleMarkMonthPaid} onShowToast={showToast} onDeleteProperty={handleDeleteProperty} onUpdateProperty={(id, u) => store.updateRental(id, u)} />
                 ))}
               </div>
             )}
@@ -97,6 +98,24 @@ export default function RentalPortfolioPage() {
       <UnifiedPdfVerificationModal isOpen={directPdf.queue.length > 0} queue={directPdf.queue} onClose={directPdf.clearQueue} onOpenTenantStatement={(id) => { directPdf.clearQueue(); modals.openStatementModal(id); }} />
       <TenantStatement propertyId={modals.statementPropertyId} isOpen={Boolean(modals.statementPropertyId)} onClose={modals.closeStatementModal} onOpenMeterReadings={() => { const id = modals.statementPropertyId; modals.closeStatementModal(); if (id) modals.openMeterModal(id); }} />
       <MeterReadingsModal propertyId={modals.meterPropertyId} isOpen={Boolean(modals.meterPropertyId)} onClose={modals.closeMeterModal} />
+      <TenantNoticeModal
+        isOpen={modals.isNoticeModalOpen}
+        property={modals.noticeProperty}
+        initialLeaseId={modals.noticeLeaseId}
+        onClose={modals.closeNoticeModal}
+        onMarkNotice={(propertyId, leaseId, notice) => {
+          store.markTenantNotice(propertyId, leaseId, notice);
+          showToast('Notice recorded for tenant');
+        }}
+        onCancelNotice={(propertyId, leaseId) => {
+          store.cancelTenantNotice(propertyId, leaseId);
+          showToast('Notice retracted');
+        }}
+        onFinalizeMoveOut={(propertyId, leaseId, params) => {
+          store.finalizeTenantMoveOut(propertyId, leaseId, params);
+          showToast(params.action === 'replacement' ? 'Lease archived & replacement tenant assigned' : 'Lease archived & unit set to vacant');
+        }}
+      />
       <PaymentModal isOpen={paymentModal.isOpen && Boolean(paymentModal.property)} property={paymentModal.property} editingPayment={paymentModal.editingPayment} initialLeaseId={paymentModal.initialLeaseId} initialMonth={paymentModal.initialMonth} initialAmount={paymentModal.initialAmount} initialAllocations={paymentModal.initialAllocations} onClose={paymentModal.closePaymentModal} onSave={(p, eId) => { if (!paymentModal.property) return; if (eId) { store.updateTenantPayment(paymentModal.property.id, eId, p); showToast('Payment updated'); } else { store.recordTenantPayment(paymentModal.property.id, p); showToast('Payment recorded'); } paymentModal.closePaymentModal(); }} />
       <WriteOffModal isOpen={writeOffModal.isOpen && Boolean(writeOffModal.property)} property={writeOffModal.property} initialLeaseId={writeOffModal.initialLeaseId} initialAmount={writeOffModal.initialAmount} initialAllocations={writeOffModal.initialAllocations} onClose={writeOffModal.closeWriteOffModal} onSave={(p) => { if (!writeOffModal.property) return; store.recordArrearsWriteOff(writeOffModal.property.id, p); showToast(`Written off ${formatZAR(p.amountZAR)}`); writeOffModal.closeWriteOffModal(); }} />
       {directPdf.isProcessing && (

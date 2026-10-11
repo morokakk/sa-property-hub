@@ -297,6 +297,7 @@ export function mapRentals(rentals: RentalProperty[] = [], userId: string): Prop
     bond_payment_effective_date: r.bondPaymentEffectiveDate || null,
     bond_revision_note: r.bondRevisionNote || null,
     leases: (r.leases ? JSON.parse(JSON.stringify(r.leases)) : []) as any,
+    archived_leases: (r.archivedLeases ? JSON.parse(JSON.stringify(r.archivedLeases)) : []) as any,
     management_type: r.managementType || null,
     agency_name: r.agencyName || null,
     agency_commission_percent: toNullableNumeric(r.agencyCommissionPercent),

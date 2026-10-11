@@ -3,11 +3,14 @@ import {
   RentalProperty,
   ExtractedRentalUnit,
   RentalRefinanceParams,
+  Lease,
+  ArchivedLease,
 } from '@/types';
 import { RootStoreState, RentalSlice } from '../types';
 import { INITIAL_RENTALS } from '../initialData';
 import { syncAgmReminderTask, syncLeaseExpiryTasks } from '../utils/taskSync';
 import { calculatePropertyArrears } from '@/lib/calculations/arrears';
+import { reconcilePropertyStatus } from '@/lib/calculations/rentals';
 
 export const createRentalSlice: StateCreator<
   RootStoreState,
@@ -395,6 +398,162 @@ export const createRentalSlice: StateCreator<
       return {
         rentals: updatedRentals,
         liquidCapitalReserve: state.liquidCapitalReserve + params.cashEquityPulledOutZAR,
+      };
+    }),
+
+  markTenantNotice: (propertyId, leaseId, notice) =>
+    set((state) => {
+      const updatedRentals = state.rentals.map((r) => {
+        if (r.id !== propertyId) return r;
+        const updatedLeases = (r.leases || []).map((l) => {
+          if (l.id !== leaseId) return l;
+          return {
+            ...l,
+            status: 'Notice Given' as const,
+            noticeGivenDate: notice.noticeGivenDate,
+            vacationDate: notice.vacationDate,
+            noticeReason: notice.noticeReason,
+            noticeNotes: notice.noticeNotes,
+          };
+        });
+        const reconciledStatus = reconcilePropertyStatus(updatedLeases);
+        return {
+          ...r,
+          leases: updatedLeases,
+          status: reconciledStatus,
+        };
+      });
+
+      const target = updatedRentals.find((r) => r.id === propertyId);
+      let tasks = state.tasks;
+      if (target) {
+        tasks = syncLeaseExpiryTasks(tasks, propertyId, target.title, target.leases);
+      }
+
+      return {
+        rentals: updatedRentals,
+        tasks,
+      };
+    }),
+
+  cancelTenantNotice: (propertyId, leaseId) =>
+    set((state) => {
+      const updatedRentals = state.rentals.map((r) => {
+        if (r.id !== propertyId) return r;
+        const updatedLeases = (r.leases || []).map((l) => {
+          if (l.id !== leaseId) return l;
+          return {
+            ...l,
+            status: 'Occupied' as const,
+            noticeGivenDate: undefined,
+            vacationDate: undefined,
+            noticeReason: undefined,
+            noticeNotes: undefined,
+          };
+        });
+        const reconciledStatus = reconcilePropertyStatus(updatedLeases);
+        return {
+          ...r,
+          leases: updatedLeases,
+          status: reconciledStatus,
+        };
+      });
+
+      const target = updatedRentals.find((r) => r.id === propertyId);
+      let tasks = state.tasks;
+      if (target) {
+        tasks = syncLeaseExpiryTasks(tasks, propertyId, target.title, target.leases);
+      }
+
+      return {
+        rentals: updatedRentals,
+        tasks,
+      };
+    }),
+
+  finalizeTenantMoveOut: (propertyId, leaseId, params) =>
+    set((state) => {
+      const updatedRentals = state.rentals.map((r) => {
+        if (r.id !== propertyId) return r;
+        const departingLease = (r.leases || []).find((l) => l.id === leaseId);
+        if (!departingLease) return r;
+
+        // Create archived lease record
+        const archivedRecord: ArchivedLease = {
+          id: departingLease.id,
+          unitName: departingLease.unitName || 'Main Unit',
+          tenantName: departingLease.tenantName,
+          tenantPhone: departingLease.tenantPhone,
+          tenantEmail: departingLease.tenantEmail,
+          leaseStartDate: departingLease.leaseStartDate,
+          leaseEndDate: departingLease.leaseEndDate,
+          monthlyRentZAR: departingLease.monthlyRentZAR,
+          depositHeldZAR: departingLease.depositHeldZAR,
+          annualEscalationPercent: departingLease.annualEscalationPercent,
+          roomType: departingLease.roomType,
+          noticeGivenDate: departingLease.noticeGivenDate || params.vacationDate,
+          vacationDate: params.vacationDate,
+          departureReason: params.departureReason,
+          forwardingNotes: params.forwardingNotes,
+          archivedAt: new Date().toISOString(),
+        };
+
+        let updatedLeases: Lease[];
+        if (params.action === 'replacement' && params.replacementLease) {
+          const replacement: Lease = {
+            id: `lease-${Date.now()}`,
+            unitName: departingLease.unitName || 'Main Unit',
+            tenantName: params.replacementLease.tenantName || 'Tenant Unassigned',
+            tenantPhone: params.replacementLease.tenantPhone || '',
+            tenantEmail: params.replacementLease.tenantEmail || '',
+            leaseStartDate: params.replacementLease.leaseStartDate || params.vacationDate,
+            leaseEndDate:
+              params.replacementLease.leaseEndDate ||
+              new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+            monthlyRentZAR: params.replacementLease.monthlyRentZAR ?? departingLease.monthlyRentZAR,
+            depositHeldZAR: params.replacementLease.depositHeldZAR ?? departingLease.depositHeldZAR,
+            annualEscalationPercent: params.replacementLease.annualEscalationPercent ?? 7.0,
+            status: 'Occupied',
+            roomType: departingLease.roomType,
+          };
+          updatedLeases = (r.leases || []).map((l) => (l.id === leaseId ? replacement : l));
+        } else {
+          // Vacant unit
+          const vacantLease: Lease = {
+            ...departingLease,
+            tenantName: 'Vacant',
+            tenantPhone: undefined,
+            tenantEmail: undefined,
+            status: 'Vacant',
+            depositHeldZAR: 0,
+            noticeGivenDate: undefined,
+            vacationDate: undefined,
+            noticeReason: undefined,
+            noticeNotes: undefined,
+          };
+          updatedLeases = (r.leases || []).map((l) => (l.id === leaseId ? vacantLease : l));
+        }
+
+        const reconciledStatus = reconcilePropertyStatus(updatedLeases);
+        const existingArchived = r.archivedLeases || [];
+
+        return {
+          ...r,
+          leases: updatedLeases,
+          archivedLeases: [archivedRecord, ...existingArchived],
+          status: reconciledStatus,
+        };
+      });
+
+      const target = updatedRentals.find((r) => r.id === propertyId);
+      let tasks = state.tasks;
+      if (target) {
+        tasks = syncLeaseExpiryTasks(tasks, propertyId, target.title, target.leases);
+      }
+
+      return {
+        rentals: updatedRentals,
+        tasks,
       };
     }),
 });
