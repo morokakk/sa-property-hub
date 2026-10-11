@@ -1,5 +1,6 @@
 import { RentalProperty } from '@/types';
 import { calculateMonthlyBondRepayment } from '@/lib/calculations/propertyMetrics';
+import { getMonthKey, isLeaseActiveInMonth } from '@/lib/calculations/arrears';
 
 export interface RentalTaxCalculationResult {
   entityType: 'Company (27%)' | 'Individual (45%)' | 'Pre-Tax';
@@ -317,3 +318,84 @@ export function calculateRentalSec11aTax({
     annualTax: annualTaxZAR,
   };
 }
+
+/**
+ * 6. Portfolio Time-Weighted Physical Occupancy Rate YTD Calculator
+ * Calculates the percentage of active lettable unit-months tenanted vs. available
+ * across elapsed months of the current South African tax year (starting 1 March).
+ */
+export interface PortfolioOccupancyResult {
+  totalUnitMonths: number;
+  occupiedUnitMonths: number;
+  vacantUnitMonths: number;
+  occupancyRatePercent: number;
+  underwritingTargetPercent: number;
+  variancePercent: number;
+  elapsedMonths: number;
+}
+
+export function calculatePortfolioOccupancyYtd(
+  rentals: RentalProperty[],
+  referenceDate: Date = new Date(),
+  underwritingTargetPercent = 95.0
+): PortfolioOccupancyResult {
+  const activeRentals = (rentals || []).filter((r) => r && r.status !== 'Sold');
+  const year = referenceDate.getFullYear();
+  const month = referenceDate.getMonth(); // 0 = Jan, 1 = Feb, 2 = Mar...
+
+  // SA Tax Year starts 1 March
+  const startYear = month >= 2 ? year : year - 1;
+  const elapsedMonths = Math.min(12, Math.max(1, month >= 2 ? month - 2 + 1 : 10 + (month + 1)));
+
+  // Generate elapsed tax year month keys in format 'YYYY-MM'
+  const elapsedMonthKeys: string[] = [];
+  for (let i = 0; i < elapsedMonths; i++) {
+    const calendarMonth = (2 + i) % 12; // 2 = March (0-indexed)
+    const calendarYear = 2 + i >= 12 ? startYear + 1 : startYear;
+    elapsedMonthKeys.push(`${calendarYear}-${String(calendarMonth + 1).padStart(2, '0')}`);
+  }
+
+  let totalUnitMonths = 0;
+  let occupiedUnitMonths = 0;
+
+  activeRentals.forEach((rental) => {
+    const purchaseMonth = rental.purchaseDate ? getMonthKey(rental.purchaseDate) : undefined;
+
+    elapsedMonthKeys.forEach((monthKey) => {
+      // If property was acquired after this month, it was not yet owned/available
+      if (purchaseMonth && monthKey < purchaseMonth) {
+        return;
+      }
+
+      if (rental.leases && rental.leases.length > 0) {
+        rental.leases.forEach((lease) => {
+          totalUnitMonths += 1;
+          if (isLeaseActiveInMonth(lease, monthKey)) {
+            occupiedUnitMonths += 1;
+          }
+        });
+      } else {
+        totalUnitMonths += 1;
+        if (rental.status === 'Occupied' || rental.status === 'Notice Given') {
+          occupiedUnitMonths += 1;
+        }
+      }
+    });
+  });
+
+  const vacantUnitMonths = Math.max(0, totalUnitMonths - occupiedUnitMonths);
+  const occupancyRatePercent =
+    totalUnitMonths > 0 ? (occupiedUnitMonths / totalUnitMonths) * 100 : 100;
+  const variancePercent = occupancyRatePercent - underwritingTargetPercent;
+
+  return {
+    totalUnitMonths,
+    occupiedUnitMonths,
+    vacantUnitMonths,
+    occupancyRatePercent,
+    underwritingTargetPercent,
+    variancePercent,
+    elapsedMonths,
+  };
+}
+

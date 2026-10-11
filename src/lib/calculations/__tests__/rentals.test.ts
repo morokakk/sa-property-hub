@@ -7,6 +7,7 @@ import {
   calculateDisposalMetrics,
   calculateAggregateRentalKPIs,
   calculateRentalSec11aTax,
+  calculatePortfolioOccupancyYtd,
 } from '../rentals';
 import { RentalProperty } from '@/types';
 
@@ -501,6 +502,171 @@ describe('Rentals Pure Calculations Engine', () => {
       expect(result.deductibleExpensesZAR).toBe(10_000);
       expect(result.taxableIncomeZAR).toBe(90_000);
       expect(result.annualTaxZAR).toBe(24_300);
+    });
+  });
+
+  describe('calculatePortfolioOccupancyYtd', () => {
+    const oct2026 = new Date(2026, 9, 15); // October 2026 -> 8 months YTD (Mar-Oct)
+
+    it('calculates 100% occupancy when all units are occupied throughout elapsed tax year', () => {
+      const properties: RentalProperty[] = [
+        {
+          ...baseRental,
+          id: 'rental-1',
+          purchaseDate: '2024-01-01',
+          leases: [
+            {
+              id: 'l-1',
+              unitName: 'Unit A',
+              tenantName: 'John',
+              leaseStartDate: '2025-01-01',
+              leaseEndDate: '2027-12-31',
+              monthlyRentZAR: 10_000,
+              depositHeldZAR: 10_000,
+              annualEscalationPercent: 6,
+              status: 'Occupied',
+            },
+          ],
+        },
+        {
+          ...baseRental,
+          id: 'rental-2',
+          purchaseDate: '2024-01-01',
+          leases: [
+            {
+              id: 'l-2',
+              unitName: 'Unit B',
+              tenantName: 'Jane',
+              leaseStartDate: '2025-01-01',
+              leaseEndDate: '2027-12-31',
+              monthlyRentZAR: 12_000,
+              depositHeldZAR: 12_000,
+              annualEscalationPercent: 6,
+              status: 'Occupied',
+            },
+          ],
+        },
+      ];
+
+      const result = calculatePortfolioOccupancyYtd(properties, oct2026, 95.0);
+
+      // 2 units * 8 months = 16 unit-months
+      expect(result.elapsedMonths).toBe(8);
+      expect(result.totalUnitMonths).toBe(16);
+      expect(result.occupiedUnitMonths).toBe(16);
+      expect(result.vacantUnitMonths).toBe(0);
+      expect(result.occupancyRatePercent).toBe(100);
+      expect(result.variancePercent).toBe(5.0); // 100% - 95% = +5%
+    });
+
+    it('tracks partial vacancy when a lease starts mid tax year', () => {
+      const properties: RentalProperty[] = [
+        {
+          ...baseRental,
+          id: 'rental-1',
+          purchaseDate: '2024-01-01',
+          leases: [
+            {
+              id: 'l-1',
+              unitName: 'Unit A',
+              tenantName: 'John',
+              leaseStartDate: '2026-05-01', // May 2026 (vacant Mar & Apr = 2 vacant months)
+              leaseEndDate: '2027-04-30',
+              monthlyRentZAR: 10_000,
+              depositHeldZAR: 10_000,
+              annualEscalationPercent: 6,
+              status: 'Occupied',
+            },
+          ],
+        },
+      ];
+
+      const result = calculatePortfolioOccupancyYtd(properties, oct2026, 95.0);
+
+      // 1 unit * 8 months = 8 unit-months
+      // Occupied from May to Oct = 6 months
+      expect(result.totalUnitMonths).toBe(8);
+      expect(result.occupiedUnitMonths).toBe(6);
+      expect(result.vacantUnitMonths).toBe(2);
+      expect(result.occupancyRatePercent).toBe(75.0);
+      expect(result.variancePercent).toBeCloseTo(-20.0, 1); // 75% - 95% = -20%
+    });
+
+    it('handles properties acquired mid tax year without penalizing prior months', () => {
+      const properties: RentalProperty[] = [
+        {
+          ...baseRental,
+          id: 'rental-mid-year',
+          purchaseDate: '2026-07-01', // Purchased in July 2026
+          leases: [
+            {
+              id: 'l-1',
+              unitName: 'Unit A',
+              tenantName: 'Sarah',
+              leaseStartDate: '2026-07-01',
+              leaseEndDate: '2027-06-30',
+              monthlyRentZAR: 15_000,
+              depositHeldZAR: 15_000,
+              annualEscalationPercent: 7,
+              status: 'Occupied',
+            },
+          ],
+        },
+      ];
+
+      const result = calculatePortfolioOccupancyYtd(properties, oct2026, 95.0);
+
+      // Owned July, Aug, Sep, Oct = 4 months available, 4 occupied
+      expect(result.totalUnitMonths).toBe(4);
+      expect(result.occupiedUnitMonths).toBe(4);
+      expect(result.vacantUnitMonths).toBe(0);
+      expect(result.occupancyRatePercent).toBe(100.0);
+    });
+
+    it('excludes sold properties from portfolio occupancy calculation', () => {
+      const properties: RentalProperty[] = [
+        {
+          ...baseRental,
+          id: 'rental-active',
+          status: 'Occupied',
+          purchaseDate: '2024-01-01',
+          leases: [],
+        },
+        {
+          ...baseRental,
+          id: 'rental-sold',
+          status: 'Sold',
+          purchaseDate: '2024-01-01',
+          leases: [],
+        },
+      ];
+
+      const result = calculatePortfolioOccupancyYtd(properties, oct2026, 95.0);
+
+      // Only the active property should be counted (8 unit-months)
+      expect(result.totalUnitMonths).toBe(8);
+      expect(result.occupiedUnitMonths).toBe(8);
+      expect(result.occupancyRatePercent).toBe(100.0);
+    });
+
+    it('falls back to property status when no leases array exists', () => {
+      const properties: RentalProperty[] = [
+        {
+          ...baseRental,
+          id: 'rental-vacant',
+          status: 'Vacant',
+          purchaseDate: '2024-01-01',
+          leases: [],
+        },
+      ];
+
+      const result = calculatePortfolioOccupancyYtd(properties, oct2026, 95.0);
+
+      expect(result.totalUnitMonths).toBe(8);
+      expect(result.occupiedUnitMonths).toBe(0);
+      expect(result.vacantUnitMonths).toBe(8);
+      expect(result.occupancyRatePercent).toBe(0);
+      expect(result.variancePercent).toBe(-95.0);
     });
   });
 });

@@ -12,8 +12,10 @@ import {
   FileCheck2,
   Info,
   AlertCircle,
+  Building2,
 } from 'lucide-react';
 import { calculatePropertyArrears, getMonthKey } from '@/lib/calculations/arrears';
+import { calculatePortfolioOccupancyYtd } from '@/lib/calculations/rentals';
 
 interface ActualVsBudgetKpiStripProps {
   rentals: RentalProperty[];
@@ -190,6 +192,7 @@ export default function ActualVsBudgetKpiStrip({
   const opexVariancePercent = budgetedOpexYTD > 0 ? (effectiveActualOpex / budgetedOpexYTD) * 100 : 100;
 
   const netVarianceZAR = effectiveActualNet - budgetedNetCashflowYTD;
+  const occupancy = calculatePortfolioOccupancyYtd(rentals);
 
   return (
     <div className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200 shadow-xs space-y-4">
@@ -234,8 +237,8 @@ export default function ActualVsBudgetKpiStrip({
         )}
       </div>
 
-      {/* 4-Column KPI Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+      {/* 5-Column KPI Grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
         {/* 1. Gross Rental Income */}
         <div className="p-3.5 rounded-xl border border-slate-200 bg-slate-50/70 flex flex-col justify-between">
           <div>
@@ -330,6 +333,45 @@ export default function ActualVsBudgetKpiStrip({
           <div className="mt-2.5 pt-2 border-t border-emerald-200/60 flex items-center justify-between text-[11px] text-emerald-800">
             <span className="font-medium">ITR12 Code 4216</span>
             <span className="font-bold">SARS Shield Active</span>
+          </div>
+        </div>
+
+        {/* 5. Portfolio Occupancy Rate YTD */}
+        <div className="p-3.5 rounded-xl border border-slate-200 bg-slate-50/70 flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between text-[11px] text-slate-500 mb-1">
+              <span className="font-semibold uppercase tracking-wider">Portfolio Occupancy YTD</span>
+              <Building2 className="w-3.5 h-3.5 text-blue-600" />
+            </div>
+            <div
+              className={`text-lg font-black ${
+                occupancy.occupancyRatePercent >= occupancy.underwritingTargetPercent
+                  ? 'text-slate-900'
+                  : 'text-amber-700'
+              }`}
+            >
+              {formatPercent(occupancy.occupancyRatePercent)}
+            </div>
+            <div className="text-[11px] text-slate-500 mt-0.5">
+              Target: <strong className="text-slate-700">{formatPercent(occupancy.underwritingTargetPercent)}</strong> • {occupancy.occupiedUnitMonths}/{occupancy.totalUnitMonths} unit-mo
+            </div>
+          </div>
+
+          <div className="mt-2.5 pt-2 border-t border-slate-200/60 flex items-center justify-between text-[11px]">
+            <span className="text-slate-400">Occupancy Pace:</span>
+            <span
+              className={`font-bold flex items-center gap-0.5 ${
+                occupancy.variancePercent >= 0 ? 'text-emerald-700' : 'text-amber-700'
+              }`}
+            >
+              {occupancy.variancePercent >= 0 ? (
+                <TrendingUp className="w-3 h-3" />
+              ) : (
+                <TrendingDown className="w-3 h-3" />
+              )}
+              {occupancy.variancePercent >= 0 ? '+' : ''}
+              {occupancy.variancePercent.toFixed(1)}% vs Underwriting
+            </span>
           </div>
         </div>
       </div>
