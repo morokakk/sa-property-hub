@@ -124,13 +124,27 @@ export interface OccupantRiskProfile {
   possessionObtainedDate?: string; // ISO date string YYYY-MM-DD when physical possession is officially secured
 }
 
+export type SouthAfricanProvince =
+  | 'Gauteng'
+  | 'Western Cape'
+  | 'KwaZulu-Natal'
+  | 'Eastern Cape'
+  | 'Free State'
+  | 'Limpopo'
+  | 'Mpumalanga'
+  | 'North West'
+  | 'Northern Cape'
+  | 'Other';
+
+export type Province = SouthAfricanProvince;
+
 // Opportunity Analyzer Model
 export interface OpportunityDeal {
   id: string;
   title: string;
   address: string;
   city: string;
-  province: 'Gauteng' | 'Western Cape' | 'KwaZulu-Natal' | 'Eastern Cape' | 'Free State' | 'Other';
+  province: Province;
   propertyType?: PropertyTitleType;
   agmDate?: string; // Body Corporate AGM Date (Sectional Title / Cluster)
   source: DealSource;
@@ -290,6 +304,7 @@ export interface FlipProject {
   title: string;
   address: string;
   city: string;
+  province?: Province;
   propertyType?: PropertyTitleType;
   agmDate?: string;
   purchaseDate: string;
@@ -520,6 +535,7 @@ export interface RentalProperty {
   title: string;
   address: string;
   city: string;
+  province?: Province;
   propertyType: PropertyTitleType;
   source?: DealSource;
   agmDate?: string;

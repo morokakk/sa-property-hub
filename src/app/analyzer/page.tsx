@@ -17,11 +17,13 @@ import {
 import { calculateFlipMao, calculateRentalMao } from '@/lib/calculations/maoSolver';
 import { formatOpportunityForWhatsApp } from '@/lib/whatsappFormatter';
 import { formatZAR, formatPercent } from '@/lib/formatters';
-import { OpportunityDeal, DealSource, AmenityDistance, AmenityScorecard, PropertyTitleType, DealStrategy, PassReason, OccupantRiskProfile } from '@/types';
+import { OpportunityDeal, DealSource, AmenityDistance, AmenityScorecard, PropertyTitleType, DealStrategy, PassReason, OccupantRiskProfile, Province } from '@/types';
 import { PropertyTypeBadge, AgmDateChip } from '@/components/common/PropertyTypeBadge';
 import LongTermProjectionChart from '@/components/analytics/LongTermProjectionChart';
 import { OccupancyRiskCard } from '@/components/analyzer/OccupancyRiskCard';
 import { getOccupantRiskDefaults, isEvictionActive } from '@/lib/calculations/occupantRisk';
+import InvestmentNodeSelect, { InvestmentNodeBanner } from '@/components/common/InvestmentNodeSelect';
+import { findInvestmentNode, getNodeComplianceProfile, INVESTMENT_REGION_GROUPS } from '@/lib/constants/investmentNodes';
 import {
   Calculator,
   PlusCircle,
@@ -80,8 +82,8 @@ export default function OpportunityAnalyzerPage() {
   // Form State for Deal Sourcing Calculator
   const [title, setTitle] = useState('');
   const [address, setAddress] = useState('');
-  const [city, setCity] = useState('Johannesburg');
-  const [province, setProvince] = useState<'Gauteng' | 'Western Cape' | 'KwaZulu-Natal' | 'Eastern Cape' | 'Free State' | 'Other'>('Gauteng');
+  const [city, setCity] = useState('Johannesburg CBD & Maboneng');
+  const [province, setProvince] = useState<Province>('Gauteng');
   const [source, setSource] = useState<DealSource>(analyzerDraft?.source ?? 'High-Street Auction');
   const [feeResetToast, setFeeResetToast] = useState<string | null>(null);
   const [propertyType, setPropertyType] = useState<PropertyTitleType>('Sectional Title Apartment');
@@ -119,6 +121,7 @@ export default function OpportunityAnalyzerPage() {
 
   // Deal Triage & Filter State
   const [pipelineFilter, setPipelineFilter] = useState<'active' | 'passed'>('active');
+  const [regionFilter, setRegionFilter] = useState<string>('all');
   const [showPromoted, setShowPromoted] = useState(false);
   const [passingDealId, setPassingDealId] = useState<string | null>(null);
   const [passReason, setPassReason] = useState<PassReason>('Yield Too Low');
@@ -816,6 +819,8 @@ export default function OpportunityAnalyzerPage() {
       setEditingDealId(null);
       setTitle('');
       setAddress('');
+      setCity('Johannesburg CBD & Maboneng');
+      setProvince('Gauteng');
       setPropertyType('Sectional Title Apartment');
       setAgmDate('');
       setAnnualInsurance(0);
@@ -910,6 +915,8 @@ export default function OpportunityAnalyzerPage() {
     addOpportunity(newDeal);
     setTitle('');
     setAddress('');
+    setCity('Johannesburg CBD & Maboneng');
+    setProvince('Gauteng');
     setPropertyType('Sectional Title Apartment');
     setAgmDate('');
     setAnnualInsurance(0);
@@ -939,9 +946,18 @@ export default function OpportunityAnalyzerPage() {
     [opportunities]
   );
   const displayedOpportunities = useMemo(() => {
-    if (pipelineFilter === 'passed') return passedDeals;
-    return showPromoted ? [...activeDeals, ...promotedDeals] : activeDeals;
-  }, [pipelineFilter, activeDeals, passedDeals, promotedDeals, showPromoted]);
+    const base = pipelineFilter === 'passed' ? passedDeals : (showPromoted ? [...activeDeals, ...promotedDeals] : activeDeals);
+    if (regionFilter === 'all') return base;
+    return base.filter((deal) => {
+      const node = findInvestmentNode(deal.city);
+      if (node) return node.regionGroupId === regionFilter;
+      if (regionFilter === 'gauteng_jhb' || regionFilter === 'gauteng_tshwane') return deal.province === 'Gauteng';
+      if (regionFilter === 'western_cape') return deal.province === 'Western Cape';
+      if (regionFilter === 'kzn') return deal.province === 'KwaZulu-Natal';
+      if (regionFilter === 'coastal_emerging') return ['Eastern Cape', 'Free State', 'Limpopo'].includes(deal.province);
+      return false;
+    });
+  }, [pipelineFilter, activeDeals, passedDeals, promotedDeals, showPromoted, regionFilter]);
 
   return (
     <div className="flex-1 flex flex-col">
@@ -1219,20 +1235,15 @@ export default function OpportunityAnalyzerPage() {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">City / Region</label>
-                <select
-                  name="propertyCity"
+                <InvestmentNodeSelect
                   value={city}
-                  onChange={(e) => setCity(e.target.value)}
-                  className="w-full text-xs px-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 bg-white"
-                >
-                  <option value="Johannesburg">Johannesburg</option>
-                  <option value="Cape Town">Cape Town</option>
-                  <option value="Durban">Durban</option>
-                  <option value="Pretoria">Pretoria</option>
-                  <option value="Gqeberha">Gqeberha (PE)</option>
-                  <option value="Stellenbosch">Stellenbosch</option>
-                </select>
+                  province={province}
+                  onChange={(newCity, newProvince) => {
+                    setCity(newCity);
+                    setProvince(newProvince);
+                  }}
+                  showProfileBanner={false}
+                />
               </div>
 
               <div>
@@ -1250,6 +1261,9 @@ export default function OpportunityAnalyzerPage() {
                 </select>
               </div>
             </div>
+
+            {/* Selected Investment Node Profile & Regional Compliance Strip */}
+            <InvestmentNodeBanner city={city} province={province} />
 
             {/* Investment Strategy: Buy & Hold Rental vs Buy & Flip vs Hybrid BRRRR */}
             <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/70 space-y-3">
@@ -2874,7 +2888,7 @@ export default function OpportunityAnalyzerPage() {
 
           {/* Pipeline Triage Filter Pills */}
           <div className="flex flex-wrap items-center justify-between gap-3 mb-4 pb-3 border-b border-slate-100">
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <button
                 type="button"
                 onClick={() => setPipelineFilter('active')}
@@ -2897,6 +2911,23 @@ export default function OpportunityAnalyzerPage() {
               >
                 Passed Deals ({passedDeals.length})
               </button>
+
+              {/* Region Filter Dropdown */}
+              <div className="flex items-center gap-1.5 ml-1 sm:ml-3">
+                <span className="text-xs text-slate-500 font-medium whitespace-nowrap">Region:</span>
+                <select
+                  value={regionFilter}
+                  onChange={(e) => setRegionFilter(e.target.value)}
+                  className="text-xs px-2.5 py-1.5 border border-slate-300 rounded-lg bg-white text-slate-700 font-medium focus:ring-1 focus:ring-emerald-500"
+                >
+                  <option value="all">All Regions</option>
+                  {INVESTMENT_REGION_GROUPS.map((g) => (
+                    <option key={g.id} value={g.id}>
+                      {g.title}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
 
             {pipelineFilter === 'active' && promotedDeals.length > 0 && (
@@ -3024,6 +3055,36 @@ export default function OpportunityAnalyzerPage() {
                     <p className="text-xs text-slate-500 mt-1">
                       {deal.address}, {deal.city} ({deal.province})
                     </p>
+                    {(() => {
+                      const node = findInvestmentNode(deal.city);
+                      const compliance = getNodeComplianceProfile(deal.city, deal.province);
+                      return (
+                        <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
+                          {node && (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-100 text-slate-700 border border-slate-200">
+                              <MapPin className="w-2.5 h-2.5 text-emerald-600" />
+                              {node.regionGroup.split('—')[1]?.trim() || node.regionGroup}
+                            </span>
+                          )}
+                          <span
+                            className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold border ${
+                              compliance.zone === 'western_cape'
+                                ? 'bg-cyan-50 text-cyan-800 border-cyan-200'
+                                : compliance.zone === 'coastal'
+                                ? 'bg-blue-50 text-blue-800 border-blue-200'
+                                : 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                            }`}
+                          >
+                            <ShieldCheck className="w-2.5 h-2.5" />
+                            {compliance.zone === 'western_cape'
+                              ? 'WC: Plumbing & Beetle'
+                              : compliance.zone === 'coastal'
+                              ? 'Coastal Beetle'
+                              : 'Inland CoC'}
+                          </span>
+                        </div>
+                      );
+                    })()}
 
                     {/* Rejection / Pass Reason for Archived Deals */}
                     {deal.status === 'Passed' && deal.passReason && (

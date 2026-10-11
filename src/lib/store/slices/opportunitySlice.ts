@@ -11,6 +11,7 @@ import { INITIAL_OPPORTUNITIES } from '../initialData';
 import { syncAgmReminderTask } from '../utils/taskSync';
 import { calculateMonthlyBondRepayment } from '@/lib/calculations/propertyMetrics';
 import { isEvictionActive } from '@/lib/calculations/occupantRisk';
+import { getNodeComplianceProfile } from '@/lib/constants/investmentNodes';
 
 export const createOpportunitySlice: StateCreator<
   RootStoreState,
@@ -141,6 +142,8 @@ export const createOpportunitySlice: StateCreator<
       title: `${opp.title} (Flip)`,
       address: opp.address,
       city: opp.city,
+      province: opp.province,
+      cocChecklist: getNodeComplianceProfile(opp.city, opp.province).defaultCertificates,
       propertyType: opp.propertyType || 'Freehold House',
       agmDate: opp.agmDate,
       purchaseDate: new Date().toISOString().split('T')[0],
@@ -283,6 +286,8 @@ export const createOpportunitySlice: StateCreator<
       title: opp.title,
       address: opp.address,
       city: opp.city,
+      province: opp.province,
+      cocChecklist: getNodeComplianceProfile(opp.city, opp.province).defaultCertificates,
       propertyType: opp.propertyType || 'Sectional Title Apartment',
       agmDate: opp.agmDate,
       marketValueZAR: opp.purchasePrice,

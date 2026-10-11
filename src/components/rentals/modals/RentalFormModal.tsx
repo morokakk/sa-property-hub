@@ -6,6 +6,7 @@ import {
   PropertyTitleType,
   Lease,
   AncillaryIncome,
+  Province,
 } from '@/types';
 import { formatZAR } from '@/lib/formatters';
 import { Building2, ChevronDown, ChevronUp } from 'lucide-react';
@@ -13,6 +14,8 @@ import { calculateMonthlyBondRepayment } from '@/lib/calculations/propertyMetric
 import { calculateAgencyCommission } from '@/lib/calculations/rentals';
 import { usePortfolioStore } from '@/lib/store/usePortfolioStore';
 import { TenantVettingDrawer } from './TenantVettingDrawer';
+import InvestmentNodeSelect, { InvestmentNodeBanner } from '@/components/common/InvestmentNodeSelect';
+import { getNodeComplianceProfile } from '@/lib/constants/investmentNodes';
 
 export interface RentalFormModalProps {
   isOpen: boolean;
@@ -26,6 +29,8 @@ export interface RentalFormModalProps {
   setAddress?: (v: string) => void;
   city?: string;
   setCity?: (v: string) => void;
+  province?: Province;
+  setProvince?: (v: Province) => void;
   propertyType?: PropertyTitleType;
   setPropertyType?: (v: PropertyTitleType) => void;
   agmDate?: string;
@@ -98,6 +103,8 @@ export const RentalFormModal: React.FC<RentalFormModalProps> = ({
   setAddress: propSetAddress,
   city: propCity,
   setCity: propSetCity,
+  province: propProvince,
+  setProvince: propSetProvince,
   propertyType: propPropertyType,
   setPropertyType: propSetPropertyType,
   agmDate: propAgmDate,
@@ -163,7 +170,8 @@ export const RentalFormModal: React.FC<RentalFormModalProps> = ({
   // Fallback internal state if not controlled by props
   const [localTitle, setLocalTitle] = useState('');
   const [localAddress, setLocalAddress] = useState('');
-  const [localCity, setLocalCity] = useState('Johannesburg');
+  const [localCity, setLocalCity] = useState('Johannesburg CBD & Maboneng');
+  const [localProvince, setLocalProvince] = useState<Province>('Gauteng');
   const [localPropertyType, setLocalPropertyType] = useState<PropertyTitleType>('Sectional Title Apartment');
   const [localAgmDate, setLocalAgmDate] = useState('');
   const [localMarketValue, setLocalMarketValue] = useState(1800000);
@@ -201,6 +209,7 @@ export const RentalFormModal: React.FC<RentalFormModalProps> = ({
         setLocalTitle(editingProperty.title);
         setLocalAddress(editingProperty.address);
         setLocalCity(editingProperty.city);
+        setLocalProvince(editingProperty.province || 'Gauteng');
         setLocalPropertyType(editingProperty.propertyType);
         setLocalAgmDate(editingProperty.agmDate || '');
         setLocalMarketValue(editingProperty.marketValueZAR);
@@ -240,7 +249,8 @@ export const RentalFormModal: React.FC<RentalFormModalProps> = ({
       } else {
         setLocalTitle('');
         setLocalAddress('');
-        setLocalCity('Johannesburg');
+        setLocalCity('Johannesburg CBD & Maboneng');
+        setLocalProvince('Gauteng');
         setLocalPropertyType('Sectional Title Apartment');
         setLocalAgmDate('');
         setLocalMarketValue(1800000);
@@ -295,6 +305,8 @@ export const RentalFormModal: React.FC<RentalFormModalProps> = ({
   const setAddress = propSetAddress || setLocalAddress;
   const city = propCity !== undefined ? propCity : localCity;
   const setCity = propSetCity || setLocalCity;
+  const province = propProvince !== undefined ? propProvince : localProvince;
+  const setProvince = propSetProvince || setLocalProvince;
   const propertyType = propPropertyType !== undefined ? propPropertyType : localPropertyType;
   const setPropertyType = propSetPropertyType || setLocalPropertyType;
   const agmDate = propAgmDate !== undefined ? propAgmDate : localAgmDate;
@@ -388,6 +400,8 @@ export const RentalFormModal: React.FC<RentalFormModalProps> = ({
       title,
       address: address || `${city} Property`,
       city,
+      province,
+      cocChecklist: editingProperty?.cocChecklist || getNodeComplianceProfile(city, province).defaultCertificates,
       propertyType,
       agmDate: finalAgmDate,
       marketValueZAR: marketValue,
@@ -458,14 +472,17 @@ export const RentalFormModal: React.FC<RentalFormModalProps> = ({
               />
             </div>
             <div>
-              <label className="block font-semibold text-slate-700 mb-1">City</label>
-              <input
-                type="text"
+              <InvestmentNodeSelect
+                label="City / Region"
                 name="propertyCity"
-                autoComplete="off"
                 value={city}
-                onChange={(e) => setCity(e.target.value)}
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg"
+                province={province}
+                onChange={(newCity, newProvince) => {
+                  setCity(newCity);
+                  setProvince(newProvince);
+                }}
+                showProfileBanner={false}
+                selectClassName="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs bg-white font-medium text-slate-800"
               />
             </div>
           </div>
@@ -482,6 +499,9 @@ export const RentalFormModal: React.FC<RentalFormModalProps> = ({
               className="w-full px-3 py-2 border border-slate-300 rounded-lg"
             />
           </div>
+
+          {/* Selected Investment Node Profile & Regional Compliance Strip */}
+          <InvestmentNodeBanner city={city} province={province} />
 
           {/* Property Title Type & Body Corporate AGM Section */}
           <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 space-y-3">

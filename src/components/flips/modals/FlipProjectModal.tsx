@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { FlipProject, PropertyTitleType, CloudDriveVault } from '@/types';
+import { FlipProject, PropertyTitleType, CloudDriveVault, Province } from '@/types';
 import { formatZAR } from '@/lib/formatters';
 import { parseRentalPdfStatement } from '@/lib/utilities/pdfParser';
 import {
@@ -13,6 +13,8 @@ import {
   Scale,
 } from 'lucide-react';
 import { usePortfolioStore } from '@/lib/store/usePortfolioStore';
+import InvestmentNodeSelect, { InvestmentNodeBanner } from '@/components/common/InvestmentNodeSelect';
+import { getNodeComplianceProfile } from '@/lib/constants/investmentNodes';
 
 export interface FlipProjectModalProps {
   isOpen: boolean;
@@ -28,6 +30,8 @@ export interface FlipProjectModalProps {
   setFlipAddress?: (v: string) => void;
   flipCity?: string;
   setFlipCity?: (v: string) => void;
+  flipProvince?: Province;
+  setFlipProvince?: (v: Province) => void;
   flipPropertyType?: PropertyTitleType;
   setFlipPropertyType?: (v: PropertyTitleType) => void;
   flipAgmDate?: string;
@@ -96,6 +100,8 @@ export const FlipProjectModal: React.FC<FlipProjectModalProps> = ({
   setFlipAddress: propSetFlipAddress,
   flipCity: propFlipCity,
   setFlipCity: propSetFlipCity,
+  flipProvince: propFlipProvince,
+  setFlipProvince: propSetFlipProvince,
   flipPropertyType: propFlipPropertyType,
   setFlipPropertyType: propSetFlipPropertyType,
   flipAgmDate: propFlipAgmDate,
@@ -158,7 +164,8 @@ export const FlipProjectModal: React.FC<FlipProjectModalProps> = ({
   // Local state fallbacks
   const [localTitle, setLocalTitle] = useState('');
   const [localAddress, setLocalAddress] = useState('');
-  const [localCity, setLocalCity] = useState('Cape Town');
+  const [localCity, setLocalCity] = useState('Cape Town CBD & Foreshore');
+  const [localProvince, setLocalProvince] = useState<Province>('Western Cape');
   const [localPropertyType, setLocalPropertyType] = useState<PropertyTitleType>('Freehold House');
   const [localAgmDate, setLocalAgmDate] = useState('');
   const [localPurchasePrice, setLocalPurchasePrice] = useState<number>(2500000);
@@ -191,6 +198,7 @@ export const FlipProjectModal: React.FC<FlipProjectModalProps> = ({
       setLocalTitle(editingFlip.title);
       setLocalAddress(editingFlip.address);
       setLocalCity(editingFlip.city);
+      setLocalProvince(editingFlip.province || 'Western Cape');
       setLocalPurchasePrice(editingFlip.purchasePriceZAR);
       setLocalAcquisitionCosts(editingFlip.acquisitionCostsZAR);
       setLocalRenovationBudget(editingFlip.baselineRenovationBudgetZAR);
@@ -226,7 +234,8 @@ export const FlipProjectModal: React.FC<FlipProjectModalProps> = ({
     } else if (!editingFlip && isOpen && propFlipTitle === undefined) {
       setLocalTitle('');
       setLocalAddress('');
-      setLocalCity('Cape Town');
+      setLocalCity('Cape Town CBD & Foreshore');
+      setLocalProvince('Western Cape');
       setLocalPurchasePrice(2500000);
       setLocalAcquisitionCosts(185000);
       setLocalRenovationBudget(450000);
@@ -261,6 +270,8 @@ export const FlipProjectModal: React.FC<FlipProjectModalProps> = ({
   const setFlipAddress = propSetFlipAddress || setLocalAddress;
   const flipCity = propFlipCity !== undefined ? propFlipCity : localCity;
   const setFlipCity = propSetFlipCity || setLocalCity;
+  const flipProvince = propFlipProvince !== undefined ? propFlipProvince : localProvince;
+  const setFlipProvince = propSetFlipProvince || setLocalProvince;
   const flipPropertyType = propFlipPropertyType !== undefined ? propFlipPropertyType : localPropertyType;
   const setFlipPropertyType = propSetFlipPropertyType || setLocalPropertyType;
   const flipAgmDate = propFlipAgmDate !== undefined ? propFlipAgmDate : localAgmDate;
@@ -455,6 +466,8 @@ export const FlipProjectModal: React.FC<FlipProjectModalProps> = ({
       title: flipTitle,
       address: flipAddress || `${flipCity} Project`,
       city: flipCity,
+      province: flipProvince,
+      cocChecklist: editingFlip?.cocChecklist || getNodeComplianceProfile(flipCity, flipProvince).defaultCertificates,
       propertyType: flipPropertyType,
       agmDate: isScheme && flipAgmDate ? flipAgmDate : undefined,
       purchasePriceZAR: Number(flipPurchasePrice),
@@ -486,6 +499,8 @@ export const FlipProjectModal: React.FC<FlipProjectModalProps> = ({
           title: flipTitle,
           address: flipAddress || `${flipCity} Project`,
           city: flipCity,
+          province: flipProvince,
+          cocChecklist: getNodeComplianceProfile(flipCity, flipProvince).defaultCertificates,
           propertyType: flipPropertyType,
           agmDate: isScheme && flipAgmDate ? flipAgmDate : undefined,
           purchaseDate: new Date().toISOString().split('T')[0],
@@ -629,17 +644,23 @@ export const FlipProjectModal: React.FC<FlipProjectModalProps> = ({
               />
             </div>
             <div>
-              <label className="block font-semibold text-slate-700 mb-1">City</label>
-              <input
-                type="text"
+              <InvestmentNodeSelect
+                label="City / Region"
                 name="propertyCity"
-                autoComplete="off"
                 value={flipCity}
-                onChange={(e) => setFlipCity(e.target.value)}
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg"
+                province={flipProvince}
+                onChange={(newCity, newProvince) => {
+                  setFlipCity(newCity);
+                  setFlipProvince(newProvince);
+                }}
+                showProfileBanner={false}
+                selectClassName="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs bg-white font-medium text-slate-800"
               />
             </div>
           </div>
+
+          {/* Selected Investment Node Profile & Regional Compliance Strip */}
+          <InvestmentNodeBanner city={flipCity} province={flipProvince} />
 
           {/* Property Title Type & Body Corporate AGM Section */}
           <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 space-y-3">

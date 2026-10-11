@@ -26,9 +26,34 @@ interface ComplianceChecklistProps {
   compact?: boolean;
 }
 
+import { findInvestmentNode, getNodeComplianceProfile } from '@/lib/constants/investmentNodes';
+
+export function isWesternCapeRegion(city?: string, province?: string): boolean {
+  if (province && province.toLowerCase().includes('western cape')) return true;
+  if (!city) return false;
+  const node = findInvestmentNode(city);
+  if (node && node.complianceZone === 'western_cape') return true;
+  const c = city.toLowerCase();
+  return (
+    c.includes('cape town') ||
+    c.includes('cpt') ||
+    c.includes('stellenbosch') ||
+    c.includes('somerset west') ||
+    c.includes('strand') ||
+    c.includes('paarl') ||
+    c.includes('wellington') ||
+    c.includes('george') ||
+    c.includes('mossel bay') ||
+    c.includes('hermanus') ||
+    c.includes('western cape')
+  );
+}
+
 export function isGautengRegion(city?: string, province?: string): boolean {
   if (province && province.toLowerCase().includes('gauteng')) return true;
   if (!city) return false;
+  const node = findInvestmentNode(city);
+  if (node && node.province === 'Gauteng') return true;
   const c = city.toLowerCase();
   return (
     c.includes('johannesburg') ||
@@ -64,6 +89,8 @@ export function isCoastalRegion(city?: string, province?: string): boolean {
     return true;
   }
   if (!city) return false;
+  const node = findInvestmentNode(city);
+  if (node && (node.complianceZone === 'coastal' || node.complianceZone === 'western_cape')) return true;
   const c = city.toLowerCase();
   return (
     c.includes('cape town') ||
@@ -77,7 +104,10 @@ export function isCoastalRegion(city?: string, province?: string): boolean {
     c.includes('somerset west') ||
     c.includes('western cape') ||
     c.includes('eastern cape') ||
-    c.includes('kwazulu')
+    c.includes('kwazulu') ||
+    c.includes('east london') ||
+    c.includes('mossel bay') ||
+    c.includes('george')
   );
 }
 
@@ -109,6 +139,7 @@ export default function ComplianceChecklist({
   }, [certificates]);
 
   // Region detection
+  const isWC = isWesternCapeRegion(city, province);
   const isGauteng = isGautengRegion(city, province);
   const isCoastal = isCoastalRegion(city, province);
 
@@ -158,16 +189,20 @@ export default function ComplianceChecklist({
   let primaryKeys: Array<keyof ComplianceCertificates>;
   let secondaryKeys: Array<keyof ComplianceCertificates>;
 
-  if (isGauteng) {
-    // Gauteng prioritizes Electrical, Fence, Gas, and SG Plans. Plumbing/Beetle are coastal.
-    primaryKeys = ['electrical', 'electricFence', 'gas', 'approvedPlansSG'];
-    secondaryKeys = ['plumbing', 'beetle'];
-  } else if (isCoastal) {
+  if (isWC) {
     // Western Cape prioritizes Electrical, Plumbing By-law, Beetle, Gas, Fence
     primaryKeys = ['electrical', 'plumbing', 'beetle', 'gas', 'electricFence'];
     secondaryKeys = ['approvedPlansSG'];
+  } else if (isCoastal) {
+    // Other coastal (KZN, Eastern Cape) prioritizes Electrical, Beetle, Gas, Fence, SG Plans
+    primaryKeys = ['electrical', 'beetle', 'gas', 'electricFence', 'approvedPlansSG'];
+    secondaryKeys = ['plumbing'];
+  } else if (isGauteng) {
+    // Gauteng prioritizes Electrical, Fence, Gas, and SG Plans. Plumbing/Beetle are coastal.
+    primaryKeys = ['electrical', 'electricFence', 'gas', 'approvedPlansSG'];
+    secondaryKeys = ['plumbing', 'beetle'];
   } else {
-    // General default
+    // General inland default
     primaryKeys = ['electrical', 'gas', 'electricFence', 'approvedPlansSG'];
     secondaryKeys = ['plumbing', 'beetle'];
   }
