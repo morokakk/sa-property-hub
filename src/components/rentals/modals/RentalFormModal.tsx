@@ -5,23 +5,36 @@ import {
   RentalProperty,
   PropertyTitleType,
   Lease,
+  TenantDepartureReason,
   AncillaryIncome,
   Province,
 } from '@/types';
 import { formatZAR } from '@/lib/formatters';
-import { Building2, ChevronDown, ChevronUp } from 'lucide-react';
+import { Building2, ChevronDown, ChevronUp, AlertTriangle, ArrowRight } from 'lucide-react';
 import { calculateMonthlyBondRepayment } from '@/lib/calculations/propertyMetrics';
-import { calculateAgencyCommission } from '@/lib/calculations/rentals';
+import { calculateAgencyCommission, reconcilePropertyStatus } from '@/lib/calculations/rentals';
 import { usePortfolioStore } from '@/lib/store/usePortfolioStore';
 import { TenantVettingDrawer } from './TenantVettingDrawer';
 import InvestmentNodeSelect, { InvestmentNodeBanner } from '@/components/common/InvestmentNodeSelect';
 import { getNodeComplianceProfile } from '@/lib/constants/investmentNodes';
+
+const DEPARTURE_REASONS: TenantDepartureReason[] = [
+  'Relocating / work transfer',
+  'Lease expired / non-renewal',
+  'Purchased own home',
+  'Rent affordability / downsizing',
+  'Upsizing / larger property',
+  'Eviction / breach of lease',
+  'Notice by landlord',
+  'Other',
+];
 
 export interface RentalFormModalProps {
   isOpen: boolean;
   editingProperty: RentalProperty | null;
   onClose: () => void;
   onSave: (payload: Partial<RentalProperty>, isNew: boolean) => void;
+  onOpenNoticeModal?: (property: RentalProperty, leaseId?: string) => void;
   // Controlled props for Phase 4A backward compatibility
   title?: string;
   setTitle?: (v: string) => void;
@@ -97,6 +110,7 @@ export const RentalFormModal: React.FC<RentalFormModalProps> = ({
   editingProperty,
   onClose,
   onSave,
+  onOpenNoticeModal,
   title: propTitle,
   setTitle: propSetTitle,
   address: propAddress,
@@ -396,11 +410,14 @@ export const RentalFormModal: React.FC<RentalFormModalProps> = ({
       tenantName: l.tenantName || 'Tenant Unassigned',
     }));
 
+    const reconciledStatus = reconcilePropertyStatus(finalLeases);
+
     const commonFields: Partial<RentalProperty> = {
       title,
       address: address || `${city} Property`,
       city,
       province,
+      status: reconciledStatus,
       cocChecklist: editingProperty?.cocChecklist || getNodeComplianceProfile(city, province).defaultCertificates,
       propertyType,
       agmDate: finalAgmDate,
@@ -1017,8 +1034,36 @@ export const RentalFormModal: React.FC<RentalFormModalProps> = ({
                     <label className="block text-[10px] font-semibold text-slate-600 mb-0.5">Status</label>
                     <select
                       value={lease.status}
-                      onChange={(e) => setFormLeases((prev) => prev.map((l) => l.id === lease.id ? { ...l, status: e.target.value as Lease['status'] } : l))}
-                      className="w-full px-2 py-1 text-[11px] border border-slate-300 rounded-lg bg-white"
+                      onChange={(e) => {
+                        const nextStatus = e.target.value as Lease['status'];
+                        setFormLeases((prev) =>
+                          prev.map((l) => {
+                            if (l.id !== lease.id) return l;
+                            if (nextStatus === 'Notice Given') {
+                              const today = new Date().toISOString().split('T')[0];
+                              const defaultVacation =
+                                l.leaseEndDate && l.leaseEndDate >= today
+                                  ? l.leaseEndDate
+                                  : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+                                      .toISOString()
+                                      .split('T')[0];
+                              return {
+                                ...l,
+                                status: nextStatus,
+                                noticeGivenDate: l.noticeGivenDate || today,
+                                vacationDate: l.vacationDate || defaultVacation,
+                                noticeReason: l.noticeReason || 'Relocating / work transfer',
+                              };
+                            }
+                            return { ...l, status: nextStatus };
+                          })
+                        );
+                      }}
+                      className={`w-full px-2 py-1 text-[11px] border rounded-lg font-medium ${
+                        lease.status === 'Notice Given'
+                          ? 'border-amber-400 bg-amber-50 text-amber-900 font-bold'
+                          : 'border-slate-300 bg-white text-slate-900'
+                      }`}
                     >
                       <option value="Occupied">Occupied</option>
                       <option value="Vacant">Vacant</option>
@@ -1102,6 +1147,112 @@ export const RentalFormModal: React.FC<RentalFormModalProps> = ({
                     />
                   </div>
                 </div>
+
+                {/* Inline Notice Given & Move-Out Schedule Panel */}
+                {lease.status === 'Notice Given' && (
+                  <div className="p-3 bg-amber-50/90 rounded-lg border border-amber-300 space-y-2.5 animate-in fade-in">
+                    <div className="flex items-center justify-between flex-wrap gap-1.5">
+                      <div className="flex items-center gap-1.5 text-amber-950 font-bold text-[11px]">
+                        <AlertTriangle className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                        <span>Notice Given & Move-Out Schedule</span>
+                      </div>
+                      {onOpenNoticeModal && editingProperty && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            onClose();
+                            onOpenNoticeModal(editingProperty, lease.id);
+                          }}
+                          className="text-[10px] font-semibold text-amber-900 hover:text-amber-950 bg-amber-100 hover:bg-amber-200 px-2 py-0.5 rounded border border-amber-300 flex items-center gap-1 cursor-pointer transition-colors"
+                          title="Open dedicated modal to log formal move-out or immediate replacement"
+                        >
+                          <span>Launch Full Notice / Move-Out Modal</span>
+                          <ArrowRight className="w-3 h-3" />
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                      <div>
+                        <label className="block text-[10px] font-semibold text-amber-900 mb-0.5">
+                          Notice Given Date
+                        </label>
+                        <input
+                          type="date"
+                          value={lease.noticeGivenDate || ''}
+                          onChange={(e) =>
+                            setFormLeases((prev) =>
+                              prev.map((l) =>
+                                l.id === lease.id ? { ...l, noticeGivenDate: e.target.value } : l
+                              )
+                            )
+                          }
+                          className="w-full px-2 py-1 text-[11px] border border-amber-300 rounded-lg bg-white"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[10px] font-semibold text-amber-900 mb-0.5">
+                          Target Vacation Date
+                        </label>
+                        <input
+                          type="date"
+                          value={lease.vacationDate || ''}
+                          onChange={(e) =>
+                            setFormLeases((prev) =>
+                              prev.map((l) =>
+                                l.id === lease.id ? { ...l, vacationDate: e.target.value } : l
+                              )
+                            )
+                          }
+                          className="w-full px-2 py-1 text-[11px] border border-amber-300 rounded-lg bg-white font-medium"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[10px] font-semibold text-amber-900 mb-0.5">
+                          Departure Reason
+                        </label>
+                        <select
+                          value={lease.noticeReason || 'Relocating / work transfer'}
+                          onChange={(e) =>
+                            setFormLeases((prev) =>
+                              prev.map((l) =>
+                                l.id === lease.id ? { ...l, noticeReason: e.target.value } : l
+                              )
+                            )
+                          }
+                          className="w-full px-2 py-1 text-[11px] border border-amber-300 rounded-lg bg-white"
+                        >
+                          {DEPARTURE_REASONS.map((reason) => (
+                            <option key={reason} value={reason}>
+                              {reason}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-semibold text-amber-900 mb-0.5">
+                        Move-Out Handover Notes / Key Return Instructions (Optional)
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="e.g. Exit inspection scheduled for 31 Oct, keys to be returned to concierge"
+                        value={lease.noticeNotes || ''}
+                        onChange={(e) =>
+                          setFormLeases((prev) =>
+                            prev.map((l) =>
+                              l.id === lease.id ? { ...l, noticeNotes: e.target.value } : l
+                            )
+                          )
+                        }
+                        className="w-full px-2 py-1 text-[11px] border border-amber-300 rounded-lg bg-white"
+                      />
+                    </div>
+                  </div>
+                )}
 
                 {/* Pre-Lease Tenant Vetting & PIE Act Risk Assessment Drawer */}
                 <TenantVettingDrawer
