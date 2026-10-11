@@ -210,8 +210,6 @@ export function RentalCard({
             investorDefaultTaxType={investorDefaultTaxType}
             onUpdateProperty={(updates) => onUpdateProperty(property.id, updates)}
             onOpenPmtCalculator={() => onOpenPmtCalculator(property)}
-            onOpenRefinance={() => onOpenRefinance(property)}
-            onOpenStatementModal={() => onOpenStatementModal(property.id)}
             onOpenNoticeModal={(leaseId) => onOpenNoticeModal?.(property, leaseId)}
           />
         )}

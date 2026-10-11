@@ -12,8 +12,6 @@ import {
   Building2,
   Calculator,
   ArrowUpRight,
-  AlertCircle,
-  FileText,
   Clock,
   Archive,
 } from 'lucide-react';
@@ -30,8 +28,8 @@ export interface RentalFinancialsTabProps {
   investorDefaultTaxType?: 'Company (27%)' | 'Individual (45%)' | 'Pre-Tax';
   onUpdateProperty: (updates: Partial<RentalProperty>) => void;
   onOpenPmtCalculator: () => void;
-  onOpenRefinance: () => void;
-  onOpenStatementModal: () => void;
+  onOpenRefinance?: () => void;
+  onOpenStatementModal?: () => void;
   onOpenNoticeModal?: (leaseId?: string) => void;
 }
 
@@ -42,8 +40,6 @@ export function RentalFinancialsTab({
   investorDefaultTaxType = 'Company (27%)',
   onUpdateProperty,
   onOpenPmtCalculator,
-  onOpenRefinance,
-  onOpenStatementModal,
   onOpenNoticeModal,
 }: RentalFinancialsTabProps) {
   const [showPastTenants, setShowPastTenants] = React.useState(false);
@@ -357,15 +353,6 @@ export function RentalFinancialsTab({
               <Calculator className="w-3 h-3 text-indigo-600" />
               <span>SARB PMT</span>
             </button>
-            <button
-              type="button"
-              onClick={onOpenRefinance}
-              className="inline-flex items-center gap-1 text-[10px] font-bold text-purple-700 hover:text-purple-900 bg-white hover:bg-purple-50 px-1.5 py-0.5 rounded border border-purple-200 shadow-2xs transition-colors cursor-pointer"
-              title="BRRRR: Refinance and pull out equity into seed capital"
-            >
-              <ArrowUpRight className="w-3 h-3 text-purple-600" />
-              <span>Refinance</span>
-            </button>
           </div>
           <InlineEditableAmount
             value={property.monthlyBondPaymentZAR}
@@ -373,16 +360,6 @@ export function RentalFinancialsTab({
             title="Click to edit bond repayment inline"
           />
         </div>
-
-        {(property.unpaidUtilityArrearsZAR || 0) > 0 && (
-          <div className="flex justify-between text-rose-700 font-semibold bg-rose-50 px-2 py-1 rounded border border-rose-200 text-[11px]">
-            <span className="flex items-center gap-1">
-              <AlertCircle className="w-3 h-3 text-rose-600" />
-              Utility Arrears Deduction:
-            </span>
-            <span>- {formatZAR(property.unpaidUtilityArrearsZAR || 0)}</span>
-          </div>
-        )}
 
         {/* SARS Income Tax Provision */}
         <div className="pt-2 border-t border-slate-200 space-y-1.5">
@@ -485,83 +462,6 @@ export function RentalFinancialsTab({
             </span>
           </div>
         </div>
-      </div>
-
-      {/* Inline Editable Utility Arrears Box */}
-      <div className={`mx-4 mb-4 p-3 rounded-lg border text-xs transition-colors ${
-        (property.unpaidUtilityArrearsZAR || 0) > 0
-          ? 'bg-rose-50/80 border-rose-200 text-rose-950'
-          : 'bg-slate-50 border-slate-200 text-slate-700'
-      }`}>
-        <div className="flex items-center justify-between mb-1.5">
-          <div className="flex items-center gap-1.5">
-            <span className="font-bold text-[11px] uppercase tracking-wider">Utility Arrears</span>
-            {(property.unpaidUtilityArrearsZAR || 0) > 0 ? (
-              <span className="text-[9px] font-extrabold text-rose-700 bg-rose-100 px-1.5 py-0.5 rounded border border-rose-200 uppercase tracking-wider">
-                ⚠️ Tenant Default Risk
-              </span>
-            ) : (
-              <span className="text-[10px] text-emerald-600 font-semibold">✓ Paid Up</span>
-            )}
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={onOpenStatementModal}
-              className="text-[10px] text-teal-700 hover:text-teal-900 font-bold hover:underline inline-flex items-center gap-0.5 cursor-pointer"
-              title="View tenant utility recovery and month-over-month variance statement"
-            >
-              <FileText className="w-2.5 h-2.5 text-teal-600" />
-              <span>Statements ({(property.utilityStatements?.length || 0)})</span>
-            </button>
-            <span className="text-[10px] text-slate-400">Inline edit</span>
-          </div>
-        </div>
-        <div className="flex items-center gap-1.5">
-          <div className="relative flex-1">
-            <span className="absolute left-2.5 top-1.5 text-xs text-slate-400 font-bold">R</span>
-            <input
-              type="number"
-              min={0}
-              step="any"
-              key={`${property.id}-${property.unpaidUtilityArrearsZAR || 0}`}
-              defaultValue={property.unpaidUtilityArrearsZAR || 0}
-              onBlur={(e) => {
-                const val = Math.max(0, Number(e.target.value) || 0);
-                if (val !== (property.unpaidUtilityArrearsZAR || 0)) {
-                  onUpdateProperty({ unpaidUtilityArrearsZAR: val });
-                }
-              }}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  (e.target as HTMLInputElement).blur();
-                }
-              }}
-              className={`w-full pl-6 pr-2 py-1 text-xs font-mono font-bold rounded border transition-colors focus:outline-none focus:ring-1 ${
-                (property.unpaidUtilityArrearsZAR || 0) > 0
-                  ? 'bg-white border-rose-300 text-rose-700 focus:ring-rose-400'
-                  : 'bg-white border-slate-300 text-slate-700 focus:ring-emerald-400'
-              }`}
-              placeholder="0"
-              title="Edit utility arrears and press Enter or click away to save"
-            />
-          </div>
-          {(property.unpaidUtilityArrearsZAR || 0) > 0 && (
-            <button
-              type="button"
-              onClick={() => onUpdateProperty({ unpaidUtilityArrearsZAR: 0 })}
-              className="px-2 py-1 text-[10px] font-semibold bg-white border border-rose-200 text-rose-600 hover:bg-rose-50 rounded transition-colors cursor-pointer"
-              title="Mark arrears as cleared"
-            >
-              Clear
-            </button>
-          )}
-        </div>
-        <p className="text-[10px] text-slate-500 mt-1">
-          {(property.unpaidUtilityArrearsZAR || 0) > 0
-            ? 'Unpaid municipal water/lights debt deducted directly from Net Monthly Cashflow.'
-            : 'No outstanding municipal utility debt on this unit.'}
-        </p>
       </div>
 
       {/* Collapsible Past Tenants & Historical Leases History */}
