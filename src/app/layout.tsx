@@ -21,7 +21,7 @@ export default function RootLayout({
         className="bg-slate-50 min-h-screen flex flex-col md:flex-row antialiased selection:bg-emerald-500 selection:text-white"
       >
         <Sidebar />
-        <div className="flex-1 flex flex-col min-w-0 overflow-x-hidden min-h-screen pb-16 md:pb-0">
+        <div className="flex-1 flex flex-col min-w-0 overflow-x-clip min-h-screen pb-16 md:pb-0">
           <ClientOnly>{children}</ClientOnly>
         </div>
       </body>
