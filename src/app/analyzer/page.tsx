@@ -279,6 +279,22 @@ export default function OpportunityAnalyzerPage() {
     return () => clearTimeout(timer);
   }, [feeResetToast]);
 
+  // Deep link hash listener for Get Started Guide and external links
+  useEffect(() => {
+    const syncWorkspaceTabWithHash = () => {
+      if (typeof window === 'undefined') return;
+      const hash = window.location.hash;
+      if (hash === '#analyzer-pipeline') {
+        setActiveWorkspaceTab('pipeline');
+      } else if (hash === '#analyzer-calculator' || hash === '#analyzer-results' || hash === '#analyzer-sensitivity') {
+        setActiveWorkspaceTab('calculator');
+      }
+    };
+    syncWorkspaceTabWithHash();
+    window.addEventListener('hashchange', syncWorkspaceTabWithHash);
+    return () => window.removeEventListener('hashchange', syncWorkspaceTabWithHash);
+  }, []);
+
   const isDistressedSource = source === 'High-Street Auction' || source === 'Distressed Sale / Repo';
 
   const handleSourceChange = (newSource: DealSource) => {

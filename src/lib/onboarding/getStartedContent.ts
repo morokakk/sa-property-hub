@@ -182,7 +182,7 @@ export const GET_STARTED_STAGES: readonly JourneyStage[] = [
             title: 'Buy Box Badge & DSCR',
             summary: 'Each pipeline card is scored against your Settings hurdles, with a DSCR badge.',
             howTo: [
-              'Scroll to the Deal Sourcing Pipeline.',
+              'Switch to the Deal Sourcing Pipeline tab (or toggle View Both Stacked on desktop).',
               'Read each card\'s "Buy Box Match (x/y)" badge and its DSCR value.',
               'For a near-miss, renegotiate the price or change the strategy; otherwise use Pass Deal and pick a reason to keep a record.',
             ],
@@ -210,7 +210,7 @@ export const GET_STARTED_STAGES: readonly JourneyStage[] = [
             title: 'Duplicate Scenario & Side-by-Side Compare',
             summary: 'Clone a deal as a what-if, then compare candidates in one table.',
             howTo: [
-              'Click Duplicate Scenario on a pipeline card to create a "(Scenario)" copy.',
+              'Click the ⋯ menu on a pipeline card and select Duplicate Scenario to create a "(Scenario)" copy.',
               'Edit the copy (price, rent or strategy) without touching the original.',
               'Tick Compare on two or more cards, then click Compare Side-by-Side.',
             ],
@@ -322,7 +322,7 @@ export const GET_STARTED_STAGES: readonly JourneyStage[] = [
             title: 'BOQ & Contractor Draws',
             summary: 'Bill of Quantities line items, milestone drawdowns, retention and PIE Act contractor gates.',
             howTo: [
-              'Select a flip, scroll to Bill of Quantities (BOQ) and add line items with contractor, cost and retention %.',
+              'Select a flip, open the BOQ & Execution Drawings tab, and add line items with contractor, cost and retention %.',
               'Track the Contractor Milestone Drawdown gates: deposit, first fix, finishes and practical completion.',
               'Ensure unlawful occupant eviction orders are executed before disbursing draws, and release retention only after snags are signed off.',
             ],
@@ -336,7 +336,7 @@ export const GET_STARTED_STAGES: readonly JourneyStage[] = [
             title: 'Holding Burn',
             summary: 'Monthly carrying cost (bond, rates, levies, insurance) multiplied by months held.',
             howTo: [
-              'Open a flip and expand the Total Holding Cost card to see the itemised monthly burn.',
+              'Open a flip and inspect the Total Holding Cost card (or click Simulate Delay Matrix in the operational math strip) to see the itemised monthly burn.',
               'Update the estimated duration whenever the schedule slips.',
               'Watch the projected profit fall with each extra month, and decide early whether to cut scope or sell sooner.',
             ],
@@ -541,7 +541,7 @@ export const GET_STARTED_STAGES: readonly JourneyStage[] = [
             summary: 'Download a rental tax schedule for your ITR12 or your tax practitioner.',
             howTo: [
               'Open Rental Portfolio.',
-              'Click SARS ITR12 Export in the header.',
+              'Click Data & Exports ▾ → SARS ITR12 Export in the rental header.',
               'Send the Excel schedule to your tax practitioner or use it to complete your ITR12.',
             ],
             proTip:
