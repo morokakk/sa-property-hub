@@ -55,6 +55,31 @@ export function RentalFinancialsTab({
     yieldPostTax,
   } = taxCalculation;
 
+  const [isOpExExpanded, setIsOpExExpanded] = React.useState(false);
+
+  const isFreehold = property.propertyType === 'Freehold House';
+  const monthlyLeviesOrInsurance = isFreehold
+    ? Math.round((property.annualBuildingInsuranceZAR || 0) / 12)
+    : (property.monthlyLeviesZAR || 0);
+  const monthlyRates = property.monthlyRatesTaxesZAR || 0;
+  const monthlyAgency = property.managementType === 'Agency' ? agencyCommissionZAR : 0;
+  const monthlyMaint = property.monthlyMaintenanceReserveZAR || 0;
+  const monthlyVending = property.monthlyPrepaidVendingFeeZAR || 0;
+  const monthlyCommunal = property.monthlyCommunalServicesZAR || 0;
+
+  const totalOpEx =
+    monthlyLeviesOrInsurance +
+    monthlyRates +
+    monthlyAgency +
+    monthlyMaint +
+    monthlyVending +
+    monthlyCommunal;
+
+  let opexItemsCount = 3;
+  if (property.managementType === 'Agency') opexItemsCount += 1;
+  if (monthlyVending > 0) opexItemsCount += 1;
+  if (monthlyCommunal > 0) opexItemsCount += 1;
+
   return (
     <>
       {/* Tenant Lease Details */}
@@ -236,10 +261,10 @@ export function RentalFinancialsTab({
         )}
       </div>
 
-      {/* Monthly Expenses Breakdown */}
-      <div className="p-4 text-xs space-y-2 text-slate-600">
+      {/* Monthly P&L Breakdown */}
+      <div className="p-3.5 sm:p-4 text-xs space-y-2.5 text-slate-600">
         <div className="flex justify-between items-center">
-          <span className="font-medium">Gross Monthly Rent:</span>
+          <span className="font-semibold text-slate-800">Gross Monthly Rent:</span>
           <InlineEditableAmount
             value={property.monthlyGrossRentZAR || 0}
             onSave={(val) => onUpdateProperty({ monthlyGrossRentZAR: val })}
@@ -256,83 +281,108 @@ export function RentalFinancialsTab({
           </div>
         )}
 
-        {property.propertyType === 'Freehold House' ? (
-          <div className="flex justify-between items-center text-slate-500">
-            <span>Building Insurance (Homeowner):</span>
-            <InlineEditableAmount
-              value={Math.round((property.annualBuildingInsuranceZAR || 0) / 12)}
-              onSave={(val) => onUpdateProperty({ annualBuildingInsuranceZAR: Math.round(val * 12) })}
-              title="Click to edit monthly building insurance inline"
-            />
+        {/* Collapsible OpEx Row & Accordion */}
+        <div className="border border-slate-200 rounded-lg overflow-hidden bg-slate-50/40">
+          <div className="p-2 flex items-center justify-between gap-2 text-slate-700">
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className="font-semibold text-slate-800 text-[11px]">Total Operating Expenses:</span>
+              <button
+                type="button"
+                onClick={() => setIsOpExExpanded(!isOpExExpanded)}
+                className="text-[10px] font-bold text-indigo-700 hover:text-indigo-900 bg-white hover:bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-200 transition-colors cursor-pointer shadow-2xs inline-flex items-center gap-1"
+                title="Toggle itemized OpEx breakdown"
+              >
+                <span>{isOpExExpanded ? '▲ Hide Breakdown' : `View Itemized OpEx (${opexItemsCount}) ▾`}</span>
+              </button>
+            </div>
+            <span className="font-mono font-bold text-slate-800 text-xs shrink-0">
+              - {formatZAR(totalOpEx)}/m
+            </span>
           </div>
-        ) : (
-          <div className="flex justify-between items-center text-slate-500">
-            <span>Body Corporate / HOA Levies:</span>
-            <InlineEditableAmount
-              value={property.monthlyLeviesZAR}
-              onSave={(val) => onUpdateProperty({ monthlyLeviesZAR: val })}
-              title="Click to edit monthly levies inline"
-            />
-          </div>
-        )}
 
-        <div className="flex justify-between items-center text-slate-500">
-          <span>Municipal Rates & Taxes:</span>
-          <InlineEditableAmount
-            value={property.monthlyRatesTaxesZAR}
-            onSave={(val) => onUpdateProperty({ monthlyRatesTaxesZAR: val })}
-            title="Click to edit municipal rates & taxes inline"
-          />
+          {isOpExExpanded && (
+            <div className="p-2.5 pt-1.5 border-t border-slate-200/80 bg-white space-y-2 animate-in fade-in">
+              {isFreehold ? (
+                <div className="flex justify-between items-center text-slate-500">
+                  <span>Building Insurance (Homeowner):</span>
+                  <InlineEditableAmount
+                    value={Math.round((property.annualBuildingInsuranceZAR || 0) / 12)}
+                    onSave={(val) => onUpdateProperty({ annualBuildingInsuranceZAR: Math.round(val * 12) })}
+                    title="Click to edit monthly building insurance inline"
+                  />
+                </div>
+              ) : (
+                <div className="flex justify-between items-center text-slate-500">
+                  <span>Body Corporate / HOA Levies:</span>
+                  <InlineEditableAmount
+                    value={property.monthlyLeviesZAR}
+                    onSave={(val) => onUpdateProperty({ monthlyLeviesZAR: val })}
+                    title="Click to edit monthly levies inline"
+                  />
+                </div>
+              )}
+
+              <div className="flex justify-between items-center text-slate-500">
+                <span>Municipal Rates & Taxes:</span>
+                <InlineEditableAmount
+                  value={property.monthlyRatesTaxesZAR}
+                  onSave={(val) => onUpdateProperty({ monthlyRatesTaxesZAR: val })}
+                  title="Click to edit municipal rates & taxes inline"
+                />
+              </div>
+
+              {property.managementType === 'Agency' ? (
+                <div className="flex justify-between items-center text-slate-700 font-medium bg-indigo-50/60 px-2 py-1 rounded border border-indigo-100">
+                  <span className="flex items-center gap-1 text-[11px]">
+                    <Building2 className="w-3 h-3 text-indigo-600" />
+                    Agency Fee ({property.agencyCommissionPercent || 8}%{property.agencyVatApplicable !== false ? ' + 15% VAT' : ''} - {property.agencyName || 'Agent'}):
+                  </span>
+                  <InlineEditableAmount
+                    value={agencyCommissionZAR}
+                    onSave={(val) => {
+                      const gross = property.monthlyGrossRentZAR || 0;
+                      const newPercent = gross > 0 ? Number(((val / gross) * 100).toFixed(1)) : (property.agencyCommissionPercent || 8);
+                      onUpdateProperty({
+                        monthlyAgentFeeZAR: val,
+                        agencyCommissionPercent: newPercent,
+                        ...(property.agencyName === 'iGrow Rentals' ? { agencyVatApplicable: false } : {}),
+                      });
+                    }}
+                    title="Click to edit agency fee inline"
+                  />
+                </div>
+              ) : (
+                <div className="flex justify-between items-center text-slate-500 bg-slate-50 px-2 py-1 rounded border border-slate-100 text-[11px]">
+                  <span className="flex items-center gap-1">
+                    <span>👤</span> Agency Fee (Self-Managed):
+                  </span>
+                  <span className="text-emerald-700 font-semibold">R 0 (0%)</span>
+                </div>
+              )}
+
+              <div className="flex justify-between items-center text-slate-500">
+                <span>Maintenance Reserve:</span>
+                <span>- {formatZAR(property.monthlyMaintenanceReserveZAR)}</span>
+              </div>
+
+              {monthlyVending > 0 && (
+                <div className="flex justify-between items-center text-slate-500">
+                  <span>Prepaid Sub-Meter Fee ({property.prepaidVendorName || 'Vendor'}):</span>
+                  <span>- {formatZAR(monthlyVending)}</span>
+                </div>
+              )}
+
+              {monthlyCommunal > 0 && (
+                <div className="flex justify-between items-center text-slate-500">
+                  <span>Communal / Serviced:</span>
+                  <span>- {formatZAR(monthlyCommunal)}</span>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
-        {property.managementType === 'Agency' ? (
-          <div className="flex justify-between items-center text-slate-700 font-medium bg-indigo-50/60 px-2 py-1 rounded border border-indigo-100">
-            <span className="flex items-center gap-1 text-[11px]">
-              <Building2 className="w-3 h-3 text-indigo-600" />
-              Agency Fee ({property.agencyCommissionPercent || 8}%{property.agencyVatApplicable !== false ? ' + 15% VAT' : ''} - {property.agencyName || 'Agent'}):
-            </span>
-            <InlineEditableAmount
-              value={agencyCommissionZAR}
-              onSave={(val) => {
-                const gross = property.monthlyGrossRentZAR || 0;
-                const newPercent = gross > 0 ? Number(((val / gross) * 100).toFixed(1)) : (property.agencyCommissionPercent || 8);
-                onUpdateProperty({
-                  monthlyAgentFeeZAR: val,
-                  agencyCommissionPercent: newPercent,
-                  ...(property.agencyName === 'iGrow Rentals' ? { agencyVatApplicable: false } : {}),
-                });
-              }}
-              title="Click to edit agency fee inline"
-            />
-          </div>
-        ) : (
-          <div className="flex justify-between items-center text-slate-500 bg-slate-50 px-2 py-1 rounded border border-slate-100 text-[11px]">
-            <span className="flex items-center gap-1">
-              <span>👤</span> Agency Fee (Self-Managed):
-            </span>
-            <span className="text-emerald-700 font-semibold">R 0 (0%)</span>
-          </div>
-        )}
-
-        <div className="flex justify-between items-center text-slate-500">
-          <span>Maintenance Reserve:</span>
-          <span>- {formatZAR(property.monthlyMaintenanceReserveZAR)}</span>
-        </div>
-
-        {(property.monthlyPrepaidVendingFeeZAR || 0) > 0 && (
-          <div className="flex justify-between items-center text-slate-500">
-            <span>Prepaid Sub-Meter Fee ({property.prepaidVendorName || 'Vendor'}):</span>
-            <span>- {formatZAR(property.monthlyPrepaidVendingFeeZAR || 0)}</span>
-          </div>
-        )}
-
-        {(property.monthlyCommunalServicesZAR || 0) > 0 && (
-          <div className="flex justify-between items-center text-slate-500">
-            <span>Communal / Serviced:</span>
-            <span>- {formatZAR(property.monthlyCommunalServicesZAR || 0)}</span>
-          </div>
-        )}
-
+        {/* Bank Bond Repayment */}
         <div className="flex justify-between items-center text-slate-700 bg-slate-50/80 px-2 py-1.5 rounded-lg border border-slate-200">
           <div className="flex items-center gap-1.5 flex-wrap">
             <span className="font-semibold text-slate-800 text-[11px]">Bank Bond Payment:</span>
@@ -361,106 +411,55 @@ export function RentalFinancialsTab({
           />
         </div>
 
-        {/* SARS Income Tax Provision */}
-        <div className="pt-2 border-t border-slate-200 space-y-1.5">
-          <div className="flex flex-col gap-2 text-slate-700 bg-amber-50/60 p-2.5 rounded-lg border border-amber-200">
-            <div className="flex justify-between items-start">
-              <div>
-                <div className="flex items-center gap-1.5 flex-wrap">
-                  <span className="font-semibold text-amber-950 text-[11px]">
-                    Est. SARS Tax Provision:
-                  </span>
-                  <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-amber-100 text-amber-800 border border-amber-200">
-                    {taxRateLabel} {property.taxEntityTypeOverride ? '(Override)' : '(Default)'}
-                  </span>
-                  {sec13Shield > 0 && (
-                    <span
-                      className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-emerald-100 text-emerald-800 border border-emerald-300 flex items-center gap-0.5"
-                      title={`Section 13sex Tax Shield: ${formatZAR(sec13Shield)}/yr allowance saves ${formatZAR(taxSavingsZAR)}/yr in SARS income tax`}
-                    >
-                      ✓ Sec 13sex Shield Active (-{formatZAR(taxSavingsZAR)}/yr)
-                    </span>
-                  )}
-                </div>
-                <span className="text-[10px] text-amber-700 block mt-0.5">
-                  {taxRate === 0
-                    ? 'Pre-Tax entity structure (0% tax liability)'
-                    : netCashflow <= 0
-                    ? 'Assessed operational loss (R 0 tax liability)'
-                    : `${formatZAR(annualTaxZAR)}/yr tax reserve liability`}
-                </span>
-              </div>
-              <span className="font-mono font-bold text-amber-900 text-xs shrink-0">
-                {monthlyTaxZAR > 0 ? `- ${formatZAR(monthlyTaxZAR)}` : 'R 0'}
+        {/* Compact Single-Line SARS Income Tax Provision Row */}
+        <div className="flex items-center justify-between gap-2 p-2 bg-amber-50/60 rounded-lg border border-amber-200 text-[11px]">
+          <div className="flex items-center gap-1.5 flex-wrap min-w-0">
+            <span className="font-semibold text-amber-950">Est. SARS Tax:</span>
+            <span className="font-mono font-bold text-amber-900">
+              {monthlyTaxZAR > 0 ? `- ${formatZAR(monthlyTaxZAR)}/m` : 'R 0/m'}
+            </span>
+            {sec13Shield > 0 && (
+              <span
+                className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-emerald-100 text-emerald-800 border border-emerald-300 inline-flex items-center gap-0.5 shrink-0"
+                title={`Section 13sex Tax Shield: ${formatZAR(sec13Shield)}/yr allowance saves ${formatZAR(taxSavingsZAR)}/yr in SARS income tax`}
+              >
+                ✓ Sec 13sex Shield Active (-{formatZAR(taxSavingsZAR)}/yr)
               </span>
-            </div>
-
-            {/* 1-Click Interactive Tax Entity Toggle */}
-            <div className="flex items-center gap-1 pt-1.5 border-t border-amber-200/60 flex-wrap">
-              <span className="text-[9px] font-bold text-amber-900/70 uppercase tracking-wider mr-0.5">
-                Entity:
-              </span>
-              <button
-                type="button"
-                onClick={() => onUpdateProperty({ taxEntityTypeOverride: undefined })}
-                className={`px-1.5 py-0.5 text-[9px] font-bold rounded transition-all cursor-pointer ${
-                  property.taxEntityTypeOverride === undefined
-                    ? 'bg-amber-700 text-white shadow-2xs'
-                    : 'bg-white text-slate-700 hover:text-slate-900 hover:bg-amber-100 border border-amber-200'
-                }`}
-                title={`Inherit global default from Settings (${investorDefaultTaxType})`}
-              >
-                Default ({investorDefaultTaxType === 'Individual (45%)' ? '45%' : investorDefaultTaxType === 'Pre-Tax' ? '0%' : '27%'})
-              </button>
-              <button
-                type="button"
-                onClick={() => onUpdateProperty({ taxEntityTypeOverride: 'Company (27%)' })}
-                className={`px-1.5 py-0.5 text-[9px] font-bold rounded transition-all cursor-pointer ${
-                  property.taxEntityTypeOverride === 'Company (27%)'
-                    ? 'bg-amber-700 text-white shadow-2xs'
-                    : 'bg-white text-slate-700 hover:text-slate-900 hover:bg-amber-100 border border-amber-200'
-                }`}
-              >
-                Company 27%
-              </button>
-              <button
-                type="button"
-                onClick={() => onUpdateProperty({ taxEntityTypeOverride: 'Individual (45%)' })}
-                className={`px-1.5 py-0.5 text-[9px] font-bold rounded transition-all cursor-pointer ${
-                  property.taxEntityTypeOverride === 'Individual (45%)'
-                    ? 'bg-amber-700 text-white shadow-2xs'
-                    : 'bg-white text-slate-700 hover:text-slate-900 hover:bg-amber-100 border border-amber-200'
-                }`}
-              >
-                Individual 45%
-              </button>
-              <button
-                type="button"
-                onClick={() => onUpdateProperty({ taxEntityTypeOverride: 'Pre-Tax' })}
-                className={`px-1.5 py-0.5 text-[9px] font-bold rounded transition-all cursor-pointer ${
-                  property.taxEntityTypeOverride === 'Pre-Tax'
-                    ? 'bg-amber-700 text-white shadow-2xs'
-                    : 'bg-white text-slate-700 hover:text-slate-900 hover:bg-amber-100 border border-amber-200'
-                }`}
-              >
-                Pre-Tax 0%
-              </button>
-            </div>
+            )}
           </div>
+          <div className="flex items-center gap-1 shrink-0">
+            <select
+              value={property.taxEntityTypeOverride || 'Default'}
+              onChange={(e) => {
+                const val = e.target.value;
+                onUpdateProperty({
+                  taxEntityTypeOverride: val === 'Default' ? undefined : (val as any),
+                });
+              }}
+              className="text-[10px] font-bold bg-white text-slate-800 border border-amber-300 rounded px-1.5 py-0.5 cursor-pointer hover:border-amber-400 focus:outline-hidden focus:ring-1 focus:ring-amber-500 shadow-2xs"
+              title="Switch SARS income tax entity structure"
+            >
+              <option value="Default">Default ({investorDefaultTaxType === 'Individual (45%)' ? '45%' : investorDefaultTaxType === 'Pre-Tax' ? '0%' : '27%'})</option>
+              <option value="Company (27%)">Company (27%)</option>
+              <option value="Individual (45%)">Individual (45%)</option>
+              <option value="Pre-Tax">Pre-Tax (0%)</option>
+            </select>
+          </div>
+        </div>
 
-          <div className="flex justify-between items-center text-slate-900 bg-emerald-50/70 px-2.5 py-2 rounded-lg border border-emerald-200">
-            <div>
-              <span className="font-bold text-emerald-950 text-xs block">
-                Net Post-Tax Cash Flow:
-              </span>
-              <span className="text-[10px] text-emerald-700">
-                Post-tax yield: {formatPercent(yieldPostTax)}
-              </span>
-            </div>
-            <span className={`font-mono font-black text-sm ${postTaxCashflow >= 0 ? 'text-emerald-900' : 'text-rose-700'}`}>
-              {formatZAR(postTaxCashflow)}/m
+        {/* Net Post-Tax Cash Flow */}
+        <div className="flex justify-between items-center text-slate-900 bg-emerald-50/70 px-2.5 py-2 rounded-lg border border-emerald-200">
+          <div>
+            <span className="font-bold text-emerald-950 text-xs block">
+              Net Post-Tax Cash Flow:
+            </span>
+            <span className="text-[10px] text-emerald-700">
+              Post-tax yield: {formatPercent(yieldPostTax)}
             </span>
           </div>
+          <span className={`font-mono font-black text-sm ${postTaxCashflow >= 0 ? 'text-emerald-900' : 'text-rose-700'}`}>
+            {formatZAR(postTaxCashflow)}/m
+          </span>
         </div>
       </div>
 

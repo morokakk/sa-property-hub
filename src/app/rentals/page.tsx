@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useRef } from 'react';
+import React, { useRef, useState } from 'react';
 import TopHeader from '@/components/navigation/TopHeader';
 import { useRentalPortfolio, useRentalModalState, usePaymentModal, useWriteOffModal, useDirectPdfUpload } from '@/hooks/rentals';
 import { RentalSummaryKpis } from '@/components/rentals/RentalSummaryKpis';
@@ -8,8 +8,9 @@ import ActualVsBudgetKpiStrip from '@/components/dashboard/ActualVsBudgetKpiStri
 import { RentalViewTabs } from '@/components/rentals/RentalViewTabs';
 import { RentalCard } from '@/components/rentals/RentalCard';
 import { RentalSoldCard } from '@/components/rentals/RentalSoldCard';
-import ImportDropdown from '@/components/common/ImportDropdown';
 import RentalExportDropdown from '@/components/rentals/RentalExportDropdown';
+import ValidationErrorModal from '@/components/common/ValidationErrorModal';
+import { downloadRentalsTemplate, parseImportFile, ValidationErrorItem } from '@/lib/import/excelImport';
 import TenantStatement from '@/components/rentals/TenantStatement';
 import MeterReadingsModal from '@/components/rentals/MeterReadingsModal';
 import UnifiedPdfVerificationModal from '@/components/rentals/UnifiedPdfVerificationModal';
@@ -22,7 +23,7 @@ import { SarbPmtModal } from '@/components/rentals/modals/SarbPmtModal';
 import { PaymentModal } from '@/components/rentals/modals/PaymentModal';
 import { WriteOffModal } from '@/components/rentals/modals/WriteOffModal';
 import { TenantNoticeModal } from '@/components/rentals/modals/TenantNoticeModal';
-import { Sparkles, FileSpreadsheet, PlusCircle, CheckCircle2, Building2, Archive, Loader2 } from 'lucide-react';
+import { Sparkles, PlusCircle, CheckCircle2, Building2, Archive, Loader2 } from 'lucide-react';
 import { usePortfolioStore } from '@/lib/store/usePortfolioStore';
 import { formatZAR } from '@/lib/formatters';
 
@@ -33,7 +34,47 @@ export default function RentalPortfolioPage() {
   const writeOffModal = useWriteOffModal();
   const directPdf = useDirectPdfUpload(usePortfolioStore((s) => s.aiSettings));
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const excelInputRef = useRef<HTMLInputElement>(null);
+  const [errorModalOpen, setErrorModalOpen] = useState(false);
+  const [validationErrors, setValidationErrors] = useState<ValidationErrorItem[]>([]);
+  const [uploadedFileName, setUploadedFileName] = useState('');
   const store = usePortfolioStore();
+  const bulkAddRentals = usePortfolioStore((s) => s.bulkAddRentals);
+
+  const handleExcelUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadedFileName(file.name);
+    try {
+      const result = await parseImportFile<any>(file, 'rentals');
+      if (!result.success) {
+        setValidationErrors(result.errors);
+        setErrorModalOpen(true);
+      } else {
+        const stats = bulkAddRentals(result.data);
+        let msg = `Successfully imported ${stats.addedCount} rental properties!`;
+        if (stats.duplicateCount > 0) {
+          msg += ` (${stats.duplicateCount} duplicate properties detected)`;
+        }
+        showToast(msg);
+      }
+    } catch (err) {
+      console.error('Rental import error:', err);
+      showToast('Failed to parse import file');
+    } finally {
+      e.target.value = '';
+    }
+  };
+
+  const handleDownloadTemplate = () => {
+    try {
+      downloadRentalsTemplate();
+      showToast('Downloaded Rental Portfolio template (.xlsx)');
+    } catch (err) {
+      console.error('Template download error:', err);
+      showToast('Failed to generate template workbook');
+    }
+  };
 
   return (
     <div className="flex-1 flex flex-col">
@@ -42,16 +83,59 @@ export default function RentalPortfolioPage() {
         subtitle="Manage active income properties, tenant leases, trust deposits, and maintenance histories"
         actionButton={
           <div className="flex flex-wrap items-center gap-2">
-            <input ref={fileInputRef} type="file" accept=".pdf" multiple className="hidden" onChange={(e) => { const f = Array.from(e.target.files || []); if (f.length) directPdf.enqueueFiles(f.slice(0, 3)); e.target.value = ''; }} />
-            <button id="rentals-import" data-testid="smart-doc-import" onClick={() => fileInputRef.current?.click()} className="inline-flex items-center gap-1.5 bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 text-xs font-semibold px-3 py-2 rounded-lg cursor-pointer shrink-0"><Sparkles className="w-3.5 h-3.5 text-purple-600" /><span>Smart Document Import</span></button>
-            <ImportDropdown type="rentals" onPdfSelected={directPdf.enqueueFiles} />
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".pdf"
+              multiple
+              className="hidden"
+              onChange={(e) => {
+                const f = Array.from(e.target.files || []);
+                if (f.length) directPdf.enqueueFiles(f.slice(0, 3));
+                e.target.value = '';
+              }}
+            />
+            <input
+              ref={excelInputRef}
+              type="file"
+              accept=".xlsx,.xls,.csv"
+              className="hidden"
+              onChange={handleExcelUpload}
+            />
+
+            {/* 1. Primary CTA: + Add Rental Property (Emerald solid button) */}
+            <button
+              id="rentals-add-property-btn"
+              data-testid="add-rental-btn"
+              onClick={modals.openAddRental}
+              className="inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold px-3 py-2 rounded-lg cursor-pointer shrink-0 transition-colors shadow-xs"
+            >
+              <PlusCircle className="w-3.5 h-3.5" />
+              <span>+ Add Rental Property</span>
+            </button>
+
+            {/* 2. AI Action: Smart Document Import (Indigo subtle button) */}
+            <button
+              id="rentals-import"
+              data-testid="smart-doc-import"
+              onClick={() => fileInputRef.current?.click()}
+              className="inline-flex items-center gap-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-xs font-semibold px-3 py-2 rounded-lg cursor-pointer shrink-0 transition-colors shadow-xs"
+              title="Upload utility bills, municipal rates or lease agreements via OCR"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
+              <span>Smart Document Import</span>
+            </button>
+
+            {/* 3. Unified Dropdown: Data & Exports */}
             <RentalExportDropdown
               id="rentals-itr12"
+              label="Data & Exports"
+              onTriggerImport={() => excelInputRef.current?.click()}
+              onDownloadTemplate={handleDownloadTemplate}
               onExportCsv={handleExportCsv}
               onExportAccountantJournal={handleExportAccountantJournal}
               onExportItr12={() => handleExportItr12(2026)}
             />
-            <button onClick={modals.openAddRental} className="inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold px-3 py-2 rounded-lg cursor-pointer shrink-0"><PlusCircle className="w-3.5 h-3.5" /><span>Add Rental Property</span></button>
           </div>
         }
       />
@@ -118,6 +202,13 @@ export default function RentalPortfolioPage() {
       />
       <PaymentModal isOpen={paymentModal.isOpen && Boolean(paymentModal.property)} property={paymentModal.property} editingPayment={paymentModal.editingPayment} initialLeaseId={paymentModal.initialLeaseId} initialMonth={paymentModal.initialMonth} initialAmount={paymentModal.initialAmount} initialAllocations={paymentModal.initialAllocations} onClose={paymentModal.closePaymentModal} onSave={(p, eId) => { if (!paymentModal.property) return; if (eId) { store.updateTenantPayment(paymentModal.property.id, eId, p); showToast('Payment updated'); } else { store.recordTenantPayment(paymentModal.property.id, p); showToast('Payment recorded'); } paymentModal.closePaymentModal(); }} />
       <WriteOffModal isOpen={writeOffModal.isOpen && Boolean(writeOffModal.property)} property={writeOffModal.property} initialLeaseId={writeOffModal.initialLeaseId} initialAmount={writeOffModal.initialAmount} initialAllocations={writeOffModal.initialAllocations} onClose={writeOffModal.closeWriteOffModal} onSave={(p) => { if (!writeOffModal.property) return; store.recordArrearsWriteOff(writeOffModal.property.id, p); showToast(`Written off ${formatZAR(p.amountZAR)}`); writeOffModal.closeWriteOffModal(); }} />
+      <ValidationErrorModal
+        isOpen={errorModalOpen}
+        onClose={() => setErrorModalOpen(false)}
+        fileName={uploadedFileName}
+        templateType="rentals"
+        errors={validationErrors}
+      />
       {directPdf.isProcessing && (
         <div className="fixed bottom-6 right-6 z-50 bg-slate-900 text-white text-xs px-4 py-3 rounded-xl shadow-2xl border border-purple-500/30 flex items-center gap-3 animate-in fade-in">
           <Loader2 className="w-4 h-4 text-purple-400 animate-spin shrink-0" />

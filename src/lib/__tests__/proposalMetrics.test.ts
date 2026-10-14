@@ -95,13 +95,13 @@ describe('Proposal Metrics & Rental Holding Costs Alignment', () => {
 
   describe('12-Month Collection Metrics and Vacancy Shortfall Override', () => {
     it('detects Sandhurst Executive Suite historical under-collection (<90%) and sets credit loss override', () => {
-      // In October 2026, Sandhurst has payments in Feb, Mar, Apr and unpaid May-Oct (6 months unpaid)
+      // In October 2026, Sandhurst has payments in Feb-Sep and unpaid Oct (1 month overdue)
       const metrics = calculate12MonthCollectionMetrics(sandhurstRental, '2026-10-01');
 
       expect(metrics.collectionRate).toBeLessThan(90);
       expect(metrics.isCollectionRisk).toBe(true);
-      expect(metrics.tenantArrears).toBe(111_000);
-      expect(metrics.overdueMonths).toBe(6);
+      expect(metrics.tenantArrears).toBe(18_500);
+      expect(metrics.overdueMonths).toBe(1);
 
       // Vacancy rate should be overridden from default 5% to collection shortfall (100 - collectionRate)
       expect(metrics.adjustedVacancyRate).toBeGreaterThan(5);

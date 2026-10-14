@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { RentalProperty, TenantPaymentRecord } from '@/types';
 import { calculateRentalCashflow } from '@/lib/calculations/propertyMetrics';
 import { calculateGrossYield, calculateRentalTaxProvision } from '@/lib/calculations/rentals';
@@ -25,6 +25,7 @@ import {
   Edit3,
   Trash2,
   Clock,
+  MoreHorizontal,
 } from 'lucide-react';
 
 export interface RentalCardProps {
@@ -87,6 +88,22 @@ export function RentalCard({
   onUpdateProperty,
 }: RentalCardProps) {
   const [activeTab, setActiveTab] = useState<'financials' | 'payments' | 'coc' | 'vault'>('financials');
+  const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
+  const moreMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (moreMenuRef.current && !moreMenuRef.current.contains(event.target as Node)) {
+        setIsMoreMenuOpen(false);
+      }
+    }
+    if (isMoreMenuOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isMoreMenuOpen]);
 
   const calculatedCashflow = calculateRentalCashflow(property);
   const yieldGross = calculateGrossYield(calculatedCashflow.totalGrossIncomeZAR, property.marketValueZAR);
@@ -275,7 +292,7 @@ export function RentalCard({
       />
 
       {/* Footer: Maintenance & Actions */}
-      <div className="p-4 bg-slate-50 border-t border-slate-100 flex items-center justify-between gap-2">
+      <div className="p-3.5 sm:p-4 bg-slate-50 border-t border-slate-100 flex items-center justify-between gap-2">
         <button
           type="button"
           onClick={() => onOpenMaintenance(property)}
@@ -285,7 +302,7 @@ export function RentalCard({
           <span>Maintenance ({property.maintenanceHistory?.length || 0})</span>
         </button>
 
-        <div className="flex items-center gap-1.5 flex-wrap justify-end">
+        <div className="flex items-center gap-1.5">
           <button
             type="button"
             onClick={() => onOpenMeterModal(property.id)}
@@ -314,45 +331,72 @@ export function RentalCard({
               </span>
             )}
           </button>
-          <button
-            type="button"
-            onClick={() => onOpenRefinance(property)}
-            className="inline-flex items-center gap-1 text-[11px] font-bold text-purple-700 hover:text-purple-900 bg-purple-50 hover:bg-purple-100 px-2.5 py-1 rounded-md border border-purple-200 transition-colors cursor-pointer"
-            title="BRRRR: Refinance and pull out equity into seed capital pool"
-          >
-            <ArrowUpRight className="w-3 h-3 text-purple-600" />
-            <span>Refinance</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => onOpenExit(property)}
-            className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700 hover:text-emerald-900 bg-emerald-50 hover:bg-emerald-100 px-2.5 py-1 rounded-md border border-emerald-300 transition-colors cursor-pointer"
-            title="Mark rental property as sold"
-          >
-            <Coins className="w-3 h-3 text-emerald-600" />
-            <span>Mark as Sold</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => onOpenEdit(property)}
-            className="inline-flex items-center gap-1 text-[11px] font-semibold text-indigo-700 hover:text-indigo-900 bg-indigo-50 hover:bg-indigo-100 px-2.5 py-1 rounded-md border border-indigo-200 transition-colors cursor-pointer"
-            title="Edit property & agency mandate"
-          >
-            <Edit3 className="w-3 h-3" />
-            <span>Edit</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              if (confirm(`Remove rental "${property.title}"?`)) {
-                onDeleteProperty(property.id, property.title);
-              }
-            }}
-            className="p-1.5 text-slate-400 hover:text-rose-600 rounded transition-colors cursor-pointer"
-            title="Delete property"
-          >
-            <Trash2 className="w-3.5 h-3.5" />
-          </button>
+
+          {/* Secondary Lifecycle Actions Overflow Menu */}
+          <div className="relative" ref={moreMenuRef}>
+            <button
+              type="button"
+              aria-label="More property actions"
+              data-testid={`rental-card-more-${property.id}`}
+              onClick={() => setIsMoreMenuOpen((prev) => !prev)}
+              className="p-1.5 text-slate-500 hover:text-slate-800 hover:bg-slate-200/70 rounded-md border border-slate-200 bg-white transition-colors cursor-pointer inline-flex items-center justify-center"
+              title="More actions"
+            >
+              <MoreHorizontal className="w-3.5 h-3.5" />
+            </button>
+
+            {isMoreMenuOpen && (
+              <div className="absolute right-0 bottom-full mb-1.5 w-44 bg-white rounded-lg shadow-lg border border-slate-200 py-1 z-30 animate-in fade-in zoom-in-95 duration-100">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsMoreMenuOpen(false);
+                    onOpenEdit(property);
+                  }}
+                  className="w-full text-left px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 hover:text-indigo-700 flex items-center gap-2 transition-colors cursor-pointer"
+                >
+                  <Edit3 className="w-3.5 h-3.5 text-indigo-500" />
+                  <span>Edit Property</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsMoreMenuOpen(false);
+                    onOpenRefinance(property);
+                  }}
+                  className="w-full text-left px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 hover:text-purple-700 flex items-center gap-2 transition-colors cursor-pointer"
+                >
+                  <ArrowUpRight className="w-3.5 h-3.5 text-purple-500" />
+                  <span>Refinance (BRRRR)</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsMoreMenuOpen(false);
+                    onOpenExit(property);
+                  }}
+                  className="w-full text-left px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 hover:text-emerald-700 flex items-center gap-2 transition-colors cursor-pointer"
+                >
+                  <Coins className="w-3.5 h-3.5 text-emerald-500" />
+                  <span>Mark as Sold</span>
+                </button>
+                <div className="my-1 border-t border-slate-100" />
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsMoreMenuOpen(false);
+                    if (confirm(`Remove rental "${property.title}"?`)) {
+                      onDeleteProperty(property.id, property.title);
+                    }
+                  }}
+                  className="w-full text-left px-3 py-2 text-xs font-medium text-rose-600 hover:bg-rose-50 flex items-center gap-2 transition-colors cursor-pointer"
+                >
+                  <Trash2 className="w-3.5 h-3.5 text-rose-500" />
+                  <span>Delete Property</span>
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>

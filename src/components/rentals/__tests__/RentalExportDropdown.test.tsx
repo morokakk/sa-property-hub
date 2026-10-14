@@ -4,7 +4,7 @@ import { renderToString } from 'react-dom/server';
 import RentalExportDropdown from '../RentalExportDropdown';
 
 describe('RentalExportDropdown Component', () => {
-  it('renders closed trigger button with "Export CSV" and chevron', () => {
+  it('renders closed trigger button with "Data & Exports" and chevron', () => {
     const html = renderToString(
       <RentalExportDropdown
         onExportCsv={vi.fn()}
@@ -13,7 +13,7 @@ describe('RentalExportDropdown Component', () => {
       />
     );
 
-    expect(html).toContain('Export CSV');
+    expect(html).toContain('Data &amp; Exports');
     expect(html).toContain('id="rentals-export-csv-dropdown"');
     // Dropdown options should not be in the initial closed markup
     expect(html).not.toContain('Rentals Register (.csv)');

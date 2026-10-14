@@ -4,18 +4,20 @@ import React from 'react';
 import { FlipProject } from '@/types';
 import { FlipFinancialSummary } from '@/lib/calculations/flips';
 import { formatZAR, formatPercent } from '@/lib/formatters';
-import { AlertCircle, Gift } from 'lucide-react';
+import { AlertCircle, Gift, Clock } from 'lucide-react';
 
 export interface FlipOperationalMathBannerProps {
   flip: FlipProject;
   financials: FlipFinancialSummary;
   onUpdateTaxMode?: (mode: 'Company (27%)' | 'Individual (45%)' | 'Pre-Tax') => void;
+  onOpenDelayMatrix?: () => void;
 }
 
 export function FlipOperationalMathBanner({
   flip,
   financials,
   onUpdateTaxMode,
+  onOpenDelayMatrix,
 }: FlipOperationalMathBannerProps) {
   const {
     totalBOQActualZAR: totalBOQActual,
@@ -62,8 +64,21 @@ export function FlipOperationalMathBanner({
             </>
           )}
           <span className="text-slate-400">−</span>
-          <span className="font-bold text-amber-900 bg-amber-100 border border-amber-300 px-2 py-0.5 rounded">
-            Holding ({flipHoldingMonths} mos × {formatZAR(flipMonthlyHoldingCost)}/mo = {formatZAR(totalHoldingCost)})
+          <span className="inline-flex items-center gap-1.5 font-bold text-amber-900 bg-amber-100 border border-amber-300 px-2 py-0.5 rounded flex-wrap">
+            <span>
+              Holding ({flipHoldingMonths} mos × {formatZAR(flipMonthlyHoldingCost)}/mo = {formatZAR(totalHoldingCost)})
+            </span>
+            {onOpenDelayMatrix && (
+              <button
+                type="button"
+                onClick={onOpenDelayMatrix}
+                className="inline-flex items-center gap-1 text-[10px] font-extrabold bg-amber-200/90 hover:bg-amber-300 text-amber-950 px-2 py-0.5 rounded transition-colors cursor-pointer shadow-2xs"
+                title="Simulate Council / Transfer Delay Matrix (+30, +60, +90, +120 Days)"
+              >
+                <Clock className="w-3 h-3 text-amber-800" />
+                <span>Simulate Delay Matrix (+30–120d)</span>
+              </button>
+            )}
           </span>
           {exitCommissionZAR > 0 && (
             <>

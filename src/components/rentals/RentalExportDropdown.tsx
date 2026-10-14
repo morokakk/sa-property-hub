@@ -1,13 +1,16 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
-import { FileSpreadsheet, ChevronDown, BookOpen, FileText } from 'lucide-react';
+import { FileSpreadsheet, ChevronDown, BookOpen, FileText, FileUp, Download } from 'lucide-react';
 
 interface RentalExportDropdownProps {
   id?: string;
   onExportCsv: () => void;
   onExportAccountantJournal: () => void;
   onExportItr12: () => void;
+  onTriggerImport?: () => void;
+  onDownloadTemplate?: () => void;
+  label?: string;
   className?: string;
 }
 
@@ -16,6 +19,9 @@ export default function RentalExportDropdown({
   onExportCsv,
   onExportAccountantJournal,
   onExportItr12,
+  onTriggerImport,
+  onDownloadTemplate,
+  label = 'Data & Exports',
   className = '',
 }: RentalExportDropdownProps) {
   const [isOpen, setIsOpen] = useState(false);
@@ -32,9 +38,9 @@ export default function RentalExportDropdown({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const handleSelect = (callback: () => void) => {
+  const handleSelect = (callback?: () => void) => {
     setIsOpen(false);
-    callback();
+    if (callback) callback();
   };
 
   return (
@@ -44,20 +50,68 @@ export default function RentalExportDropdown({
         id="rentals-export-csv-dropdown"
         data-testid="rentals-export-csv-dropdown"
         onClick={() => setIsOpen(!isOpen)}
-        title="Export rental portfolio to CSV, Accountant GL Journal, or SARS ITR12"
+        title="Import or export rental portfolio spreadsheets, GL journals, and SARS schedules"
         className="inline-flex items-center gap-1.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 text-xs font-semibold px-3 py-2 rounded-lg cursor-pointer shrink-0 transition-colors shadow-xs"
       >
         <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-        <span>Export CSV</span>
+        <span>{label}</span>
         <ChevronDown
           className={`w-3.5 h-3.5 text-slate-400 transition-transform duration-150 ${isOpen ? 'rotate-180' : ''}`}
         />
       </button>
 
       {isOpen && (
-        <div className="absolute left-0 mt-1.5 w-72 sm:w-80 bg-white rounded-xl shadow-xl border border-slate-200 py-1.5 z-50 animate-in fade-in zoom-in-95 duration-150">
-          <div className="px-3 py-1.5 border-b border-slate-100 text-[10px] font-bold uppercase tracking-wider text-slate-400">
-            Export Rental Reports
+        <div className="absolute right-0 mt-1.5 w-72 sm:w-80 bg-white rounded-xl shadow-xl border border-slate-200 py-1.5 z-50 animate-in fade-in zoom-in-95 duration-150">
+          {/* Section 1: Import & Templates */}
+          {(onTriggerImport || onDownloadTemplate) && (
+            <>
+              <div className="px-3 py-1.5 border-b border-slate-100 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                Import & Templates
+              </div>
+
+              {onTriggerImport && (
+                <button
+                  type="button"
+                  data-testid="import-rentals-spreadsheet"
+                  onClick={() => handleSelect(onTriggerImport)}
+                  className="w-full px-3 py-2 text-left text-xs text-slate-700 hover:bg-indigo-50 hover:text-indigo-900 flex items-start gap-2.5 transition-colors cursor-pointer"
+                >
+                  <div className="p-1 rounded bg-indigo-100 text-indigo-700 mt-0.5 shrink-0">
+                    <FileUp className="w-3.5 h-3.5" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="font-semibold text-slate-900">Import CSV / Excel</div>
+                    <div className="text-[10px] text-slate-500">
+                      Bulk upload properties, active leases & financial line items
+                    </div>
+                  </div>
+                </button>
+              )}
+
+              {onDownloadTemplate && (
+                <button
+                  type="button"
+                  data-testid="download-rentals-template"
+                  onClick={() => handleSelect(onDownloadTemplate)}
+                  className="w-full px-3 py-2 text-left text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-900 flex items-start gap-2.5 transition-colors cursor-pointer"
+                >
+                  <div className="p-1 rounded bg-slate-100 text-slate-600 mt-0.5 shrink-0">
+                    <Download className="w-3.5 h-3.5" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="font-semibold text-slate-900">Download Template (.xlsx)</div>
+                    <div className="text-[10px] text-slate-500">
+                      Standardized Excel spreadsheet template with validation hints
+                    </div>
+                  </div>
+                </button>
+              )}
+            </>
+          )}
+
+          {/* Section 2: Export Schedules */}
+          <div className="px-3 py-1.5 border-b border-t border-slate-100 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+            Export Schedules & Reports
           </div>
 
           {/* Option 1: Active Rentals Register CSV */}
