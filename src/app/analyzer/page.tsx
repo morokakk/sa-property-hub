@@ -1011,7 +1011,7 @@ export default function OpportunityAnalyzerPage() {
         subtitle="Deal-sourcing calculator with official progressive SARS transfer duty brackets and yield engines"
       />
 
-      <main className="flex-1 p-4 sm:p-6 space-y-6 max-w-7xl w-full mx-auto">
+      <main className="flex-1 p-4 sm:p-6 space-y-6 max-w-7xl w-full mx-auto pb-32">
         {/* Top Mode Switcher */}
         <AnalyzerModeSwitcher
           activeTab={activeWorkspaceTab}
@@ -1038,6 +1038,17 @@ export default function OpportunityAnalyzerPage() {
             onScrollToResults={() => {
               document.getElementById('analyzer-results')?.scrollIntoView({ behavior: 'smooth' });
             }}
+            cashDeposit={calculatedMetrics.cashDeposit}
+            transferDuty={calculatedCosts.transferDuty}
+            legalFees={
+              calculatedCosts.conveyancingFee +
+              calculatedCosts.bondRegistrationFee +
+              calculatedCosts.deedsOfficeFee +
+              calculatedCosts.ficaSundries
+            }
+            rehabCost={rehabCost}
+            auctioneerCommission={auctioneerCommission}
+            municipalArrears={municipalArrears}
           />
         )}
 
@@ -2902,7 +2913,7 @@ export default function OpportunityAnalyzerPage() {
             </div>
 
             {/* Real-time Calculation Result Bar */}
-            <div className="p-4 sm:p-5 rounded-xl bg-gradient-to-r from-slate-900 to-slate-800 text-white shadow-sm space-y-3.5">
+            <div id="analyzer-results" className="scroll-mt-28 p-4 sm:p-5 rounded-xl bg-gradient-to-r from-slate-900 to-slate-800 text-white shadow-sm space-y-3.5">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-1 border-b border-slate-700/60">
                 <div className="text-xs uppercase font-semibold text-emerald-400 tracking-wider flex items-center gap-1.5">
                   <Calculator className="w-4 h-4 text-emerald-400" />

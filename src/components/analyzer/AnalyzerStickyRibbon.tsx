@@ -1,8 +1,8 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { formatZAR, formatPercent } from '@/lib/formatters';
-import { TrendingUp, PlusCircle, Check, ArrowDownCircle } from 'lucide-react';
+import { PlusCircle, Check, ArrowDownCircle, ChevronUp, Sparkles, X } from 'lucide-react';
 
 export interface AnalyzerStickyRibbonProps {
   dayOneCapitalRequired: number;
@@ -16,6 +16,13 @@ export interface AnalyzerStickyRibbonProps {
   isEditing?: boolean;
   onSaveDeal: () => void;
   onScrollToResults?: () => void;
+  // Itemized breakdown details for the popover
+  cashDeposit?: number;
+  transferDuty?: number;
+  legalFees?: number;
+  rehabCost?: number;
+  auctioneerCommission?: number;
+  municipalArrears?: number;
 }
 
 export function AnalyzerStickyRibbon({
@@ -30,12 +37,39 @@ export function AnalyzerStickyRibbon({
   isEditing = false,
   onSaveDeal,
   onScrollToResults,
+  cashDeposit,
+  transferDuty,
+  legalFees,
+  rehabCost,
+  auctioneerCommission,
+  municipalArrears,
 }: AnalyzerStickyRibbonProps) {
+  const [showBreakdownPopover, setShowBreakdownPopover] = useState(false);
+  const popoverRef = useRef<HTMLDivElement>(null);
+
+  // Close breakdown popover on click outside
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (popoverRef.current && !popoverRef.current.contains(event.target as Node)) {
+        setShowBreakdownPopover(false);
+      }
+    }
+    if (showBreakdownPopover) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showBreakdownPopover]);
+
+  const handleJumpToResults = () => {
+    setShowBreakdownPopover(false);
+    onScrollToResults?.();
+  };
+
   return (
-    <div className="sticky top-0 z-30 bg-slate-900/95 backdrop-blur-md text-white border border-slate-700/80 shadow-md px-3.5 py-2.5 rounded-xl mb-4 animate-in fade-in duration-150">
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+    <div className="fixed bottom-20 md:bottom-5 left-3 right-3 md:left-[276px] md:right-8 z-30 bg-slate-900/95 backdrop-blur-md text-white border border-slate-700/80 shadow-2xl px-3.5 sm:px-4 py-2.5 rounded-2xl animate-in fade-in slide-in-from-bottom-3 duration-200">
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-2.5">
         {/* Metric Pills Strip */}
-        <div className="flex items-center gap-2 overflow-x-auto pb-1 lg:pb-0 text-xs flex-1">
+        <div className="flex items-center gap-2 overflow-x-auto pb-1 lg:pb-0 text-xs flex-1 scrollbar-thin">
           {/* Day-1 Cash */}
           <div className="bg-slate-800/90 border border-slate-700 px-2.5 py-1 rounded-lg shrink-0">
             <span className="text-[10px] text-slate-400 block uppercase font-medium">Day-1 Cash</span>
@@ -78,20 +112,102 @@ export function AnalyzerStickyRibbon({
           </div>
         </div>
 
-        {/* Action Buttons */}
-        <div className="flex items-center gap-2 shrink-0 self-end lg:self-center">
-          {onScrollToResults && (
-            <button
-              type="button"
-              onClick={onScrollToResults}
-              className="text-[11px] text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 px-2.5 py-1.5 rounded-lg border border-slate-600 transition-colors flex items-center gap-1 cursor-pointer"
-              title="Jump down to detailed returns breakdown"
-            >
-              <ArrowDownCircle className="w-3.5 h-3.5 text-teal-400" />
-              <span>Breakdown ▾</span>
-            </button>
+        {/* Action Buttons & Popover */}
+        <div className="relative flex items-center gap-2 shrink-0 self-end lg:self-center" ref={popoverRef}>
+          {/* Breakdown Popover */}
+          {showBreakdownPopover && (
+            <div className="absolute bottom-full right-0 mb-3 w-80 sm:w-96 bg-slate-900 text-white rounded-xl shadow-2xl border border-slate-700 p-4 z-50 animate-in fade-in zoom-in-95 duration-150">
+              <div className="flex items-center justify-between pb-2.5 mb-2.5 border-b border-slate-700">
+                <div className="flex items-center gap-1.5">
+                  <Sparkles className="w-4 h-4 text-emerald-400" />
+                  <span className="text-xs font-bold text-slate-100 uppercase tracking-wider">
+                    Day-1 Capital Breakdown
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowBreakdownPopover(false)}
+                  className="text-slate-400 hover:text-white p-1 rounded hover:bg-slate-800 text-xs cursor-pointer"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+
+              {/* Itemized Table */}
+              <div className="space-y-1.5 text-xs">
+                {cashDeposit !== undefined && (
+                  <div className="flex justify-between text-slate-300">
+                    <span>Cash Deposit:</span>
+                    <span className="font-semibold text-emerald-400 font-mono">{formatZAR(cashDeposit)}</span>
+                  </div>
+                )}
+                {transferDuty !== undefined && (
+                  <div className="flex justify-between text-slate-300">
+                    <span>SARS Transfer Duty:</span>
+                    <span className="font-semibold text-slate-200 font-mono">{formatZAR(transferDuty)}</span>
+                  </div>
+                )}
+                {legalFees !== undefined && (
+                  <div className="flex justify-between text-slate-300">
+                    <span>Legal &amp; Bond Fees:</span>
+                    <span className="font-semibold text-slate-200 font-mono">{formatZAR(legalFees)}</span>
+                  </div>
+                )}
+                {rehabCost !== undefined && (
+                  <div className="flex justify-between text-slate-300">
+                    <span>Renovation / Capex:</span>
+                    <span className="font-semibold text-amber-400 font-mono">{formatZAR(rehabCost)}</span>
+                  </div>
+                )}
+                {auctioneerCommission !== undefined && auctioneerCommission > 0 && (
+                  <div className="flex justify-between text-amber-300">
+                    <span>Auctioneer Commission:</span>
+                    <span className="font-semibold font-mono">{formatZAR(auctioneerCommission)}</span>
+                  </div>
+                )}
+                {municipalArrears !== undefined && municipalArrears > 0 && (
+                  <div className="flex justify-between text-rose-300">
+                    <span>Rates &amp; Taxes Arrears:</span>
+                    <span className="font-semibold font-mono">{formatZAR(municipalArrears)}</span>
+                  </div>
+                )}
+
+                <div className="pt-2 mt-2 border-t border-slate-700 flex justify-between items-center font-bold">
+                  <span className="text-white text-xs">Total Day-1 Capital Required:</span>
+                  <span className="text-emerald-400 font-mono text-sm">{formatZAR(dayOneCapitalRequired)}</span>
+                </div>
+              </div>
+
+              {/* Jump Button */}
+              {onScrollToResults && (
+                <button
+                  type="button"
+                  onClick={handleJumpToResults}
+                  className="w-full mt-3 bg-slate-800 hover:bg-slate-700 text-teal-300 hover:text-white border border-slate-600 rounded-lg py-2 text-xs font-bold transition-colors flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
+                >
+                  <ArrowDownCircle className="w-3.5 h-3.5 text-teal-400" />
+                  <span>Jump to Full Results &amp; Projections ↓</span>
+                </button>
+              )}
+            </div>
           )}
 
+          {/* Breakdown Toggle Button */}
+          <button
+            type="button"
+            onClick={() => setShowBreakdownPopover(!showBreakdownPopover)}
+            className={`text-[11px] px-2.5 py-1.5 rounded-lg border transition-colors flex items-center gap-1 cursor-pointer ${
+              showBreakdownPopover
+                ? 'bg-slate-700 text-white border-slate-500 shadow-inner'
+                : 'text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 border-slate-600'
+            }`}
+            title="Inspect itemized cost and capital breakdown"
+          >
+            <ArrowDownCircle className="w-3.5 h-3.5 text-teal-400" />
+            <span>Breakdown ▾</span>
+          </button>
+
+          {/* Save / Update Deal Button */}
           <button
             type="button"
             onClick={onSaveDeal}
