@@ -36,10 +36,10 @@ export default function AssetAllocationChart({ summary }: AssetAllocationChartPr
           <span className="text-xs text-slate-500 font-medium">Gross Asset Basis</span>
         </div>
 
-        <div className="flex flex-col xl:flex-row items-center gap-4 sm:gap-6 my-2">
+        <div className="flex flex-col items-center gap-4 my-2">
           {/* SVG Donut Chart */}
-          <div className="relative w-44 h-44 flex items-center justify-center shrink-0">
-            <svg className="w-44 h-44 -rotate-90 transform" viewBox="0 0 160 160">
+          <div className="relative w-40 h-40 flex items-center justify-center shrink-0">
+            <svg className="w-40 h-40 -rotate-90 transform" viewBox="0 0 160 160">
               {/* Background circle */}
               <circle
                 cx="80"
@@ -105,7 +105,7 @@ export default function AssetAllocationChart({ summary }: AssetAllocationChartPr
           </div>
 
           {/* Legend and values */}
-          <div className="flex-1 w-full space-y-3">
+          <div className="w-full space-y-2.5">
             <div className="flex items-center justify-between gap-3 text-xs">
               <div className="flex items-center gap-2 min-w-0">
                 <span className="w-3 h-3 rounded-sm bg-emerald-500 shrink-0"></span>
