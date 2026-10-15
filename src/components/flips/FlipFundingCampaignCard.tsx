@@ -32,15 +32,15 @@ export function FlipFundingCampaignCard({
     <div className="bg-slate-900 text-white rounded-xl shadow-xs border border-slate-800 overflow-hidden">
       <div className="p-4 sm:p-5 border-b border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div className="flex items-center gap-2.5">
-          <div className="p-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
-            <Coins className="w-5 h-5" />
+          <div className="w-8 h-8 rounded-md bg-slate-800 border border-slate-700 flex items-center justify-center text-slate-200 shrink-0">
+            <Coins className="w-4 h-4" />
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h3 className="text-sm font-bold text-white tracking-wide">
-                Funding Campaign & Capital Progress
+              <h3 className="text-sm font-semibold text-white tracking-tight">
+                Funding Campaign &amp; Capital Progress
               </h3>
-              <span className="text-[10px] bg-slate-800 px-2 py-0.5 rounded text-emerald-400 font-semibold border border-slate-700">
+              <span className="text-[10px] bg-slate-800 px-2 py-0.5 rounded text-emerald-400 font-semibold border border-slate-700 tabular-nums">
                 {fundingProgressPercent}% Raised
               </span>
             </div>
@@ -55,7 +55,7 @@ export function FlipFundingCampaignCard({
             <button
               type="button"
               onClick={onSyncLedgerToDeal}
-              className="px-2.5 py-1.5 text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer"
+              className="px-2.5 py-1.5 text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer shadow-xs"
               title="Sync 'Capital Raised' with active linked ledger tranches"
             >
               <RotateCcw className="w-3.5 h-3.5 text-slate-400" />
@@ -65,7 +65,7 @@ export function FlipFundingCampaignCard({
           <button
             type="button"
             onClick={onOpenFundingModal}
-            className="px-3 py-1.5 text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg shadow-sm transition-colors cursor-pointer"
+            className="px-3 py-1.5 text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg shadow-xs border-t border-white/15 transition-colors cursor-pointer"
           >
             Edit Funding Terms
           </button>
@@ -75,38 +75,38 @@ export function FlipFundingCampaignCard({
       <div className="p-4 sm:p-5 space-y-4">
         {/* Metrics Grid */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <div className="bg-slate-800/60 p-3 rounded-lg border border-slate-800">
-            <span className="text-[10px] uppercase font-bold text-slate-400 block">Funding Required</span>
-            <div className="text-base sm:text-lg font-extrabold text-white mt-0.5">
+          <div className="bg-slate-800/60 p-3 rounded-lg border border-slate-700/60">
+            <span className="text-[11px] uppercase tracking-wider font-semibold text-slate-400 block">Funding Required</span>
+            <div className="text-base sm:text-lg font-bold text-white tabular-nums tracking-tight mt-0.5">
               {formatZAR(fundingRequiredVal)}
             </div>
-            <span className="text-[9px] text-slate-400">Target raise facility</span>
+            <span className="text-[10px] text-slate-400">Target raise facility</span>
           </div>
 
-          <div className="bg-slate-800/60 p-3 rounded-lg border border-slate-800">
-            <span className="text-[10px] uppercase font-bold text-emerald-400 block">Capital Raised</span>
-            <div className="text-base sm:text-lg font-extrabold text-emerald-400 mt-0.5">
+          <div className="bg-slate-800/60 p-3 rounded-lg border border-slate-700/60">
+            <span className="text-[11px] uppercase tracking-wider font-semibold text-slate-400 block">Capital Raised</span>
+            <div className="text-base sm:text-lg font-bold text-emerald-400 tabular-nums tracking-tight mt-0.5">
               {formatZAR(capitalRaisedVal)}
             </div>
-            <span className="text-[9px] text-slate-400">Managed to raise</span>
+            <span className="text-[10px] text-slate-400">Managed to raise</span>
           </div>
 
-          <div className="bg-slate-800/60 p-3 rounded-lg border border-slate-800">
-            <span className="text-[10px] uppercase font-bold text-amber-400 block">Remaining Required</span>
-            <div className="text-base sm:text-lg font-extrabold text-amber-400 mt-0.5">
+          <div className="bg-slate-800/60 p-3 rounded-lg border border-slate-700/60">
+            <span className="text-[11px] uppercase tracking-wider font-semibold text-slate-400 block">Remaining Required</span>
+            <div className="text-base sm:text-lg font-bold text-amber-300 tabular-nums tracking-tight mt-0.5">
               {formatZAR(capitalRemainingVal)}
             </div>
-            <span className="text-[9px] text-slate-400">
-              {capitalRemainingVal === 0 ? 'Fully funded! 🎉' : 'Still to secure'}
+            <span className="text-[10px] text-slate-400">
+              {capitalRemainingVal === 0 ? 'Fully funded' : 'Still to secure'}
             </span>
           </div>
 
-          <div className="bg-slate-800/60 p-3 rounded-lg border border-slate-800">
-            <span className="text-[10px] uppercase font-bold text-slate-400 block">Cost Basis Drawn</span>
-            <div className="text-base sm:text-lg font-extrabold text-slate-200 mt-0.5">
+          <div className="bg-slate-800/60 p-3 rounded-lg border border-slate-700/60">
+            <span className="text-[11px] uppercase tracking-wider font-semibold text-slate-400 block">Cost Basis Drawn</span>
+            <div className="text-base sm:text-lg font-bold text-slate-200 tabular-nums tracking-tight mt-0.5">
               {formatZAR(totalCostBasis)}
             </div>
-            <span className="text-[9px] text-slate-400">Purchase + legal + spend</span>
+            <span className="text-[10px] text-slate-400">Purchase + legal + spend</span>
           </div>
         </div>
 
@@ -114,16 +114,16 @@ export function FlipFundingCampaignCard({
         <div>
           <div className="flex items-center justify-between text-xs mb-1.5">
             <span className="font-semibold text-slate-300 text-[11px]">Fundraising Progress</span>
-            <span className="font-extrabold text-emerald-400 text-xs">
+            <span className="font-bold text-emerald-400 text-xs tabular-nums">
               {formatZAR(capitalRaisedVal)} / {formatZAR(fundingRequiredVal)} ({fundingProgressPercent}%)
             </span>
           </div>
-          <div className="w-full bg-slate-800 h-2.5 rounded-full overflow-hidden border border-slate-700/60">
+          <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden border border-slate-700/60">
             <div
               className={`h-full transition-all duration-500 rounded-full ${
                 fundingProgressPercent >= 100
-                  ? 'bg-gradient-to-r from-emerald-500 to-teal-400'
-                  : 'bg-gradient-to-r from-emerald-600 to-indigo-500'
+                  ? 'bg-emerald-500'
+                  : 'bg-emerald-600'
               }`}
               style={{ width: `${Math.min(100, Math.max(0, fundingProgressPercent))}%` }}
             />

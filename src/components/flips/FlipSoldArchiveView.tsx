@@ -13,6 +13,7 @@ import {
   CheckCircle2,
   ChevronRight,
   RotateCcw,
+  X,
 } from 'lucide-react';
 
 export interface FlipSoldArchiveViewProps {
@@ -72,9 +73,10 @@ export function FlipSoldArchiveView({
               <button
                 type="button"
                 onClick={onClearConvertedRentalBanner}
-                className="text-indigo-400 hover:text-indigo-700 text-xs px-1.5 py-1 cursor-pointer"
+                className="text-indigo-400 hover:text-indigo-700 p-1 rounded-md transition-colors cursor-pointer"
+                aria-label="Dismiss banner"
               >
-                ✕
+                <X className="w-3.5 h-3.5" />
               </button>
             )}
           </div>

@@ -3,7 +3,7 @@
 import React from 'react';
 import { RentalProperty } from '@/types';
 import { formatZAR, formatDate } from '@/lib/formatters';
-import { History } from 'lucide-react';
+import { History, X } from 'lucide-react';
 
 export interface RefinanceAuditModalProps {
   isOpen: boolean;
@@ -33,9 +33,10 @@ export const RefinanceAuditModal: React.FC<RefinanceAuditModalProps> = ({
           <button
             type="button"
             onClick={onClose}
-            className="text-slate-400 hover:text-slate-700 font-bold cursor-pointer"
+            className="text-slate-400 hover:text-slate-700 p-1 rounded-md transition-colors cursor-pointer"
+            aria-label="Close dialog"
           >
-            ✕
+            <X className="w-4 h-4" />
           </button>
         </div>
 

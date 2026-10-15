@@ -23,7 +23,7 @@ import { SarbPmtModal } from '@/components/rentals/modals/SarbPmtModal';
 import { PaymentModal } from '@/components/rentals/modals/PaymentModal';
 import { WriteOffModal } from '@/components/rentals/modals/WriteOffModal';
 import { TenantNoticeModal } from '@/components/rentals/modals/TenantNoticeModal';
-import { Sparkles, PlusCircle, CheckCircle2, Building2, Archive, Loader2 } from 'lucide-react';
+import { Sparkles, PlusCircle, CheckCircle2, Building2, Archive, Loader2, Check, X } from 'lucide-react';
 import { usePortfolioStore } from '@/lib/store/usePortfolioStore';
 import { formatZAR } from '@/lib/formatters';
 
@@ -148,13 +148,17 @@ export default function RentalPortfolioPage() {
             {modals.refinanceSuccessBanner && (
               <div className="bg-purple-50 border border-purple-200 rounded-xl p-4 flex items-center justify-between gap-3 animate-in fade-in">
                 <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-full bg-purple-600 text-white flex items-center justify-center font-bold">✓</div>
+                  <div className="w-8 h-8 rounded-md bg-purple-700 text-white flex items-center justify-center font-bold">
+                    <Check className="w-4 h-4" />
+                  </div>
                   <div>
                     <h4 className="text-xs font-bold text-purple-950">Equity Pulled Out & Deposited into Seed Capital!</h4>
                     <p className="text-[11px] text-purple-700"><strong>{formatZAR(modals.refinanceSuccessBanner.amount)}</strong> cash equity from {modals.refinanceSuccessBanner.propertyTitle} is now available in your Reserve.</p>
                   </div>
                 </div>
-                <button onClick={modals.clearRefinanceBanner} className="text-purple-400 hover:text-purple-700 text-xs px-2 py-1">✕</button>
+                <button onClick={modals.clearRefinanceBanner} className="text-purple-400 hover:text-purple-700 p-1 rounded-md transition-colors" aria-label="Dismiss banner">
+                  <X className="w-3.5 h-3.5" />
+                </button>
               </div>
             )}
             {activeRentals.length === 0 ? (

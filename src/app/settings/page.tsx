@@ -1184,7 +1184,7 @@ function SettingsContent() {
               }`}
             >
               <Building className="w-3.5 h-3.5 text-emerald-600" />
-              <span>🏢 Entity, Banking &amp; Branding</span>
+              <span>Entity, Banking &amp; Branding</span>
             </button>
 
             <button
@@ -1200,7 +1200,7 @@ function SettingsContent() {
               }`}
             >
               <Target className="w-3.5 h-3.5 text-indigo-600" />
-              <span>🎯 Underwriting, Buy Box &amp; SARS Tax</span>
+              <span>Underwriting, Buy Box &amp; SARS Tax</span>
             </button>
 
             <button
@@ -1216,7 +1216,7 @@ function SettingsContent() {
               }`}
             >
               <Sparkles className="w-3.5 h-3.5 text-amber-600" />
-              <span>✨ AI Extraction &amp; BYOK</span>
+              <span>AI Extraction &amp; BYOK</span>
             </button>
           </div>
 

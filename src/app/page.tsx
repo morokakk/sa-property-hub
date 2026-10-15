@@ -30,6 +30,7 @@ import {
   AlertTriangle,
   Landmark,
   Compass,
+  X,
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -55,7 +56,7 @@ export default function GlobalDashboardPage() {
         actionButton={
           <Link
             href="/analyzer"
-            className="inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold px-3 py-2 rounded-lg shadow-sm transition-colors shrink-0 whitespace-nowrap"
+            className="inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold px-3 py-2 rounded-lg shadow-xs border-t border-white/15 transition-colors shrink-0 whitespace-nowrap"
           >
             <PlusCircle className="w-3.5 h-3.5" />
             Analyze New Deal
@@ -65,59 +66,59 @@ export default function GlobalDashboardPage() {
 
       <main className="flex-1 p-4 sm:p-6 space-y-6 max-w-7xl w-full mx-auto">
         {/* Available Liquidity & Purchasing Power Banner */}
-        <div className="bg-gradient-to-r from-emerald-950 via-slate-900 to-slate-900 rounded-2xl p-5 text-white border border-emerald-800/40 shadow-lg relative overflow-hidden">
+        <div className="bg-slate-900 rounded-xl p-5 text-white border border-slate-800 shadow-xs relative overflow-hidden">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-4 items-stretch relative z-10">
             {/* Primary Hero Block (4 of 12 columns) */}
             <div className="sm:col-span-2 lg:col-span-4 flex flex-col justify-between">
               <div>
                 <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-400 bg-emerald-950/80 px-2 py-0.5 rounded border border-emerald-700/50">
+                  <span className="text-[11px] font-semibold uppercase tracking-wider text-emerald-400 bg-slate-800/90 px-2 py-0.5 rounded border border-slate-700">
                     Seed Capital &amp; Purchasing Power
                   </span>
                   <span className="text-xs text-slate-400">Ready for next acquisition</span>
                 </div>
                 <div className="mt-2">
-                  <div className="text-2xl sm:text-3xl font-black text-white tracking-tight whitespace-nowrap">
+                  <div className="text-2xl sm:text-3xl font-bold text-white tracking-tight tabular-nums whitespace-nowrap">
                     {formatZAR(summary.totalAvailablePurchasingPower)}
                   </div>
-                  <span className="text-xs font-semibold text-emerald-400 font-sans block mt-0.5">
+                  <span className="text-xs font-medium text-emerald-400 block mt-0.5">
                     Net Deployable Purchasing Power
                   </span>
                 </div>
               </div>
 
               <div
-                className="text-xs text-slate-300 mt-3 font-mono bg-slate-950/70 p-2.5 rounded-xl border border-slate-800/80 space-y-1"
+                className="text-xs text-slate-300 mt-3 bg-slate-950/80 p-2.5 rounded-lg border border-slate-800 space-y-1"
                 title={`Gross War Chest: ${formatZAR(summary.deployableWarChest)} (${formatZAR(summary.liquidCapitalReserve)} Cash + ${formatZAR(summary.unallocatedFundingReserve)} Facilities) − Ring-Fenced: ${formatZAR(summary.ringFencedWorkingCapital)} = Net Purchasing Power: ${formatZAR(summary.totalAvailablePurchasingPower)}`}
               >
                 <div className="flex items-center justify-between gap-1 text-[11px] text-slate-300">
                   <span>Gross War Chest:</span>
-                  <strong className="font-bold text-white whitespace-nowrap">{formatZAR(summary.deployableWarChest)}</strong>
+                  <strong className="font-semibold text-white tabular-nums whitespace-nowrap">{formatZAR(summary.deployableWarChest)}</strong>
                 </div>
                 <div className="flex items-center justify-between gap-1 text-[11px] text-slate-300 border-t border-slate-800/80 pt-1">
                   <span className="text-slate-400">− Ring-Fenced:</span>
-                  <strong className="font-bold text-amber-300 whitespace-nowrap">{formatZAR(summary.ringFencedWorkingCapital)}</strong>
+                  <strong className="font-semibold text-amber-300 tabular-nums whitespace-nowrap">{formatZAR(summary.ringFencedWorkingCapital)}</strong>
                 </div>
               </div>
             </div>
 
             {/* 4 Breakdown Cards (2 columns each = 8 of 12 columns) */}
-            <div className="col-span-1 lg:col-span-2 bg-slate-800/60 rounded-xl p-3 border border-slate-700/60 flex flex-col justify-between">
+            <div className="col-span-1 lg:col-span-2 bg-slate-800/60 rounded-lg p-3 border border-slate-700/60 flex flex-col justify-between">
               <div>
                 <div className="flex items-center justify-between text-[11px] text-slate-400 mb-0.5">
-                  <span className="font-medium text-emerald-400">Free Unallocated Cash</span>
+                  <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Free Cash</span>
                   <button
                     onClick={() => {
                       setSeedAmount(summary.liquidCapitalReserve);
                       setShowEditSeedModal(true);
                     }}
-                    className="text-emerald-400 hover:text-emerald-300 p-0.5 rounded hover:bg-emerald-950 transition-colors cursor-pointer"
+                    className="text-emerald-400 hover:text-emerald-300 p-0.5 rounded hover:bg-slate-700/60 transition-colors cursor-pointer"
                     title="Edit Seed Capital Reserve"
                   >
                     <Edit3 className="w-3 h-3" />
                   </button>
                 </div>
-                <div className="text-base sm:text-lg font-black text-emerald-300 whitespace-nowrap">
+                <div className="text-base sm:text-lg font-bold text-white tabular-nums tracking-tight whitespace-nowrap">
                   {formatZAR(summary.freeUnallocatedCash)}
                 </div>
               </div>
@@ -135,10 +136,10 @@ export default function GlobalDashboardPage() {
               </div>
             </div>
 
-            <div className="col-span-1 lg:col-span-2 bg-slate-800/60 rounded-xl p-3 border border-slate-700/60 flex flex-col justify-between">
+            <div className="col-span-1 lg:col-span-2 bg-slate-800/60 rounded-lg p-3 border border-slate-700/60 flex flex-col justify-between">
               <div>
-                <div className="text-[11px] text-amber-400 font-medium mb-0.5">Ring-Fenced Capital</div>
-                <div className="text-base sm:text-lg font-bold text-amber-300 whitespace-nowrap">
+                <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-0.5">Ring-Fenced</div>
+                <div className="text-base sm:text-lg font-bold text-amber-300 tabular-nums tracking-tight whitespace-nowrap">
                   {formatZAR(summary.ringFencedWorkingCapital)}
                 </div>
               </div>
@@ -147,10 +148,10 @@ export default function GlobalDashboardPage() {
               </div>
             </div>
 
-            <div className="col-span-1 lg:col-span-2 bg-slate-800/60 rounded-xl p-3 border border-slate-700/60 flex flex-col justify-between">
+            <div className="col-span-1 lg:col-span-2 bg-slate-800/60 rounded-lg p-3 border border-slate-700/60 flex flex-col justify-between">
               <div>
-                <div className="text-[11px] text-slate-400 font-medium mb-0.5">Pre-Approved Facilities</div>
-                <div className="text-base sm:text-lg font-bold text-indigo-300 whitespace-nowrap">
+                <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-0.5">Pre-Approved Lines</div>
+                <div className="text-base sm:text-lg font-bold text-white tabular-nums tracking-tight whitespace-nowrap">
                   {formatZAR(summary.unallocatedFundingReserve)}
                 </div>
               </div>
@@ -159,10 +160,10 @@ export default function GlobalDashboardPage() {
               </div>
             </div>
 
-            <div className="col-span-1 lg:col-span-2 bg-slate-800/60 rounded-xl p-3 border border-slate-700/60 flex flex-col justify-between">
+            <div className="col-span-1 lg:col-span-2 bg-slate-800/60 rounded-lg p-3 border border-slate-700/60 flex flex-col justify-between">
               <div>
-                <div className="text-[11px] text-slate-400 font-medium mb-0.5">Realized Profits</div>
-                <div className="text-base sm:text-lg font-bold text-slate-200 whitespace-nowrap">
+                <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-0.5">Realized Profit</div>
+                <div className="text-base sm:text-lg font-bold text-emerald-400 tabular-nums tracking-tight whitespace-nowrap">
                   {formatZAR(summary.totalRealizedFlipProfits)}
                 </div>
               </div>
@@ -267,12 +268,12 @@ export default function GlobalDashboardPage() {
         {/* Top Executive KPI Metric Cards */}
         <div id="dashboard-kpis" className="scroll-mt-20 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
           {/* Total Portfolio Value */}
-          <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-xs">
+          <div className="bg-white rounded-xl p-4 border border-slate-200/90 shadow-2xs">
             <div className="flex items-center justify-between text-slate-500 mb-1">
-              <span className="text-[11px] font-semibold uppercase tracking-wider">Total Portfolio Value</span>
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Total Portfolio Value</span>
               <Building className="w-4 h-4 text-emerald-600" />
             </div>
-            <div className="text-xl font-bold text-slate-900 mt-1">
+            <div className="text-xl font-bold text-slate-900 tabular-nums tracking-tight mt-1">
               {formatZAR(summary.totalGrossAssetValue)}
             </div>
             <div className="text-[11px] text-slate-500 mt-1 flex items-center justify-between">
@@ -282,46 +283,46 @@ export default function GlobalDashboardPage() {
           </div>
 
           {/* Total Liabilities */}
-          <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-xs">
+          <div className="bg-white rounded-xl p-4 border border-slate-200/90 shadow-2xs">
             <div className="flex items-center justify-between text-slate-500 mb-1">
-              <span className="text-[11px] font-semibold uppercase tracking-wider">Total Liabilities</span>
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Total Liabilities</span>
               <Coins className="w-4 h-4 text-rose-500" />
             </div>
-            <div className="text-xl font-bold text-slate-900 mt-1">
+            <div className="text-xl font-bold text-slate-900 tabular-nums tracking-tight mt-1">
               {formatZAR(summary.totalFundingLiabilities)}
             </div>
             <div className="text-[11px] text-slate-500 mt-1 flex items-center justify-between">
               <span>Drawn Bonds + Active Private Debt</span>
-              <span className="text-rose-600 font-medium">
+              <span className="text-rose-600 font-medium tabular-nums">
                 {formatPercent(100 - equityRatio)} Gearing
               </span>
             </div>
           </div>
 
           {/* Net Equity */}
-          <div className="bg-emerald-900 text-white rounded-xl p-4 border border-emerald-800 shadow-md shadow-emerald-950/20">
-            <div className="flex items-center justify-between text-emerald-200 mb-1">
-              <span className="text-[11px] font-semibold uppercase tracking-wider">Net Equity (ZAR)</span>
-              <ShieldCheck className="w-4 h-4 text-emerald-300" />
+          <div className="bg-slate-900 text-white rounded-xl p-4 border border-slate-800 shadow-xs">
+            <div className="flex items-center justify-between text-slate-400 mb-1">
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Net Equity (ZAR)</span>
+              <ShieldCheck className="w-4 h-4 text-emerald-400" />
             </div>
-            <div className="text-xl font-extrabold text-white mt-1">
+            <div className="text-xl font-bold text-emerald-400 tabular-nums tracking-tight mt-1">
               {formatZAR(summary.netEquity)}
             </div>
-            <div className="text-[11px] text-emerald-200/80 mt-1 flex items-center justify-between">
+            <div className="text-[11px] text-slate-400 mt-1 flex items-center justify-between">
               <span>Assets minus Debt</span>
-              <span className="bg-emerald-800/80 px-1.5 py-0.2 rounded text-emerald-100 font-semibold">
+              <span className="bg-slate-800 px-1.5 py-0.5 rounded text-emerald-400 border border-slate-700 font-semibold tabular-nums text-[10px]">
                 {formatPercent(equityRatio)} Equity
               </span>
             </div>
           </div>
 
           {/* Monthly Net Cash Flow */}
-          <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-xs">
+          <div className="bg-white rounded-xl p-4 border border-slate-200/90 shadow-2xs">
             <div className="flex items-center justify-between text-slate-500 mb-1">
-              <span className="text-[11px] font-semibold uppercase tracking-wider">Net Monthly Cash Flow</span>
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Net Monthly Cash Flow</span>
               <TrendingUp className="w-4 h-4 text-teal-600" />
             </div>
-            <div className={`text-xl font-bold mt-1 ${summary.monthlyNetRentalCashflow >= 0 ? 'text-slate-900' : 'text-rose-600'}`}>
+            <div className={`text-xl font-bold tabular-nums tracking-tight mt-1 ${summary.monthlyNetRentalCashflow >= 0 ? 'text-slate-900' : 'text-rose-600'}`}>
               {formatZAR(summary.monthlyNetRentalCashflow)}
               <span className="text-xs font-normal text-slate-400">/mo</span>
             </div>
@@ -332,28 +333,28 @@ export default function GlobalDashboardPage() {
           </div>
 
           {/* Flip Pipeline Upside */}
-          <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-xs flex flex-col justify-between">
+          <div className="bg-white rounded-xl p-4 border border-slate-200/90 shadow-2xs flex flex-col justify-between">
             <div>
               <div className="flex items-center justify-between text-slate-500 mb-1">
-                <span className="text-[11px] font-semibold uppercase tracking-wider">Projected Flip Profits</span>
+                <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Projected Flip Profits</span>
                 <Hammer className="w-4 h-4 text-indigo-600" />
               </div>
               <div className="flex items-baseline justify-between mt-1">
-                <div className="text-xl font-bold text-slate-900">
+                <div className="text-xl font-bold text-slate-900 tabular-nums tracking-tight">
                   {formatZAR(summary.totalGrossProjectedFlipProfits)}
                 </div>
-                <span className="text-[10px] font-semibold bg-indigo-50 text-indigo-700 px-1.5 py-0.5 rounded border border-indigo-100">
+                <span className="text-[10px] font-semibold bg-indigo-50 text-indigo-700 px-1.5 py-0.5 rounded border border-indigo-100 tabular-nums">
                   Gross Pre-Tax
                 </span>
               </div>
               <div className="mt-2 pt-2 border-t border-slate-100 space-y-1">
                 <div className="text-[11px] text-slate-500 flex items-center justify-between">
-                  <span className="text-rose-600 font-medium">− {formatZAR(summary.totalSarsFlipTaxReserve)}</span>
+                  <span className="text-rose-600 font-medium tabular-nums">− {formatZAR(summary.totalSarsFlipTaxReserve)}</span>
                   <span className="text-slate-400 text-[10px]">Flip Prov. Tax (27%)</span>
                 </div>
                 <div className="text-[11px] flex items-center justify-between font-bold text-emerald-800 bg-emerald-50 px-2 py-1 rounded border border-emerald-100/80">
                   <span>Net Realizable:</span>
-                  <span>{formatZAR(summary.totalNetProjectedFlipProfits)}</span>
+                  <span className="tabular-nums">{formatZAR(summary.totalNetProjectedFlipProfits)}</span>
                 </div>
               </div>
             </div>
@@ -522,11 +523,12 @@ export default function GlobalDashboardPage() {
                         </div>
                         <div className="flex items-center gap-1">
                           {hasArrears && (
-                            <span className="text-[9px] font-bold bg-rose-100 text-rose-800 border border-rose-300 px-1.5 py-0.5 rounded-full">
-                              ⚠️ Arrears: -{formatZAR(totalArrears)}
+                            <span className="text-[9px] font-semibold bg-rose-50 text-rose-700 border border-rose-200 px-2 py-0.5 rounded-md flex items-center gap-1 tabular-nums">
+                              <AlertTriangle className="w-3 h-3 text-rose-600 shrink-0" />
+                              <span>Arrears: -{formatZAR(totalArrears)}</span>
                             </span>
                           )}
-                          <span className="text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded-full">
+                          <span className="text-[10px] font-semibold bg-slate-100 text-slate-700 border border-slate-200 px-2 py-0.5 rounded-md">
                             {rental.status}
                           </span>
                         </div>
@@ -534,16 +536,16 @@ export default function GlobalDashboardPage() {
 
                       <div className="grid grid-cols-3 gap-2 text-xs mt-3 pt-2 border-t border-slate-200/60">
                         <div>
-                          <span className="text-[10px] text-slate-400 block">Market Value</span>
-                          <span className="font-semibold text-slate-800">{formatZAR(rental.marketValueZAR)}</span>
+                          <span className="text-[10px] uppercase font-semibold text-slate-400 block">Market Value</span>
+                          <span className="font-semibold text-slate-900 tabular-nums">{formatZAR(rental.marketValueZAR)}</span>
                         </div>
                         <div>
-                          <span className="text-[10px] text-slate-400 block">Gross Rent</span>
-                          <span className="font-semibold text-slate-800">{formatZAR(rental.monthlyGrossRentZAR)}/m</span>
+                          <span className="text-[10px] uppercase font-semibold text-slate-400 block">Gross Rent</span>
+                          <span className="font-semibold text-slate-900 tabular-nums">{formatZAR(rental.monthlyGrossRentZAR)}/m</span>
                         </div>
                         <div>
-                          <span className="text-[10px] text-slate-400 block">Net Cashflow</span>
-                          <span className={`font-bold ${netMonthly >= 0 ? 'text-emerald-700' : 'text-rose-600'}`}>
+                          <span className="text-[10px] uppercase font-semibold text-slate-400 block">Net Cashflow</span>
+                          <span className={`font-bold tabular-nums ${netMonthly >= 0 ? 'text-emerald-700' : 'text-rose-600'}`}>
                             {formatZAR(netMonthly)}/m
                           </span>
                         </div>
@@ -557,13 +559,13 @@ export default function GlobalDashboardPage() {
         </div>
 
         {/* Centralized Financing Summary Banner */}
-        <div className="bg-gradient-to-r from-slate-900 to-slate-800 rounded-xl p-5 text-white shadow-md flex flex-col md:flex-row items-center justify-between gap-4">
+        <div className="bg-slate-900 rounded-xl p-5 text-white border border-slate-800 shadow-xs flex flex-col md:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="p-3 bg-emerald-500/20 text-emerald-400 rounded-xl border border-emerald-500/30">
-              <Users className="w-6 h-6" />
+            <div className="w-9 h-9 rounded-md bg-slate-800 border border-slate-700 text-slate-200 flex items-center justify-center shrink-0">
+              <Users className="w-5 h-5" />
             </div>
             <div>
-              <h4 className="text-sm font-bold">Funding & Capital Facility Status</h4>
+              <h4 className="text-sm font-semibold tracking-tight">Funding & Capital Facility Status</h4>
               <p className="text-xs text-slate-300 mt-0.5">
                 {funding.length} Active capital sources registered across private lenders, joint ventures, and angel investors.
               </p>
@@ -571,12 +573,12 @@ export default function GlobalDashboardPage() {
           </div>
           <div className="flex items-center gap-4 text-right">
             <div>
-              <span className="text-[10px] uppercase text-slate-400 font-semibold block">Active Private Debt</span>
-              <span className="text-base font-bold text-emerald-400">{formatZAR(summary.totalPrivateFundingLiability)}</span>
+              <span className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold block">Active Private Debt</span>
+              <span className="text-base font-bold text-emerald-400 tabular-nums">{formatZAR(summary.totalPrivateFundingLiability)}</span>
             </div>
             <Link
               href="/funding"
-              className="bg-white/10 hover:bg-white/20 text-white text-xs font-semibold px-3 py-2 rounded-lg transition-colors border border-white/10"
+              className="bg-slate-800 hover:bg-slate-700 text-white text-xs font-semibold px-3 py-2 rounded-lg transition-colors border border-slate-700 shadow-xs"
             >
               Manage Ledger
             </Link>
@@ -591,8 +593,8 @@ export default function GlobalDashboardPage() {
               <div className="w-12 h-1.5 bg-slate-300 rounded-full mx-auto mb-3 sm:hidden" />
               <div className="flex items-center justify-between pb-3 sm:pb-4 border-b border-slate-100">
                 <div className="flex items-center gap-2.5">
-                  <div className="p-2 rounded-xl bg-emerald-100 text-emerald-700">
-                    <Wallet className="w-5 h-5" />
+                  <div className="w-8 h-8 rounded-md bg-slate-100 border border-slate-200/80 text-slate-700 flex items-center justify-center shrink-0">
+                    <Wallet className="w-4 h-4" />
                   </div>
                   <div>
                     <h3 className="text-base font-bold text-slate-900">Adjust Liquid Seed Capital</h3>
@@ -603,7 +605,7 @@ export default function GlobalDashboardPage() {
                   onClick={() => setShowEditSeedModal(false)}
                   className="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-100 min-h-[36px] min-w-[36px] flex items-center justify-center cursor-pointer"
                 >
-                  ✕
+                  <X className="w-4 h-4" />
                 </button>
               </div>
 

@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { RentalProperty } from '@/types';
 import { formatZAR } from '@/lib/formatters';
-import { Calculator, CheckCircle2 } from 'lucide-react';
+import { Calculator, CheckCircle2, X, Lightbulb } from 'lucide-react';
 import { calculateMonthlyBondRepayment } from '@/lib/calculations/propertyMetrics';
 import { usePortfolioStore } from '@/lib/store/usePortfolioStore';
 
@@ -137,16 +137,21 @@ export const SarbPmtModal: React.FC<SarbPmtModalProps> = ({
             </div>
           </div>
           <button
+            type="button"
             onClick={onClose}
-            className="text-slate-400 hover:text-slate-700 text-sm font-bold p-1 rounded cursor-pointer"
+            className="text-slate-400 hover:text-slate-700 p-1 rounded-md transition-colors cursor-pointer"
+            aria-label="Close dialog"
           >
-            ✕
+            <X className="w-4 h-4" />
           </button>
         </div>
 
         <form onSubmit={handleSubmit} noValidate className="space-y-4 text-xs">
-          <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-amber-900 text-[11px] leading-relaxed">
-            💡 <strong>Forward-Only Guarantee:</strong> Modifying the bond repayment takes effect from the selected <strong>Effective Month</strong> for upcoming bank debit orders. Historical performance and past months remain uncorrupted.
+          <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-amber-900 text-[11px] leading-relaxed flex items-start gap-2">
+            <Lightbulb className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+            <div>
+              <strong>Forward-Only Guarantee:</strong> Modifying the bond repayment takes effect from the selected <strong>Effective Month</strong> for upcoming bank debit orders. Historical performance and past months remain uncorrupted.
+            </div>
           </div>
 
           <div className="grid grid-cols-2 gap-3">

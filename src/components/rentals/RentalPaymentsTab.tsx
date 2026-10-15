@@ -22,6 +22,7 @@ import {
   FileText,
   Edit3,
   Trash2,
+  Check,
 } from 'lucide-react';
 
 export interface RentalPaymentsTabProps {
@@ -326,20 +327,22 @@ export function RentalPaymentsTab({
               {activeTenantLease ? `${activeTenantLease.unitName} Arrears Balance` : 'Total Arrears Balance (All Units)'}
             </span>
             {currentTabArrearsInfo.totalArrearsZAR > 0 ? (
-              <span className="text-[9px] font-extrabold text-rose-700 bg-rose-100 px-1.5 py-0.5 rounded border border-rose-200 uppercase tracking-wider">
-                ⚠️ Arrears Outstanding
+              <span className="text-[9px] font-extrabold text-rose-700 bg-rose-100 px-1.5 py-0.5 rounded border border-rose-200 uppercase tracking-wider inline-flex items-center gap-1">
+                <AlertTriangle className="w-2.5 h-2.5 text-rose-700" />
+                Arrears Outstanding
               </span>
             ) : currentTabArrearsInfo.totalArrearsZAR < 0 ? (
               <span className="text-[10px] text-teal-700 bg-teal-100 px-1.5 py-0.5 rounded font-bold">
                 In Credit
               </span>
             ) : (
-              <span className="text-[10px] text-emerald-700 bg-emerald-100 px-1.5 py-0.5 rounded font-bold">
-                ✓ Account Paid Up
+              <span className="text-[10px] text-emerald-700 bg-emerald-100 px-1.5 py-0.5 rounded font-bold inline-flex items-center gap-1">
+                <Check className="w-3 h-3 text-emerald-700" />
+                Account Paid Up
               </span>
             )}
           </div>
-          <span className="font-mono font-black text-sm text-slate-900">
+          <span className="font-mono font-black text-sm text-slate-900 tabular-nums tracking-tight">
             {currentTabArrearsInfo.totalArrearsZAR > 0
               ? formatZAR(currentTabArrearsInfo.totalArrearsZAR)
               : currentTabArrearsInfo.totalArrearsZAR < 0

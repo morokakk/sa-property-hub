@@ -58,6 +58,12 @@ import {
   Layers,
   Sliders,
   ArrowRightLeft,
+  Building2,
+  Home,
+  Warehouse,
+  Briefcase,
+  Calendar,
+  RefreshCw,
 } from 'lucide-react';
 import Link from 'next/link';
 import { exportOpportunitiesCSV } from '@/lib/export/csvExport';
@@ -1122,7 +1128,7 @@ export default function OpportunityAnalyzerPage() {
                           onClick={() => setShowMaoSolver(false)}
                           className="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-100 text-sm cursor-pointer min-h-[32px] min-w-[32px] flex items-center justify-center"
                         >
-                          ✕
+                          <X className="w-4 h-4" />
                         </button>
                       </div>
 
@@ -1131,24 +1137,26 @@ export default function OpportunityAnalyzerPage() {
                         <button
                           type="button"
                           onClick={() => setMaoSolverMode('Flip')}
-                          className={`flex-1 py-1.5 px-3 font-bold rounded-md transition-all cursor-pointer ${
+                          className={`flex-1 py-1.5 px-3 font-semibold rounded-md transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
                             maoSolverMode === 'Flip'
-                              ? 'bg-white text-slate-900 shadow-2xs'
+                              ? 'bg-white text-slate-900 shadow-2xs font-bold'
                               : 'text-slate-600 hover:text-slate-900'
                           }`}
                         >
-                          🔄 Flip Exit ROI
+                          <Hammer className="w-3.5 h-3.5" />
+                          <span>Flip Exit ROI</span>
                         </button>
                         <button
                           type="button"
                           onClick={() => setMaoSolverMode('Rental')}
-                          className={`flex-1 py-1.5 px-3 font-bold rounded-md transition-all cursor-pointer ${
+                          className={`flex-1 py-1.5 px-3 font-semibold rounded-md transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
                             maoSolverMode === 'Rental'
-                              ? 'bg-white text-slate-900 shadow-2xs'
+                              ? 'bg-white text-slate-900 shadow-2xs font-bold'
                               : 'text-slate-600 hover:text-slate-900'
                           }`}
                         >
-                          🏠 Rental Net Yield
+                          <Building2 className="w-3.5 h-3.5" />
+                          <span>Rental Net Yield</span>
                         </button>
                       </div>
 
@@ -1383,30 +1391,36 @@ export default function OpportunityAnalyzerPage() {
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                   {(
                     [
-                      { id: 'Rental' as const, label: '🏠 Buy & Hold Rental', desc: 'Long-term cash flow & equity compounding' },
-                      { id: 'Flip' as const, label: '🔄 Buy & Flip', desc: 'Short-term renovation & capital liquidation' },
-                      { id: 'BRRRR' as const, label: '⚡ Hybrid BRRRR', desc: 'Rehab, refinance & compound hold' },
+                      { id: 'Rental' as const, label: 'Buy & Hold Rental', icon: Building2, desc: 'Long-term cash flow & equity compounding' },
+                      { id: 'Flip' as const, label: 'Buy & Flip', icon: Hammer, desc: 'Short-term renovation & capital liquidation' },
+                      { id: 'BRRRR' as const, label: 'Hybrid BRRRR', icon: RefreshCw, desc: 'Rehab, refinance & compound hold' },
                     ] as const
-                  ).map((st) => (
-                    <button
-                      key={st.id}
-                      type="button"
-                      onClick={() => handleStrategyChange(st.id)}
-                      className={`py-2 px-3 rounded-lg text-xs font-semibold transition-all text-left border cursor-pointer ${
-                        strategy === st.id
-                          ? 'bg-slate-900 text-white border-slate-900 shadow-2xs font-bold'
-                          : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
-                      }`}
-                    >
-                      <div className="font-bold flex items-center justify-between">
-                        <span>{st.label}</span>
-                        {strategy === st.id && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>}
-                      </div>
-                      <div className={`text-[10px] truncate mt-0.5 ${strategy === st.id ? 'text-slate-300' : 'text-slate-500'}`}>
-                        {st.desc}
-                      </div>
-                    </button>
-                  ))}
+                  ).map((st) => {
+                    const StrategyIcon = st.icon;
+                    return (
+                      <button
+                        key={st.id}
+                        type="button"
+                        onClick={() => handleStrategyChange(st.id)}
+                        className={`py-2 px-3 rounded-lg text-xs font-semibold transition-all text-left border cursor-pointer ${
+                          strategy === st.id
+                            ? 'bg-slate-900 text-white border-slate-900 shadow-2xs font-bold'
+                            : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
+                        }`}
+                      >
+                        <div className="font-bold flex items-center justify-between">
+                          <span className="flex items-center gap-1.5">
+                            <StrategyIcon className="w-3.5 h-3.5" />
+                            {st.label}
+                          </span>
+                          {strategy === st.id && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>}
+                        </div>
+                        <div className={`text-[10px] truncate mt-0.5 ${strategy === st.id ? 'text-slate-300' : 'text-slate-500'}`}>
+                          {st.desc}
+                        </div>
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
 
@@ -1425,44 +1439,49 @@ export default function OpportunityAnalyzerPage() {
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                     {(
                       [
-                        { id: 'Sectional Title Apartment', label: '🏢 Sectional Title' },
-                        { id: 'Freehold House', label: '🏡 Freehold House' },
-                        { id: 'Townhouse / Cluster', label: '🏘️ Townhouse / Cluster' },
-                        { id: 'Multi-unit Commercial', label: '🏬 Commercial' },
+                        { id: 'Sectional Title Apartment', label: 'Sectional Title', icon: Building2 },
+                        { id: 'Freehold House', label: 'Freehold House', icon: Home },
+                        { id: 'Townhouse / Cluster', label: 'Townhouse / Cluster', icon: Warehouse },
+                        { id: 'Multi-unit Commercial', label: 'Commercial', icon: Briefcase },
                       ] as const
-                    ).map((pt) => (
-                      <button
-                        key={pt.id}
-                        type="button"
-                        onClick={() => {
-                          setPropertyType(pt.id);
-                          if (pt.id === 'Freehold House') {
-                            setMonthlyLevies(0);
-                            const newIns = annualInsurance > 0 ? annualInsurance : 7_200;
-                            setAnnualInsurance(newIns);
-                            updateAnalyzerDraft({ monthlyLevies: 0, annualInsurance: newIns });
-                          } else {
-                            setAnnualInsurance(0);
-                            updateAnalyzerDraft({ annualInsurance: 0 });
-                          }
-                        }}
-                        className={`py-2 px-3 rounded-lg text-xs font-semibold transition-all text-center border ${
-                          propertyType === pt.id
-                            ? 'bg-slate-900 text-white border-slate-900 shadow-2xs font-bold'
-                            : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
-                        }`}
-                      >
-                        {pt.label}
-                      </button>
-                    ))}
+                    ).map((pt) => {
+                      const TypeIcon = pt.icon;
+                      return (
+                        <button
+                          key={pt.id}
+                          type="button"
+                          onClick={() => {
+                            setPropertyType(pt.id);
+                            if (pt.id === 'Freehold House') {
+                              setMonthlyLevies(0);
+                              const newIns = annualInsurance > 0 ? annualInsurance : 7_200;
+                              setAnnualInsurance(newIns);
+                              updateAnalyzerDraft({ monthlyLevies: 0, annualInsurance: newIns });
+                            } else {
+                              setAnnualInsurance(0);
+                              updateAnalyzerDraft({ annualInsurance: 0 });
+                            }
+                          }}
+                          className={`py-2 px-3 rounded-lg text-xs font-semibold transition-all text-center border flex items-center justify-center gap-1.5 cursor-pointer ${
+                            propertyType === pt.id
+                              ? 'bg-slate-900 text-white border-slate-900 shadow-2xs font-bold'
+                              : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
+                          }`}
+                        >
+                          <TypeIcon className="w-3.5 h-3.5" />
+                          <span>{pt.label}</span>
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
 
                 {(propertyType === 'Sectional Title Apartment' || propertyType === 'Townhouse / Cluster') && (
                   <div className="pt-2 border-t border-slate-200/80">
                     <div className="flex items-center justify-between mb-1">
-                      <label className="block text-xs font-semibold text-slate-800">
-                        📅 Scheduled Body Corporate AGM Date
+                      <label className="block text-xs font-semibold text-slate-800 flex items-center gap-1.5">
+                        <Calendar className="w-3.5 h-3.5 text-indigo-600" />
+                        <span>Scheduled Body Corporate AGM Date</span>
                       </label>
                       <span className="text-[10px] text-indigo-600 font-medium">
                         Auto-schedules reminder task 14 days prior to AGM
@@ -2929,15 +2948,15 @@ export default function OpportunityAnalyzerPage() {
             </div>
 
             {/* Real-time Calculation Result Bar */}
-            <div id="analyzer-results" className="scroll-mt-28 p-4 sm:p-5 rounded-xl bg-gradient-to-r from-slate-900 to-slate-800 text-white shadow-sm space-y-3.5">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-1 border-b border-slate-700/60">
+            <div id="analyzer-results" className="scroll-mt-28 p-4 sm:p-5 rounded-xl bg-slate-900 text-white border border-slate-800 shadow-xs space-y-3.5">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-1 border-b border-slate-800">
                 <div className="text-xs uppercase font-semibold text-emerald-400 tracking-wider flex items-center gap-1.5">
                   <Calculator className="w-4 h-4 text-emerald-400" />
-                  Calculated Acquisition & Returns Breakdown
+                  Calculated Acquisition &amp; Returns Breakdown
                 </div>
                 <div className="flex items-center gap-2">
                   {isSection13Eligible && (
-                    <span className="text-[10px] font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 px-2 py-0.5 rounded-full flex items-center gap-1">
+                    <span className="text-[10px] font-semibold bg-emerald-500/10 text-emerald-300 border border-emerald-500/30 px-2 py-0.5 rounded-md flex items-center gap-1 tabular-nums">
                       <Sparkles className="w-3 h-3" /> Sec 13sex Active: +{formatZAR(calculatedSection13.annualTaxSavingsZAR)}/yr Shield
                     </span>
                   )}
@@ -2945,71 +2964,71 @@ export default function OpportunityAnalyzerPage() {
               </div>
 
               {/* Prominent Day-1 Initial Capital Required Hero Banner */}
-              <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 items-center bg-slate-800/80 p-3.5 rounded-xl border border-slate-700">
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 items-center bg-slate-800/70 p-3.5 rounded-xl border border-slate-700/80">
                 <div className="lg:col-span-5 flex items-center gap-3">
-                  <div className={`p-2.5 rounded-xl border ${
+                  <div className={`w-10 h-10 rounded-md border flex items-center justify-center shrink-0 ${
                     isReserveSufficient
-                      ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
-                      : 'bg-rose-500/10 border-rose-500/30 text-rose-400'
+                      ? 'bg-slate-800 border-slate-700 text-emerald-400'
+                      : 'bg-slate-800 border-slate-700 text-rose-400'
                   }`}>
-                    <ShieldCheck className="w-6 h-6" />
+                    <ShieldCheck className="w-5 h-5" />
                   </div>
                   <div>
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-xs font-bold uppercase tracking-wider text-slate-300">
+                      <span className="text-xs font-semibold uppercase tracking-wider text-slate-300">
                         Initial Capital Required (Day 1)
                       </span>
-                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                      <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-md border tabular-nums ${
                         isReserveSufficient
-                          ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
-                          : 'bg-rose-500/20 text-rose-300 border-rose-500/40'
+                          ? 'bg-emerald-950/80 text-emerald-300 border-emerald-800/60'
+                          : 'bg-rose-950/80 text-rose-300 border-rose-800/60'
                       }`}>
                         {isReserveSufficient
                           ? `Reserve Surplus: +${formatZAR(reserveDelta)}`
                           : `Reserve Shortfall: -${formatZAR(Math.abs(reserveDelta))}`}
                       </span>
                     </div>
-                    <div className="text-2xl font-black text-white font-mono mt-0.5">
+                    <div className="text-2xl font-bold text-white tabular-nums tracking-tight mt-0.5">
                       {formatZAR(calculatedMetrics.initialCapitalRequired)}
                     </div>
                   </div>
                 </div>
 
-                <div className="lg:col-span-7 flex flex-wrap items-center gap-2 text-[11px] text-slate-300 bg-slate-900/60 p-2.5 rounded-lg border border-slate-700/60">
+                <div className="lg:col-span-7 flex flex-wrap items-center gap-2 text-[11px] text-slate-300 bg-slate-950/70 p-2.5 rounded-lg border border-slate-800">
                   <span className="font-semibold text-slate-400">Day-1 Outlay Breakdown:</span>
-                  <span className="bg-slate-800 px-2 py-0.5 rounded border border-slate-700 text-white">
-                    Deposit: <strong className="text-emerald-400">{formatZAR(calculatedMetrics.cashDeposit)}</strong>
+                  <span className="bg-slate-800 px-2 py-0.5 rounded border border-slate-700 text-white tabular-nums">
+                    Deposit: <strong className="text-emerald-400 font-semibold">{formatZAR(calculatedMetrics.cashDeposit)}</strong>
                   </span>
                   <span className="text-slate-500">+</span>
-                  <span className="bg-slate-800 px-2 py-0.5 rounded border border-slate-700 text-white">
-                    SARS Duty: <strong className="text-slate-200">{formatZAR(calculatedCosts.transferDuty)}</strong>
+                  <span className="bg-slate-800 px-2 py-0.5 rounded border border-slate-700 text-white tabular-nums">
+                    SARS Duty: <strong className="text-slate-200 font-semibold">{formatZAR(calculatedCosts.transferDuty)}</strong>
                   </span>
                   <span className="text-slate-500">+</span>
-                  <span className="bg-slate-800 px-2 py-0.5 rounded border border-slate-700 text-white">
-                    Legal & Bond Fees: <strong className="text-slate-200">{formatZAR(calculatedCosts.conveyancingFee + calculatedCosts.bondRegistrationFee + calculatedCosts.deedsOfficeFee + calculatedCosts.ficaSundries)}</strong>
+                  <span className="bg-slate-800 px-2 py-0.5 rounded border border-slate-700 text-white tabular-nums">
+                    Legal &amp; Bond Fees: <strong className="text-slate-200 font-semibold">{formatZAR(calculatedCosts.conveyancingFee + calculatedCosts.bondRegistrationFee + calculatedCosts.deedsOfficeFee + calculatedCosts.ficaSundries)}</strong>
                   </span>
                   <span className="text-slate-500">+</span>
-                  <span className="bg-slate-800 px-2 py-0.5 rounded border border-slate-700 text-white">
-                    Rehab/Capex: <strong className="text-amber-400">{formatZAR(rehabCost)}</strong>
+                  <span className="bg-slate-800 px-2 py-0.5 rounded border border-slate-700 text-white tabular-nums">
+                    Rehab/Capex: <strong className="text-amber-400 font-semibold">{formatZAR(rehabCost)}</strong>
                   </span>
                   {auctioneerCommission > 0 && (
                     <>
                       <span className="text-slate-500">+</span>
-                      <span className="bg-amber-950/60 px-2 py-0.5 rounded border border-amber-500/40 text-amber-200">
-                        Auction Fee: <strong className="text-amber-300">{formatZAR(auctioneerCommission)}</strong>
+                      <span className="bg-slate-800 px-2 py-0.5 rounded border border-amber-600/40 text-amber-200 tabular-nums">
+                        Auction Fee: <strong className="text-amber-300 font-semibold">{formatZAR(auctioneerCommission)}</strong>
                       </span>
                     </>
                   )}
                   {municipalArrears > 0 && (
                     <>
                       <span className="text-slate-500">+</span>
-                      <span className="bg-rose-950/60 px-2 py-0.5 rounded border border-rose-500/40 text-rose-200">
-                        Rates Arrears: <strong className="text-rose-300">{formatZAR(municipalArrears)}</strong>
+                      <span className="bg-slate-800 px-2 py-0.5 rounded border border-rose-600/40 text-rose-200 tabular-nums">
+                        Rates Arrears: <strong className="text-rose-300 font-semibold">{formatZAR(municipalArrears)}</strong>
                       </span>
                     </>
                   )}
                   <span className="text-slate-400 text-[10px] block w-full mt-1 border-t border-slate-800 pt-1">
-                    Liquid Capital Reserve: <strong className="text-white">{formatZAR(liquidCapitalReserve)}</strong>
+                    Liquid Capital Reserve: <strong className="text-white tabular-nums">{formatZAR(liquidCapitalReserve)}</strong>
                     {isReserveSufficient
                       ? ' • Capital buffer intact for emergency reserves.'
                       : ' • Outlay exceeds current liquid reserve; external syndicate/funder needed.'}
@@ -3040,10 +3059,10 @@ export default function OpportunityAnalyzerPage() {
               <button
                 type="button"
                 onClick={handleCopyCurrentCalcWhatsApp}
-                className="bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 text-xs font-semibold px-4 py-2.5 rounded-lg shadow-2xs flex items-center gap-1.5 transition-colors"
+                className="bg-slate-50 hover:bg-slate-100 text-slate-800 border border-slate-200 text-xs font-semibold px-4 py-2.5 rounded-lg shadow-2xs flex items-center gap-1.5 transition-colors cursor-pointer"
                 title="Format calculated deal metrics into clean WhatsApp pitch text and copy to clipboard"
               >
-                {copiedCalc ? <Check className="w-4 h-4 text-emerald-600" /> : <Share2 className="w-4 h-4 text-emerald-700" />}
+                {copiedCalc ? <Check className="w-4 h-4 text-emerald-600" /> : <Share2 className="w-4 h-4 text-slate-700" />}
                 <span>{copiedCalc ? 'Copied WhatsApp Deal Summary!' : 'Copy WhatsApp Summary'}</span>
               </button>
 
@@ -3053,7 +3072,7 @@ export default function OpportunityAnalyzerPage() {
                   editingDealId
                     ? 'bg-amber-600 hover:bg-amber-700 focus:ring-amber-500'
                     : 'bg-emerald-600 hover:bg-emerald-700 focus:ring-emerald-500'
-                } text-white text-xs font-semibold px-5 py-2.5 rounded-lg shadow-sm flex items-center gap-1.5 transition-colors`}
+                } text-white text-xs font-semibold px-5 py-2.5 rounded-lg shadow-xs border-t border-white/15 flex items-center gap-1.5 transition-colors cursor-pointer`}
               >
                 {editingDealId ? (
                   <>

@@ -25,6 +25,7 @@ import {
   AlertTriangle,
   Layers,
   ArrowRight,
+  X,
 } from 'lucide-react';
 import { exportFundingCSV } from '@/lib/export/csvExport';
 import { formatPaymentStatement } from '@/lib/whatsappFormatter';
@@ -282,41 +283,41 @@ export default function FundingTrackerPage() {
 
       <main className="flex-1 p-4 sm:p-6 space-y-6 max-w-7xl w-full mx-auto">
         {/* Purchasing Power & Seed Capital Banner */}
-        <div id="funding-reserve" className="scroll-mt-20 bg-gradient-to-r from-slate-950 via-slate-900 to-emerald-950 rounded-2xl p-5 text-white border border-emerald-800/40 shadow-lg">
+        <div id="funding-reserve" className="scroll-mt-20 bg-slate-900 rounded-xl p-5 text-white border border-slate-800 shadow-xs">
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-5">
             <div className="flex items-start sm:items-center gap-3.5">
-              <div className="w-12 h-12 rounded-xl bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shrink-0 shadow-inner">
-                <Wallet className="w-6 h-6" />
+              <div className="w-10 h-10 rounded-md bg-slate-800 border border-slate-700 flex items-center justify-center text-slate-200 shrink-0">
+                <Wallet className="w-5 h-5" />
               </div>
               <div>
                 <div className="flex items-center gap-2">
-                  <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-400 bg-emerald-950/80 px-2 py-0.5 rounded border border-emerald-700/50">
+                  <span className="text-[11px] font-semibold uppercase tracking-wider text-emerald-400 bg-slate-800 px-2 py-0.5 rounded border border-slate-700">
                     Deployable War Chest
                   </span>
                   <span className="text-xs text-slate-400">Cash + Pre-Approved Facility Capacity</span>
                 </div>
-                <h3 className="text-xl sm:text-2xl font-black text-white mt-1 tracking-tight flex items-baseline gap-2">
+                <h3 className="text-xl sm:text-2xl font-bold text-white mt-1 tracking-tight tabular-nums flex items-baseline gap-2">
                   {formatZAR(summary.deployableWarChest)}
-                  <span className="text-xs font-semibold text-emerald-400 font-sans">Gross War Chest</span>
+                  <span className="text-xs font-medium text-emerald-400 font-sans">Gross War Chest</span>
                 </h3>
                 <div
-                  className="text-xs text-slate-300 mt-2 font-mono bg-slate-950/60 px-2.5 py-1.5 rounded-lg border border-slate-800/80 w-fit flex flex-wrap items-center gap-1.5"
+                  className="text-xs text-slate-300 mt-2 bg-slate-950/80 px-2.5 py-1.5 rounded-lg border border-slate-800 w-fit flex flex-wrap items-center gap-1.5"
                   title={`Gross War Chest: ${formatZAR(summary.deployableWarChest)} (${formatZAR(summary.liquidCapitalReserve)} Cash + ${formatZAR(summary.unallocatedFundingReserve)} Facilities) Less Ring-Fenced: ${formatZAR(summary.ringFencedWorkingCapital)} = Net Deployable: ${formatZAR(summary.totalAvailablePurchasingPower)}`}
                 >
                   <span className="text-slate-300">Less: Ring-Fenced Project Commitments</span>
-                  <span className="text-amber-400 font-semibold">(−{formatZAR(summary.ringFencedWorkingCapital)})</span>
+                  <span className="text-amber-400 font-semibold tabular-nums">(−{formatZAR(summary.ringFencedWorkingCapital)})</span>
                   <span className="text-slate-400 font-bold px-0.5">=</span>
                   <span className="text-slate-300">Net Deployable Purchasing Power:</span>
-                  <strong className="font-bold text-emerald-300">{formatZAR(summary.totalAvailablePurchasingPower)}</strong>
+                  <strong className="font-semibold text-emerald-300 tabular-nums">{formatZAR(summary.totalAvailablePurchasingPower)}</strong>
                 </div>
               </div>
             </div>
 
             <div className="grid grid-cols-2 xl:grid-cols-4 gap-3 border-t lg:border-t-0 lg:border-l border-slate-800 pt-3 lg:pt-0 lg:pl-6">
-              <div className="bg-slate-800/60 rounded-xl p-3 border border-slate-700/60 flex flex-col justify-between">
+              <div className="bg-slate-800/60 rounded-lg p-3 border border-slate-700/60 flex flex-col justify-between">
                 <div>
-                  <span className="text-[11px] text-slate-400 block font-medium">Liquid Cash Reserve</span>
-                  <span className="text-base font-bold text-emerald-300 block mt-0.5">
+                  <span className="text-[11px] uppercase tracking-wider text-slate-400 block font-semibold">Liquid Cash Reserve</span>
+                  <span className="text-base font-bold text-white tabular-nums tracking-tight block mt-0.5">
                     {formatZAR(summary.liquidCapitalReserve)}
                   </span>
                 </div>
@@ -328,30 +329,30 @@ export default function FundingTrackerPage() {
                 </span>
               </div>
 
-              <div className="bg-slate-800/60 rounded-xl p-3 border border-slate-700/60 flex flex-col justify-between">
+              <div className="bg-slate-800/60 rounded-lg p-3 border border-slate-700/60 flex flex-col justify-between">
                 <div>
-                  <span className="text-[11px] text-amber-400 block font-medium">Ring-Fenced Capital</span>
-                  <span className="text-base font-bold text-amber-300 block mt-0.5">
+                  <span className="text-[11px] uppercase tracking-wider text-slate-400 block font-semibold">Ring-Fenced Capital</span>
+                  <span className="text-base font-bold text-amber-300 tabular-nums tracking-tight block mt-0.5">
                     {formatZAR(summary.ringFencedWorkingCapital)}
                   </span>
                 </div>
                 <span className="text-[10px] text-slate-400 block mt-1">Committed to active flips</span>
               </div>
 
-              <div className="bg-slate-800/60 rounded-xl p-3 border border-slate-700/60 flex flex-col justify-between">
+              <div className="bg-slate-800/60 rounded-lg p-3 border border-slate-700/60 flex flex-col justify-between">
                 <div>
-                  <span className="text-[11px] text-slate-400 block font-medium">Unallocated Facilities</span>
-                  <span className="text-base font-bold text-indigo-300 block mt-0.5">
+                  <span className="text-[11px] uppercase tracking-wider text-slate-400 block font-semibold">Unallocated Facilities</span>
+                  <span className="text-base font-bold text-white tabular-nums tracking-tight block mt-0.5">
                     {formatZAR(summary.unallocatedFundingReserve)}
                   </span>
                 </div>
                 <span className="text-[10px] text-slate-400 block mt-1">General liquidity lines</span>
               </div>
 
-              <div className="bg-slate-800/60 rounded-xl p-3 border border-slate-700/60 flex flex-col justify-between">
+              <div className="bg-slate-800/60 rounded-lg p-3 border border-slate-700/60 flex flex-col justify-between">
                 <div>
-                  <span className="text-[11px] text-slate-400 block font-medium">Realized Flip Gains</span>
-                  <span className="text-base font-bold text-slate-200 block mt-0.5">
+                  <span className="text-[11px] uppercase tracking-wider text-slate-400 block font-semibold">Realized Flip Gains</span>
+                  <span className="text-base font-bold text-emerald-400 tabular-nums tracking-tight block mt-0.5">
                     {formatZAR(summary.totalRealizedFlipProfits)}
                   </span>
                 </div>
@@ -363,33 +364,33 @@ export default function FundingTrackerPage() {
 
         {/* Top KPI Metrics Bar */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-xs">
-            <span className="text-[11px] font-semibold text-slate-500 uppercase">Drawn Capital vs Capacity</span>
-            <div className="text-xl font-bold text-slate-900 mt-1">{formatZAR(totalCapitalDrawn)}</div>
-            <p className="text-[11px] text-slate-400 mt-0.5 truncate">
+          <div className="bg-white rounded-xl p-4 border border-slate-200/90 shadow-2xs">
+            <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Drawn Capital vs Capacity</span>
+            <div className="text-xl font-bold text-slate-900 tabular-nums tracking-tight mt-1">{formatZAR(totalCapitalDrawn)}</div>
+            <p className="text-[11px] text-slate-500 mt-0.5 truncate">
               Of {formatZAR(totalFacilityCapacity)} facility capacity ({formatZAR(totalUndrawnFacilities)} undrawn)
             </p>
           </div>
 
-          <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-xs">
-            <span className="text-[11px] font-semibold text-slate-500 uppercase">Monthly Interest Expense</span>
-            <div className="text-xl font-bold text-rose-600 mt-1">
+          <div className="bg-white rounded-xl p-4 border border-slate-200/90 shadow-2xs">
+            <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Monthly Interest Expense</span>
+            <div className="text-xl font-bold text-rose-600 tabular-nums tracking-tight mt-1">
               {formatZAR(totalMonthlyInterestExpense)}
               <span className="text-xs font-normal text-slate-400">/mo</span>
             </div>
             <p className="text-[11px] text-emerald-600 font-medium mt-0.5">Accrues strictly on drawn tranches</p>
           </div>
 
-          <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-xs">
-            <span className="text-[11px] font-semibold text-slate-500 uppercase">Outstanding Liability</span>
-            <div className="text-xl font-bold text-slate-900 mt-1">{formatZAR(totalOutstanding)}</div>
-            <p className="text-[11px] text-slate-400 mt-0.5">Excluding mortgage bonds</p>
+          <div className="bg-white rounded-xl p-4 border border-slate-200/90 shadow-2xs">
+            <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Outstanding Liability</span>
+            <div className="text-xl font-bold text-slate-900 tabular-nums tracking-tight mt-1">{formatZAR(totalOutstanding)}</div>
+            <p className="text-[11px] text-slate-500 mt-0.5">Excluding mortgage bonds</p>
           </div>
 
-          <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-xs">
-            <span className="text-[11px] font-semibold text-slate-500 uppercase">Total Returns Repaid</span>
-            <div className="text-xl font-bold text-emerald-600 mt-1">{formatZAR(totalRepayments)}</div>
-            <p className="text-[11px] text-slate-400 mt-0.5">Interest & capital returned</p>
+          <div className="bg-white rounded-xl p-4 border border-slate-200/90 shadow-2xs">
+            <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Total Returns Repaid</span>
+            <div className="text-xl font-bold text-emerald-600 tabular-nums tracking-tight mt-1">{formatZAR(totalRepayments)}</div>
+            <p className="text-[11px] text-slate-500 mt-0.5">Interest &amp; capital returned</p>
           </div>
         </div>
 
@@ -1009,7 +1010,7 @@ export default function FundingTrackerPage() {
                               className="text-slate-400 hover:text-rose-600 text-xs p-1"
                               title="Delete Tranche"
                             >
-                              ✕
+                              <X className="w-3.5 h-3.5" />
                             </button>
                           )}
                         </div>
@@ -1017,7 +1018,7 @@ export default function FundingTrackerPage() {
                     ))}
                     <div className="text-[11px] text-slate-600 pt-1 flex justify-between font-semibold">
                       <span>Total Phased Facility:</span>
-                      <span className="text-emerald-700 font-bold">
+                      <span className="text-emerald-700 font-bold tabular-nums">
                         {formatZAR(customTranches.reduce((s, t) => s + (Number(t.amountZAR) || 0), 0))}
                       </span>
                     </div>
@@ -1035,7 +1036,7 @@ export default function FundingTrackerPage() {
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-semibold shadow-xs cursor-pointer"
+                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-semibold shadow-xs border-t border-white/15 cursor-pointer"
                 >
                   Save Capital Source
                 </button>
@@ -1058,9 +1059,9 @@ export default function FundingTrackerPage() {
               <button
                 type="button"
                 onClick={() => setSyncModalSource(null)}
-                className="text-slate-400 hover:text-slate-600 font-bold text-base cursor-pointer"
+                className="text-slate-400 hover:text-slate-600 font-bold text-base cursor-pointer p-1"
               >
-                ✕
+                <X className="w-4 h-4" />
               </button>
             </div>
 

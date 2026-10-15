@@ -378,7 +378,7 @@ export default function GetStartedPage() {
         <section
           id="go-live"
           aria-labelledby="go-live-title"
-          className="scroll-mt-20 bg-gradient-to-r from-emerald-950 via-slate-900 to-slate-900 text-white rounded-2xl p-4 sm:p-6 border border-emerald-800/40 shadow-lg space-y-3"
+          className="scroll-mt-20 bg-slate-900 text-white rounded-xl p-4 sm:p-6 border border-slate-800 shadow-xs space-y-3"
           data-testid="guide-go-live"
         >
           <div className="flex items-start gap-3">

@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { FlipProject } from '@/types';
 import { formatZAR } from '@/lib/formatters';
-import { CheckCircle2 } from 'lucide-react';
+import { CheckCircle2, X } from 'lucide-react';
 import { usePortfolioStore } from '@/lib/store/usePortfolioStore';
 
 export interface FlipExitModalProps {
@@ -134,9 +134,10 @@ export const FlipExitModal: React.FC<FlipExitModalProps> = ({
           <button
             type="button"
             onClick={onClose}
-            className="text-slate-400 hover:text-slate-700 font-bold cursor-pointer"
+            className="text-slate-400 hover:text-slate-700 p-1 rounded-md transition-colors cursor-pointer"
+            aria-label="Close dialog"
           >
-            ✕
+            <X className="w-4 h-4" />
           </button>
         </div>
 

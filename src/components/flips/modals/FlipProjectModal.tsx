@@ -11,6 +11,7 @@ import {
   CheckCircle2,
   Landmark,
   Scale,
+  X,
 } from 'lucide-react';
 import { usePortfolioStore } from '@/lib/store/usePortfolioStore';
 import InvestmentNodeSelect, { InvestmentNodeBanner } from '@/components/common/InvestmentNodeSelect';
@@ -565,9 +566,10 @@ export const FlipProjectModal: React.FC<FlipProjectModalProps> = ({
           <button
             type="button"
             onClick={handleClose}
-            className="text-slate-400 hover:text-slate-600 p-1 rounded-lg text-sm font-bold cursor-pointer"
+            className="text-slate-400 hover:text-slate-600 p-1 rounded-lg transition-colors cursor-pointer"
+            aria-label="Close dialog"
           >
-            ✕
+            <X className="w-4 h-4" />
           </button>
         </div>
 

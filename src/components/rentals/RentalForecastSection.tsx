@@ -44,7 +44,7 @@ export function RentalForecastSection({
       >
         <span className="flex items-center gap-1.5 font-bold">
           <TrendingUp className="w-3.5 h-3.5 text-emerald-600" />
-          <span>📈 20-Year Long-Term Forecast</span>
+          <span>20-Year Long-Term Forecast</span>
           <span className="text-[10px] font-normal text-slate-400 hidden sm:inline">
             (5% Growth • 6% Esc.)
           </span>

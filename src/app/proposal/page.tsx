@@ -35,6 +35,11 @@ import {
   Users,
   Gavel,
   Scale,
+  Building2,
+  RefreshCw,
+  FileText,
+  Briefcase,
+  Handshake,
 } from 'lucide-react';
 import {
   calculateRentalHoldingCosts,
@@ -689,39 +694,39 @@ function ProposalGeneratorContent() {
                 <button
                   type="button"
                   onClick={() => setPitchStrategy('Flip')}
-                  className={`px-2 sm:px-3 py-1.5 rounded-md text-xs font-bold transition-all flex items-center justify-center gap-1 text-center min-w-0 ${
+                  className={`px-2 sm:px-3 py-1.5 rounded-md text-xs font-semibold transition-all flex items-center justify-center gap-1.5 text-center min-w-0 ${
                     pitchStrategy === 'Flip'
-                      ? 'bg-white text-emerald-800 shadow-xs border border-slate-200/60'
+                      ? 'bg-white text-emerald-800 shadow-xs border border-slate-200/60 font-bold'
                       : 'text-slate-600 hover:text-slate-900'
                   }`}
                 >
-                  <span>🔄</span>
-                  <span className="truncate">Buy & Flip</span>
+                  <Hammer className="w-3.5 h-3.5 text-emerald-700 shrink-0" />
+                  <span className="truncate">Buy &amp; Flip</span>
                   {pitchStrategy === 'Flip' && <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0"></span>}
                 </button>
                 <button
                   type="button"
                   onClick={() => setPitchStrategy('Rental')}
-                  className={`px-2 sm:px-3 py-1.5 rounded-md text-xs font-bold transition-all flex items-center justify-center gap-1 text-center min-w-0 ${
+                  className={`px-2 sm:px-3 py-1.5 rounded-md text-xs font-semibold transition-all flex items-center justify-center gap-1.5 text-center min-w-0 ${
                     pitchStrategy === 'Rental'
-                      ? 'bg-white text-indigo-800 shadow-xs border border-slate-200/60'
+                      ? 'bg-white text-indigo-800 shadow-xs border border-slate-200/60 font-bold'
                       : 'text-slate-600 hover:text-slate-900'
                   }`}
                 >
-                  <span>🏠</span>
-                  <span className="truncate">Buy & Hold</span>
+                  <Building2 className="w-3.5 h-3.5 text-indigo-700 shrink-0" />
+                  <span className="truncate">Buy &amp; Hold</span>
                   {pitchStrategy === 'Rental' && <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 shrink-0"></span>}
                 </button>
                 <button
                   type="button"
                   onClick={() => setPitchStrategy('BRRRR')}
-                  className={`px-2 sm:px-3 py-1.5 rounded-md text-xs font-bold transition-all flex items-center justify-center gap-1 text-center min-w-0 ${
+                  className={`px-2 sm:px-3 py-1.5 rounded-md text-xs font-semibold transition-all flex items-center justify-center gap-1.5 text-center min-w-0 ${
                     pitchStrategy === 'BRRRR'
-                      ? 'bg-white text-purple-800 shadow-xs border border-slate-200/60'
+                      ? 'bg-white text-purple-800 shadow-xs border border-slate-200/60 font-bold'
                       : 'text-slate-600 hover:text-slate-900'
                   }`}
                 >
-                  <span>⚡</span>
+                  <RefreshCw className="w-3.5 h-3.5 text-purple-700 shrink-0" />
                   <span className="truncate">BRRRR</span>
                   {pitchStrategy === 'BRRRR' && <span className="w-1.5 h-1.5 rounded-full bg-purple-500 shrink-0"></span>}
                 </button>
@@ -782,14 +787,29 @@ function ProposalGeneratorContent() {
                   <span className="text-[10px] bg-slate-100 text-slate-700 font-bold px-2 py-0.5 rounded">
                     South Africa (ZAR)
                   </span>
-                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${
+                  <span className={`text-[10px] font-semibold px-2 py-0.5 rounded border flex items-center gap-1 ${
                     isFlip 
-                      ? 'bg-amber-50 text-amber-800 border-amber-200' 
+                      ? 'bg-slate-100 text-slate-800 border-slate-200' 
                       : pitchStrategy === 'BRRRR'
-                      ? 'bg-purple-50 text-purple-800 border-purple-200'
-                      : 'bg-indigo-50 text-indigo-800 border-indigo-200'
+                      ? 'bg-slate-100 text-slate-800 border-slate-200'
+                      : 'bg-slate-100 text-slate-800 border-slate-200'
                   }`}>
-                    {isFlip ? '🔄 Buy & Flip Mandate' : pitchStrategy === 'BRRRR' ? '⚡ Hybrid BRRRR Strategy' : '🏠 Buy & Hold Rental'}
+                    {isFlip ? (
+                      <>
+                        <Hammer className="w-3 h-3 text-emerald-700" />
+                        <span>Buy &amp; Flip Mandate</span>
+                      </>
+                    ) : pitchStrategy === 'BRRRR' ? (
+                      <>
+                        <RefreshCw className="w-3 h-3 text-purple-700" />
+                        <span>Hybrid BRRRR Strategy</span>
+                      </>
+                    ) : (
+                      <>
+                        <Building2 className="w-3 h-3 text-indigo-700" />
+                        <span>Buy &amp; Hold Rental</span>
+                      </>
+                    )}
                   </span>
                   {deal.source && (
                     <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-100 text-slate-800 border border-slate-300">
@@ -934,33 +954,39 @@ function ProposalGeneratorContent() {
                 </h2>
                 <div className="flex items-center gap-1.5 flex-wrap">
                   {deal.source === 'High-Street Auction' && (
-                    <span className="text-[10px] font-extrabold px-2 py-0.5 rounded bg-amber-100 text-amber-900 border border-amber-300 flex items-center gap-1">
-                      ⚡ 10% Cash Deposit Fall-of-Hammer • 21-Day Bank Guarantee
+                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-slate-100 text-slate-800 border border-slate-200/80 flex items-center gap-1.5">
+                      <Zap className="w-3 h-3 text-amber-700 shrink-0" />
+                      <span>10% Cash Deposit Fall-of-Hammer • 21-Day Bank Guarantee</span>
                     </span>
                   )}
                   {deal.source === 'Distressed Sale / Repo' && (
-                    <span className="text-[10px] font-extrabold px-2 py-0.5 rounded bg-rose-100 text-rose-900 border border-rose-300 flex items-center gap-1">
-                      🛡️ Bank Repo Foreclosure • Section 118 Rates Clearance
+                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-slate-100 text-slate-800 border border-slate-200/80 flex items-center gap-1.5">
+                      <ShieldCheck className="w-3 h-3 text-rose-700 shrink-0" />
+                      <span>Bank Repo Foreclosure • Section 118 Rates Clearance</span>
                     </span>
                   )}
                   {deal.source === 'iGrow Rentals' && (
-                    <span className="text-[10px] font-extrabold px-2 py-0.5 rounded bg-emerald-100 text-emerald-900 border border-emerald-300 flex items-center gap-1">
-                      🏢 Turnkey Developer Stock • Section 13sex Eligible • R0 Transfer Duty
+                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-slate-100 text-slate-800 border border-slate-200/80 flex items-center gap-1.5">
+                      <Building2 className="w-3 h-3 text-emerald-700 shrink-0" />
+                      <span>Turnkey Developer Stock • Section 13sex Eligible • R0 Transfer Duty</span>
                     </span>
                   )}
                   {deal.source === 'Direct Owner' && (
-                    <span className="text-[10px] font-extrabold px-2 py-0.5 rounded bg-indigo-100 text-indigo-900 border border-indigo-300 flex items-center gap-1">
-                      🤝 Off-Market Sourcing • Zero Agent Commission
+                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-slate-100 text-slate-800 border border-slate-200/80 flex items-center gap-1.5">
+                      <Handshake className="w-3 h-3 text-indigo-700 shrink-0" />
+                      <span>Off-Market Sourcing • Zero Agent Commission</span>
                     </span>
                   )}
                   {deal.source === 'Private Agent' && (
-                    <span className="text-[10px] font-extrabold px-2 py-0.5 rounded bg-blue-100 text-blue-900 border border-blue-300 flex items-center gap-1">
-                      📋 Compliant OTP • Verified Deeds Office CMA Comps
+                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-slate-100 text-slate-800 border border-slate-200/80 flex items-center gap-1.5">
+                      <FileText className="w-3 h-3 text-blue-700 shrink-0" />
+                      <span>Compliant OTP • Verified Deeds Office CMA Comps</span>
                     </span>
                   )}
                   {deal.type === 'rental' && (
-                    <span className="text-[10px] font-extrabold px-2 py-0.5 rounded bg-teal-100 text-teal-900 border border-teal-300 flex items-center gap-1">
-                      💼 Stabilized Portfolio Asset • In-Place Paying Tenancy
+                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-slate-100 text-slate-800 border border-slate-200/80 flex items-center gap-1.5">
+                      <Briefcase className="w-3 h-3 text-teal-700 shrink-0" />
+                      <span>Stabilized Portfolio Asset • In-Place Paying Tenancy</span>
                     </span>
                   )}
                 </div>
@@ -1051,8 +1077,9 @@ function ProposalGeneratorContent() {
                     <h2 className="text-sm uppercase tracking-wider font-extrabold text-slate-900">
                       Rent Roll &amp; Collection Track Record
                     </h2>
-                    <span className="text-[10px] bg-teal-100 text-teal-800 font-bold px-2 py-0.5 rounded border border-teal-300">
-                      💼 Stabilized Portfolio Asset
+                    <span className="text-[10px] bg-teal-100 text-teal-800 font-bold px-2 py-0.5 rounded border border-teal-300 inline-flex items-center gap-1">
+                      <Briefcase className="w-3 h-3 text-teal-700" />
+                      Stabilized Portfolio Asset
                     </span>
                   </div>
                   <label className="no-print inline-flex items-center gap-2 cursor-pointer bg-slate-100 hover:bg-slate-200 border border-slate-300 px-2.5 py-1 rounded-md text-xs font-semibold text-slate-700 transition-colors">
@@ -1076,7 +1103,7 @@ function ProposalGeneratorContent() {
                     <AlertTriangle className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
                     <div className="space-y-1">
                       <span className="font-bold text-amber-900 block text-xs">
-                        ⚠️ Tenant Collection Risk: Historical Under-Collection ({deal.collectionRate.toFixed(1)}%)
+                        Tenant Collection Risk: Historical Under-Collection ({deal.collectionRate.toFixed(1)}%)
                       </span>
                       <p className="text-amber-800 leading-relaxed text-[11px]">
                         The tracked 12-month tenant collection rate is <strong>{deal.collectionRate.toFixed(1)}%</strong> ({formatZAR(deal.totalCollected12m)} collected of {formatZAR(deal.totalBilled12m)} billed) with an outstanding tenant arrears receivable of <strong>{formatZAR(deal.tenantArrears)}</strong> ({deal.overdueMonths} {deal.overdueMonths === 1 ? 'month' : 'months'} overdue). Underwriting and long-term projections have been adjusted to reflect actual historical credit performance.
@@ -1749,8 +1776,9 @@ function ProposalGeneratorContent() {
                     <h2 className="text-sm uppercase tracking-wider font-extrabold text-slate-900">
                       4. Hybrid BRRRR Strategy: 2-Phase Refinance & Capital Recycling Model
                     </h2>
-                    <span className="text-[10px] bg-purple-100 text-purple-800 font-bold px-2 py-0.5 rounded border border-purple-300">
-                      ⚡ BRRRR Lifecycle
+                    <span className="text-[10px] bg-purple-100 text-purple-800 font-bold px-2 py-0.5 rounded border border-purple-300 inline-flex items-center gap-1">
+                      <Zap className="w-3 h-3 text-purple-700" />
+                      BRRRR Lifecycle
                     </span>
                   </div>
                   <span className="text-[10px] font-semibold text-slate-500">
@@ -1890,8 +1918,9 @@ function ProposalGeneratorContent() {
                     <h2 className="text-sm uppercase tracking-wider font-extrabold text-slate-900">
                       4. Long-Term Wealth & Equity Projections ({projectionData.length}-Year Horizon)
                     </h2>
-                    <span className="text-[10px] bg-indigo-100 text-indigo-800 font-bold px-2 py-0.5 rounded border border-indigo-200">
-                      🏠 Buy & Hold Rental
+                    <span className="text-[10px] bg-indigo-100 text-indigo-800 font-bold px-2 py-0.5 rounded border border-indigo-200 inline-flex items-center gap-1">
+                      <Building2 className="w-3 h-3 text-indigo-700" />
+                      Buy & Hold Rental
                     </span>
                   </div>
                   <span className="text-[10px] font-semibold text-slate-500">

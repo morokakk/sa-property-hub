@@ -15,6 +15,7 @@ import {
   MessageCircle,
   Mail,
   AlertCircle,
+  User,
 } from 'lucide-react';
 
 export interface RentalCardHeaderProps {
@@ -158,13 +159,14 @@ export function RentalCardHeader({
         {/* Management Status & 1-Click Contact */}
         <div className="flex items-center justify-between gap-2 pt-1 border-t border-slate-50">
           {property.managementType === 'Agency' ? (
-            <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200 truncate">
+            <span className="inline-flex items-center gap-1.5 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200 truncate">
               <Building2 className="w-3 h-3 text-indigo-600 shrink-0" />
-              <span className="truncate">🏢 Managed: {property.agencyName || 'Agency'} ({property.agencyCommissionPercent || 8}%{property.agencyVatApplicable !== false ? ` + VAT = ${((property.agencyCommissionPercent || 8) * 1.15).toFixed(1)}%` : ''})</span>
+              <span className="truncate">Managed: {property.agencyName || 'Agency'} ({property.agencyCommissionPercent || 8}%{property.agencyVatApplicable !== false ? ` + VAT = ${((property.agencyCommissionPercent || 8) * 1.15).toFixed(1)}%` : ''})</span>
             </span>
           ) : (
-            <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200 shrink-0">
-              <span>👤 Self-Managed</span>
+            <span className="inline-flex items-center gap-1.5 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200 shrink-0">
+              <User className="w-3 h-3 text-slate-600 shrink-0" />
+              <span>Self-Managed</span>
             </span>
           )}
 
@@ -181,9 +183,9 @@ export function RentalCardHeader({
         <div className="bg-rose-50 border-y border-rose-200 px-4 py-2 flex items-center justify-between text-xs">
           <span className="flex items-center gap-1.5 font-bold text-rose-700">
             <AlertCircle className="w-3.5 h-3.5 text-rose-600 animate-pulse" />
-            ⚠️ Tenant Default Risk: Arrears Accruing
+            Tenant Default Risk: Arrears Accruing
           </span>
-          <span className="font-extrabold text-rose-700 font-mono">
+          <span className="font-extrabold text-rose-700 font-mono tabular-nums tracking-tight">
             -{formatZAR(arrearsInfo.totalArrearsZAR)}
           </span>
         </div>
@@ -193,18 +195,18 @@ export function RentalCardHeader({
       <div className="p-4 bg-slate-50/60 grid grid-cols-3 gap-2 text-center border-b border-slate-100 text-xs">
         <div>
           <span className="text-[10px] text-slate-400 block">Market Value</span>
-          <strong className="text-slate-900">{formatZAR(property.marketValueZAR, { compact: true })}</strong>
+          <strong className="text-slate-900 tabular-nums tracking-tight">{formatZAR(property.marketValueZAR, { compact: true })}</strong>
         </div>
         <div>
           <span className="text-[10px] text-slate-400 block">Gross Yield</span>
-          <strong className="text-emerald-700">{formatPercent(grossYieldPercent)}</strong>
+          <strong className="text-emerald-700 tabular-nums tracking-tight">{formatPercent(grossYieldPercent)}</strong>
         </div>
         <div>
           <span className="text-[10px] text-slate-400 block">Net Cashflow</span>
-          <strong className={netCashflow >= 0 ? 'text-emerald-700' : 'text-rose-600'}>
+          <strong className={`${netCashflow >= 0 ? 'text-emerald-700' : 'text-rose-600'} tabular-nums tracking-tight`}>
             {formatZAR(netCashflow)}/m
           </strong>
-          <span className="text-[9px] text-slate-400 block font-normal">
+          <span className="text-[9px] text-slate-400 block font-normal tabular-nums tracking-tight">
             Post-tax: {formatZAR(postTaxCashflow)}/m
           </span>
         </div>

@@ -30,6 +30,11 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+/* Institutional Financial Typography */
+table, th, td, .tabular-nums, [data-metric], [data-currency] {
+  font-variant-numeric: tabular-nums;
+}
+
 /* Custom Scrollbar for clean financial dashboards */
 ::-webkit-scrollbar {
   width: 6px;

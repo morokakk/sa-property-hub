@@ -154,13 +154,13 @@ export default function TopHeader({ title, subtitle, actionButton }: TopHeaderPr
           </div>
 
           {/* Net Equity Quick Pill (Visible on mobile next to title) */}
-          <div className="md:hidden bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-lg flex items-center gap-1.5 shrink-0">
-            <Coins className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+          <div className="md:hidden bg-slate-50 border border-slate-200/90 px-2.5 py-1 rounded-md flex items-center gap-2 shrink-0">
+            <Coins className="w-3.5 h-3.5 text-slate-700 shrink-0" />
             <div className="text-left">
-              <span className="text-[8px] uppercase font-semibold text-emerald-800 tracking-wider block leading-none">
+              <span className="text-[9px] uppercase font-semibold text-slate-500 tracking-wider block leading-none">
                 Net Equity
               </span>
-              <span className="text-xs font-bold text-emerald-950" suppressHydrationWarning>
+              <span className="text-xs font-bold text-slate-900 tabular-nums tracking-tight" suppressHydrationWarning>
                 {isMounted ? formatZAR(summary.netEquity) : 'R 10 735 000'}
               </span>
             </div>
@@ -170,13 +170,15 @@ export default function TopHeader({ title, subtitle, actionButton }: TopHeaderPr
         {/* Row 2 on mobile / Right on desktop */}
         <div className="flex flex-wrap items-center justify-between md:justify-end gap-2 sm:gap-2.5 w-full md:w-auto min-w-0">
           {/* Net Equity Quick Pill (Visible on large desktop) */}
-          <div className="hidden xl:flex bg-emerald-50 border border-emerald-200 px-3.5 py-1.5 rounded-lg items-center gap-2 shrink-0">
-            <Coins className="w-4 h-4 text-emerald-600 shrink-0" />
+          <div className="hidden xl:flex bg-slate-50 border border-slate-200/90 px-3.5 py-1.5 rounded-lg items-center gap-2.5 shrink-0 shadow-2xs">
+            <div className="w-6 h-6 rounded-md bg-white border border-slate-200/80 flex items-center justify-center text-slate-700 shrink-0">
+              <Coins className="w-3.5 h-3.5" />
+            </div>
             <div className="text-left">
-              <span className="text-[10px] uppercase font-semibold text-emerald-800 tracking-wider block leading-none">
+              <span className="text-[10px] uppercase font-semibold text-slate-500 tracking-wider block leading-none">
                 Net Equity (ZAR)
               </span>
-              <span className="text-sm font-bold text-emerald-950" suppressHydrationWarning>
+              <span className="text-sm font-bold text-slate-900 tabular-nums tracking-tight" suppressHydrationWarning>
                 {isMounted ? formatZAR(summary.netEquity) : 'R 10 735 000'}
               </span>
             </div>
@@ -228,9 +230,9 @@ export default function TopHeader({ title, subtitle, actionButton }: TopHeaderPr
                   </div>
                   <button
                     onClick={handleExportExcel}
-                    className="w-full px-3 py-2 text-left text-xs text-slate-700 hover:bg-emerald-50 hover:text-emerald-900 flex items-start gap-2.5 transition-colors cursor-pointer"
+                    className="w-full px-3 py-2 text-left text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-900 flex items-start gap-2.5 transition-colors cursor-pointer"
                   >
-                    <div className="p-1 rounded bg-emerald-100 text-emerald-700 mt-0.5 shrink-0">
+                    <div className="w-7 h-7 rounded-md bg-slate-100 border border-slate-200/80 text-slate-700 flex items-center justify-center mt-0.5 shrink-0">
                       <FileSpreadsheet className="w-3.5 h-3.5" />
                     </div>
                     <div>
@@ -241,9 +243,9 @@ export default function TopHeader({ title, subtitle, actionButton }: TopHeaderPr
 
                   <button
                     onClick={handleExportJournal}
-                    className="w-full px-3 py-2 text-left text-xs text-slate-700 hover:bg-amber-50 hover:text-amber-900 flex items-start gap-2.5 transition-colors cursor-pointer"
+                    className="w-full px-3 py-2 text-left text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-900 flex items-start gap-2.5 transition-colors cursor-pointer"
                   >
-                    <div className="p-1 rounded bg-amber-100 text-amber-700 mt-0.5 shrink-0">
+                    <div className="w-7 h-7 rounded-md bg-slate-100 border border-slate-200/80 text-slate-700 flex items-center justify-center mt-0.5 shrink-0">
                       <BookOpen className="w-3.5 h-3.5" />
                     </div>
                     <div className="min-w-0 break-words">
@@ -254,9 +256,9 @@ export default function TopHeader({ title, subtitle, actionButton }: TopHeaderPr
 
                   <button
                     onClick={handleExportJSON}
-                    className="w-full px-3 py-2 text-left text-xs text-slate-700 hover:bg-indigo-50 hover:text-indigo-900 flex items-start gap-2.5 transition-colors cursor-pointer"
+                    className="w-full px-3 py-2 text-left text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-900 flex items-start gap-2.5 transition-colors cursor-pointer"
                   >
-                    <div className="p-1 rounded bg-indigo-100 text-indigo-700 mt-0.5 shrink-0">
+                    <div className="w-7 h-7 rounded-md bg-slate-100 border border-slate-200/80 text-slate-700 flex items-center justify-center mt-0.5 shrink-0">
                       <FileCode2 className="w-3.5 h-3.5" />
                     </div>
                     <div>

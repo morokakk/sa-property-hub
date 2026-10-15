@@ -141,7 +141,7 @@ export function RentalCard({
             <span className="flex items-center gap-1.5 font-bold text-amber-900 truncate">
               <Clock className="w-3.5 h-3.5 text-amber-600 shrink-0" />
               <span className="truncate">
-                ⚠️ Notice: {noticeLease.tenantName} vacating {formatDate(noticeLease.vacationDate || '')} ({noticeLease.noticeReason || 'Moving Out'})
+                Notice: {noticeLease.tenantName} vacating {formatDate(noticeLease.vacationDate || '')} ({noticeLease.noticeReason || 'Moving Out'})
               </span>
             </span>
             {onOpenNoticeModal && (

@@ -202,9 +202,9 @@ export default function LongTermProjectionChart({
   return (
     <div className={`space-y-4 print:space-y-3 ${className}`}>
       {/* Interactive Active Snapshot Bar (Hidden on print) */}
-      <div className="no-print bg-slate-900 text-white rounded-xl p-3.5 sm:p-4 border border-slate-800 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-3">
+      <div className={`no-print bg-slate-900 text-white rounded-xl p-3 sm:p-4 border border-slate-800 shadow-xs flex flex-col ${compact ? 'gap-3' : 'md:flex-row md:items-center justify-between gap-3'}`}>
         <div className="flex items-center gap-3">
-          <div className="p-2.5 rounded-lg bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+          <div className="p-2.5 rounded-lg bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 shrink-0">
             <TrendingUp className="w-5 h-5" />
           </div>
           <div>
@@ -222,7 +222,7 @@ export default function LongTermProjectionChart({
                 </span>
               )}
             </div>
-            <div className="text-lg sm:text-xl font-extrabold text-white font-mono mt-0.5">
+            <div className="text-lg sm:text-xl font-extrabold text-white font-mono mt-0.5 tabular-nums tracking-tight">
               Net Equity: <span className="text-emerald-400">{formatZAR(activeSnapshot.netEquity)}</span>
             </div>
           </div>
@@ -230,27 +230,29 @@ export default function LongTermProjectionChart({
 
         <div className={`grid gap-2 text-xs ${compact ? 'grid-cols-2' : 'grid-cols-2 sm:grid-cols-4'}`}>
           <div className="bg-slate-800/80 p-2 rounded-lg border border-slate-700">
-            <span className="text-[10px] text-slate-400 block font-medium">Property Value</span>
-            <span className="font-bold text-slate-100 text-xs">
+            <span className="text-[10px] text-slate-400 block font-medium truncate">Property Value</span>
+            <span className="font-bold text-slate-100 text-xs tabular-nums tracking-tight">
               {compact ? formatCompactZAR(activeSnapshot.propertyValue) : formatZAR(activeSnapshot.propertyValue)}
             </span>
           </div>
           <div className="bg-slate-800/80 p-2 rounded-lg border border-slate-700">
-            <span className="text-[10px] text-rose-400 block font-medium">Outstanding Bond</span>
-            <span className="font-bold text-rose-300 text-xs">
+            <span className="text-[10px] text-rose-400 block font-medium truncate" title="Outstanding Bond Balance">
+              Bond Balance
+            </span>
+            <span className="font-bold text-rose-300 text-xs tabular-nums tracking-tight">
               {compact ? formatCompactZAR(activeSnapshot.outstandingBond) : formatZAR(activeSnapshot.outstandingBond)}
             </span>
           </div>
           <div className="bg-slate-800/80 p-2 rounded-lg border border-slate-700">
-            <span className="text-[10px] text-indigo-400 block font-medium">Annual Rent</span>
-            <span className="font-bold text-indigo-300 text-xs">
+            <span className="text-[10px] text-indigo-400 block font-medium truncate">Annual Rent</span>
+            <span className="font-bold text-indigo-300 text-xs tabular-nums tracking-tight">
               {compact ? formatCompactZAR(activeSnapshot.rent) : formatZAR(activeSnapshot.rent)}
             </span>
           </div>
           <div className="bg-slate-800/80 p-2 rounded-lg border border-slate-700">
-            <span className="text-[10px] text-emerald-400 block font-medium">Annual Cashflow</span>
+            <span className="text-[10px] text-emerald-400 block font-medium truncate">Annual Cashflow</span>
             <span
-              className={`font-bold text-xs ${
+              className={`font-bold text-xs tabular-nums tracking-tight ${
                 activeSnapshot.netCashflow >= 0 ? 'text-emerald-400' : 'text-rose-400'
               }`}
             >

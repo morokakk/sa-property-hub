@@ -40,11 +40,11 @@ export default function CloudPublishModal({
         onClick={(e) => e.stopPropagation()}
       >
         {/* Modal Header */}
-        <div className="bg-gradient-to-r from-sky-900 via-sky-800 to-indigo-900 p-5 sm:p-6 text-white flex items-start justify-between gap-4">
+        <div className="bg-slate-900 border-b border-slate-800 p-5 sm:p-6 text-white flex items-start justify-between gap-4">
           <div className="flex items-start gap-3">
-            <div className="p-2.5 bg-white/10 rounded-xl border border-white/20 text-sky-200 shrink-0 shadow-inner">
+            <div className="w-10 h-10 rounded-md bg-slate-800 border border-slate-700 text-slate-300 flex items-center justify-center shrink-0">
               <div className="relative">
-                <Cloud className="w-6 h-6 text-sky-200" />
+                <Cloud className="w-5 h-5 text-slate-300" />
                 <ShieldCheck className="w-3.5 h-3.5 text-emerald-400 absolute -bottom-1 -right-1" />
               </div>
             </div>
@@ -55,7 +55,7 @@ export default function CloudPublishModal({
               >
                 Cloud Sync Required to Share Online
               </h2>
-              <p className="text-xs text-sky-200/90 mt-0.5">
+              <p className="text-xs text-slate-400 mt-0.5">
                 Public tenant statements require private cloud hosting
               </p>
             </div>
@@ -64,7 +64,7 @@ export default function CloudPublishModal({
             type="button"
             data-testid="close-publish-modal-btn"
             onClick={onClose}
-            className="text-white/70 hover:text-white p-1.5 rounded-lg hover:bg-white/10 transition-colors cursor-pointer shrink-0"
+            className="text-slate-400 hover:text-white p-1.5 rounded-lg hover:bg-slate-800 transition-colors cursor-pointer shrink-0"
             aria-label="Close dialog"
           >
             <X className="w-5 h-5" />

@@ -38,10 +38,10 @@ export function FlipMetricsCards({
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3.5">
       {/* 1. Purchase & Costs */}
-      <div className="bg-white p-3.5 rounded-xl border border-slate-200 shadow-xs flex flex-col justify-between min-h-[112px]">
+      <div className="bg-white p-3.5 rounded-xl border border-slate-200/90 shadow-2xs flex flex-col justify-between min-h-[112px]">
         <div>
-          <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide">Purchase & Costs</span>
-          <div className="text-xl font-bold text-slate-900 mt-0.5">
+          <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Purchase &amp; Costs</span>
+          <div className="text-xl font-bold text-slate-900 tabular-nums tracking-tight mt-0.5">
             {formatZAR(flip.purchasePriceZAR + flip.acquisitionCostsZAR + totalMunicipalClearanceOutlay)}
           </div>
         </div>
@@ -49,7 +49,7 @@ export function FlipMetricsCards({
           className="text-[11px] text-slate-500 mt-1 leading-tight"
           title={`Purchase Price: ${formatZAR(flip.purchasePriceZAR)} • Conveyancing & Duty: ${formatZAR(flip.acquisitionCostsZAR)}${totalMunicipalClearanceOutlay > 0 ? ` • Sec 118 RCC Outlay: ${formatZAR(totalMunicipalClearanceOutlay)}` : ''}`}
         >
-          <div>Acq & Legal: {formatZAR(flip.purchasePriceZAR + flip.acquisitionCostsZAR, { compact: true })}</div>
+          <div>Acq &amp; Legal: {formatZAR(flip.purchasePriceZAR + flip.acquisitionCostsZAR, { compact: true })}</div>
           <div className="text-[10px] text-slate-400">
             {totalMunicipalClearanceOutlay > 0 ? `Sec 118: ${formatZAR(totalMunicipalClearanceOutlay, { compact: true })}` : 'Rates Clearance: R 0'}
           </div>
@@ -57,10 +57,10 @@ export function FlipMetricsCards({
       </div>
 
       {/* 2. BOQ Renovation Spend */}
-      <div className="bg-white p-3.5 rounded-xl border border-slate-200 shadow-xs flex flex-col justify-between min-h-[112px]">
+      <div className="bg-white p-3.5 rounded-xl border border-slate-200/90 shadow-2xs flex flex-col justify-between min-h-[112px]">
         <div>
-          <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide">BOQ Renovation Spend</span>
-          <div className="text-xl font-bold text-indigo-700 mt-0.5">
+          <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">BOQ Renovation Spend</span>
+          <div className="text-xl font-bold text-indigo-700 tabular-nums tracking-tight mt-0.5">
             {formatZAR(totalBOQActual)}
           </div>
         </div>
@@ -76,16 +76,16 @@ export function FlipMetricsCards({
       {/* 3. Total Holding Cost Card (Expandable Itemization) */}
       <div
         id="flips-holding-cost"
-        className="scroll-mt-20 bg-white p-3.5 rounded-xl border border-amber-200/90 shadow-xs flex flex-col justify-between min-h-[112px] relative"
+        className="scroll-mt-20 bg-white p-3.5 rounded-xl border border-amber-200/90 shadow-2xs flex flex-col justify-between min-h-[112px] relative"
       >
         <div>
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide">Total Holding Cost</span>
-            <span className="text-[10px] text-amber-800 bg-amber-50 px-1.5 py-0.5 rounded font-bold border border-amber-200">
+            <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Total Holding Cost</span>
+            <span className="text-[10px] text-amber-800 bg-amber-50 px-1.5 py-0.5 rounded font-bold border border-amber-200 tabular-nums">
               {flipHoldingMonths} Mos
             </span>
           </div>
-          <div className="text-xl font-bold text-amber-700 mt-0.5">
+          <div className="text-xl font-bold text-amber-700 tabular-nums tracking-tight mt-0.5">
             - {formatZAR(totalHoldingCost)}
           </div>
         </div>
@@ -108,7 +108,7 @@ export function FlipMetricsCards({
             <div className="font-bold text-slate-800 border-b border-amber-100 pb-1 mb-1.5">Monthly Carrying Burn Breakdown</div>
             <div className="flex justify-between">
               <span>Interim Bond:</span>
-              <strong className="text-slate-800 font-semibold">{formatZAR(flip.monthlyBondPaymentZAR || 0)}/m</strong>
+              <strong className="text-slate-800 font-semibold tabular-nums">{formatZAR(flip.monthlyBondPaymentZAR || 0)}/m</strong>
             </div>
             <div className="flex justify-between">
               <span>{flip.propertyType === 'Freehold House' ? 'Levies (N/A):' : 'Body Corporate / HOA:'}</span>
@@ -117,23 +117,23 @@ export function FlipMetricsCards({
               </strong>
             </div>
             <div className="flex justify-between">
-              <span>Rates & Taxes:</span>
-              <strong className="text-slate-800 font-semibold">{formatZAR(flip.monthlyRatesTaxesZAR || 0)}/m</strong>
+              <span>Rates &amp; Taxes:</span>
+              <strong className="text-slate-800 font-semibold tabular-nums">{formatZAR(flip.monthlyRatesTaxesZAR || 0)}/m</strong>
             </div>
             <div className="flex justify-between">
-              <span>Security & Other:</span>
-              <strong className="text-slate-800 font-semibold">{formatZAR(flip.monthlyOtherHoldingCostZAR || 0)}/m</strong>
+              <span>Security &amp; Other:</span>
+              <strong className="text-slate-800 font-semibold tabular-nums">{formatZAR(flip.monthlyOtherHoldingCostZAR || 0)}/m</strong>
             </div>
           </div>
         )}
       </div>
 
       {/* 4. Budget Variance */}
-      <div className="bg-white p-3.5 rounded-xl border border-slate-200 shadow-xs flex flex-col justify-between min-h-[112px]">
+      <div className="bg-white p-3.5 rounded-xl border border-slate-200/90 shadow-2xs flex flex-col justify-between min-h-[112px]">
         <div>
-          <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide">Budget Variance</span>
+          <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Budget Variance</span>
           <div
-            className={`text-xl font-bold mt-0.5 ${
+            className={`text-xl font-bold tabular-nums tracking-tight mt-0.5 ${
               totalBOQVariance <= 0 ? 'text-emerald-600' : 'text-rose-600'
             }`}
           >
@@ -152,33 +152,33 @@ export function FlipMetricsCards({
       </div>
 
       {/* 5. Target Exit Valuation */}
-      <div className="bg-white p-3.5 rounded-xl border border-slate-200 shadow-xs flex flex-col justify-between min-h-[112px]">
+      <div className="bg-white p-3.5 rounded-xl border border-slate-200/90 shadow-2xs flex flex-col justify-between min-h-[112px]">
         <div>
-          <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide">Target Exit Valuation</span>
-          <div className="text-xl font-bold text-slate-900 mt-0.5">
+          <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Target Exit Valuation</span>
+          <div className="text-xl font-bold text-slate-900 tabular-nums tracking-tight mt-0.5">
             {formatZAR(flip.targetExitPriceZAR)}
           </div>
         </div>
         <div className="text-[11px] text-slate-500 mt-1 leading-tight">
-          <div className="text-[10px] text-slate-400">Target Date</div>
+          <div className="text-[10px] uppercase font-semibold text-slate-400">Target Date</div>
           <div className="font-medium text-slate-700">{formatDate(flip.targetCompletionDate)}</div>
         </div>
       </div>
 
       {/* 6. Projected Net Upside */}
-      <div className="bg-gradient-to-br from-emerald-800 to-teal-900 text-white p-3.5 rounded-xl shadow-sm flex flex-col justify-between min-h-[112px]">
+      <div className="bg-slate-900 text-white p-3.5 rounded-xl border border-slate-800 shadow-xs flex flex-col justify-between min-h-[112px]">
         <div>
-          <span className="text-[11px] font-semibold text-emerald-200 uppercase tracking-wide">Projected Net Upside</span>
-          <div className="text-xl font-extrabold text-white mt-0.5">
+          <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Projected Net Upside</span>
+          <div className="text-xl font-bold text-emerald-400 tabular-nums tracking-tight mt-0.5">
             {effectiveTaxRate > 0 ? formatZAR(netProfitAfterTax) : formatZAR(projectedNetProfit)}
           </div>
         </div>
-        <div className="text-[11px] text-emerald-200 mt-1 font-bold leading-tight flex items-center justify-between">
+        <div className="text-[11px] text-slate-300 mt-1 font-semibold leading-tight flex items-center justify-between">
           <span>
             {effectiveTaxRate > 0 ? formatPercent(afterTaxROI) : formatPercent(projectedROI)}{' '}
             {effectiveTaxRate > 0 ? 'After-Tax ROI' : 'Net ROI'}
           </span>
-          <span className="text-[9px] text-emerald-300 opacity-90 font-medium">
+          <span className="text-[10px] text-emerald-400 font-medium bg-slate-800 border border-slate-700 px-1.5 py-0.5 rounded tabular-nums">
             {effectiveTaxRate > 0 ? `${effectiveTaxRate}% Tax` : 'Pre-Tax'}
           </span>
         </div>

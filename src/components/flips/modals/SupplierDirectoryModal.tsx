@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { LocalSupplier } from '@/types';
-import { Store, Trash2 } from 'lucide-react';
+import { Store, Trash2, X } from 'lucide-react';
 import { usePortfolioStore } from '@/lib/store/usePortfolioStore';
 
 export interface SupplierDirectoryModalProps {
@@ -125,10 +125,12 @@ export const SupplierDirectoryModal: React.FC<SupplierDirectoryModalProps> = ({
             </p>
           </div>
           <button
+            type="button"
             onClick={onClose}
-            className="text-slate-400 hover:text-slate-700 text-sm font-bold cursor-pointer"
+            className="text-slate-400 hover:text-slate-700 p-1 rounded-md transition-colors cursor-pointer"
+            aria-label="Close dialog"
           >
-            ✕
+            <X className="w-4 h-4" />
           </button>
         </div>
 

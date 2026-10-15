@@ -238,14 +238,14 @@ export default function Sidebar() {
       <aside className="no-print hidden md:flex w-64 bg-slate-900 text-slate-100 flex-col shrink-0 min-h-screen border-r border-slate-800">
         {/* Brand Header */}
         <div className="p-5 border-b border-slate-800 flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-700 flex items-center justify-center text-white font-bold shadow-lg shadow-emerald-950/50">
-            <Building2 className="w-5 h-5 text-white" />
+          <div className="w-8 h-8 rounded-md bg-emerald-600 border border-emerald-400/30 flex items-center justify-center text-white shrink-0 shadow-xs">
+            <Building2 className="w-4 h-4 text-white" strokeWidth={2} />
           </div>
           <div>
-            <div className="font-bold tracking-tight text-white flex items-center gap-1.5 text-base">
+            <div className="font-semibold tracking-tight text-white flex items-center gap-1.5 text-sm">
               SA Property Hub
             </div>
-            <p className="text-xs text-slate-400 font-medium">Investor Suite (ZAR)</p>
+            <p className="text-[10px] uppercase tracking-widest text-emerald-400/90 font-semibold">ZAR INSTITUTIONAL SUITE</p>
           </div>
         </div>
 
@@ -263,7 +263,7 @@ export default function Sidebar() {
                 href={item.href}
                 className={`flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
                   isActive
-                    ? 'bg-emerald-600 text-white shadow-sm shadow-emerald-900/40 font-semibold'
+                    ? 'bg-emerald-600 text-white shadow-xs font-semibold'
                     : 'text-slate-300 hover:bg-slate-800/80 hover:text-white'
                 }`}
               >
@@ -296,7 +296,7 @@ export default function Sidebar() {
                 href={item.href}
                 className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
                   isActive
-                    ? 'bg-emerald-600 text-white shadow-sm shadow-emerald-900/40 font-semibold'
+                    ? 'bg-emerald-600 text-white shadow-xs font-semibold'
                     : 'text-slate-300 hover:bg-slate-800/80 hover:text-white'
                 }`}
               >
@@ -325,17 +325,17 @@ export default function Sidebar() {
       {/* ========================================================================= */}
       {/* 2. MOBILE TOP APP BAR (< md)                                              */}
       {/* ========================================================================= */}
-      <header className="no-print md:hidden bg-slate-900 text-white px-4 py-3 border-b border-slate-800 flex items-center justify-between sticky top-0 z-40 shadow-sm">
+      <header className="no-print md:hidden bg-slate-900 text-white px-4 py-3 border-b border-slate-800 flex items-center justify-between sticky top-0 z-40 shadow-xs">
         <Link href="/" className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-500 to-teal-700 flex items-center justify-center text-white font-bold shadow-md shadow-emerald-950/50">
-            <Building2 className="w-4 h-4 text-white" />
+          <div className="w-8 h-8 rounded-md bg-emerald-600 border border-emerald-400/30 flex items-center justify-center text-white shrink-0 shadow-xs">
+            <Building2 className="w-4 h-4 text-white" strokeWidth={2} />
           </div>
           <div>
-            <span className="font-bold tracking-tight text-white text-sm block leading-none">
+            <span className="font-semibold tracking-tight text-white text-sm block leading-none">
               SA Property Hub
             </span>
-            <span className="text-[10px] text-emerald-400 font-semibold uppercase tracking-wider">
-              Investor Suite
+            <span className="text-[10px] text-emerald-400/90 font-semibold uppercase tracking-widest">
+              ZAR INSTITUTIONAL SUITE
             </span>
           </div>
         </Link>
@@ -364,12 +364,12 @@ export default function Sidebar() {
               {/* Drawer Brand Header */}
               <div className="p-4 border-b border-slate-800 flex items-center justify-between sticky top-0 bg-slate-900/95 backdrop-blur-xs z-10">
                 <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-500 to-teal-700 flex items-center justify-center text-white font-bold">
-                    <Building2 className="w-4 h-4 text-white" />
+                  <div className="w-8 h-8 rounded-md bg-emerald-600 border border-emerald-400/30 flex items-center justify-center text-white shrink-0 shadow-xs">
+                    <Building2 className="w-4 h-4 text-white" strokeWidth={2} />
                   </div>
                   <div>
-                    <span className="font-bold text-sm block">SA Property Hub</span>
-                    <span className="text-[10px] text-slate-400">All Modules & Settings</span>
+                    <span className="font-semibold tracking-tight text-white text-sm block">SA Property Hub</span>
+                    <span className="text-[10px] text-emerald-400/90 font-semibold uppercase tracking-widest">ZAR INSTITUTIONAL SUITE</span>
                   </div>
                 </div>
 
@@ -397,7 +397,7 @@ export default function Sidebar() {
                       onClick={() => setIsMobileDrawerOpen(false)}
                       className={`flex items-center justify-between px-3 py-2.5 rounded-lg text-xs font-medium transition-all ${
                         isActive
-                          ? 'bg-emerald-600 text-white font-semibold shadow-sm'
+                          ? 'bg-emerald-600 text-white font-semibold shadow-xs'
                           : 'text-slate-300 hover:bg-slate-800 hover:text-white'
                       }`}
                     >
@@ -431,7 +431,7 @@ export default function Sidebar() {
                       onClick={() => setIsMobileDrawerOpen(false)}
                       className={`flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-xs font-medium transition-all ${
                         isActive
-                          ? 'bg-emerald-600 text-white font-semibold shadow-sm'
+                          ? 'bg-emerald-600 text-white font-semibold shadow-xs'
                           : 'text-slate-300 hover:bg-slate-800 hover:text-white'
                       }`}
                     >

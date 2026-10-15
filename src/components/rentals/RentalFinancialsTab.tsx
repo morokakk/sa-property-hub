@@ -14,6 +14,10 @@ import {
   ArrowUpRight,
   Clock,
   Archive,
+  Mail,
+  Phone,
+  User,
+  Check,
 } from 'lucide-react';
 
 export interface RentalFinancialsTabProps {
@@ -95,67 +99,71 @@ export function RentalFinancialsTab({
                 {property.leases!.length} Units • {property.leases!.filter((l) => l.status === 'Occupied').length} Occupied • {formatZAR(property.leases!.filter((l) => l.status === 'Occupied').reduce((s, l) => s + l.monthlyRentZAR, 0))}/m
               </strong>
             </div>
-            <div className="space-y-1.5 pl-5">
+            <div className="space-y-2 pt-1">
               {property.leases!.map((l) => (
-                <div key={l.id} className="flex items-center justify-between text-[11px] gap-2 flex-wrap sm:flex-nowrap">
-                  <div className="flex items-center gap-1.5 flex-wrap">
-                    <span className={l.status === 'Occupied' ? 'text-slate-700 font-medium' : l.status === 'Notice Given' ? 'text-amber-800 font-bold' : 'text-slate-400'}>
-                      {l.unitName}: {l.tenantName} ({l.status})
-                    </span>
-                    {l.roomType && (
-                      <span className="text-[9px] font-medium bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded border border-slate-200 shrink-0">
-                        {l.roomType}
+                <div key={l.id} className="pt-2 border-t border-slate-100 first:border-t-0 first:pt-0 space-y-1 text-[11px]">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="min-w-0 flex items-center gap-1.5 flex-wrap">
+                      <span className={`font-medium ${l.status === 'Occupied' ? 'text-slate-700' : l.status === 'Notice Given' ? 'text-amber-800 font-bold' : 'text-slate-400'}`}>
+                        {l.unitName}: {l.tenantName} ({l.status})
                       </span>
-                    )}
-                    {l.guarantorName && (
+                      {l.roomType && (
+                        <span className="text-[9px] font-medium bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded border border-slate-200 shrink-0">
+                          {l.roomType}
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className="font-semibold text-slate-900 tabular-nums shrink-0">{formatZAR(l.monthlyRentZAR)}/m</span>
+                      {onOpenNoticeModal && (
+                        <button
+                          type="button"
+                          onClick={() => onOpenNoticeModal(l.id)}
+                          className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded border transition-colors cursor-pointer shrink-0 ${
+                            l.status === 'Notice Given'
+                              ? 'bg-amber-100 hover:bg-amber-200 text-amber-900 border-amber-300'
+                              : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-200'
+                          }`}
+                          title="Manage notice or record move-out"
+                        >
+                          <Clock className="w-2.5 h-2.5" />
+                          <span>{l.status === 'Notice Given' ? 'Notice' : 'Notice/Exit'}</span>
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                  {l.guarantorName && (
+                    <div className="flex items-center">
                       <span
-                        className="inline-flex items-center gap-1 text-[9px] font-semibold text-indigo-700 bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-200 max-w-[220px] truncate"
+                        className="inline-flex items-center gap-1 text-[9px] font-semibold text-indigo-700 bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-200 max-w-full truncate"
                         title={`Guarantor: ${l.guarantorName}${l.guarantorContact ? ` (${l.guarantorContact})` : ''}`}
                       >
-                        <span className="shrink-0">🛡️</span>
+                        <ShieldCheck className="w-3 h-3 text-indigo-600 shrink-0" />
                         <span className="truncate">Guarantor: {l.guarantorName}</span>
                         {l.guarantorContact && (
                           l.guarantorContact.includes('@') ? (
                             <a
                               href={`mailto:${l.guarantorContact}`}
-                              className="text-indigo-600 hover:underline shrink-0"
+                              className="text-indigo-600 hover:text-indigo-900 shrink-0 inline-flex items-center"
                               onClick={(e) => e.stopPropagation()}
                               title={`Email guarantor: ${l.guarantorContact}`}
                             >
-                              ✉️
+                              <Mail className="w-2.5 h-2.5" />
                             </a>
                           ) : (
                             <a
                               href={`tel:${l.guarantorContact.replace(/\s+/g, '')}`}
-                              className="text-indigo-600 hover:underline shrink-0"
+                              className="text-indigo-600 hover:text-indigo-900 shrink-0 inline-flex items-center"
                               onClick={(e) => e.stopPropagation()}
                               title={`Call guarantor: ${l.guarantorContact}`}
                             >
-                              📞
+                              <Phone className="w-2.5 h-2.5" />
                             </a>
                           )
                         )}
                       </span>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="font-medium shrink-0">{formatZAR(l.monthlyRentZAR)}/m</span>
-                    {onOpenNoticeModal && (
-                      <button
-                        type="button"
-                        onClick={() => onOpenNoticeModal(l.id)}
-                        className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded border transition-colors cursor-pointer shrink-0 ${
-                          l.status === 'Notice Given'
-                            ? 'bg-amber-100 hover:bg-amber-200 text-amber-900 border-amber-300'
-                            : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-200'
-                        }`}
-                        title="Manage notice or record move-out"
-                      >
-                        <Clock className="w-2.5 h-2.5" />
-                        <span>{l.status === 'Notice Given' ? 'Notice' : 'Notice/Exit'}</span>
-                      </button>
-                    )}
-                  </div>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -179,26 +187,26 @@ export function RentalFinancialsTab({
                     className="inline-flex items-center gap-1 text-[9px] font-semibold text-indigo-700 bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-200 max-w-[220px] truncate"
                     title={`Guarantor: ${property.leases[0].guarantorName}${property.leases[0].guarantorContact ? ` (${property.leases[0].guarantorContact})` : ''}`}
                   >
-                    <span className="shrink-0">🛡️</span>
+                    <ShieldCheck className="w-3 h-3 text-indigo-600 shrink-0" />
                     <span className="truncate">Guarantor: {property.leases[0].guarantorName}</span>
                     {property.leases[0].guarantorContact && (
                       property.leases[0].guarantorContact.includes('@') ? (
                         <a
                           href={`mailto:${property.leases[0].guarantorContact}`}
-                          className="text-indigo-600 hover:underline shrink-0"
+                          className="text-indigo-600 hover:text-indigo-900 shrink-0 inline-flex items-center"
                           onClick={(e) => e.stopPropagation()}
                           title={`Email guarantor: ${property.leases[0].guarantorContact}`}
                         >
-                          ✉️
+                          <Mail className="w-2.5 h-2.5" />
                         </a>
                       ) : (
                         <a
                           href={`tel:${property.leases[0].guarantorContact.replace(/\s+/g, '')}`}
-                          className="text-indigo-600 hover:underline shrink-0"
+                          className="text-indigo-600 hover:text-indigo-900 shrink-0 inline-flex items-center"
                           onClick={(e) => e.stopPropagation()}
                           title={`Call guarantor: ${property.leases[0].guarantorContact}`}
                         >
-                          📞
+                          <Phone className="w-2.5 h-2.5" />
                         </a>
                       )
                     )}
@@ -353,8 +361,8 @@ export function RentalFinancialsTab({
                 </div>
               ) : (
                 <div className="flex justify-between items-center text-slate-500 bg-slate-50 px-2 py-1 rounded border border-slate-100 text-[11px]">
-                  <span className="flex items-center gap-1">
-                    <span>👤</span> Agency Fee (Self-Managed):
+                  <span className="flex items-center gap-1.5">
+                    <User className="w-3 h-3 text-slate-500" /> Agency Fee (Self-Managed):
                   </span>
                   <span className="text-emerald-700 font-semibold">R 0 (0%)</span>
                 </div>
@@ -420,10 +428,10 @@ export function RentalFinancialsTab({
             </span>
             {sec13Shield > 0 && (
               <span
-                className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-emerald-100 text-emerald-800 border border-emerald-300 inline-flex items-center gap-0.5 shrink-0"
+                className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-emerald-100 text-emerald-800 border border-emerald-300 inline-flex items-center gap-1 shrink-0"
                 title={`Section 13sex Tax Shield: ${formatZAR(sec13Shield)}/yr allowance saves ${formatZAR(taxSavingsZAR)}/yr in SARS income tax`}
               >
-                ✓ Sec 13sex Shield Active (-{formatZAR(taxSavingsZAR)}/yr)
+                <Check className="w-2.5 h-2.5 text-emerald-700" /> Sec 13sex Shield Active (-{formatZAR(taxSavingsZAR)}/yr)
               </span>
             )}
           </div>

@@ -29,6 +29,7 @@ import {
   ShieldCheck,
   Sparkles,
   ChevronDown,
+  X,
 } from 'lucide-react';
 
 export interface PipelineDealCardProps {
@@ -622,9 +623,10 @@ export function PipelineDealCard({
               <button
                 type="button"
                 onClick={() => setIsPassModalOpen(false)}
-                className="text-slate-400 hover:text-slate-600 p-1 text-sm cursor-pointer min-h-[32px] min-w-[32px] flex items-center justify-center"
+                className="text-slate-400 hover:text-slate-600 p-1 text-sm cursor-pointer min-h-[32px] min-w-[32px] flex items-center justify-center transition-colors"
+                aria-label="Close dialog"
               >
-                ✕
+                <X className="w-4 h-4" />
               </button>
             </div>
             <label className="block text-xs font-semibold text-slate-600 mb-1">Reason</label>

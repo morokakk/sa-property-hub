@@ -8,7 +8,7 @@ import {
   PaymentMethod,
 } from '@/types';
 import { formatZAR } from '@/lib/formatters';
-import { CreditCard } from 'lucide-react';
+import { CreditCard, X } from 'lucide-react';
 import {
   getUnpaidLedgerMonths,
   allocateOldestFirst,
@@ -258,8 +258,9 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
             type="button"
             onClick={onClose}
             className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
+            aria-label="Close dialog"
           >
-            ✕
+            <X className="w-4 h-4" />
           </button>
         </div>
 
@@ -462,10 +463,11 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                         const updated = paymentAllocations.filter((_, i) => i !== idx);
                         setAllocations(updated.length > 0 ? updated : [{ periodMonth, amountZAR: amount }]);
                       }}
-                      className="text-slate-400 hover:text-rose-600 text-sm px-1 cursor-pointer"
+                      className="text-slate-400 hover:text-rose-600 p-1 cursor-pointer transition-colors"
                       title="Remove month allocation"
+                      aria-label="Remove month allocation"
                     >
-                      ✕
+                      <X className="w-3.5 h-3.5" />
                     </button>
                   </div>
                 ))}

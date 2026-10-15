@@ -8,7 +8,7 @@ import {
   PaymentAllocation,
 } from '@/types';
 import { formatZAR } from '@/lib/formatters';
-import { Archive, AlertCircle } from 'lucide-react';
+import { Archive, AlertCircle, X } from 'lucide-react';
 import {
   calculatePropertyArrears,
   getUnpaidLedgerMonths,
@@ -206,8 +206,9 @@ export const WriteOffModal: React.FC<WriteOffModalProps> = ({
             type="button"
             onClick={onClose}
             className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
+            aria-label="Close dialog"
           >
-            ✕
+            <X className="w-4 h-4" />
           </button>
         </div>
 
@@ -361,9 +362,10 @@ export const WriteOffModal: React.FC<WriteOffModalProps> = ({
                       const updated = allocations.filter((_, i) => i !== idx);
                       setAllocations(updated);
                     }}
-                    className="text-slate-400 hover:text-rose-600 text-sm px-1 cursor-pointer"
+                    className="text-slate-400 hover:text-rose-600 p-1 cursor-pointer transition-colors"
+                    aria-label="Remove allocation"
                   >
-                    ✕
+                    <X className="w-3.5 h-3.5" />
                   </button>
                 </div>
               ))}
