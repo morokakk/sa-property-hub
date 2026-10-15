@@ -49,6 +49,12 @@ test.describe('Local-to-Cloud Database Migration Bridge', () => {
     // Verify non-intrusive POC explanation
     await expect(cloudSyncCard).toContainText('POC Zero-Gate Experience');
 
+    // If collapsed, expand inline auth controls via toggle button
+    const toggleBtn = page.locator('[data-testid="toggle-cloud-auth-btn"]');
+    if (await toggleBtn.isVisible()) {
+      await toggleBtn.click();
+    }
+
     // Verify inline auth toggles
     const signInTab = page.locator('[data-testid="auth-mode-signin"]');
     const signUpTab = page.locator('[data-testid="auth-mode-signup"]');
@@ -120,6 +126,11 @@ test.describe('Local-to-Cloud Database Migration Bridge', () => {
     // Use the inline sign-in form to log in
     const cloudSyncCard = page.locator('[data-testid="cloud-sync-card"]');
     await expect(cloudSyncCard).toBeVisible();
+
+    const toggleBtn = page.locator('[data-testid="toggle-cloud-auth-btn"]');
+    if (await toggleBtn.isVisible()) {
+      await toggleBtn.click();
+    }
 
     const emailInput = cloudSyncCard.locator('input[type="email"]');
     const passwordInput = cloudSyncCard.locator('input[type="password"]');

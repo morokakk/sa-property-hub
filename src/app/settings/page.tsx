@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef, useEffect, Suspense } from 'react';
+import React, { useState, useRef, useEffect, useMemo, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import TopHeader from '@/components/navigation/TopHeader';
 import PublishLinkGuidanceBanner from '@/components/rentals/PublishLinkGuidanceBanner';
@@ -38,6 +38,10 @@ import {
   ArrowLeft,
   Target,
   CreditCard,
+  ChevronDown,
+  ChevronUp,
+  RotateCcw,
+  BookOpen,
 } from 'lucide-react';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabaseClient';
@@ -49,6 +53,9 @@ import {
   SUPPORTED_ANTHROPIC_MODELS,
   normalizeAiModel,
 } from '@/lib/ai/modelConfig';
+import { formatZAR, formatPercent } from '@/lib/formatters';
+
+type SettingsTab = 'entity' | 'underwriting' | 'ai';
 
 function SettingsContent() {
   const searchParams = useSearchParams();
@@ -60,6 +67,11 @@ function SettingsContent() {
   const aiSettings = usePortfolioStore((state) => state.aiSettings);
   const updateAiSettings = usePortfolioStore((state) => state.updateAiSettings);
   const resetToDemoData = usePortfolioStore((state) => state.resetToDemoData);
+
+  // Active Tab & View Mode State
+  const [activeTab, setActiveTab] = useState<SettingsTab>('entity');
+  const [showAllSections, setShowAllSections] = useState<boolean>(false);
+  const [isAuthExpanded, setIsAuthExpanded] = useState<boolean>(false);
 
   // Form state initialized from Zustand
   const [entityName, setEntityName] = useState(investorProfile.entityName || '');
@@ -154,6 +166,52 @@ function SettingsContent() {
   const [hydrateFeedback, setHydrateFeedback] = useState<string | null>(null);
   const [hydrateError, setHydrateError] = useState<string | null>(null);
 
+  // Synchronize active tab based on URL deep-link anchor
+  const syncTabFromHash = () => {
+    if (typeof window === 'undefined') return;
+    const hash = window.location.hash.toLowerCase();
+    let targetTab: SettingsTab | null = null;
+    let targetElementId: string | null = null;
+
+    if (hash.includes('settings-entity')) {
+      targetTab = 'entity';
+      targetElementId = 'settings-entity';
+    } else if (hash.includes('settings-branding')) {
+      targetTab = 'entity';
+      targetElementId = 'settings-branding';
+    } else if (hash.includes('settings-banking')) {
+      targetTab = 'entity';
+      targetElementId = 'settings-banking';
+    } else if (hash.includes('settings-finance')) {
+      targetTab = 'underwriting';
+      targetElementId = 'settings-finance';
+    } else if (hash.includes('settings-buybox')) {
+      targetTab = 'underwriting';
+      targetElementId = 'settings-buybox';
+    } else if (hash.includes('settings-ai')) {
+      targetTab = 'ai';
+      targetElementId = 'settings-ai';
+    }
+
+    if (targetTab) {
+      setActiveTab(targetTab);
+      if (targetElementId) {
+        setTimeout(() => {
+          const el = document.getElementById(targetElementId!);
+          if (el) {
+            el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }
+        }, 100);
+      }
+    }
+  };
+
+  useEffect(() => {
+    syncTabFromHash();
+    window.addEventListener('hashchange', syncTabFromHash);
+    return () => window.removeEventListener('hashchange', syncTabFromHash);
+  }, []);
+
   useEffect(() => {
     // Check initial auth state
     supabase.auth.getUser().then(({ data: { user } }) => {
@@ -171,7 +229,10 @@ function SettingsContent() {
         search.includes('reset_password=true')
       ) {
         setAuthMode('update_password');
+        setIsAuthExpanded(true);
         setAuthInfo('Password recovery session detected. Please enter your new password below.');
+      } else if (actionParam === 'signin' || actionParam === 'cloud') {
+        setIsAuthExpanded(true);
       }
     }
 
@@ -181,6 +242,7 @@ function SettingsContent() {
     } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'PASSWORD_RECOVERY') {
         setAuthMode('update_password');
+        setIsAuthExpanded(true);
         setAuthError(null);
         setAuthInfo('Please set your new password below.');
       }
@@ -195,7 +257,113 @@ function SettingsContent() {
     return () => {
       subscription.unsubscribe();
     };
-  }, []);
+  }, [actionParam]);
+
+  // Compute dirty changes state
+  const isDirty = useMemo(() => {
+    return (
+      entityName !== (investorProfile.entityName || '') ||
+      tradingAs !== (investorProfile.tradingAs || '') ||
+      registrationOrId !== (investorProfile.registrationOrId || '') ||
+      contactNumber !== (investorProfile.contactNumber || '') ||
+      email !== (investorProfile.email || '') ||
+      website !== (investorProfile.website || '') ||
+      physicalAddress !== (investorProfile.physicalAddress || '') ||
+      bioSummary !== (investorProfile.bioSummary || '') ||
+      logoBase64 !== (investorProfile.logoBase64 || '') ||
+      bankName !== (investorProfile.bankName || '') ||
+      accountHolder !== (investorProfile.accountHolder || '') ||
+      accountNumber !== (investorProfile.accountNumber || '') ||
+      accountType !== (investorProfile.accountType || 'Cheque / Current') ||
+      branchCode !== (investorProfile.branchCode || '') ||
+      swiftCode !== (investorProfile.swiftCode || '') ||
+      remittanceInstructions !== (investorProfile.remittanceInstructions || '') ||
+      defaultPrimeRate !== (investorProfile.defaultPrimeRatePercent || 10.75) ||
+      baselineHurdleYield !== (investorProfile.baselineHurdleYieldPercent || 10.0) ||
+      defaultCommission !== (investorProfile.defaultAgentCommissionPercent || 5.0) ||
+      defaultTaxEntity !== investorProfile.defaultTaxEntityType ||
+      vatExemptAgent !== (investorProfile.vatExemptAgent ?? false) ||
+      minNetYield !== (investorProfile.minNetYieldPercent ?? 8.0) ||
+      minMonthlyCashflow !== (investorProfile.minMonthlyCashflowZAR ?? 1500) ||
+      minNetRoi !== (investorProfile.minNetRoiPercent ?? 8.0) ||
+      minFlipRoi !== (investorProfile.minFlipRoiPercent ?? 18.0) ||
+      maxDay1Cash !== (investorProfile.maxDay1CashZAR ?? 500000) ||
+      minDscr !== (investorProfile.minDscr ?? 1.20) ||
+      marginalTaxRate !== (investorProfile.marginalTaxRatePercent ?? 31.0) ||
+      aiProvider !== (aiSettings?.provider || 'anthropic') ||
+      aiApiKey !== (aiSettings?.apiKey || '') ||
+      aiModel !== normalizeAiModel(aiSettings?.model)
+    );
+  }, [
+    investorProfile,
+    aiSettings,
+    entityName,
+    tradingAs,
+    registrationOrId,
+    contactNumber,
+    email,
+    website,
+    physicalAddress,
+    bioSummary,
+    logoBase64,
+    bankName,
+    accountHolder,
+    accountNumber,
+    accountType,
+    branchCode,
+    swiftCode,
+    remittanceInstructions,
+    defaultPrimeRate,
+    baselineHurdleYield,
+    defaultCommission,
+    defaultTaxEntity,
+    vatExemptAgent,
+    minNetYield,
+    minMonthlyCashflow,
+    minNetRoi,
+    minFlipRoi,
+    maxDay1Cash,
+    minDscr,
+    marginalTaxRate,
+    aiProvider,
+    aiApiKey,
+    aiModel,
+  ]);
+
+  const handleDiscardChanges = () => {
+    setEntityName(investorProfile.entityName || '');
+    setTradingAs(investorProfile.tradingAs || '');
+    setRegistrationOrId(investorProfile.registrationOrId || '');
+    setContactNumber(investorProfile.contactNumber || '');
+    setEmail(investorProfile.email || '');
+    setWebsite(investorProfile.website || '');
+    setPhysicalAddress(investorProfile.physicalAddress || '');
+    setBioSummary(investorProfile.bioSummary || '');
+    setLogoBase64(investorProfile.logoBase64 || '');
+    setBankName(investorProfile.bankName || '');
+    setAccountHolder(investorProfile.accountHolder || '');
+    setAccountNumber(investorProfile.accountNumber || '');
+    setAccountType(investorProfile.accountType || 'Cheque / Current');
+    setBranchCode(investorProfile.branchCode || '');
+    setSwiftCode(investorProfile.swiftCode || '');
+    setRemittanceInstructions(investorProfile.remittanceInstructions || '');
+    setDefaultPrimeRate(investorProfile.defaultPrimeRatePercent || 10.75);
+    setBaselineHurdleYield(investorProfile.baselineHurdleYieldPercent || 10.0);
+    setDefaultCommission(investorProfile.defaultAgentCommissionPercent || 5.0);
+    setDefaultTaxEntity(investorProfile.defaultTaxEntityType);
+    setVatExemptAgent(investorProfile.vatExemptAgent ?? false);
+    setMinNetYield(investorProfile.minNetYieldPercent ?? 8.0);
+    setMinMonthlyCashflow(investorProfile.minMonthlyCashflowZAR ?? 1500);
+    setMinNetRoi(investorProfile.minNetRoiPercent ?? 8.0);
+    setMinFlipRoi(investorProfile.minFlipRoiPercent ?? 18.0);
+    setMaxDay1Cash(investorProfile.maxDay1CashZAR ?? 500000);
+    setMinDscr(investorProfile.minDscr ?? 1.20);
+    setMarginalTaxRate(investorProfile.marginalTaxRatePercent ?? 31.0);
+    setAiProvider(aiSettings?.provider || 'anthropic');
+    setAiApiKey(aiSettings?.apiKey || '');
+    setAiModel(normalizeAiModel(aiSettings?.model));
+    setLogoError(null);
+  };
 
   const handleAuthSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -388,8 +556,13 @@ function SettingsContent() {
     }
   };
 
-  const handleSave = (e: React.FormEvent) => {
-    e.preventDefault();
+  // Universal Save handler: updates Zustand store, stamps settingsSavedAt, and syncs to Supabase
+  const handleSave = (e?: React.FormEvent) => {
+    if (e && e.preventDefault) {
+      e.preventDefault();
+    }
+
+    const nowIso = new Date().toISOString();
 
     updateInvestorProfile({
       entityName,
@@ -420,12 +593,23 @@ function SettingsContent() {
       maxDay1CashZAR: maxDay1Cash,
       minDscr: minDscr,
       marginalTaxRatePercent: marginalTaxRate,
+      settingsSavedAt: nowIso,
     });
 
     updateAiSettings({
       provider: aiProvider,
       apiKey: aiApiKey.trim(),
       model: aiModel,
+    });
+
+    // Auto-complete Step 0 onboarding checklist items
+    const store = usePortfolioStore.getState();
+    const completedGuideSteps = store.completedGuideSteps;
+    const toggleGuideStep = store.toggleGuideStep;
+    ['settings-entity-branding', 'settings-finance-defaults', 'settings-buy-box'].forEach((stepId) => {
+      if (!completedGuideSteps.includes(stepId)) {
+        toggleGuideStep(stepId);
+      }
     });
 
     if (currentUser?.id) {
@@ -452,7 +636,7 @@ function SettingsContent() {
           baseline_hurdle_yield_percent: baselineHurdleYield,
           default_agent_commission_percent: defaultCommission,
           default_tax_entity_type: defaultTaxEntity,
-          updated_at: new Date().toISOString(),
+          updated_at: nowIso,
         })
         .eq('user_id', currentUser.id)
         .then(({ error }) => {
@@ -466,6 +650,14 @@ function SettingsContent() {
     setTimeout(() => setSavedSuccess(false), 3500);
   };
 
+  // AI API Key validation check
+  const apiKeyValidationState = useMemo(() => {
+    const key = aiApiKey.trim();
+    if (!key) return 'empty';
+    if (key.startsWith('sk-ant-') && key.length >= 20) return 'valid';
+    return 'invalid_prefix';
+  }, [aiApiKey]);
+
   return (
     <div className="flex-1 flex flex-col">
       <TopHeader
@@ -474,10 +666,16 @@ function SettingsContent() {
         actionButton={
           <button
             onClick={handleSave}
-            className="inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold px-4 py-2 rounded-lg shadow-sm transition-colors cursor-pointer"
+            className="relative inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold px-4 py-2 rounded-lg shadow-sm transition-colors cursor-pointer"
           >
             <Save className="w-3.5 h-3.5" />
-            Save Profile & Settings
+            <span>Save Profile &amp; Settings</span>
+            {isDirty && (
+              <span
+                className="w-2 h-2 rounded-full bg-amber-400 animate-pulse ml-0.5"
+                title="Unsaved changes pending"
+              />
+            )}
           </button>
         }
       />
@@ -506,25 +704,32 @@ function SettingsContent() {
           currentUser={currentUser}
         />
 
-        {/* Card: Cloud Database Synchronization */}
+        {/* Compact Cloud Database Synchronization Bar */}
         <div
           data-testid="cloud-sync-card"
-          className="bg-white rounded-xl border border-slate-200 p-4 sm:p-6 shadow-xs space-y-4"
+          className="bg-white rounded-xl border border-slate-200 p-4 shadow-xs space-y-4"
         >
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
-            <div className="flex items-center gap-2.5">
-              <div className="p-2 bg-sky-50 rounded-lg text-sky-700">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="p-2 bg-sky-50 rounded-lg text-sky-700 shrink-0">
                 <Cloud className="w-5 h-5" />
               </div>
-              <div>
-                <h2 className="text-base font-bold text-slate-900">Cloud Database Synchronization</h2>
-                <p className="text-xs text-slate-500">
-                  Securely backup and replicate your local browser portfolio into the cloud PostgreSQL database.
+              <div className="min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h2 className="text-sm sm:text-base font-bold text-slate-900">
+                    Cloud Database Synchronization
+                  </h2>
+                  <span className="text-[11px] font-semibold text-sky-700 bg-sky-50 px-2 py-0.5 rounded border border-sky-200">
+                    Multi-Device Sync
+                  </span>
+                </div>
+                <p className="text-xs text-slate-500 truncate">
+                  POC Zero-Gate Experience: Securely backup and replicate your local portfolio into PostgreSQL.
                 </p>
               </div>
             </div>
 
-            <div>
+            <div className="flex items-center gap-2 shrink-0">
               {currentUser ? (
                 <span
                   data-testid="cloud-status-badge"
@@ -534,13 +739,24 @@ function SettingsContent() {
                   Cloud Connected
                 </span>
               ) : (
-                <span
-                  data-testid="local-mode-badge"
-                  className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-800 border border-amber-200"
-                >
-                  <DbIcon className="w-3.5 h-3.5" />
-                  Local Storage Only
-                </span>
+                <>
+                  <span
+                    data-testid="local-mode-badge"
+                    className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-800 border border-amber-200"
+                  >
+                    <DbIcon className="w-3.5 h-3.5" />
+                    Local Storage Only
+                  </span>
+                  <button
+                    type="button"
+                    data-testid="toggle-cloud-auth-btn"
+                    onClick={() => setIsAuthExpanded(!isAuthExpanded)}
+                    className="inline-flex items-center gap-1 px-3 py-1 rounded-lg text-xs font-semibold bg-sky-50 hover:bg-sky-100 text-sky-800 border border-sky-200 transition-colors cursor-pointer"
+                  >
+                    <span>{isAuthExpanded ? 'Collapse Form' : 'Sign In / Enable Cloud Sync'}</span>
+                    {isAuthExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                  </button>
+                </>
               )}
             </div>
           </div>
@@ -614,7 +830,7 @@ function SettingsContent() {
 
           {currentUser ? (
             /* Authenticated View */
-            <div className="space-y-4">
+            <div className="pt-2 border-t border-slate-100">
               <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
                 <div>
                   <div className="font-semibold text-slate-800 flex items-center gap-1.5">
@@ -646,7 +862,7 @@ function SettingsContent() {
                     data-testid="refresh-cloud-btn"
                     onClick={handleRefreshFromCloud}
                     disabled={isHydrating || isSyncing}
-                    className="inline-flex items-center gap-1.5 bg-sky-600 hover:bg-sky-700 active:bg-sky-800 disabled:bg-slate-300 text-white font-bold px-4 py-2.5 rounded-lg shadow-sm text-xs transition-colors cursor-pointer"
+                    className="inline-flex items-center gap-1.5 bg-sky-600 hover:bg-sky-700 active:bg-sky-800 disabled:bg-slate-300 text-white font-bold px-4 py-2 rounded-lg shadow-sm text-xs transition-colors cursor-pointer"
                   >
                     <Cloud className={`w-3.5 h-3.5 ${isHydrating ? 'animate-spin' : ''}`} />
                     {isHydrating ? 'Refreshing...' : 'Refresh from Cloud'}
@@ -657,18 +873,18 @@ function SettingsContent() {
                     data-testid="sync-cloud-btn"
                     onClick={handleSyncToCloud}
                     disabled={isSyncing || isHydrating}
-                    className="inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 disabled:bg-slate-300 text-white font-bold px-5 py-2.5 rounded-lg shadow-sm text-xs transition-colors cursor-pointer"
+                    className="inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 disabled:bg-slate-300 text-white font-bold px-4 py-2 rounded-lg shadow-sm text-xs transition-colors cursor-pointer"
                   >
                     <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
-                    {isSyncing ? 'Syncing to Cloud...' : 'Sync Local Data to Cloud'}
+                    {isSyncing ? 'Syncing...' : 'Sync Local Data to Cloud'}
                   </button>
                 </div>
               </div>
             </div>
-          ) : (
-            /* Unauthenticated POC View (Local Storage Only with Inline Auth Toggle) */
-            <div className="space-y-4">
-              <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-600 space-y-1">
+          ) : isAuthExpanded ? (
+            /* Unauthenticated Expanded View (Inline Auth Controls) */
+            <div className="space-y-4 pt-2 border-t border-slate-100">
+              <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-600 space-y-1">
                 <p className="font-semibold text-slate-800">
                   POC Zero-Gate Experience: Sign in is strictly optional.
                 </p>
@@ -829,7 +1045,7 @@ function SettingsContent() {
                     <button
                       type="submit"
                       disabled={authSubmitting}
-                      className="inline-flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 disabled:bg-slate-300 text-white font-bold py-2.5 px-6 rounded-lg shadow-sm text-xs transition-colors cursor-pointer"
+                      className="inline-flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 disabled:bg-slate-300 text-white font-bold py-2 px-5 rounded-lg shadow-sm text-xs transition-colors cursor-pointer"
                     >
                       {authMode === 'signin' ? (
                         <>
@@ -870,23 +1086,23 @@ function SettingsContent() {
 
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-1 border-t border-slate-100">
                     <p className="text-[11px] text-slate-500">
-                      We will email you a secure link to reset your cloud password.
+                      We will email you a password recovery link.
                     </p>
 
                     <button
                       type="submit"
                       data-testid="send-reset-link-btn"
                       disabled={authSubmitting}
-                      className="inline-flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 disabled:bg-slate-300 text-white font-bold py-2.5 px-6 rounded-lg shadow-sm text-xs transition-colors cursor-pointer"
+                      className="inline-flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 disabled:bg-slate-300 text-white font-bold py-2 px-5 rounded-lg shadow-sm text-xs transition-colors cursor-pointer"
                     >
-                      <Mail className="w-4 h-4" />
-                      <span>{authSubmitting ? 'Sending Link...' : 'Send Password Reset Link'}</span>
+                      <Key className="w-4 h-4" />
+                      <span>{authSubmitting ? 'Sending...' : 'Send Recovery Link'}</span>
                     </button>
                   </div>
                 </form>
               )}
 
-              {/* Inline Auth Form: Update Password (Recovery Mode) */}
+              {/* Inline Auth Form: Set New Password */}
               {authMode === 'update_password' && (
                 <form onSubmit={handleAuthSubmit} className="space-y-3 text-xs">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -940,7 +1156,7 @@ function SettingsContent() {
                       type="submit"
                       data-testid="save-new-password-btn"
                       disabled={authSubmitting}
-                      className="inline-flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 disabled:bg-slate-300 text-white font-bold py-2.5 px-6 rounded-lg shadow-sm text-xs transition-colors cursor-pointer"
+                      className="inline-flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 disabled:bg-slate-300 text-white font-bold py-2 px-5 rounded-lg shadow-sm text-xs transition-colors cursor-pointer"
                     >
                       <CheckCircle2 className="w-4 h-4" />
                       <span>{authSubmitting ? 'Saving Password...' : 'Save New Password & Sign In'}</span>
@@ -949,762 +1165,964 @@ function SettingsContent() {
                 </form>
               )}
             </div>
-          )}
+          ) : null}
+        </div>
+
+        {/* 3-Tab Foundation Workspace Switcher */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200 pb-3">
+          <div className="inline-flex p-1 bg-slate-100 rounded-xl gap-1 text-xs font-semibold overflow-x-auto max-w-full">
+            <button
+              type="button"
+              onClick={() => {
+                setActiveTab('entity');
+                setShowAllSections(false);
+              }}
+              className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-lg transition-colors cursor-pointer whitespace-nowrap ${
+                !showAllSections && activeTab === 'entity'
+                  ? 'bg-white text-slate-900 shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <Building className="w-3.5 h-3.5 text-emerald-600" />
+              <span>🏢 Entity, Banking &amp; Branding</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setActiveTab('underwriting');
+                setShowAllSections(false);
+              }}
+              className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-lg transition-colors cursor-pointer whitespace-nowrap ${
+                !showAllSections && activeTab === 'underwriting'
+                  ? 'bg-white text-slate-900 shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <Target className="w-3.5 h-3.5 text-indigo-600" />
+              <span>🎯 Underwriting, Buy Box &amp; SARS Tax</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setActiveTab('ai');
+                setShowAllSections(false);
+              }}
+              className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-lg transition-colors cursor-pointer whitespace-nowrap ${
+                !showAllSections && activeTab === 'ai'
+                  ? 'bg-white text-slate-900 shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <Sparkles className="w-3.5 h-3.5 text-amber-600" />
+              <span>✨ AI Extraction &amp; BYOK</span>
+            </button>
+          </div>
+
+          <div className="flex items-center gap-2 self-end sm:self-auto">
+            <button
+              type="button"
+              data-testid="view-mode-toggle"
+              onClick={() => setShowAllSections(!showAllSections)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors cursor-pointer ${
+                showAllSections
+                  ? 'bg-emerald-50 border-emerald-300 text-emerald-800'
+                  : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+              }`}
+            >
+              {showAllSections ? '✓ Showing All Sections' : 'Show All Sections'}
+            </button>
+          </div>
         </div>
 
         <form onSubmit={handleSave} noValidate className="space-y-6">
-          {/* Section 1: Entity & Contact Details */}
-          <div id="settings-entity" className="scroll-mt-20 bg-white rounded-xl border border-slate-200 p-4 sm:p-6 shadow-xs space-y-4">
-            <div className="flex items-center gap-2.5 pb-3 border-b border-slate-100">
-              <div className="p-2 bg-emerald-50 rounded-lg text-emerald-700">
-                <Building className="w-5 h-5" />
-              </div>
-              <div>
-                <h2 className="text-base font-bold text-slate-900">Entity & Legal Representation</h2>
-                <p className="text-xs text-slate-500">
-                  Used across generated lender proposals, contracts, and confidentiality memorandums.
-                </p>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
-              <div>
-                <label className="block font-semibold text-slate-700 mb-1">
-                  Sole Proprietor / Legal Entity Name *
-                </label>
-                <input
-                  type="text"
-                  name="organization"
-                  autoComplete="organization"
-                  required
-                  placeholder="e.g. L&M Property Investments (Pty) Ltd"
-                  value={entityName}
-                  onChange={(e) => setEntityName(e.target.value)}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-emerald-500 font-medium text-slate-900"
-                />
-              </div>
-
-              <div>
-                <label className="block font-semibold text-slate-700 mb-1">
-                  Trading Name / Brand (Optional)
-                </label>
-                <input
-                  type="text"
-                  name="tradingAs"
-                  autoComplete="organization"
-                  placeholder="e.g. L&M Trading & Capital"
-                  value={tradingAs}
-                  onChange={(e) => setTradingAs(e.target.value)}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-emerald-500 text-slate-900"
-                />
-              </div>
-
-              <div>
-                <label className="block font-semibold text-slate-700 mb-1">
-                  CIPC Company Reg / SA National ID *
-                </label>
-                <input
-                  type="text"
-                  name="cipcOrId"
-                  autoComplete="off"
-                  required
-                  placeholder="e.g. 2022/498211/07 or 8501015021088"
-                  value={registrationOrId}
-                  onChange={(e) => setRegistrationOrId(e.target.value)}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-emerald-500 font-mono text-slate-800"
-                />
-              </div>
-
-              <div>
-                <label className="block font-semibold text-slate-700 mb-1">
-                  Contact Phone Number *
-                </label>
-                <input
-                  type="tel"
-                  name="tel"
-                  autoComplete="tel"
-                  required
-                  placeholder="e.g. +27 82 890 4321"
-                  value={contactNumber}
-                  onChange={(e) => setContactNumber(e.target.value)}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-emerald-500 text-slate-900"
-                />
-              </div>
-
-              <div>
-                <label className="block font-semibold text-slate-700 mb-1">
-                  Official Email Address *
-                </label>
-                <input
-                  type="email"
-                  name="email"
-                  autoComplete="email"
-                  required
-                  placeholder="e.g. invest@lmtrading.co.za"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-emerald-500 text-slate-900"
-                />
-              </div>
-
-              <div>
-                <label className="block font-semibold text-slate-700 mb-1">
-                  Website / Investor Portal URL
-                </label>
-                <input
-                  type="url"
-                  name="url"
-                  autoComplete="url"
-                  placeholder="e.g. https://www.lmtrading.co.za"
-                  value={website}
-                  onChange={(e) => setWebsite(e.target.value)}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-emerald-500 text-slate-900"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Physical / Office Address (South Africa)
-              </label>
-              <input
-                type="text"
-                name="street-address"
-                autoComplete="street-address"
-                placeholder="e.g. Suite 402, The Boulevard Office Park, Searle St, Woodstock, Cape Town"
-                value={physicalAddress}
-                onChange={(e) => setPhysicalAddress(e.target.value)}
-                className="w-full text-xs px-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-emerald-500 text-slate-900"
-              />
-            </div>
-          </div>
-
-          {/* Section: Banking & Remittance Information */}
-          <div id="settings-banking" className="scroll-mt-20 bg-white rounded-xl border border-slate-200 p-6 shadow-xs space-y-4">
-            <div className="flex items-center gap-2.5 pb-3 border-b border-slate-100">
-              <div className="p-2 bg-emerald-50 rounded-lg text-emerald-700">
-                <CreditCard className="w-5 h-5" />
-              </div>
-              <div>
-                <h2 className="text-base font-bold text-slate-900">Banking & Remittance Details</h2>
-                <p className="text-xs text-slate-500">
-                  Account information displayed on monthly tenant statements, tax invoices, and payment receipts.
-                </p>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 text-xs">
-              {/* Bank Selection */}
-              <div>
-                <label className="block font-semibold text-slate-700 mb-1">
-                  Bank Name (South Africa) *
-                </label>
-                <div className="space-y-1.5">
-                  <select
-                    value={SOUTH_AFRICAN_BANKS.some((b) => b.name === bankName) ? bankName : bankName ? 'Other' : ''}
-                    onChange={(e) => {
-                      if (e.target.value === 'Other') {
-                        setBankName('');
-                      } else {
-                        handleBankSelect(e.target.value);
-                      }
-                    }}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-emerald-500 bg-white text-slate-900 font-medium"
-                  >
-                    <option value="">Select a South African Bank...</option>
-                    {SOUTH_AFRICAN_BANKS.map((b) => (
-                      <option key={b.name} value={b.name}>
-                        {b.name} ({b.universalBranchCode})
-                      </option>
-                    ))}
-                    <option value="Other">Other / Custom Bank</option>
-                  </select>
-
-                  {(!SOUTH_AFRICAN_BANKS.some((b) => b.name === bankName) || bankName === '') && (
-                    <input
-                      type="text"
-                      placeholder="Enter custom bank name"
-                      value={bankName}
-                      onChange={(e) => setBankName(e.target.value)}
-                      className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-emerald-500 text-slate-900"
-                    />
-                  )}
-                </div>
-              </div>
-
-              {/* Account Holder */}
-              <div>
-                <label className="block font-semibold text-slate-700 mb-1">
-                  Account Holder / Beneficiary Name *
-                </label>
-                <input
-                  type="text"
-                  placeholder={entityName || 'e.g. L&M Property Investments (Pty) Ltd'}
-                  value={accountHolder}
-                  onChange={(e) => setAccountHolder(e.target.value)}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-emerald-500 text-slate-900 font-medium"
-                />
-                <span className="text-[10px] text-slate-400 mt-1 block">
-                  Defaults to entity name if left blank
-                </span>
-              </div>
-
-              {/* Account Number */}
-              <div>
-                <label className="block font-semibold text-slate-700 mb-1">
-                  Account Number *
-                </label>
-                <input
-                  type="text"
-                  placeholder="e.g. 62891044321"
-                  value={accountNumber}
-                  onChange={(e) => setAccountNumber(e.target.value)}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-emerald-500 font-mono text-slate-900 font-bold"
-                />
-              </div>
-
-              {/* Account Type */}
-              <div>
-                <label className="block font-semibold text-slate-700 mb-1">
-                  Account Type *
-                </label>
-                <select
-                  value={accountType}
-                  onChange={(e) => setAccountType(e.target.value)}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-emerald-500 bg-white text-slate-900 font-medium"
-                >
-                  {ACCOUNT_TYPES.map((t) => (
-                    <option key={t} value={t}>
-                      {t}
-                    </option>
-                  ))}
-                  <option value="Transmission">Transmission</option>
-                </select>
-              </div>
-
-              {/* Branch Code */}
-              <div>
-                <label className="block font-semibold text-slate-700 mb-1">
-                  Branch / Clearing Code *
-                </label>
-                <input
-                  type="text"
-                  placeholder="e.g. 250655"
-                  value={branchCode}
-                  onChange={(e) => setBranchCode(e.target.value)}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-emerald-500 font-mono text-slate-900 font-bold"
-                />
-                <span className="text-[10px] text-slate-400 mt-1 block">
-                  Universal electronic code (auto-filled on bank selection)
-                </span>
-              </div>
-
-              {/* SWIFT / BIC Code (Optional) */}
-              <div>
-                <label className="block font-semibold text-slate-700 mb-1">
-                  SWIFT / BIC Code (Optional)
-                </label>
-                <input
-                  type="text"
-                  placeholder="e.g. FIRNZAJJ"
-                  value={swiftCode}
-                  onChange={(e) => setSwiftCode(e.target.value.toUpperCase())}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-emerald-500 font-mono text-slate-900"
-                />
-                <span className="text-[10px] text-slate-400 mt-1 block">
-                  Required only for international cross-border EFTs
-                </span>
-              </div>
-            </div>
-
-            {/* Custom Remittance Instructions */}
-            <div className="pt-2 border-t border-slate-100">
-              <label className="block font-semibold text-slate-700 mb-1 text-xs">
-                Custom Remittance Instructions / Payment Terms Note
-              </label>
-              <textarea
-                rows={2}
-                value={remittanceInstructions}
-                onChange={(e) => setRemittanceInstructions(e.target.value)}
-                placeholder="e.g. Please use the statement payment reference as your bank beneficiary reference. Email POP to invest@lmtrading.co.za."
-                className="w-full text-xs p-2.5 border border-slate-300 rounded-lg focus:ring-1 focus:ring-emerald-500 leading-relaxed resize-none text-slate-900"
-              />
-              <p className="text-[10px] text-slate-400 mt-0.5">
-                Printed beneath bank account details on generated statements and PDF invoices.
-              </p>
-            </div>
-          </div>
-
-          {/* Section 2: Logo Upload & Bio Summary */}
-          <div id="settings-branding" className="scroll-mt-20 bg-white rounded-xl border border-slate-200 p-6 shadow-xs space-y-4">
-            <div className="flex items-center gap-2.5 pb-3 border-b border-slate-100">
-              <div className="p-2 bg-indigo-50 rounded-lg text-indigo-700">
-                <FileText className="w-5 h-5" />
-              </div>
-              <div>
-                <h2 className="text-base font-bold text-slate-900">Custom Brand Logo & Investor Bio</h2>
-                <p className="text-xs text-slate-500">
-                  Brand your pitch decks and summarize your track record for private funders.
-                </p>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-xs">
-              {/* Logo Preview & Upload */}
-              <div className="space-y-3">
-                <label className="block font-semibold text-slate-700">Investor / Syndicate Logo</label>
-                
-                <div className="border-2 border-dashed border-slate-200 rounded-xl p-4 flex flex-col items-center justify-center text-center bg-slate-50 min-h-[160px]">
-                  {logoBase64 ? (
-                    <div className="space-y-3 w-full flex flex-col items-center">
-                      <div className="max-h-24 max-w-full p-2 bg-white rounded-lg border border-slate-200 shadow-2xs flex items-center justify-center">
-                        <img
-                          src={logoBase64}
-                          alt="Investor Logo Preview"
-                          className="max-h-20 max-w-[180px] object-contain"
-                        />
-                      </div>
-                      <button
-                        type="button"
-                        onClick={handleRemoveLogo}
-                        className="text-rose-600 hover:text-rose-700 font-semibold text-xs flex items-center gap-1"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" /> Remove Logo
-                      </button>
+          {/* TAB 1: Entity, Banking & Branding */}
+          {(showAllSections || activeTab === 'entity') && (
+            <div className="space-y-6 animate-in fade-in duration-150">
+              {/* Section 1: Entity & Legal Representation */}
+              <div id="settings-entity" className="scroll-mt-20 bg-white rounded-xl border border-slate-200 p-4 sm:p-6 shadow-xs space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-100">
+                  <div className="flex items-center gap-2.5">
+                    <div className="p-2 bg-emerald-50 rounded-lg text-emerald-700">
+                      <Building className="w-5 h-5" />
                     </div>
-                  ) : (
-                    <div className="space-y-2">
-                      <div className="w-12 h-12 rounded-xl bg-slate-200 text-slate-500 flex items-center justify-center mx-auto">
-                        <Building className="w-6 h-6 text-slate-400" />
-                      </div>
-                      <p className="text-slate-500 text-[11px]">
-                        Upload PNG, JPG, or SVG (Max 2MB)
+                    <div>
+                      <h2 className="text-base font-bold text-slate-900">Entity &amp; Legal Representation</h2>
+                      <p className="text-xs text-slate-500">
+                        Used across generated lender proposals, contracts, and confidentiality memorandums.
                       </p>
                     </div>
-                  )}
-                </div>
-
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/*"
-                  onChange={handleLogoUpload}
-                  className="hidden"
-                  id="logo-file-input"
-                />
-
-                <label
-                  htmlFor="logo-file-input"
-                  className="w-full inline-flex items-center justify-center gap-1.5 py-2 px-3 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50 font-semibold cursor-pointer transition-colors"
-                >
-                  <Upload className="w-3.5 h-3.5" />
-                  <span>{logoBase64 ? 'Replace Logo' : 'Upload Logo File'}</span>
-                </label>
-
-                {logoError && (
-                  <div
-                    data-testid="logo-upload-error"
-                    className="p-2.5 bg-rose-50 border border-rose-200 rounded-lg text-rose-700 text-xs flex items-start gap-2 animate-in fade-in"
-                  >
-                    <AlertCircle className="w-3.5 h-3.5 text-rose-600 shrink-0 mt-0.5" />
-                    <span>{logoError}</span>
                   </div>
-                )}
-              </div>
-
-              {/* Bio Summary Text Area */}
-              <div className="md:col-span-2 space-y-2">
-                <label className="block font-semibold text-slate-700">
-                  Investor / Firm Background & Track Record Summary
-                </label>
-                <p className="text-[11px] text-slate-500">
-                  This narrative is embedded dynamically in the Executive Opportunity section of pitch proposals.
-                </p>
-                <textarea
-                  rows={6}
-                  value={bioSummary}
-                  onChange={(e) => setBioSummary(e.target.value)}
-                  placeholder="Describe your property acquisition strategy, local geographic focus, prior exits, and risk mitigation methodologies..."
-                  className="w-full text-xs p-3 border border-slate-300 rounded-lg focus:ring-1 focus:ring-emerald-500 leading-relaxed resize-none text-slate-900"
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Section 3: Default Acquisition & Hurdle Metrics */}
-          <div id="settings-finance" className="scroll-mt-20 bg-white rounded-xl border border-slate-200 p-6 shadow-xs space-y-4">
-            <div className="flex items-center gap-2.5 pb-3 border-b border-slate-100">
-              <div className="p-2 bg-amber-50 rounded-lg text-amber-700">
-                <Coins className="w-5 h-5" />
-              </div>
-              <div>
-                <h2 className="text-base font-bold text-slate-900">Default Financial & Acquisition Metrics</h2>
-                <p className="text-xs text-slate-500">
-                  Baseline assumptions auto-populated into the Opportunity Analyzer and Deal Evaluators.
-                </p>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 text-xs">
-              <div className="p-3.5 rounded-lg bg-slate-50 border border-slate-200">
-                <label className="block font-semibold text-slate-700 mb-1">
-                  Default SA Prime Lending Rate
-                </label>
-                <p className="text-[10px] text-slate-400 mb-2">SARB baseline prime repo indicator</p>
-                <div className="flex items-center">
-                  <input
-                    type="number"
-                    name="defaultPrimeRate"
-                    autoComplete="off"
-                    min="0"
-                    step="any"
-                    value={defaultPrimeRate}
-                    onChange={(e) => setDefaultPrimeRate(Number(e.target.value))}
-                    className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg font-bold text-slate-900 bg-white"
-                  />
-                  <span className="ml-1.5 font-bold text-slate-600">%</span>
+                  <span className="text-[11px] font-semibold text-emerald-800 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200 self-start sm:self-auto">
+                    Powers ➔ Proposal Generator
+                  </span>
                 </div>
-              </div>
 
-              <div className="p-3.5 rounded-lg bg-slate-50 border border-slate-200">
-                <label className="block font-semibold text-slate-700 mb-1">
-                  Baseline Investment Hurdle Yield
-                </label>
-                <p className="text-[10px] text-slate-400 mb-2">Minimum net yield required to greenlight</p>
-                <div className="flex items-center">
-                  <input
-                    type="number"
-                    name="baselineHurdleYield"
-                    autoComplete="off"
-                    min="0"
-                    step="any"
-                    value={baselineHurdleYield}
-                    onChange={(e) => setBaselineHurdleYield(Number(e.target.value))}
-                    className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg font-bold text-emerald-700 bg-white"
-                  />
-                  <span className="ml-1.5 font-bold text-slate-600">%</span>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+                  <div>
+                    <label className="block font-semibold text-slate-700 mb-1">
+                      Sole Proprietor / Legal Entity Name *
+                    </label>
+                    <input
+                      type="text"
+                      name="organization"
+                      autoComplete="organization"
+                      required
+                      placeholder="e.g. L&M Property Investments (Pty) Ltd"
+                      value={entityName}
+                      onChange={(e) => setEntityName(e.target.value)}
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-emerald-500 font-medium text-slate-900"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block font-semibold text-slate-700 mb-1">
+                      Trading Name / Brand (Optional)
+                    </label>
+                    <input
+                      type="text"
+                      name="tradingAs"
+                      autoComplete="organization"
+                      placeholder="e.g. L&M Trading & Capital"
+                      value={tradingAs}
+                      onChange={(e) => setTradingAs(e.target.value)}
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-emerald-500 text-slate-900"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block font-semibold text-slate-700 mb-1">
+                      CIPC Company Reg / SA National ID *
+                    </label>
+                    <input
+                      type="text"
+                      name="cipcOrId"
+                      autoComplete="off"
+                      required
+                      placeholder="e.g. 2022/498211/07 or 8501015021088"
+                      value={registrationOrId}
+                      onChange={(e) => setRegistrationOrId(e.target.value)}
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-emerald-500 font-mono text-slate-800"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block font-semibold text-slate-700 mb-1">
+                      Contact Phone Number *
+                    </label>
+                    <input
+                      type="tel"
+                      name="tel"
+                      autoComplete="tel"
+                      required
+                      placeholder="e.g. +27 82 890 4321"
+                      value={contactNumber}
+                      onChange={(e) => setContactNumber(e.target.value)}
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-emerald-500 text-slate-900"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block font-semibold text-slate-700 mb-1">
+                      Official Email Address *
+                    </label>
+                    <input
+                      type="email"
+                      name="email"
+                      autoComplete="email"
+                      required
+                      placeholder="e.g. invest@lmtrading.co.za"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-emerald-500 text-slate-900"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block font-semibold text-slate-700 mb-1">
+                      Website / Investor Portal URL
+                    </label>
+                    <input
+                      type="url"
+                      name="url"
+                      autoComplete="url"
+                      placeholder="e.g. https://www.lmtrading.co.za"
+                      value={website}
+                      onChange={(e) => setWebsite(e.target.value)}
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-emerald-500 text-slate-900"
+                    />
+                  </div>
                 </div>
-              </div>
 
-              <div className="p-3.5 rounded-lg bg-slate-50 border border-slate-200">
-                <label className="block font-semibold text-slate-700 mb-1">
-                  Default Exit Agent Sales Commission
-                </label>
-                <p className="text-[10px] text-slate-400 mb-2">Standard estate agency exit percentage</p>
-                <div className="flex items-center mb-2">
-                  <input
-                    type="number"
-                    name="defaultCommission"
-                    autoComplete="off"
-                    min="0"
-                    step="any"
-                    value={defaultCommission}
-                    onChange={(e) => setDefaultCommission(Number(e.target.value))}
-                    className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg font-bold text-slate-900 bg-white"
-                  />
-                  <span className="ml-1.5 font-bold text-slate-600">%</span>
-                </div>
-                <label className="flex items-center gap-1.5 text-[11px] text-slate-600 cursor-pointer select-none">
-                  <input
-                    type="checkbox"
-                    checked={vatExemptAgent}
-                    onChange={(e) => setVatExemptAgent(e.target.checked)}
-                    className="rounded text-emerald-600 focus:ring-emerald-500 h-3.5 w-3.5"
-                  />
-                  <span className="font-medium">Agency is VAT-Exempt (no 1.15x VAT)</span>
-                </label>
-              </div>
-
-              <div className="p-3.5 rounded-lg bg-slate-50 border border-slate-200">
-                <label className="block font-semibold text-slate-700 mb-1">
-                  Default Tax Entity
-                </label>
-                <p className="text-[10px] text-slate-400 mb-2">SARS tax treatment for rental &amp; flip profits</p>
-                <select
-                  value={defaultTaxEntity || 'Pre-Tax'}
-                  onChange={(e) => {
-                    const val = e.target.value as 'Company (27%)' | 'Individual (45%)' | 'Pre-Tax';
-                    setDefaultTaxEntity(val);
-                  }}
-                  className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg font-bold text-slate-900 bg-white"
-                >
-                  <option value="Company (27%)">Company (27%)</option>
-                  <option value="Individual (45%)">Individual (45%)</option>
-                  <option value="Pre-Tax">Pre-Tax</option>
-                </select>
-              </div>
-            </div>
-          </div>
-
-          {/* Section 4: Strategy-Aware Buy Box Hurdles & SARS Criteria */}
-          <div id="settings-buybox" className="scroll-mt-20 bg-white rounded-xl border border-slate-200 p-6 shadow-xs space-y-4">
-            <div className="flex items-center gap-2.5 pb-3 border-b border-slate-100">
-              <div className="p-2 bg-emerald-50 rounded-lg text-emerald-700">
-                <Target className="w-5 h-5" />
-              </div>
-              <div>
-                <h2 className="text-base font-bold text-slate-900">Strategy-Aware Buy Box Hurdles &amp; SARS Criteria</h2>
-                <p className="text-xs text-slate-500">
-                  Automated pass/fail criteria matching pipeline deals against your investment mandate.
-                </p>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
-              <div className="p-3.5 rounded-lg bg-slate-50 border border-slate-200">
-                <label className="block font-semibold text-slate-700 mb-1">
-                  Min Net Yield (Rental / BRRRR)
-                </label>
-                <p className="text-[10px] text-slate-400 mb-2">Minimum net cap rate yield hurdle</p>
-                <div className="flex items-center">
-                  <input
-                    type="number"
-                    step="any"
-                    value={minNetYield}
-                    onChange={(e) => setMinNetYield(Number(e.target.value))}
-                    className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg font-bold text-emerald-700 bg-white"
-                  />
-                  <span className="ml-1.5 font-bold text-slate-600">%</span>
-                </div>
-              </div>
-
-              <div className="p-3.5 rounded-lg bg-slate-50 border border-slate-200">
-                <label className="block font-semibold text-slate-700 mb-1">
-                  Min Monthly Cash Flow
-                </label>
-                <p className="text-[10px] text-slate-400 mb-2">Net rental cash flow after bond and opex</p>
-                <div className="flex items-center">
-                  <span className="mr-1.5 font-bold text-slate-500">R</span>
-                  <input
-                    type="number"
-                    step="100"
-                    value={minMonthlyCashflow}
-                    onChange={(e) => setMinMonthlyCashflow(Number(e.target.value))}
-                    className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg font-bold text-slate-900 bg-white"
-                  />
-                </div>
-              </div>
-
-              <div className="p-3.5 rounded-lg bg-slate-50 border border-slate-200">
-                <label className="block font-semibold text-slate-700 mb-1">
-                  Min Cash-on-Cash ROI
-                </label>
-                <p className="text-[10px] text-slate-400 mb-2">Net cashflow return on Day-1 capital</p>
-                <div className="flex items-center">
-                  <input
-                    type="number"
-                    step="any"
-                    value={minNetRoi}
-                    onChange={(e) => setMinNetRoi(Number(e.target.value))}
-                    className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg font-bold text-indigo-700 bg-white"
-                  />
-                  <span className="ml-1.5 font-bold text-slate-600">%</span>
-                </div>
-              </div>
-
-              <div className="p-3.5 rounded-lg bg-slate-50 border border-slate-200">
-                <label className="block font-semibold text-slate-700 mb-1">
-                  Min Flip ROI Hurdle
-                </label>
-                <p className="text-[10px] text-slate-400 mb-2">Minimum net ROI on flip project capital</p>
-                <div className="flex items-center">
-                  <input
-                    type="number"
-                    step="any"
-                    value={minFlipRoi}
-                    onChange={(e) => setMinFlipRoi(Number(e.target.value))}
-                    className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg font-bold text-amber-700 bg-white"
-                  />
-                  <span className="ml-1.5 font-bold text-slate-600">%</span>
-                </div>
-              </div>
-
-              <div className="p-3.5 rounded-lg bg-slate-50 border border-slate-200">
-                <label className="block font-semibold text-slate-700 mb-1">
-                  Max Day-1 Capital Required
-                </label>
-                <p className="text-[10px] text-slate-400 mb-2">Deposit + transfer duty + legal + initial capex</p>
-                <div className="flex items-center">
-                  <span className="mr-1.5 font-bold text-slate-500">R</span>
-                  <input
-                    type="number"
-                    step="10000"
-                    value={maxDay1Cash}
-                    onChange={(e) => setMaxDay1Cash(Number(e.target.value))}
-                    className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg font-bold text-slate-900 bg-white"
-                  />
-                </div>
-              </div>
-
-              <div className="p-3.5 rounded-lg bg-slate-50 border border-slate-200">
-                <label className="block font-semibold text-slate-700 mb-1">
-                  Min DSCR (Debt Service Coverage)
-                </label>
-                <p className="text-[10px] text-slate-400 mb-2">Net Operating Income / Bond Repayment</p>
-                <div className="flex items-center">
-                  <input
-                    type="number"
-                    step="0.05"
-                    value={minDscr}
-                    onChange={(e) => setMinDscr(Number(e.target.value))}
-                    className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg font-bold text-emerald-700 bg-white"
-                  />
-                  <span className="ml-1.5 font-bold text-slate-600">x</span>
-                </div>
-              </div>
-
-              <div className="p-3.5 rounded-lg bg-slate-50 border border-slate-200 sm:col-span-2">
-                <label className="block font-semibold text-slate-700 mb-1">
-                  Marginal Tax Rate (SARS Section 11(a) Individual)
-                </label>
-                <p className="text-[10px] text-slate-400 mb-2">
-                  Applied to taxable rental income (rates, levies, agent fees, and bond interest deducted)
-                </p>
-                <div className="flex items-center">
-                  <input
-                    type="number"
-                    step="any"
-                    value={marginalTaxRate}
-                    onChange={(e) => setMarginalTaxRate(Number(e.target.value))}
-                    className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg font-bold text-slate-900 bg-white"
-                  />
-                  <span className="ml-1.5 font-bold text-slate-600">%</span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Card: AI Integration (BYOK) */}
-          <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-xs space-y-5">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <div className="flex items-center gap-2">
-                <div className="p-1.5 rounded-lg bg-indigo-50 text-indigo-700">
-                  <Sparkles className="w-4 h-4" />
-                </div>
                 <div>
-                  <h3 className="text-sm font-bold text-slate-900">AI Integration & Statement Extraction (BYOK)</h3>
-                  <p className="text-xs text-slate-500">
-                    Bring Your Own Key to parse visual managing agent statements (iGrow, WeconnectU) directly from your browser.
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Physical / Office Address (South Africa)
+                  </label>
+                  <input
+                    type="text"
+                    name="street-address"
+                    autoComplete="street-address"
+                    placeholder="e.g. Suite 402, The Boulevard Office Park, Searle St, Woodstock, Cape Town"
+                    value={physicalAddress}
+                    onChange={(e) => setPhysicalAddress(e.target.value)}
+                    className="w-full text-xs px-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-emerald-500 text-slate-900"
+                  />
+                </div>
+              </div>
+
+              {/* Section 2: Logo Upload & Bio Summary */}
+              <div id="settings-branding" className="scroll-mt-20 bg-white rounded-xl border border-slate-200 p-4 sm:p-6 shadow-xs space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-100">
+                  <div className="flex items-center gap-2.5">
+                    <div className="p-2 bg-indigo-50 rounded-lg text-indigo-700">
+                      <FileText className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h2 className="text-base font-bold text-slate-900">Custom Brand Logo &amp; Investor Bio</h2>
+                      <p className="text-xs text-slate-500">
+                        Brand your pitch decks and summarize your track record for private funders.
+                      </p>
+                    </div>
+                  </div>
+                  <span className="text-[11px] font-semibold text-indigo-800 bg-indigo-50 px-2.5 py-1 rounded-full border border-indigo-200 self-start sm:self-auto">
+                    Powers ➔ Pitch Decks
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-xs">
+                  {/* Compact Logo Preview & Upload */}
+                  <div className="space-y-2.5">
+                    <label className="block font-semibold text-slate-700">Investor / Syndicate Logo</label>
+                    
+                    <div className="border-2 border-dashed border-slate-200 rounded-xl p-3 flex flex-col items-center justify-center text-center bg-slate-50 min-h-[110px]">
+                      {logoBase64 ? (
+                        <div className="space-y-2 w-full flex flex-col items-center">
+                          <div className="max-h-20 max-w-full p-1.5 bg-white rounded-lg border border-slate-200 shadow-2xs flex items-center justify-center">
+                            <img
+                              src={logoBase64}
+                              alt="Investor Logo Preview"
+                              className="max-h-16 max-w-[160px] object-contain"
+                            />
+                          </div>
+                          <button
+                            type="button"
+                            onClick={handleRemoveLogo}
+                            className="text-rose-600 hover:text-rose-700 font-semibold text-xs flex items-center gap-1"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" /> Remove Logo
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="space-y-1.5">
+                          <div className="w-9 h-9 rounded-lg bg-slate-200 text-slate-500 flex items-center justify-center mx-auto">
+                            <Building className="w-5 h-5 text-slate-400" />
+                          </div>
+                          <p className="text-slate-500 text-[11px]">
+                            PNG, JPG, or SVG (Max 2MB)
+                          </p>
+                        </div>
+                      )}
+                    </div>
+
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/*"
+                      onChange={handleLogoUpload}
+                      className="hidden"
+                      id="logo-file-input"
+                    />
+
+                    <label
+                      htmlFor="logo-file-input"
+                      className="w-full inline-flex items-center justify-center gap-1.5 py-1.5 px-3 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50 font-semibold cursor-pointer transition-colors text-xs"
+                    >
+                      <Upload className="w-3.5 h-3.5" />
+                      <span>{logoBase64 ? 'Replace Logo' : 'Upload Logo File'}</span>
+                    </label>
+
+                    {logoError && (
+                      <div
+                        data-testid="logo-upload-error"
+                        className="p-2.5 bg-rose-50 border border-rose-200 rounded-lg text-rose-700 text-xs flex items-start gap-2 animate-in fade-in"
+                      >
+                        <AlertCircle className="w-3.5 h-3.5 text-rose-600 shrink-0 mt-0.5" />
+                        <span>{logoError}</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Bio Summary Text Area */}
+                  <div className="md:col-span-2 space-y-2">
+                    <label className="block font-semibold text-slate-700">
+                      Investor / Firm Background &amp; Track Record Summary
+                    </label>
+                    <p className="text-[11px] text-slate-500">
+                      This narrative is embedded dynamically in the Executive Opportunity section of pitch proposals.
+                    </p>
+                    <textarea
+                      rows={5}
+                      value={bioSummary}
+                      onChange={(e) => setBioSummary(e.target.value)}
+                      placeholder="Describe your property acquisition strategy, local geographic focus, prior exits, and risk mitigation methodologies..."
+                      className="w-full text-xs p-3 border border-slate-300 rounded-lg focus:ring-1 focus:ring-emerald-500 leading-relaxed resize-none text-slate-900"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Section 3: Banking & Remittance Details */}
+              <div id="settings-banking" className="scroll-mt-20 bg-white rounded-xl border border-slate-200 p-4 sm:p-6 shadow-xs space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-100">
+                  <div className="flex items-center gap-2.5">
+                    <div className="p-2 bg-emerald-50 rounded-lg text-emerald-700">
+                      <CreditCard className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h2 className="text-base font-bold text-slate-900">Banking &amp; Remittance Details</h2>
+                      <p className="text-xs text-slate-500">
+                        Account information displayed on monthly tenant statements, tax invoices, and payment receipts.
+                      </p>
+                    </div>
+                  </div>
+                  <span className="text-[11px] font-semibold text-emerald-800 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200 self-start sm:self-auto">
+                    Powers ➔ Tenant Statements
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 text-xs">
+                  {/* Bank Selection */}
+                  <div>
+                    <label className="block font-semibold text-slate-700 mb-1">
+                      Bank Name (South Africa) *
+                    </label>
+                    <div className="space-y-1.5">
+                      <select
+                        value={SOUTH_AFRICAN_BANKS.some((b) => b.name === bankName) ? bankName : bankName ? 'Other' : ''}
+                        onChange={(e) => {
+                          if (e.target.value === 'Other') {
+                            setBankName('');
+                          } else {
+                            handleBankSelect(e.target.value);
+                          }
+                        }}
+                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-emerald-500 bg-white text-slate-900 font-medium"
+                      >
+                        <option value="">Select a South African Bank...</option>
+                        {SOUTH_AFRICAN_BANKS.map((b) => (
+                          <option key={b.name} value={b.name}>
+                            {b.name} ({b.universalBranchCode})
+                          </option>
+                        ))}
+                        <option value="Other">Other / Custom Bank</option>
+                      </select>
+
+                      {(!SOUTH_AFRICAN_BANKS.some((b) => b.name === bankName) || bankName === '') && (
+                        <input
+                          type="text"
+                          placeholder="Enter custom bank name"
+                          value={bankName}
+                          onChange={(e) => setBankName(e.target.value)}
+                          className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-emerald-500 text-slate-900"
+                        />
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Account Holder */}
+                  <div>
+                    <label className="block font-semibold text-slate-700 mb-1">
+                      Account Holder / Beneficiary Name *
+                    </label>
+                    <input
+                      type="text"
+                      placeholder={entityName || 'e.g. L&M Property Investments (Pty) Ltd'}
+                      value={accountHolder}
+                      onChange={(e) => setAccountHolder(e.target.value)}
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-emerald-500 text-slate-900 font-medium"
+                    />
+                    <span className="text-[10px] text-slate-400 mt-1 block">
+                      Defaults to entity name if left blank
+                    </span>
+                  </div>
+
+                  {/* Account Number */}
+                  <div>
+                    <label className="block font-semibold text-slate-700 mb-1">
+                      Account Number *
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. 62891044321"
+                      value={accountNumber}
+                      onChange={(e) => setAccountNumber(e.target.value)}
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-emerald-500 font-mono text-slate-900 font-bold"
+                    />
+                  </div>
+
+                  {/* Account Type */}
+                  <div>
+                    <label className="block font-semibold text-slate-700 mb-1">
+                      Account Type *
+                    </label>
+                    <select
+                      value={accountType}
+                      onChange={(e) => setAccountType(e.target.value)}
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-emerald-500 bg-white text-slate-900 font-medium"
+                    >
+                      {ACCOUNT_TYPES.map((t) => (
+                        <option key={t} value={t}>
+                          {t}
+                        </option>
+                      ))}
+                      <option value="Transmission">Transmission</option>
+                    </select>
+                  </div>
+
+                  {/* Branch Code */}
+                  <div>
+                    <label className="block font-semibold text-slate-700 mb-1">
+                      Branch / Clearing Code *
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. 250655"
+                      value={branchCode}
+                      onChange={(e) => setBranchCode(e.target.value)}
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-emerald-500 font-mono text-slate-900 font-bold"
+                    />
+                    <span className="text-[10px] text-slate-400 mt-1 block">
+                      Universal electronic code (auto-filled on bank selection)
+                    </span>
+                  </div>
+
+                  {/* SWIFT / BIC Code (Optional) */}
+                  <div>
+                    <label className="block font-semibold text-slate-700 mb-1">
+                      SWIFT / BIC Code (Optional)
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. FIRNZAJJ"
+                      value={swiftCode}
+                      onChange={(e) => setSwiftCode(e.target.value.toUpperCase())}
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-emerald-500 font-mono text-slate-900"
+                    />
+                    <span className="text-[10px] text-slate-400 mt-1 block">
+                      Required only for international cross-border EFTs
+                    </span>
+                  </div>
+                </div>
+
+                {/* Custom Remittance Instructions */}
+                <div className="pt-2 border-t border-slate-100">
+                  <label className="block font-semibold text-slate-700 mb-1 text-xs">
+                    Custom Remittance Instructions / Payment Terms Note
+                  </label>
+                  <textarea
+                    rows={2}
+                    value={remittanceInstructions}
+                    onChange={(e) => setRemittanceInstructions(e.target.value)}
+                    placeholder="e.g. Please use the statement payment reference as your bank beneficiary reference. Email POP to invest@lmtrading.co.za."
+                    className="w-full text-xs p-2.5 border border-slate-300 rounded-lg focus:ring-1 focus:ring-emerald-500 leading-relaxed resize-none text-slate-900"
+                  />
+                  <p className="text-[10px] text-slate-400 mt-0.5">
+                    Printed beneath bank account details on generated statements and PDF invoices.
                   </p>
                 </div>
               </div>
-              <span className="text-[10px] font-bold uppercase tracking-wider bg-indigo-50 text-indigo-700 border border-indigo-200 px-2.5 py-1 rounded-full flex items-center gap-1">
-                <ShieldCheck className="w-3 h-3 text-indigo-600" /> Client-Side Only
-              </span>
             </div>
+          )}
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
-              <div>
-                <label className="block font-semibold text-slate-700 mb-1">AI Provider</label>
-                <select
-                  value={aiProvider}
-                  onChange={(e) => setAiProvider(e.target.value as 'anthropic' | 'google')}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white text-slate-800 font-medium focus:ring-1 focus:ring-indigo-500"
-                >
-                  <option value="anthropic">Anthropic Claude (Messages API - Active)</option>
-                  <option value="google" disabled>Google Gemini 1.5 Pro (Coming Soon)</option>
-                </select>
-                <p className="text-[11px] text-slate-400 mt-1">
-                  Claude Sonnet 5 supports high-precision multi-page PDF & image ledger extractions.
-                </p>
-              </div>
-
-              <div>
-                <label className="block font-semibold text-slate-700 mb-1">Extraction Model</label>
-                <select
-                  value={
-                    (SUPPORTED_ANTHROPIC_MODELS as readonly string[]).includes(aiModel)
-                      ? aiModel
-                      : 'custom'
-                  }
-                  onChange={(e) => {
-                    if (e.target.value !== 'custom') {
-                      setAiModel(e.target.value);
-                    }
-                  }}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white text-slate-800 font-medium focus:ring-1 focus:ring-indigo-500"
-                >
-                  <option value="claude-sonnet-5">Claude Sonnet 5 (claude-sonnet-5 - Recommended)</option>
-                  <option value="claude-haiku-4-5">Claude Haiku 4.5 (claude-haiku-4-5 - Fast & Cost-Efficient)</option>
-                  <option value="claude-opus-5">Claude Opus 5 (claude-opus-5 - Deep Reasoning)</option>
-                  <option value="claude-fable-5-1">Claude Fable 5.1 (claude-fable-5-1 - Flagship)</option>
-                  <option value="claude-sonnet-4-6">Claude Sonnet 4.6 (claude-sonnet-4-6)</option>
-                  <option value="custom">Custom Model Identifier...</option>
-                </select>
-                {!(SUPPORTED_ANTHROPIC_MODELS as readonly string[]).includes(aiModel) && (
-                  <input
-                    type="text"
-                    value={aiModel}
-                    onChange={(e) => setAiModel(e.target.value)}
-                    placeholder="Enter custom model identifier (e.g. claude-sonnet-5)"
-                    className="mt-2 w-full px-3 py-1.5 text-xs font-mono border border-slate-300 rounded-lg bg-white text-slate-800"
-                  />
-                )}
-                <p className="text-[11px] text-slate-400 mt-1">
-                  Enforces structured tool-use schema for forensic rental ledger extraction.
-                </p>
-              </div>
-            </div>
-
-            <div>
-              <label className="block font-semibold text-slate-700 mb-1">
-                Anthropic API Key <span className="text-slate-400 font-normal">(Client-Side Only)</span>
-              </label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
-                  <Key className="w-4 h-4" />
+          {/* TAB 2: Underwriting, Buy Box & SARS Tax */}
+          {(showAllSections || activeTab === 'underwriting') && (
+            <div className="space-y-6 animate-in fade-in duration-150">
+              {/* Section 4: Default Financial & Acquisition Metrics */}
+              <div id="settings-finance" className="scroll-mt-20 bg-white rounded-xl border border-slate-200 p-4 sm:p-6 shadow-xs space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-100">
+                  <div className="flex items-center gap-2.5">
+                    <div className="p-2 bg-amber-50 rounded-lg text-amber-700">
+                      <Coins className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h2 className="text-base font-bold text-slate-900">Default Financial &amp; Acquisition Metrics</h2>
+                      <p className="text-xs text-slate-500">
+                        Baseline assumptions auto-populated into the Opportunity Analyzer and Deal Evaluators.
+                      </p>
+                    </div>
+                  </div>
+                  <span className="text-[11px] font-semibold text-amber-800 bg-amber-50 px-2.5 py-1 rounded-full border border-amber-200 self-start sm:self-auto">
+                    Powers ➔ Opportunity Analyzer
+                  </span>
                 </div>
-                <input
-                  type={showApiKey ? 'text' : 'password'}
-                  name="aiApiKey"
-                  autoComplete="off"
-                  spellCheck={false}
-                  data-1p-ignore
-                  value={aiApiKey}
-                  onChange={(e) => setAiApiKey(e.target.value)}
-                  placeholder="sk-ant-api03-..."
-                  className="w-full pl-9 pr-10 py-2 border border-slate-300 rounded-lg font-mono text-xs text-slate-800 bg-white placeholder-slate-400 focus:ring-1 focus:ring-indigo-500"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowApiKey(!showApiKey)}
-                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 cursor-pointer"
-                  title={showApiKey ? 'Hide key' : 'Show key'}
-                >
-                  {showApiKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                </button>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
+                  <div className="p-3.5 rounded-lg bg-slate-50 border border-slate-200">
+                    <label className="block font-semibold text-slate-700 mb-1">
+                      Default SA Prime Lending Rate
+                    </label>
+                    <p className="text-[10px] text-slate-400 mb-2">SARB baseline prime repo indicator</p>
+                    <div className="flex items-center">
+                      <input
+                        type="number"
+                        name="defaultPrimeRate"
+                        autoComplete="off"
+                        min="0"
+                        step="any"
+                        value={defaultPrimeRate}
+                        onChange={(e) => setDefaultPrimeRate(Number(e.target.value))}
+                        className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg font-bold text-slate-900 bg-white"
+                      />
+                      <span className="ml-1.5 font-bold text-slate-600">%</span>
+                    </div>
+                  </div>
+
+                  <div className="p-3.5 rounded-lg bg-slate-50 border border-slate-200">
+                    <label className="block font-semibold text-slate-700 mb-1">
+                      Baseline Investment Hurdle Yield
+                    </label>
+                    <p className="text-[10px] text-slate-400 mb-2">Minimum net yield required to greenlight</p>
+                    <div className="flex items-center">
+                      <input
+                        type="number"
+                        name="baselineHurdleYield"
+                        autoComplete="off"
+                        min="0"
+                        step="any"
+                        value={baselineHurdleYield}
+                        onChange={(e) => setBaselineHurdleYield(Number(e.target.value))}
+                        className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg font-bold text-emerald-700 bg-white"
+                      />
+                      <span className="ml-1.5 font-bold text-slate-600">%</span>
+                    </div>
+                  </div>
+
+                  <div className="p-3.5 rounded-lg bg-slate-50 border border-slate-200">
+                    <label className="block font-semibold text-slate-700 mb-1">
+                      Default Exit Agent Sales Commission
+                    </label>
+                    <p className="text-[10px] text-slate-400 mb-2">Standard estate agency exit percentage</p>
+                    <div className="flex items-center mb-2">
+                      <input
+                        type="number"
+                        name="defaultCommission"
+                        autoComplete="off"
+                        min="0"
+                        step="any"
+                        value={defaultCommission}
+                        onChange={(e) => setDefaultCommission(Number(e.target.value))}
+                        className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg font-bold text-slate-900 bg-white"
+                      />
+                      <span className="ml-1.5 font-bold text-slate-600">%</span>
+                    </div>
+                    <label className="flex items-center gap-1.5 text-[11px] text-slate-600 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={vatExemptAgent}
+                        onChange={(e) => setVatExemptAgent(e.target.checked)}
+                        className="rounded text-emerald-600 focus:ring-emerald-500 h-3.5 w-3.5"
+                      />
+                      <span className="font-medium">Agency is VAT-Exempt (no 1.15x VAT)</span>
+                    </label>
+                  </div>
+                </div>
+
+                {/* Unified SARS Tax Treatment Controls */}
+                <div className="p-4 rounded-xl bg-slate-50/80 border border-slate-200 space-y-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-bold text-slate-900 text-xs flex items-center gap-1.5">
+                      <Shield className="w-4 h-4 text-indigo-600" />
+                      SARS Income Tax Treatment &amp; Rate Entity
+                    </span>
+                    <span className="text-[10px] font-semibold text-slate-500">
+                      Synchronized across Rental Tax Reserve &amp; Flip Corporate Tax
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+                    <div>
+                      <label className="block font-semibold text-slate-700 mb-1">
+                        Default Tax Entity
+                      </label>
+                      <select
+                        value={defaultTaxEntity || 'Pre-Tax'}
+                        onChange={(e) => {
+                          const val = e.target.value as 'Company (27%)' | 'Individual (45%)' | 'Pre-Tax';
+                          setDefaultTaxEntity(val);
+                        }}
+                        className="w-full px-3 py-2 border border-slate-300 rounded-lg font-bold text-slate-900 bg-white"
+                      >
+                        <option value="Company (27%)">Company (27%) - Corporate Income Tax</option>
+                        <option value="Individual (45%)">Individual (45%) - Top Marginal Bracket</option>
+                        <option value="Pre-Tax">Pre-Tax - Gross Cash Flow Analysis</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="font-semibold text-slate-700">
+                          Marginal Tax Rate (SARS Section 11(a) Individual)
+                        </label>
+                        <span className="text-[10px] text-slate-400">Default: 31%</span>
+                      </div>
+                      <div className="flex items-center">
+                        <input
+                          type="number"
+                          step="any"
+                          value={marginalTaxRate}
+                          onChange={(e) => setMarginalTaxRate(Number(e.target.value))}
+                          className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg font-bold text-slate-900 bg-white"
+                        />
+                        <span className="ml-1.5 font-bold text-slate-600">%</span>
+                      </div>
+                      {(defaultTaxEntity === 'Company (27%)' || defaultTaxEntity === 'Pre-Tax') && (
+                        <p className="text-[10px] text-slate-500 mt-1 italic">
+                          Applied when Individual tax override is selected on a rental card.
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Section 5: Strategy-Aware Buy Box Hurdles & SARS Criteria */}
+              <div id="settings-buybox" className="scroll-mt-20 bg-white rounded-xl border border-slate-200 p-4 sm:p-6 shadow-xs space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-100">
+                  <div className="flex items-center gap-2.5">
+                    <div className="p-2 bg-emerald-50 rounded-lg text-emerald-700">
+                      <Target className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h2 className="text-base font-bold text-slate-900">Strategy-Aware Buy Box Hurdles &amp; SARS Criteria</h2>
+                      <p className="text-xs text-slate-500">
+                        Automated pass/fail criteria matching pipeline deals against your investment mandate.
+                      </p>
+                    </div>
+                  </div>
+                  <span className="text-[11px] font-semibold text-emerald-800 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200 self-start sm:self-auto">
+                    Powers ➔ Deal Sourcing Match
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 text-xs">
+                  <div className="p-3.5 rounded-lg bg-slate-50 border border-slate-200">
+                    <label className="block font-semibold text-slate-700 mb-1">
+                      Min Net Yield (Rental / BRRRR)
+                    </label>
+                    <p className="text-[10px] text-slate-400 mb-2">Minimum net cap rate yield hurdle</p>
+                    <div className="flex items-center">
+                      <input
+                        type="number"
+                        step="any"
+                        value={minNetYield}
+                        onChange={(e) => setMinNetYield(Number(e.target.value))}
+                        className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg font-bold text-emerald-700 bg-white"
+                      />
+                      <span className="ml-1.5 font-bold text-slate-600">%</span>
+                    </div>
+                  </div>
+
+                  <div className="p-3.5 rounded-lg bg-slate-50 border border-slate-200">
+                    <label className="block font-semibold text-slate-700 mb-1">
+                      Min Monthly Cash Flow
+                    </label>
+                    <p className="text-[10px] text-slate-400 mb-2">Net rental cash flow after bond and opex</p>
+                    <div className="flex items-center mb-1.5">
+                      <span className="mr-1.5 font-bold text-slate-500">R</span>
+                      <input
+                        type="number"
+                        step="100"
+                        value={minMonthlyCashflow}
+                        onChange={(e) => setMinMonthlyCashflow(Number(e.target.value))}
+                        className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg font-bold text-slate-900 bg-white"
+                      />
+                    </div>
+                    <span className="text-[11px] text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 font-semibold inline-block">
+                      {formatZAR(minMonthlyCashflow)} / mo
+                    </span>
+                  </div>
+
+                  <div className="p-3.5 rounded-lg bg-slate-50 border border-slate-200">
+                    <label className="block font-semibold text-slate-700 mb-1">
+                      Min Cash-on-Cash ROI
+                    </label>
+                    <p className="text-[10px] text-slate-400 mb-2">Net cashflow return on Day-1 capital</p>
+                    <div className="flex items-center">
+                      <input
+                        type="number"
+                        step="any"
+                        value={minNetRoi}
+                        onChange={(e) => setMinNetRoi(Number(e.target.value))}
+                        className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg font-bold text-indigo-700 bg-white"
+                      />
+                      <span className="ml-1.5 font-bold text-slate-600">%</span>
+                    </div>
+                  </div>
+
+                  <div className="p-3.5 rounded-lg bg-slate-50 border border-slate-200">
+                    <label className="block font-semibold text-slate-700 mb-1">
+                      Min Flip ROI Hurdle
+                    </label>
+                    <p className="text-[10px] text-slate-400 mb-2">Minimum net ROI on flip project capital</p>
+                    <div className="flex items-center">
+                      <input
+                        type="number"
+                        step="any"
+                        value={minFlipRoi}
+                        onChange={(e) => setMinFlipRoi(Number(e.target.value))}
+                        className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg font-bold text-amber-700 bg-white"
+                      />
+                      <span className="ml-1.5 font-bold text-slate-600">%</span>
+                    </div>
+                  </div>
+
+                  <div className="p-3.5 rounded-lg bg-slate-50 border border-slate-200">
+                    <label className="block font-semibold text-slate-700 mb-1">
+                      Max Day-1 Capital Required
+                    </label>
+                    <p className="text-[10px] text-slate-400 mb-2">Deposit + transfer duty + legal + initial capex</p>
+                    <div className="flex items-center mb-1.5">
+                      <span className="mr-1.5 font-bold text-slate-500">R</span>
+                      <input
+                        type="number"
+                        step="10000"
+                        value={maxDay1Cash}
+                        onChange={(e) => setMaxDay1Cash(Number(e.target.value))}
+                        className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg font-bold text-slate-900 bg-white"
+                      />
+                    </div>
+                    <span className="text-[11px] text-slate-700 bg-slate-100 px-2 py-0.5 rounded border border-slate-200 font-semibold inline-block">
+                      {formatZAR(maxDay1Cash)} max cash outlay
+                    </span>
+                  </div>
+
+                  <div className="p-3.5 rounded-lg bg-slate-50 border border-slate-200">
+                    <label className="block font-semibold text-slate-700 mb-1">
+                      Min DSCR (Debt Service Coverage)
+                    </label>
+                    <p className="text-[10px] text-slate-400 mb-2">Net Operating Income / Bond Repayment</p>
+                    <div className="flex items-center">
+                      <input
+                        type="number"
+                        step="0.05"
+                        value={minDscr}
+                        onChange={(e) => setMinDscr(Number(e.target.value))}
+                        className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg font-bold text-emerald-700 bg-white"
+                      />
+                      <span className="ml-1.5 font-bold text-slate-600">x</span>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
+          )}
 
-            {/* Privacy Disclaimer */}
-            <div className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 flex items-start gap-2.5 text-xs text-slate-600">
-              <Shield className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-              <div className="space-y-0.5">
-                <span className="font-bold text-slate-800 block">Direct Browser Processing Privacy Guarantee</span>
-                <p className="text-slate-500 leading-relaxed text-[11px]">
-                  API keys and uploaded managing agent statements are processed entirely in your browser and communicated directly with Anthropic via browser CORS. Your credentials and financial documents are never stored or logged on an external application server.
-                </p>
+          {/* TAB 3: AI Extraction & BYOK */}
+          {(showAllSections || activeTab === 'ai') && (
+            <div className="space-y-6 animate-in fade-in duration-150">
+              {/* Section 6: AI Integration & Statement Extraction (BYOK) */}
+              <div id="settings-ai" className="scroll-mt-20 bg-white rounded-xl border border-slate-200 p-4 sm:p-6 shadow-xs space-y-5">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
+                  <div className="flex items-center gap-2">
+                    <div className="p-1.5 rounded-lg bg-indigo-50 text-indigo-700">
+                      <Sparkles className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-bold text-slate-900">AI Integration &amp; Statement Extraction (BYOK)</h3>
+                      <p className="text-xs text-slate-500">
+                        Bring Your Own Key to parse visual managing agent statements (iGrow, WeconnectU) directly from your browser.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 self-start sm:self-auto">
+                    <span className="text-[10px] font-bold uppercase tracking-wider bg-indigo-50 text-indigo-700 border border-indigo-200 px-2.5 py-1 rounded-full flex items-center gap-1">
+                      <ShieldCheck className="w-3 h-3 text-indigo-600" /> Client-Side Only
+                    </span>
+                  </div>
+                </div>
+
+                {/* Telemetry and Key Status Ribbon */}
+                <div className="flex flex-wrap items-center gap-2.5 p-3 rounded-lg bg-slate-50 border border-slate-200 text-xs">
+                  <span className="text-[11px] bg-white border border-slate-200 text-slate-700 px-2.5 py-1 rounded-md font-semibold flex items-center gap-1.5 shadow-2xs">
+                    <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
+                    0 tokens used in this browser session
+                  </span>
+
+                  {apiKeyValidationState === 'valid' && (
+                    <span className="text-[11px] bg-emerald-50 border border-emerald-200 text-emerald-800 px-2.5 py-1 rounded-md font-semibold flex items-center gap-1.5">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                      Valid Anthropic API Key Format
+                    </span>
+                  )}
+                  {apiKeyValidationState === 'empty' && (
+                    <span className="text-[11px] bg-slate-100 border border-slate-200 text-slate-600 px-2.5 py-1 rounded-md font-medium flex items-center gap-1.5">
+                      <Shield className="w-3.5 h-3.5 text-slate-400" />
+                      Client-Side Only • No Key Configured
+                    </span>
+                  )}
+                  {apiKeyValidationState === 'invalid_prefix' && (
+                    <span className="text-[11px] bg-amber-50 border border-amber-200 text-amber-800 px-2.5 py-1 rounded-md font-medium flex items-center gap-1.5">
+                      <AlertCircle className="w-3.5 h-3.5 text-amber-600" />
+                      Check Key Format (Anthropic keys typically start with sk-ant-)
+                    </span>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+                  <div>
+                    <label className="block font-semibold text-slate-700 mb-1">AI Provider</label>
+                    <select
+                      value={aiProvider}
+                      onChange={(e) => setAiProvider(e.target.value as 'anthropic' | 'google')}
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white text-slate-800 font-medium focus:ring-1 focus:ring-indigo-500"
+                    >
+                      <option value="anthropic">Anthropic Claude (Messages API - Active)</option>
+                      <option value="google" disabled>Google Gemini 1.5 Pro (Coming Soon)</option>
+                    </select>
+                    <p className="text-[11px] text-slate-400 mt-1">
+                      Claude Sonnet 5 supports high-precision multi-page PDF &amp; image ledger extractions.
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="block font-semibold text-slate-700 mb-1">Extraction Model</label>
+                    <select
+                      value={
+                        (SUPPORTED_ANTHROPIC_MODELS as readonly string[]).includes(aiModel)
+                          ? aiModel
+                          : 'custom'
+                      }
+                      onChange={(e) => {
+                        if (e.target.value !== 'custom') {
+                          setAiModel(e.target.value);
+                        }
+                      }}
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white text-slate-800 font-medium focus:ring-1 focus:ring-indigo-500"
+                    >
+                      <option value="claude-sonnet-5">Claude Sonnet 5 (claude-sonnet-5 - Recommended)</option>
+                      <option value="claude-haiku-4-5">Claude Haiku 4.5 (claude-haiku-4-5 - Fast &amp; Cost-Efficient)</option>
+                      <option value="claude-opus-5">Claude Opus 5 (claude-opus-5 - Deep Reasoning)</option>
+                      <option value="claude-fable-5-1">Claude Fable 5.1 (claude-fable-5-1 - Flagship)</option>
+                      <option value="claude-sonnet-4-6">Claude Sonnet 4.6 (claude-sonnet-4-6)</option>
+                      <option value="custom">Custom Model Identifier...</option>
+                    </select>
+                    {!(SUPPORTED_ANTHROPIC_MODELS as readonly string[]).includes(aiModel) && (
+                      <input
+                        type="text"
+                        value={aiModel}
+                        onChange={(e) => setAiModel(e.target.value)}
+                        placeholder="Enter custom model identifier (e.g. claude-sonnet-5)"
+                        className="mt-2 w-full px-3 py-1.5 text-xs font-mono border border-slate-300 rounded-lg bg-white text-slate-800"
+                      />
+                    )}
+                    <p className="text-[11px] text-slate-400 mt-1">
+                      Enforces structured tool-use schema for forensic rental ledger extraction.
+                    </p>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">
+                    Anthropic API Key <span className="text-slate-400 font-normal">(Client-Side Only)</span>
+                  </label>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                      <Key className="w-4 h-4" />
+                    </div>
+                    <input
+                      type={showApiKey ? 'text' : 'password'}
+                      name="aiApiKey"
+                      autoComplete="off"
+                      spellCheck={false}
+                      data-1p-ignore
+                      value={aiApiKey}
+                      onChange={(e) => setAiApiKey(e.target.value)}
+                      placeholder="sk-ant-api03-..."
+                      className="w-full pl-9 pr-10 py-2 border border-slate-300 rounded-lg font-mono text-xs text-slate-800 bg-white placeholder-slate-400 focus:ring-1 focus:ring-indigo-500"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowApiKey(!showApiKey)}
+                      className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 cursor-pointer"
+                      title={showApiKey ? 'Hide key' : 'Show key'}
+                    >
+                      {showApiKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Privacy Disclaimer */}
+                <div className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 flex items-start gap-2.5 text-xs text-slate-600">
+                  <Shield className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                  <div className="space-y-0.5">
+                    <span className="font-bold text-slate-800 block">Direct Browser Processing Privacy Guarantee</span>
+                    <p className="text-slate-500 leading-relaxed text-[11px]">
+                      API keys and uploaded managing agent statements are processed entirely in your browser and communicated directly with Anthropic via browser CORS. Your credentials and financial documents are never stored or logged on an external application server.
+                    </p>
+                  </div>
+                </div>
               </div>
             </div>
-          </div>
+          )}
 
-          {/* Action Bar */}
-          <div className="flex items-center justify-between pt-2">
+          {/* Footer Navigation Bar */}
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-4 border-t border-slate-200 text-xs">
             <Link
               href="/proposal"
-              className="text-xs font-semibold text-indigo-600 hover:text-indigo-800"
+              className="font-semibold text-indigo-600 hover:text-indigo-800 flex items-center gap-1.5"
             >
               ← Go to Proposal Generator
             </Link>
 
-            <button
-              type="submit"
-              className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold px-6 py-2.5 rounded-lg shadow-sm flex items-center gap-2 transition-colors cursor-pointer"
-            >
-              <Save className="w-4 h-4" /> Save Profile & Settings
-            </button>
+            <div className="flex items-center gap-3">
+              <Link
+                href="/get-started#stage-0"
+                className="text-slate-500 hover:text-slate-800 font-medium flex items-center gap-1"
+              >
+                <BookOpen className="w-3.5 h-3.5 text-slate-400" />
+                <span>View Step 0 in Get Started Guide ➔</span>
+              </Link>
+
+              <button
+                type="submit"
+                className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold px-6 py-2.5 rounded-lg shadow-sm flex items-center gap-2 transition-colors cursor-pointer"
+              >
+                <Save className="w-4 h-4" /> Save Profile &amp; Settings
+              </button>
+            </div>
           </div>
         </form>
+
+        {/* Adaptive Floating Save Dock for Dirty Changes (Guardrail 1: bottom-16 on mobile to avoid bottom navigation bar, md:bottom-4 on desktop) */}
+        {isDirty && (
+          <div className="fixed bottom-16 md:bottom-4 left-4 right-4 sm:left-auto sm:right-6 z-40 bg-slate-900/95 backdrop-blur-md text-white px-4 py-3 rounded-xl shadow-2xl border border-slate-700/80 flex items-center justify-between sm:justify-end gap-3.5 animate-in slide-in-from-bottom-5 duration-200">
+            <div className="flex items-center gap-2 text-xs">
+              <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span>
+              <span className="font-semibold text-slate-200">Unsaved Changes</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                data-testid="floating-discard-btn"
+                onClick={handleDiscardChanges}
+                className="px-3 py-1.5 rounded-lg border border-slate-600 hover:bg-slate-800 text-slate-300 text-xs font-semibold transition-colors cursor-pointer flex items-center gap-1.5"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                <span>Discard</span>
+              </button>
+              <button
+                type="button"
+                data-testid="floating-save-btn"
+                onClick={handleSave}
+                className="bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white text-xs font-bold px-4 py-1.5 rounded-lg shadow-sm transition-colors cursor-pointer flex items-center gap-1.5"
+              >
+                <Save className="w-3.5 h-3.5" />
+                <span>Save Profile &amp; Settings</span>
+              </button>
+            </div>
+          </div>
+        )}
       </main>
     </div>
   );

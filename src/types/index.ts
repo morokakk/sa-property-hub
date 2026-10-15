@@ -897,6 +897,7 @@ export interface InvestorProfile {
   branchCode?: string;
   swiftCode?: string;
   remittanceInstructions?: string;
+  settingsSavedAt?: string;
 }
 
 export interface StatementBankingDetails {

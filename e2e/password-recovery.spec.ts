@@ -8,6 +8,12 @@ test.describe('Cloud Database Authentication & Password Recovery Flow', () => {
     const syncCard = page.locator('text=Cloud Database Synchronization').first();
     await expect(syncCard).toBeVisible({ timeout: 15_000 });
 
+    // If collapsed, expand Cloud Sync inline auth controls
+    const toggleBtn = page.locator('[data-testid="toggle-cloud-auth-btn"]');
+    if (await toggleBtn.isVisible()) {
+      await toggleBtn.click();
+    }
+
     // Locate "Forgot password?" link on Sign In form
     const forgotPasswordLink = page.locator('[data-testid="forgot-password-link"]');
     await expect(forgotPasswordLink).toBeVisible();
@@ -32,6 +38,12 @@ test.describe('Cloud Database Authentication & Password Recovery Flow', () => {
 
   test('2. Enforces minimum 8-character password constraint on Sign Up and Sign In', async ({ page }) => {
     await page.goto('/settings', { waitUntil: 'networkidle' });
+
+    // If collapsed, expand Cloud Sync inline auth controls
+    const toggleBtn2 = page.locator('[data-testid="toggle-cloud-auth-btn"]');
+    if (await toggleBtn2.isVisible()) {
+      await toggleBtn2.click();
+    }
 
     // Switch to Create Account mode
     const signUpTab = page.locator('[data-testid="auth-mode-signup"]');
