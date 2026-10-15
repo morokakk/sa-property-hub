@@ -10,14 +10,13 @@ export default function UpcomingDeadlines() {
   const flips = usePortfolioStore((state) => state.flips);
   const funding = usePortfolioStore((state) => state.funding);
   const rentals = usePortfolioStore((state) => state.rentals);
-  const tasks = usePortfolioStore((state) => state.tasks);
 
   // Compile operational deadlines
   interface DeadlineItem {
     id: string;
     title: string;
     date: string;
-    type: 'conveyancing' | 'coupon' | 'flip' | 'lease' | 'task';
+    type: 'conveyancing' | 'coupon' | 'flip' | 'lease';
     badge: string;
     badgeColor: string;
     detail: string;
@@ -26,27 +25,7 @@ export default function UpcomingDeadlines() {
 
   const deadlines: DeadlineItem[] = [];
 
-  // 1. Task deadlines
-  tasks
-    .filter((t) => t.status !== 'Completed')
-    .forEach((t) => {
-      deadlines.push({
-        id: `t-${t.id}`,
-        title: t.title,
-        date: t.dueDate,
-        type: 'task',
-        badge: t.priority,
-        badgeColor:
-          t.priority === 'Urgent'
-            ? 'bg-rose-100 text-rose-800 border-rose-200'
-            : t.priority === 'High'
-            ? 'bg-amber-100 text-amber-800 border-amber-200'
-            : 'bg-blue-100 text-blue-800 border-blue-200',
-        detail: t.linkedEntity.name,
-      });
-    });
-
-  // 2. Section 118 Municipal Rates Clearance & Billing Disputes
+  // 1. Section 118 Municipal Rates Clearance & Billing Disputes
   flips
     .filter((f) => f.status === 'Active' || f.status === 'Delayed')
     .forEach((f) => {
@@ -165,7 +144,7 @@ export default function UpcomingDeadlines() {
       if (!a.isUrgentDispute && b.isUrgentDispute) return 1;
       return new Date(a.date).getTime() - new Date(b.date).getTime();
     })
-    .slice(0, 8);
+    .slice(0, 4);
 
   return (
     <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-xs flex flex-col justify-between">
@@ -173,18 +152,18 @@ export default function UpcomingDeadlines() {
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
             <Clock className="w-4 h-4 text-slate-500" />
-            <h3 className="font-semibold text-slate-900 text-sm">Upcoming Operational Deadlines</h3>
+            <h3 className="font-semibold text-slate-900 text-sm">Contract &amp; Statutory Deadlines</h3>
           </div>
           <Link
             href="/tasks"
             className="text-xs text-emerald-600 hover:text-emerald-700 font-medium"
           >
-            View All
+            View Calendar ➔
           </Link>
         </div>
 
         {sortedDeadlines.length === 0 ? (
-          <p className="text-xs text-slate-400 py-6 text-center">No upcoming deadlines registered.</p>
+          <p className="text-xs text-slate-400 py-6 text-center">No upcoming statutory deadlines registered.</p>
         ) : (
           <div className="space-y-3">
             {sortedDeadlines.map((item) => (
@@ -214,7 +193,7 @@ export default function UpcomingDeadlines() {
       </div>
 
       <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
-        <span>Active operational pipeline</span>
+        <span>Contract &amp; statutory pipeline</span>
         <span className="font-semibold text-slate-700">{deadlines.length} tracked dates</span>
       </div>
     </div>

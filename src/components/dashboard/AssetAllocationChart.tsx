@@ -106,28 +106,28 @@ export default function AssetAllocationChart({ summary }: AssetAllocationChartPr
 
           {/* Legend and values */}
           <div className="flex-1 w-full space-y-3">
-            <div className="flex items-center justify-between text-xs">
-              <div className="flex items-center gap-2">
+            <div className="flex items-center justify-between gap-3 text-xs">
+              <div className="flex items-center gap-2 min-w-0">
                 <span className="w-3 h-3 rounded-sm bg-emerald-500 shrink-0"></span>
-                <span className="text-slate-700 font-medium">Active Rentals ({formatPercent(rentalPercent)})</span>
+                <span className="text-slate-700 font-medium truncate">Active Rentals ({formatPercent(rentalPercent)})</span>
               </div>
-              <span className="font-semibold text-slate-900">{formatZAR(totalRentalValue)}</span>
+              <span className="font-semibold text-slate-900 shrink-0 whitespace-nowrap">{formatZAR(totalRentalValue)}</span>
             </div>
 
-            <div className="flex items-center justify-between text-xs">
-              <div className="flex items-center gap-2">
+            <div className="flex items-center justify-between gap-3 text-xs">
+              <div className="flex items-center gap-2 min-w-0">
                 <span className="w-3 h-3 rounded-sm bg-indigo-500 shrink-0"></span>
-                <span className="text-slate-700 font-medium">Ongoing Flips ({formatPercent(flipPercent)})</span>
+                <span className="text-slate-700 font-medium truncate">Ongoing Flips ({formatPercent(flipPercent)})</span>
               </div>
-              <span className="font-semibold text-slate-900">{formatZAR(totalFlipValue)}</span>
+              <span className="font-semibold text-slate-900 shrink-0 whitespace-nowrap">{formatZAR(totalFlipValue)}</span>
             </div>
 
-            <div className="flex items-center justify-between text-xs">
-              <div className="flex items-center gap-2">
+            <div className="flex items-center justify-between gap-3 text-xs">
+              <div className="flex items-center gap-2 min-w-0">
                 <span className="w-3 h-3 rounded-sm bg-amber-500 shrink-0"></span>
-                <span className="text-slate-700 font-medium">Liquid Cash ({formatPercent(cashPercent)})</span>
+                <span className="text-slate-700 font-medium truncate">Liquid Cash ({formatPercent(cashPercent)})</span>
               </div>
-              <span className="font-semibold text-slate-900">{formatZAR(liquidCapitalReserve)}</span>
+              <span className="font-semibold text-slate-900 shrink-0 whitespace-nowrap">{formatZAR(liquidCapitalReserve)}</span>
             </div>
           </div>
         </div>

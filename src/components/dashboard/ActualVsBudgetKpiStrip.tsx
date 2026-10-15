@@ -13,6 +13,8 @@ import {
   Info,
   AlertCircle,
   Building2,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
 import { calculatePropertyArrears, getMonthKey } from '@/lib/calculations/arrears';
 import { calculatePortfolioOccupancyYtd } from '@/lib/calculations/rentals';
@@ -21,6 +23,8 @@ interface ActualVsBudgetKpiStripProps {
   rentals: RentalProperty[];
   title?: string;
   showSubtitle?: boolean;
+  collapsible?: boolean;
+  defaultCollapsed?: boolean;
 }
 
 export function getSaTaxYearInfo(targetDate: Date = new Date()) {
@@ -57,7 +61,10 @@ export default function ActualVsBudgetKpiStrip({
   rentals,
   title = 'Actuals YTD vs. Budget (SA Tax Year)',
   showSubtitle = true,
+  collapsible = false,
+  defaultCollapsed = false,
 }: ActualVsBudgetKpiStripProps) {
+  const [isCollapsed, setIsCollapsed] = React.useState(collapsible ? defaultCollapsed : false);
   const activeRentals = rentals.filter((r) => r.status !== 'Sold');
   const taxYearInfo = getSaTaxYearInfo();
   const elapsedMonths = taxYearInfo.elapsedMonths;
@@ -223,22 +230,63 @@ export default function ActualVsBudgetKpiStrip({
           </div>
         </div>
 
-        {!hasTransactions && (
-          <div className="flex items-center gap-1.5 text-[11px] text-slate-500 bg-slate-50 px-2.5 py-1 rounded-lg border border-slate-200 self-start sm:self-auto">
-            <Info className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-            <span>
-              {hasLoggedPaymentRecords
-                ? `Derived from ${formatZAR(effectiveActualRent)} logged tenant payment records`
-                : currentTaxYearArrears > 0
-                ? `Adjusted for ${formatZAR(currentTaxYearArrears)} current tax year tenant arrears`
-                : 'Tracking against budgeted baseline (0 transactions logged for YTD)'}
-            </span>
-          </div>
-        )}
+        <div className="flex items-center gap-2 flex-wrap">
+          {!hasTransactions && (
+            <div className="flex items-center gap-1.5 text-[11px] text-slate-500 bg-slate-50 px-2.5 py-1 rounded-lg border border-slate-200 self-start sm:self-auto">
+              <Info className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+              <span>
+                {hasLoggedPaymentRecords
+                  ? `Derived from ${formatZAR(effectiveActualRent)} logged tenant payment records`
+                  : currentTaxYearArrears > 0
+                  ? `Adjusted for ${formatZAR(currentTaxYearArrears)} current tax year tenant arrears`
+                  : 'Tracking against budgeted baseline (0 transactions logged for YTD)'}
+              </span>
+            </div>
+          )}
+
+          {collapsible && (
+            <button
+              type="button"
+              onClick={() => setIsCollapsed(!isCollapsed)}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 transition-colors cursor-pointer shrink-0"
+            >
+              {isCollapsed ? (
+                <>
+                  <span>Expand 5-Card Tax Audit</span>
+                  <ChevronDown className="w-3.5 h-3.5" />
+                </>
+              ) : (
+                <>
+                  <span>Collapse Audit</span>
+                  <ChevronUp className="w-3.5 h-3.5" />
+                </>
+              )}
+            </button>
+          )}
+        </div>
       </div>
 
+      {/* Live Compact Performance Ribbon when Collapsed */}
+      {collapsible && isCollapsed && (
+        <div className="flex flex-wrap items-center gap-2 pt-1 animate-in fade-in duration-150">
+          <span className="text-xs bg-slate-50 border border-slate-200 px-2.5 py-1.5 rounded-lg text-slate-700 font-medium">
+            Collected YTD: <strong className="text-slate-900 font-bold">{formatZAR(effectiveActualRent)}</strong> <span className={rentVariancePercent >= 100 ? 'text-emerald-700' : 'text-amber-700'}>({rentVariancePercent.toFixed(1)}% Pace)</span>
+          </span>
+          <span className="text-xs bg-slate-50 border border-slate-200 px-2.5 py-1.5 rounded-lg text-slate-700 font-medium">
+            Net YTD: <strong className={effectiveActualNet >= 0 ? 'text-emerald-700 font-bold' : 'text-rose-600 font-bold'}>{formatZAR(effectiveActualNet)}</strong>
+          </span>
+          <span className="text-xs bg-slate-50 border border-slate-200 px-2.5 py-1.5 rounded-lg text-slate-700 font-medium">
+            Portfolio Occupancy YTD: <strong className="text-slate-900 font-bold">{formatPercent(occupancy.occupancyRatePercent)}</strong>
+          </span>
+          <span className="text-xs bg-emerald-50 border border-emerald-200 px-2.5 py-1.5 rounded-lg text-emerald-800 font-medium">
+            ITR12 Code 4216 Shield: <strong className="font-bold">{formatZAR(effectiveActualInterest)}</strong>
+          </span>
+        </div>
+      )}
+
       {/* 5-Column KPI Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+      {!isCollapsed && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
         {/* 1. Gross Rental Income */}
         <div className="p-3.5 rounded-xl border border-slate-200 bg-slate-50/70 flex flex-col justify-between">
           <div>
@@ -375,6 +423,7 @@ export default function ActualVsBudgetKpiStrip({
           </div>
         </div>
       </div>
+      )}
     </div>
   );
 }

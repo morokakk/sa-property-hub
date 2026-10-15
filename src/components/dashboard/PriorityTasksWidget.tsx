@@ -10,13 +10,13 @@ export default function PriorityTasksWidget() {
   const tasks = usePortfolioStore((state) => state.tasks);
   const toggleTaskStatus = usePortfolioStore((state) => state.toggleTaskStatus);
 
-  const priorityTasks = tasks
-    .filter((t) => t.status !== 'Completed')
+  const pendingTasks = tasks.filter((t) => t.status !== 'Completed');
+  const priorityTasks = [...pendingTasks]
     .sort((a, b) => {
       const pOrder = { Urgent: 0, High: 1, Medium: 2, Low: 3 };
       return pOrder[a.priority] - pOrder[b.priority];
     })
-    .slice(0, 5);
+    .slice(0, 4);
 
   return (
     <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-xs flex flex-col justify-between">
@@ -86,7 +86,7 @@ export default function PriorityTasksWidget() {
 
       <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
         <span>Pending priority actions</span>
-        <span className="font-semibold text-slate-700">{priorityTasks.length} to-dos</span>
+        <span className="font-semibold text-slate-700">{pendingTasks.length} pending to-dos</span>
       </div>
     </div>
   );
