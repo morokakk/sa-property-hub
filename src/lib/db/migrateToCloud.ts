@@ -459,6 +459,7 @@ export function mapFundingSources(funding: FundingSource[] = [], userId: string)
     linked_deal_name: fs.linkedDealName || null,
     total_repaid_zar: toNumeric(fs.totalRepaidZAR, 0),
     total_interest_paid_zar: toNullableNumeric(fs.totalInterestPaidZAR),
+    last_payment_reference: fs.lastPaymentReference || null,
     status: fs.status || 'Active',
     notes: fs.notes || null,
     tranches: (fs.tranches ? JSON.parse(JSON.stringify(fs.tranches)) : []) as any,

@@ -92,6 +92,7 @@ export default function FundingTrackerPage() {
   const [repaymentAmount, setRepaymentAmount] = useState<number>(0);
   const [paymentType, setPaymentType] = useState<string>('Monthly Coupon / Interest');
   const [paymentDate, setPaymentDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [paymentReference, setPaymentReference] = useState<string>('');
   const [copyReceiptOnSave, setCopyReceiptOnSave] = useState<boolean>(true);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
@@ -211,6 +212,8 @@ export default function FundingTrackerPage() {
   const handleProcessRepayment = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!repaymentModalSource || repaymentAmount <= 0) return;
+    const trimmedReference = paymentReference.trim();
+
     if (paymentType === 'Principal Repayment' || paymentType === 'Partial Return' || paymentType === 'Full Settlement') {
       const currentRepaid = repaymentModalSource.totalRepaidZAR || 0;
       const newTotalRepaid = currentRepaid + repaymentAmount;
@@ -221,12 +224,14 @@ export default function FundingTrackerPage() {
       updateFunding(repaymentModalSource.id, {
         totalRepaidZAR: newTotalRepaid,
         status: isSettled ? 'Settled' : repaymentModalSource.status,
+        ...(trimmedReference ? { lastPaymentReference: trimmedReference } : {}),
       });
     } else {
       // Monthly Coupon / Interest or Profit Share Distribution
       const currentInterest = repaymentModalSource.totalInterestPaidZAR || 0;
       updateFunding(repaymentModalSource.id, {
         totalInterestPaidZAR: currentInterest + repaymentAmount,
+        ...(trimmedReference ? { lastPaymentReference: trimmedReference } : {}),
       });
     }
 
@@ -247,6 +252,7 @@ export default function FundingTrackerPage() {
         returnTerms: returnTermsText,
         amount: repaymentAmount,
         date: paymentDate,
+        paymentReference: trimmedReference || undefined,
       });
 
       try {
@@ -264,6 +270,7 @@ export default function FundingTrackerPage() {
 
     setRepaymentModalSource(null);
     setRepaymentAmount(0);
+    setPaymentReference('');
   };
 
   const totalFacilityCapacity = funding.reduce((sum, f) => sum + f.capitalAmountZAR, 0);
@@ -281,6 +288,17 @@ export default function FundingTrackerPage() {
       const activeBalance = Math.max(0, drawn - (f.totalRepaidZAR || 0));
       return sum + Math.round((activeBalance * (f.returnRatePercent / 100)) / 12);
     }, 0);
+
+  const activeLenderSurname = repaymentModalSource?.lenderName
+    ? repaymentModalSource.lenderName
+        .trim()
+        .replace(/[^a-zA-Z0-9\s]/g, '')
+        .split(/\s+/)
+        .filter(Boolean)
+        .pop()
+        ?.toUpperCase() || 'LENDER'
+    : 'LENDER';
+  const suggestedPaymentReference = `EFT-${activeLenderSurname}-${(paymentDate || '').replace(/-/g, '')}`;
 
   return (
     <div className="flex-1 flex flex-col">
@@ -590,6 +608,14 @@ export default function FundingTrackerPage() {
                           Repaid: {formatZAR(item.totalRepaidZAR)}
                           {item.totalInterestPaidZAR ? ` • Interest: ${formatZAR(item.totalInterestPaidZAR)}` : ''}
                         </div>
+                        {item.lastPaymentReference && (
+                          <div
+                            className="text-[10px] text-slate-500 font-mono truncate max-w-[150px] mt-0.5"
+                            title={`Last Payment Reference: ${item.lastPaymentReference}`}
+                          >
+                            Ref: {item.lastPaymentReference}
+                          </div>
+                        )}
                       </td>
                       <td className="p-3.5">
                         <span
@@ -624,6 +650,7 @@ export default function FundingTrackerPage() {
                               onClick={() => {
                                 setRepaymentModalSource(item);
                                 setRepaymentAmount(0);
+                                setPaymentReference('');
                                 setPaymentType(
                                   item.returnTermsType === 'Equity Profit Split'
                                     ? 'Profit Share Distribution'
@@ -1341,6 +1368,30 @@ export default function FundingTrackerPage() {
                 </div>
               </div>
 
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block font-semibold text-slate-700">
+                    Payment Reference / EFT Note <span className="font-normal text-slate-400">(Optional)</span>
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setPaymentReference(suggestedPaymentReference)}
+                    className="text-[10px] font-semibold text-indigo-600 hover:text-indigo-800 transition-colors cursor-pointer"
+                  >
+                    Auto-fill suggestion
+                  </button>
+                </div>
+                <input
+                  type="text"
+                  name="paymentReference"
+                  autoComplete="off"
+                  value={paymentReference}
+                  onChange={(e) => setPaymentReference(e.target.value)}
+                  placeholder={`e.g. ${suggestedPaymentReference}`}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg font-mono text-xs text-slate-900 placeholder:text-slate-400 placeholder:font-sans"
+                />
+              </div>
+
               <div className="p-3 rounded-lg bg-slate-50 border border-slate-200 text-[11px] space-y-1">
                 <div className="flex justify-between">
                   <span>Current Principal Repaid:</span>
@@ -1376,7 +1427,10 @@ export default function FundingTrackerPage() {
                 <div className="flex items-center justify-end gap-2">
                   <button
                     type="button"
-                    onClick={() => setRepaymentModalSource(null)}
+                    onClick={() => {
+                      setRepaymentModalSource(null);
+                      setPaymentReference('');
+                    }}
                     className="px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50 font-semibold cursor-pointer"
                   >
                     Cancel

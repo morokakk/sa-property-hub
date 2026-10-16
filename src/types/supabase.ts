@@ -270,6 +270,7 @@ export type Database = {
           entity_or_contact: string
           funding_type: string
           id: string
+          last_payment_reference: string | null
           lender_name: string
           linked_deal_id: string | null
           linked_deal_name: string | null
@@ -296,6 +297,7 @@ export type Database = {
           entity_or_contact?: string
           funding_type: string
           id?: string
+          last_payment_reference?: string | null
           lender_name: string
           linked_deal_id?: string | null
           linked_deal_name?: string | null
@@ -322,6 +324,7 @@ export type Database = {
           entity_or_contact?: string
           funding_type?: string
           id?: string
+          last_payment_reference?: string | null
           lender_name?: string
           linked_deal_id?: string | null
           linked_deal_name?: string | null

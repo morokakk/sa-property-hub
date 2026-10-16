@@ -267,6 +267,7 @@ export interface FundingSource {
   delayExtensionDays?: number; // Days extended due to linked deal delays
   originalMaturityDate?: string;
   delayNotes?: string;
+  lastPaymentReference?: string;
 }
 
 // Bill of Quantities (BOQ) Item

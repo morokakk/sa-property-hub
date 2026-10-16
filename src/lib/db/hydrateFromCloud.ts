@@ -292,6 +292,7 @@ export function unmapFundingSources(
     linkedDealName: fs.linked_deal_name || undefined,
     totalRepaidZAR: toNum(fs.total_repaid_zar, 0),
     totalInterestPaidZAR: toNullableNum(fs.total_interest_paid_zar),
+    lastPaymentReference: fs.last_payment_reference || undefined,
     status: (fs.status as any) || 'Active',
     notes: fs.notes || undefined,
     tranches: parseJson(fs.tranches, []),

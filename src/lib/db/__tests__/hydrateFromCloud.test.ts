@@ -278,6 +278,35 @@ describe('hydrateFromCloud Reverse Mappers', () => {
     expect((result[0].costs as any).numberOfUnits).toBeUndefined();
     expect(result[0].costs.totalAcquisitionCost).toBe(1552350);
   });
+
+  it('correctly reverse-maps funding sources with last_payment_reference', () => {
+    const fundingRows = [
+      {
+        id: 'fund-c1',
+        user_id: 'usr-1',
+        lender_name: 'Johan Meyer',
+        entity_or_contact: 'Meyer Trust',
+        email_phone: 'johan@meyer.co.za',
+        funding_type: 'Private Lender',
+        capital_amount_zar: 1500000,
+        disbursement_date: '2026-03-01',
+        maturity_date: '2026-11-30',
+        return_terms_type: 'Fixed Interest',
+        return_rate_percent: 14,
+        payment_schedule: 'Monthly Interest',
+        total_repaid_zar: 105000,
+        last_payment_reference: 'EFT-MEYER-20260901',
+        status: 'Active',
+        created_at: '2026-01-01',
+        updated_at: '2026-01-01',
+      },
+    ];
+
+    const result = unmapFundingSources(fundingRows as any);
+    expect(result).toHaveLength(1);
+    expect(result[0].id).toBe('fund-c1');
+    expect(result[0].lastPaymentReference).toBe('EFT-MEYER-20260901');
+  });
 });
 
 describe('hydrateFromCloud Execution Engine', () => {

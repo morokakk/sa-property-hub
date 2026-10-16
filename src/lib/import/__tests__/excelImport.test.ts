@@ -16,6 +16,9 @@ describe('Excel Import Engine Unit Tests', () => {
       expect(normalizeHeader('  Monthly Gross Rent (ZAR)  ')).toBe('monthly gross rent');
       expect(normalizeHeader('Bond Interest Rate (%)')).toBe('bond interest rate');
       expect(normalizeHeader('Estimated Duration (Months)')).toBe('estimated duration');
+      expect(normalizeHeader('Floor Area (m²)')).toBe('floor area');
+      expect(normalizeHeader('Floor Area (sqm)')).toBe('floor area');
+      expect(normalizeHeader('Units')).toBe('units');
     });
 
     it('correctly parses numbers and strips currency symbols, spaces, and commas', () => {
@@ -313,6 +316,46 @@ describe('Excel Import Engine Unit Tests', () => {
       expect(result.data[0].source).toBe('iGrow Rentals');
       expect(result.data[0].utilityStatements).toBeUndefined();
     });
+
+    it('parses Units and Floor Area (m²) and defaults Units to 1 if omitted', () => {
+      const headers = [
+        'Property Title *',
+        'Address *',
+        'City *',
+        'Market Value (ZAR) *',
+        'Purchase Price (ZAR) *',
+        'Monthly Gross Rent (ZAR) *',
+        'Units',
+        'Floor Area (m²)',
+      ];
+      const dataRowWithValues = [
+        'Rosebank Duplex Block',
+        '10 Oxford Rd',
+        'Rosebank',
+        '4000000',
+        '3200000',
+        '36000',
+        '4',
+        '320',
+      ];
+      const dataRowOmitted = [
+        'Single Apartment',
+        '12 Dover St',
+        'Randburg',
+        '1200000',
+        '1000000',
+        '10000',
+        '',
+        '',
+      ];
+
+      const result = parseRentalsRows([headers, dataRowWithValues, dataRowOmitted]);
+      expect(result.success).toBe(true);
+      expect(result.data[0].numberOfUnits).toBe(4);
+      expect(result.data[0].floorAreaSqm).toBe(320);
+      expect(result.data[1].numberOfUnits).toBe(1);
+      expect(result.data[1].floorAreaSqm).toBeUndefined();
+    });
   });
 
   describe('Flips Parser & Auto-Estimations', () => {
@@ -396,6 +439,49 @@ describe('Excel Import Engine Unit Tests', () => {
       // Total monthly holding cost = 12500 + 0 + 1800 + 700 = 15000
       expect(flip.monthlyHoldingCostZAR).toBe(15000);
       expect(result.warnings.some((w) => w.includes('Freehold'))).toBe(true);
+    });
+
+    it('parses Units and Floor Area (m²) and defaults Units to 1 if omitted', () => {
+      const headers = [
+        'Project Title *',
+        'Address *',
+        'City *',
+        'Property Type',
+        'Units',
+        'Floor Area (m²)',
+        'Purchase Price (ZAR) *',
+        'Renovation Budget (ZAR) *',
+        'Target Exit Price (ZAR) *',
+      ];
+      const dataRowWithValues = [
+        'Melville Multi-Unit Conversion',
+        '14 7th Ave',
+        'Johannesburg',
+        'Freehold House',
+        '3',
+        '280',
+        '1800000',
+        '450000',
+        '2900000',
+      ];
+      const dataRowOmitted = [
+        'Linden Cottage Flip',
+        '55 4th Ave',
+        'Johannesburg',
+        'Freehold House',
+        '',
+        '',
+        '1500000',
+        '300000',
+        '2300000',
+      ];
+
+      const result = parseFlipsRows([headers, dataRowWithValues, dataRowOmitted]);
+      expect(result.success).toBe(true);
+      expect(result.data[0].numberOfUnits).toBe(3);
+      expect(result.data[0].floorAreaSqm).toBe(280);
+      expect(result.data[1].numberOfUnits).toBe(1);
+      expect(result.data[1].floorAreaSqm).toBeUndefined();
     });
   });
 });

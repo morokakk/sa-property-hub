@@ -719,6 +719,50 @@ describe('whatsappFormatter - Strategy Adaptive Formatting', () => {
       expect(receipt).toContain(`• Amount Disbursed: ${formatZAR(82_800)}`);
       expect(receipt).toContain(`• Date: ${formatDate('2026-12-05')}`);
     });
+
+    it('includes • Reference: FNB-EFT-MEYER-OCT26 when paymentReference is provided', () => {
+      const receipt = formatPaymentStatement({
+        funderName: 'Johan Meyer',
+        funderEntity: 'Meyer Family Trust',
+        linkedAsset: 'Berea High-Yield Fix & Flip',
+        paymentType: 'Monthly Coupon / Interest',
+        returnTerms: '14% p.a. Fixed Interest',
+        amount: 7_000,
+        date: '2026-10-16',
+        paymentReference: 'FNB-EFT-MEYER-OCT26',
+      });
+
+      expect(receipt).toContain('• Reference: FNB-EFT-MEYER-OCT26');
+      expect(receipt).toContain(`• Date: ${formatDate('2026-10-16')}\n• Reference: FNB-EFT-MEYER-OCT26\n\nThank you for partnering with us.`);
+    });
+
+    it('cleanly omits the Reference bullet when paymentReference is undefined or whitespace-only', () => {
+      const receiptUndefined = formatPaymentStatement({
+        funderName: 'Johan Meyer',
+        linkedAsset: 'Berea High-Yield Fix & Flip',
+        paymentType: 'Monthly Coupon / Interest',
+        returnTerms: '14% p.a. Fixed Interest',
+        amount: 7_000,
+        date: '2026-10-16',
+      });
+
+      const receiptWhitespace = formatPaymentStatement({
+        funderName: 'Johan Meyer',
+        linkedAsset: 'Berea High-Yield Fix & Flip',
+        paymentType: 'Monthly Coupon / Interest',
+        returnTerms: '14% p.a. Fixed Interest',
+        amount: 7_000,
+        date: '2026-10-16',
+        paymentReference: '   ',
+      });
+
+      expect(receiptUndefined).not.toContain('Reference:');
+      expect(receiptUndefined).not.toContain('• Reference:');
+      expect(receiptWhitespace).not.toContain('Reference:');
+      expect(receiptWhitespace).not.toContain('• Reference:');
+      expect(receiptUndefined).toContain(`• Date: ${formatDate('2026-10-16')}\n\nThank you for partnering with us.`);
+      expect(receiptWhitespace).toContain(`• Date: ${formatDate('2026-10-16')}\n\nThank you for partnering with us.`);
+    });
   });
 
   describe('Zero Emojis Verification for Institutional Business Clients', () => {

@@ -42,6 +42,9 @@ export function normalizeHeader(header: string): string {
     .replace(/\(months\)/g, '')
     .replace(/\(yyyy-mm-dd\)/g, '')
     .replace(/\(yyyy-mm\)/g, '')
+    .replace(/\(m²\)/gi, '')
+    .replace(/\(sqm\)/gi, '')
+    .replace(/\(m2\)/gi, '')
     .trim();
 }
 
@@ -783,6 +786,12 @@ export function parseRentalsRows(rawRows: unknown[][]): ParseResult<RentalProper
     const address = getColVal(row, 'address')?.toString().trim();
     const city = getColVal(row, 'city')?.toString().trim() || 'Johannesburg';
     const propertyTypeRaw = getColVal(row, 'property type');
+    const rawUnits = getColVal(row, 'units') ?? getColVal(row, 'number of units');
+    const rawFloorArea = getColVal(row, 'floor area') ?? getColVal(row, 'floor area sqm');
+    const parsedUnits = parseNumber(rawUnits);
+    const numberOfUnits = parsedUnits !== null && parsedUnits > 0 ? Math.round(parsedUnits) : 1;
+    const parsedFloorArea = parseNumber(rawFloorArea);
+    const floorAreaSqm = parsedFloorArea !== null && parsedFloorArea > 0 ? parsedFloorArea : undefined;
     const sourceRaw = getColVal(row, 'source')?.toString().trim();
     const rawMarketValue = getColVal(row, 'market value');
     const rawPurchasePrice = getColVal(row, 'purchase price');
@@ -953,6 +962,8 @@ export function parseRentalsRows(rawRows: unknown[][]): ParseResult<RentalProper
         address,
         city,
         propertyType,
+        numberOfUnits,
+        floorAreaSqm,
         source,
         agmDate,
         marketValueZAR: marketValue,
@@ -1060,6 +1071,12 @@ export function parseFlipsRows(rawRows: unknown[][]): ParseResult<FlipProject> {
     const address = getColVal(row, 'address')?.toString().trim();
     const city = getColVal(row, 'city')?.toString().trim() || 'Johannesburg';
     const propertyTypeRaw = getColVal(row, 'property type');
+    const rawUnits = getColVal(row, 'units') ?? getColVal(row, 'number of units');
+    const rawFloorArea = getColVal(row, 'floor area') ?? getColVal(row, 'floor area sqm');
+    const parsedUnits = parseNumber(rawUnits);
+    const numberOfUnits = parsedUnits !== null && parsedUnits > 0 ? Math.round(parsedUnits) : 1;
+    const parsedFloorArea = parseNumber(rawFloorArea);
+    const floorAreaSqm = parsedFloorArea !== null && parsedFloorArea > 0 ? parsedFloorArea : undefined;
     const rawPurchasePrice = getColVal(row, 'purchase price');
     const rawAcqCosts = getColVal(row, 'acquisition costs');
     const rawRenoBudget = getColVal(row, 'renovation budget');
@@ -1197,6 +1214,8 @@ export function parseFlipsRows(rawRows: unknown[][]): ParseResult<FlipProject> {
         address,
         city,
         propertyType,
+        numberOfUnits,
+        floorAreaSqm,
         agmDate,
         purchaseDate,
         purchasePriceZAR: purchasePrice,

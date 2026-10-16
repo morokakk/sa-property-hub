@@ -294,6 +294,30 @@ describe('migrateToCloud Payload Mappers', () => {
       expect(mapped[0].capital_amount_zar).toBe(1000000);
     });
 
+    it('correctly maps lastPaymentReference to last_payment_reference', () => {
+      const funding: FundingSource[] = [
+        {
+          id: 'fund-1',
+          lenderName: 'Johan Meyer',
+          entityOrContact: 'Meyer Family Trust',
+          emailPhone: 'johan@meyer.co.za',
+          fundingType: 'Private Lender',
+          capitalAmountZAR: 1500000,
+          disbursementDate: '2026-03-01',
+          maturityDate: '2026-11-30',
+          returnTermsType: 'Fixed Interest',
+          returnRatePercent: 14.0,
+          paymentSchedule: 'Monthly Interest',
+          totalRepaidZAR: 105000,
+          lastPaymentReference: 'EFT-MEYER-20260901',
+          status: 'Active',
+        },
+      ];
+
+      const mapped = mapFundingSources(funding, TEST_USER_ID);
+      expect(mapped[0].last_payment_reference).toBe('EFT-MEYER-20260901');
+    });
+
     it('correctly maps opportunities with pipeline details', () => {
       const opps: OpportunityDeal[] = [
         {

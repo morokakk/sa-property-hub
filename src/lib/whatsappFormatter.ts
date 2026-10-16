@@ -653,6 +653,7 @@ export interface PaymentStatementDetails {
   returnTerms: string;
   amount: number;
   date: string;
+  paymentReference?: string;
 }
 
 /**
@@ -667,6 +668,7 @@ export function formatPaymentStatement(details: PaymentStatementDetails): string
     returnTerms,
     amount,
     date,
+    paymentReference,
   } = details;
 
   const investorLine =
@@ -686,7 +688,11 @@ export function formatPaymentStatement(details: PaymentStatementDetails): string
   text += `• Linked Asset: ${assetLine}\n`;
   text += `• Payment Type: ${paymentType} (${returnTerms})\n`;
   text += `• Amount Disbursed: ${formatZAR(amount)}\n`;
-  text += `• Date: ${formattedDate}\n\n`;
+  text += `• Date: ${formattedDate}\n`;
+  if (paymentReference && paymentReference.trim().length > 0) {
+    text += `• Reference: ${paymentReference.trim()}\n`;
+  }
+  text += `\n`;
   text += `Thank you for partnering with us. Your capital remains actively deployed and performing.`;
 
   return text;
