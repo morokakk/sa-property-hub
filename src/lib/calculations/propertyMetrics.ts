@@ -1,5 +1,6 @@
 import { AcquisitionCostBreakdown, AmenityDistance, AmenityScorecard, AncillaryIncome, DealStrategy, InvestorProfile, Lease, LongTermProjectionYear, OccupantRiskProfile, OpportunityDeal, PropertyTitleType, RentalProperty } from '@/types';
 import { calculateEvictionCarryingCost } from './occupantRisk';
+import { computeAcquisitionCosts } from './sarsTax';
 
 /**
  * Computes Built-in Equity and discount percentage
@@ -95,6 +96,8 @@ export interface DealDscrParams {
   vacancyRatePercent?: number;
   managementFeePercent?: number;
   agencyVatApplicable?: boolean;
+  tenantPlacementFeePercent?: number;
+  annualSpvAdminAuditFeeZAR?: number;
   monthlyLevies?: number;
   monthlyRatesTaxes?: number;
   annualInsurance?: number;
@@ -116,8 +119,8 @@ export interface DealDscrResult {
   monthlyNoi: number;
   annualNetOperatingIncome: number;
   monthlyBondPayment: number;
-  dscr: number;
-  rawDscr: number;
+  dscr: number | null;
+  rawDscr: number | null;
   operatingExpenses: number;
   effectiveGrossRent: number;
 }
@@ -143,6 +146,10 @@ export function calculateDealDscr(
   const mgmtFeePercent = deal.managementFeePercent ?? 8.0;
   const agentMgt = (grossRent * (mgmtFeePercent / 100)) * vatMult;
 
+  const placementFeePercent = deal.tenantPlacementFeePercent ?? 0;
+  const monthlyPlacementFee = (grossRent * (placementFeePercent / 100)) * vatMult;
+  const monthlySpvAdminZAR = (deal.annualSpvAdminAuditFeeZAR || 0) / 12;
+
   const levies = deal.propertyType === 'Freehold House' ? 0 : (deal.monthlyLevies || 0);
   const rates = deal.monthlyRatesTaxes || 0;
   const insurance = Math.round((deal.annualInsurance || 0) / 12);
@@ -150,7 +157,16 @@ export function calculateDealDscr(
   const vending = deal.monthlyPrepaidVendingFeeZAR ?? 0;
   const communal = deal.monthlyCommunalServicesZAR ?? 0;
 
-  const operatingExpenses = levies + rates + agentMgt + insurance + maintenance + vending + communal;
+  const operatingExpenses =
+    levies +
+    rates +
+    agentMgt +
+    monthlyPlacementFee +
+    monthlySpvAdminZAR +
+    insurance +
+    maintenance +
+    vending +
+    communal;
   const monthlyNoi = effectiveGrossRent - operatingExpenses;
   const annualNetOperatingIncome = monthlyNoi * 12;
 
@@ -171,10 +187,10 @@ export function calculateDealDscr(
 
   const rawDscr = monthlyBondPayment > 0
     ? monthlyNoi / monthlyBondPayment
-    : (monthlyNoi > 0 ? 99.0 : 0);
-  const dscr = monthlyBondPayment > 0
+    : null;
+  const dscr = monthlyBondPayment > 0 && rawDscr !== null
     ? Number(rawDscr.toFixed(2))
-    : (monthlyNoi > 0 ? 99.0 : 0);
+    : null;
 
   return {
     monthlyNoi: Math.round(monthlyNoi),
@@ -187,11 +203,82 @@ export function calculateDealDscr(
   };
 }
 
+/**
+ * Solves the annualized Internal Rate of Return (IRR %) for an array of cashflows [CF0, CF1, ..., CFn]
+ * using Newton-Raphson with a bisection fallback for numerical stability.
+ */
+export function solveIrrPercent(cashflows: number[]): number {
+  if (!cashflows || cashflows.length < 2) return 0;
+  const cf0 = cashflows[0];
+  if (cf0 >= 0) return 0;
+
+  const npv = (rate: number): number => {
+    let sum = 0;
+    for (let t = 0; t < cashflows.length; t++) {
+      const denom = Math.pow(1 + rate, t);
+      if (!Number.isFinite(denom) || denom === 0) return Number.NaN;
+      sum += cashflows[t] / denom;
+    }
+    return sum;
+  };
+
+  // Bisection bracket search between -95% and +1000%
+  let low = -0.95;
+  let high = 10.0;
+  let fLow = npv(low);
+  let fHigh = npv(high);
+
+  if (!Number.isFinite(fLow) || !Number.isFinite(fHigh)) return 0;
+
+  // Try Newton-Raphson first starting at 10%
+  let guess = 0.1;
+  for (let iter = 0; iter < 50; iter++) {
+    let f = 0;
+    let df = 0;
+    for (let t = 0; t < cashflows.length; t++) {
+      const factor = Math.pow(1 + guess, t);
+      f += cashflows[t] / factor;
+      if (t > 0) {
+        df -= (t * cashflows[t]) / Math.pow(1 + guess, t + 1);
+      }
+    }
+    if (Math.abs(f) < 1e-7) {
+      return Number.isFinite(guess) ? Number((guess * 100).toFixed(2)) : 0;
+    }
+    if (Math.abs(df) < 1e-10) break;
+    const next = guess - f / df;
+    if (next <= -0.95 || next > 10.0 || !Number.isFinite(next)) break;
+    guess = next;
+  }
+
+  // Fallback to bisection if Newton-Raphson did not converge cleanly
+  if (fLow * fHigh > 0) {
+    return 0;
+  }
+  for (let i = 0; i < 100; i++) {
+    const mid = (low + high) / 2;
+    const fMid = npv(mid);
+    if (Math.abs(fMid) < 1e-7 || (high - low) / 2 < 1e-7) {
+      return Number.isFinite(mid) ? Number((mid * 100).toFixed(2)) : 0;
+    }
+    if (fLow * fMid <= 0) {
+      high = mid;
+      fHigh = fMid;
+    } else {
+      low = mid;
+      fLow = fMid;
+    }
+  }
+  const finalRate = (low + high) / 2;
+  return Number.isFinite(finalRate) ? Number((finalRate * 100).toFixed(2)) : 0;
+}
+
 export interface OpportunityMetricsResult {
   grossYield: number;
   capRate: number;
   netRoi: number;
   monthlyCashFlow: number;
+  monthlyNOI: number;
   annualNetOperatingIncome: number;
   totalCashRequired: number;
   initialCapitalRequired: number;
@@ -200,8 +287,22 @@ export interface OpportunityMetricsResult {
   monthlyBondPayment: number;
   projectedFlipNetProfit: number;
   projectedFlipRoi: number;
-  dscr: number;
-  rawDscr?: number;
+  annualizedFlipRoi: number;
+  monthlyHoldingBurnZAR: number;
+  dscr: number | null;
+  rawDscr?: number | null;
+  fiveYearIrrPercent: number;
+  purchasePricePerSqm: number;
+  valuationPerSqm: number;
+  averagePricePerUnit: number;
+  transferDutyZAR: number;
+  monthlyPlacementFeeZAR: number;
+  monthlySpvAdminZAR: number;
+  brrrrRefinanceLoanZAR: number;
+  brrrrCashLeftInDealZAR: number;
+  brrrrEquityExtractedZAR: number;
+  brrrrPostRefiBondPaymentZAR: number;
+  brrrrPostRefiCashflowZAR: number;
   evictionLegalCostZAR?: number;
   evictionDelayBurnZAR?: number;
   totalOccupantCostZAR?: number;
@@ -223,27 +324,41 @@ export function calculateEffectiveExitCommission(
 }
 
 export function calculateDealMetrics(params: {
+  strategy?: DealStrategy;
   purchasePrice: number;
+  openMarketValueZAR?: number;
+  openMarketValue?: number;
+  numberOfUnits?: number;
+  floorAreaSqm?: number;
+  isVatInclusiveDeveloperSale?: boolean;
+  customTransferDutyZAR?: number;
+  tenantPlacementFeePercent?: number;
+  annualSpvAdminAuditFeeZAR?: number;
+  refinanceLtvPercent?: number;
   estimatedRehabCost: number;
   monthlyRentalEstimate: number;
   monthlyLevies: number;
   monthlyRatesTaxes: number;
-  annualInsurance: number;
-  managementFeePercent: number;
+  annualInsurance?: number;
+  managementFeePercent?: number;
   agencyVatApplicable?: boolean;
   monthlyMaintenanceReserveZAR?: number;
   monthlyPrepaidVendingFeeZAR?: number;
   monthlyCommunalServicesZAR?: number;
-  vacancyRatePercent: number;
+  vacancyRatePercent?: number;
   targetExitPrice: number;
-  holdingPeriodMonths: number;
+  explicitFiveYearExitPriceZAR?: number;
+  holdingPeriodMonths?: number;
   loanToValuePercent: number;
   depositZAR?: number;
   bondLTV?: number;
   interestRatePercent: number;
   interestRateMargin?: number;
   loanTermYears: number;
-  costs: AcquisitionCostBreakdown;
+  annualCapitalGrowthPercent?: number;
+  annualRentalEscalationPercent?: number;
+  annualExpenseInflationPercent?: number;
+  costs?: AcquisitionCostBreakdown;
   auctioneerCommissionZAR?: number;
   municipalArrearsZAR?: number;
   exitCommissionPercent?: number;
@@ -253,26 +368,38 @@ export function calculateDealMetrics(params: {
 }): OpportunityMetricsResult {
   const {
     purchasePrice,
+    openMarketValueZAR,
+    openMarketValue,
+    numberOfUnits = 1,
+    floorAreaSqm = 0,
+    isVatInclusiveDeveloperSale = false,
+    customTransferDutyZAR,
+    tenantPlacementFeePercent = 0,
+    annualSpvAdminAuditFeeZAR = 0,
+    refinanceLtvPercent = 75,
     estimatedRehabCost,
     monthlyRentalEstimate,
     monthlyLevies,
     monthlyRatesTaxes,
-    annualInsurance,
-    managementFeePercent,
+    annualInsurance = 0,
+    managementFeePercent = 0,
     agencyVatApplicable,
     monthlyMaintenanceReserveZAR,
     monthlyPrepaidVendingFeeZAR,
     monthlyCommunalServicesZAR,
-    vacancyRatePercent,
+    vacancyRatePercent = 0,
     targetExitPrice,
-    holdingPeriodMonths,
+    explicitFiveYearExitPriceZAR,
+    holdingPeriodMonths = 6,
     loanToValuePercent,
     depositZAR,
     bondLTV,
     interestRatePercent,
-    interestRateMargin,
     loanTermYears,
-    costs,
+    annualCapitalGrowthPercent = 5.0,
+    annualRentalEscalationPercent = 6.0,
+    annualExpenseInflationPercent = 6.0,
+    costs: providedCosts,
     auctioneerCommissionZAR,
     municipalArrearsZAR,
     exitCommissionPercent,
@@ -281,15 +408,41 @@ export function calculateDealMetrics(params: {
     occupantRisk,
   } = params;
 
-  // Effective LTV and Deposit
   const effectiveLTV = bondLTV !== undefined ? bondLTV : loanToValuePercent;
   const cashDeposit =
     depositZAR !== undefined
       ? depositZAR
       : Math.round(purchasePrice * (1 - effectiveLTV / 100));
-
-  // Financed principal must strictly equal purchasePrice - cashDeposit
   const bondAmount = Math.max(0, purchasePrice - cashDeposit);
+
+  const costs: AcquisitionCostBreakdown = providedCosts ?? computeAcquisitionCosts(
+    purchasePrice,
+    effectiveLTV,
+    {
+      customTransferDuty: customTransferDutyZAR,
+      isVatInclusiveDeveloperSale,
+    }
+  );
+
+  const effectiveMarketValue = openMarketValueZAR ?? openMarketValue ?? 0;
+  const safeUnits = numberOfUnits && numberOfUnits > 0 ? numberOfUnits : 1;
+  const safeSqm = floorAreaSqm && floorAreaSqm > 0 ? floorAreaSqm : 0;
+
+  // 1. Rate per Square Metre (R/m²) & Unit Benchmarks
+  const purchasePricePerSqm = safeSqm > 0 ? Math.round(purchasePrice / safeSqm) : 0;
+  const valuationPerSqm = safeSqm > 0 && effectiveMarketValue > 0 ? Math.round(effectiveMarketValue / safeSqm) : 0;
+  const averagePricePerUnit = safeUnits > 0 ? Math.round(purchasePrice / safeUnits) : purchasePrice;
+
+  // 2. Developer VAT-Inclusive Transfer Duty Guard
+  const hasNonZeroCustomDuty =
+    (customTransferDutyZAR !== undefined && customTransferDutyZAR > 0) ||
+    (costs.isTransferDutyOverridden && costs.transferDuty > 0);
+  const transferDutyZAR = isVatInclusiveDeveloperSale && !hasNonZeroCustomDuty
+    ? 0
+    : (customTransferDutyZAR !== undefined ? customTransferDutyZAR : costs.transferDuty);
+
+  const effectiveTotalAcquisitionCost =
+    costs.totalAcquisitionCost - costs.transferDuty + transferDutyZAR;
 
   // Holding bond cost reflects bond interest only (not double-counting principal repayment)
   const monthlyBondInterest = bondAmount > 0 ? (bondAmount * (interestRatePercent / 100 / 12)) : 0;
@@ -309,8 +462,8 @@ export function calculateDealMetrics(params: {
   const auctionCosts = (auctioneerCommissionZAR || 0) + (municipalArrearsZAR || 0);
 
   // Total Capital Outlay & Day-1 Initial Capital Required
-  const totalCost = costs.totalAcquisitionCost + estimatedRehabCost + auctionCosts + totalEvictionBurden;
-  const cashFees = costs.totalAcquisitionCost - purchasePrice;
+  const totalCost = effectiveTotalAcquisitionCost + estimatedRehabCost + auctionCosts + totalEvictionBurden;
+  const cashFees = effectiveTotalAcquisitionCost - purchasePrice;
   const initialCapitalRequired = cashDeposit + cashFees + estimatedRehabCost + auctionCosts + evictionLegalFee;
   const totalCashRequired = initialCapitalRequired;
 
@@ -321,17 +474,22 @@ export function calculateDealMetrics(params: {
     loanTermYears
   );
 
-  // Rental Cashflow Calculations
+  // 3. Rental Cashflow Calculations (including amortized tenant placement fee & SPV admin fee)
   const grossMonthlyRent = monthlyRentalEstimate;
   const vacancyLoss = (grossMonthlyRent * vacancyRatePercent) / 100;
   const effectiveGrossRent = grossMonthlyRent - vacancyLoss;
   const vatMultiplier = agencyVatApplicable !== false ? 1.15 : 1.0;
   const managementFee = (grossMonthlyRent * (managementFeePercent / 100)) * vatMultiplier;
+  const monthlyPlacementFee = (grossMonthlyRent * ((tenantPlacementFeePercent || 0) / 100)) * vatMultiplier;
+  const monthlySpvAdminZAR = (annualSpvAdminAuditFeeZAR || 0) / 12;
   const monthlyInsurance = annualInsurance / 12;
+
   const totalMonthlyOperatingExpenses =
     monthlyLevies + 
     monthlyRatesTaxes + 
     managementFee + 
+    monthlyPlacementFee +
+    monthlySpvAdminZAR +
     monthlyInsurance + 
     (monthlyMaintenanceReserveZAR || 0) + 
     (monthlyPrepaidVendingFeeZAR || 0) +
@@ -347,13 +505,13 @@ export function calculateDealMetrics(params: {
   const capRate = totalCost > 0 ? (annualNetOperatingIncome / totalCost) * 100 : 0;
   const netRoi = totalCashRequired > 0 ? (annualCashFlow / totalCashRequired) * 100 : 0;
 
-  // Debt Service Coverage Ratio (DSCR): Monthly NOI / Monthly Bond Repayment
+  // 4. Debt Service Coverage Ratio (DSCR): Monthly NOI / Monthly Bond Repayment
   const rawDscr = monthlyBondPayment > 0
     ? (monthlyNetOperatingIncome / monthlyBondPayment)
-    : (monthlyNetOperatingIncome > 0 ? 99.0 : 0);
-  const dscr = monthlyBondPayment > 0
+    : null;
+  const dscr = monthlyBondPayment > 0 && rawDscr !== null
     ? Number(rawDscr.toFixed(2))
-    : (monthlyNetOperatingIncome > 0 ? 99.0 : 0);
+    : null;
 
   // Buy-and-Flip Projections
   // Apply 15% SARS VAT (1.15 multiplier) to default agent commission unless vatExemptAgent is explicitly true
@@ -367,9 +525,12 @@ export function calculateDealMetrics(params: {
   const holdingBondInterest = monthlyBondInterest * holdingPeriodMonths;
   const holdingLeviesAndRates = (monthlyLevies + monthlyRatesTaxes) * holdingPeriodMonths;
   const totalHoldingCosts = holdingBondInterest + holdingLeviesAndRates;
+  const monthlyHoldingBurnZAR = Math.round(
+    monthlyBondPayment + monthlyLevies + monthlyRatesTaxes + monthlyInsurance + (occupantRisk?.monthlySiteSecurityZAR || 0)
+  );
 
   const totalFlipCosts =
-    costs.totalAcquisitionCost +
+    effectiveTotalAcquisitionCost +
     estimatedRehabCost +
     auctionCosts +
     totalHoldingCosts +
@@ -382,12 +543,86 @@ export function calculateDealMetrics(params: {
   const projectedFlipRoi = flipCashInvested > 0
     ? (projectedFlipNetProfit / flipCashInvested) * 100
     : (totalCost > 0 ? (projectedFlipNetProfit / totalCost) * 100 : 0);
+  const safeHoldingMonths = holdingPeriodMonths > 0 ? holdingPeriodMonths : 6;
+  const annualizedFlipRoi = projectedFlipRoi * (12 / safeHoldingMonths);
+
+  // 4b. 5-Year IRR Calculation
+  // Simulate 5-year cashflows + Year 5 disposal proceeds
+  const baseValuationForGrowth = effectiveMarketValue > 0 ? effectiveMarketValue : purchasePrice;
+  const year5GrossDisposalValue =
+    explicitFiveYearExitPriceZAR && explicitFiveYearExitPriceZAR > 0
+      ? explicitFiveYearExitPriceZAR
+      : Math.round(baseValuationForGrowth * Math.pow(1 + annualCapitalGrowthPercent / 100, 5));
+
+  // Calculate remaining bond balance at end of Year 5 (60 months)
+  let remainingBondYear5 = bondAmount;
+  const monthlyRate = interestRatePercent > 0 ? (interestRatePercent / 100) / 12 : 0;
+  const totalLoanMonths = Math.max(1, loanTermYears * 12);
+  let exactPmt = 0;
+  if (bondAmount > 0 && monthlyRate > 0) {
+    const factor = Math.pow(1 + monthlyRate, totalLoanMonths);
+    exactPmt = (bondAmount * (monthlyRate * factor)) / (factor - 1);
+  }
+  const annualBondPayments5Y: number[] = [];
+  for (let y = 1; y <= 5; y++) {
+    let yearBondPaid = 0;
+    for (let m = 1; m <= 12; m++) {
+      if (remainingBondYear5 <= 0) {
+        remainingBondYear5 = 0;
+        continue;
+      }
+      const interest = remainingBondYear5 * monthlyRate;
+      const principalPaid = exactPmt - interest;
+      if (principalPaid >= remainingBondYear5) {
+        yearBondPaid += interest + remainingBondYear5;
+        remainingBondYear5 = 0;
+      } else {
+        remainingBondYear5 -= principalPaid;
+        yearBondPaid += exactPmt;
+      }
+    }
+    annualBondPayments5Y.push(yearBondPaid);
+  }
+
+  const baseAnnualGrossRent = grossMonthlyRent * 12;
+  const baseAnnualOpExAndVacancy = (totalMonthlyOperatingExpenses + vacancyLoss) * 12;
+  const irrCashflows: number[] = [-Math.max(1, initialCapitalRequired)];
+  for (let y = 1; y <= 5; y++) {
+    const yrRent = baseAnnualGrossRent * Math.pow(1 + annualRentalEscalationPercent / 100, y - 1);
+    const yrCosts = baseAnnualOpExAndVacancy * Math.pow(1 + annualExpenseInflationPercent / 100, y - 1);
+    const yrBond = annualBondPayments5Y[y - 1] ?? 0;
+    let yrNetCf = yrRent - yrCosts - yrBond;
+    if (y === 5) {
+      const year5ExitComm = year5GrossDisposalValue * commissionRate;
+      const netExitProceeds = year5GrossDisposalValue - year5ExitComm - remainingBondYear5;
+      yrNetCf += netExitProceeds;
+    }
+    irrCashflows.push(yrNetCf);
+  }
+  const fiveYearIrrPercent = initialCapitalRequired > 0 ? solveIrrPercent(irrCashflows) : 0;
+
+  // 5. BRRRR Refinance Cash-Out Metrics
+  const brrrrValuationBase = targetExitPrice > 0
+    ? targetExitPrice
+    : (effectiveMarketValue > 0 ? effectiveMarketValue : purchasePrice);
+  const effectiveRefiLtv = refinanceLtvPercent ?? 75;
+  const brrrrRefinanceLoanZAR = Math.round(brrrrValuationBase * (effectiveRefiLtv / 100));
+  const totalDealAllInOutlay = initialCapitalRequired + bondAmount;
+  const brrrrCashLeftInDealZAR = Math.max(0, Math.round(totalDealAllInOutlay - brrrrRefinanceLoanZAR));
+  const brrrrEquityExtractedZAR = Math.max(0, Math.round(brrrrRefinanceLoanZAR - totalDealAllInOutlay));
+  const brrrrPostRefiBondPaymentZAR = calculateMonthlyBondRepayment(
+    brrrrRefinanceLoanZAR,
+    interestRatePercent,
+    loanTermYears
+  );
+  const brrrrPostRefiCashflowZAR = Math.round(monthlyNetOperatingIncome - brrrrPostRefiBondPaymentZAR);
 
   return {
     grossYield: Number(grossYield.toFixed(2)),
     capRate: Number(capRate.toFixed(2)),
     netRoi: Number(netRoi.toFixed(2)),
     monthlyCashFlow: Math.round(monthlyCashFlow),
+    monthlyNOI: Math.round(monthlyNetOperatingIncome),
     annualNetOperatingIncome: Math.round(annualNetOperatingIncome),
     totalCashRequired: Math.round(totalCashRequired),
     initialCapitalRequired: Math.round(initialCapitalRequired),
@@ -396,8 +631,22 @@ export function calculateDealMetrics(params: {
     monthlyBondPayment: Math.round(monthlyBondPayment),
     projectedFlipNetProfit: Math.round(projectedFlipNetProfit),
     projectedFlipRoi: Number(projectedFlipRoi.toFixed(2)),
+    annualizedFlipRoi: Number(annualizedFlipRoi.toFixed(2)),
+    monthlyHoldingBurnZAR,
     dscr,
     rawDscr,
+    fiveYearIrrPercent,
+    purchasePricePerSqm,
+    valuationPerSqm,
+    averagePricePerUnit,
+    transferDutyZAR: Math.round(transferDutyZAR),
+    monthlyPlacementFeeZAR: Math.round(monthlyPlacementFee),
+    monthlySpvAdminZAR: Math.round(monthlySpvAdminZAR),
+    brrrrRefinanceLoanZAR,
+    brrrrCashLeftInDealZAR,
+    brrrrEquityExtractedZAR,
+    brrrrPostRefiBondPaymentZAR,
+    brrrrPostRefiCashflowZAR,
     evictionLegalCostZAR: evictionLegalFee,
     evictionDelayBurnZAR: evictionHoldingBurn,
     totalOccupantCostZAR: totalEvictionBurden,
@@ -425,7 +674,7 @@ export function evaluateDealCriteria(
     totalCashRequired?: number;
     projectedFlipRoi?: number;
     projectedFlipNetProfit?: number;
-    dscr?: number;
+    dscr?: number | null;
     monthlyBondPayment?: number;
     annualNetOperatingIncome?: number;
   },
@@ -453,7 +702,7 @@ export function evaluateDealCriteria(
         : (metrics.monthlyCashFlow ?? 0) + bondPayment;
       dscr = noi / bondPayment;
     } else {
-      dscr = 99.0;
+      dscr = null;
     }
   }
 
@@ -468,7 +717,9 @@ export function evaluateDealCriteria(
     criteriaMap['minMonthlyCashflow'] = (metrics.monthlyCashFlow ?? 0) >= minMonthlyCashflow;
     criteriaMap['minNetRoi'] = (metrics.netRoi ?? 0) >= minNetRoi;
     criteriaMap['maxDay1Cash'] = day1Cash !== undefined ? day1Cash <= maxDay1Cash : false;
-    criteriaMap['minDscr'] = (dscr ?? 0) >= (minDscr - 1e-4);
+    // Unleveraged (all-cash) deals where dscr === null or monthlyBondPayment === 0 automatically pass minDscr
+    const isUnleveragedCashDeal = dscr === null || metrics.monthlyBondPayment === 0;
+    criteriaMap['minDscr'] = isUnleveragedCashDeal ? true : (dscr ?? 0) >= (minDscr - 1e-4);
   }
 
   const values = Object.values(criteriaMap);
@@ -719,6 +970,8 @@ export function generateLongTermProjection(
     monthlyCommunalServicesZAR?: number;
     monthlyMaintenanceReserveZAR?: number;
     monthlyPrepaidVendingFeeZAR?: number;
+    tenantPlacementFeePercent?: number;
+    annualSpvAdminAuditFeeZAR?: number;
   }
 ): LongTermProjectionYear[] {
   const purchasePrice = deal.purchasePrice ?? 0;
@@ -793,6 +1046,8 @@ export function generateLongTermProjection(
   const vacancyLoss = (monthlyRent * vacancyRate) / 100;
   const vatMultiplier = deal.agencyVatApplicable !== false ? 1.15 : 1.0;
   const managementFee = (monthlyRent * ((deal.managementFeePercent ?? 8) / 100)) * vatMultiplier;
+  const placementFee = (monthlyRent * ((deal.tenantPlacementFeePercent ?? 0) / 100)) * vatMultiplier;
+  const monthlySpvAdmin = (deal.annualSpvAdminAuditFeeZAR ?? 0) / 12;
   const monthlyInsurance = (deal.annualInsurance ?? 7_200) / 12;
   const monthlyLevies = deal.monthlyLevies ?? 0;
   const monthlyRates = deal.monthlyRatesTaxes ?? 0;
@@ -804,6 +1059,8 @@ export function generateLongTermProjection(
     monthlyLevies +
     monthlyRates +
     managementFee +
+    placementFee +
+    monthlySpvAdmin +
     monthlyInsurance +
     vacancyLoss +
     monthlyCommunal +

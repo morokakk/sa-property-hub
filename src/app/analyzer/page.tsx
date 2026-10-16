@@ -117,6 +117,17 @@ export default function OpportunityAnalyzerPage() {
   const [monthlyPrepaidVendingFee, setMonthlyPrepaidVendingFee] = useState<number>(analyzerDraft?.monthlyPrepaidVendingFeeZAR ?? 150);
   const [monthlyCommunalServices, setMonthlyCommunalServices] = useState<number>(analyzerDraft?.monthlyCommunalServicesZAR ?? 0);
 
+  // Multi-Unit, Syndication & BRRRR Underwriting State
+  const [numberOfUnits, setNumberOfUnits] = useState<number>(analyzerDraft?.numberOfUnits ?? 1);
+  const [floorAreaSqm, setFloorAreaSqm] = useState<number>(analyzerDraft?.floorAreaSqm ?? 0);
+  const [isVatInclusiveDeveloperSale, setIsVatInclusiveDeveloperSale] = useState<boolean>(
+    analyzerDraft?.isVatInclusiveDeveloperSale ?? (analyzerDraft?.source === 'iGrow Rentals')
+  );
+  const [tenantPlacementFeePercent, setTenantPlacementFeePercent] = useState<number>(analyzerDraft?.tenantPlacementFeePercent ?? 0);
+  const [annualSpvAdminAuditFeeZAR, setAnnualSpvAdminAuditFeeZAR] = useState<number>(analyzerDraft?.annualSpvAdminAuditFeeZAR ?? 0);
+  const [refinanceLtvPercent, setRefinanceLtvPercent] = useState<number>(analyzerDraft?.refinanceLtvPercent ?? 75);
+  const [isFiveYearExitOverridden, setIsFiveYearExitOverridden] = useState<boolean>(false);
+
   // Exit VAT & Holding Sensitivity State
   const [holdingPeriodMonths, setHoldingPeriodMonths] = useState<number>(analyzerDraft?.holdingPeriodMonths ?? 6);
   const [vatExemptAgent, setVatExemptAgent] = useState<boolean>(analyzerDraft?.vatExemptAgent ?? investorProfile?.vatExemptAgent ?? false);
@@ -144,7 +155,9 @@ export default function OpportunityAnalyzerPage() {
   const [isOpExReservesOpen, setIsOpExReservesOpen] = useState(
     (analyzerDraft?.monthlyMaintenanceReserveZAR !== undefined && analyzerDraft?.monthlyMaintenanceReserveZAR !== 800) ||
     (analyzerDraft?.monthlyPrepaidVendingFeeZAR !== undefined && analyzerDraft?.monthlyPrepaidVendingFeeZAR !== 150) ||
-    (analyzerDraft?.monthlyCommunalServicesZAR !== undefined && analyzerDraft?.monthlyCommunalServicesZAR > 0)
+    (analyzerDraft?.monthlyCommunalServicesZAR !== undefined && analyzerDraft?.monthlyCommunalServicesZAR > 0) ||
+    (analyzerDraft?.tenantPlacementFeePercent !== undefined && analyzerDraft?.tenantPlacementFeePercent > 0) ||
+    (analyzerDraft?.annualSpvAdminAuditFeeZAR !== undefined && analyzerDraft?.annualSpvAdminAuditFeeZAR > 0)
   );
   const [isStressAndTaxOpen, setIsStressAndTaxOpen] = useState(
     analyzerDraft?.interestRateMargin !== undefined && analyzerDraft?.interestRateMargin !== 0
@@ -229,6 +242,14 @@ export default function OpportunityAnalyzerPage() {
       if (analyzerDraft.monthlyMaintenanceReserveZAR !== undefined) setMonthlyMaintenanceReserve(analyzerDraft.monthlyMaintenanceReserveZAR);
       if (analyzerDraft.monthlyPrepaidVendingFeeZAR !== undefined) setMonthlyPrepaidVendingFee(analyzerDraft.monthlyPrepaidVendingFeeZAR);
       if (analyzerDraft.monthlyCommunalServicesZAR !== undefined) setMonthlyCommunalServices(analyzerDraft.monthlyCommunalServicesZAR);
+      if (analyzerDraft.numberOfUnits !== undefined) setNumberOfUnits(analyzerDraft.numberOfUnits);
+      if (analyzerDraft.floorAreaSqm !== undefined) setFloorAreaSqm(analyzerDraft.floorAreaSqm);
+      if (analyzerDraft.isVatInclusiveDeveloperSale !== undefined) {
+        setIsVatInclusiveDeveloperSale(analyzerDraft.isVatInclusiveDeveloperSale);
+      }
+      if (analyzerDraft.tenantPlacementFeePercent !== undefined) setTenantPlacementFeePercent(analyzerDraft.tenantPlacementFeePercent);
+      if (analyzerDraft.annualSpvAdminAuditFeeZAR !== undefined) setAnnualSpvAdminAuditFeeZAR(analyzerDraft.annualSpvAdminAuditFeeZAR);
+      if (analyzerDraft.refinanceLtvPercent !== undefined) setRefinanceLtvPercent(analyzerDraft.refinanceLtvPercent);
       if (analyzerDraft.interestRateMargin !== undefined) {
         setInterestRateMargin(analyzerDraft.interestRateMargin);
         setInterestRate(Number(((investorProfile?.defaultPrimeRatePercent ?? 10.75) + analyzerDraft.interestRateMargin).toFixed(2)));
@@ -306,8 +327,12 @@ export default function OpportunityAnalyzerPage() {
   const handleSourceChange = (newSource: DealSource) => {
     const isCurrentDistressed = source === 'High-Street Auction' || source === 'Distressed Sale / Repo';
     const isNewDistressed = newSource === 'High-Street Auction' || newSource === 'Distressed Sale / Repo';
+    const isIGrowDeveloper = newSource === 'iGrow Rentals';
 
     setSource(newSource);
+    if (isIGrowDeveloper) {
+      setIsVatInclusiveDeveloperSale(true);
+    }
 
     if (isCurrentDistressed && !isNewDistressed) {
       const hadFees = (auctioneerCommission || 0) > 0 || (municipalArrears || 0) > 0;
@@ -318,15 +343,22 @@ export default function OpportunityAnalyzerPage() {
           source: newSource,
           auctioneerCommission: 0,
           municipalArrears: 0,
+          ...(isIGrowDeveloper ? { isVatInclusiveDeveloperSale: true } : {}),
         });
         setFeeResetToast(
           'Switched to standard retail channel. Auction commission and municipal arrears reset to R0.'
         );
       } else {
-        updateAnalyzerDraft({ source: newSource });
+        updateAnalyzerDraft({
+          source: newSource,
+          ...(isIGrowDeveloper ? { isVatInclusiveDeveloperSale: true } : {}),
+        });
       }
     } else {
-      updateAnalyzerDraft({ source: newSource });
+      updateAnalyzerDraft({
+        source: newSource,
+        ...(isIGrowDeveloper ? { isVatInclusiveDeveloperSale: true } : {}),
+      });
     }
   };
 
@@ -334,6 +366,8 @@ export default function OpportunityAnalyzerPage() {
     setStrategy(newStrategy);
     if (newStrategy === 'Flip' || newStrategy === 'BRRRR') {
       setIsHoldingOpen(true);
+    } else {
+      setIsHoldingOpen(false);
     }
     updateAnalyzerDraft({ strategy: newStrategy });
   };
@@ -431,10 +465,11 @@ export default function OpportunityAnalyzerPage() {
   // Real-time calculation
   const calculatedCosts = useMemo(() => {
     return computeAcquisitionCosts(purchasePrice, loanToValue, {
-      customTransferDuty: overrideTax ? customTransferDuty : undefined,
+      customTransferDuty: overrideTax ? customTransferDuty : (isVatInclusiveDeveloperSale ? 0 : undefined),
       customConveyancing: overrideLegal ? customConveyancing : undefined,
+      isVatInclusiveDeveloperSale,
     });
-  }, [purchasePrice, loanToValue, overrideTax, customTransferDuty, overrideLegal, customConveyancing]);
+  }, [purchasePrice, loanToValue, overrideTax, customTransferDuty, overrideLegal, customConveyancing, isVatInclusiveDeveloperSale]);
 
   const defaultAgentCommission = investorProfile?.defaultAgentCommissionPercent ?? 5.0;
   const effectiveExitCommissionPercent = useMemo(() => {
@@ -444,6 +479,14 @@ export default function OpportunityAnalyzerPage() {
   const calculatedMetrics = useMemo(() => {
     return calculateDealMetrics({
       purchasePrice,
+      openMarketValueZAR: openMarketValue,
+      numberOfUnits,
+      floorAreaSqm,
+      isVatInclusiveDeveloperSale,
+      customTransferDutyZAR: overrideTax ? customTransferDuty : undefined,
+      tenantPlacementFeePercent,
+      annualSpvAdminAuditFeeZAR,
+      refinanceLtvPercent,
       estimatedRehabCost: rehabCost,
       monthlyRentalEstimate: monthlyRent,
       monthlyLevies: propertyType === 'Freehold House' ? 0 : monthlyLevies,
@@ -453,6 +496,7 @@ export default function OpportunityAnalyzerPage() {
       agencyVatApplicable,
       vacancyRatePercent: vacancyRate,
       targetExitPrice,
+      explicitFiveYearExitPriceZAR: strategy === 'Rental' && isFiveYearExitOverridden && targetExitPrice > 0 ? targetExitPrice : undefined,
       holdingPeriodMonths,
       loanToValuePercent: loanToValue,
       depositZAR,
@@ -462,6 +506,9 @@ export default function OpportunityAnalyzerPage() {
       vatExemptAgent,
       defaultAgentCommissionPercent: defaultAgentCommission,
       loanTermYears,
+      annualCapitalGrowthPercent: annualCapitalGrowth,
+      annualRentalEscalationPercent: annualRentalEscalation,
+      annualExpenseInflationPercent: annualExpenseInflation,
       costs: calculatedCosts,
       auctioneerCommissionZAR: auctioneerCommission,
       municipalArrearsZAR: municipalArrears,
@@ -473,6 +520,15 @@ export default function OpportunityAnalyzerPage() {
     });
   }, [
     purchasePrice,
+    openMarketValue,
+    numberOfUnits,
+    floorAreaSqm,
+    isVatInclusiveDeveloperSale,
+    overrideTax,
+    customTransferDuty,
+    tenantPlacementFeePercent,
+    annualSpvAdminAuditFeeZAR,
+    refinanceLtvPercent,
     rehabCost,
     monthlyRent,
     monthlyLevies,
@@ -486,6 +542,8 @@ export default function OpportunityAnalyzerPage() {
     vacancyRate,
     propertyType,
     targetExitPrice,
+    strategy,
+    isFiveYearExitOverridden,
     holdingPeriodMonths,
     loanToValue,
     depositZAR,
@@ -495,6 +553,9 @@ export default function OpportunityAnalyzerPage() {
     defaultAgentCommission,
     effectiveExitCommissionPercent,
     loanTermYears,
+    annualCapitalGrowth,
+    annualRentalEscalation,
+    annualExpenseInflation,
     calculatedCosts,
     auctioneerCommission,
     municipalArrears,
@@ -532,6 +593,10 @@ export default function OpportunityAnalyzerPage() {
       agencyVatApplicable,
       vacancyRatePercent: vacancyRate,
       monthlyCommunalServicesZAR: monthlyCommunalServices,
+      monthlyMaintenanceReserveZAR: monthlyMaintenanceReserve,
+      monthlyPrepaidVendingFeeZAR: monthlyPrepaidVendingFee,
+      tenantPlacementFeePercent,
+      annualSpvAdminAuditFeeZAR,
     });
   }, [
     purchasePrice,
@@ -550,6 +615,10 @@ export default function OpportunityAnalyzerPage() {
     managementFee,
     agencyVatApplicable,
     monthlyCommunalServices,
+    monthlyMaintenanceReserve,
+    monthlyPrepaidVendingFee,
+    tenantPlacementFeePercent,
+    annualSpvAdminAuditFeeZAR,
     vacancyRate,
     propertyType,
   ]);
@@ -602,6 +671,8 @@ export default function OpportunityAnalyzerPage() {
       monthlyMaintenanceReserve,
       monthlyPrepaidVendingFee,
       monthlyCommunalServicesZAR: monthlyCommunalServices,
+      tenantPlacementFeePercent,
+      annualSpvAdminAuditFeeZAR,
       rehabCost,
       estimatedAcquisitionCostRate: 0.05,
       targetNetYieldPercent: maoTargetYield,
@@ -621,6 +692,8 @@ export default function OpportunityAnalyzerPage() {
     monthlyMaintenanceReserve,
     monthlyPrepaidVendingFee,
     monthlyCommunalServices,
+    tenantPlacementFeePercent,
+    annualSpvAdminAuditFeeZAR,
     rehabCost,
     maoTargetYield,
     occupantRisk,
@@ -664,6 +737,12 @@ export default function OpportunityAnalyzerPage() {
       monthlyRatesTaxes: monthlyRates,
       annualInsurance: finalInsurance,
       monthlyCommunalServicesZAR: monthlyCommunalServices,
+      numberOfUnits,
+      floorAreaSqm,
+      isVatInclusiveDeveloperSale,
+      tenantPlacementFeePercent,
+      annualSpvAdminAuditFeeZAR,
+      refinanceLtvPercent,
       managementFeePercent: managementFee,
       agencyVatApplicable,
       vacancyRatePercent: vacancyRate,
@@ -746,6 +825,20 @@ export default function OpportunityAnalyzerPage() {
     setMonthlyMaintenanceReserve(deal.monthlyMaintenanceReserveZAR !== undefined ? deal.monthlyMaintenanceReserveZAR : (analyzerDraft?.monthlyMaintenanceReserveZAR ?? 800));
     setMonthlyPrepaidVendingFee(deal.monthlyPrepaidVendingFeeZAR !== undefined ? deal.monthlyPrepaidVendingFeeZAR : (analyzerDraft?.monthlyPrepaidVendingFeeZAR ?? 150));
     setMonthlyCommunalServices(deal.monthlyCommunalServicesZAR !== undefined ? deal.monthlyCommunalServicesZAR : (analyzerDraft?.monthlyCommunalServicesZAR ?? 0));
+    setNumberOfUnits(deal.numberOfUnits ?? 1);
+    setFloorAreaSqm(deal.floorAreaSqm ?? 0);
+    const isDevSale = deal.isVatInclusiveDeveloperSale ?? (deal.source === 'iGrow Rentals');
+    setIsVatInclusiveDeveloperSale(isDevSale);
+    setTenantPlacementFeePercent(deal.tenantPlacementFeePercent ?? 0);
+    setAnnualSpvAdminAuditFeeZAR(deal.annualSpvAdminAuditFeeZAR ?? 0);
+    setRefinanceLtvPercent(deal.refinanceLtvPercent ?? 75);
+    setIsFiveYearExitOverridden(false);
+    const hasCustomDuty = deal.customTransferDuty !== undefined && (!isDevSale || deal.customTransferDuty > 0);
+    setOverrideTax(hasCustomDuty);
+    setCustomTransferDuty(hasCustomDuty ? (deal.customTransferDuty ?? 0) : 0);
+    const hasCustomLegal = deal.customConveyancing !== undefined;
+    setOverrideLegal(hasCustomLegal);
+    setCustomConveyancing(hasCustomLegal ? (deal.customConveyancing ?? 0) : 0);
     const effectiveLtv = deal.bondLTV !== undefined ? deal.bondLTV : (deal.loanToValuePercent ?? 100);
     setLoanToValue(effectiveLtv);
     const effectiveDep = deal.depositZAR !== undefined ? deal.depositZAR : Math.max(0, Math.round(deal.purchasePrice * (1 - effectiveLtv / 100)));
@@ -768,11 +861,17 @@ export default function OpportunityAnalyzerPage() {
     setActiveWorkspaceTab('calculator');
     if (deal.strategy === 'Flip' || deal.strategy === 'BRRRR') {
       setIsHoldingOpen(true);
+    } else {
+      setIsHoldingOpen(false);
     }
-    if (deal.interestRateMargin || deal.section13sex) {
+    if (deal.interestRateMargin || deal.section13sex || hasCustomDuty || hasCustomLegal) {
       setIsStressAndTaxOpen(true);
     }
-    if (deal.monthlyMaintenanceReserveZAR !== undefined && deal.monthlyMaintenanceReserveZAR !== 800) {
+    if (
+      (deal.monthlyMaintenanceReserveZAR !== undefined && deal.monthlyMaintenanceReserveZAR !== 800) ||
+      (deal.tenantPlacementFeePercent && deal.tenantPlacementFeePercent > 0) ||
+      (deal.annualSpvAdminAuditFeeZAR && deal.annualSpvAdminAuditFeeZAR > 0)
+    ) {
       setIsOpExReservesOpen(true);
     }
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -797,6 +896,17 @@ export default function OpportunityAnalyzerPage() {
     setMonthlyMaintenanceReserve(analyzerDraft?.monthlyMaintenanceReserveZAR ?? 800);
     setMonthlyPrepaidVendingFee(analyzerDraft?.monthlyPrepaidVendingFeeZAR ?? 150);
     setMonthlyCommunalServices(analyzerDraft?.monthlyCommunalServicesZAR ?? 0);
+    setNumberOfUnits(analyzerDraft?.numberOfUnits ?? 1);
+    setFloorAreaSqm(analyzerDraft?.floorAreaSqm ?? 0);
+    setIsVatInclusiveDeveloperSale(analyzerDraft?.isVatInclusiveDeveloperSale ?? false);
+    setTenantPlacementFeePercent(analyzerDraft?.tenantPlacementFeePercent ?? 0);
+    setAnnualSpvAdminAuditFeeZAR(analyzerDraft?.annualSpvAdminAuditFeeZAR ?? 0);
+    setRefinanceLtvPercent(analyzerDraft?.refinanceLtvPercent ?? 75);
+    setIsFiveYearExitOverridden(false);
+    setOverrideTax(false);
+    setCustomTransferDuty(0);
+    setOverrideLegal(false);
+    setCustomConveyancing(0);
     setAnnualCapitalGrowth(5.0);
     setAnnualRentalEscalation(6.0);
     setAnnualExpenseInflation(6.0);
@@ -844,6 +954,12 @@ export default function OpportunityAnalyzerPage() {
         vacancyRatePercent: vacancyRate,
         managementFeePercent: managementFee,
         agencyVatApplicable,
+        numberOfUnits,
+        floorAreaSqm,
+        isVatInclusiveDeveloperSale,
+        tenantPlacementFeePercent,
+        annualSpvAdminAuditFeeZAR,
+        refinanceLtvPercent,
         targetExitPrice,
         holdingPeriodMonths,
         exitCommissionPercent: effectiveExitCommissionPercent,
@@ -866,7 +982,7 @@ export default function OpportunityAnalyzerPage() {
         annualCapitalGrowthPercent: annualCapitalGrowth,
         annualRentalEscalationPercent: annualRentalEscalation,
         annualExpenseInflationPercent: annualExpenseInflation,
-        customTransferDuty: overrideTax ? customTransferDuty : undefined,
+        customTransferDuty: overrideTax ? customTransferDuty : (isVatInclusiveDeveloperSale ? 0 : undefined),
         customConveyancing: overrideLegal ? customConveyancing : undefined,
         costs: calculatedCosts,
         section13sex: isSection13Eligible ? calculatedSection13 : undefined,
@@ -903,6 +1019,17 @@ export default function OpportunityAnalyzerPage() {
       setMonthlyMaintenanceReserve(analyzerDraft?.monthlyMaintenanceReserveZAR ?? 800);
       setMonthlyPrepaidVendingFee(analyzerDraft?.monthlyPrepaidVendingFeeZAR ?? 150);
       setMonthlyCommunalServices(analyzerDraft?.monthlyCommunalServicesZAR ?? 0);
+      setNumberOfUnits(analyzerDraft?.numberOfUnits ?? 1);
+      setFloorAreaSqm(analyzerDraft?.floorAreaSqm ?? 0);
+      setIsVatInclusiveDeveloperSale(analyzerDraft?.isVatInclusiveDeveloperSale ?? false);
+      setTenantPlacementFeePercent(analyzerDraft?.tenantPlacementFeePercent ?? 0);
+      setAnnualSpvAdminAuditFeeZAR(analyzerDraft?.annualSpvAdminAuditFeeZAR ?? 0);
+      setRefinanceLtvPercent(analyzerDraft?.refinanceLtvPercent ?? 75);
+      setIsFiveYearExitOverridden(false);
+      setOverrideTax(false);
+      setCustomTransferDuty(0);
+      setOverrideLegal(false);
+      setCustomConveyancing(0);
       setAnnualCapitalGrowth(5.0);
       setAnnualRentalEscalation(6.0);
       setAnnualExpenseInflation(6.0);
@@ -938,6 +1065,12 @@ export default function OpportunityAnalyzerPage() {
       managementFeePercent: managementFee,
       agencyVatApplicable,
       vacancyRatePercent: vacancyRate,
+      numberOfUnits,
+      floorAreaSqm,
+      isVatInclusiveDeveloperSale,
+      tenantPlacementFeePercent,
+      annualSpvAdminAuditFeeZAR,
+      refinanceLtvPercent,
       targetExitPrice,
       exitCommissionPercent: effectiveExitCommissionPercent,
       vatExemptAgent,
@@ -960,7 +1093,7 @@ export default function OpportunityAnalyzerPage() {
       annualCapitalGrowthPercent: annualCapitalGrowth,
       annualRentalEscalationPercent: annualRentalEscalation,
       annualExpenseInflationPercent: annualExpenseInflation,
-      customTransferDuty: overrideTax ? customTransferDuty : undefined,
+      customTransferDuty: overrideTax ? customTransferDuty : (isVatInclusiveDeveloperSale ? 0 : undefined),
       customConveyancing: overrideLegal ? customConveyancing : undefined,
       costs: calculatedCosts,
       section13sex: isSection13Eligible ? calculatedSection13 : undefined,
@@ -995,6 +1128,17 @@ export default function OpportunityAnalyzerPage() {
     setMonthlyMaintenanceReserve(analyzerDraft?.monthlyMaintenanceReserveZAR ?? 800);
     setMonthlyPrepaidVendingFee(analyzerDraft?.monthlyPrepaidVendingFeeZAR ?? 150);
     setMonthlyCommunalServices(analyzerDraft?.monthlyCommunalServicesZAR ?? 0);
+    setNumberOfUnits(analyzerDraft?.numberOfUnits ?? 1);
+    setFloorAreaSqm(analyzerDraft?.floorAreaSqm ?? 0);
+    setIsVatInclusiveDeveloperSale(analyzerDraft?.isVatInclusiveDeveloperSale ?? false);
+    setTenantPlacementFeePercent(analyzerDraft?.tenantPlacementFeePercent ?? 0);
+    setAnnualSpvAdminAuditFeeZAR(analyzerDraft?.annualSpvAdminAuditFeeZAR ?? 0);
+    setRefinanceLtvPercent(analyzerDraft?.refinanceLtvPercent ?? 75);
+    setIsFiveYearExitOverridden(false);
+    setOverrideTax(false);
+    setCustomTransferDuty(0);
+    setOverrideLegal(false);
+    setCustomConveyancing(0);
     setVacancyRate(analyzerDraft?.vacancyRatePercent ?? 6.0);
     setManagementFee(analyzerDraft?.managementFeePercent ?? 8.0);
     setAgencyVatApplicable(analyzerDraft?.agencyVatApplicable ?? true);
@@ -1047,21 +1191,30 @@ export default function OpportunityAnalyzerPage() {
         {/* Sticky Live Underwriting Ribbon */}
         {(activeWorkspaceTab === 'calculator' || isStackedView) && (
           <AnalyzerStickyRibbon
+            strategy={strategy}
             dayOneCapitalRequired={calculatedMetrics.initialCapitalRequired}
             builtInEquity={calculatedBuiltInEquity.builtInEquityZAR}
             builtInEquityPercent={calculatedBuiltInEquity.builtInEquityPercent}
             grossYield={calculatedMetrics.grossYield}
             netCapRate={calculatedMetrics.capRate}
             monthlyNetCashFlow={calculatedMetrics.monthlyCashFlow}
+            netRoi={calculatedMetrics.netRoi}
+            dscr={calculatedMetrics.dscr}
+            fiveYearIrrPercent={calculatedMetrics.fiveYearIrrPercent}
             projectedFlipProfit={calculatedMetrics.projectedFlipNetProfit}
             projectedFlipROI={calculatedMetrics.projectedFlipRoi}
+            annualizedFlipROI={calculatedMetrics.annualizedFlipRoi}
+            monthlyHoldingBurnZAR={calculatedMetrics.monthlyHoldingBurnZAR}
+            brrrrPostRefiCashflowZAR={calculatedMetrics.brrrrPostRefiCashflowZAR}
+            brrrrEquityExtractedZAR={calculatedMetrics.brrrrEquityExtractedZAR}
+            brrrrCashLeftInDealZAR={calculatedMetrics.brrrrCashLeftInDealZAR}
             isEditing={Boolean(editingDealId)}
             onSaveDeal={() => formRef.current?.requestSubmit()}
             onScrollToResults={() => {
               document.getElementById('analyzer-results')?.scrollIntoView({ behavior: 'smooth' });
             }}
             cashDeposit={calculatedMetrics.cashDeposit}
-            transferDuty={calculatedCosts.transferDuty}
+            transferDuty={calculatedMetrics.transferDutyZAR}
             legalFees={
               calculatedCosts.conveyancingFee +
               calculatedCosts.bondRegistrationFee +
@@ -1476,6 +1629,62 @@ export default function OpportunityAnalyzerPage() {
                   </div>
                 </div>
 
+                {/* Unit Count & Total Floor Area (m²) Inputs for Multi-Unit / Bulk SPVs */}
+                <div className="pt-2 border-t border-slate-200/80 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="text-[11px] font-semibold text-slate-700">
+                        Units (Qty)
+                      </label>
+                      {numberOfUnits >= 5 && (
+                        <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100 px-1.5 py-0.5 rounded">
+                          ≥5 Units (Sec 13sex)
+                        </span>
+                      )}
+                    </div>
+                    <input
+                      type="number"
+                      name="numberOfUnits"
+                      autoComplete="off"
+                      min="1"
+                      step="1"
+                      value={numberOfUnits}
+                      onChange={(e) => {
+                        const val = Math.max(1, Math.round(Number(e.target.value) || 1));
+                        setNumberOfUnits(val);
+                        updateAnalyzerDraft({ numberOfUnits: val });
+                      }}
+                      className="w-full text-xs px-3 py-2 border border-slate-300 rounded-lg bg-white focus:ring-1 focus:ring-emerald-500 font-semibold text-slate-900"
+                    />
+                  </div>
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="text-[11px] font-semibold text-slate-700">
+                        Total Size (m²)
+                      </label>
+                      <span className="text-[10px] text-slate-400">Optional (e.g. 420)</span>
+                    </div>
+                    <div className="relative">
+                      <input
+                        type="number"
+                        name="floorAreaSqm"
+                        autoComplete="off"
+                        min="0"
+                        step="any"
+                        placeholder="0"
+                        value={floorAreaSqm || ''}
+                        onChange={(e) => {
+                          const val = Math.max(0, Number(e.target.value) || 0);
+                          setFloorAreaSqm(val);
+                          updateAnalyzerDraft({ floorAreaSqm: val });
+                        }}
+                        className="w-full text-xs px-3 pr-8 py-2 border border-slate-300 rounded-lg bg-white focus:ring-1 focus:ring-emerald-500 font-semibold text-slate-900"
+                      />
+                      <span className="absolute right-2.5 top-2 text-[11px] text-slate-400 font-bold">m²</span>
+                    </div>
+                  </div>
+                </div>
+
                 {(propertyType === 'Sectional Title Apartment' || propertyType === 'Townhouse / Cluster') && (
                   <div className="pt-2 border-t border-slate-200/80">
                     <div className="flex items-center justify-between mb-1">
@@ -1679,9 +1888,28 @@ export default function OpportunityAnalyzerPage() {
 
                 {/* Target Purchase Price / Max Bid (ZAR) */}
                 <div>
-                  <div className="flex items-center justify-between mb-1">
+                  <div className="flex items-center justify-between gap-1 mb-1 flex-wrap">
                     <label className="text-[11px] font-semibold text-slate-700">Target Purchase Price / Max Bid (ZAR) *</label>
-                    <span className="text-[10px] text-slate-400">Agreed / Auction Cap</span>
+                    <label
+                      className={`inline-flex items-center gap-1 cursor-pointer text-[10px] font-semibold px-1.5 py-0.5 rounded border transition-colors select-none ${
+                        isVatInclusiveDeveloperSale
+                          ? 'bg-emerald-100 text-emerald-900 border-emerald-300'
+                          : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-100'
+                      }`}
+                      title="VAT-registered developer / off-plan sale — SARS Transfer Duty is R 0"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={isVatInclusiveDeveloperSale}
+                        onChange={(e) => {
+                          const checked = e.target.checked;
+                          setIsVatInclusiveDeveloperSale(checked);
+                          updateAnalyzerDraft({ isVatInclusiveDeveloperSale: checked });
+                        }}
+                        className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 w-3 h-3 cursor-pointer"
+                      />
+                      <span>Developer / VAT-Incl. (R0 Transfer Duty)</span>
+                    </label>
                   </div>
                   <div className="relative">
                     <span className="absolute left-2.5 top-2 text-xs text-slate-400 font-bold">R</span>
@@ -1726,11 +1954,27 @@ export default function OpportunityAnalyzerPage() {
                   <div className="text-lg font-black mt-1">
                     {formatZAR(calculatedBuiltInEquity.builtInEquityZAR)}
                   </div>
-                  <span className="text-[10px] opacity-80 block">
-                    {calculatedBuiltInEquity.builtInEquityZAR > 0
-                      ? 'Immediate equity cushion upon transfer'
-                      : 'Target bid equals or exceeds market valuation'}
-                  </span>
+                  {(floorAreaSqm > 0 || numberOfUnits > 1) ? (
+                    <div className="text-[10px] font-semibold opacity-90 flex flex-wrap items-center gap-1.5 mt-0.5">
+                      {floorAreaSqm > 0 && (
+                        <span>
+                          Bid: {formatZAR(calculatedMetrics.purchasePricePerSqm)}/m² vs Val: {formatZAR(calculatedMetrics.valuationPerSqm)}/m²
+                        </span>
+                      )}
+                      {floorAreaSqm > 0 && numberOfUnits > 1 && <span>&bull;</span>}
+                      {numberOfUnits > 1 && (
+                        <span>
+                          Avg {formatZAR(calculatedMetrics.averagePricePerUnit)} / unit ({numberOfUnits} units)
+                        </span>
+                      )}
+                    </div>
+                  ) : (
+                    <span className="text-[10px] opacity-80 block">
+                      {calculatedBuiltInEquity.builtInEquityZAR > 0
+                        ? 'Immediate equity cushion upon transfer'
+                        : 'Target bid equals or exceeds market valuation'}
+                    </span>
+                  )}
                 </div>
               </div>
             </div>
@@ -1852,7 +2096,28 @@ export default function OpportunityAnalyzerPage() {
               </div>
 
               <div>
-                <label className="block text-[11px] font-semibold text-slate-700 mb-1">Target Flip Exit Price</label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-[11px] font-semibold text-slate-700">
+                    {strategy === 'Rental'
+                      ? 'Est. 5-Year Exit Value (Optional)'
+                      : strategy === 'BRRRR'
+                      ? 'Post-Rehab ARV Valuation (ZAR)'
+                      : 'Target Flip Exit Price'}
+                  </label>
+                  {strategy === 'Rental' && isFiveYearExitOverridden && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsFiveYearExitOverridden(false);
+                        setTargetExitPrice(0);
+                        updateAnalyzerDraft({ targetExitPrice: 0 });
+                      }}
+                      className="text-[9px] font-bold text-indigo-600 hover:underline cursor-pointer"
+                    >
+                      Auto 5Y
+                    </button>
+                  )}
+                </div>
                 <div className="relative">
                   <span className="absolute left-2.5 top-2 text-xs text-slate-400 font-bold">R</span>
                   <input
@@ -1861,9 +2126,24 @@ export default function OpportunityAnalyzerPage() {
                     autoComplete="off"
                     min="0"
                     step="any"
-                    value={targetExitPrice}
+                    value={strategy === 'Rental' && !isFiveYearExitOverridden ? '' : targetExitPrice}
+                    placeholder={
+                      strategy === 'Rental'
+                        ? `${Math.round((openMarketValue > 0 ? openMarketValue : purchasePrice) * Math.pow(1 + (annualCapitalGrowth || 0) / 100, 5)).toLocaleString()} (Auto 5Y)`
+                        : '0'
+                    }
                     onChange={(e) => {
-                      const val = Number(e.target.value);
+                      const raw = e.target.value;
+                      if (strategy === 'Rental' && raw === '') {
+                        setIsFiveYearExitOverridden(false);
+                        setTargetExitPrice(0);
+                        updateAnalyzerDraft({ targetExitPrice: 0 });
+                        return;
+                      }
+                      const val = Number(raw);
+                      if (strategy === 'Rental') {
+                        setIsFiveYearExitOverridden(val > 0);
+                      }
                       setTargetExitPrice(val);
                       updateAnalyzerDraft({ targetExitPrice: val });
                     }}
@@ -1872,6 +2152,88 @@ export default function OpportunityAnalyzerPage() {
                 </div>
               </div>
             </div>
+
+            {/* Hybrid BRRRR Post-Rehab Refinance Modeling Panel */}
+            {strategy === 'BRRRR' && (
+              <div className="p-4 rounded-xl bg-purple-50/70 border border-purple-200 space-y-3 shadow-2xs">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-purple-200/80 pb-2">
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="w-4 h-4 text-purple-700 shrink-0" />
+                    <div>
+                      <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
+                        Hybrid BRRRR Post-Rehab Refinance Engine
+                      </h4>
+                      <span className="text-[10px] text-slate-500">
+                        Model bank refinance proceeds on stabilized ARV, trapped capital &amp; post-refi cashflow
+                      </span>
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
+                    <span className="font-bold text-purple-900 bg-white px-2.5 py-0.5 rounded border border-purple-200 font-mono">
+                      Refinance Loan: {formatZAR(calculatedMetrics.brrrrRefinanceLoanZAR)}
+                    </span>
+                    <span className="font-bold text-indigo-900 bg-indigo-100/80 px-2.5 py-0.5 rounded border border-indigo-200 font-mono">
+                      Cash Left in Deal: {formatZAR(calculatedMetrics.brrrrCashLeftInDealZAR)}
+                    </span>
+                    <span className={`font-bold px-2.5 py-0.5 rounded border font-mono ${
+                      calculatedMetrics.brrrrPostRefiCashflowZAR >= 0
+                        ? 'text-emerald-900 bg-emerald-100/80 border-emerald-300'
+                        : 'text-rose-900 bg-rose-100/80 border-rose-300'
+                    }`}>
+                      Post-Refi Cashflow: {formatZAR(calculatedMetrics.brrrrPostRefiCashflowZAR)}/m
+                    </span>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-center">
+                  <div className="md:col-span-7 space-y-1.5">
+                    <div className="flex items-center justify-between text-xs">
+                      <label className="font-bold text-slate-800">
+                        Post-Rehab Refinance LTV (%)
+                      </label>
+                      <span className="font-mono font-extrabold text-purple-900 bg-white px-2 py-0.5 rounded border border-purple-200">
+                        {refinanceLtvPercent}% of ARV
+                      </span>
+                    </div>
+                    <input
+                      type="range"
+                      min="50"
+                      max="90"
+                      step="5"
+                      value={refinanceLtvPercent}
+                      onChange={(e) => {
+                        const val = Number(e.target.value);
+                        setRefinanceLtvPercent(val);
+                        updateAnalyzerDraft({ refinanceLtvPercent: val });
+                      }}
+                      className="w-full accent-purple-600 cursor-pointer h-1.5 bg-purple-200 rounded-lg"
+                    />
+                    <div className="flex justify-between text-[9px] text-slate-500 font-medium px-0.5">
+                      <span>50% (Conservative)</span>
+                      <span>70% (Standard Bank Refi)</span>
+                      <span>75% (Target)</span>
+                      <span>80%</span>
+                      <span>90% (Aggressive)</span>
+                    </div>
+                  </div>
+
+                  <div className="md:col-span-5 grid grid-cols-2 gap-2 text-xs">
+                    <div className="bg-white p-2.5 rounded-lg border border-purple-200">
+                      <span className="text-[10px] text-slate-500 block">Equity Recycled</span>
+                      <span className="font-black text-emerald-700 font-mono">
+                        {formatZAR(calculatedMetrics.brrrrEquityExtractedZAR)}
+                      </span>
+                    </div>
+                    <div className="bg-white p-2.5 rounded-lg border border-purple-200">
+                      <span className="text-[10px] text-slate-500 block">Post-Refi Bond ({interestRate}%)</span>
+                      <span className="font-black text-slate-900 font-mono">
+                        {formatZAR(calculatedMetrics.brrrrPostRefiBondPaymentZAR)}/m
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Holding Period Sensitivity (1-12 Months) & Agent Commission VAT */}
             <div id="analyzer-sensitivity" className="scroll-mt-20 rounded-xl bg-slate-50 border border-slate-200 overflow-hidden shadow-2xs">
@@ -2146,13 +2508,13 @@ export default function OpportunityAnalyzerPage() {
                         Fine-Tune OpEx Reserves
                       </span>
                       <span className="text-[10px] text-slate-500">
-                        Monthly Maintenance, Prepaid Meter Vending & Communal Services
+                        Maintenance, Prepaid Vending, Communal Services, Placement &amp; SPV Audit Fees
                       </span>
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="text-[11px] font-semibold text-slate-700 bg-white px-2.5 py-0.5 rounded border border-slate-200">
-                      Total Reserves: <strong className="text-emerald-700">-{formatZAR(monthlyMaintenanceReserve + monthlyPrepaidVendingFee + (monthlyCommunalServices || 0))}/pm</strong>
+                      Total Reserves: <strong className="text-emerald-700">-{formatZAR(monthlyMaintenanceReserve + monthlyPrepaidVendingFee + (monthlyCommunalServices || 0) + (calculatedMetrics.monthlyPlacementFeeZAR || 0) + (calculatedMetrics.monthlySpvAdminZAR || 0))}/pm</strong>
                     </span>
                     <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${isOpExReservesOpen ? 'rotate-180' : ''}`} />
                   </div>
@@ -2160,7 +2522,7 @@ export default function OpportunityAnalyzerPage() {
 
                 {isOpExReservesOpen && (
                   <div className="p-4 pt-0 border-t border-slate-200/70">
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 pt-3">
                       <div>
                         <div className="flex items-center justify-between mb-1">
                           <label className="block text-[11px] font-semibold text-slate-700">
@@ -2252,6 +2614,71 @@ export default function OpportunityAnalyzerPage() {
                         </div>
                         <p className="text-[10px] text-slate-500 mt-1">
                           Consolidated communal amenities (uncapped Wi-Fi, communal cleaning, security, garden care). Default: R 0.
+                        </p>
+                      </div>
+
+                      <div>
+                        <div className="flex items-center justify-between mb-1">
+                          <label className="block text-[11px] font-semibold text-slate-700">
+                            Tenant Placement Fee (% Rent)
+                          </label>
+                          <span className="text-[10px] font-bold text-slate-700 bg-slate-200 px-1.5 py-0.5 rounded">
+                            -{formatZAR(calculatedMetrics.monthlyPlacementFeeZAR)}/pm
+                          </span>
+                        </div>
+                        <div className="relative">
+                          <input
+                            type="number"
+                            name="tenantPlacementFeePercent"
+                            autoComplete="off"
+                            min="0"
+                            max="20"
+                            step="0.5"
+                            value={tenantPlacementFeePercent || ''}
+                            placeholder="0"
+                            onChange={(e) => {
+                              const val = Math.max(0, Number(e.target.value) || 0);
+                              setTenantPlacementFeePercent(val);
+                              updateAnalyzerDraft({ tenantPlacementFeePercent: val });
+                            }}
+                            className="w-full text-xs px-3 pr-7 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-emerald-500 font-semibold text-slate-900 bg-white"
+                          />
+                          <span className="absolute right-3 top-2 text-xs text-slate-400 font-bold">%</span>
+                        </div>
+                        <p className="text-[10px] text-slate-500 mt-1">
+                          Amortized leasing / procurement commission{agencyVatApplicable ? ' (+15% VAT applied)' : ''}. Default: 0%.
+                        </p>
+                      </div>
+
+                      <div>
+                        <div className="flex items-center justify-between mb-1">
+                          <label className="block text-[11px] font-semibold text-slate-700">
+                            Annual SPV Audit / Admin (ZAR/yr)
+                          </label>
+                          <span className="text-[10px] font-bold text-slate-700 bg-slate-200 px-1.5 py-0.5 rounded">
+                            -{formatZAR(calculatedMetrics.monthlySpvAdminZAR)}/pm
+                          </span>
+                        </div>
+                        <div className="relative">
+                          <span className="absolute left-3 top-2 text-xs text-slate-400 font-bold">R</span>
+                          <input
+                            type="number"
+                            name="annualSpvAdminAuditFeeZAR"
+                            autoComplete="off"
+                            min="0"
+                            step="1000"
+                            value={annualSpvAdminAuditFeeZAR || ''}
+                            placeholder="0"
+                            onChange={(e) => {
+                              const val = Math.max(0, Number(e.target.value) || 0);
+                              setAnnualSpvAdminAuditFeeZAR(val);
+                              updateAnalyzerDraft({ annualSpvAdminAuditFeeZAR: val });
+                            }}
+                            className="w-full text-xs pl-7 pr-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-emerald-500 font-semibold text-slate-900 bg-white"
+                          />
+                        </div>
+                        <p className="text-[10px] text-slate-500 mt-1">
+                          For syndications, body corporate audits, or Pty Ltd accounting — divided by 12 p.m.
                         </p>
                       </div>
                     </div>
@@ -2792,7 +3219,12 @@ export default function OpportunityAnalyzerPage() {
                     </span>
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
+                  {numberOfUnits >= 5 && (
+                    <span className="text-[10px] font-bold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full border border-emerald-300">
+                      ✓ Meets SARS ≥5-Unit Sec 13sex Threshold
+                    </span>
+                  )}
                   <span className="text-[11px] font-semibold text-slate-700 bg-white px-2.5 py-0.5 rounded border border-slate-200">
                     {overrideTax || overrideLegal ? 'Custom Overrides Active' : `Auto SARS: ${formatZAR(calculatedCosts.transferDuty)}`}
                     {isSection13Eligible ? ` • Sec 13sex (+${formatZAR(calculatedSection13.annualTaxSavingsZAR)}/yr)` : ''}
@@ -2874,9 +3306,16 @@ export default function OpportunityAnalyzerPage() {
                           <Sparkles className="w-4 h-4 text-emerald-700" />
                           <h4 className="text-xs font-bold text-slate-900">SARS Section 13sex Tax Shield</h4>
                         </div>
-                        <span className="text-[10px] font-semibold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full">
-                          55% Base • 20 Yrs
-                        </span>
+                        <div className="flex items-center gap-1.5">
+                          {numberOfUnits >= 5 && (
+                            <span className="text-[10px] font-bold bg-emerald-200/80 text-emerald-900 px-2 py-0.5 rounded-full">
+                              ✓ ≥5 Units ({numberOfUnits})
+                            </span>
+                          )}
+                          <span className="text-[10px] font-semibold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full">
+                            55% Base • 20 Yrs
+                          </span>
+                        </div>
                       </div>
 
                       <div className="space-y-2.5 text-xs">
@@ -3001,7 +3440,7 @@ export default function OpportunityAnalyzerPage() {
                   </span>
                   <span className="text-slate-500">+</span>
                   <span className="bg-slate-800 px-2 py-0.5 rounded border border-slate-700 text-white tabular-nums">
-                    SARS Duty: <strong className="text-slate-200 font-semibold">{formatZAR(calculatedCosts.transferDuty)}</strong>
+                    SARS Duty: <strong className="text-slate-200 font-semibold">{formatZAR(calculatedMetrics.transferDutyZAR)}</strong>
                   </span>
                   <span className="text-slate-500">+</span>
                   <span className="bg-slate-800 px-2 py-0.5 rounded border border-slate-700 text-white tabular-nums">
@@ -3038,9 +3477,10 @@ export default function OpportunityAnalyzerPage() {
 
               {/* Standard Performance & Returns Metric Badges */}
               <AnalyzerResultsGrid
+                strategy={strategy}
                 builtInEquityZAR={calculatedBuiltInEquity.builtInEquityZAR}
                 builtInEquityPercent={calculatedBuiltInEquity.builtInEquityPercent}
-                totalAcquisitionCost={calculatedCosts.totalAcquisitionCost}
+                totalAcquisitionCost={calculatedCosts.totalAcquisitionCost - calculatedCosts.transferDuty + calculatedMetrics.transferDutyZAR + rehabCost + (auctioneerCommission || 0) + (municipalArrears || 0)}
                 grossYield={calculatedMetrics.grossYield}
                 capRate={calculatedMetrics.capRate}
                 monthlyCashFlow={calculatedMetrics.monthlyCashFlow}
@@ -3051,6 +3491,22 @@ export default function OpportunityAnalyzerPage() {
                 isSection13Eligible={isSection13Eligible}
                 section13AnnualSavings={calculatedSection13.annualTaxSavingsZAR}
                 section13TwentyYearSavings={calculatedSection13.twentyYearCumulativeSavingsZAR}
+                netRoi={calculatedMetrics.netRoi}
+                minNetRoiHurdle={investorProfile?.minNetRoiPercent ?? 8}
+                dscr={calculatedMetrics.dscr}
+                minDscrHurdle={investorProfile?.minDscr ?? 1.2}
+                fiveYearIrrPercent={calculatedMetrics.fiveYearIrrPercent}
+                purchasePricePerSqm={calculatedMetrics.purchasePricePerSqm}
+                valuationPerSqm={calculatedMetrics.valuationPerSqm}
+                numberOfUnits={numberOfUnits}
+                averagePricePerUnit={calculatedMetrics.averagePricePerUnit}
+                annualizedFlipRoi={calculatedMetrics.annualizedFlipRoi}
+                monthlyHoldingBurnZAR={calculatedMetrics.monthlyHoldingBurnZAR}
+                holdingPeriodMonths={holdingPeriodMonths}
+                brrrrPostRefiCashflowZAR={calculatedMetrics.brrrrPostRefiCashflowZAR}
+                brrrrEquityExtractedZAR={calculatedMetrics.brrrrEquityExtractedZAR}
+                brrrrCashLeftInDealZAR={calculatedMetrics.brrrrCashLeftInDealZAR}
+                brrrrRefinanceLoanZAR={calculatedMetrics.brrrrRefinanceLoanZAR}
               />
             </div>
 
@@ -3457,11 +3913,11 @@ export default function OpportunityAnalyzerPage() {
                         .map((deal) => {
                           const dscrInfo = calculateDealDscr(deal, investorProfile?.defaultPrimeRatePercent);
                           const dscr = dscrInfo.dscr;
-                          const meetsHurdle = dscrInfo.rawDscr >= (investorProfile?.minDscr ?? 1.20) - 1e-4;
+                          const meetsHurdle = dscrInfo.rawDscr === null || dscrInfo.rawDscr >= (investorProfile?.minDscr ?? 1.20) - 1e-4;
                           return (
                             <td key={deal.id} className="p-3 border-l border-slate-100">
                               <span className={`font-bold px-2 py-0.5 rounded text-xs ${meetsHurdle ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'}`}>
-                                {dscr >= 99 ? 'Cash Deal' : `${dscr.toFixed(2)}x`}
+                                {dscr === null || dscr >= 99 ? 'N/A (Cash)' : `${dscr.toFixed(2)}x`}
                               </span>
                             </td>
                           );

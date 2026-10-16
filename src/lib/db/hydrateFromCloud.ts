@@ -304,81 +304,128 @@ export function unmapFundingSources(
 export function unmapOpportunities(
   rows: Database['public']['Tables']['opportunities']['Row'][] = []
 ): OpportunityDeal[] {
-  return rows.map((opp) => ({
-    id: opp.id,
-    title: opp.title,
-    address: opp.address,
-    city: opp.city,
-    province: (opp.province as any) || 'Gauteng',
-    propertyType: (opp.property_type as any) || undefined,
-    agmDate: opp.agm_date || undefined,
-    source: (opp.source as any) || 'Direct Owner',
-    openMarketValueZAR: toNum(opp.open_market_value_zar, 0),
-    purchasePrice: toNum(opp.purchase_price_zar, 0),
-    builtInEquityZAR: toNum(opp.built_in_equity_zar, 0),
-    builtInEquityPercent: toNum(opp.built_in_equity_percent, 0),
-    estimatedRehabCost: toNum(opp.estimated_rehab_cost_zar, 0),
-    monthlyRentalEstimate: toNum(opp.monthly_rental_estimate_zar, 0),
-    monthlyLevies: toNum(opp.monthly_levies_zar, 0),
-    monthlyRatesTaxes: toNum(opp.monthly_rates_taxes_zar, 0),
-    monthlyCommunalServicesZAR: toNullableNum(opp.monthly_communal_services_zar) ?? undefined,
-    annualInsurance: toNum(opp.annual_insurance_zar, 0),
-    managementFeePercent: toNum(opp.management_fee_percent, 8.0),
-    agencyVatApplicable: opp.agency_vat_applicable ?? true,
-    vacancyRatePercent: toNum(opp.vacancy_rate_percent, 5.0),
-    targetExitPrice: toNum(opp.target_exit_price_zar, 0),
-    exitCommissionPercent: toNum(opp.exit_commission_percent, 5.75),
-    vatExemptAgent: Boolean((opp as any).vat_exempt_agent ?? false),
-    holdingPeriodMonths: toNum(opp.holding_period_months, 6),
-    strategy: (opp.strategy as any) || 'Rental',
-    interestRateMargin: toNullableNum((opp as any).interest_rate_margin) ?? undefined,
-    monthlyHoldingCostZAR: toNum(opp.monthly_holding_cost_zar, 0),
-    monthlyBondPaymentZAR: toNum(opp.monthly_bond_payment_zar, 0),
-    monthlyOtherHoldingCostZAR: toNum(opp.monthly_other_holding_cost_zar, 0),
-    loanToValuePercent: toNum(opp.loan_to_value_percent, 80.0),
-    bondLTV: toNum(opp.bond_ltv, 80.0),
-    depositZAR: toNum(opp.deposit_zar, 0),
-    interestRatePercent: toNum(opp.interest_rate_percent, 11.75),
-    loanTermYears: toNum(opp.loan_term_years, 20),
-    annualCapitalGrowthPercent: toNum(opp.annual_capital_growth_percent, 5.0),
-    annualRentalEscalationPercent: toNum(opp.annual_rental_escalation_percent, 6.0),
-    annualExpenseInflationPercent: toNum(opp.annual_expense_inflation_percent, 6.0),
-    bondTermYears: toNum(opp.bond_term_years, 20),
-    customTransferDuty: toNullableNum(opp.custom_transfer_duty_zar),
-    customConveyancing: toNullableNum(opp.custom_conveyancing_zar),
-    customBondReg: toNullableNum(opp.custom_bond_reg_zar),
-    auctioneerCommissionZAR: toNum(opp.auctioneer_commission_zar, 0),
-    municipalArrearsZAR: toNum(opp.municipal_arrears_zar, 0),
-    grossYield: toNum(opp.gross_yield, 0),
-    capRate: toNum(opp.cap_rate, 0),
-    netRoi: toNum(opp.net_roi, 0),
-    monthlyCashFlow: toNum(opp.monthly_cash_flow_zar, 0),
-    initialCapitalRequired: toNum(opp.initial_capital_required_zar, 0),
-    projectedFlipNetProfit: toNum(opp.projected_flip_net_profit_zar, 0),
-    projectedFlipRoi: toNum(opp.projected_flip_roi, 0),
-    fundingRequiredZAR: toNum(opp.funding_required_zar, 0),
-    capitalRaisedZAR: toNum(opp.capital_raised_zar, 0),
-    primaryFunderName: opp.primary_funder_name || undefined,
-    primaryFunderContact: opp.primary_funder_contact || undefined,
-    primaryFunderType: (opp.primary_funder_type as any) || undefined,
-    coFundersNotes: opp.co_funders_notes || undefined,
-    promisedReturnType: (opp.promised_return_type as any) || undefined,
-    promisedReturnRatePercent: toNum(opp.promised_return_rate_percent, 0),
-    promisedPayoutSchedule: (opp.promised_payout_schedule as any) || undefined,
-    securityOffered: opp.security_offered || undefined,
-    amenityScorecard: opp.amenity_scorecard ? (parseJson(opp.amenity_scorecard, undefined) as any) : undefined,
-    costs: opp.costs ? (parseJson(opp.costs, undefined) as any) : undefined,
-    section13sex: opp.section_13sex ? (parseJson(opp.section_13sex, undefined) as any) : undefined,
-    driveVault: opp.drive_vault ? (parseJson(opp.drive_vault, undefined) as any) : undefined,
-    ancillaryIncomes: parseJson(opp.ancillary_incomes, []),
-    occupantRisk: opp.occupant_risk ? (parseJson(opp.occupant_risk, undefined) as any) : undefined,
-    status: (opp.status as any) || 'Screening',
-    passReason: (opp.pass_reason as any) || undefined,
-    passNotes: opp.pass_notes || undefined,
-    passedAt: opp.passed_at || undefined,
-    notes: opp.notes || undefined,
-    createdAt: (opp as any).created_at || new Date().toISOString(),
-  }));
+  return rows.map((opp) => {
+    const rawCosts = opp.costs ? (parseJson(opp.costs, undefined) as any) : undefined;
+    let cleanCosts: OpportunityDeal['costs'] | undefined = undefined;
+    if (rawCosts && typeof rawCosts === 'object') {
+      const {
+        numberOfUnits: _u,
+        floorAreaSqm: _f,
+        isVatInclusiveDeveloperSale: _v,
+        tenantPlacementFeePercent: _t,
+        annualSpvAdminAuditFeeZAR: _a,
+        refinanceLtvPercent: _r,
+        monthlyMaintenanceReserveZAR: _m,
+        monthlyPrepaidVendingFeeZAR: _p,
+        ...restCosts
+      } = rawCosts;
+      cleanCosts = Object.keys(restCosts).length > 0 ? (restCosts as any) : undefined;
+    }
+
+    return {
+      id: opp.id,
+      title: opp.title,
+      address: opp.address,
+      city: opp.city,
+      province: (opp.province as any) || 'Gauteng',
+      propertyType: (opp.property_type as any) || undefined,
+      agmDate: opp.agm_date || undefined,
+      source: (opp.source as any) || 'Direct Owner',
+      openMarketValueZAR: toNum(opp.open_market_value_zar, 0),
+      purchasePrice: toNum(opp.purchase_price_zar, 0),
+      builtInEquityZAR: toNum(opp.built_in_equity_zar, 0),
+      builtInEquityPercent: toNum(opp.built_in_equity_percent, 0),
+      estimatedRehabCost: toNum(opp.estimated_rehab_cost_zar, 0),
+      monthlyRentalEstimate: toNum(opp.monthly_rental_estimate_zar, 0),
+      monthlyLevies: toNum(opp.monthly_levies_zar, 0),
+      monthlyRatesTaxes: toNum(opp.monthly_rates_taxes_zar, 0),
+      monthlyCommunalServicesZAR: toNullableNum(opp.monthly_communal_services_zar) ?? undefined,
+      monthlyMaintenanceReserveZAR:
+        toNullableNum((opp as any).monthly_maintenance_reserve_zar) ??
+        toNullableNum(rawCosts?.monthlyMaintenanceReserveZAR),
+      monthlyPrepaidVendingFeeZAR:
+        toNullableNum((opp as any).monthly_prepaid_vending_fee_zar) ??
+        toNullableNum(rawCosts?.monthlyPrepaidVendingFeeZAR),
+      numberOfUnits:
+        toNullableNum((opp as any).number_of_units) ??
+        toNullableNum(rawCosts?.numberOfUnits),
+      floorAreaSqm:
+        toNullableNum((opp as any).floor_area_sqm) ??
+        toNullableNum(rawCosts?.floorAreaSqm),
+      isVatInclusiveDeveloperSale:
+        (opp as any).is_vat_inclusive_developer_sale !== undefined &&
+        (opp as any).is_vat_inclusive_developer_sale !== null
+          ? Boolean((opp as any).is_vat_inclusive_developer_sale)
+          : rawCosts?.isVatInclusiveDeveloperSale !== undefined
+          ? Boolean(rawCosts.isVatInclusiveDeveloperSale)
+          : undefined,
+      tenantPlacementFeePercent:
+        toNullableNum((opp as any).tenant_placement_fee_percent) ??
+        toNullableNum(rawCosts?.tenantPlacementFeePercent),
+      annualSpvAdminAuditFeeZAR:
+        toNullableNum((opp as any).annual_spv_admin_audit_fee_zar) ??
+        toNullableNum(rawCosts?.annualSpvAdminAuditFeeZAR),
+      refinanceLtvPercent:
+        toNullableNum((opp as any).refinance_ltv_percent) ??
+        toNullableNum(rawCosts?.refinanceLtvPercent),
+      annualInsurance: toNum(opp.annual_insurance_zar, 0),
+      managementFeePercent: toNum(opp.management_fee_percent, 8.0),
+      agencyVatApplicable: opp.agency_vat_applicable ?? true,
+      vacancyRatePercent: toNum(opp.vacancy_rate_percent, 5.0),
+      targetExitPrice: toNum(opp.target_exit_price_zar, 0),
+      exitCommissionPercent: toNum(opp.exit_commission_percent, 5.75),
+      vatExemptAgent: Boolean((opp as any).vat_exempt_agent ?? false),
+      holdingPeriodMonths: toNum(opp.holding_period_months, 6),
+      strategy: (opp.strategy as any) || 'Rental',
+      interestRateMargin: toNullableNum((opp as any).interest_rate_margin) ?? undefined,
+      monthlyHoldingCostZAR: toNum(opp.monthly_holding_cost_zar, 0),
+      monthlyBondPaymentZAR: toNum(opp.monthly_bond_payment_zar, 0),
+      monthlyOtherHoldingCostZAR: toNum(opp.monthly_other_holding_cost_zar, 0),
+      loanToValuePercent: toNum(opp.loan_to_value_percent, 80.0),
+      bondLTV: toNum(opp.bond_ltv, 80.0),
+      depositZAR: toNum(opp.deposit_zar, 0),
+      interestRatePercent: toNum(opp.interest_rate_percent, 11.75),
+      loanTermYears: toNum(opp.loan_term_years, 20),
+      annualCapitalGrowthPercent: toNum(opp.annual_capital_growth_percent, 5.0),
+      annualRentalEscalationPercent: toNum(opp.annual_rental_escalation_percent, 6.0),
+      annualExpenseInflationPercent: toNum(opp.annual_expense_inflation_percent, 6.0),
+      bondTermYears: toNum(opp.bond_term_years, 20),
+      customTransferDuty: toNullableNum(opp.custom_transfer_duty_zar),
+      customConveyancing: toNullableNum(opp.custom_conveyancing_zar),
+      customBondReg: toNullableNum(opp.custom_bond_reg_zar),
+      auctioneerCommissionZAR: toNum(opp.auctioneer_commission_zar, 0),
+      municipalArrearsZAR: toNum(opp.municipal_arrears_zar, 0),
+      grossYield: toNum(opp.gross_yield, 0),
+      capRate: toNum(opp.cap_rate, 0),
+      netRoi: toNum(opp.net_roi, 0),
+      monthlyCashFlow: toNum(opp.monthly_cash_flow_zar, 0),
+      initialCapitalRequired: toNum(opp.initial_capital_required_zar, 0),
+      projectedFlipNetProfit: toNum(opp.projected_flip_net_profit_zar, 0),
+      projectedFlipRoi: toNum(opp.projected_flip_roi, 0),
+      fundingRequiredZAR: toNum(opp.funding_required_zar, 0),
+      capitalRaisedZAR: toNum(opp.capital_raised_zar, 0),
+      primaryFunderName: opp.primary_funder_name || undefined,
+      primaryFunderContact: opp.primary_funder_contact || undefined,
+      primaryFunderType: (opp.primary_funder_type as any) || undefined,
+      coFundersNotes: opp.co_funders_notes || undefined,
+      promisedReturnType: (opp.promised_return_type as any) || undefined,
+      promisedReturnRatePercent: toNum(opp.promised_return_rate_percent, 0),
+      promisedPayoutSchedule: (opp.promised_payout_schedule as any) || undefined,
+      securityOffered: opp.security_offered || undefined,
+      amenityScorecard: opp.amenity_scorecard ? (parseJson(opp.amenity_scorecard, undefined) as any) : undefined,
+      costs: cleanCosts as any,
+      section13sex: opp.section_13sex ? (parseJson(opp.section_13sex, undefined) as any) : undefined,
+      driveVault: opp.drive_vault ? (parseJson(opp.drive_vault, undefined) as any) : undefined,
+      ancillaryIncomes: parseJson(opp.ancillary_incomes, []),
+      occupantRisk: opp.occupant_risk ? (parseJson(opp.occupant_risk, undefined) as any) : undefined,
+      status: (opp.status as any) || 'Screening',
+      passReason: (opp.pass_reason as any) || undefined,
+      passNotes: opp.pass_notes || undefined,
+      passedAt: opp.passed_at || undefined,
+      notes: opp.notes || undefined,
+      createdAt: (opp as any).created_at || new Date().toISOString(),
+    };
+  });
 }
 
 export function unmapTasks(

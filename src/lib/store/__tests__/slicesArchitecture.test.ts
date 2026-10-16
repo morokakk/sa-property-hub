@@ -260,6 +260,97 @@ describe('Refactoring Phase 3: Zustand Slice Pattern Migration Architectural Tes
       expect(createdRental).toBeDefined();
       expect(createdRental?.marketValueZAR).toBe(secondOpp.purchasePrice);
     });
+
+    it('carries over multi-unit leases, SPV admin, placement fees, Section 13sex shield, and floor area / VAT notes during promotion', () => {
+      usePortfolioStore.getState().addOpportunity({
+        id: 'opp-multi-unit-test',
+        title: 'Midrand 4-Unit Block',
+        address: '100 Lever Rd',
+        city: 'Midrand',
+        province: 'Gauteng',
+        source: 'iGrow Rentals',
+        strategy: 'BRRRR',
+        openMarketValueZAR: 2600000,
+        purchasePrice: 2000000,
+        numberOfUnits: 4,
+        floorAreaSqm: 250,
+        isVatInclusiveDeveloperSale: true,
+        tenantPlacementFeePercent: 8.33,
+        annualSpvAdminAuditFeeZAR: 12000,
+        refinanceLtvPercent: 75,
+        monthlyMaintenanceReserveZAR: 800,
+        builtInEquityZAR: 600000,
+        builtInEquityPercent: 23.08,
+        estimatedRehabCost: 150000,
+        monthlyRentalEstimate: 25000,
+        monthlyLevies: 2400,
+        monthlyRatesTaxes: 1600,
+        annualInsurance: 6000,
+        managementFeePercent: 8,
+        vacancyRatePercent: 5,
+        targetExitPrice: 2700000,
+        holdingPeriodMonths: 6,
+        loanToValuePercent: 80,
+        bondLTV: 80,
+        depositZAR: 400000,
+        interestRatePercent: 11.75,
+        loanTermYears: 20,
+        section13sex: {
+          isEligible: true,
+          buildingDeductionBaseZAR: 1100000,
+          annualAllowanceZAR: 55000,
+          taxRatePercent: 27,
+          annualTaxSavingsZAR: 14850,
+          twentyYearCumulativeSavingsZAR: 297000,
+        },
+        costs: {
+          purchasePrice: 2000000,
+          transferDuty: 0,
+          conveyancingFee: 32000,
+          bondRegistrationFee: 28000,
+          deedsOfficeFee: 1500,
+          ficaSundries: 850,
+          totalAcquisitionCost: 2062350,
+        },
+        grossYield: 15,
+        capRate: 11,
+        netRoi: 18,
+        monthlyCashFlow: 3200,
+        projectedFlipNetProfit: 300000,
+        projectedFlipRoi: 14,
+        status: 'Screening',
+        createdAt: '2026-01-01T00:00:00Z',
+      });
+
+      usePortfolioStore.getState().promoteOpportunityToRental('opp-multi-unit-test');
+      let state = usePortfolioStore.getState();
+      const rental = state.rentals.find((r) => r.title === 'Midrand 4-Unit Block');
+      expect(rental).toBeDefined();
+      expect(rental?.leases).toHaveLength(4);
+      expect(rental?.leases.map((l) => l.unitName)).toEqual(['Unit 1', 'Unit 2', 'Unit 3', 'Unit 4']);
+      expect(rental?.leases.reduce((s, l) => s + l.monthlyRentZAR, 0)).toBe(25000);
+      expect(rental?.isBrrrrProperty).toBe(true);
+      expect(rental?.section13sexAnnualShieldZAR).toBe(14850);
+      // 800 base maintenance + 12000/12 SPV admin = 1800
+      expect(rental?.monthlyMaintenanceReserveZAR).toBe(1800);
+      // 8% management + 8.33/12 placement (~0.69%) = 8.69%
+      expect(rental?.agencyCommissionPercent).toBeCloseTo(8.69, 2);
+      expect(rental?.notes).toContain('4 Units');
+      expect(rental?.notes).toContain('250 m²');
+      expect(rental?.notes).toContain('VAT-Inclusive Developer Sale');
+
+      // Also verify Flip promotion carries over strategy, source, municipalValuationZAR, and multi-unit/sqm/VAT notes
+      usePortfolioStore.getState().promoteOpportunityToFlip('opp-multi-unit-test');
+      state = usePortfolioStore.getState();
+      const flip = state.flips.find((f) => f.title.includes('Midrand 4-Unit Block'));
+      expect(flip).toBeDefined();
+      expect(flip?.strategy).toBe('BRRRR');
+      expect(flip?.source).toBe('iGrow Rentals');
+      expect(flip?.municipalValuationZAR).toBe(2600000);
+      expect(flip?.notes).toContain('4 Units');
+      expect(flip?.notes).toContain('250 m²');
+      expect(flip?.notes).toContain('VAT-Inclusive Developer Sale');
+    });
   });
 
   describe('3. Backward-Compatible Re-Exports Parity', () => {

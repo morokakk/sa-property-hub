@@ -88,6 +88,7 @@ export function computeAcquisitionCosts(
     customTransferDuty?: number;
     customConveyancing?: number;
     customBondReg?: number;
+    isVatInclusiveDeveloperSale?: boolean;
   }
 ): AcquisitionCostBreakdown {
   if (purchasePrice <= 0) {
@@ -106,9 +107,12 @@ export function computeAcquisitionCosts(
 
   const bondAmount = (purchasePrice * loanToValuePercent) / 100;
   
-  const transferDuty = overrides?.customTransferDuty !== undefined
-    ? overrides.customTransferDuty
-    : calculateSarsTransferDuty(purchasePrice);
+  const transferDuty =
+    overrides?.customTransferDuty !== undefined && (!overrides?.isVatInclusiveDeveloperSale || overrides.customTransferDuty > 0)
+      ? overrides.customTransferDuty
+      : overrides?.isVatInclusiveDeveloperSale
+      ? 0
+      : calculateSarsTransferDuty(purchasePrice);
 
   const conveyancingFee = overrides?.customConveyancing !== undefined
     ? overrides.customConveyancing

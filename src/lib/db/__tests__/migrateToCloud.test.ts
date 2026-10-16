@@ -346,6 +346,14 @@ describe('migrateToCloud Payload Mappers', () => {
             monthlySiteSecurityZAR: 4500,
             totalEvictionCarryingCostZAR: 135000,
           },
+          numberOfUnits: 4,
+          floorAreaSqm: 320,
+          isVatInclusiveDeveloperSale: true,
+          tenantPlacementFeePercent: 8.33,
+          annualSpvAdminAuditFeeZAR: 18000,
+          refinanceLtvPercent: 75,
+          monthlyMaintenanceReserveZAR: 1200,
+          monthlyPrepaidVendingFeeZAR: 250,
           status: 'Screening',
           createdAt: '2025-03-01T10:00:00Z',
         },
@@ -365,6 +373,14 @@ describe('migrateToCloud Payload Mappers', () => {
         monthlySiteSecurityZAR: 4500,
         totalEvictionCarryingCostZAR: 135000,
       });
+      expect((mapped[0].costs as any).numberOfUnits).toBe(4);
+      expect((mapped[0].costs as any).floorAreaSqm).toBe(320);
+      expect((mapped[0].costs as any).isVatInclusiveDeveloperSale).toBe(true);
+      expect((mapped[0].costs as any).tenantPlacementFeePercent).toBe(8.33);
+      expect((mapped[0].costs as any).annualSpvAdminAuditFeeZAR).toBe(18000);
+      expect((mapped[0].costs as any).refinanceLtvPercent).toBe(75);
+      expect((mapped[0].costs as any).monthlyMaintenanceReserveZAR).toBe(1200);
+      expect((mapped[0].costs as any).monthlyPrepaidVendingFeeZAR).toBe(250);
     });
 
     it('correctly maps tasks and suppliers', () => {

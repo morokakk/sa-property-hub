@@ -49,6 +49,8 @@ export const INITIAL_RENTALS: RentalProperty[] = [
     city: 'Johannesburg',
     propertyType: 'Sectional Title Apartment',
     source: 'Private Agent',
+    numberOfUnits: 1,
+    floorAreaSqm: 95,
     agmDate: '2026-11-12',
     marketValueZAR: 2_450_000,
     purchasePriceZAR: 2_100_000,
@@ -453,6 +455,8 @@ export const INITIAL_RENTALS: RentalProperty[] = [
     city: 'Durban',
     propertyType: 'Sectional Title Apartment',
     source: 'Direct Owner',
+    numberOfUnits: 1,
+    floorAreaSqm: 82,
     agmDate: '2026-10-14',
     marketValueZAR: 1_850_000,
     purchasePriceZAR: 1_650_000,
@@ -844,6 +848,8 @@ export const INITIAL_RENTALS: RentalProperty[] = [
     city: 'Cape Town',
     propertyType: 'Sectional Title Apartment',
     source: 'Private Agent',
+    numberOfUnits: 1,
+    floorAreaSqm: 64,
     agmDate: '2027-02-18',
     marketValueZAR: 3_200_000,
     purchasePriceZAR: 2_750_000,
@@ -1191,6 +1197,8 @@ export const INITIAL_RENTALS: RentalProperty[] = [
     city: 'Krugersdorp',
     propertyType: 'Freehold House',
     source: 'Direct Owner',
+    numberOfUnits: 3,
+    floorAreaSqm: 320,
     marketValueZAR: 1_100_000,
     purchasePriceZAR: 680_000,
     purchaseDate: '2026-01-15',
@@ -1587,6 +1595,8 @@ export const INITIAL_FLIPS: FlipProject[] = [
     city: 'Cape Town',
     propertyType: 'Freehold House',
     source: 'Private Agent',
+    numberOfUnits: 1,
+    floorAreaSqm: 340,
     purchaseDate: '2026-03-01',
     purchasePriceZAR: 3_800_000,
     acquisitionCostsZAR: 315_000,
@@ -1750,6 +1760,8 @@ export const INITIAL_FLIPS: FlipProject[] = [
     city: 'Pretoria',
     propertyType: 'Townhouse / Cluster',
     source: 'Distressed Sale / Repo',
+    numberOfUnits: 1,
+    floorAreaSqm: 450,
     agmDate: '2026-11-20',
     purchaseDate: '2026-05-15',
     purchasePriceZAR: 2_100_000,
@@ -1893,6 +1905,8 @@ export const INITIAL_FLIPS: FlipProject[] = [
     city: 'Johannesburg',
     propertyType: 'Freehold House',
     source: 'High-Street Auction',
+    numberOfUnits: 1,
+    floorAreaSqm: 280,
     purchaseDate: '2026-06-10',
     purchasePriceZAR: 1_450_000,
     acquisitionCostsZAR: 98_500,
@@ -2399,10 +2413,14 @@ function createSampleOpportunity(
   strategy: DealStrategy = 'Rental',
   occupantRisk?: OccupantRiskProfile
 ): OpportunityDeal {
+  const isDeveloperSale = source === 'iGrow Rentals';
   const depositZAR = Math.round(purchasePrice * (1 - ltv / 100));
-  const costs = computeAcquisitionCosts(purchasePrice, ltv);
+  const costs = computeAcquisitionCosts(purchasePrice, ltv, {
+    customTransferDuty: isDeveloperSale ? 0 : undefined,
+  });
   const metrics = calculateDealMetrics({
     purchasePrice,
+    openMarketValueZAR: openMarketValue,
     estimatedRehabCost: rehabCost,
     monthlyRentalEstimate: monthlyRent,
     monthlyLevies: levies,
@@ -2422,6 +2440,7 @@ function createSampleOpportunity(
     auctioneerCommissionZAR,
     municipalArrearsZAR,
     occupantRisk,
+    isVatInclusiveDeveloperSale: isDeveloperSale,
   });
 
   const { builtInEquityZAR, builtInEquityPercent } = computeBuiltInEquity(openMarketValue, purchasePrice);
@@ -2459,6 +2478,12 @@ function createSampleOpportunity(
     targetExitPrice: exitPrice,
     holdingPeriodMonths: 6,
     strategy,
+    numberOfUnits: 1,
+    floorAreaSqm: 0,
+    isVatInclusiveDeveloperSale: isDeveloperSale,
+    tenantPlacementFeePercent: 0,
+    annualSpvAdminAuditFeeZAR: 0,
+    refinanceLtvPercent: 75,
     loanToValuePercent: ltv,
     bondLTV: ltv,
     depositZAR,
@@ -2670,6 +2695,12 @@ export const INITIAL_ANALYZER_DRAFT: AnalyzerDraft = {
   interestRateMargin: 0,
   vatExemptAgent: false,
   holdingPeriodMonths: 6,
+  numberOfUnits: 1,
+  floorAreaSqm: 0,
+  isVatInclusiveDeveloperSale: false,
+  tenantPlacementFeePercent: 0,
+  annualSpvAdminAuditFeeZAR: 0,
+  refinanceLtvPercent: 75,
 };
 
 export const EMPTY_ANALYZER_DRAFT: AnalyzerDraft = {
@@ -2696,6 +2727,12 @@ export const EMPTY_ANALYZER_DRAFT: AnalyzerDraft = {
   holdingPeriodMonths: 6,
   managementFeePercent: 8.0,
   agencyVatApplicable: true,
+  numberOfUnits: 1,
+  floorAreaSqm: 0,
+  isVatInclusiveDeveloperSale: false,
+  tenantPlacementFeePercent: 0,
+  annualSpvAdminAuditFeeZAR: 0,
+  refinanceLtvPercent: 75,
 };
 
 export const DEFAULT_AI_SETTINGS: AiSettings = {

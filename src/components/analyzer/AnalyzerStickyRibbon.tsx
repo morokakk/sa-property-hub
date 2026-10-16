@@ -3,16 +3,26 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { formatZAR, formatPercent } from '@/lib/formatters';
 import { PlusCircle, Check, ArrowDownCircle, ChevronUp, Sparkles, X } from 'lucide-react';
+import { DealStrategy } from '@/types';
 
 export interface AnalyzerStickyRibbonProps {
+  strategy?: DealStrategy;
   dayOneCapitalRequired: number;
   builtInEquity: number;
   builtInEquityPercent: number;
   grossYield: number;
   netCapRate: number;
   monthlyNetCashFlow: number;
+  netRoi?: number;
+  dscr?: number | null;
+  fiveYearIrrPercent?: number;
   projectedFlipProfit: number;
   projectedFlipROI: number;
+  annualizedFlipROI?: number;
+  monthlyHoldingBurnZAR?: number;
+  brrrrPostRefiCashflowZAR?: number;
+  brrrrEquityExtractedZAR?: number;
+  brrrrCashLeftInDealZAR?: number;
   isEditing?: boolean;
   onSaveDeal: () => void;
   onScrollToResults?: () => void;
@@ -26,14 +36,23 @@ export interface AnalyzerStickyRibbonProps {
 }
 
 export function AnalyzerStickyRibbon({
+  strategy = 'Rental',
   dayOneCapitalRequired,
   builtInEquity,
   builtInEquityPercent,
   grossYield,
   netCapRate,
   monthlyNetCashFlow,
+  netRoi = 0,
+  dscr = null,
+  fiveYearIrrPercent = 0,
   projectedFlipProfit,
   projectedFlipROI,
+  annualizedFlipROI = 0,
+  monthlyHoldingBurnZAR = 0,
+  brrrrPostRefiCashflowZAR = 0,
+  brrrrEquityExtractedZAR = 0,
+  brrrrCashLeftInDealZAR = 0,
   isEditing = false,
   onSaveDeal,
   onScrollToResults,
@@ -95,21 +114,59 @@ export function AnalyzerStickyRibbon({
             </span>
           </div>
 
-          {/* Monthly Cashflow */}
-          <div className="bg-slate-800/90 border border-slate-700 px-2.5 py-1 rounded-lg shrink-0">
-            <span className="text-[10px] text-slate-400 block uppercase font-medium">Monthly Cashflow</span>
-            <span className={`font-bold font-mono ${monthlyNetCashFlow >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-              {formatZAR(monthlyNetCashFlow)}/m
-            </span>
-          </div>
+          {/* Strategy-Matched Primary KPIs */}
+          {strategy === 'Rental' && (
+            <>
+              <div className="bg-slate-800/90 border border-slate-700 px-2.5 py-1 rounded-lg shrink-0">
+                <span className="text-[10px] text-slate-400 block uppercase font-medium">Net Cashflow / CoC</span>
+                <span className={`font-bold font-mono ${monthlyNetCashFlow >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                  {formatZAR(monthlyNetCashFlow)}/m ({formatPercent(netRoi)})
+                </span>
+              </div>
+              <div className="bg-slate-800/90 border border-slate-700 px-2.5 py-1 rounded-lg shrink-0">
+                <span className="text-[10px] text-slate-400 block uppercase font-medium">
+                  {dscr === null ? 'DSCR / 5Y IRR' : 'DSCR / 5Y IRR'}
+                </span>
+                <span className="font-bold text-teal-300 font-mono">
+                  {dscr === null ? 'N/A (Cash)' : `${dscr.toFixed(2)}x`} &bull; {formatPercent(fiveYearIrrPercent)} IRR
+                </span>
+              </div>
+            </>
+          )}
 
-          {/* Flip Profit / ROI */}
-          <div className="bg-slate-800/90 border border-slate-700 px-2.5 py-1 rounded-lg shrink-0">
-            <span className="text-[10px] text-slate-400 block uppercase font-medium">Flip Profit / ROI</span>
-            <span className="font-bold text-amber-300 font-mono">
-              {formatZAR(projectedFlipProfit)} ({formatPercent(projectedFlipROI)})
-            </span>
-          </div>
+          {strategy === 'Flip' && (
+            <>
+              <div className="bg-slate-800/90 border border-slate-700 px-2.5 py-1 rounded-lg shrink-0">
+                <span className="text-[10px] text-slate-400 block uppercase font-medium">Monthly Burn</span>
+                <span className="font-bold text-rose-400 font-mono">
+                  -{formatZAR(monthlyHoldingBurnZAR)}/m
+                </span>
+              </div>
+              <div className="bg-slate-800/90 border border-slate-700 px-2.5 py-1 rounded-lg shrink-0">
+                <span className="text-[10px] text-slate-400 block uppercase font-medium">Flip Profit / ROI (Ann.)</span>
+                <span className="font-bold text-amber-300 font-mono">
+                  {formatZAR(projectedFlipProfit)} ({formatPercent(projectedFlipROI)} &bull; {formatPercent(annualizedFlipROI)}/yr)
+                </span>
+              </div>
+            </>
+          )}
+
+          {strategy === 'BRRRR' && (
+            <>
+              <div className="bg-slate-800/90 border border-slate-700 px-2.5 py-1 rounded-lg shrink-0">
+                <span className="text-[10px] text-slate-400 block uppercase font-medium">Post-Refi Cashflow</span>
+                <span className={`font-bold font-mono ${brrrrPostRefiCashflowZAR >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                  {formatZAR(brrrrPostRefiCashflowZAR)}/m
+                </span>
+              </div>
+              <div className="bg-slate-800/90 border border-slate-700 px-2.5 py-1 rounded-lg shrink-0">
+                <span className="text-[10px] text-slate-400 block uppercase font-medium">Cash Left / Extracted</span>
+                <span className="font-bold text-purple-300 font-mono">
+                  {brrrrCashLeftInDealZAR === 0 ? 'R 0 (Infinite ROI)' : formatZAR(brrrrCashLeftInDealZAR)} &bull; +{formatZAR(brrrrEquityExtractedZAR)}
+                </span>
+              </div>
+            </>
+          )}
         </div>
 
         {/* Action Buttons & Popover */}

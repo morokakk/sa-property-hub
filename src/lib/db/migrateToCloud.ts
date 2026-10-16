@@ -534,7 +534,30 @@ export function mapOpportunities(opportunities: OpportunityDeal[] = [], userId: 
     promised_payout_schedule: opp.promisedPayoutSchedule || null,
     security_offered: opp.securityOffered || null,
     amenity_scorecard: (opp.amenityScorecard ? JSON.parse(JSON.stringify(opp.amenityScorecard)) : {}) as any,
-    costs: (opp.costs ? JSON.parse(JSON.stringify(opp.costs)) : {}) as any,
+    costs: (() => {
+      const baseCosts = opp.costs ? JSON.parse(JSON.stringify(opp.costs)) : {};
+      if (opp.numberOfUnits !== undefined) baseCosts.numberOfUnits = opp.numberOfUnits;
+      if (opp.floorAreaSqm !== undefined) baseCosts.floorAreaSqm = opp.floorAreaSqm;
+      if (opp.isVatInclusiveDeveloperSale !== undefined) {
+        baseCosts.isVatInclusiveDeveloperSale = opp.isVatInclusiveDeveloperSale;
+      }
+      if (opp.tenantPlacementFeePercent !== undefined) {
+        baseCosts.tenantPlacementFeePercent = opp.tenantPlacementFeePercent;
+      }
+      if (opp.annualSpvAdminAuditFeeZAR !== undefined) {
+        baseCosts.annualSpvAdminAuditFeeZAR = opp.annualSpvAdminAuditFeeZAR;
+      }
+      if (opp.refinanceLtvPercent !== undefined) {
+        baseCosts.refinanceLtvPercent = opp.refinanceLtvPercent;
+      }
+      if (opp.monthlyMaintenanceReserveZAR !== undefined) {
+        baseCosts.monthlyMaintenanceReserveZAR = opp.monthlyMaintenanceReserveZAR;
+      }
+      if (opp.monthlyPrepaidVendingFeeZAR !== undefined) {
+        baseCosts.monthlyPrepaidVendingFeeZAR = opp.monthlyPrepaidVendingFeeZAR;
+      }
+      return baseCosts;
+    })() as any,
     section_13sex: (opp.section13sex ? JSON.parse(JSON.stringify(opp.section13sex)) : {}) as any,
     drive_vault: (opp.driveVault ? JSON.parse(JSON.stringify(opp.driveVault)) : {}) as any,
     ancillary_incomes: (opp.ancillaryIncomes ? JSON.parse(JSON.stringify(opp.ancillaryIncomes)) : []) as any,

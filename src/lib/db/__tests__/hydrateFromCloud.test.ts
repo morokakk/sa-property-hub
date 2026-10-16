@@ -217,7 +217,7 @@ describe('hydrateFromCloud Reverse Mappers', () => {
     expect(result[0].boq[1].supplierOrContractor).toBe('Sparky Electric');
   });
 
-  it('correctly reverse-maps opportunities and restores occupantRisk', () => {
+  it('correctly reverse-maps opportunities and restores occupantRisk and extended underwriting fields from costs JSONB', () => {
     const oppRows = [
       {
         id: 'opp-c1',
@@ -229,6 +229,23 @@ describe('hydrateFromCloud Reverse Mappers', () => {
         property_type: 'Freehold House',
         purchase_price_zar: 1500000,
         strategy: 'Flip',
+        costs: {
+          purchasePrice: 1500000,
+          transferDuty: 0,
+          conveyancingFee: 28000,
+          bondRegistrationFee: 22000,
+          deedsOfficeFee: 1500,
+          ficaSundries: 850,
+          totalAcquisitionCost: 1552350,
+          numberOfUnits: 6,
+          floorAreaSqm: 410,
+          isVatInclusiveDeveloperSale: true,
+          tenantPlacementFeePercent: 8.33,
+          annualSpvAdminAuditFeeZAR: 15000,
+          refinanceLtvPercent: 75,
+          monthlyMaintenanceReserveZAR: 900,
+          monthlyPrepaidVendingFeeZAR: 300,
+        },
         occupant_risk: {
           occupancyStatus: 'unlawful_occupant',
           evictionRequired: true,
@@ -250,6 +267,16 @@ describe('hydrateFromCloud Reverse Mappers', () => {
     expect(result[0].occupantRisk?.occupancyStatus).toBe('unlawful_occupant');
     expect(result[0].occupantRisk?.evictionJurisdiction).toBe('high_court');
     expect(result[0].occupantRisk?.budgetedLegalEvictionCostZAR).toBe(85000);
+    expect(result[0].numberOfUnits).toBe(6);
+    expect(result[0].floorAreaSqm).toBe(410);
+    expect(result[0].isVatInclusiveDeveloperSale).toBe(true);
+    expect(result[0].tenantPlacementFeePercent).toBe(8.33);
+    expect(result[0].annualSpvAdminAuditFeeZAR).toBe(15000);
+    expect(result[0].refinanceLtvPercent).toBe(75);
+    expect(result[0].monthlyMaintenanceReserveZAR).toBe(900);
+    expect(result[0].monthlyPrepaidVendingFeeZAR).toBe(300);
+    expect((result[0].costs as any).numberOfUnits).toBeUndefined();
+    expect(result[0].costs.totalAcquisitionCost).toBe(1552350);
   });
 });
 

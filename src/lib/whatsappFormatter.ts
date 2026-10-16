@@ -1,6 +1,6 @@
 import { formatZAR, formatPercent, formatDate } from './formatters';
 import { OpportunityDeal, FlipProject, InvestorProfile, DealStrategy, DealSource, RentalProperty, TenantPaymentRecord, OccupantRiskProfile } from '@/types';
-import { generateLongTermProjection, calculateMonthlyBondRepayment } from './calculations/propertyMetrics';
+import { generateLongTermProjection, calculateMonthlyBondRepayment, calculateDealMetrics } from './calculations/propertyMetrics';
 import { calculatePropertyArrears, formatMonthLabel, getMonthKey, calculateTenantStatementTiers } from './calculations/arrears';
 import { isEvictionActive, calculateEvictionCarryingCost } from './calculations/occupantRisk';
 
@@ -23,6 +23,11 @@ export interface ProposalPitchParams {
     municipalArrears?: number;
     exitCommissionPercent?: number;
     isSection13Eligible?: boolean;
+    numberOfUnits?: number;
+    floorAreaSqm?: number;
+    isVatInclusiveDeveloperSale?: boolean;
+    tenantPlacementFeePercent?: number;
+    annualSpvAdminAuditFeeZAR?: number;
     arvZAR?: number;
     refinanceLtvPercent?: number;
     holdingDurationMonths?: number;
@@ -110,6 +115,14 @@ export function formatOpportunityForWhatsApp(
   text += `━━━━━━━━━━━━━━━━━━━━━\n`;
   text += `• Property: *${deal.title}*\n`;
   text += `• Location: ${deal.address}, ${deal.city} (${deal.province})\n`;
+  if (deal.numberOfUnits && deal.numberOfUnits > 1) {
+    text += `• Multi-Unit Configuration: *${deal.numberOfUnits} Units* (${formatZAR(Math.round(deal.purchasePrice / deal.numberOfUnits))}/unit)\n`;
+  }
+  if (deal.floorAreaSqm && deal.floorAreaSqm > 0) {
+    const pSqm = Math.round(deal.purchasePrice / deal.floorAreaSqm);
+    const vSqm = deal.openMarketValueZAR ? Math.round(deal.openMarketValueZAR / deal.floorAreaSqm) : 0;
+    text += `• Floor Area: *${deal.floorAreaSqm} m²* (Purchase: *${formatZAR(pSqm)}/m²*${vSqm > 0 ? ` | Valuation: ${formatZAR(vSqm)}/m²` : ''})\n`;
+  }
   if (deal.amenityScorecard) {
     text += `• Location Grade: *${deal.amenityScorecard.compositeGrade}* (${deal.amenityScorecard.compositeScore}/12 pts)\n`;
     text += `  - Schools: ${deal.amenityScorecard.schools} | Police: ${deal.amenityScorecard.policeStation}\n`;
@@ -161,7 +174,7 @@ export function formatOpportunityForWhatsApp(
     } else {
       text += `• Purchase Price: *${formatZAR(deal.purchasePrice)}*\n`;
     }
-    text += `• SARS Duty & Legal: ${formatZAR(acquisitionLegalAndDuty)}\n`;
+    text += `• SARS Duty & Legal: ${formatZAR(acquisitionLegalAndDuty)}${deal.isVatInclusiveDeveloperSale ? ' (R 0 SARS Transfer Duty - VAT-Inclusive Developer Sale)' : ''}\n`;
     if (legalEvictionReserve > 0) {
       text += `• PIE Act Legal Eviction Reserve: *${formatZAR(legalEvictionReserve)}*\n`;
     }
@@ -190,6 +203,36 @@ export function formatOpportunityForWhatsApp(
     const depositVal = deal.depositZAR !== undefined ? deal.depositZAR : Math.round(deal.purchasePrice * (1 - ltvVal / 100));
     const initialCap = deal.initialCapitalRequired ?? (depositVal + (deal.costs.totalAcquisitionCost - deal.purchasePrice) + deal.estimatedRehabCost + legalEvictionReserve);
 
+    const liveMetrics = calculateDealMetrics({
+      purchasePrice: deal.purchasePrice,
+      openMarketValueZAR: deal.openMarketValueZAR,
+      numberOfUnits: deal.numberOfUnits,
+      floorAreaSqm: deal.floorAreaSqm,
+      isVatInclusiveDeveloperSale: deal.isVatInclusiveDeveloperSale,
+      depositZAR: depositVal,
+      bondLTV: ltvVal,
+      loanToValuePercent: deal.loanToValuePercent,
+      interestRatePercent: deal.interestRatePercent,
+      loanTermYears: deal.bondTermYears ?? deal.loanTermYears ?? 20,
+      estimatedRehabCost: deal.estimatedRehabCost,
+      targetExitPrice: deal.targetExitPrice,
+      monthlyRentalEstimate: deal.monthlyRentalEstimate,
+      monthlyLevies: deal.monthlyLevies,
+      monthlyRatesTaxes: deal.monthlyRatesTaxes,
+      monthlyCommunalServicesZAR: deal.monthlyCommunalServicesZAR,
+      monthlyMaintenanceReserveZAR: deal.monthlyMaintenanceReserveZAR,
+      monthlyPrepaidVendingFeeZAR: deal.monthlyPrepaidVendingFeeZAR,
+      tenantPlacementFeePercent: deal.tenantPlacementFeePercent,
+      annualSpvAdminAuditFeeZAR: deal.annualSpvAdminAuditFeeZAR,
+      managementFeePercent: deal.managementFeePercent ?? 8,
+      agencyVatApplicable: deal.agencyVatApplicable ?? false,
+      vacancyRatePercent: deal.vacancyRatePercent ?? 5,
+      annualInsurance: deal.annualInsurance ?? 6000,
+      strategy: deal.strategy,
+      refinanceLtvPercent: deal.refinanceLtvPercent,
+      occupantRisk: deal.occupantRisk,
+    });
+
     text += `*FINANCIAL & ACQUISITION SUMMARY (ZAR)*\n`;
     if (deal.openMarketValueZAR) {
       text += `• Open Market Value: *${formatZAR(deal.openMarketValueZAR)}*\n`;
@@ -198,7 +241,7 @@ export function formatOpportunityForWhatsApp(
     } else {
       text += `• Purchase Price: *${formatZAR(deal.purchasePrice)}*\n`;
     }
-    text += `• SARS Duty & Legal: ${formatZAR(deal.costs.totalAcquisitionCost - deal.purchasePrice)}\n`;
+    text += `• SARS Duty & Legal: ${formatZAR(deal.costs.totalAcquisitionCost - deal.purchasePrice)}${deal.isVatInclusiveDeveloperSale ? ' (R 0 SARS Transfer Duty - VAT-Inclusive Developer Sale)' : ''}\n`;
     if (legalEvictionReserve > 0) {
       text += `• PIE Act Legal Eviction Reserve: *${formatZAR(legalEvictionReserve)}*\n`;
     }
@@ -212,9 +255,27 @@ export function formatOpportunityForWhatsApp(
     text += `\n*CASH FLOW & YIELD PERFORMANCE*\n`;
     text += `• Est. Gross Rent: *${formatZAR(deal.monthlyRentalEstimate)}/m*\n`;
     text += `• Gross Yield: *${formatPercent(deal.grossYield)}* | Cap Rate: *${formatPercent(deal.capRate)}*\n`;
+    const dscrStr = liveMetrics.dscr !== null ? `${liveMetrics.dscr.toFixed(2)}x` : 'N/A (Cash)';
+    text += `• Debt Service Coverage (DSCR): *${dscrStr}* | 5-Yr IRR: *${formatPercent(liveMetrics.fiveYearIrrPercent)}*\n`;
     text += `• Net Cash Flow: *${formatZAR(deal.monthlyCashFlow)}/m* (After bond, levies, rates${deal.monthlyCommunalServicesZAR ? ', communal services' : ''})\n`;
     if (deal.monthlyCommunalServicesZAR) {
       text += `• Communal / Serviced OpEx: *${formatZAR(deal.monthlyCommunalServicesZAR)}/m* (Wi-Fi, cleaning, security, garden)\n`;
+    }
+    if ((deal.tenantPlacementFeePercent ?? 0) > 0 || (deal.annualSpvAdminAuditFeeZAR ?? 0) > 0) {
+      text += `• Corporate & Placement Provision: Placement ${formatZAR(liveMetrics.monthlyPlacementFeeZAR)}/m (${deal.tenantPlacementFeePercent ?? 8.33}% p.a.) | SPV Audit/Tax ${formatZAR(liveMetrics.monthlySpvAdminZAR)}/m\n`;
+    }
+
+    if (isBrrrr) {
+      const refiLtv = deal.refinanceLtvPercent ?? 75;
+      text += `\n*PHASE 2 BRRRR REFINANCE MODEL*\n`;
+      text += `• Post-Rehab Valuation (ARV): *${formatZAR(deal.targetExitPrice || deal.openMarketValueZAR || deal.purchasePrice)}* (${refiLtv}% Refi LTV)\n`;
+      text += `• Refinance Facility: *${formatZAR(liveMetrics.brrrrRefinanceLoanZAR)}*\n`;
+      if (liveMetrics.brrrrEquityExtractedZAR > 0) {
+        text += `• Tax-Free Equity Extracted: *+${formatZAR(liveMetrics.brrrrEquityExtractedZAR)}* (Infinite Return)\n`;
+      } else {
+        text += `• Net Capital Left in Deal: *${formatZAR(liveMetrics.brrrrCashLeftInDealZAR)}*\n`;
+      }
+      text += `• Post-Refinance Cash Flow: *${formatZAR(liveMetrics.brrrrPostRefiCashflowZAR)}/m*\n`;
     }
 
     // Ancillary Commercial Covenant Lines (P4)
@@ -244,6 +305,14 @@ export function formatOpportunityForWhatsApp(
       monthlyLevies: deal.monthlyLevies,
       monthlyRatesTaxes: deal.monthlyRatesTaxes,
       monthlyCommunalServicesZAR: deal.monthlyCommunalServicesZAR,
+      monthlyMaintenanceReserveZAR: deal.monthlyMaintenanceReserveZAR,
+      monthlyPrepaidVendingFeeZAR: deal.monthlyPrepaidVendingFeeZAR,
+      tenantPlacementFeePercent: deal.tenantPlacementFeePercent,
+      annualSpvAdminAuditFeeZAR: deal.annualSpvAdminAuditFeeZAR,
+      managementFeePercent: deal.managementFeePercent,
+      agencyVatApplicable: deal.agencyVatApplicable,
+      vacancyRatePercent: deal.vacancyRatePercent,
+      annualInsurance: deal.annualInsurance,
     });
 
     if (projections.length >= 10) {
@@ -450,6 +519,12 @@ export function formatProposalPitchForWhatsApp(
   text += `• Asset: *${deal.title}*\n`;
   text += `• Location: ${deal.address}, ${deal.city}, South Africa\n`;
   text += `• Strategy Mandate: *${isFlip ? 'Buy & Flip' : strategy === 'BRRRR' ? 'Hybrid BRRRR' : 'Buy & Hold Rental'}*\n`;
+  if (deal.numberOfUnits && deal.numberOfUnits > 1) {
+    text += `• Multi-Unit Configuration: *${deal.numberOfUnits} Units* (${formatZAR(Math.round(deal.purchasePrice / deal.numberOfUnits))}/unit)\n`;
+  }
+  if (deal.floorAreaSqm && deal.floorAreaSqm > 0) {
+    text += `• Floor Area: *${deal.floorAreaSqm} m²* (${formatZAR(Math.round(deal.purchasePrice / deal.floorAreaSqm))}/m²)\n`;
+  }
 
   if (deal.source) {
     if (deal.source === 'High-Street Auction') {
@@ -490,11 +565,14 @@ export function formatProposalPitchForWhatsApp(
   if (deal.type !== 'rental' && arrears > 0) {
     text += `• Municipal Clearance Arrears: *${formatZAR(arrears)}*\n`;
   }
-  if (deal.source === 'iGrow Rentals') {
+  if (deal.source === 'iGrow Rentals' || deal.isVatInclusiveDeveloperSale) {
     text += `• SARS Transfer Duty: *R 0* (VAT Inclusive Developer Stock)\n`;
   }
   if (deal.isSection13Eligible) {
     text += `• SARS Tax Shield: *Section 13sex Eligible* (5% p.a. Building Deduction)\n`;
+  }
+  if (deal.annualSpvAdminAuditFeeZAR && deal.annualSpvAdminAuditFeeZAR > 0) {
+    text += `• Corporate SPV Admin & Audit: *${formatZAR(deal.annualSpvAdminAuditFeeZAR)}/yr*\n`;
   }
   text += `• Capex & Legal: ${formatZAR(deal.acquisitionCosts + deal.renovationBudget)}\n`;
   if (legalEvictionReserve > 0) {

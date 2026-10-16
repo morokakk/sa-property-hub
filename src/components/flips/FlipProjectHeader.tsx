@@ -64,6 +64,22 @@ export function FlipProjectHeader({
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2 flex-wrap mb-1.5">
           <PropertyTypeBadge type={flip.propertyType} />
+          {(() => {
+            const sqm = flip.floorAreaSqm || (flip.notes ? Number(flip.notes.match(/(\d+)\s*m²/)?.[1]) : undefined);
+            if (!sqm || sqm <= 0) return null;
+            const ratePerSqm = Math.round(flip.purchasePriceZAR / sqm);
+            return (
+              <span
+                className="inline-flex items-center gap-1 text-[10px] font-semibold bg-slate-100 text-slate-700 border border-slate-200 px-2 py-0.5 rounded-full"
+                title={`Total Floor Area: ${sqm} m² • Purchase Rate: R ${ratePerSqm.toLocaleString('en-ZA')}/m²`}
+              >
+                <span>📐 {sqm} m²</span>
+                <span className="text-slate-400 font-normal text-[9px]">
+                  (R {ratePerSqm.toLocaleString('en-ZA')}/m²)
+                </span>
+              </span>
+            );
+          })()}
           <AgmDateChip agmDate={flip.agmDate} />
 
           {/* Interactive Phase Selector */}

@@ -5,6 +5,7 @@ import {
   calculateDealMetrics,
   generateRentalLongTermProjection,
 } from '../propertyMetrics';
+import { calculateRentalMao } from '../maoSolver';
 import { RentalProperty } from '@/types';
 
 describe('Property Metrics Calculation Engine & Communal Services OpEx', () => {
@@ -239,4 +240,223 @@ describe('Property Metrics Calculation Engine & Communal Services OpEx', () => {
       expect(projWith[1].costs - projWithout[1].costs).toBe(Math.round(30000 * 1.06));
     });
   });
+
+  describe('4. Circa Illovo 12-Unit SPV & Multi-Unit / Syndication Underwriting', () => {
+    it('accurately models Circa Illovo 12-unit VAT-inclusive developer sale with R0 transfer duty, R/m², SPV admin fee, DSCR, and 5-Yr IRR', () => {
+      const purchasePrice = 11_699_536;
+      const openMarketValue = 12_609_500;
+      const numberOfUnits = 12;
+      const floorAreaSqm = 420;
+
+      const metrics = calculateDealMetrics({
+        strategy: 'Rental',
+        purchasePrice,
+        openMarketValue,
+        numberOfUnits,
+        floorAreaSqm,
+        isVatInclusiveDeveloperSale: true,
+        estimatedRehabCost: 0,
+        monthlyRentalEstimate: 109_956,
+        monthlyLevies: 15_000,
+        monthlyRatesTaxes: 8_400,
+        annualInsurance: 0,
+        managementFeePercent: 6,
+        agencyVatApplicable: false,
+        tenantPlacementFeePercent: 3.3,
+        annualSpvAdminAuditFeeZAR: 50_000,
+        monthlyMaintenanceReserveZAR: 2_500,
+        monthlyPrepaidVendingFeeZAR: 0,
+        monthlyCommunalServicesZAR: 0,
+        vacancyRatePercent: 5,
+        targetExitPrice: 0,
+        holdingPeriodMonths: 6,
+        loanToValuePercent: 30,
+        interestRatePercent: 10.0,
+        loanTermYears: 10,
+        annualCapitalGrowthPercent: 5.0,
+        annualRentalEscalationPercent: 6.0,
+        annualExpenseInflationPercent: 6.0,
+      });
+
+      // 1. VAT-Inclusive Developer Sale -> R0 Transfer Duty (saving ~R1,106,699)
+      expect(metrics.transferDutyZAR).toBe(0);
+
+      // 2. Built-in Equity
+      const builtInEquityZAR = openMarketValue - purchasePrice;
+      const builtInEquityPercent = Number(((builtInEquityZAR / openMarketValue) * 100).toFixed(2));
+      expect(builtInEquityZAR).toBe(909_964);
+      expect(builtInEquityPercent).toBeCloseTo(7.22, 2);
+
+      // 3. Price & Valuation per m² and Average Price per Unit
+      expect(metrics.purchasePricePerSqm).toBe(27_856); // Math.round(11699536 / 420)
+      expect(metrics.valuationPerSqm).toBe(30_023); // Math.round(12609500 / 420)
+      expect(metrics.averagePricePerUnit).toBe(Math.round(purchasePrice / 12)); // 974,961
+
+      // 4. SPV Admin Fee & Placement Fee in OpEx
+      expect(metrics.monthlySpvAdminZAR).toBe(Math.round(50_000 / 12)); // 4,167
+      expect(metrics.monthlyPlacementFeeZAR).toBe(Math.round(109_956 * 0.033)); // 3,629
+
+      // 5. DSCR & 5-Year IRR are finite numbers without NaN
+      expect(metrics.dscr).not.toBeNull();
+      expect(metrics.dscr).toBeCloseTo(1.38, 2);
+      expect(Number.isFinite(metrics.fiveYearIrrPercent)).toBe(true);
+      expect(metrics.fiveYearIrrPercent).toBeGreaterThan(8);
+    });
+
+    it('guards against division-by-zero when floorAreaSqm is 0 or omitted', () => {
+      const metrics = calculateDealMetrics({
+        purchasePrice: 1_500_000,
+        openMarketValue: 1_800_000,
+        floorAreaSqm: 0,
+        numberOfUnits: 0,
+        estimatedRehabCost: 0,
+        monthlyRentalEstimate: 15_000,
+        monthlyLevies: 1_200,
+        monthlyRatesTaxes: 800,
+        targetExitPrice: 1_800_000,
+        loanToValuePercent: 80,
+        interestRatePercent: 11.5,
+        loanTermYears: 20,
+      });
+
+      expect(metrics.purchasePricePerSqm).toBe(0);
+      expect(metrics.valuationPerSqm).toBe(0);
+      expect(metrics.averagePricePerUnit).toBe(1_500_000);
+    });
+  });
+
+  describe('5. Hybrid BRRRR Refinance & Unleveraged Cash DSCR', () => {
+    it('models Hybrid BRRRR post-rehab refinance loan, trapped cash, recycled equity, and post-refi cashflow', () => {
+      const metrics = calculateDealMetrics({
+        strategy: 'BRRRR',
+        purchasePrice: 1_000_000,
+        openMarketValue: 1_200_000,
+        estimatedRehabCost: 200_000,
+        monthlyRentalEstimate: 18_000,
+        monthlyLevies: 1_200,
+        monthlyRatesTaxes: 900,
+        managementFeePercent: 8,
+        agencyVatApplicable: true,
+        vacancyRatePercent: 5,
+        targetExitPrice: 1_600_000, // Post-Rehab ARV
+        refinanceLtvPercent: 75,
+        loanToValuePercent: 80, // R800k initial bond, R200k deposit
+        interestRatePercent: 11.0,
+        loanTermYears: 20,
+      });
+
+      // Refinance loan at 75% of R1.6M ARV = R1,200,000
+      expect(metrics.brrrrRefinanceLoanZAR).toBe(1_200_000);
+      // Total all-in outlay = Deposit (200k) + Initial Bond (800k) + Rehab (200k) + Fees (~47k) = ~1,247k
+      // Cash left in deal = max(0, ~1,247k - 1,200k) = ~47k
+      expect(metrics.brrrrCashLeftInDealZAR).toBe(metrics.initialCapitalRequired + metrics.bondAmount - 1_200_000);
+      expect(metrics.brrrrEquityExtractedZAR).toBe(0);
+      expect(metrics.brrrrPostRefiBondPaymentZAR).toBeGreaterThan(metrics.monthlyBondPayment);
+      expect(metrics.brrrrPostRefiCashflowZAR).toBe(
+        Math.round(metrics.annualNetOperatingIncome / 12 - metrics.brrrrPostRefiBondPaymentZAR)
+      );
+
+      // Verify full cash-out BRRRR when ARV is R1,800,000 (75% = R1,350,000 > R1,247k all-in outlay)
+      const fullOutMetrics = calculateDealMetrics({
+        strategy: 'BRRRR',
+        purchasePrice: 1_000_000,
+        openMarketValue: 1_200_000,
+        estimatedRehabCost: 200_000,
+        monthlyRentalEstimate: 18_000,
+        monthlyLevies: 1_200,
+        monthlyRatesTaxes: 900,
+        targetExitPrice: 1_800_000,
+        refinanceLtvPercent: 75,
+        loanToValuePercent: 80,
+        interestRatePercent: 11.0,
+        loanTermYears: 20,
+      });
+      expect(fullOutMetrics.brrrrRefinanceLoanZAR).toBe(1_350_000);
+      expect(fullOutMetrics.brrrrCashLeftInDealZAR).toBe(0);
+      expect(fullOutMetrics.brrrrEquityExtractedZAR).toBe(
+        1_350_000 - (fullOutMetrics.initialCapitalRequired + fullOutMetrics.bondAmount)
+      );
+    });
+
+    it('returns dscr: null when loanToValuePercent is 0 (unleveraged cash deal)', () => {
+      const cashMetrics = calculateDealMetrics({
+        strategy: 'Rental',
+        purchasePrice: 1_200_000,
+        openMarketValue: 1_350_000,
+        estimatedRehabCost: 0,
+        monthlyRentalEstimate: 14_000,
+        monthlyLevies: 1_500,
+        monthlyRatesTaxes: 800,
+        targetExitPrice: 0,
+        loanToValuePercent: 0,
+        interestRatePercent: 11.5,
+        loanTermYears: 20,
+      });
+
+      expect(cashMetrics.monthlyBondPayment).toBe(0);
+      expect(cashMetrics.dscr).toBeNull();
+      expect(Number.isFinite(cashMetrics.fiveYearIrrPercent)).toBe(true);
+    });
+
+    it('deducts tenantPlacementFeePercent and annualSpvAdminAuditFeeZAR in calculateRentalMao so MAO aligns with calculateDealMetrics NOI', () => {
+      const maoWithoutSyndicationFees = calculateRentalMao({
+        monthlyRent: 109_956,
+        vacancyRatePercent: 5,
+        managementFeePercent: 6,
+        agencyVatApplicable: false,
+        monthlyLevies: 15_000,
+        monthlyRates: 8_400,
+        annualInsurance: 0,
+        monthlyMaintenanceReserve: 2_500,
+        monthlyPrepaidVendingFee: 0,
+        monthlyCommunalServicesZAR: 0,
+        tenantPlacementFeePercent: 0,
+        annualSpvAdminAuditFeeZAR: 0,
+        targetNetYieldPercent: 8.5,
+      });
+
+      const maoWithSyndicationFees = calculateRentalMao({
+        monthlyRent: 109_956,
+        vacancyRatePercent: 5,
+        managementFeePercent: 6,
+        agencyVatApplicable: false,
+        monthlyLevies: 15_000,
+        monthlyRates: 8_400,
+        annualInsurance: 0,
+        monthlyMaintenanceReserve: 2_500,
+        monthlyPrepaidVendingFee: 0,
+        monthlyCommunalServicesZAR: 0,
+        tenantPlacementFeePercent: 3.3,
+        annualSpvAdminAuditFeeZAR: 50_000,
+        targetNetYieldPercent: 8.5,
+      });
+
+      const expectedPlacementAnnual = Math.round(109_956 * 12 * 0.033);
+      const expectedSpvAnnual = 50_000;
+      expect(maoWithoutSyndicationFees.stressTestedNoi - maoWithSyndicationFees.stressTestedNoi).toBe(
+        expectedPlacementAnnual + expectedSpvAnnual
+      );
+      expect(maoWithSyndicationFees.maxAllowablePrice).toBeLessThan(maoWithoutSyndicationFees.maxAllowablePrice);
+    });
+
+    it('allows non-zero customTransferDutyZAR override even when isVatInclusiveDeveloperSale is true', () => {
+      const overriddenMetrics = calculateDealMetrics({
+        purchasePrice: 5_000_000,
+        openMarketValue: 5_500_000,
+        isVatInclusiveDeveloperSale: true,
+        customTransferDutyZAR: 75_000,
+        estimatedRehabCost: 0,
+        monthlyRentalEstimate: 45_000,
+        monthlyLevies: 4_000,
+        monthlyRatesTaxes: 2_500,
+        targetExitPrice: 0,
+        loanToValuePercent: 70,
+        interestRatePercent: 10.5,
+        loanTermYears: 20,
+      });
+
+      expect(overriddenMetrics.transferDutyZAR).toBe(75_000);
+    });
+  });
 });
+

@@ -373,13 +373,13 @@ export function PipelineDealCard({
         {/* DSCR Badge */}
         <span
           className={`text-[10px] font-bold px-2 py-0.5 rounded-md border flex items-center gap-1 ${
-            dealDscr >= (investorProfile?.minDscr ?? 1.20)
+            dealDscr === null || dealDscr >= (investorProfile?.minDscr ?? 1.20)
               ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
               : 'bg-rose-50 text-rose-800 border-rose-300'
           }`}
-          title={`Debt Service Coverage Ratio: ${dealDscr >= 99 ? 'No Bond (Cash Deal)' : `${dealDscr}x`} (Hurdle: ${investorProfile?.minDscr ?? 1.20}x)`}
+          title={`Debt Service Coverage Ratio: ${dealDscr === null || dealDscr >= 99 ? 'No Bond (Cash Deal)' : `${dealDscr}x`} (Hurdle: ${investorProfile?.minDscr ?? 1.20}x)`}
         >
-          DSCR: {dealDscr >= 99 ? 'Cash' : `${dealDscr.toFixed(2)}x`}
+          DSCR: {dealDscr === null || dealDscr >= 99 ? 'N/A (Cash)' : `${dealDscr.toFixed(2)}x`}
         </span>
 
         {/* Section 11(a) Compliant */}

@@ -173,6 +173,13 @@ export interface OpportunityDeal {
   monthlyMaintenanceReserveZAR?: number; // e.g. R 800
   monthlyPrepaidVendingFeeZAR?: number; // e.g. R 150
   monthlyCommunalServicesZAR?: number; // e.g. R 2500 (Wi-Fi, cleaning, security)
+  // Multi-Unit, Syndication & BRRRR Underwriting Extensions
+  numberOfUnits?: number; // Default: 1 — Quantity of residential/sectional title units in the acquisition
+  floorAreaSqm?: number; // Default: 0 — Total combined floor area in square metres (m²)
+  isVatInclusiveDeveloperSale?: boolean; // Default: false — Developer/off-plan purchase where VAT is included and SARS Transfer Duty is R 0
+  tenantPlacementFeePercent?: number; // Default: 0 — Tenant procurement fee (% of gross rent) amortized monthly into OpEx
+  annualSpvAdminAuditFeeZAR?: number; // Default: 0 — Annual SPV accounting, audit, or platform admin fee amortized monthly (annualSpvAdminAuditFeeZAR / 12)
+  refinanceLtvPercent?: number; // Default: 75 — Post-rehab refinance LTV percentage for BRRRR strategy underwriting
   // Financing
   loanToValuePercent: number; // e.g. 80% or 0% for cash
   bondLTV: number; // e.g. 100% or 80%
@@ -313,6 +320,8 @@ export interface FlipProject {
   baselineRenovationBudgetZAR: number;
   strategy?: DealStrategy; // Defaults to 'Flip'
   source?: DealSource;
+  numberOfUnits?: number; // e.g. 1 or multi-unit block
+  floorAreaSqm?: number; // Total floor area in square metres (m²)
   // Holding Period Carrying Costs
   estimatedDurationMonths?: number;
   monthlyHoldingCostZAR?: number; // Total monthly holding cost
@@ -572,6 +581,8 @@ export interface RentalProperty {
   province?: Province;
   propertyType: PropertyTitleType;
   source?: DealSource;
+  numberOfUnits?: number; // e.g. 1 or multi-unit block
+  floorAreaSqm?: number; // Total floor area in square metres (m²)
   agmDate?: string;
   marketValueZAR: number;
   purchasePriceZAR: number;
@@ -954,6 +965,12 @@ export interface AnalyzerDraft {
   vatExemptAgent?: boolean;
   holdingPeriodMonths?: number;
   occupantRisk?: OccupantRiskProfile;
+  numberOfUnits?: number;
+  floorAreaSqm?: number;
+  isVatInclusiveDeveloperSale?: boolean;
+  tenantPlacementFeePercent?: number;
+  annualSpvAdminAuditFeeZAR?: number;
+  refinanceLtvPercent?: number;
 }
 
 // Client-side BYOK AI Integration Settings

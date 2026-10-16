@@ -53,6 +53,8 @@ export interface RentalMaoParams {
   monthlyMaintenanceReserve?: number;
   monthlyPrepaidVendingFee?: number;
   monthlyCommunalServicesZAR?: number;
+  tenantPlacementFeePercent?: number;
+  annualSpvAdminAuditFeeZAR?: number;
   rehabCost?: number;
   estimatedAcquisitionCostRate?: number;
   targetNetYieldPercent: number; // Target Cap Rate, e.g. 8.5%
@@ -72,6 +74,8 @@ export interface RentalMaoResult {
   vacancyLossAnnual: number;
   effectiveGrossRentAnnual: number;
   managementFeeAnnual: number;
+  placementFeeAnnual?: number;
+  spvAdminFeeAnnual?: number;
   annualOperatingExpenses: number;
   stressTestedNoi: number;
   totalAllowableCost?: number;
@@ -195,7 +199,7 @@ export function calculateFlipMao(params: FlipMaoParams): FlipMaoResult {
 /**
  * Solve Rental Maximum Purchase Price
  * MAO = Stress-Tested NOI / Target Net Yield%
- * where Stress-Tested NOI = (Gross Rent * (1 - Vacancy%)) - OpEx (Levies + Rates + Insurance + Management + Maintenance + Vending)
+ * where Stress-Tested NOI = (Gross Rent * (1 - Vacancy%)) - OpEx (Levies + Rates + Insurance + Management + Placement + SPV Admin + Maintenance + Vending)
  * With PIE Act Eviction Risk:
  * Deducts legal reserve and interim eviction carrying burn from the allowable acquisition ceiling.
  */
@@ -211,6 +215,8 @@ export function calculateRentalMao(params: RentalMaoParams): RentalMaoResult {
     monthlyMaintenanceReserve = 0,
     monthlyPrepaidVendingFee = 0,
     monthlyCommunalServicesZAR = 0,
+    tenantPlacementFeePercent = 0,
+    annualSpvAdminAuditFeeZAR = 0,
     rehabCost = 0,
     estimatedAcquisitionCostRate = 0,
     targetNetYieldPercent,
@@ -227,6 +233,8 @@ export function calculateRentalMao(params: RentalMaoParams): RentalMaoResult {
 
   const vatMultiplier = agencyVatApplicable !== false ? 1.15 : 1.0;
   const managementFeeAnnual = Math.round(grossAnnualRent * (Math.max(0, managementFeePercent) / 100) * vatMultiplier);
+  const placementFeeAnnual = Math.round(grossAnnualRent * (Math.max(0, tenantPlacementFeePercent) / 100) * vatMultiplier);
+  const spvAdminFeeAnnual = Math.round(Math.max(0, annualSpvAdminAuditFeeZAR));
   const statutoryAndLeviesAnnual = (Math.max(0, monthlyLevies) + Math.max(0, monthlyRates)) * 12;
   const annualInsuranceClean = Math.max(0, annualInsurance);
   const maintenanceAnnual = Math.max(0, monthlyMaintenanceReserve) * 12;
@@ -237,6 +245,8 @@ export function calculateRentalMao(params: RentalMaoParams): RentalMaoResult {
     statutoryAndLeviesAnnual +
     annualInsuranceClean +
     managementFeeAnnual +
+    placementFeeAnnual +
+    spvAdminFeeAnnual +
     maintenanceAnnual +
     vendingAnnual +
     communalAnnual;
@@ -250,6 +260,8 @@ export function calculateRentalMao(params: RentalMaoParams): RentalMaoResult {
       vacancyLossAnnual,
       effectiveGrossRentAnnual,
       managementFeeAnnual,
+      placementFeeAnnual,
+      spvAdminFeeAnnual,
       annualOperatingExpenses,
       stressTestedNoi: Math.round(stressTestedNoi),
       totalAllowableCost: 0,
@@ -307,6 +319,8 @@ export function calculateRentalMao(params: RentalMaoParams): RentalMaoResult {
     vacancyLossAnnual,
     effectiveGrossRentAnnual,
     managementFeeAnnual,
+    placementFeeAnnual,
+    spvAdminFeeAnnual,
     annualOperatingExpenses,
     stressTestedNoi: Math.round(stressTestedNoi),
     totalAllowableCost,

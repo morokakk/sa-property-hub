@@ -137,6 +137,24 @@ export const createOpportunitySlice: StateCreator<
       .toISOString()
       .split('T')[0];
 
+    const extraFlipNotes: string[] = [];
+    if (opp.numberOfUnits && opp.numberOfUnits > 1) {
+      extraFlipNotes.push(`${opp.numberOfUnits} Units`);
+    }
+    if (opp.floorAreaSqm && opp.floorAreaSqm > 0) {
+      const ratePerSqm = Math.round(opp.purchasePrice / opp.floorAreaSqm);
+      extraFlipNotes.push(`${opp.floorAreaSqm} m² (R ${ratePerSqm.toLocaleString('en-ZA')}/m²)`);
+    }
+    if (opp.isVatInclusiveDeveloperSale) {
+      extraFlipNotes.push('VAT-Inclusive Developer Sale (R 0 Transfer Duty)');
+    }
+    const baseNote = hasEviction
+      ? `Promoted from Opportunity Analyzer. Source: ${opp.source}. Includes R ${legalEvictionCost.toLocaleString('en-ZA')} legal reserve for PIE Act eviction litigation (${opp.occupantRisk!.estimatedEvictionDelayDays}d delay).`
+      : `Promoted from Opportunity Analyzer. Source: ${opp.source}`;
+    const fullFlipNote = extraFlipNotes.length > 0
+      ? `${baseNote} (${extraFlipNotes.join(' • ')})`
+      : baseNote;
+
     const newFlip: FlipProject = {
       id: `flip-${Date.now()}`,
       title: `${opp.title} (Flip)`,
@@ -150,11 +168,21 @@ export const createOpportunitySlice: StateCreator<
       purchasePriceZAR: opp.purchasePrice,
       acquisitionCostsZAR: totalAcquisitionCosts,
       baselineRenovationBudgetZAR: opp.estimatedRehabCost || 250_000,
+      strategy: opp.strategy || 'Flip',
+      source: opp.source,
+      numberOfUnits: opp.numberOfUnits,
+      floorAreaSqm: opp.floorAreaSqm,
+      municipalValuationZAR: opp.openMarketValueZAR || undefined,
       estimatedDurationMonths: opp.holdingPeriodMonths || 6,
+      monthlyBondPaymentZAR: opp.monthlyBondPaymentZAR,
+      monthlyLeviesZAR: opp.monthlyLevies,
+      monthlyRatesTaxesZAR: opp.monthlyRatesTaxes,
+      monthlyOtherHoldingCostZAR: opp.monthlyOtherHoldingCostZAR,
       monthlyHoldingCostZAR:
-        (opp.monthlyLevies || 0) +
-        (opp.monthlyRatesTaxes || 0) +
-        (opp.monthlyCashFlow < 0 ? Math.abs(opp.monthlyCashFlow) : 0),
+        opp.monthlyHoldingCostZAR ??
+        ((opp.monthlyLevies || 0) +
+          (opp.monthlyRatesTaxes || 0) +
+          (opp.monthlyCashFlow < 0 ? Math.abs(opp.monthlyCashFlow) : 0)),
       targetExitPriceZAR: opp.targetExitPrice || opp.purchasePrice * 1.35,
       exitCommissionPercent: opp.exitCommissionPercent ?? 5.75,
       targetCompletionDate,
@@ -179,9 +207,7 @@ export const createOpportunitySlice: StateCreator<
       promisedPayoutSchedule: opp.promisedPayoutSchedule || 'Monthly Interest',
       securityOffered: opp.securityOffered || '2nd Mortgage Bond registered over title deed',
       status: 'Active',
-      notes: hasEviction
-        ? `Promoted from Opportunity Analyzer. Source: ${opp.source}. Includes R ${legalEvictionCost.toLocaleString('en-ZA')} legal reserve for PIE Act eviction litigation (${opp.occupantRisk!.estimatedEvictionDelayDays}d delay).`
-        : `Promoted from Opportunity Analyzer. Source: ${opp.source}`,
+      notes: fullFlipNote,
       driveVault: opp.driveVault ? { ...opp.driveVault } : undefined,
       boq: [
         {
@@ -281,12 +307,77 @@ export const createOpportunitySlice: StateCreator<
       opp.depositZAR !== undefined
         ? Math.max(0, opp.purchasePrice - opp.depositZAR)
         : (opp.purchasePrice * effectiveLTV) / 100;
+
+    const unitCount = opp.numberOfUnits && opp.numberOfUnits > 1 ? Math.round(opp.numberOfUnits) : 1;
+    const leaseStartDate = new Date().toISOString().split('T')[0];
+    const leaseEndDate = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000)
+      .toISOString()
+      .split('T')[0];
+    const escalationPct = opp.annualRentalEscalationPercent ?? 7.0;
+
+    const leases =
+      unitCount > 1
+        ? Array.from({ length: unitCount }, (_, idx) => {
+            const baseUnitRent = Math.floor(opp.monthlyRentalEstimate / unitCount);
+            const remainder = opp.monthlyRentalEstimate - baseUnitRent * unitCount;
+            const unitRent = idx === 0 ? baseUnitRent + remainder : baseUnitRent;
+            return {
+              id: `lease-${Date.now()}-${idx + 1}`,
+              unitName: `Unit ${idx + 1}`,
+              tenantName: 'Tenant Pending Placement',
+              tenantPhone: '+27 —',
+              tenantEmail: 'pending@tenant.co.za',
+              leaseStartDate,
+              leaseEndDate,
+              monthlyRentZAR: unitRent,
+              depositHeldZAR: unitRent * 2,
+              annualEscalationPercent: escalationPct,
+              status: 'Vacant' as const,
+            };
+          })
+        : [
+            {
+              id: `lease-${Date.now()}`,
+              unitName: 'Main Unit',
+              tenantName: 'Tenant Pending Placement',
+              tenantPhone: '+27 —',
+              tenantEmail: 'pending@tenant.co.za',
+              leaseStartDate,
+              leaseEndDate,
+              monthlyRentZAR: opp.monthlyRentalEstimate,
+              depositHeldZAR: opp.monthlyRentalEstimate * 2,
+              annualEscalationPercent: escalationPct,
+              status: 'Vacant' as const,
+            },
+          ];
+
+    const placementFeeMonthlyPct = (opp.tenantPlacementFeePercent || 0) / 12;
+    const effectiveCommPct = Number(((opp.managementFeePercent ?? 8) + placementFeeMonthlyPct).toFixed(4));
+    const vatMult = opp.agencyVatApplicable !== false ? 1.15 : 1.0;
+    const monthlySpvAdminZAR = Math.round((opp.annualSpvAdminAuditFeeZAR || 0) / 12);
+
+    const rentalNoteParts: string[] = [];
+    if (opp.notes) rentalNoteParts.push(opp.notes);
+    if (unitCount > 1) rentalNoteParts.push(`${unitCount} Units`);
+    if (opp.floorAreaSqm && opp.floorAreaSqm > 0) {
+      rentalNoteParts.push(`${opp.floorAreaSqm} m² (R ${Math.round(opp.purchasePrice / opp.floorAreaSqm).toLocaleString('en-ZA')}/m²)`);
+    }
+    if (opp.isVatInclusiveDeveloperSale) {
+      rentalNoteParts.push('VAT-Inclusive Developer Sale (R 0 Transfer Duty)');
+    }
+    if (opp.annualSpvAdminAuditFeeZAR && opp.annualSpvAdminAuditFeeZAR > 0) {
+      rentalNoteParts.push(`SPV Admin/Audit: R ${opp.annualSpvAdminAuditFeeZAR.toLocaleString('en-ZA')}/yr`);
+    }
+
     const newRental: RentalProperty = {
       id: `rental-${Date.now()}`,
       title: opp.title,
       address: opp.address,
       city: opp.city,
       province: opp.province,
+      source: opp.source,
+      numberOfUnits: unitCount,
+      floorAreaSqm: opp.floorAreaSqm,
       cocChecklist: getNodeComplianceProfile(opp.city, opp.province).defaultCertificates,
       propertyType: opp.propertyType || 'Sectional Title Apartment',
       agmDate: opp.agmDate,
@@ -302,39 +393,27 @@ export const createOpportunitySlice: StateCreator<
             opp.loanTermYears || 20
           )
         : 0,
-      leases: [
-        {
-          id: `lease-${Date.now()}`,
-          unitName: 'Main Unit',
-          tenantName: 'Tenant Pending Placement',
-          tenantPhone: '+27 —',
-          tenantEmail: 'pending@tenant.co.za',
-          leaseStartDate: new Date().toISOString().split('T')[0],
-          leaseEndDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000)
-            .toISOString()
-            .split('T')[0],
-          monthlyRentZAR: opp.monthlyRentalEstimate,
-          depositHeldZAR: opp.monthlyRentalEstimate * 2,
-          annualEscalationPercent: 7.0,
-          status: 'Vacant',
-        },
-      ],
+      leases,
       monthlyGrossRentZAR: opp.monthlyRentalEstimate,
       monthlyLeviesZAR: opp.propertyType === 'Freehold House' ? 0 : opp.monthlyLevies,
       annualBuildingInsuranceZAR:
         opp.propertyType === 'Freehold House' ? (opp.annualInsurance ?? 7_200) : 0,
       monthlyRatesTaxesZAR: opp.monthlyRatesTaxes,
       managementType: 'Agency',
-      agencyCommissionPercent: opp.managementFeePercent ?? 8,
+      agencyCommissionPercent: effectiveCommPct,
       agencyVatApplicable: opp.agencyVatApplicable !== false,
       monthlyAgentFeeZAR: Math.round(
-        opp.monthlyRentalEstimate *
-          ((opp.managementFeePercent ?? 8) / 100) *
-          (opp.agencyVatApplicable !== false ? 1.15 : 1.0)
+        opp.monthlyRentalEstimate * (effectiveCommPct / 100) * vatMult
       ),
-      monthlyMaintenanceReserveZAR: 500,
+      monthlyMaintenanceReserveZAR: (opp.monthlyMaintenanceReserveZAR ?? 500) + monthlySpvAdminZAR,
       monthlyPrepaidVendingFeeZAR: opp.monthlyPrepaidVendingFeeZAR,
       monthlyCommunalServicesZAR: opp.monthlyCommunalServicesZAR,
+      section13sexAnnualShieldZAR: opp.section13sex?.isEligible
+        ? opp.section13sex.annualTaxSavingsZAR
+        : undefined,
+      isBrrrrProperty: opp.strategy === 'BRRRR' ? true : undefined,
+      ancillaryIncomes: opp.ancillaryIncomes ? structuredClone(opp.ancillaryIncomes) : undefined,
+      notes: rentalNoteParts.length > 0 ? rentalNoteParts.join(' • ') : undefined,
       driveVault: opp.driveVault ? { ...opp.driveVault } : undefined,
       maintenanceHistory: [],
       status: 'Vacant',

@@ -227,6 +227,19 @@ function ProposalGeneratorContent() {
         monthlyRent: o.monthlyRentalEstimate,
         monthlyLevies: o.monthlyLevies,
         monthlyRates: o.monthlyRatesTaxes,
+        annualInsurance: o.annualInsurance ?? 7_200,
+        managementFeePercent: o.managementFeePercent ?? 8,
+        agencyVatApplicable: o.agencyVatApplicable ?? true,
+        vacancyRatePercent: o.vacancyRatePercent ?? 5,
+        monthlyMaintenanceReserveZAR: o.monthlyMaintenanceReserveZAR,
+        monthlyPrepaidVendingFeeZAR: o.monthlyPrepaidVendingFeeZAR,
+        monthlyCommunalServicesZAR: o.monthlyCommunalServicesZAR,
+        numberOfUnits: o.numberOfUnits,
+        floorAreaSqm: o.floorAreaSqm,
+        isVatInclusiveDeveloperSale: o.isVatInclusiveDeveloperSale,
+        tenantPlacementFeePercent: o.tenantPlacementFeePercent,
+        annualSpvAdminAuditFeeZAR: o.annualSpvAdminAuditFeeZAR,
+        refinanceLtvPercent: o.refinanceLtvPercent,
         depositZAR: o.depositZAR,
         loanToValue: o.loanToValuePercent,
         interestRatePercent: o.interestRatePercent,
@@ -246,7 +259,7 @@ function ProposalGeneratorContent() {
         arrearsWriteOffsTotal: 0,
         isCollectionRisk: false,
         actualCollectedRentAvg: 0,
-        adjustedVacancyRate: 5,
+        adjustedVacancyRate: o.vacancyRatePercent ?? 5,
         rawRental: undefined,
         occupantRisk: o.occupantRisk,
       };
@@ -282,8 +295,8 @@ function ProposalGeneratorContent() {
         source: r.source ?? 'Private Agent',
         auctioneerCommission: 0,
         municipalArrears: 0,
-        isSection13Eligible: false,
-        section13Allowance: 0,
+        isSection13Eligible: Boolean(r.section13sexAnnualShieldZAR && r.section13sexAnnualShieldZAR > 0),
+        section13Allowance: r.section13sexAnnualShieldZAR ?? 0,
         holdingDurationMonths: 12,
         monthlyBondHolding: holdingCosts.monthlyBond,
         monthlyLeviesHolding: holdingCosts.monthlyLevies,
@@ -308,6 +321,19 @@ function ProposalGeneratorContent() {
         monthlyRent: r.monthlyGrossRentZAR,
         monthlyLevies: holdingCosts.monthlyLevies,
         monthlyRates: holdingCosts.monthlyRates,
+        annualInsurance: r.annualBuildingInsuranceZAR ?? 7_200,
+        managementFeePercent: r.agencyCommissionPercent ?? 8,
+        agencyVatApplicable: r.agencyVatApplicable ?? true,
+        vacancyRatePercent: 5,
+        monthlyMaintenanceReserveZAR: r.monthlyMaintenanceReserveZAR,
+        monthlyPrepaidVendingFeeZAR: r.monthlyPrepaidVendingFeeZAR,
+        monthlyCommunalServicesZAR: r.monthlyCommunalServicesZAR,
+        numberOfUnits: r.leases?.length && r.leases.length > 1 ? r.leases.length : undefined,
+        floorAreaSqm: undefined,
+        isVatInclusiveDeveloperSale: undefined,
+        tenantPlacementFeePercent: undefined,
+        annualSpvAdminAuditFeeZAR: undefined,
+        refinanceLtvPercent: undefined,
         depositZAR: Math.max(0, openMarket - (r.outstandingBondBalanceZAR || 0)),
         loanToValue: openMarket > 0 ? Math.round(((r.outstandingBondBalanceZAR || 0) / openMarket) * 100) : 70,
         interestRatePercent: r.bondInterestRatePercent || 11.75,
@@ -354,9 +380,10 @@ function ProposalGeneratorContent() {
 
   const projectionData = useMemo(() => {
     if (!deal || isFlip) return [];
+    const d = deal as any;
     const vacancyRate = deal.type === 'rental' && (deal.collectionRate ?? 100) < 90
       ? Math.max(5, Math.round(100 - deal.collectionRate))
-      : 5;
+      : (d.vacancyRatePercent ?? 5);
     return generateLongTermProjection({
       purchasePrice: deal.purchasePrice,
       openMarketValueZAR: deal.openMarketValue,
@@ -372,9 +399,15 @@ function ProposalGeneratorContent() {
       monthlyRentalEstimate: deal.monthlyRent || Math.round(deal.purchasePrice * 0.009),
       monthlyLevies: deal.monthlyLevies || 0,
       monthlyRatesTaxes: deal.monthlyRates || 0,
-      annualInsurance: 7_200,
-      managementFeePercent: 8,
+      annualInsurance: d.annualInsurance ?? 7_200,
+      managementFeePercent: d.managementFeePercent ?? 8,
+      agencyVatApplicable: d.agencyVatApplicable ?? true,
       vacancyRatePercent: vacancyRate,
+      monthlyMaintenanceReserveZAR: d.monthlyMaintenanceReserveZAR,
+      monthlyPrepaidVendingFeeZAR: d.monthlyPrepaidVendingFeeZAR,
+      monthlyCommunalServicesZAR: d.monthlyCommunalServicesZAR,
+      tenantPlacementFeePercent: d.tenantPlacementFeePercent,
+      annualSpvAdminAuditFeeZAR: d.annualSpvAdminAuditFeeZAR,
     });
   }, [deal, isFlip]);
 
@@ -1013,6 +1046,57 @@ function ProposalGeneratorContent() {
                       <span>Stabilized Portfolio Asset • In-Place Paying Tenancy</span>
                     </span>
                   )}
+                  {(deal as any).numberOfUnits != null && (deal as any).numberOfUnits > 1 && (
+                    <span
+                      data-testid="proposal-badge-units"
+                      className="text-[10px] font-bold px-2 py-0.5 rounded bg-indigo-50 text-indigo-800 border border-indigo-200 flex items-center gap-1"
+                    >
+                      <Users className="w-3 h-3 text-indigo-700 shrink-0" />
+                      <span>
+                        {(deal as any).numberOfUnits} Units • {formatZAR(Math.round(deal.purchasePrice / (deal as any).numberOfUnits))}/unit
+                      </span>
+                    </span>
+                  )}
+                  {(deal as any).floorAreaSqm != null && (deal as any).floorAreaSqm > 0 && (
+                    <span
+                      data-testid="proposal-badge-floor-area"
+                      className="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-100 text-slate-800 border border-slate-200 flex items-center gap-1"
+                    >
+                      <Layers className="w-3 h-3 text-slate-700 shrink-0" />
+                      <span>
+                        {(deal as any).floorAreaSqm} m² • {formatZAR(Math.round(deal.purchasePrice / (deal as any).floorAreaSqm))}/m²
+                      </span>
+                    </span>
+                  )}
+                  {(deal as any).isVatInclusiveDeveloperSale && deal.source !== 'iGrow Rentals' && (
+                    <span
+                      data-testid="proposal-badge-vat-inclusive"
+                      className="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-200 flex items-center gap-1"
+                    >
+                      <ShieldCheck className="w-3 h-3 text-emerald-700 shrink-0" />
+                      <span>VAT-Inclusive Developer Sale • R 0 Transfer Duty</span>
+                    </span>
+                  )}
+                  {(deal as any).annualSpvAdminAuditFeeZAR != null && (deal as any).annualSpvAdminAuditFeeZAR > 0 && (
+                    <span
+                      data-testid="proposal-badge-spv-admin"
+                      className="text-[10px] font-bold px-2 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-200 flex items-center gap-1"
+                    >
+                      <Coins className="w-3 h-3 text-amber-700 shrink-0" />
+                      <span>
+                        SPV Admin/Audit: {formatZAR((deal as any).annualSpvAdminAuditFeeZAR)}/yr ({formatZAR(Math.round((deal as any).annualSpvAdminAuditFeeZAR / 12))}/mo)
+                      </span>
+                    </span>
+                  )}
+                  {pitchStrategy === 'BRRRR' && (deal as any).refinanceLtvPercent != null && (
+                    <span
+                      data-testid="proposal-badge-refi-ltv"
+                      className="text-[10px] font-bold px-2 py-0.5 rounded bg-purple-50 text-purple-800 border border-purple-200 flex items-center gap-1"
+                    >
+                      <RefreshCw className="w-3 h-3 text-purple-700 shrink-0" />
+                      <span>{(deal as any).refinanceLtvPercent}% Refi LTV</span>
+                    </span>
+                  )}
                 </div>
               </div>
 
@@ -1354,11 +1438,11 @@ function ProposalGeneratorContent() {
                     <tr>
                       <td className="p-2.5 font-medium flex items-center gap-1.5 flex-wrap">
                         <span>
-                          {deal.source === 'iGrow Rentals'
+                          {deal.source === 'iGrow Rentals' || (deal as any).isVatInclusiveDeveloperSale
                             ? 'Conveyancing Legal Fees & Registration'
                             : 'SARS Transfer Duty & Conveyancing Legal Fees'}
                         </span>
-                        {deal.source === 'iGrow Rentals' && (
+                        {(deal.source === 'iGrow Rentals' || (deal as any).isVatInclusiveDeveloperSale) && (
                           <span className="text-[10px] bg-emerald-100 text-emerald-900 font-bold px-1.5 py-0.2 rounded border border-emerald-200">
                             R0 SARS Transfer Duty (VAT Incl.)
                           </span>
@@ -1834,7 +1918,7 @@ function ProposalGeneratorContent() {
                   <div className="p-2.5 rounded-lg bg-emerald-50 border border-emerald-300">
                     <div className="text-[10px] uppercase font-bold text-emerald-800">4. Refi & Return</div>
                     <div className="font-extrabold text-emerald-900 text-xs mt-0.5">
-                      {formatZAR(Math.round((deal.targetExitPrice || Math.round(deal.purchasePrice * 1.35)) * 0.75))}
+                      {formatZAR(Math.round((deal.targetExitPrice || Math.round(deal.purchasePrice * 1.35)) * (((deal as any).refinanceLtvPercent ?? 75) / 100)))}
                     </div>
                     <div className="text-[9px] text-emerald-700 font-semibold">Repay lender capital</div>
                   </div>
@@ -1843,12 +1927,12 @@ function ProposalGeneratorContent() {
                 {/* Refinance Economics Metric Cards */}
                 {(() => {
                   const postRehabArv = deal.targetExitPrice || Math.round(deal.purchasePrice * 1.35);
-                  const refiLtvPercent = 75;
+                  const refiLtvPercent = (deal as any).refinanceLtvPercent ?? 75;
                   const newBankMortgage = Math.round(postRehabArv * (refiLtvPercent / 100));
                   const totalCapitalInvested = totalProjectCost;
                   const capitalExtracted = Math.min(totalCapitalInvested, newBankMortgage);
                   const netEquityTrapped = Math.max(0, totalCapitalInvested - newBankMortgage);
-                  const monthlyRefiBond = calculateMonthlyBondRepayment(newBankMortgage, 11.75, 20);
+                  const monthlyRefiBond = calculateMonthlyBondRepayment(newBankMortgage, deal.interestRatePercent ?? 11.75, deal.bondTermYears ?? deal.loanTermYears ?? 20);
                   const netRentalCashflowPostRefi = (deal.monthlyRent || Math.round(deal.purchasePrice * 0.009)) - (monthlyRefiBond + monthlyLevies + monthlyRates);
 
                   return (
@@ -1907,7 +1991,7 @@ function ProposalGeneratorContent() {
                             <tr className="bg-purple-50/40">
                               <td className="p-2.5 font-semibold text-purple-950">Phase 2: Post-Rehab Bank Mortgage Refinance</td>
                               <td className="p-2.5 font-bold font-mono text-purple-900">{formatZAR(newBankMortgage)}</td>
-                              <td className="p-2.5 text-purple-900 font-medium">Tier-1 Commercial Bank (75% LTV)</td>
+                              <td className="p-2.5 text-purple-900 font-medium">Tier-1 Commercial Bank ({refiLtvPercent}% LTV)</td>
                               <td className="p-2.5 text-slate-600">Replaces short-term private bridge facility with 20-year term debt</td>
                             </tr>
                             <tr className="bg-emerald-50/70 font-bold">

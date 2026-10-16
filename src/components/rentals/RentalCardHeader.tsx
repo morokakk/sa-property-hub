@@ -108,6 +108,25 @@ export function RentalCardHeader({
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-1.5 flex-wrap mb-1">
               <PropertyTypeBadge type={property.propertyType} />
+              {(() => {
+                const sqm = property.floorAreaSqm || (property.notes ? Number(property.notes.match(/(\d+)\s*m²/)?.[1]) : undefined);
+                if (!sqm || sqm <= 0) return null;
+                const purchasePerSqm = Math.round(property.purchasePriceZAR / sqm);
+                const valuationPerSqm = property.marketValueZAR > 0 ? Math.round(property.marketValueZAR / sqm) : 0;
+                return (
+                  <span
+                    className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200"
+                    title={`Total Floor Area: ${sqm} m² • Purchase Rate: R ${purchasePerSqm.toLocaleString('en-ZA')}/m²${valuationPerSqm > 0 ? ` • Current Valuation: R ${valuationPerSqm.toLocaleString('en-ZA')}/m²` : ''}`}
+                  >
+                    <span>📐 {sqm} m²</span>
+                    {valuationPerSqm > 0 && (
+                      <span className="text-slate-400 font-normal text-[9px]">
+                        (R {valuationPerSqm.toLocaleString('en-ZA')}/m²)
+                      </span>
+                    )}
+                  </span>
+                );
+              })()}
               <AgmDateChip agmDate={property.agmDate} />
               {property.isBrrrrProperty && (
                 <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-800 border border-indigo-200">
@@ -196,6 +215,15 @@ export function RentalCardHeader({
         <div>
           <span className="text-[10px] text-slate-400 block">Market Value</span>
           <strong className="text-slate-900 tabular-nums tracking-tight">{formatZAR(property.marketValueZAR, { compact: true })}</strong>
+          {(() => {
+            const sqm = property.floorAreaSqm || (property.notes ? Number(property.notes.match(/(\d+)\s*m²/)?.[1]) : undefined);
+            if (!sqm || sqm <= 0 || property.marketValueZAR <= 0) return null;
+            return (
+              <span className="text-[9px] text-slate-400 block font-normal tabular-nums">
+                R {Math.round(property.marketValueZAR / sqm).toLocaleString('en-ZA')}/m²
+              </span>
+            );
+          })()}
         </div>
         <div>
           <span className="text-[10px] text-slate-400 block">Gross Yield</span>
