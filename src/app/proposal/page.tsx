@@ -1511,6 +1511,19 @@ function ProposalGeneratorContent() {
                         </td>
                       </tr>
                     )}
+                    {isFlip && exitCommission > 0 && (
+                      <tr data-testid="exit-commission-row">
+                        <td className="p-2.5 font-medium flex items-center gap-1.5 flex-wrap">
+                          <span>Exit Sales & Marketing Commission ({exitCommissionPercent}% VAT Incl.)</span>
+                          <span className="text-[10px] bg-slate-100 text-slate-700 font-bold px-1.5 py-0.2 rounded border border-slate-200">
+                            Disposal Cost
+                          </span>
+                        </td>
+                        <td className="p-2.5 font-bold">{formatZAR(exitCommission)}</td>
+                        <td className="p-2.5">{totalProjectCost > 0 ? formatPercent((exitCommission / totalProjectCost) * 100) : '0%'}</td>
+                        <td className="p-2.5 text-slate-500">Settled from gross sales proceeds upon transfer</td>
+                      </tr>
+                    )}
                     <tr className="bg-slate-50 font-bold">
                       <td className="p-2.5">Total Project Capital Outlay</td>
                       <td className="p-2.5 text-emerald-800">{formatZAR(totalProjectCost)}</td>
@@ -1835,7 +1848,7 @@ function ProposalGeneratorContent() {
                           <td className="p-2.5 font-medium flex items-center gap-1.5 flex-wrap">
                             <span className="text-rose-950 font-bold">Stage 1: Eviction Delay Interim Holding Burn</span>
                             <span className="text-[10px] bg-rose-100 text-rose-900 font-bold px-1.5 py-0.2 rounded border border-rose-300">
-                              ~{evictionDelayDays} Days ({evictionDelayMonths} Mos)
+                              ~{evictionDelayDays} Days ({evictionDelayMonths.toFixed(1)} Mos)
                             </span>
                           </td>
                           <td className="p-2.5 font-bold font-mono text-rose-900">
@@ -1878,7 +1891,9 @@ function ProposalGeneratorContent() {
                       </tr>
                       <tr className="bg-amber-50/70 font-bold">
                         <td className="p-2.5 text-amber-950">Total Carrying Cost Reserve (Escrow Tranche)</td>
-                        <td className="p-2.5 text-amber-950 font-mono">{formatZAR(monthlyBurnRate)}/mo</td>
+                        <td className="p-2.5 text-amber-950 font-mono">
+                          {isEviction ? `${formatZAR(monthlyBurnRate)}/mo (Stage 2)` : `${formatZAR(monthlyBurnRate)}/mo`}
+                        </td>
                         <td className="p-2.5 text-amber-950 font-mono">{formatZAR(totalHoldingReserve)}</td>
                         <td className="p-2.5 text-amber-950">100.0%</td>
                         <td className="p-2.5 text-amber-900 font-semibold">
@@ -2078,7 +2093,7 @@ function ProposalGeneratorContent() {
                     <tr>
                       <th className="p-2.5">Scenario</th>
                       <th className="p-2.5">Exit Valuation (ZAR)</th>
-                      <th className="p-2.5">Gross Net Profit</th>
+                      <th className="p-2.5">Projected Net Profit</th>
                       <th className="p-2.5">Sponsor ROI</th>
                       <th className="p-2.5">Lender Security Cushion</th>
                     </tr>
