@@ -466,6 +466,87 @@ describe('whatsappFormatter - Strategy Adaptive Formatting', () => {
     expect(output).not.toContain('Tenant Collection Risk flagged');
   });
 
+  it('formats Proposal Generator pitch with Monthly Coupon return structure', () => {
+    const output = formatProposalPitchForWhatsApp({
+      deal: {
+        id: 'deal-coupon-1',
+        title: 'Kloof Street Heritage Redesign',
+        address: '74 Kloof Street',
+        city: 'Cape Town',
+        purchasePrice: 3_800_000,
+        acquisitionCosts: 315_000,
+        renovationBudget: 750_000,
+        targetExitPrice: 5_650_000,
+        strategy: 'Flip',
+        holdingDurationMonths: 6,
+      },
+      strategy: 'Flip',
+      capitalRequested: 1_300_000,
+      fundingOfferType: 'Monthly Coupon',
+      offeredRate: 14.0,
+      securityType: '1st registered second-mortgage bond',
+      investorProfile: mockInvestorProfile,
+    });
+
+    expect(output).toContain('• Proposed Return: *14%* (p.a. Monthly Coupon)');
+    expect(output).toContain('• Coupon Payout: Monthly in advance');
+    expect(output).toContain(`Projected Total Payout: *${formatZAR(1_391_002)}* (${formatZAR(15_167)}/mo over 6 months)`);
+  });
+
+  it('formats Proposal Generator pitch with Bullet Repayment return structure', () => {
+    const output = formatProposalPitchForWhatsApp({
+      deal: {
+        id: 'deal-bullet-1',
+        title: 'Waterkloof Diplomatic Fixer',
+        address: '112 Crown Avenue',
+        city: 'Pretoria',
+        purchasePrice: 2_100_000,
+        acquisitionCosts: 185_000,
+        renovationBudget: 450_000,
+        targetExitPrice: 3_350_000,
+        strategy: 'Flip',
+        holdingDurationMonths: 7,
+      },
+      strategy: 'Flip',
+      capitalRequested: 1_000_000,
+      fundingOfferType: 'Bullet Repayment',
+      offeredRate: 16.0,
+      securityType: '2nd Mortgage Bond',
+      investorProfile: mockInvestorProfile,
+    });
+
+    expect(output).toContain('• Proposed Return: *16%* (p.a. Bullet Return - Accrued)');
+    expect(output).toContain('• Coupon Payout: Lump sum at property transfer (0 monthly drag)');
+    expect(output).toContain(`Projected Total Payout: *${formatZAR(1_093_333)}* (${formatZAR(93_333)} accrued return on exit)`);
+  });
+
+  it('formats Proposal Generator pitch with Equity Profit Split return structure', () => {
+    const output = formatProposalPitchForWhatsApp({
+      deal: {
+        id: 'deal-equity-1',
+        title: 'Waterkloof Diplomatic Fixer',
+        address: '112 Crown Avenue',
+        city: 'Pretoria',
+        purchasePrice: 2_100_000,
+        acquisitionCosts: 185_000,
+        renovationBudget: 450_000,
+        targetExitPrice: 3_350_000,
+        strategy: 'Flip',
+        holdingDurationMonths: 7,
+      },
+      strategy: 'Flip',
+      capitalRequested: 800_000,
+      fundingOfferType: 'Equity Profit Split',
+      offeredRate: 25.0,
+      securityType: 'JV Syndicate Profit Participation',
+      investorProfile: mockInvestorProfile,
+    });
+
+    expect(output).toContain('• Proposed Return: *25%* (Net Profit Split)');
+    expect(output).toContain('• Coupon Payout: At property transfer');
+    expect(output).toContain('profit share on exit');
+  });
+
   describe('PIE Act Statutory Eviction Risk & Contractor Gating Disclosures', () => {
     const unlawfulRiskMagistrate: OccupantRiskProfile = {
       occupancyStatus: 'unlawful_occupant',

@@ -1,5 +1,5 @@
 import { formatZAR, formatPercent, formatDate } from './formatters';
-import { OpportunityDeal, FlipProject, InvestorProfile, DealStrategy, DealSource, RentalProperty, TenantPaymentRecord, OccupantRiskProfile } from '@/types';
+import { OpportunityDeal, FlipProject, InvestorProfile, DealStrategy, DealSource, RentalProperty, TenantPaymentRecord, OccupantRiskProfile, ReturnTermType } from '@/types';
 import { generateLongTermProjection, calculateMonthlyBondRepayment, calculateDealMetrics } from './calculations/propertyMetrics';
 import { calculatePropertyArrears, formatMonthLabel, getMonthKey, calculateTenantStatementTiers } from './calculations/arrears';
 import { isEvictionActive, calculateEvictionCarryingCost } from './calculations/occupantRisk';
@@ -62,7 +62,7 @@ export interface ProposalPitchParams {
   };
   strategy: DealStrategy;
   capitalRequested: number;
-  fundingOfferType: 'Fixed Interest' | 'Profit Share';
+  fundingOfferType: ReturnTermType | 'Profit Share';
   offeredRate: number;
   securityType: string;
   notes?: string;
@@ -508,11 +508,44 @@ export function formatProposalPitchForWhatsApp(
   const projectROI = totalProjectCost > 0 ? (projectedNetProfit / totalProjectCost) * 100 : 0;
   const loanToCost = totalProjectCost > 0 ? (capitalRequested / totalProjectCost) * 100 : 0;
 
-  const durationFactor = (holdingDuration || 6) / 12;
-  const projectedLenderPayout =
-    fundingOfferType === 'Fixed Interest'
-      ? capitalRequested + capitalRequested * (offeredRate / 100) * durationFactor
-      : capitalRequested + projectedNetProfit * (offeredRate / 100);
+  const durationMonths = holdingDuration || 6;
+  const durationFactor = durationMonths / 12;
+
+  const normalizedType: ReturnTermType =
+    fundingOfferType === 'Profit Share' ? 'Equity Profit Split' : fundingOfferType;
+
+  let proposedReturnLabel = '';
+  let couponPayoutLabel = '';
+  let projectedPayoutDetails = '';
+  let projectedLenderPayout = capitalRequested;
+
+  if (normalizedType === 'Equity Profit Split') {
+    const profitShareAmount = Math.round(projectedNetProfit * (offeredRate / 100));
+    projectedLenderPayout = capitalRequested + profitShareAmount;
+    proposedReturnLabel = `*${offeredRate}%* (Net Profit Split)`;
+    couponPayoutLabel = 'At property transfer';
+    projectedPayoutDetails = `*${formatZAR(projectedLenderPayout)}* (${formatZAR(profitShareAmount)} profit share on exit)`;
+  } else if (normalizedType === 'Monthly Coupon') {
+    const monthlyCoupon = Math.round((capitalRequested * (offeredRate / 100)) / 12);
+    const totalCoupon = monthlyCoupon * durationMonths;
+    projectedLenderPayout = capitalRequested + totalCoupon;
+    proposedReturnLabel = `*${offeredRate}%* (p.a. Monthly Coupon)`;
+    couponPayoutLabel = 'Monthly in advance';
+    projectedPayoutDetails = `*${formatZAR(projectedLenderPayout)}* (${formatZAR(monthlyCoupon)}/mo over ${durationMonths} months)`;
+  } else if (normalizedType === 'Bullet Repayment') {
+    const accruedReturn = Math.round(capitalRequested * (offeredRate / 100) * durationFactor);
+    projectedLenderPayout = capitalRequested + accruedReturn;
+    proposedReturnLabel = `*${offeredRate}%* (p.a. Bullet Return - Accrued)`;
+    couponPayoutLabel = 'Lump sum at property transfer (0 monthly drag)';
+    projectedPayoutDetails = `*${formatZAR(projectedLenderPayout)}* (${formatZAR(accruedReturn)} accrued return on exit)`;
+  } else {
+    // Fixed Interest
+    const accruedReturn = Math.round(capitalRequested * (offeredRate / 100) * durationFactor);
+    projectedLenderPayout = capitalRequested + accruedReturn;
+    proposedReturnLabel = `*${offeredRate}%* (p.a. Fixed Interest)`;
+    couponPayoutLabel = 'Monthly in advance';
+    projectedPayoutDetails = `*${formatZAR(projectedLenderPayout)}*`;
+  }
 
   let text = `*CONFIDENTIAL INVESTMENT MEMORANDUM*\n`;
   text += `━━━━━━━━━━━━━━━━━━━━━\n`;
@@ -619,8 +652,8 @@ export function formatProposalPitchForWhatsApp(
   text += `*PROPOSED LENDER / PARTNER RETURN TERMS*\n`;
   text += `• Facility Principal: *${formatZAR(capitalRequested)}*\n`;
   text += `• Loan-to-Cost (LTC): *${formatPercent(loanToCost)}*\n`;
-  text += `• Proposed Return: *${offeredRate}%* (${fundingOfferType === 'Fixed Interest' ? 'p.a. Fixed Interest' : 'Net Profit Split'})\n`;
-  text += `• Coupon Payout: ${fundingOfferType === 'Fixed Interest' ? 'Monthly in advance' : 'At property transfer'}\n`;
+  text += `• Proposed Return: ${proposedReturnLabel}\n`;
+  text += `• Coupon Payout: ${couponPayoutLabel}\n`;
   text += `• Security / Collateral: *${securityType}*\n`;
   if (deal.completionDate) {
     text += `• Target Maturity: ${formatDate(deal.completionDate)}\n`;
@@ -632,7 +665,7 @@ export function formatProposalPitchForWhatsApp(
     text += `• Post-Rehab ARV Valuation: *${formatZAR(arv)}* (${refiLtv}% LTV Refi: ${formatZAR(estRefiCash)})\n`;
     text += `• Lender Capital Exit: Phase 2 Bank Refinance @ Month 6 (100% Principal Repaid to Investor)\n`;
   }
-  text += `• Projected Total Payout: *${formatZAR(projectedLenderPayout)}*\n`;
+  text += `• Projected Total Payout: ${projectedPayoutDetails}\n`;
 
   if (investorProfile) {
     text += `\n• Contact Sponsor: ${investorProfile.contactNumber} | Email: ${investorProfile.email}\n`;

@@ -8,7 +8,7 @@ import { formatZAR, formatPercent, formatDate } from '@/lib/formatters';
 import { generateLongTermProjection, calculateMonthlyBondRepayment } from '@/lib/calculations/propertyMetrics';
 import { formatProposalPitchForWhatsApp } from '@/lib/whatsappFormatter';
 import LongTermProjectionChart from '@/components/analytics/LongTermProjectionChart';
-import { DealStrategy, DealSource, OccupantRiskProfile } from '@/types';
+import { DealStrategy, DealSource, OccupantRiskProfile, ReturnTermType } from '@/types';
 import {
   Printer,
   FileCheck2,
@@ -412,14 +412,28 @@ function ProposalGeneratorContent() {
   }, [deal, isFlip]);
 
   // Proposed Investor Terms state
-  const [fundingOfferType, setFundingOfferType] = useState<'Fixed Interest' | 'Profit Share'>('Fixed Interest');
-  const [offeredRate, setOfferedRate] = useState<number>(14.5);
+  const [fundingOfferType, setFundingOfferType] = useState<ReturnTermType>('Fixed Interest');
+  const [offeredRate, setOfferedRate] = useState<number>(14);
   const [securityType, setSecurityType] = useState('2nd Mortgage Bond registered over title deed');
   const [capitalRequested, setCapitalRequested] = useState<number>(
     deal ? Math.round((deal.purchasePrice + deal.acquisitionCosts + deal.renovationBudget) * 0.7) : 1000000
   );
   const [pitchNotes, setPitchNotes] = useState<string>(() => deal?.notes || '');
   const [isSavedFeedback, setIsSavedFeedback] = useState(false);
+
+  const handleReturnTermsChange = (newStructure: ReturnTermType) => {
+    setFundingOfferType(newStructure);
+
+    if (newStructure === 'Equity Profit Split') {
+      if (offeredRate === 14 || offeredRate === 14.5) {
+        setOfferedRate(50);
+      }
+    } else {
+      if (offeredRate === 50) {
+        setOfferedRate(14);
+      }
+    }
+  };
 
   // Sync state when deal selection changes
   useEffect(() => {
@@ -447,10 +461,10 @@ function ProposalGeneratorContent() {
       const defaultCapital =
         deal.fundingRequiredZAR ??
         Math.round(fullProjectOutlay * 0.7);
-      const defaultOfferType =
-        deal.promisedReturnType === 'Equity Profit Split' ? 'Profit Share' : 'Fixed Interest';
+      const defaultOfferType: ReturnTermType =
+        (deal.promisedReturnType as ReturnTermType) ?? 'Fixed Interest';
       const defaultRate =
-        deal.promisedReturnRatePercent ?? (defaultOfferType === 'Profit Share' ? 50 : 14.5);
+        deal.promisedReturnRatePercent ?? (defaultOfferType === 'Equity Profit Split' ? 50 : 14);
       const defaultSec = deal.securityOffered ?? '2nd Mortgage Bond registered over title deed';
       setCapitalRequested(defaultCapital);
       setFundingOfferType(defaultOfferType);
@@ -462,12 +476,11 @@ function ProposalGeneratorContent() {
 
   const handleSaveTermsToDeal = () => {
     if (!deal) return;
-    const returnTypeToSave = fundingOfferType === 'Profit Share' ? 'Equity Profit Split' : 'Fixed Interest';
     if (deal.type === 'flip') {
       updateFlip(deal.id, {
         strategy: pitchStrategy,
         fundingRequiredZAR: capitalRequested,
-        promisedReturnType: returnTypeToSave,
+        promisedReturnType: fundingOfferType,
         promisedReturnRatePercent: offeredRate,
         securityOffered: securityType,
         notes: pitchNotes,
@@ -476,7 +489,7 @@ function ProposalGeneratorContent() {
       updateOpportunity(deal.id, {
         strategy: pitchStrategy,
         fundingRequiredZAR: capitalRequested,
-        promisedReturnType: returnTypeToSave,
+        promisedReturnType: fundingOfferType,
         promisedReturnRatePercent: offeredRate,
         securityOffered: securityType,
         notes: pitchNotes,
@@ -487,7 +500,7 @@ function ProposalGeneratorContent() {
       });
     }
     setIsSavedFeedback(true);
-    setTimeout(() => setIsSavedFeedback(false), 2500);
+    setTimeout(() => setIsSavedFeedback(false), 3000);
   };
 
   // Financial calculations
@@ -692,24 +705,24 @@ function ProposalGeneratorContent() {
               <select
                 name="fundingOfferType"
                 value={fundingOfferType}
-                onChange={(e) => {
-                  const val = e.target.value as 'Fixed Interest' | 'Profit Share';
-                  setFundingOfferType(val);
-                  if (val === 'Profit Share' && (offeredRate === 14 || offeredRate === 14.5)) {
-                    setOfferedRate(50);
-                  } else if (val === 'Fixed Interest' && offeredRate === 50) {
-                    setOfferedRate(14.5);
-                  }
-                }}
+                onChange={(e) => handleReturnTermsChange(e.target.value as ReturnTermType)}
                 className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg bg-white"
               >
-                <option value="Fixed Interest">Fixed Interest Coupon</option>
-                <option value="Profit Share">Equity / Profit Split</option>
+                <option value="Fixed Interest">Fixed Interest (% per annum)</option>
+                <option value="Equity Profit Split">Equity Profit Split (% of Net Profit)</option>
+                <option value="Monthly Coupon">Monthly Coupon</option>
+                <option value="Bullet Repayment">Bullet Repayment</option>
               </select>
             </div>
             <div>
               <label className="block text-[11px] font-semibold text-slate-600 mb-1">
-                {fundingOfferType === 'Profit Share' ? 'Offered Profit Share (%)' : 'Offered Return Rate (% p.a.)'}
+                {fundingOfferType === 'Equity Profit Split'
+                  ? 'Offered Profit Share (% of Net Profit)'
+                  : fundingOfferType === 'Bullet Repayment'
+                  ? 'Bullet Return Rate (% p.a.)'
+                  : fundingOfferType === 'Monthly Coupon'
+                  ? 'Monthly Coupon Rate (% p.a.)'
+                  : 'Annual Interest Rate (% p.a.)'}
               </label>
               <input
                 type="number"
@@ -718,7 +731,7 @@ function ProposalGeneratorContent() {
                 min="0"
                 step="any"
                 value={offeredRate}
-                placeholder={fundingOfferType === 'Profit Share' ? '50' : '14.5'}
+                placeholder={fundingOfferType === 'Equity Profit Split' ? '50' : '14'}
                 onChange={(e) => setOfferedRate(Number(e.target.value))}
                 className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg font-bold text-emerald-700"
               />
@@ -1712,13 +1725,26 @@ function ProposalGeneratorContent() {
                   <div className="flex items-center justify-between">
                     <span className="font-semibold text-slate-700">Proposed Return:</span>
                     <strong className="text-emerald-800 text-sm">
-                      {offeredRate}% {fundingOfferType === 'Fixed Interest' ? 'p.a. Fixed Interest' : 'Net Profit Split'}
+                      {offeredRate}%{' '}
+                      {fundingOfferType === 'Equity Profit Split'
+                        ? 'Net Profit Split'
+                        : fundingOfferType === 'Monthly Coupon'
+                        ? 'p.a. Monthly Coupon'
+                        : fundingOfferType === 'Bullet Repayment'
+                        ? 'p.a. Bullet Return (Accrued)'
+                        : 'p.a. Fixed Interest'}
                     </strong>
                   </div>
                   <div className="flex items-center justify-between">
-                    <span className="font-semibold text-slate-700">Coupon Payout:</span>
+                    <span className="font-semibold text-slate-700">Payout Schedule:</span>
                     <strong className="text-slate-800">
-                      {fundingOfferType === 'Fixed Interest' ? 'Monthly in advance' : 'At property transfer'}
+                      {fundingOfferType === 'Monthly Coupon'
+                        ? 'Monthly in advance'
+                        : fundingOfferType === 'Bullet Repayment'
+                        ? 'Lump sum at property transfer (0 monthly drag)'
+                        : fundingOfferType === 'Fixed Interest'
+                        ? 'Monthly in advance'
+                        : 'At property transfer'}
                     </strong>
                   </div>
                 </div>
@@ -1735,9 +1761,26 @@ function ProposalGeneratorContent() {
                   <div className="flex items-center justify-between">
                     <span className="font-semibold text-slate-700">Projected Lender Payout:</span>
                     <strong className="text-emerald-700 text-sm">
-                      {fundingOfferType === 'Fixed Interest'
-                        ? formatZAR(capitalRequested + (capitalRequested * (offeredRate / 100) * (holdingDuration / 12)))
-                        : formatZAR(capitalRequested + (projectedNetProfit * (offeredRate / 100)))}
+                      {(() => {
+                        const durationMonths = holdingDuration || 6;
+                        const durationFactor = durationMonths / 12;
+                        if (fundingOfferType === 'Equity Profit Split') {
+                          const profitShare = Math.round(projectedNetProfit * (offeredRate / 100));
+                          return `${formatZAR(capitalRequested + profitShare)} (${formatZAR(profitShare)} profit share)`;
+                        }
+                        if (fundingOfferType === 'Monthly Coupon') {
+                          const monthlyCoupon = Math.round((capitalRequested * (offeredRate / 100)) / 12);
+                          const totalCoupon = monthlyCoupon * durationMonths;
+                          return `${formatZAR(monthlyCoupon)}/mo • Total ${formatZAR(capitalRequested + totalCoupon)}`;
+                        }
+                        if (fundingOfferType === 'Bullet Repayment') {
+                          const accruedReturn = Math.round(capitalRequested * (offeredRate / 100) * durationFactor);
+                          return `${formatZAR(capitalRequested + accruedReturn)} (accrued at exit)`;
+                        }
+                        // Fixed Interest
+                        const accruedReturn = Math.round(capitalRequested * (offeredRate / 100) * durationFactor);
+                        return formatZAR(capitalRequested + accruedReturn);
+                      })()}
                     </strong>
                   </div>
                 </div>
