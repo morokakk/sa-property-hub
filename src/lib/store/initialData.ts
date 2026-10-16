@@ -2073,7 +2073,8 @@ export const INITIAL_FUNDING: FundingSource[] = [
     paymentSchedule: 'Monthly Interest',
     linkedDealId: 'flip-1',
     linkedDealName: 'Kloof Street Heritage Redesign',
-    totalRepaidZAR: 105_000, // Monthly payments made
+    totalRepaidZAR: 0,
+    totalInterestPaidZAR: 105_000, // Monthly coupon payments made (R17,500 x 6)
     lastPaymentReference: 'EFT-MEYER-20260901',
     status: 'Active',
     notes: 'First registered second-mortgage bond over Kloof Street. Monthly coupon R17,500.',

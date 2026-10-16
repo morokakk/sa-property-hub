@@ -392,8 +392,8 @@ describe('Portfolio Summary: Ring-Fenced Working Capital & SARS Provisional Tax 
   it('correctly calculates initial portfolio summary from store with updated accounting', () => {
     const summary = computePortfolioSummary(usePortfolioStore.getState());
 
-    // Private debt should be strictly drawn: R 1,995,000
-    expect(summary.totalPrivateFundingLiability).toBe(1_995_000);
+    // Private debt should be strictly drawn: R 2,100,000 (Johan R1.3M drawn + Protea R800k drawn)
+    expect(summary.totalPrivateFundingLiability).toBe(2_100_000);
 
     // Unallocated funding reserve should include Oom Piet's standby facility: R 450,000
     expect(summary.unallocatedFundingReserve).toBe(450_000);
@@ -412,8 +412,8 @@ describe('Portfolio Summary: Ring-Fenced Working Capital & SARS Provisional Tax 
     // Total bond liabilities across 4 active rentals = 1.28M + 940k + 1.55M + 520k = R 4,290,000
     expect(summary.totalBondLiabilities).toBe(4_290_000);
 
-    // Total funding liabilities = R 1,995,000 (private) + R 4,290,000 (bonds) = R 6,285,000
-    expect(summary.totalFundingLiabilities).toBe(6_285_000);
+    // Total funding liabilities = R 2,100,000 (private) + R 4,290,000 (bonds) = R 6,390,000
+    expect(summary.totalFundingLiabilities).toBe(6_390_000);
   });
 
   it('ensures settled funding facilities with tranches carry 0 liability', () => {
@@ -511,8 +511,8 @@ describe('Portfolio Summary: Ring-Fenced Working Capital & SARS Provisional Tax 
     expect(activatedSummary.deployableWarChest).toBe(650_000);
     // Net purchasing power without standby facility drops to 0 (free cash 0 + 0 standby)
     expect(activatedSummary.totalAvailablePurchasingPower).toBe(0);
-    // Total private funding liability increases by 450,000 (from 1,995,000 to 2,445,000)
-    expect(activatedSummary.totalPrivateFundingLiability).toBe(2_445_000);
+    // Total private funding liability increases by 450,000 (from 2,100,000 to 2,550,000)
+    expect(activatedSummary.totalPrivateFundingLiability).toBe(2_550_000);
   });
 
   it('calculates rental tax reserve property-by-property with individual overrides and global default fallback', () => {

@@ -279,7 +279,7 @@ export default function FundingTrackerPage() {
     return sum + drawn;
   }, 0);
   const totalUndrawnFacilities = Math.max(0, totalFacilityCapacity - totalCapitalDrawn);
-  const totalRepayments = funding.reduce((sum, f) => sum + (f.totalRepaidZAR || 0), 0);
+  const totalRepayments = funding.reduce((sum, f) => sum + (f.totalRepaidZAR || 0) + (f.totalInterestPaidZAR || 0), 0);
   const totalOutstanding = summary.totalPrivateFundingLiability;
   const totalMonthlyInterestExpense = funding
     .filter((f) => f.status === 'Active' && f.returnTermsType === 'Fixed Interest')
@@ -349,12 +349,15 @@ export default function FundingTrackerPage() {
                 </h3>
                 <div
                   className="text-xs text-slate-300 mt-2 bg-slate-950/80 px-2.5 py-1.5 rounded-lg border border-slate-800 w-fit flex flex-wrap items-center gap-1.5"
-                  title={`Gross War Chest: ${formatZAR(summary.deployableWarChest)} (${formatZAR(summary.liquidCapitalReserve)} Cash + ${formatZAR(summary.unallocatedFundingReserve)} Facilities) Less Ring-Fenced: ${formatZAR(summary.ringFencedWorkingCapital)} = Net Deployable: ${formatZAR(summary.totalAvailablePurchasingPower)}`}
+                  title={`Free Cash: ${formatZAR(summary.freeUnallocatedCash)} (${formatZAR(summary.liquidCapitalReserve)} Bank − ${formatZAR(summary.ringFencedWorkingCapital)} Ring-Fenced) + Standby Facilities: ${formatZAR(summary.unallocatedFundingReserve)} = Net Deployable Purchasing Power: ${formatZAR(summary.totalAvailablePurchasingPower)}`}
                 >
-                  <span className="text-slate-300">Less: Ring-Fenced Project Commitments</span>
-                  <span className="text-amber-400 font-semibold tabular-nums">(−{formatZAR(summary.ringFencedWorkingCapital)})</span>
+                  <span className="text-slate-300">Free Cash:</span>
+                  <strong className="font-semibold text-white tabular-nums">{formatZAR(summary.freeUnallocatedCash)}</strong>
+                  <span className="text-slate-400 font-bold px-0.5">+</span>
+                  <span className="text-slate-300">Standby Facilities:</span>
+                  <strong className="font-semibold text-white tabular-nums">{formatZAR(summary.unallocatedFundingReserve)}</strong>
                   <span className="text-slate-400 font-bold px-0.5">=</span>
-                  <span className="text-slate-300">Net Deployable Purchasing Power:</span>
+                  <span className="text-slate-300">Net Deployable:</span>
                   <strong className="font-semibold text-emerald-300 tabular-nums">{formatZAR(summary.totalAvailablePurchasingPower)}</strong>
                 </div>
               </div>

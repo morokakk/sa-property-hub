@@ -89,15 +89,15 @@ export default function GlobalDashboardPage() {
 
               <div
                 className="text-xs text-slate-300 mt-3 bg-slate-950/80 p-2.5 rounded-lg border border-slate-800 space-y-1"
-                title={`Gross War Chest: ${formatZAR(summary.deployableWarChest)} (${formatZAR(summary.liquidCapitalReserve)} Cash + ${formatZAR(summary.unallocatedFundingReserve)} Facilities) − Ring-Fenced: ${formatZAR(summary.ringFencedWorkingCapital)} = Net Purchasing Power: ${formatZAR(summary.totalAvailablePurchasingPower)}`}
+                title={`Free Cash: ${formatZAR(summary.freeUnallocatedCash)} (${formatZAR(summary.liquidCapitalReserve)} Bank − ${formatZAR(summary.ringFencedWorkingCapital)} Ring-Fenced) + Standby Facilities: ${formatZAR(summary.unallocatedFundingReserve)} = Net Deployable Purchasing Power: ${formatZAR(summary.totalAvailablePurchasingPower)}`}
               >
                 <div className="flex items-center justify-between gap-1 text-[11px] text-slate-300">
-                  <span>Gross War Chest:</span>
-                  <strong className="font-semibold text-white tabular-nums whitespace-nowrap">{formatZAR(summary.deployableWarChest)}</strong>
+                  <span>Free Cash (Post-Escrow):</span>
+                  <strong className="font-semibold text-white tabular-nums whitespace-nowrap">{formatZAR(summary.freeUnallocatedCash)}</strong>
                 </div>
                 <div className="flex items-center justify-between gap-1 text-[11px] text-slate-300 border-t border-slate-800/80 pt-1">
-                  <span className="text-slate-400">− Ring-Fenced:</span>
-                  <strong className="font-semibold text-amber-300 tabular-nums whitespace-nowrap">{formatZAR(summary.ringFencedWorkingCapital)}</strong>
+                  <span className="text-slate-400">+ Standby Facilities:</span>
+                  <strong className="font-semibold text-emerald-300 tabular-nums whitespace-nowrap">+{formatZAR(summary.unallocatedFundingReserve)}</strong>
                 </div>
               </div>
             </div>
