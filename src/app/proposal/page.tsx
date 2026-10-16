@@ -449,7 +449,8 @@ function ProposalGeneratorContent() {
         Math.round(fullProjectOutlay * 0.7);
       const defaultOfferType =
         deal.promisedReturnType === 'Equity Profit Split' ? 'Profit Share' : 'Fixed Interest';
-      const defaultRate = deal.promisedReturnRatePercent ?? 14.5;
+      const defaultRate =
+        deal.promisedReturnRatePercent ?? (defaultOfferType === 'Profit Share' ? 50 : 14.5);
       const defaultSec = deal.securityOffered ?? '2nd Mortgage Bond registered over title deed';
       setCapitalRequested(defaultCapital);
       setFundingOfferType(defaultOfferType);
@@ -691,7 +692,15 @@ function ProposalGeneratorContent() {
               <select
                 name="fundingOfferType"
                 value={fundingOfferType}
-                onChange={(e) => setFundingOfferType(e.target.value as any)}
+                onChange={(e) => {
+                  const val = e.target.value as 'Fixed Interest' | 'Profit Share';
+                  setFundingOfferType(val);
+                  if (val === 'Profit Share' && (offeredRate === 14 || offeredRate === 14.5)) {
+                    setOfferedRate(50);
+                  } else if (val === 'Fixed Interest' && offeredRate === 50) {
+                    setOfferedRate(14.5);
+                  }
+                }}
                 className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg bg-white"
               >
                 <option value="Fixed Interest">Fixed Interest Coupon</option>
@@ -699,7 +708,9 @@ function ProposalGeneratorContent() {
               </select>
             </div>
             <div>
-              <label className="block text-[11px] font-semibold text-slate-600 mb-1">Offered Return Rate (%)</label>
+              <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+                {fundingOfferType === 'Profit Share' ? 'Offered Profit Share (%)' : 'Offered Return Rate (% p.a.)'}
+              </label>
               <input
                 type="number"
                 name="offeredReturnRatePercent"
@@ -707,6 +718,7 @@ function ProposalGeneratorContent() {
                 min="0"
                 step="any"
                 value={offeredRate}
+                placeholder={fundingOfferType === 'Profit Share' ? '50' : '14.5'}
                 onChange={(e) => setOfferedRate(Number(e.target.value))}
                 className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg font-bold text-emerald-700"
               />

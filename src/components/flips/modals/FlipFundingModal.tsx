@@ -116,6 +116,34 @@ export const FlipFundingModal: React.FC<FlipFundingModalProps> = ({
   const securityOffered = propSecurityOffered !== undefined ? propSecurityOffered : localSecurityOffered;
   const setSecurityOffered = propSetSecurityOffered || setLocalSecurityOffered;
 
+  const handlePromisedReturnStructureChange = (newStructure: FlipProject['promisedReturnType']) => {
+    setPromisedReturnType(newStructure);
+
+    if (newStructure === 'Equity Profit Split') {
+      setPromisedPayoutSchedule('At Exit (Maturity)');
+      if (promisedReturnRatePercent === 14) {
+        setPromisedReturnRatePercent(50);
+      }
+    } else if (newStructure === 'Bullet Repayment') {
+      setPromisedPayoutSchedule('At Exit (Maturity)');
+      if (promisedReturnRatePercent === 50) {
+        setPromisedReturnRatePercent(14);
+      }
+    } else if (newStructure === 'Monthly Coupon') {
+      setPromisedPayoutSchedule('Monthly Interest');
+      if (promisedReturnRatePercent === 50) {
+        setPromisedReturnRatePercent(14);
+      }
+    } else if (newStructure === 'Fixed Interest') {
+      if (promisedPayoutSchedule === 'At Exit (Maturity)') {
+        setPromisedPayoutSchedule('Monthly Interest');
+      }
+      if (promisedReturnRatePercent === 50) {
+        setPromisedReturnRatePercent(14);
+      }
+    }
+  };
+
   if (!isOpen || !flip) return null;
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -248,7 +276,7 @@ export const FlipFundingModal: React.FC<FlipFundingModalProps> = ({
               <label className="block font-semibold text-slate-700 mb-1">Promised Return Structure</label>
               <select
                 value={promisedReturnType}
-                onChange={(e) => setPromisedReturnType(e.target.value as FlipProject['promisedReturnType'])}
+                onChange={(e) => handlePromisedReturnStructureChange(e.target.value as FlipProject['promisedReturnType'])}
                 className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white"
               >
                 <option value="Fixed Interest">Fixed Interest (% p.a.)</option>
@@ -258,7 +286,15 @@ export const FlipFundingModal: React.FC<FlipFundingModalProps> = ({
               </select>
             </div>
             <div>
-              <label className="block font-semibold text-slate-700 mb-1">Promised Rate / Split (%)</label>
+              <label className="block font-semibold text-slate-700 mb-1">
+                {promisedReturnType === 'Equity Profit Split'
+                  ? 'Promised Profit Share (% of Net Flip)'
+                  : promisedReturnType === 'Bullet Repayment'
+                  ? 'Bullet Return Rate (% p.a.)'
+                  : promisedReturnType === 'Monthly Coupon'
+                  ? 'Monthly Coupon Rate (% p.a.)'
+                  : 'Promised Interest Rate (% p.a.)'}
+              </label>
               <input
                 type="number"
                 name="returnRatePercent"
@@ -267,18 +303,40 @@ export const FlipFundingModal: React.FC<FlipFundingModalProps> = ({
                 step="any"
                 value={promisedReturnRatePercent}
                 onChange={(e) => setPromisedReturnRatePercent(Number(e.target.value))}
+                placeholder={promisedReturnType === 'Equity Profit Split' ? '50' : '14'}
                 className="w-full px-3 py-2 border border-slate-300 rounded-lg font-bold text-emerald-700"
               />
+              <span className="text-[10px] text-slate-400 block mt-0.5">
+                {promisedReturnType === 'Equity Profit Split'
+                  ? 'e.g. 50% for 50/50 JV split or 25% of net profit'
+                  : promisedReturnType === 'Bullet Repayment'
+                  ? 'Principal + return repaid as lump sum at exit'
+                  : promisedReturnType === 'Monthly Coupon'
+                  ? 'Regular monthly coupon payments'
+                  : 'Annual interest rate charged on loan'}
+              </span>
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block font-semibold text-slate-700 mb-1">Payout Schedule</label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block font-semibold text-slate-700">Payout Schedule</label>
+                {promisedReturnType === 'Equity Profit Split' && (
+                  <span className="text-[10px] font-semibold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">
+                    Locked to Exit
+                  </span>
+                )}
+              </div>
               <select
                 value={promisedPayoutSchedule}
                 onChange={(e) => setPromisedPayoutSchedule(e.target.value as FlipProject['promisedPayoutSchedule'])}
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white"
+                disabled={promisedReturnType === 'Equity Profit Split'}
+                className={`w-full px-3 py-2 border rounded-lg ${
+                  promisedReturnType === 'Equity Profit Split'
+                    ? 'bg-slate-100 border-slate-200 text-slate-500 cursor-not-allowed'
+                    : 'bg-white border-slate-300'
+                }`}
               >
                 <option value="Monthly Interest">Monthly Interest</option>
                 <option value="Quarterly">Quarterly</option>

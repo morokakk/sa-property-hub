@@ -102,6 +102,35 @@ export default function FundingTrackerPage() {
     return () => clearTimeout(timer);
   }, [toastMessage]);
 
+  const handleReturnTermsChange = (newStructure: ReturnTermType) => {
+    setReturnTermsType(newStructure);
+
+    if (newStructure === 'Equity Profit Split') {
+      setPaymentSchedule('At Exit (Maturity)');
+      // If still on default 14% interest rate, toggle to standard 50% equity profit split
+      if (returnRatePercent === 14) {
+        setReturnRatePercent(50);
+      }
+    } else if (newStructure === 'Bullet Repayment') {
+      setPaymentSchedule('At Exit (Maturity)');
+      if (returnRatePercent === 50) {
+        setReturnRatePercent(14);
+      }
+    } else if (newStructure === 'Monthly Coupon') {
+      setPaymentSchedule('Monthly Interest');
+      if (returnRatePercent === 50) {
+        setReturnRatePercent(14);
+      }
+    } else if (newStructure === 'Fixed Interest') {
+      if (paymentSchedule === 'At Exit (Maturity)') {
+        setPaymentSchedule('Monthly Interest');
+      }
+      if (returnRatePercent === 50) {
+        setReturnRatePercent(14);
+      }
+    }
+  };
+
   const handleAddFunding = (e: React.FormEvent) => {
     e.preventDefault();
     if (!lenderName) {
@@ -813,7 +842,7 @@ export default function FundingTrackerPage() {
                   <label className="block font-semibold text-slate-700 mb-1">Return Structure</label>
                   <select
                     value={returnTermsType}
-                    onChange={(e) => setReturnTermsType(e.target.value as ReturnTermType)}
+                    onChange={(e) => handleReturnTermsChange(e.target.value as ReturnTermType)}
                     className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white"
                   >
                     <option value="Fixed Interest">Fixed Interest (% per annum)</option>
@@ -823,7 +852,15 @@ export default function FundingTrackerPage() {
                   </select>
                 </div>
                 <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Rate / Split (%)</label>
+                  <label className="block font-semibold text-slate-700 mb-1">
+                    {returnTermsType === 'Equity Profit Split'
+                      ? 'Investor Profit Share (% of Net Profit)'
+                      : returnTermsType === 'Bullet Repayment'
+                      ? 'Bullet Return Rate (% p.a.)'
+                      : returnTermsType === 'Monthly Coupon'
+                      ? 'Monthly Coupon Rate (% p.a.)'
+                      : 'Annual Interest Rate (% p.a.)'}
+                  </label>
                   <input
                     type="number"
                     name="returnRatePercent"
@@ -832,24 +869,51 @@ export default function FundingTrackerPage() {
                     step="any"
                     value={returnRatePercent}
                     onChange={(e) => setReturnRatePercent(Number(e.target.value))}
+                    placeholder={returnTermsType === 'Equity Profit Split' ? '50' : '14'}
                     className="w-full px-3 py-2 border border-slate-300 rounded-lg font-bold"
                   />
+                  <p className="text-[11px] text-slate-400 mt-1">
+                    {returnTermsType === 'Equity Profit Split'
+                      ? 'e.g. 50% for 50/50 JV split, or 25% of net profit upon sale'
+                      : returnTermsType === 'Bullet Repayment'
+                      ? 'Principal + return repaid as lump sum at maturity'
+                      : returnTermsType === 'Monthly Coupon'
+                      ? 'Regular monthly coupon payments on drawn facility'
+                      : 'Annual interest rate charged on active drawn principal'}
+                  </p>
                 </div>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Payment Schedule</label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block font-semibold text-slate-700">Payment Schedule</label>
+                    {returnTermsType === 'Equity Profit Split' && (
+                      <span className="text-[10px] font-semibold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">
+                        Locked to Exit
+                      </span>
+                    )}
+                  </div>
                   <select
                     value={paymentSchedule}
                     onChange={(e) => setPaymentSchedule(e.target.value as any)}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white"
+                    disabled={returnTermsType === 'Equity Profit Split'}
+                    className={`w-full px-3 py-2 border rounded-lg ${
+                      returnTermsType === 'Equity Profit Split'
+                        ? 'bg-slate-100 border-slate-200 text-slate-500 cursor-not-allowed'
+                        : 'bg-white border-slate-300'
+                    }`}
                   >
                     <option value="Monthly Interest">Monthly Interest</option>
                     <option value="Quarterly">Quarterly</option>
                     <option value="At Exit (Maturity)">At Exit (Maturity / Sale)</option>
                     <option value="Bi-Annual">Bi-Annual</option>
                   </select>
+                  {returnTermsType === 'Equity Profit Split' && (
+                    <p className="text-[11px] text-amber-700 mt-1">
+                      Profit share is distributed upon deal exit &amp; deed transfer.
+                    </p>
+                  )}
                 </div>
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">Link to Active Deal / Project</label>
