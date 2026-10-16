@@ -276,6 +276,33 @@ describe('whatsappFormatter - Strategy Adaptive Formatting', () => {
     expect(output).toContain('Sponsor: Apex Capital Properties');
   });
 
+  it('formats Proposal Generator pitch with custom Value-Add Thesis note', () => {
+    const output = formatProposalPitchForWhatsApp({
+      deal: {
+        id: 'deal-pitch-2',
+        title: 'Kloof Street Heritage Redesign',
+        address: '74 Kloof Street',
+        city: 'Cape Town',
+        purchasePrice: 3_800_000,
+        acquisitionCosts: 315_000,
+        renovationBudget: 750_000,
+        targetExitPrice: 5_650_000,
+        strategy: 'Flip',
+        holdingDurationMonths: 6,
+        notes: 'Restoring historic Victorian facade while introducing open-plan modern Scandinavian interior.',
+      },
+      strategy: 'Flip',
+      capitalRequested: 1_800_000,
+      fundingOfferType: 'Fixed Interest',
+      offeredRate: 14.0,
+      securityType: '1st registered second-mortgage bond',
+      notes: 'Restoring historic Victorian facade while introducing open-plan modern Scandinavian interior.',
+      investorProfile: mockInvestorProfile,
+    });
+
+    expect(output).toContain('• Value-Add Thesis: "Restoring historic Victorian facade while introducing open-plan modern Scandinavian interior."');
+  });
+
   it('formats Proposal Generator pitch with High-Street Auction sourcing and distressed arrears', () => {
     const output = formatProposalPitchForWhatsApp({
       deal: {

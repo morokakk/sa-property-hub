@@ -53,12 +53,14 @@ export interface ProposalPitchParams {
     tenantArrears?: number;
     overdueMonths?: number;
     occupantRisk?: OccupantRiskProfile;
+    notes?: string;
   };
   strategy: DealStrategy;
   capitalRequested: number;
   fundingOfferType: 'Fixed Interest' | 'Profit Share';
   offeredRate: number;
   securityType: string;
+  notes?: string;
   investorProfile?: InvestorProfile;
 }
 
@@ -465,6 +467,11 @@ export function formatProposalPitchForWhatsApp(
 
   if (investorProfile) {
     text += `• Sponsor: ${investorProfile.entityName} ${investorProfile.tradingAs ? `(T/A ${investorProfile.tradingAs})` : ''}\n`;
+  }
+
+  const pitchThesis = params.notes !== undefined ? params.notes : deal.notes;
+  if (pitchThesis && pitchThesis.trim()) {
+    text += `• Value-Add Thesis: "${pitchThesis.trim()}"\n`;
   }
   text += `\n`;
 

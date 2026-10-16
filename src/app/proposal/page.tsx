@@ -213,7 +213,7 @@ function ProposalGeneratorContent() {
           .toISOString()
           .split('T')[0],
         boq: [],
-        notes: `Sourced via ${o.source}. Gross Yield: ${o.grossYield}%, Cap Rate: ${o.capRate}%`,
+        notes: o.notes || `Sourced via ${o.source}. Gross Yield: ${o.grossYield}%, Cap Rate: ${o.capRate}%`,
         fundingRequiredZAR: o.fundingRequiredZAR,
         capitalRaisedZAR: o.capitalRaisedZAR,
         primaryFunderName: o.primaryFunderName,
@@ -294,7 +294,7 @@ function ProposalGeneratorContent() {
         exitCommissionPercent: 5.75,
         completionDate: r.leases?.[0]?.leaseEndDate || new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
         boq: [],
-        notes: `Seasoned portfolio asset. Tenant: ${showTenantNames ? (r.leases?.[0]?.tenantName || 'In-place') : 'In-Place (Masked)'}. Gross Rent: ${formatZAR(r.monthlyGrossRentZAR)}/mo. Bond balance: ${formatZAR(r.outstandingBondBalanceZAR || 0)}.`,
+        notes: r.notes || `Seasoned portfolio asset. Tenant: ${showTenantNames ? (r.leases?.[0]?.tenantName || 'In-place') : 'In-Place (Masked)'}. Gross Rent: ${formatZAR(r.monthlyGrossRentZAR)}/mo. Bond balance: ${formatZAR(r.outstandingBondBalanceZAR || 0)}.`,
         fundingRequiredZAR: Math.round(openMarket * 0.3),
         capitalRaisedZAR: 0,
         primaryFunderName: undefined,
@@ -385,6 +385,7 @@ function ProposalGeneratorContent() {
   const [capitalRequested, setCapitalRequested] = useState<number>(
     deal ? Math.round((deal.purchasePrice + deal.acquisitionCosts + deal.renovationBudget) * 0.7) : 1000000
   );
+  const [pitchNotes, setPitchNotes] = useState<string>(() => deal?.notes || '');
   const [isSavedFeedback, setIsSavedFeedback] = useState(false);
 
   // Sync state when deal selection changes
@@ -421,6 +422,7 @@ function ProposalGeneratorContent() {
       setFundingOfferType(defaultOfferType);
       setOfferedRate(defaultRate);
       setSecurityType(defaultSec);
+      setPitchNotes(deal.notes || '');
     }
   }, [selectedDealId]);
 
@@ -434,6 +436,7 @@ function ProposalGeneratorContent() {
         promisedReturnType: returnTypeToSave,
         promisedReturnRatePercent: offeredRate,
         securityOffered: securityType,
+        notes: pitchNotes,
       });
     } else if (deal.type === 'opportunity') {
       updateOpportunity(deal.id, {
@@ -442,10 +445,11 @@ function ProposalGeneratorContent() {
         promisedReturnType: returnTypeToSave,
         promisedReturnRatePercent: offeredRate,
         securityOffered: securityType,
+        notes: pitchNotes,
       });
     } else if (deal.type === 'rental') {
       updateRental(deal.id, {
-        notes: `Private pitch terms: ${offeredRate}% ${fundingOfferType}, security: ${securityType}`,
+        notes: pitchNotes,
       });
     }
     setIsSavedFeedback(true);
@@ -521,9 +525,10 @@ function ProposalGeneratorContent() {
       fundingOfferType,
       offeredRate,
       securityType,
+      notes: pitchNotes,
       investorProfile,
     });
-  }, [deal, pitchStrategy, capitalRequested, fundingOfferType, offeredRate, securityType, investorProfile, auctioneerCommission, municipalArrears, exitCommissionPercent]);
+  }, [deal, pitchStrategy, capitalRequested, fundingOfferType, offeredRate, securityType, pitchNotes, investorProfile, auctioneerCommission, municipalArrears, exitCommissionPercent]);
 
   const handleCopyPitchWhatsApp = async () => {
     if (!pitchWhatsAppText) return;
@@ -684,6 +689,25 @@ function ProposalGeneratorContent() {
                 className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg"
               />
             </div>
+          </div>
+
+          <div className="pt-3 border-t border-slate-100 text-xs">
+            <label htmlFor="pitch-notes-input" className="block text-[11px] font-semibold text-slate-600 mb-1">
+              Executive Deal Thesis / Renovation Scope (Pitch Highlight Quote)
+            </label>
+            <textarea
+              id="pitch-notes-input"
+              name="pitchNotes"
+              rows={2}
+              autoComplete="off"
+              value={pitchNotes}
+              onChange={(e) => setPitchNotes(e.target.value)}
+              placeholder="e.g., Restoring historic Victorian facade while introducing open-plan modern Scandinavian interior."
+              className="w-full px-3 py-2 border border-slate-300 rounded-lg text-slate-800 text-xs italic focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 resize-y"
+            />
+            <p className="text-[10px] text-slate-400 mt-1">
+              Appears live as the highlighted thesis quote on Section 1 below and in the WhatsApp pitch memorandum. Click &ldquo;Save Terms to Deal&rdquo; to persist changes to the deal.
+            </p>
           </div>
 
           {/* Strategy Selector */}
@@ -1053,9 +1077,9 @@ function ProposalGeneratorContent() {
                 </div>
               )}
 
-              {deal.notes && (
+              {pitchNotes && (
                 <div className="p-3 rounded-lg bg-slate-50 border-l-4 border-emerald-600 text-xs text-slate-700 font-medium italic">
-                  &ldquo;{deal.notes}&rdquo;
+                  &ldquo;{pitchNotes}&rdquo;
                 </div>
               )}
               {investorProfile.bioSummary && (
