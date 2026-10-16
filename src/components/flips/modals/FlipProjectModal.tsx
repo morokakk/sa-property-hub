@@ -16,6 +16,7 @@ import {
 import { usePortfolioStore } from '@/lib/store/usePortfolioStore';
 import InvestmentNodeSelect, { InvestmentNodeBanner } from '@/components/common/InvestmentNodeSelect';
 import { getNodeComplianceProfile } from '@/lib/constants/investmentNodes';
+import AiApiKeyGuardrailBanner from '@/components/ai/AiApiKeyGuardrailBanner';
 
 export interface FlipProjectModalProps {
   isOpen: boolean;
@@ -193,6 +194,7 @@ export const FlipProjectModal: React.FC<FlipProjectModalProps> = ({
   const [localPdfParseNotice, setLocalPdfParseNotice] = useState<string | null>(null);
   const [localExtractedValuation, setLocalExtractedValuation] = useState<number | null>(null);
   const [localIsParsingPdf, setLocalIsParsingPdf] = useState(false);
+  const [cachedUploadFiles, setCachedUploadFiles] = useState<File[]>([]);
 
   useEffect(() => {
     if (editingFlip && isOpen && propFlipTitle === undefined) {
@@ -336,8 +338,9 @@ export const FlipProjectModal: React.FC<FlipProjectModalProps> = ({
     onClose();
   };
 
-  const handlePdfUpload = async (files: File[]) => {
+  const handlePdfUpload = async (files: File[], overrideAiSettings?: typeof aiSettings) => {
     if (!files || files.length === 0) return;
+    setCachedUploadFiles(files);
     if (propOnPdfSelected) {
       propOnPdfSelected(files);
       return;
@@ -345,6 +348,8 @@ export const FlipProjectModal: React.FC<FlipProjectModalProps> = ({
 
     setLocalIsParsingPdf(true);
     setPdfParseNotice(null);
+
+    const activeSettings = overrideAiSettings || aiSettings;
 
     try {
       let combinedRates = 0;
@@ -357,7 +362,7 @@ export const FlipProjectModal: React.FC<FlipProjectModalProps> = ({
       let detectedValuation = 0;
 
       for (const file of files) {
-        const parsed = await parseRentalPdfStatement(file, aiSettings);
+        const parsed = await parseRentalPdfStatement(file, activeSettings);
         if (!parsed.success) continue;
 
         if (parsed.docType === 'municipal_utility' && parsed.utilityStatement) {
@@ -433,6 +438,16 @@ export const FlipProjectModal: React.FC<FlipProjectModalProps> = ({
       console.error('Failed to parse statement for flip:', err);
     } finally {
       setLocalIsParsingPdf(false);
+    }
+  };
+
+  const handleKeySaved = async (savedKey: string) => {
+    if (cachedUploadFiles && cachedUploadFiles.length > 0) {
+      const updatedSettings = {
+        ...(aiSettings || { provider: 'anthropic' as const, model: 'claude-sonnet-5' }),
+        apiKey: savedKey,
+      };
+      await handlePdfUpload(cachedUploadFiles, updatedSettings);
     }
   };
 
@@ -572,6 +587,11 @@ export const FlipProjectModal: React.FC<FlipProjectModalProps> = ({
             <X className="w-4 h-4" />
           </button>
         </div>
+
+        {/* Missing AI Key Guardrail Banner */}
+        {!aiSettings?.apiKey && (
+          <AiApiKeyGuardrailBanner onKeySaved={handleKeySaved} className="mb-3" />
+        )}
 
         {/* Quick Auto-fill from PDF statement button / dropzone */}
         <div className="relative mb-3">

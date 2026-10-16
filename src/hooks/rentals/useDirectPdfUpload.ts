@@ -8,17 +8,22 @@ export interface ParsingProgress {
   filename: string;
 }
 
+export type DirectPdfQueueItem = UnifiedParsedStatementResult & {
+  fileName?: string;
+  file?: File;
+};
+
 export interface UseDirectPdfUploadReturn {
-  queue: (UnifiedParsedStatementResult & { fileName?: string })[];
+  queue: DirectPdfQueueItem[];
   isProcessing: boolean;
   parsingProgress: ParsingProgress | null;
   enqueueFiles: (files: FileList | File[]) => Promise<void>;
   clearQueue: () => void;
-  setQueue: React.Dispatch<React.SetStateAction<(UnifiedParsedStatementResult & { fileName?: string })[]>>;
+  setQueue: React.Dispatch<React.SetStateAction<DirectPdfQueueItem[]>>;
 }
 
 export function useDirectPdfUpload(aiSettings?: AiSettings): UseDirectPdfUploadReturn {
-  const [queue, setQueue] = useState<(UnifiedParsedStatementResult & { fileName?: string })[]>([]);
+  const [queue, setQueue] = useState<DirectPdfQueueItem[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [parsingProgress, setParsingProgress] = useState<ParsingProgress | null>(null);
 
@@ -28,7 +33,7 @@ export function useDirectPdfUpload(aiSettings?: AiSettings): UseDirectPdfUploadR
       if (!files || files.length === 0) return;
 
       setIsProcessing(true);
-      const parsedResults: (UnifiedParsedStatementResult & { fileName?: string })[] = [];
+      const parsedResults: DirectPdfQueueItem[] = [];
 
       try {
         for (let i = 0; i < files.length; i++) {
@@ -36,20 +41,11 @@ export function useDirectPdfUpload(aiSettings?: AiSettings): UseDirectPdfUploadR
           setParsingProgress({ current: i + 1, total: files.length, filename: file.name });
           const result = await parseRentalPdfStatement(file, aiSettings);
 
-          if (!result.success) {
-            setParsingProgress(null);
-            setIsProcessing(false);
-            if (typeof window !== 'undefined' && typeof window.alert === 'function') {
-              window.alert(
-                `Failed to parse "${file.name}":\n\n${result.error || 'Unrecognized document structure'}\n\nPlease check this file and re-upload.`
-              );
-            }
-            return;
-          }
-
+          // Retain cached file reference for zero-friction re-parse
           parsedResults.push({
             ...result,
             fileName: file.name,
+            file,
           });
         }
 

@@ -17,6 +17,7 @@ import {
   Receipt,
   User,
   ShieldCheck,
+  Loader2,
 } from 'lucide-react';
 import { usePortfolioStore } from '@/lib/store/usePortfolioStore';
 import {
@@ -25,11 +26,16 @@ import {
   ExtractedRentalUnit,
   MeterReading,
   PropertyTitleType,
+  AiSettings,
 } from '@/types';
-import { UnifiedParsedStatementResult, findMatchingRental } from '@/lib/utilities/pdfParser';
+import { UnifiedParsedStatementResult, findMatchingRental, parseRentalPdfStatement } from '@/lib/utilities/pdfParser';
 import { formatZAR, formatDate } from '@/lib/formatters';
+import AiApiKeyGuardrailBanner from '@/components/ai/AiApiKeyGuardrailBanner';
 
-export type VerificationStatementItem = UnifiedParsedStatementResult & { fileName?: string };
+export type VerificationStatementItem = UnifiedParsedStatementResult & {
+  fileName?: string;
+  file?: File;
+};
 
 interface UnifiedPdfVerificationModalProps {
   isOpen: boolean;
@@ -50,14 +56,24 @@ export default function UnifiedPdfVerificationModal({
   const addRental = usePortfolioStore((state) => state.addRental);
   const updateRental = usePortfolioStore((state) => state.updateRental);
   const addUtilityStatement = usePortfolioStore((state) => state.addUtilityStatement);
+  const aiSettings = usePortfolioStore((state) => state.aiSettings);
 
   const activeRentals = useMemo(() => rentals.filter((r) => r.status !== 'Sold'), [rentals]);
 
-  const items: VerificationStatementItem[] = useMemo(() => {
-    if (queue && queue.length > 0) return queue;
-    if (singleData) return [singleData];
-    return [];
+  const [localItems, setLocalItems] = useState<VerificationStatementItem[]>([]);
+  const [isReparsing, setIsReparsing] = useState(false);
+
+  useEffect(() => {
+    if (queue && queue.length > 0) {
+      setLocalItems(queue);
+    } else if (singleData) {
+      setLocalItems([singleData]);
+    } else {
+      setLocalItems([]);
+    }
   }, [queue, singleData]);
+
+  const items = localItems;
 
   const [currentIndex, setCurrentIndex] = useState(0);
   const [itemStatuses, setItemStatuses] = useState<Record<number, 'pending' | 'saved' | 'skipped'>>({});
@@ -89,6 +105,36 @@ export default function UnifiedPdfVerificationModal({
   }, [isOpen]);
 
   const data = items[currentIndex] || null;
+  const hasApiKey = Boolean(aiSettings?.apiKey && aiSettings.apiKey.trim().length > 5);
+
+  const handleKeySaved = async (savedKey: string) => {
+    const currentItem = items[currentIndex];
+    if (!currentItem?.file) return;
+
+    setIsReparsing(true);
+    try {
+      const updatedAiSettings: AiSettings = {
+        ...(aiSettings || { provider: 'anthropic', model: 'claude-sonnet-5' }),
+        apiKey: savedKey,
+      };
+      const result = await parseRentalPdfStatement(currentItem.file, updatedAiSettings);
+      if (result.success) {
+        setLocalItems((prev) => {
+          const next = [...prev];
+          next[currentIndex] = {
+            ...result,
+            fileName: currentItem.fileName,
+            file: currentItem.file,
+          };
+          return next;
+        });
+      }
+    } catch (err) {
+      console.error('Failed to re-parse with newly saved key:', err);
+    } finally {
+      setIsReparsing(false);
+    }
+  };
 
   // Editable Financial & Valuation Fields (cross-statement)
   const [marketValueZAR, setMarketValueZAR] = useState(0);
@@ -594,6 +640,78 @@ export default function UnifiedPdfVerificationModal({
     ? propertyName || 'New Property'
     : matchedRental?.title || 'Selected Property';
 
+  if (!isOpen || !data) return null;
+
+  if (!data.success) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-150">
+        <div
+          className="bg-white rounded-t-3xl sm:rounded-2xl shadow-2xl border border-slate-200 w-full max-w-xl overflow-hidden flex flex-col animate-in zoom-in-95 duration-200"
+          role="dialog"
+          aria-modal="true"
+        >
+          {/* Header */}
+          <div className="bg-slate-900 text-white px-4 sm:px-6 py-4 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center border border-amber-500/30 shrink-0">
+                <AlertCircle className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold tracking-tight">Statement Extraction Notice</h3>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  {data.fileName || 'Uploaded Statement'}
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={onClose}
+              className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+
+          <div className="p-4 sm:p-6 space-y-4">
+            <div className="p-3.5 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-950 space-y-1.5">
+              <span className="font-bold block">Document Parsing Notice</span>
+              <p className="text-amber-800 leading-relaxed text-[11px]">
+                {data.error || 'This statement requires an AI API Key to extract structured rent and utility line items.'}
+              </p>
+            </div>
+
+            {isReparsing ? (
+              <div className="bg-purple-50 border border-purple-200 rounded-xl p-4 flex items-center justify-center gap-2.5 text-xs text-purple-900 font-semibold animate-pulse">
+                <Loader2 className="w-4 h-4 animate-spin text-purple-600" />
+                <span>Re-parsing statement with newly saved API key...</span>
+              </div>
+            ) : (
+              <AiApiKeyGuardrailBanner onKeySaved={handleKeySaved} />
+            )}
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+              {items.length > 1 && currentIndex < items.length - 1 && (
+                <button
+                  type="button"
+                  onClick={() => setCurrentIndex((prev) => prev + 1)}
+                  className="px-3.5 py-2 text-xs font-semibold text-slate-600 hover:text-slate-900 rounded-lg transition-colors cursor-pointer"
+                >
+                  Skip to Next Statement ↗
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={onClose}
+                className="px-4 py-2 text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg transition-colors cursor-pointer"
+              >
+                Dismiss
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-150">
       <div
@@ -691,6 +809,19 @@ export default function UnifiedPdfVerificationModal({
 
         {/* Modal Body */}
         <div className="p-4 sm:p-6 overflow-y-auto space-y-5 flex-1">
+          {/* Active Re-parsing Loader */}
+          {isReparsing && (
+            <div className="bg-purple-50 border border-purple-200 rounded-xl p-3.5 flex items-center justify-center gap-2 text-xs text-purple-900 font-semibold animate-pulse">
+              <Loader2 className="w-4 h-4 animate-spin text-purple-600" />
+              <span>Re-analyzing statement with newly saved AI credentials...</span>
+            </div>
+          )}
+
+          {/* Missing AI Key Guardrail Banner (shown when key missing or fallback parser used) */}
+          {!hasApiKey && !isReparsing && (
+            <AiApiKeyGuardrailBanner onKeySaved={handleKeySaved} />
+          )}
+
           {/* Property Target & Match Status Banner */}
           <div className={`p-3.5 rounded-xl border space-y-3 ${
             isNewProperty

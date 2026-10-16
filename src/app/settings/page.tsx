@@ -42,6 +42,7 @@ import {
   ChevronUp,
   RotateCcw,
   BookOpen,
+  ExternalLink,
 } from 'lucide-react';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabaseClient';
@@ -51,6 +52,10 @@ import { SOUTH_AFRICAN_BANKS, ACCOUNT_TYPES } from '@/lib/constants/banks';
 import {
   DEFAULT_ANTHROPIC_MODEL,
   SUPPORTED_ANTHROPIC_MODELS,
+  DEFAULT_GOOGLE_MODEL,
+  SUPPORTED_GOOGLE_MODELS,
+  getProviderConfig,
+  validateApiKeyFormat,
   normalizeAiModel,
 } from '@/lib/ai/modelConfig';
 import { formatZAR, formatPercent } from '@/lib/formatters';
@@ -650,13 +655,23 @@ function SettingsContent() {
     setTimeout(() => setSavedSuccess(false), 3500);
   };
 
+  // AI Provider & Key Configuration
+  const currentProviderConfig = useMemo(() => {
+    return getProviderConfig(aiProvider);
+  }, [aiProvider]);
+
   // AI API Key validation check
   const apiKeyValidationState = useMemo(() => {
-    const key = aiApiKey.trim();
-    if (!key) return 'empty';
-    if (key.startsWith('sk-ant-') && key.length >= 20) return 'valid';
-    return 'invalid_prefix';
-  }, [aiApiKey]);
+    return validateApiKeyFormat(aiProvider, aiApiKey);
+  }, [aiProvider, aiApiKey]);
+
+  const handleProviderChange = (newProvider: 'anthropic' | 'google') => {
+    setAiProvider(newProvider);
+    const newConfig = getProviderConfig(newProvider);
+    if (!(newConfig.supportedModels as readonly string[]).includes(aiModel)) {
+      setAiModel(newConfig.defaultModel);
+    }
+  };
 
   return (
     <div className="flex-1 flex flex-col">
@@ -1952,7 +1967,7 @@ function SettingsContent() {
                   {apiKeyValidationState === 'valid' && (
                     <span className="text-[11px] bg-emerald-50 border border-emerald-200 text-emerald-800 px-2.5 py-1 rounded-md font-semibold flex items-center gap-1.5">
                       <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                      Valid Anthropic API Key Format
+                      Valid {currentProviderConfig.name} API Key Format
                     </span>
                   )}
                   {apiKeyValidationState === 'empty' && (
@@ -1964,7 +1979,7 @@ function SettingsContent() {
                   {apiKeyValidationState === 'invalid_prefix' && (
                     <span className="text-[11px] bg-amber-50 border border-amber-200 text-amber-800 px-2.5 py-1 rounded-md font-medium flex items-center gap-1.5">
                       <AlertCircle className="w-3.5 h-3.5 text-amber-600" />
-                      Check Key Format (Anthropic keys typically start with sk-ant-)
+                      Check Key Format ({currentProviderConfig.name} keys typically start with {currentProviderConfig.keyPrefix})
                     </span>
                   )}
                 </div>
@@ -1974,14 +1989,16 @@ function SettingsContent() {
                     <label className="block font-semibold text-slate-700 mb-1">AI Provider</label>
                     <select
                       value={aiProvider}
-                      onChange={(e) => setAiProvider(e.target.value as 'anthropic' | 'google')}
+                      onChange={(e) => handleProviderChange(e.target.value as 'anthropic' | 'google')}
                       className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white text-slate-800 font-medium focus:ring-1 focus:ring-indigo-500"
                     >
                       <option value="anthropic">Anthropic Claude (Messages API - Active)</option>
-                      <option value="google" disabled>Google Gemini 1.5 Pro (Coming Soon)</option>
+                      <option value="google">Google Gemini (Gemini Flash &amp; Pro - Active)</option>
                     </select>
                     <p className="text-[11px] text-slate-400 mt-1">
-                      Claude Sonnet 5 supports high-precision multi-page PDF &amp; image ledger extractions.
+                      {aiProvider === 'google'
+                        ? 'Google Gemini provides high-speed multimodal OCR and statement parsing.'
+                        : 'Claude Sonnet 5 supports high-precision multi-page PDF & image ledger extractions.'}
                     </p>
                   </div>
 
@@ -1989,7 +2006,7 @@ function SettingsContent() {
                     <label className="block font-semibold text-slate-700 mb-1">Extraction Model</label>
                     <select
                       value={
-                        (SUPPORTED_ANTHROPIC_MODELS as readonly string[]).includes(aiModel)
+                        (currentProviderConfig.supportedModels as readonly string[]).includes(aiModel)
                           ? aiModel
                           : 'custom'
                       }
@@ -2000,19 +2017,29 @@ function SettingsContent() {
                       }}
                       className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white text-slate-800 font-medium focus:ring-1 focus:ring-indigo-500"
                     >
-                      <option value="claude-sonnet-5">Claude Sonnet 5 (claude-sonnet-5 - Recommended)</option>
-                      <option value="claude-haiku-4-5">Claude Haiku 4.5 (claude-haiku-4-5 - Fast &amp; Cost-Efficient)</option>
-                      <option value="claude-opus-5">Claude Opus 5 (claude-opus-5 - Deep Reasoning)</option>
-                      <option value="claude-fable-5-1">Claude Fable 5.1 (claude-fable-5-1 - Flagship)</option>
-                      <option value="claude-sonnet-4-6">Claude Sonnet 4.6 (claude-sonnet-4-6)</option>
+                      {aiProvider === 'google' ? (
+                        <>
+                          <option value="gemini-3.1-pro">Gemini 3.1 Pro (gemini-3.1-pro - Recommended)</option>
+                          <option value="gemini-3.8-flash">Gemini 3.8 Flash (gemini-3.8-flash - Fast &amp; Cost-Efficient)</option>
+                          <option value="gemini-3.7-flash">Gemini 3.7 Flash (gemini-3.7-flash - Flagship Reasoning)</option>
+                        </>
+                      ) : (
+                        <>
+                          <option value="claude-sonnet-5">Claude Sonnet 5 (claude-sonnet-5 - Recommended)</option>
+                          <option value="claude-haiku-4-5">Claude Haiku 4.5 (claude-haiku-4-5 - Fast &amp; Cost-Efficient)</option>
+                          <option value="claude-opus-5">Claude Opus 5 (claude-opus-5 - Deep Reasoning)</option>
+                          <option value="claude-fable-5-1">Claude Fable 5.1 (claude-fable-5-1 - Flagship)</option>
+                          <option value="claude-sonnet-4-6">Claude Sonnet 4.6 (claude-sonnet-4-6)</option>
+                        </>
+                      )}
                       <option value="custom">Custom Model Identifier...</option>
                     </select>
-                    {!(SUPPORTED_ANTHROPIC_MODELS as readonly string[]).includes(aiModel) && (
+                    {!(currentProviderConfig.supportedModels as readonly string[]).includes(aiModel) && (
                       <input
                         type="text"
                         value={aiModel}
                         onChange={(e) => setAiModel(e.target.value)}
-                        placeholder="Enter custom model identifier (e.g. claude-sonnet-5)"
+                        placeholder={`Enter custom model identifier (e.g. ${currentProviderConfig.defaultModel})`}
                         className="mt-2 w-full px-3 py-1.5 text-xs font-mono border border-slate-300 rounded-lg bg-white text-slate-800"
                       />
                     )}
@@ -2024,7 +2051,7 @@ function SettingsContent() {
 
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">
-                    Anthropic API Key <span className="text-slate-400 font-normal">(Client-Side Only)</span>
+                    {currentProviderConfig.inputLabel} <span className="text-slate-400 font-normal">(Client-Side Only)</span>
                   </label>
                   <div className="relative">
                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
@@ -2038,7 +2065,7 @@ function SettingsContent() {
                       data-1p-ignore
                       value={aiApiKey}
                       onChange={(e) => setAiApiKey(e.target.value)}
-                      placeholder="sk-ant-api03-..."
+                      placeholder={currentProviderConfig.keyPlaceholder}
                       className="w-full pl-9 pr-10 py-2 border border-slate-300 rounded-lg font-mono text-xs text-slate-800 bg-white placeholder-slate-400 focus:ring-1 focus:ring-indigo-500"
                     />
                     <button
@@ -2049,6 +2076,34 @@ function SettingsContent() {
                     >
                       {showApiKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                     </button>
+                  </div>
+
+                  {/* Interactive Provider-Aware Documentation & Console Links */}
+                  <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mt-1">
+                    <a
+                      href={currentProviderConfig.docUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 inline-flex items-center gap-1 transition-colors font-medium"
+                    >
+                      {currentProviderConfig.docLabel}
+                      <ExternalLink className="w-3 h-3 shrink-0" />
+                    </a>
+
+                    {currentProviderConfig.consoleUrl && (
+                      <>
+                        <span className="text-slate-300 text-xs select-none">•</span>
+                        <a
+                          href={currentProviderConfig.consoleUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 inline-flex items-center gap-1 transition-colors font-medium"
+                        >
+                          {currentProviderConfig.consoleLabel}
+                          <ExternalLink className="w-3 h-3 shrink-0" />
+                        </a>
+                      </>
+                    )}
                   </div>
                 </div>
 
