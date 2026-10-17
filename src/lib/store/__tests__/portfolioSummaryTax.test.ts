@@ -661,4 +661,105 @@ describe('Portfolio Summary: Ring-Fenced Working Capital & SARS Provisional Tax 
     const taxDifference = summarySec11a.annualRentalTaxReserve - hypotheticalFullInstallmentTax;
     expect(taxDifference).toBe(2_015);
   });
+
+  it('dynamically reflects newly added capital sources in the Deployable War Chest and liquid reserves', () => {
+    const baseState = usePortfolioStore.getState();
+    const initialSummary = computePortfolioSummary(baseState);
+
+    // Initial baseline: 650k cash + 450k standby = 1,100,000
+    expect(initialSummary.liquidCapitalReserve).toBe(650_000);
+    expect(initialSummary.unallocatedFundingReserve).toBe(450_000);
+    expect(initialSummary.deployableWarChest).toBe(1_100_000);
+
+    // 1. User adds an Active general liquidity facility (e.g. mmmtest R500,000)
+    const newActiveSource: FundingSource = {
+      id: 'fund-new-active-500k',
+      lenderName: 'mmmtest',
+      entityOrContact: 'Test Entity',
+      emailPhone: 'test@example.com',
+      fundingType: 'Private Lender',
+      capitalAmountZAR: 500_000,
+      disbursementDate: '2026-10-17',
+      maturityDate: '2027-10-17',
+      returnTermsType: 'Fixed Interest',
+      returnRatePercent: 14.0,
+      paymentSchedule: 'Monthly Interest',
+      linkedDealName: 'General Portfolio Liquidity',
+      totalRepaidZAR: 0,
+      status: 'Active',
+    };
+
+    const activeSummary = computePortfolioSummary({
+      ...baseState,
+      funding: [newActiveSource, ...baseState.funding],
+    });
+
+    // Liquid cash reserve increases by 500k: 650,000 + 500,000 = 1,150,000
+    expect(activeSummary.liquidCapitalReserve).toBe(1_150_000);
+    // Unallocated standby facilities remain 450,000 (Oom Piet)
+    expect(activeSummary.unallocatedFundingReserve).toBe(450_000);
+    // Deployable War Chest increases from 1.1M to 1.65M: 1,150,000 + 450,000 = 1,600,000
+    expect(activeSummary.deployableWarChest).toBe(1_600_000);
+
+    // 2. User adds a Standby unallocated facility (e.g. R300,000)
+    const newStandbySource: FundingSource = {
+      id: 'fund-new-standby-300k',
+      lenderName: 'New Standby Facility',
+      entityOrContact: 'Standby Partner',
+      emailPhone: 'standby@example.com',
+      fundingType: 'Private Lender',
+      capitalAmountZAR: 300_000,
+      disbursementDate: '2026-10-17',
+      maturityDate: '2027-10-17',
+      returnTermsType: 'Fixed Interest',
+      returnRatePercent: 12.0,
+      paymentSchedule: 'At Exit (Maturity)',
+      linkedDealName: 'General Operational Reserve',
+      totalRepaidZAR: 0,
+      status: 'Standby',
+    };
+
+    const standbySummary = computePortfolioSummary({
+      ...baseState,
+      funding: [newStandbySource, ...baseState.funding],
+    });
+
+    // Liquid cash remains 650,000
+    expect(standbySummary.liquidCapitalReserve).toBe(650_000);
+    // Standby reserve increases: 450,000 + 300,000 = 750,000
+    expect(standbySummary.unallocatedFundingReserve).toBe(750_000);
+    // War chest increases: 650,000 + 750,000 = 1,400,000
+    expect(standbySummary.deployableWarChest).toBe(1_400_000);
+
+    // 3. User adds a Deal-Linked active facility (e.g. Sandhurst R735,000)
+    const newDealLinkedSource: FundingSource = {
+      id: 'fund-new-sandhurst-735k',
+      lenderName: 'sdfsd',
+      entityOrContact: 'sdfsd contact',
+      emailPhone: 'sdfsd@example.com',
+      fundingType: 'Private Lender',
+      capitalAmountZAR: 735_000,
+      disbursementDate: '2026-10-16',
+      maturityDate: '2027-10-16',
+      returnTermsType: 'Monthly Coupon',
+      returnRatePercent: 13.5,
+      paymentSchedule: 'Monthly Interest',
+      linkedDealId: 'rental-1',
+      linkedDealName: 'Sandhurst Executive Suite',
+      totalRepaidZAR: 0,
+      status: 'Active',
+    };
+
+    const dealLinkedSummary = computePortfolioSummary({
+      ...baseState,
+      funding: [newDealLinkedSource, ...baseState.funding],
+    });
+
+    // Deal-linked active debt does not artificially inflate general company cash
+    expect(dealLinkedSummary.liquidCapitalReserve).toBe(650_000);
+    expect(dealLinkedSummary.unallocatedFundingReserve).toBe(450_000);
+    expect(dealLinkedSummary.deployableWarChest).toBe(1_100_000);
+    // But it is recorded in total private funding liabilities: 2.1M + 735k = 2,835,000
+    expect(dealLinkedSummary.totalPrivateFundingLiability).toBe(2_835_000);
+  });
 });

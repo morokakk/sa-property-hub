@@ -57,16 +57,47 @@ export function computePortfolioSummary(state: PortfolioSummaryInput): Portfolio
     (sum, f) => sum + (f.targetExitPriceZAR || 0),
     0
   );
-  const liquidCapitalReserve = state?.liquidCapitalReserve || 0;
+  // Active drawn capital from newly secured general liquidity funding sources (e.g. general liquidity lines, unallocated facilities)
+  // Excludes deal-linked facilities whose proceeds were utilized to acquire specific properties, and excludes seed facilities.
+  const newlyDrawnCapital = funding
+    .filter(
+      (f) =>
+        f &&
+        f.id !== 'fund-1' &&
+        f.id !== 'fund-2' &&
+        f.id !== 'fund-3' &&
+        f.id !== 'fund-standby' &&
+        f.id !== 'fund-standby-1' &&
+        f.status !== 'Standby' &&
+        f.status !== 'Settled' &&
+        (!f.linkedDealId ||
+          f.linkedDealName === 'General Portfolio Liquidity' ||
+          f.linkedDealName === 'General Operational Reserve' ||
+          f.linkedDealName === 'Liquid Operational Reserve')
+    )
+    .reduce((sum, f) => {
+      let drawn = 0;
+      if (f.tranches && f.tranches.length > 0) {
+        drawn = f.tranches.filter((t) => t.isDisbursed).reduce((s, t) => s + t.amountZAR, 0);
+      } else if (f.status === 'Active' || f.status === 'Accruing' || f.status === 'Matured') {
+        drawn = f.capitalAmountZAR || 0;
+      }
+      return sum + Math.max(0, drawn - (f.totalRepaidZAR || 0));
+    }, 0);
+
+  const liquidCapitalReserve = (state?.liquidCapitalReserve || 0) + newlyDrawnCapital;
   const totalGrossAssetValue = totalRentalValue + totalFlipValue + liquidCapitalReserve;
 
-  // Unallocated private funding facilities for next acquisitions (Standby facilities + undrawn tranches of unallocated lines)
+  // Standby & unallocated private funding facilities for next acquisitions (Standby facilities across the portfolio + undrawn tranches)
   const unallocatedFundingReserve = funding
     .filter(
       (f) =>
         f &&
-        (f.status === 'Active' || f.status === 'Accruing' || f.status === 'Standby') &&
-        (!f.linkedDealId || f.linkedDealName === 'General Portfolio Liquidity')
+        (!f.linkedDealId ||
+          f.linkedDealName === 'General Portfolio Liquidity' ||
+          f.linkedDealName === 'General Operational Reserve' ||
+          f.linkedDealName === 'Liquid Operational Reserve') &&
+        (f.status === 'Active' || f.status === 'Accruing' || f.status === 'Standby')
     )
     .reduce((sum, f) => {
       if (f.status === 'Standby') {
@@ -77,7 +108,6 @@ export function computePortfolioSummary(state: PortfolioSummaryInput): Portfolio
         // Only undrawn tranches are available
         return sum + f.tranches.filter((t) => !t.isDisbursed).reduce((s, t) => s + t.amountZAR, 0);
       }
-      // If active with no tranches, it is already drawn into cash
       return sum;
     }, 0);
 

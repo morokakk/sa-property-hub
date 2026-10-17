@@ -262,6 +262,8 @@ export interface FundingSource {
   totalRepaidZAR: number;
   totalInterestPaidZAR?: number; // Total monthly coupon / interest paid (separate from principal repayment)
   status: 'Active' | 'Accruing' | 'Standby' | 'Matured' | 'Settled';
+  contactPerson?: string;
+  securityOffered?: string;
   notes?: string;
   tranches?: FundingTranche[];
   delayExtensionDays?: number; // Days extended due to linked deal delays
@@ -648,6 +650,17 @@ export interface RentalProperty {
   meterRegistry?: PropertyMeter[];
   // SARS ITR12 Property Actual Transactions
   transactions?: Transaction[];
+  // Funding Campaign Fields
+  fundingRequiredZAR?: number;
+  capitalRaisedZAR?: number;
+  primaryFunderName?: string;
+  primaryFunderContact?: string;
+  primaryFunderType?: 'Private Lender' | 'Syndicate JV Partner' | 'Friends & Family' | 'Equity Partner';
+  coFundersNotes?: string;
+  promisedReturnType?: ReturnTermType;
+  promisedReturnRatePercent?: number;
+  promisedPayoutSchedule?: 'Monthly Interest' | 'Quarterly' | 'At Exit (Maturity)' | 'Bi-Annual';
+  securityOffered?: string;
 }
 
 // Property Meter Registry Record

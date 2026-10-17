@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import TopHeader from '@/components/navigation/TopHeader';
+import AddFundingModal from '@/components/funding/AddFundingModal';
 import { usePortfolioStore, usePortfolioSummary } from '@/lib/store/usePortfolioStore';
 import { formatZAR, formatPercent, formatDate } from '@/lib/formatters';
 import { FundingSource, FundingTranche, FundingType, ReturnTermType } from '@/types';
@@ -55,29 +56,6 @@ export default function FundingTrackerPage() {
 
   // New Capital Source Form State
   const [showAddModal, setShowAddModal] = useState(false);
-  const [lenderName, setLenderName] = useState('');
-  const [entityOrContact, setEntityOrContact] = useState('');
-  const [emailPhone, setEmailPhone] = useState('');
-  const [fundingType, setFundingType] = useState<FundingType>('Private Lender');
-  const [capitalAmountZAR, setCapitalAmountZAR] = useState<number>(500_000);
-  const [disbursementDate, setDisbursementDate] = useState<string>(new Date().toISOString().split('T')[0]);
-  const [maturityDate, setMaturityDate] = useState<string>(
-    new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
-  );
-  const [returnTermsType, setReturnTermsType] = useState<ReturnTermType>('Fixed Interest');
-  const [returnRatePercent, setReturnRatePercent] = useState<number>(14);
-  const [paymentSchedule, setPaymentSchedule] = useState<'Monthly Interest' | 'Quarterly' | 'At Exit (Maturity)' | 'Bi-Annual'>('Monthly Interest');
-  const [linkedDealId, setLinkedDealId] = useState<string>('');
-  const [facilityStatus, setFacilityStatus] = useState<'Active' | 'Standby'>('Active');
-  const [notes, setNotes] = useState('');
-
-  // Phased Tranches State for New Capital Source
-  const [enableTranches, setEnableTranches] = useState(false);
-  const [customTranches, setCustomTranches] = useState<Array<Omit<FundingTranche, 'id'> & { id?: string }>>([
-    { name: 'Tranche 1: Acquisition & Transfer', amountZAR: 300_000, isDisbursed: true, linkedMilestonePhase: 'Deposit' },
-    { name: 'Tranche 2: First Fix & Wet Works', amountZAR: 150_000, isDisbursed: false, linkedMilestonePhase: 'First Fix / Wet Works' },
-    { name: 'Tranche 3: Finishes & Snagging', amountZAR: 50_000, isDisbursed: false, linkedMilestonePhase: 'Finishes' },
-  ]);
 
   // Deal Delay Sync Modal State
   const [syncModalSource, setSyncModalSource] = useState<FundingSource | null>(null);
@@ -102,94 +80,6 @@ export default function FundingTrackerPage() {
     const timer = setTimeout(() => setToastMessage(null), 3500);
     return () => clearTimeout(timer);
   }, [toastMessage]);
-
-  const handleReturnTermsChange = (newStructure: ReturnTermType) => {
-    setReturnTermsType(newStructure);
-
-    if (newStructure === 'Equity Profit Split') {
-      setPaymentSchedule('At Exit (Maturity)');
-      // If still on default 14% interest rate, toggle to standard 50% equity profit split
-      if (returnRatePercent === 14) {
-        setReturnRatePercent(50);
-      }
-    } else if (newStructure === 'Bullet Repayment') {
-      setPaymentSchedule('At Exit (Maturity)');
-      if (returnRatePercent === 50) {
-        setReturnRatePercent(14);
-      }
-    } else if (newStructure === 'Monthly Coupon') {
-      setPaymentSchedule('Monthly Interest');
-      if (returnRatePercent === 50) {
-        setReturnRatePercent(14);
-      }
-    } else if (newStructure === 'Fixed Interest') {
-      if (paymentSchedule === 'At Exit (Maturity)') {
-        setPaymentSchedule('Monthly Interest');
-      }
-      if (returnRatePercent === 50) {
-        setReturnRatePercent(14);
-      }
-    }
-  };
-
-  const handleAddFunding = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!lenderName) {
-      alert('Please enter a lender or investor name.');
-      return;
-    }
-
-    const linkedDeal = flips.find((f) => f.id === linkedDealId) || rentals.find((r) => r.id === linkedDealId);
-
-    let finalTranches: FundingTranche[] | undefined = undefined;
-    let finalPrincipal = capitalAmountZAR;
-
-    if (enableTranches && customTranches.length > 0) {
-      finalTranches = customTranches.map((t, idx) => ({
-        id: t.id || `tr-${Date.now()}-${idx + 1}`,
-        name: t.name,
-        amountZAR: Number(t.amountZAR) || 0,
-        isDisbursed: Boolean(t.isDisbursed),
-        disbursedDate: t.isDisbursed ? (t.disbursedDate || disbursementDate) : undefined,
-        linkedMilestonePhase: t.linkedMilestonePhase,
-      }));
-      const trTotal = finalTranches.reduce((sum, tr) => sum + tr.amountZAR, 0);
-      if (trTotal > 0) {
-        finalPrincipal = trTotal;
-      }
-    }
-
-    const newSource: FundingSource = {
-      id: `fund-${Date.now()}`,
-      lenderName,
-      entityOrContact,
-      emailPhone,
-      fundingType,
-      capitalAmountZAR: finalPrincipal,
-      disbursementDate,
-      maturityDate,
-      originalMaturityDate: maturityDate,
-      returnTermsType,
-      returnRatePercent,
-      paymentSchedule,
-      linkedDealId: linkedDealId || undefined,
-      linkedDealName: linkedDeal ? linkedDeal.title : 'General Portfolio Liquidity',
-      totalRepaidZAR: 0,
-      status: facilityStatus,
-      notes,
-      tranches: finalTranches,
-    };
-
-    addFunding(newSource);
-    setShowAddModal(false);
-    // Reset Form
-    setLenderName('');
-    setEntityOrContact('');
-    setEmailPhone('');
-    setNotes('');
-    setFacilityStatus('Active');
-    setEnableTranches(false);
-  };
 
   const handleToggleTrancheDisburse = (sourceId: string, trancheId: string) => {
     const source = funding.find((f) => f.id === sourceId);
@@ -237,10 +127,14 @@ export default function FundingTrackerPage() {
 
     if (copyReceiptOnSave) {
       const returnTermsText = `${repaymentModalSource.returnRatePercent}% ${
-        repaymentModalSource.returnTermsType === 'Fixed Interest'
-          ? 'p.a. Fixed Interest'
-          : repaymentModalSource.returnTermsType === 'Equity Profit Split'
+        repaymentModalSource.returnTermsType === 'Equity Profit Split'
           ? 'Net Profit Split'
+          : repaymentModalSource.returnTermsType === 'Fixed Interest'
+          ? 'p.a. Fixed Interest'
+          : repaymentModalSource.returnTermsType === 'Monthly Coupon'
+          ? 'p.a. Monthly Coupon'
+          : repaymentModalSource.returnTermsType === 'Bullet Repayment'
+          ? 'p.a. Bullet Repayment'
           : repaymentModalSource.returnTermsType
       }`;
 
@@ -282,7 +176,7 @@ export default function FundingTrackerPage() {
   const totalRepayments = funding.reduce((sum, f) => sum + (f.totalRepaidZAR || 0) + (f.totalInterestPaidZAR || 0), 0);
   const totalOutstanding = summary.totalPrivateFundingLiability;
   const totalMonthlyInterestExpense = funding
-    .filter((f) => f.status === 'Active' && f.returnTermsType === 'Fixed Interest')
+    .filter((f) => f.status === 'Active' && (f.returnTermsType === 'Fixed Interest' || f.returnTermsType === 'Monthly Coupon'))
     .reduce((sum, f) => {
       const { drawn } = getFundingDrawnAndUndrawn(f);
       const activeBalance = Math.max(0, drawn - (f.totalRepaidZAR || 0));
@@ -486,11 +380,12 @@ export default function FundingTrackerPage() {
                     const { drawn, undrawn, drawnCount, totalTranches, hasTranches } = getFundingDrawnAndUndrawn(item);
                     const balance = Math.max(0, item.capitalAmountZAR - (item.totalRepaidZAR || 0));
                     const activeDrawnBalance = Math.max(0, drawn - (item.totalRepaidZAR || 0));
-                    const monthlyInterest = item.returnTermsType === 'Fixed Interest'
-                      ? Math.round((activeDrawnBalance * (item.returnRatePercent / 100)) / 12)
-                      : 0;
+                    const monthlyInterest =
+                      item.returnTermsType === 'Fixed Interest' || item.returnTermsType === 'Monthly Coupon'
+                        ? Math.round((activeDrawnBalance * (item.returnRatePercent / 100)) / 12)
+                        : 0;
                     const delayCarryingCost =
-                      item.delayExtensionDays && item.delayExtensionDays > 0 && item.returnTermsType === 'Fixed Interest'
+                      item.delayExtensionDays && item.delayExtensionDays > 0 && item.returnTermsType !== 'Equity Profit Split'
                         ? Math.round(((activeDrawnBalance * (item.returnRatePercent / 100)) / 365) * item.delayExtensionDays)
                         : 0;
 
@@ -562,9 +457,9 @@ export default function FundingTrackerPage() {
                           {item.returnTermsType}
                         </div>
                         <div className="text-[11px] text-emerald-700 font-bold">
-                          {item.returnRatePercent}% {item.returnTermsType === 'Fixed Interest' ? 'p.a.' : 'profit split'}
+                          {item.returnRatePercent}% {item.returnTermsType === 'Equity Profit Split' ? 'profit split' : 'p.a.'}
                         </div>
-                        {item.returnTermsType === 'Fixed Interest' && (
+                        {(item.returnTermsType === 'Fixed Interest' || item.returnTermsType === 'Monthly Coupon') && (
                           <div className="text-[10px] text-slate-500 font-normal mt-0.5">
                             {item.status === 'Standby'
                               ? 'R 0/mo (Undrawn Standby)'
@@ -788,357 +683,12 @@ export default function FundingTrackerPage() {
         </div>
       </main>
 
-      {/* Add Funding Source Modal (Mobile Bottom Sheet / Desktop Centered Dialog) */}
-      {showAddModal && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 z-50">
-          <div className="bg-white rounded-t-3xl sm:rounded-xl max-w-xl w-full p-5 sm:p-6 shadow-xl border border-slate-200 max-h-[92vh] sm:max-h-none overflow-y-auto">
-            <div className="w-12 h-1.5 bg-slate-300 rounded-full mx-auto mb-3 sm:hidden" />
-            <h3 className="text-base font-bold text-slate-900 mb-4 flex items-center gap-2">
-              <Coins className="w-5 h-5 text-emerald-600" />
-              Add Financing / Capital Source
-            </h3>
-
-            <form onSubmit={handleAddFunding} noValidate className="space-y-4 text-xs">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Lender / Investor Name *</label>
-                  <input
-                    type="text"
-                    name="lenderName"
-                    autoComplete="organization"
-                    required
-                    placeholder="e.g. Johan Meyer"
-                    value={lenderName}
-                    onChange={(e) => setLenderName(e.target.value)}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg"
-                  />
-                </div>
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Entity / Trust (Optional)</label>
-                  <input
-                    type="text"
-                    name="contactPerson"
-                    autoComplete="name"
-                    placeholder="e.g. Meyer Family Trust"
-                    value={entityOrContact}
-                    onChange={(e) => setEntityOrContact(e.target.value)}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Funding Category</label>
-                  <select
-                    value={fundingType}
-                    onChange={(e) => setFundingType(e.target.value as FundingType)}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white"
-                  >
-                    <option value="Private Lender">Private Lender (Angel / HNW)</option>
-                    <option value="Proposal-backed">Proposal-backed (Syndicate / JV)</option>
-                    <option value="Ad-hoc Friends & Family">Ad-hoc Friends & Family</option>
-                    <option value="Equity Partner">Equity Partner</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Facility Status</label>
-                  <select
-                    value={facilityStatus}
-                    onChange={(e) => setFacilityStatus(e.target.value as 'Active' | 'Standby')}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white font-medium"
-                  >
-                    <option value="Active">Active (Disbursed / Accruing)</option>
-                    <option value="Standby">Standby (Pre-Approved / Undrawn)</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Principal Amount (ZAR)</label>
-                  <input
-                    type="number"
-                    name="capitalAmountZAR"
-                    autoComplete="off"
-                    min="0"
-                    step="any"
-                    value={capitalAmountZAR}
-                    onChange={(e) => setCapitalAmountZAR(Number(e.target.value))}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg font-bold"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Return Structure</label>
-                  <select
-                    value={returnTermsType}
-                    onChange={(e) => handleReturnTermsChange(e.target.value as ReturnTermType)}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white"
-                  >
-                    <option value="Fixed Interest">Fixed Interest (% per annum)</option>
-                    <option value="Equity Profit Split">Equity Profit Split (% of Net Profit)</option>
-                    <option value="Monthly Coupon">Monthly Coupon</option>
-                    <option value="Bullet Repayment">Bullet Repayment</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">
-                    {returnTermsType === 'Equity Profit Split'
-                      ? 'Investor Profit Share (% of Net Profit)'
-                      : returnTermsType === 'Bullet Repayment'
-                      ? 'Bullet Return Rate (% p.a.)'
-                      : returnTermsType === 'Monthly Coupon'
-                      ? 'Monthly Coupon Rate (% p.a.)'
-                      : 'Annual Interest Rate (% p.a.)'}
-                  </label>
-                  <input
-                    type="number"
-                    name="returnRatePercent"
-                    autoComplete="off"
-                    min="0"
-                    step="any"
-                    value={returnRatePercent}
-                    onChange={(e) => setReturnRatePercent(Number(e.target.value))}
-                    placeholder={returnTermsType === 'Equity Profit Split' ? '50' : '14'}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg font-bold"
-                  />
-                  <p className="text-[11px] text-slate-400 mt-1">
-                    {returnTermsType === 'Equity Profit Split'
-                      ? 'e.g. 50% for 50/50 JV split, or 25% of net profit upon sale'
-                      : returnTermsType === 'Bullet Repayment'
-                      ? 'Principal + return repaid as lump sum at maturity'
-                      : returnTermsType === 'Monthly Coupon'
-                      ? 'Regular monthly coupon payments on drawn facility'
-                      : 'Annual interest rate charged on active drawn principal'}
-                  </p>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <label className="block font-semibold text-slate-700">Payment Schedule</label>
-                    {returnTermsType === 'Equity Profit Split' && (
-                      <span className="text-[10px] font-semibold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">
-                        Locked to Exit
-                      </span>
-                    )}
-                  </div>
-                  <select
-                    value={paymentSchedule}
-                    onChange={(e) => setPaymentSchedule(e.target.value as any)}
-                    disabled={returnTermsType === 'Equity Profit Split'}
-                    className={`w-full px-3 py-2 border rounded-lg ${
-                      returnTermsType === 'Equity Profit Split'
-                        ? 'bg-slate-100 border-slate-200 text-slate-500 cursor-not-allowed'
-                        : 'bg-white border-slate-300'
-                    }`}
-                  >
-                    <option value="Monthly Interest">Monthly Interest</option>
-                    <option value="Quarterly">Quarterly</option>
-                    <option value="At Exit (Maturity)">At Exit (Maturity / Sale)</option>
-                    <option value="Bi-Annual">Bi-Annual</option>
-                  </select>
-                  {returnTermsType === 'Equity Profit Split' && (
-                    <p className="text-[11px] text-amber-700 mt-1">
-                      Profit share is distributed upon deal exit &amp; deed transfer.
-                    </p>
-                  )}
-                </div>
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Link to Active Deal / Project</label>
-                  <select
-                    value={linkedDealId}
-                    onChange={(e) => setLinkedDealId(e.target.value)}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white"
-                  >
-                    <option value="">-- General Operational Reserve --</option>
-                    <optgroup label="Active Flips">
-                      {flips.map((flip) => (
-                        <option key={flip.id} value={flip.id}>
-                          [FLIP] {flip.title} ({flip.city})
-                        </option>
-                      ))}
-                    </optgroup>
-                    <optgroup label="Portfolio Rentals">
-                      {rentals.map((rental) => (
-                        <option key={rental.id} value={rental.id}>
-                          [RENTAL] {rental.title} ({rental.city})
-                        </option>
-                      ))}
-                    </optgroup>
-                  </select>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Disbursement Date</label>
-                  <input
-                    type="date"
-                    name="disbursementDate"
-                    autoComplete="off"
-                    value={disbursementDate}
-                    onChange={(e) => setDisbursementDate(e.target.value)}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg"
-                  />
-                </div>
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Maturity / Due Date</label>
-                  <input
-                    type="date"
-                    name="maturityDate"
-                    autoComplete="off"
-                    value={maturityDate}
-                    onChange={(e) => setMaturityDate(e.target.value)}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block font-semibold text-slate-700 mb-1">Contact Email / Phone / Notes</label>
-                <input
-                  type="text"
-                  name="fundingNotes"
-                  autoComplete="off"
-                  placeholder="e.g. +27 82 123 4567 • Security: 2nd Mortgage Bond"
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg"
-                />
-              </div>
-
-              {/* Phased Milestone Tranches Toggle & Configuration */}
-              <div className="border-t border-slate-200 pt-3">
-                <div className="flex items-center justify-between mb-2">
-                  <label className="flex items-center gap-2 cursor-pointer select-none font-semibold text-slate-800">
-                    <input
-                      type="checkbox"
-                      checked={enableTranches}
-                      onChange={(e) => setEnableTranches(e.target.checked)}
-                      className="w-4 h-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 accent-emerald-600"
-                    />
-                    <span>Configure Phased Milestone Tranches</span>
-                  </label>
-                  {enableTranches && (
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setCustomTranches([
-                          ...customTranches,
-                          {
-                            name: `Tranche ${customTranches.length + 1}`,
-                            amountZAR: 100_000,
-                            isDisbursed: false,
-                            linkedMilestonePhase: 'Finishes',
-                          },
-                        ])
-                      }
-                      className="text-xs font-semibold text-emerald-600 hover:text-emerald-700 cursor-pointer"
-                    >
-                      + Add Tranche
-                    </button>
-                  )}
-                </div>
-
-                {enableTranches && (
-                  <div className="space-y-2.5 mt-2 bg-slate-50 p-3 rounded-xl border border-slate-200">
-                    <p className="text-[11px] text-slate-500">
-                      Private lender interest only begins accruing on tranches marked as <strong>Disbursed</strong>.
-                    </p>
-                    {customTranches.map((tr, idx) => (
-                      <div
-                        key={idx}
-                        className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center bg-white p-2.5 rounded-lg border border-slate-200 shadow-2xs"
-                      >
-                        <div className="sm:col-span-5">
-                          <label className="text-[10px] text-slate-400 block mb-0.5">Tranche Label</label>
-                          <input
-                            type="text"
-                            placeholder="e.g. Tranche 1: Deposit"
-                            value={tr.name}
-                            onChange={(e) => {
-                              const updated = [...customTranches];
-                              updated[idx].name = e.target.value;
-                              setCustomTranches(updated);
-                            }}
-                            className="w-full px-2 py-1 border border-slate-200 rounded text-xs font-medium"
-                          />
-                        </div>
-                        <div className="sm:col-span-3">
-                          <label className="text-[10px] text-slate-400 block mb-0.5">Amount (ZAR)</label>
-                          <input
-                            type="number"
-                            min="0"
-                            placeholder="Amount"
-                            value={tr.amountZAR}
-                            onChange={(e) => {
-                              const updated = [...customTranches];
-                              updated[idx].amountZAR = Number(e.target.value);
-                              setCustomTranches(updated);
-                            }}
-                            className="w-full px-2 py-1 border border-slate-200 rounded text-xs font-bold"
-                          />
-                        </div>
-                        <div className="sm:col-span-3 flex items-center pt-3.5 sm:pt-0">
-                          <label className="flex items-center gap-1.5 text-[11px] text-slate-700 cursor-pointer select-none">
-                            <input
-                              type="checkbox"
-                              checked={tr.isDisbursed}
-                              onChange={(e) => {
-                                const updated = [...customTranches];
-                                updated[idx].isDisbursed = e.target.checked;
-                                setCustomTranches(updated);
-                              }}
-                              className="w-3.5 h-3.5 accent-emerald-600 rounded"
-                            />
-                            <span>Drawn Day 1</span>
-                          </label>
-                        </div>
-                        <div className="sm:col-span-1 text-right">
-                          {customTranches.length > 1 && (
-                            <button
-                              type="button"
-                              onClick={() => setCustomTranches(customTranches.filter((_, i) => i !== idx))}
-                              className="text-slate-400 hover:text-rose-600 text-xs p-1"
-                              title="Delete Tranche"
-                            >
-                              <X className="w-3.5 h-3.5" />
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                    <div className="text-[11px] text-slate-600 pt-1 flex justify-between font-semibold">
-                      <span>Total Phased Facility:</span>
-                      <span className="text-emerald-700 font-bold tabular-nums">
-                        {formatZAR(customTranches.reduce((s, t) => s + (Number(t.amountZAR) || 0), 0))}
-                      </span>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-200">
-                <button
-                  type="button"
-                  onClick={() => setShowAddModal(false)}
-                  className="px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50 font-semibold cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-semibold shadow-xs border-t border-white/15 cursor-pointer"
-                >
-                  Save Capital Source
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      {/* Add Funding Source Modal */}
+      <AddFundingModal
+        isOpen={showAddModal}
+        onClose={() => setShowAddModal(false)}
+        onSuccess={() => setToastMessage('Capital source registered successfully')}
+      />
 
       {/* Sync Deal Delay Action Modal */}
       {syncModalSource && (
@@ -1274,7 +824,7 @@ export default function FundingTrackerPage() {
                       <span>New Extended Maturity:</span>
                       <strong className="text-slate-900">{formatDate(newDateStr)}</strong>
                     </div>
-                    {syncModalSource.returnTermsType === 'Fixed Interest' && (
+                    {syncModalSource.returnTermsType !== 'Equity Profit Split' && (
                       <div className="text-[11px] text-amber-900 flex justify-between">
                         <span>Additional Delay Carrying Interest:</span>
                         <strong className="text-rose-700 font-extrabold">+{formatZAR(delayInterest)}</strong>

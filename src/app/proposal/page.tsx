@@ -8,8 +8,10 @@ import { formatZAR, formatPercent, formatDate } from '@/lib/formatters';
 import { generateLongTermProjection, calculateMonthlyBondRepayment } from '@/lib/calculations/propertyMetrics';
 import { formatProposalPitchForWhatsApp } from '@/lib/whatsappFormatter';
 import LongTermProjectionChart from '@/components/analytics/LongTermProjectionChart';
-import { DealStrategy, DealSource, OccupantRiskProfile, ReturnTermType } from '@/types';
+import AddFundingModal from '@/components/funding/AddFundingModal';
+import { DealStrategy, DealSource, OccupantRiskProfile, ReturnTermType, FundingSource } from '@/types';
 import {
+  PlusCircle,
   Printer,
   FileCheck2,
   Building,
@@ -68,6 +70,118 @@ function getSafeLogoUri(uri?: string): string {
   return uri;
 }
 
+interface LinkedFundingResult {
+  capitalRaisedZAR: number;
+  fundingRequiredZAR: number;
+  primaryFunderName?: string;
+  primaryFunderContact?: string;
+  primaryFunderType?: any;
+  coFundersNotes?: string;
+  promisedReturnType: ReturnTermType;
+  promisedReturnRatePercent: number;
+  promisedPayoutSchedule: string;
+  securityOffered: string;
+  linkedFundingList: FundingSource[];
+}
+
+function getLinkedFundingDetails(
+  dealId: string,
+  dealTitle: string,
+  fundingList: FundingSource[],
+  staticDeal: {
+    fundingRequiredZAR?: number;
+    capitalRaisedZAR?: number;
+    primaryFunderName?: string;
+    primaryFunderContact?: string;
+    primaryFunderType?: any;
+    coFundersNotes?: string;
+    promisedReturnType?: ReturnTermType;
+    promisedReturnRatePercent?: number;
+    promisedPayoutSchedule?: string;
+    securityOffered?: string;
+  },
+  defaultFallbacks: {
+    fundingRequiredDefault?: number;
+    promisedReturnTypeDefault?: ReturnTermType;
+    promisedReturnRateDefault?: number;
+    promisedPayoutScheduleDefault?: string;
+    securityOfferedDefault?: string;
+  } = {}
+): LinkedFundingResult {
+  const linked = fundingList.filter(
+    (f) =>
+      f.linkedDealId === dealId ||
+      (f.linkedDealName && f.linkedDealName.trim().toLowerCase() === dealTitle.trim().toLowerCase())
+  );
+
+  const totalLedgerSecured = linked.reduce((sum, f) => sum + (f.capitalAmountZAR || 0), 0);
+  const effectiveCapitalRaised = Math.max(staticDeal.capitalRaisedZAR || 0, totalLedgerSecured);
+
+  const leadFunder = linked[0];
+  const primaryFunderName = leadFunder?.lenderName || staticDeal.primaryFunderName;
+  const primaryFunderContact =
+    leadFunder?.contactPerson ||
+    leadFunder?.entityOrContact ||
+    leadFunder?.emailPhone ||
+    staticDeal.primaryFunderContact;
+  const primaryFunderType = leadFunder?.fundingType || staticDeal.primaryFunderType;
+
+  let coFundersNotes = staticDeal.coFundersNotes;
+  if (linked.length > 1) {
+    const coFunderText = linked
+      .slice(1)
+      .map((f) => `${f.lenderName} (${formatZAR(f.capitalAmountZAR)})`)
+      .join(', ');
+    coFundersNotes = staticDeal.coFundersNotes
+      ? `${staticDeal.coFundersNotes}, ${coFunderText}`
+      : coFunderText;
+  }
+
+  const baseRequired = staticDeal.fundingRequiredZAR ?? defaultFallbacks.fundingRequiredDefault ?? 0;
+  // Ensure target capital raise reflects at least the capital already secured
+  const effectiveFundingRequired = Math.max(baseRequired, effectiveCapitalRaised);
+
+  const promisedReturnType =
+    staticDeal.promisedReturnType ??
+    leadFunder?.returnTermsType ??
+    defaultFallbacks.promisedReturnTypeDefault ??
+    'Fixed Interest';
+
+  const promisedReturnRatePercent =
+    staticDeal.promisedReturnRatePercent ??
+    leadFunder?.returnRatePercent ??
+    defaultFallbacks.promisedReturnRateDefault ??
+    (promisedReturnType === 'Equity Profit Split' ? 50 : 14);
+
+  const promisedPayoutSchedule =
+    staticDeal.promisedPayoutSchedule ??
+    leadFunder?.paymentSchedule ??
+    defaultFallbacks.promisedPayoutScheduleDefault ??
+    (promisedReturnType === 'Monthly Coupon' || promisedReturnType === 'Fixed Interest'
+      ? 'Monthly Interest'
+      : 'At Exit (Maturity)');
+
+  const securityOffered =
+    staticDeal.securityOffered ??
+    leadFunder?.securityOffered ??
+    defaultFallbacks.securityOfferedDefault ??
+    '2nd Mortgage Bond registered over title deed';
+
+  return {
+    capitalRaisedZAR: effectiveCapitalRaised,
+    fundingRequiredZAR: effectiveFundingRequired,
+    primaryFunderName,
+    primaryFunderContact,
+    primaryFunderType,
+    coFundersNotes,
+    promisedReturnType,
+    promisedReturnRatePercent,
+    promisedPayoutSchedule,
+    securityOffered,
+    linkedFundingList: linked,
+  };
+}
+
 function ProposalGeneratorContent() {
   const searchParams = useSearchParams();
   const queryDealId = searchParams.get('dealId');
@@ -75,6 +189,7 @@ function ProposalGeneratorContent() {
   const rentals = usePortfolioStore((state) => state.rentals);
   const flips = usePortfolioStore((state) => state.flips);
   const opportunities = usePortfolioStore((state) => state.opportunities);
+  const funding = usePortfolioStore((state) => state.funding);
   const suppliers = usePortfolioStore((state) => state.suppliers);
   const investorProfile = usePortfolioStore((state) => state.investorProfile);
   const updateRental = usePortfolioStore((state) => state.updateRental);
@@ -85,85 +200,106 @@ function ProposalGeneratorContent() {
 
   // Combine Flips, Opportunities, and Active Rentals as pitch candidates
   const allDeals = useMemo(() => [
-    ...flips.map((f) => ({
-      id: f.id,
-      type: 'flip' as const,
-      title: f.title,
-      address: f.address,
-      city: f.city,
-      openMarketValue: f.targetExitPriceZAR,
-      purchasePrice: f.purchasePriceZAR,
-      builtInEquity: Math.max(0, f.targetExitPriceZAR - f.purchasePriceZAR),
-      builtInEquityPercent: f.targetExitPriceZAR > 0
-        ? Number((((f.targetExitPriceZAR - f.purchasePriceZAR) / f.targetExitPriceZAR) * 100).toFixed(1))
-        : 0,
-      amenityScorecard: {
-        schools: '0-5km' as const,
-        policeStation: '0-5km' as const,
-        medicalClinic: '0-5km' as const,
-        shoppingMall: '0-5km' as const,
-        compositeGrade: 'A-Grade (Prime Hub)' as const,
-        compositeScore: 12,
-      },
-      acquisitionCosts: f.acquisitionCostsZAR,
-      renovationBudget: f.baselineRenovationBudgetZAR,
-      strategy: f.strategy ?? 'Flip',
-      source: f.source ?? 'Private Agent',
-      auctioneerCommission: 0,
-      municipalArrears: 0,
-      isSection13Eligible: false,
-      holdingDurationMonths: f.estimatedDurationMonths ?? 6,
-      exitCommissionPercent: f.exitCommissionPercent ?? 5.75,
-      monthlyBondHolding: f.monthlyBondPaymentZAR ?? 0,
-      monthlyLeviesHolding: f.monthlyLeviesZAR ?? 0,
-      monthlyRatesHolding: f.monthlyRatesTaxesZAR ?? 0,
-      monthlyOtherHolding: f.monthlyOtherHoldingCostZAR ?? 0,
-      monthlyHoldingCost: f.monthlyHoldingCostZAR ?? (
-        (f.monthlyBondPaymentZAR ?? 0) +
-        (f.monthlyLeviesZAR ?? 0) +
-        (f.monthlyRatesTaxesZAR ?? 0) +
-        (f.monthlyOtherHoldingCostZAR ?? 0)
-      ),
-      targetExitPrice: f.targetExitPriceZAR,
-      completionDate: f.targetCompletionDate,
-      boq: f.boq,
-      notes: f.notes,
-      fundingRequiredZAR: f.fundingRequiredZAR,
-      capitalRaisedZAR: f.capitalRaisedZAR,
-      primaryFunderName: f.primaryFunderName,
-      primaryFunderContact: f.primaryFunderContact,
-      primaryFunderType: f.primaryFunderType,
-      coFundersNotes: f.coFundersNotes,
-      promisedReturnType: f.promisedReturnType,
-      promisedReturnRatePercent: f.promisedReturnRatePercent,
-      promisedPayoutSchedule: f.promisedPayoutSchedule,
-      securityOffered: f.securityOffered,
-      monthlyRent: Math.round(f.purchasePriceZAR * 0.009),
-      monthlyLevies: f.monthlyLeviesZAR || 0,
-      monthlyRates: f.monthlyRatesTaxesZAR || 0,
-      depositZAR: 0,
-      loanToValue: 100,
-      interestRatePercent: 11.75,
-      loanTermYears: 20,
-      annualCapitalGrowthPercent: 5.0,
-      annualRentalEscalationPercent: 6.0,
-      annualExpenseInflationPercent: 6.0,
-      bondTermYears: 20,
-      ancillaryIncomes: [],
-      tenantArrears: 0,
-      overdueMonths: 0,
-      collectionRate: 100,
-      totalCollected12m: 0,
-      totalBilled12m: 0,
-      paidInFullMonths: 0,
-      totalTrackedMonths: 0,
-      arrearsWriteOffsTotal: 0,
-      isCollectionRisk: false,
-      actualCollectedRentAvg: 0,
-      adjustedVacancyRate: 5,
-      rawRental: undefined,
-      occupantRisk: f.occupantRisk,
-    })),
+    ...flips.map((f) => {
+      const fundingDetails = getLinkedFundingDetails(f.id, f.title, funding, {
+        fundingRequiredZAR: f.fundingRequiredZAR,
+        capitalRaisedZAR: f.capitalRaisedZAR,
+        primaryFunderName: f.primaryFunderName,
+        primaryFunderContact: f.primaryFunderContact,
+        primaryFunderType: f.primaryFunderType,
+        coFundersNotes: f.coFundersNotes,
+        promisedReturnType: f.promisedReturnType,
+        promisedReturnRatePercent: f.promisedReturnRatePercent,
+        promisedPayoutSchedule: f.promisedPayoutSchedule,
+        securityOffered: f.securityOffered,
+      }, {
+        fundingRequiredDefault: f.fundingRequiredZAR,
+        promisedReturnTypeDefault: f.promisedReturnType || 'Fixed Interest',
+        promisedReturnRateDefault: f.promisedReturnRatePercent || 14,
+        promisedPayoutScheduleDefault: f.promisedPayoutSchedule || 'Monthly Interest',
+        securityOfferedDefault: f.securityOffered || '2nd Mortgage Bond registered over title deed',
+      });
+
+      return {
+        id: f.id,
+        type: 'flip' as const,
+        title: f.title,
+        address: f.address,
+        city: f.city,
+        openMarketValue: f.targetExitPriceZAR,
+        purchasePrice: f.purchasePriceZAR,
+        builtInEquity: Math.max(0, f.targetExitPriceZAR - f.purchasePriceZAR),
+        builtInEquityPercent: f.targetExitPriceZAR > 0
+          ? Number((((f.targetExitPriceZAR - f.purchasePriceZAR) / f.targetExitPriceZAR) * 100).toFixed(1))
+          : 0,
+        amenityScorecard: {
+          schools: '0-5km' as const,
+          policeStation: '0-5km' as const,
+          medicalClinic: '0-5km' as const,
+          shoppingMall: '0-5km' as const,
+          compositeGrade: 'A-Grade (Prime Hub)' as const,
+          compositeScore: 12,
+        },
+        acquisitionCosts: f.acquisitionCostsZAR,
+        renovationBudget: f.baselineRenovationBudgetZAR,
+        strategy: f.strategy ?? 'Flip',
+        source: f.source ?? 'Private Agent',
+        auctioneerCommission: 0,
+        municipalArrears: 0,
+        isSection13Eligible: false,
+        holdingDurationMonths: f.estimatedDurationMonths ?? 6,
+        exitCommissionPercent: f.exitCommissionPercent ?? 5.75,
+        monthlyBondHolding: f.monthlyBondPaymentZAR ?? 0,
+        monthlyLeviesHolding: f.monthlyLeviesZAR ?? 0,
+        monthlyRatesHolding: f.monthlyRatesTaxesZAR ?? 0,
+        monthlyOtherHolding: f.monthlyOtherHoldingCostZAR ?? 0,
+        monthlyHoldingCost: f.monthlyHoldingCostZAR ?? (
+          (f.monthlyBondPaymentZAR ?? 0) +
+          (f.monthlyLeviesZAR ?? 0) +
+          (f.monthlyRatesTaxesZAR ?? 0) +
+          (f.monthlyOtherHoldingCostZAR ?? 0)
+        ),
+        targetExitPrice: f.targetExitPriceZAR,
+        completionDate: f.targetCompletionDate,
+        boq: f.boq,
+        notes: f.notes,
+        fundingRequiredZAR: fundingDetails.fundingRequiredZAR,
+        capitalRaisedZAR: fundingDetails.capitalRaisedZAR,
+        primaryFunderName: fundingDetails.primaryFunderName,
+        primaryFunderContact: fundingDetails.primaryFunderContact,
+        primaryFunderType: fundingDetails.primaryFunderType,
+        coFundersNotes: fundingDetails.coFundersNotes,
+        promisedReturnType: fundingDetails.promisedReturnType,
+        promisedReturnRatePercent: fundingDetails.promisedReturnRatePercent,
+        promisedPayoutSchedule: fundingDetails.promisedPayoutSchedule,
+        securityOffered: fundingDetails.securityOffered,
+        monthlyRent: Math.round(f.purchasePriceZAR * 0.009),
+        monthlyLevies: f.monthlyLeviesZAR || 0,
+        monthlyRates: f.monthlyRatesTaxesZAR || 0,
+        depositZAR: 0,
+        loanToValue: 100,
+        interestRatePercent: 11.75,
+        loanTermYears: 20,
+        annualCapitalGrowthPercent: 5.0,
+        annualRentalEscalationPercent: 6.0,
+        annualExpenseInflationPercent: 6.0,
+        bondTermYears: 20,
+        ancillaryIncomes: [],
+        tenantArrears: 0,
+        overdueMonths: 0,
+        collectionRate: 100,
+        totalCollected12m: 0,
+        totalBilled12m: 0,
+        paidInFullMonths: 0,
+        totalTrackedMonths: 0,
+        arrearsWriteOffsTotal: 0,
+        isCollectionRisk: false,
+        actualCollectedRentAvg: 0,
+        adjustedVacancyRate: 5,
+        rawRental: undefined,
+        occupantRisk: f.occupantRisk,
+      };
+    }),
     ...opportunities.map((o) => {
       const openMarket = o.openMarketValueZAR || Math.round(o.purchasePrice * 1.2);
       const builtIn = o.builtInEquityZAR ?? (openMarket - o.purchasePrice);
@@ -176,6 +312,25 @@ function ProposalGeneratorContent() {
         compositeGrade: 'A-Grade (Prime Hub)' as const,
         compositeScore: 12,
       };
+
+      const fundingDetails = getLinkedFundingDetails(o.id, o.title, funding, {
+        fundingRequiredZAR: o.fundingRequiredZAR,
+        capitalRaisedZAR: o.capitalRaisedZAR,
+        primaryFunderName: o.primaryFunderName,
+        primaryFunderContact: o.primaryFunderContact,
+        primaryFunderType: o.primaryFunderType,
+        coFundersNotes: o.coFundersNotes,
+        promisedReturnType: o.promisedReturnType,
+        promisedReturnRatePercent: o.promisedReturnRatePercent,
+        promisedPayoutSchedule: o.promisedPayoutSchedule,
+        securityOffered: o.securityOffered,
+      }, {
+        fundingRequiredDefault: o.fundingRequiredZAR,
+        promisedReturnTypeDefault: o.promisedReturnType || 'Fixed Interest',
+        promisedReturnRateDefault: o.promisedReturnRatePercent || 14,
+        promisedPayoutScheduleDefault: o.promisedPayoutSchedule || 'Monthly Interest',
+        securityOfferedDefault: o.securityOffered || '2nd Mortgage Bond registered over title deed',
+      });
 
       return {
         id: o.id,
@@ -214,16 +369,16 @@ function ProposalGeneratorContent() {
           .split('T')[0],
         boq: [],
         notes: o.notes || `Sourced via ${o.source}. Gross Yield: ${o.grossYield}%, Cap Rate: ${o.capRate}%`,
-        fundingRequiredZAR: o.fundingRequiredZAR,
-        capitalRaisedZAR: o.capitalRaisedZAR,
-        primaryFunderName: o.primaryFunderName,
-        primaryFunderContact: o.primaryFunderContact,
-        primaryFunderType: o.primaryFunderType,
-        coFundersNotes: o.coFundersNotes,
-        promisedReturnType: o.promisedReturnType,
-        promisedReturnRatePercent: o.promisedReturnRatePercent,
-        promisedPayoutSchedule: o.promisedPayoutSchedule,
-        securityOffered: o.securityOffered,
+        fundingRequiredZAR: fundingDetails.fundingRequiredZAR,
+        capitalRaisedZAR: fundingDetails.capitalRaisedZAR,
+        primaryFunderName: fundingDetails.primaryFunderName,
+        primaryFunderContact: fundingDetails.primaryFunderContact,
+        primaryFunderType: fundingDetails.primaryFunderType,
+        coFundersNotes: fundingDetails.coFundersNotes,
+        promisedReturnType: fundingDetails.promisedReturnType,
+        promisedReturnRatePercent: fundingDetails.promisedReturnRatePercent,
+        promisedPayoutSchedule: fundingDetails.promisedPayoutSchedule,
+        securityOffered: fundingDetails.securityOffered,
         monthlyRent: o.monthlyRentalEstimate,
         monthlyLevies: o.monthlyLevies,
         monthlyRates: o.monthlyRatesTaxes,
@@ -271,6 +426,25 @@ function ProposalGeneratorContent() {
       const holdingCosts = calculateRentalHoldingCosts(r);
       const collectionMetrics = calculate12MonthCollectionMetrics(r);
 
+      const fundingDetails = getLinkedFundingDetails(r.id, r.title, funding, {
+        fundingRequiredZAR: r.fundingRequiredZAR,
+        capitalRaisedZAR: r.capitalRaisedZAR,
+        primaryFunderName: r.primaryFunderName,
+        primaryFunderContact: r.primaryFunderContact,
+        primaryFunderType: r.primaryFunderType,
+        coFundersNotes: r.coFundersNotes,
+        promisedReturnType: r.promisedReturnType,
+        promisedReturnRatePercent: r.promisedReturnRatePercent,
+        promisedPayoutSchedule: r.promisedPayoutSchedule,
+        securityOffered: r.securityOffered,
+      }, {
+        fundingRequiredDefault: Math.round(openMarket * 0.3),
+        promisedReturnTypeDefault: 'Monthly Coupon',
+        promisedReturnRateDefault: 13.5,
+        promisedPayoutScheduleDefault: 'Monthly Interest',
+        securityOfferedDefault: '2nd Mortgage Bond registered over title deed',
+      });
+
       return {
         id: r.id,
         type: 'rental' as const,
@@ -308,16 +482,16 @@ function ProposalGeneratorContent() {
         completionDate: r.leases?.[0]?.leaseEndDate || new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
         boq: [],
         notes: r.notes || `Seasoned portfolio asset. Tenant: ${showTenantNames ? (r.leases?.[0]?.tenantName || 'In-place') : 'In-Place (Masked)'}. Gross Rent: ${formatZAR(r.monthlyGrossRentZAR)}/mo. Bond balance: ${formatZAR(r.outstandingBondBalanceZAR || 0)}.`,
-        fundingRequiredZAR: Math.round(openMarket * 0.3),
-        capitalRaisedZAR: 0,
-        primaryFunderName: undefined,
-        primaryFunderContact: undefined,
-        primaryFunderType: undefined,
-        coFundersNotes: undefined,
-        promisedReturnType: 'Monthly Coupon',
-        promisedReturnRatePercent: 13.5,
-        promisedPayoutSchedule: 'Monthly Interest',
-        securityOffered: '2nd Mortgage Bond registered over title deed',
+        fundingRequiredZAR: fundingDetails.fundingRequiredZAR,
+        capitalRaisedZAR: fundingDetails.capitalRaisedZAR,
+        primaryFunderName: fundingDetails.primaryFunderName,
+        primaryFunderContact: fundingDetails.primaryFunderContact,
+        primaryFunderType: fundingDetails.primaryFunderType,
+        coFundersNotes: fundingDetails.coFundersNotes,
+        promisedReturnType: fundingDetails.promisedReturnType,
+        promisedReturnRatePercent: fundingDetails.promisedReturnRatePercent,
+        promisedPayoutSchedule: fundingDetails.promisedPayoutSchedule,
+        securityOffered: fundingDetails.securityOffered,
         monthlyRent: r.monthlyGrossRentZAR,
         monthlyLevies: holdingCosts.monthlyLevies,
         monthlyRates: holdingCosts.monthlyRates,
@@ -358,7 +532,7 @@ function ProposalGeneratorContent() {
         occupantRisk: undefined,
       };
     }),
-  ], [flips, opportunities, rentals, showTenantNames]);
+  ], [flips, opportunities, rentals, funding, showTenantNames]);
 
   const [selectedDealId, setSelectedDealId] = useState<string>(
     queryDealId || allDeals[0]?.id || ''
@@ -420,6 +594,14 @@ function ProposalGeneratorContent() {
   );
   const [pitchNotes, setPitchNotes] = useState<string>(() => deal?.notes || '');
   const [isSavedFeedback, setIsSavedFeedback] = useState(false);
+  const [isAddFundingModalOpen, setIsAddFundingModalOpen] = useState(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!toastMessage) return;
+    const timer = setTimeout(() => setToastMessage(null), 3500);
+    return () => clearTimeout(timer);
+  }, [toastMessage]);
 
   const handleReturnTermsChange = (newStructure: ReturnTermType) => {
     setFundingOfferType(newStructure);
@@ -497,10 +679,61 @@ function ProposalGeneratorContent() {
     } else if (deal.type === 'rental') {
       updateRental(deal.id, {
         notes: pitchNotes,
+        fundingRequiredZAR: capitalRequested,
+        promisedReturnType: fundingOfferType,
+        promisedReturnRatePercent: offeredRate,
+        securityOffered: securityType,
       });
     }
     setIsSavedFeedback(true);
     setTimeout(() => setIsSavedFeedback(false), 3000);
+  };
+
+  const fundingInitialValues: Partial<FundingSource> = {
+    linkedDealId: deal?.id,
+    linkedDealName: deal?.title,
+    capitalAmountZAR: Number(capitalRequested) || 0,
+    returnTermsType: fundingOfferType,
+    returnRatePercent: Number(offeredRate) || 0,
+    securityOffered: securityType,
+    lenderName: deal?.primaryFunderName || '',
+    contactPerson: deal?.primaryFunderContact || '',
+    status: 'Standby', // Preserves portfolio cash math until drawn
+    paymentSchedule:
+      fundingOfferType === 'Monthly Coupon' || fundingOfferType === 'Fixed Interest'
+        ? 'Monthly Interest'
+        : 'At Exit (Maturity)',
+    notes: [
+      securityType ? `Security: ${securityType}` : '',
+      pitchNotes ? `Thesis: ${pitchNotes}` : '',
+    ]
+      .filter(Boolean)
+      .join(' • '),
+  };
+
+  const handleFundingCreated = (createdFunding: FundingSource) => {
+    if (!deal) return;
+    const updates: any = {};
+    if (!deal.primaryFunderName && createdFunding.lenderName) {
+      updates.primaryFunderName = createdFunding.lenderName;
+      updates.primaryFunderContact = createdFunding.contactPerson || createdFunding.entityOrContact || createdFunding.emailPhone || '';
+    }
+    if (createdFunding.status === 'Active') {
+      const drawnAmount = createdFunding.tranches?.length
+        ? createdFunding.tranches.filter((t) => t.isDisbursed).reduce((s, t) => s + t.amountZAR, 0)
+        : createdFunding.capitalAmountZAR;
+      updates.capitalRaisedZAR = (deal.capitalRaisedZAR || 0) + drawnAmount;
+    }
+    if (Object.keys(updates).length > 0) {
+      if (deal.type === 'flip') {
+        updateFlip(deal.id, updates);
+      } else if (deal.type === 'opportunity') {
+        updateOpportunity(deal.id, updates);
+      } else if (deal.type === 'rental') {
+        updateRental(deal.id, updates);
+      }
+    }
+    setToastMessage('Facility successfully recorded in Funding & Capital Ledger');
   };
 
   // Financial calculations
@@ -833,23 +1066,34 @@ function ProposalGeneratorContent() {
               )}
             </div>
 
-            <button
-              type="button"
-              onClick={handleSaveTermsToDeal}
-              className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold shadow-2xs transition-colors cursor-pointer"
-            >
-              {isSavedFeedback ? (
-                <>
-                  <Check className="w-3.5 h-3.5 text-emerald-200" />
-                  <span>Saved to Deal!</span>
-                </>
-              ) : (
-                <>
-                  <Save className="w-3.5 h-3.5" />
-                  <span>Save Terms to Deal</span>
-                </>
-              )}
-            </button>
+            <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+              <button
+                type="button"
+                onClick={() => setIsAddFundingModalOpen(true)}
+                className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 px-3.5 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 rounded-lg text-xs font-semibold shadow-2xs transition-colors cursor-pointer"
+              >
+                <PlusCircle className="w-3.5 h-3.5 text-emerald-700" />
+                <span>+ Add to Capital Ledger</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleSaveTermsToDeal}
+                className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold shadow-2xs transition-colors cursor-pointer"
+              >
+                {isSavedFeedback ? (
+                  <>
+                    <Check className="w-3.5 h-3.5 text-emerald-200" />
+                    <span>Saved to Deal!</span>
+                  </>
+                ) : (
+                  <>
+                    <Save className="w-3.5 h-3.5" />
+                    <span>Save Terms to Deal</span>
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         </div>
 
@@ -2196,6 +2440,22 @@ function ProposalGeneratorContent() {
                 </div>
               </div>
             </div>
+          </div>
+        )}
+
+        {/* Add Funding Source Modal */}
+        <AddFundingModal
+          isOpen={isAddFundingModalOpen}
+          onClose={() => setIsAddFundingModalOpen(false)}
+          initialValues={fundingInitialValues}
+          onSuccess={handleFundingCreated}
+        />
+
+        {/* Toast Notification */}
+        {toastMessage && (
+          <div className="fixed bottom-6 right-6 z-50 bg-slate-900 text-white px-4 py-2.5 rounded-xl shadow-xl flex items-center gap-2 text-xs font-semibold border border-slate-700 animate-in fade-in slide-in-from-bottom-2 duration-200">
+            <Check className="w-4 h-4 text-emerald-400" />
+            <span>{toastMessage}</span>
           </div>
         )}
       </main>
