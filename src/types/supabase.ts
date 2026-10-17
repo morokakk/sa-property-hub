@@ -262,6 +262,7 @@ export type Database = {
       funding_sources: {
         Row: {
           capital_amount_zar: number
+          contact_person: string | null
           created_at: string
           delay_extension_days: number | null
           delay_notes: string | null
@@ -280,6 +281,7 @@ export type Database = {
           payment_schedule: string
           return_rate_percent: number
           return_terms_type: string
+          security_offered: string | null
           status: string
           total_interest_paid_zar: number | null
           total_repaid_zar: number
@@ -289,6 +291,7 @@ export type Database = {
         }
         Insert: {
           capital_amount_zar?: number
+          contact_person?: string | null
           created_at?: string
           delay_extension_days?: number | null
           delay_notes?: string | null
@@ -307,6 +310,7 @@ export type Database = {
           payment_schedule?: string
           return_rate_percent?: number
           return_terms_type?: string
+          security_offered?: string | null
           status?: string
           total_interest_paid_zar?: number | null
           total_repaid_zar?: number
@@ -316,6 +320,7 @@ export type Database = {
         }
         Update: {
           capital_amount_zar?: number
+          contact_person?: string | null
           created_at?: string
           delay_extension_days?: number | null
           delay_notes?: string | null
@@ -334,6 +339,7 @@ export type Database = {
           payment_schedule?: string
           return_rate_percent?: number
           return_terms_type?: string
+          security_offered?: string | null
           status?: string
           total_interest_paid_zar?: number | null
           total_repaid_zar?: number
@@ -704,12 +710,15 @@ export type Database = {
           bond_interest_rate_percent: number | null
           bond_payment_effective_date: string | null
           bond_revision_note: string | null
+          capital_raised_zar: number | null
           city: string
+          co_funders_notes: string | null
           coc_checklist: Json
           converted_from_flip_id: string | null
           created_at: string
           drive_vault: Json
           exit_notes: string | null
+          funding_required_zar: number | null
           id: string
           is_brrrr_property: boolean | null
           leases: Json
@@ -730,11 +739,18 @@ export type Database = {
           outstanding_bond_balance_zar: number | null
           payment_records: Json | null
           prepaid_vendor_name: string | null
+          primary_funder_contact: string | null
+          primary_funder_name: string | null
+          primary_funder_type: string | null
+          promised_payout_schedule: string | null
+          promised_return_rate_percent: number | null
+          promised_return_type: string | null
           property_type: string | null
           purchase_date: string | null
           purchase_price_zar: number | null
           refinance_history: Json
           section_13sex_annual_shield_zar: number | null
+          security_offered: string | null
           sold_date: string | null
           source: string | null
           status: string
@@ -763,12 +779,15 @@ export type Database = {
           bond_interest_rate_percent?: number | null
           bond_payment_effective_date?: string | null
           bond_revision_note?: string | null
+          capital_raised_zar?: number | null
           city?: string
+          co_funders_notes?: string | null
           coc_checklist?: Json
           converted_from_flip_id?: string | null
           created_at?: string
           drive_vault?: Json
           exit_notes?: string | null
+          funding_required_zar?: number | null
           id?: string
           is_brrrr_property?: boolean | null
           leases?: Json
@@ -789,11 +808,18 @@ export type Database = {
           outstanding_bond_balance_zar?: number | null
           payment_records?: Json | null
           prepaid_vendor_name?: string | null
+          primary_funder_contact?: string | null
+          primary_funder_name?: string | null
+          primary_funder_type?: string | null
+          promised_payout_schedule?: string | null
+          promised_return_rate_percent?: number | null
+          promised_return_type?: string | null
           property_type?: string | null
           purchase_date?: string | null
           purchase_price_zar?: number | null
           refinance_history?: Json
           section_13sex_annual_shield_zar?: number | null
+          security_offered?: string | null
           sold_date?: string | null
           source?: string | null
           status?: string
@@ -822,12 +848,15 @@ export type Database = {
           bond_interest_rate_percent?: number | null
           bond_payment_effective_date?: string | null
           bond_revision_note?: string | null
+          capital_raised_zar?: number | null
           city?: string
+          co_funders_notes?: string | null
           coc_checklist?: Json
           converted_from_flip_id?: string | null
           created_at?: string
           drive_vault?: Json
           exit_notes?: string | null
+          funding_required_zar?: number | null
           id?: string
           is_brrrr_property?: boolean | null
           leases?: Json
@@ -848,11 +877,18 @@ export type Database = {
           outstanding_bond_balance_zar?: number | null
           payment_records?: Json | null
           prepaid_vendor_name?: string | null
+          primary_funder_contact?: string | null
+          primary_funder_name?: string | null
+          primary_funder_type?: string | null
+          promised_payout_schedule?: string | null
+          promised_return_rate_percent?: number | null
+          promised_return_type?: string | null
           property_type?: string | null
           purchase_date?: string | null
           purchase_price_zar?: number | null
           refinance_history?: Json
           section_13sex_annual_shield_zar?: number | null
+          security_offered?: string | null
           sold_date?: string | null
           source?: string | null
           status?: string

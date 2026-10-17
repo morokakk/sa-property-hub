@@ -185,6 +185,16 @@ export function unmapRentals(rows: Database['public']['Tables']['properties']['R
     monthlyPrepaidVendingFeeZAR: toNullableNum(r.monthly_prepaid_vending_fee_zar),
     monthlyCommunalServicesZAR: toNullableNum(r.monthly_communal_services_zar) ?? undefined,
     ancillaryIncomes: parseJson(r.ancillary_incomes, []),
+    fundingRequiredZAR: toNullableNum(r.funding_required_zar),
+    capitalRaisedZAR: toNullableNum(r.capital_raised_zar),
+    primaryFunderName: r.primary_funder_name || undefined,
+    primaryFunderContact: r.primary_funder_contact || undefined,
+    primaryFunderType: (r.primary_funder_type as any) || undefined,
+    coFundersNotes: r.co_funders_notes || undefined,
+    promisedReturnType: (r.promised_return_type as any) || undefined,
+    promisedReturnRatePercent: toNullableNum(r.promised_return_rate_percent),
+    promisedPayoutSchedule: (r.promised_payout_schedule as any) || undefined,
+    securityOffered: r.security_offered || undefined,
   }));
 }
 
@@ -299,6 +309,8 @@ export function unmapFundingSources(
     delayExtensionDays: toNullableNum(fs.delay_extension_days),
     originalMaturityDate: fs.original_maturity_date || undefined,
     delayNotes: fs.delay_notes || undefined,
+    contactPerson: fs.contact_person || fs.entity_or_contact || undefined,
+    securityOffered: fs.security_offered || undefined,
   }));
 }
 

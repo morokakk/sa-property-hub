@@ -336,6 +336,16 @@ export function mapRentals(rentals: RentalProperty[] = [], userId: string): Prop
     monthly_prepaid_vending_fee_zar: toNullableNumeric(r.monthlyPrepaidVendingFeeZAR),
     monthly_communal_services_zar: toNullableNumeric(r.monthlyCommunalServicesZAR),
     ancillary_incomes: (r.ancillaryIncomes ? JSON.parse(JSON.stringify(r.ancillaryIncomes)) : []) as any,
+    funding_required_zar: toNullableNumeric(r.fundingRequiredZAR),
+    capital_raised_zar: toNullableNumeric(r.capitalRaisedZAR),
+    primary_funder_name: r.primaryFunderName || null,
+    primary_funder_contact: r.primaryFunderContact || null,
+    primary_funder_type: r.primaryFunderType || null,
+    co_funders_notes: r.coFundersNotes || null,
+    promised_return_type: r.promisedReturnType || null,
+    promised_return_rate_percent: toNullableNumeric(r.promisedReturnRatePercent),
+    promised_payout_schedule: r.promisedPayoutSchedule || null,
+    security_offered: r.securityOffered || null,
     updated_at: new Date().toISOString(),
   }));
 }
@@ -466,6 +476,8 @@ export function mapFundingSources(funding: FundingSource[] = [], userId: string)
     delay_extension_days: toNullableInteger(fs.delayExtensionDays),
     original_maturity_date: toDateOnly(fs.originalMaturityDate),
     delay_notes: fs.delayNotes || null,
+    contact_person: fs.contactPerson || fs.entityOrContact || null,
+    security_offered: fs.securityOffered || null,
     updated_at: new Date().toISOString(),
   }));
 }

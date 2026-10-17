@@ -165,6 +165,53 @@ describe('migrateToCloud Payload Mappers', () => {
       expect((mapped[0].leases as any)[0].tenantName).toBe('John Doe');
     });
 
+    it('maps rental funding campaign fields correctly', () => {
+      const rentalWithFunding: RentalProperty = {
+        id: 'rental-sandhurst',
+        title: 'Sandhurst Executive Suite',
+        address: '35 Fredman Drive',
+        city: 'Johannesburg',
+        propertyType: 'Sectional Title Apartment',
+        marketValueZAR: 2450000,
+        purchasePriceZAR: 2100000,
+        purchaseDate: '2024-05-01',
+        outstandingBondBalanceZAR: 1280000,
+        bondInterestRatePercent: 11.75,
+        monthlyBondPaymentZAR: 13800,
+        monthlyGrossRentZAR: 18500,
+        monthlyLeviesZAR: 2400,
+        monthlyRatesTaxesZAR: 1800,
+        monthlyAgentFeeZAR: 0,
+        monthlyMaintenanceReserveZAR: 1000,
+        status: 'Occupied',
+        leases: [],
+        maintenanceHistory: [],
+        fundingRequiredZAR: 1470000,
+        capitalRaisedZAR: 1470000,
+        primaryFunderName: 'sdfsd',
+        primaryFunderContact: 'sdfsd contact',
+        primaryFunderType: 'Private Lender',
+        coFundersNotes: 'mmm (R 735,000)',
+        promisedReturnType: 'Monthly Coupon',
+        promisedReturnRatePercent: 13.5,
+        promisedPayoutSchedule: 'Monthly Interest',
+        securityOffered: '2nd Mortgage Bond registered over title deed',
+      };
+
+      const mapped = mapRentals([rentalWithFunding], TEST_USER_ID);
+      expect(mapped).toHaveLength(1);
+      expect(mapped[0].funding_required_zar).toBe(1470000);
+      expect(mapped[0].capital_raised_zar).toBe(1470000);
+      expect(mapped[0].primary_funder_name).toBe('sdfsd');
+      expect(mapped[0].primary_funder_contact).toBe('sdfsd contact');
+      expect(mapped[0].primary_funder_type).toBe('Private Lender');
+      expect(mapped[0].co_funders_notes).toBe('mmm (R 735,000)');
+      expect(mapped[0].promised_return_type).toBe('Monthly Coupon');
+      expect(mapped[0].promised_return_rate_percent).toBe(13.5);
+      expect(mapped[0].promised_payout_schedule).toBe('Monthly Interest');
+      expect(mapped[0].security_offered).toBe('2nd Mortgage Bond registered over title deed');
+    });
+
     it('returns empty array when rentals list is empty', () => {
       expect(mapRentals([], TEST_USER_ID)).toEqual([]);
     });
