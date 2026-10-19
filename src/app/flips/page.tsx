@@ -6,13 +6,15 @@ import { useFlipSelection, useFlipModalManager, useFlipCalculations } from '@/ho
 import { FlipProjectTabs } from '@/components/flips/FlipProjectTabs';
 import { FlipActivePipeline } from '@/components/flips/FlipActivePipeline';
 import { FlipSoldArchiveView } from '@/components/flips/FlipSoldArchiveView';
-import { FlipProjectModal } from '@/components/flips/modals/FlipProjectModal';
-import { AddBOQItemModal } from '@/components/flips/modals/AddBOQItemModal';
-import { FlipExitModal } from '@/components/flips/modals/FlipExitModal';
-import { FlipToRentalModal } from '@/components/flips/modals/FlipToRentalModal';
-import { FlipFundingModal } from '@/components/flips/modals/FlipFundingModal';
-import { SupplierDirectoryModal } from '@/components/flips/modals/SupplierDirectoryModal';
-import DelayMatrixModal from '@/components/flips/DelayMatrixModal';
+import dynamic from 'next/dynamic';
+
+const FlipProjectModal = dynamic(() => import('@/components/flips/modals/FlipProjectModal').then((m) => m.FlipProjectModal), { ssr: false });
+const AddBOQItemModal = dynamic(() => import('@/components/flips/modals/AddBOQItemModal').then((m) => m.AddBOQItemModal), { ssr: false });
+const FlipExitModal = dynamic(() => import('@/components/flips/modals/FlipExitModal').then((m) => m.FlipExitModal), { ssr: false });
+const FlipToRentalModal = dynamic(() => import('@/components/flips/modals/FlipToRentalModal').then((m) => m.FlipToRentalModal), { ssr: false });
+const FlipFundingModal = dynamic(() => import('@/components/flips/modals/FlipFundingModal').then((m) => m.FlipFundingModal), { ssr: false });
+const SupplierDirectoryModal = dynamic(() => import('@/components/flips/modals/SupplierDirectoryModal').then((m) => m.SupplierDirectoryModal), { ssr: false });
+const DelayMatrixModal = dynamic(() => import('@/components/flips/DelayMatrixModal'), { ssr: false });
 import ImportDropdown from '@/components/common/ImportDropdown';
 import { PlusCircle, Store } from 'lucide-react';
 import { usePortfolioStore } from '@/lib/store/usePortfolioStore';

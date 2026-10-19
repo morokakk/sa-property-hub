@@ -9,20 +9,22 @@ import { RentalViewTabs } from '@/components/rentals/RentalViewTabs';
 import { RentalCard } from '@/components/rentals/RentalCard';
 import { RentalSoldCard } from '@/components/rentals/RentalSoldCard';
 import RentalExportDropdown from '@/components/rentals/RentalExportDropdown';
-import ValidationErrorModal from '@/components/common/ValidationErrorModal';
-import { downloadRentalsTemplate, parseImportFile, ValidationErrorItem } from '@/lib/import/excelImport';
-import TenantStatement from '@/components/rentals/TenantStatement';
-import MeterReadingsModal from '@/components/rentals/MeterReadingsModal';
-import UnifiedPdfVerificationModal from '@/components/rentals/UnifiedPdfVerificationModal';
-import { RentalFormModal } from '@/components/rentals/modals/RentalFormModal';
-import { RefinanceModal } from '@/components/rentals/modals/RefinanceModal';
-import { RefinanceAuditModal } from '@/components/rentals/modals/RefinanceAuditModal';
-import { MaintenanceModal } from '@/components/rentals/modals/MaintenanceModal';
-import { ExitSaleModal } from '@/components/rentals/modals/ExitSaleModal';
-import { SarbPmtModal } from '@/components/rentals/modals/SarbPmtModal';
-import { PaymentModal } from '@/components/rentals/modals/PaymentModal';
-import { WriteOffModal } from '@/components/rentals/modals/WriteOffModal';
-import { TenantNoticeModal } from '@/components/rentals/modals/TenantNoticeModal';
+import dynamic from 'next/dynamic';
+import type { ValidationErrorItem } from '@/lib/import/excelImport';
+
+const ValidationErrorModal = dynamic(() => import('@/components/common/ValidationErrorModal'), { ssr: false });
+const TenantStatement = dynamic(() => import('@/components/rentals/TenantStatement'), { ssr: false });
+const MeterReadingsModal = dynamic(() => import('@/components/rentals/MeterReadingsModal'), { ssr: false });
+const UnifiedPdfVerificationModal = dynamic(() => import('@/components/rentals/UnifiedPdfVerificationModal'), { ssr: false });
+const RentalFormModal = dynamic(() => import('@/components/rentals/modals/RentalFormModal').then((m) => m.RentalFormModal), { ssr: false });
+const RefinanceModal = dynamic(() => import('@/components/rentals/modals/RefinanceModal').then((m) => m.RefinanceModal), { ssr: false });
+const RefinanceAuditModal = dynamic(() => import('@/components/rentals/modals/RefinanceAuditModal').then((m) => m.RefinanceAuditModal), { ssr: false });
+const MaintenanceModal = dynamic(() => import('@/components/rentals/modals/MaintenanceModal').then((m) => m.MaintenanceModal), { ssr: false });
+const ExitSaleModal = dynamic(() => import('@/components/rentals/modals/ExitSaleModal').then((m) => m.ExitSaleModal), { ssr: false });
+const SarbPmtModal = dynamic(() => import('@/components/rentals/modals/SarbPmtModal').then((m) => m.SarbPmtModal), { ssr: false });
+const PaymentModal = dynamic(() => import('@/components/rentals/modals/PaymentModal').then((m) => m.PaymentModal), { ssr: false });
+const WriteOffModal = dynamic(() => import('@/components/rentals/modals/WriteOffModal').then((m) => m.WriteOffModal), { ssr: false });
+const TenantNoticeModal = dynamic(() => import('@/components/rentals/modals/TenantNoticeModal').then((m) => m.TenantNoticeModal), { ssr: false });
 import { Sparkles, PlusCircle, CheckCircle2, Building2, Archive, Loader2, Check, X } from 'lucide-react';
 import { usePortfolioStore } from '@/lib/store/usePortfolioStore';
 import { formatZAR } from '@/lib/formatters';
@@ -46,6 +48,7 @@ export default function RentalPortfolioPage() {
     if (!file) return;
     setUploadedFileName(file.name);
     try {
+      const { parseImportFile } = await import('@/lib/import/excelImport');
       const result = await parseImportFile<any>(file, 'rentals');
       if (!result.success) {
         setValidationErrors(result.errors);
@@ -66,9 +69,10 @@ export default function RentalPortfolioPage() {
     }
   };
 
-  const handleDownloadTemplate = () => {
+  const handleDownloadTemplate = async () => {
     try {
-      downloadRentalsTemplate();
+      const { downloadRentalsTemplate } = await import('@/lib/import/excelImport');
+      await downloadRentalsTemplate();
       showToast('Downloaded Rental Portfolio template (.xlsx)');
     } catch (err) {
       console.error('Template download error:', err);

@@ -16,7 +16,6 @@ import {
   ChevronDown,
   BookOpen,
 } from 'lucide-react';
-import { exportPortfolioToExcel } from '@/lib/export/excelExport';
 import { exportAccountantJournalCSV } from '@/lib/export/csvExport';
 
 interface TopHeaderProps {
@@ -75,10 +74,11 @@ export default function TopHeader({ title, subtitle, actionButton }: TopHeaderPr
     }
   };
 
-  const handleExportExcel = () => {
+  const handleExportExcel = async () => {
     setShowExportMenu(false);
+    const { exportPortfolioToExcel } = await import('@/lib/export/excelExport');
     const currentState = usePortfolioStore.getState();
-    exportPortfolioToExcel({
+    await exportPortfolioToExcel({
       rentals: currentState.rentals,
       flips: currentState.flips,
       opportunities: currentState.opportunities,

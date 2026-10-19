@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { AlertCircle, X, CheckCircle2, ShieldAlert } from 'lucide-react';
-import { ValidationErrorItem } from '@/lib/import/excelImport';
+import type { ValidationErrorItem } from '@/lib/import/excelImport';
 
 interface ValidationErrorModalProps {
   isOpen: boolean;

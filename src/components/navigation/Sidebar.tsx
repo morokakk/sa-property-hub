@@ -26,7 +26,6 @@ import {
   BookOpen,
 } from 'lucide-react';
 import { usePortfolioStore } from '@/lib/store/usePortfolioStore';
-import { exportPortfolioToExcel } from '@/lib/export/excelExport';
 import { exportAccountantJournalCSV } from '@/lib/export/csvExport';
 
 export default function Sidebar() {
@@ -79,9 +78,10 @@ export default function Sidebar() {
     }
   };
 
-  const handleExportExcel = () => {
+  const handleExportExcel = async () => {
+    const { exportPortfolioToExcel } = await import('@/lib/export/excelExport');
     const currentState = usePortfolioStore.getState();
-    exportPortfolioToExcel({
+    await exportPortfolioToExcel({
       rentals: currentState.rentals,
       flips: currentState.flips,
       opportunities: currentState.opportunities,

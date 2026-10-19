@@ -34,7 +34,9 @@ import {
 } from '@/types';
 import { formatDate, formatZAR } from '@/lib/formatters';
 import { calculateMunicipalDisputeImpact } from '@/lib/calculations/municipalTariffs';
-import DisputeLetterModal from './DisputeLetterModal';
+import dynamic from 'next/dynamic';
+
+const DisputeLetterModal = dynamic(() => import('./DisputeLetterModal'), { ssr: false });
 import PropertyMeterRegistryModal from './PropertyMeterRegistryModal';
 import MunicipalDirectoryModal from './MunicipalDirectoryModal';
 

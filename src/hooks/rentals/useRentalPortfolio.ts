@@ -4,7 +4,6 @@ import { usePortfolioStore, usePortfolioSummary } from '@/lib/store/usePortfolio
 import { calculateAggregateRentalKPIs } from '@/lib/calculations/rentals';
 import { calculatePropertyArrears } from '@/lib/calculations/arrears';
 import { exportRentalsCSV, exportAccountantJournalCSV } from '@/lib/export/csvExport';
-import { exportITR12TaxReport } from '@/lib/export/excelExport';
 import { formatZAR } from '@/lib/formatters';
 
 export interface UseRentalPortfolioReturn {
@@ -81,8 +80,9 @@ export function useRentalPortfolio(): UseRentalPortfolioReturn {
   }, [rentals, showToast]);
 
   const handleExportItr12 = useCallback(
-    (taxYear: number = 2026) => {
-      exportITR12TaxReport(rentals, taxYear);
+    async (taxYear: number = 2026) => {
+      const { exportITR12TaxReport } = await import('@/lib/export/excelExport');
+      await exportITR12TaxReport(rentals, taxYear);
       showToast(`Exported SARS ITR12 tax schedule (${taxYear})`);
     },
     [rentals, showToast]

@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { parseRentalPdfStatement, UnifiedParsedStatementResult } from '@/lib/utilities/pdfParser';
+import type { UnifiedParsedStatementResult } from '@/lib/utilities/pdfParser';
 import { AiSettings } from '@/types';
 
 export interface ParsingProgress {
@@ -36,6 +36,7 @@ export function useDirectPdfUpload(aiSettings?: AiSettings): UseDirectPdfUploadR
       const parsedResults: DirectPdfQueueItem[] = [];
 
       try {
+        const { parseRentalPdfStatement } = await import('@/lib/utilities/pdfParser');
         for (let i = 0; i < files.length; i++) {
           const file = files[i];
           setParsingProgress({ current: i + 1, total: files.length, filename: file.name });

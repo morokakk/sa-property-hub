@@ -1,4 +1,3 @@
-import * as XLSX from 'xlsx';
 import {
   RentalProperty,
   FlipProject,
@@ -22,7 +21,8 @@ interface ExportPortfolioData {
  * Builds and downloads a multi-tab Microsoft Excel (.xlsx) workbook
  * containing high-fidelity financial tables across the entire portfolio.
  */
-export function exportPortfolioToExcel(data: ExportPortfolioData) {
+export async function exportPortfolioToExcel(data: ExportPortfolioData) {
+  const XLSX = await import('xlsx');
   const { rentals, flips, opportunities, funding, summary, investorProfile } = data;
   const wb = XLSX.utils.book_new();
 
@@ -477,7 +477,8 @@ export function exportPortfolioToExcel(data: ExportPortfolioData) {
  * - Bad Debts Written Off (Code 4226)
  * - SARS Section 13sex Allowance (Code 4224)
  */
-export function exportITR12TaxReport(rentals: RentalProperty[], taxYear: number | string = 2026) {
+export async function exportITR12TaxReport(rentals: RentalProperty[], taxYear: number | string = 2026) {
+  const XLSX = await import('xlsx');
   const wb = XLSX.utils.book_new();
 
   const titleRows = [

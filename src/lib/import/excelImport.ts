@@ -1,4 +1,3 @@
-import * as XLSX from 'xlsx';
 import {
   OpportunityDeal,
   RentalProperty,
@@ -86,7 +85,8 @@ export function parsePropertyType(val: unknown): PropertyTitleType {
 // TEMPLATE DOWNLOAD GENERATORS
 // -------------------------------------------------------------
 
-export function downloadPipelineTemplate() {
+export async function downloadPipelineTemplate() {
+  const XLSX = await import('xlsx');
   const wb = XLSX.utils.book_new();
 
   const headers = [
@@ -184,7 +184,8 @@ export function downloadPipelineTemplate() {
   XLSX.writeFile(wb, 'sa-property-pipeline-template.xlsx');
 }
 
-export function downloadRentalsTemplate() {
+export async function downloadRentalsTemplate() {
+  const XLSX = await import('xlsx');
   const wb = XLSX.utils.book_new();
 
   const headers = [
@@ -367,7 +368,8 @@ export function downloadRentalsTemplate() {
   XLSX.writeFile(wb, 'sa-property-rentals-template.xlsx');
 }
 
-export function downloadFlipsTemplate() {
+export async function downloadFlipsTemplate() {
+  const XLSX = await import('xlsx');
   const wb = XLSX.utils.book_new();
 
   const headers = [
@@ -489,6 +491,7 @@ export function downloadFlipsTemplate() {
  * Reads binary file or text CSV into a 2D array of strings/values.
  */
 export async function extractRawSheetRows(file: File): Promise<unknown[][]> {
+  const XLSX = await import('xlsx');
   const arrayBuffer = await file.arrayBuffer();
   const wb = XLSX.read(arrayBuffer, { type: 'array' });
   const firstSheetName = wb.SheetNames[0];

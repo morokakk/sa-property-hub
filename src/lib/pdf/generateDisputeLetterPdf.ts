@@ -1,4 +1,4 @@
-import { PDFDocument, rgb, StandardFonts, PDFFont, PDFPage } from 'pdf-lib';
+import type { PDFFont, PDFPage } from 'pdf-lib';
 import { DisputeLetterData } from '@/types';
 import { base64ToUint8Array } from '@/lib/utils/imageDownscale';
 
@@ -8,13 +8,7 @@ const PAGE_HEIGHT = 841.89;
 const MARGIN = 45;
 const CONTENT_WIDTH = PAGE_WIDTH - MARGIN * 2;
 
-// Professional Palette
-const COLOR_PRIMARY = rgb(0.08, 0.15, 0.28); // Slate 900
-const COLOR_SECONDARY = rgb(0.2, 0.3, 0.45); // Slate 700
-const COLOR_MUTED = rgb(0.45, 0.52, 0.62); // Slate 500
-const COLOR_LIGHT_BG = rgb(0.96, 0.97, 0.98); // Slate 50
-const COLOR_BORDER = rgb(0.85, 0.88, 0.92); // Slate 200
-const COLOR_AMBER = rgb(0.85, 0.45, 0.05); // Amber 600
+
 
 /**
  * Sanitizes input text so it only contains characters supported by pdf-lib StandardFonts (WinAnsi).
@@ -80,7 +74,16 @@ function wrapText(text: string, maxWidth: number, font: PDFFont, fontSize: numbe
  * - Page 2: Annexure A (Photographic Evidence with verification caption)
  */
 export async function generateDisputeLetterPdf(data: DisputeLetterData): Promise<Uint8Array> {
+  const { PDFDocument, rgb, StandardFonts } = await import('pdf-lib');
   const doc = await PDFDocument.create();
+
+  // Professional Palette
+  const COLOR_PRIMARY = rgb(0.08, 0.15, 0.28); // Slate 900
+  const COLOR_SECONDARY = rgb(0.2, 0.3, 0.45); // Slate 700
+  const COLOR_MUTED = rgb(0.45, 0.52, 0.62); // Slate 500
+  const COLOR_LIGHT_BG = rgb(0.96, 0.97, 0.98); // Slate 50
+  const COLOR_BORDER = rgb(0.85, 0.88, 0.92); // Slate 200
+  const COLOR_AMBER = rgb(0.85, 0.45, 0.05); // Amber 600
 
   doc.setTitle(sanitizeWinAnsi(`Municipal Billing Dispute - Account ${data.accountNumber || 'Pending'}`));
   doc.setAuthor(sanitizeWinAnsi(data.senderName || 'Property Owner / Manager'));

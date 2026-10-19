@@ -12,13 +12,7 @@ import {
   FileSpreadsheet,
   FileText,
 } from 'lucide-react';
-import {
-  downloadPipelineTemplate,
-  downloadRentalsTemplate,
-  downloadFlipsTemplate,
-  parseImportFile,
-  ValidationErrorItem,
-} from '@/lib/import/excelImport';
+import type { ValidationErrorItem } from '@/lib/import/excelImport';
 import { usePortfolioStore } from '@/lib/store/usePortfolioStore';
 import ValidationErrorModal from './ValidationErrorModal';
 
@@ -74,17 +68,19 @@ export default function ImportDropdown({
     }, 4500);
   };
 
-  const handleDownloadTemplate = () => {
+  const handleDownloadTemplate = async () => {
     setIsOpen(false);
     try {
+      const { downloadPipelineTemplate, downloadRentalsTemplate, downloadFlipsTemplate } =
+        await import('@/lib/import/excelImport');
       if (type === 'pipeline') {
-        downloadPipelineTemplate();
+        await downloadPipelineTemplate();
         showToast('Downloaded Deal Pipeline template (.xlsx).');
       } else if (type === 'rentals') {
-        downloadRentalsTemplate();
+        await downloadRentalsTemplate();
         showToast('Downloaded Rental Portfolio template (.xlsx).');
       } else {
-        downloadFlipsTemplate();
+        await downloadFlipsTemplate();
         showToast('Downloaded Buy-and-Flip template (.xlsx).');
       }
     } catch (err) {
@@ -131,6 +127,7 @@ export default function ImportDropdown({
     setIsProcessing(true);
 
     try {
+      const { parseImportFile } = await import('@/lib/import/excelImport');
       if (type === 'pipeline') {
         const result = await parseImportFile<any>(file, 'pipeline');
         if (!result.success) {

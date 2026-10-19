@@ -1,15 +1,23 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import { usePathname } from 'next/navigation';
 import AuthHydrator from '@/components/AuthHydrator';
 import HashScroller from '@/components/navigation/HashScroller';
 
 export default function ClientOnly({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
   const [hasMounted, setHasMounted] = useState(false);
 
   useEffect(() => {
     setHasMounted(true);
   }, []);
+
+  // Public tenant statement portal must render immediately with SSR,
+  // bypassing mount spinner and avoiding landlord state hydrators.
+  if (pathname?.startsWith('/statement')) {
+    return <>{children}</>;
+  }
 
   if (!hasMounted) {
     return (
