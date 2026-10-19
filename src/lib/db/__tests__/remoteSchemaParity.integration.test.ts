@@ -17,7 +17,7 @@ import {
   INITIAL_RENTALS,
   INITIAL_FLIPS,
   INITIAL_OPPORTUNITIES,
-  INITIAL_FUNDING_SOURCES,
+  INITIAL_FUNDING,
 } from '@/lib/store/initialData';
 
 /**
@@ -85,14 +85,14 @@ describe('Remote Supabase Schema Parity Integration Test', () => {
 
     const mappedProfile = mapProfile(
       INITIAL_INVESTOR_PROFILE,
-      'test-parity-user-id',
-      'test@example.co.za',
       {
         liquidCapitalReserve: 100000,
         rentalForecastView: 'wealth-only',
-        aiSettings: { provider: 'anthropic', model: 'claude-sonnet-5' },
-        analyzerDraft: { openMarketValue: 1000000 },
-      }
+        aiSettings: { provider: 'anthropic', model: 'claude-sonnet-5', apiKey: 'sk-ant-test' },
+        analyzerDraft: { openMarketValue: 1000000 } as any,
+      },
+      'test-parity-user-id',
+      'test@example.co.za'
     );
 
     const generatedKeys = Object.keys(mappedProfile);
@@ -159,7 +159,7 @@ describe('Remote Supabase Schema Parity Integration Test', () => {
     // 2. Funding Sources -> funding_sources table
     const remoteFundingColumns = remoteSchemaMap.get('funding_sources');
     expect(remoteFundingColumns).toBeDefined();
-    const mappedFunding = mapFundingSources(INITIAL_FUNDING_SOURCES, 'test-parity-user-id');
+    const mappedFunding = mapFundingSources(INITIAL_FUNDING, 'test-parity-user-id');
     const missingFundingKeys = Object.keys(mappedFunding[0] || {}).filter((k) => !remoteFundingColumns!.has(k));
     expect(missingFundingKeys, `Missing in funding_sources: ${missingFundingKeys.join(', ')}`).toEqual([]);
 
