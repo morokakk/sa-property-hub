@@ -76,6 +76,7 @@ export default function TenantStatement({
   const setStatementTenantBillingMethod = usePortfolioStore(
     (state) => state.setStatementTenantBillingMethod
   );
+  const updateRental = usePortfolioStore((state) => state.updateRental);
   const aiSettings = usePortfolioStore((state) => state.aiSettings);
 
   const [isUploading, setIsUploading] = useState(false);
@@ -549,12 +550,12 @@ export default function TenantStatement({
     }
 
     const origin = typeof window !== 'undefined' ? window.location.origin : '';
-    const shareUrl = `${origin}/statement/${selectedLease.id}?month=${activePeriodMonth}`;
 
     // 1. Detect if current property is a demo property (rental-1..rental-4, demo-rental-*)
     const isDemo = isDemoRentalProperty(rental.id);
 
     if (isDemo) {
+      const shareUrl = `${origin}/statement/${selectedLease.statementToken ?? selectedLease.id}?month=${activePeriodMonth}`;
       try {
         if (navigator?.clipboard?.writeText) {
           await navigator.clipboard.writeText(shareUrl);
@@ -589,7 +590,17 @@ export default function TenantStatement({
         return;
       }
 
-      // 3. Authenticated user: Automatically publish/upload property to Supabase on the fly
+      // 3. Authenticated user: Mint statementToken if not present and upload property to Supabase on the fly
+      let token = selectedLease.statementToken;
+      if (!token) {
+        token = crypto.randomUUID();
+        const updatedLeases = (rental.leases || []).map((l) =>
+          l.id === selectedLease.id ? { ...l, statementToken: token } : l
+        );
+        updateRental(rental.id, { leases: updatedLeases });
+      }
+      const shareUrl = `${origin}/statement/${token}?month=${activePeriodMonth}`;
+
       const res = await migrateToCloud({ state: usePortfolioStore.getState() });
 
       if (!res.success) {
@@ -647,10 +658,8 @@ export default function TenantStatement({
     }
 
     const origin = typeof window !== 'undefined' ? window.location.origin : '';
-    const shareUrl = `${origin}/statement/${selectedLease.id}?month=${activePeriodMonth}`;
-
-    // 1. Cloud Sync Guardrail for user-created properties
     const isDemo = isDemoRentalProperty(rental.id);
+    let token = selectedLease.statementToken;
 
     if (!isDemo) {
       setIsSendingEmail(true);
@@ -672,6 +681,14 @@ export default function TenantStatement({
           setIsShareDropdownOpen(false);
           setShowCloudPublishModal(true);
           return;
+        }
+
+        if (!token) {
+          token = crypto.randomUUID();
+          const updatedLeases = (rental.leases || []).map((l) =>
+            l.id === selectedLease.id ? { ...l, statementToken: token } : l
+          );
+          updateRental(rental.id, { leases: updatedLeases });
         }
 
         const res = await migrateToCloud({ state: usePortfolioStore.getState() });
@@ -696,6 +713,8 @@ export default function TenantStatement({
     } else {
       setIsSendingEmail(true);
     }
+
+    const shareUrl = `${origin}/statement/${token ?? selectedLease.id}?month=${activePeriodMonth}`;
 
     // Close the dropdown immediately so user sees modal and action spinner
     setIsShareDropdownOpen(false);

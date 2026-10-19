@@ -523,7 +523,7 @@ export function RentalFinancialsTab({
                       Archived {formatDate(archived.archivedAt)}
                     </span>
                     <a
-                      href={`/statement/${archived.id}`}
+                      href={`/statement/${archived.statementToken ?? archived.id}`}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="font-bold text-indigo-700 hover:text-indigo-900 underline flex items-center gap-0.5"

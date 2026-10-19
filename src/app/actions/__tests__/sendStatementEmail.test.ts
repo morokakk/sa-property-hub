@@ -136,7 +136,7 @@ describe('sendStatementEmail Server Action', () => {
         error: null,
       });
 
-      const rawBase64 = 'SGVsbG8gV29ybGQ='; // "Hello World"
+      const rawBase64 = Buffer.from('%PDF-1.4 Hello World').toString('base64'); // Starts with JVBERi0
       const payloadWithDataUri = {
         ...validPayload,
         pdfBase64: `data:application/pdf;base64,${rawBase64}`,
@@ -147,7 +147,19 @@ describe('sendStatementEmail Server Action', () => {
       expect(result.success).toBe(true);
       const callArgs = mockSend.mock.calls[0][0];
       const attachedBuffer = callArgs.attachments[0].content as Buffer;
-      expect(attachedBuffer.toString('utf-8')).toBe('Hello World');
+      expect(attachedBuffer.toString('utf-8')).toBe('%PDF-1.4 Hello World');
+    });
+
+    it('rejects invalid non-PDF payload failing %PDF- magic header check', async () => {
+      process.env.RESEND_API_KEY = 're_test_12345';
+      const nonPdfBase64 = Buffer.from('NOT_A_PDF_CONTENT').toString('base64');
+      const result = await sendStatementEmail({
+        ...validPayload,
+        pdfBase64: nonPdfBase64,
+      });
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('Rate limit exceeded or invalid PDF format');
     });
 
     it('handles Resend API error response without throwing', async () => {

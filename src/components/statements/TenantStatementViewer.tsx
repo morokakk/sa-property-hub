@@ -131,7 +131,8 @@ export default function TenantStatementViewer({
     if (initialMonth && periodOptions.some((p) => p.month === initialMonth)) {
       return initialMonth;
     }
-    return periodOptions[0]?.month || getMonthKey();
+    const latestWithStatement = periodOptions.find((p) => p.hasUtilityStatement);
+    return latestWithStatement?.month || periodOptions[0]?.month || getMonthKey();
   }, [selectedPeriodMonth, periodOptions, initialMonth]);
 
   useEffect(() => {

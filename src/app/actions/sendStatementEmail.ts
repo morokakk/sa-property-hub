@@ -25,6 +25,11 @@ export interface SendStatementEmailResult {
   error?: string;
 }
 
+// In-memory rate limiting map (IP/client -> timestamp array)
+const rateLimitMap = new Map<string, number[]>();
+const RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000; // 1 hour
+const MAX_REQUESTS_PER_WINDOW = 5;
+
 /**
  * Server Action for sending tenant statements via Resend with PDF attachment.
  */
@@ -45,6 +50,36 @@ export async function sendStatementEmail(
       remainingLeaseTerm,
       bankingDetails,
     } = payload;
+
+    // Rate limiting (bypassed in test environment)
+    if (process.env.NODE_ENV !== 'test') {
+      let clientIp = 'unknown-client';
+      try {
+        const { headers } = await import('next/headers');
+        const headerList = await headers();
+        clientIp =
+          headerList.get('x-forwarded-for')?.split(',')[0].trim() ||
+          headerList.get('x-real-ip') ||
+          'unknown-client';
+      } catch {
+        // Fallback when headers context is unavailable
+      }
+
+      const now = Date.now();
+      const timestamps = (rateLimitMap.get(clientIp) || []).filter(
+        (ts) => now - ts < RATE_LIMIT_WINDOW_MS
+      );
+
+      if (timestamps.length >= MAX_REQUESTS_PER_WINDOW) {
+        return {
+          success: false,
+          error: 'Rate limit exceeded or invalid PDF format',
+        };
+      }
+
+      timestamps.push(now);
+      rateLimitMap.set(clientIp, timestamps);
+    }
 
     if (!to || !to.trim()) {
       return {
@@ -90,6 +125,14 @@ export async function sendStatementEmail(
       return {
         success: false,
         error: 'Statement PDF payload is invalid or empty.',
+      };
+    }
+
+    // Enforce PDF format validation: verify %PDF- magic bytes
+    if (pdfBuffer.length < 5 || !pdfBuffer.subarray(0, 5).equals(Buffer.from('%PDF-'))) {
+      return {
+        success: false,
+        error: 'Rate limit exceeded or invalid PDF format',
       };
     }
 

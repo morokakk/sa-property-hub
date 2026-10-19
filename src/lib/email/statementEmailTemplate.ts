@@ -14,6 +14,19 @@ export interface GenerateEmailHtmlParams {
 }
 
 /**
+ * Escapes HTML characters in user-controlled or database strings to prevent injection.
+ */
+export function escapeHtml(str?: string): string {
+  if (!str) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+/**
  * Builds the professional branded HTML email body for tenant rental & utility statements.
  */
 export function generateStatementEmailHtml(params: GenerateEmailHtmlParams): string {
@@ -29,6 +42,33 @@ export function generateStatementEmailHtml(params: GenerateEmailHtmlParams): str
     remainingLeaseTerm,
     bankingDetails,
   } = params;
+
+  const safePropertyName = escapeHtml(propertyName);
+  const safeTenantName = escapeHtml(tenantName || 'Tenant');
+  const safeUnitName = unitName ? escapeHtml(unitName) : undefined;
+  const safeBillingPeriod = escapeHtml(billingPeriod);
+  const safeTotalAmountDueFormatted = escapeHtml(totalAmountDueFormatted);
+  const safeLandlordName = landlordName ? escapeHtml(landlordName) : undefined;
+  const safeFilename = escapeHtml(filename);
+  const safeRemainingLeaseTerm = remainingLeaseTerm ? escapeHtml(remainingLeaseTerm) : undefined;
+  const safeStatementUrl = escapeHtml(statementUrl);
+
+  const safeBankingDetails = bankingDetails
+    ? {
+        bankName: escapeHtml(bankingDetails.bankName),
+        accountHolder: escapeHtml(bankingDetails.accountHolder),
+        accountNumber: escapeHtml(bankingDetails.accountNumber),
+        accountType: bankingDetails.accountType ? escapeHtml(bankingDetails.accountType) : undefined,
+        branchCode: escapeHtml(bankingDetails.branchCode),
+        swiftCode: bankingDetails.swiftCode ? escapeHtml(bankingDetails.swiftCode) : undefined,
+        paymentReference: bankingDetails.paymentReference
+          ? escapeHtml(bankingDetails.paymentReference)
+          : undefined,
+        remittanceInstructions: bankingDetails.remittanceInstructions
+          ? escapeHtml(bankingDetails.remittanceInstructions)
+          : undefined,
+      }
+    : undefined;
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -49,10 +89,10 @@ export function generateStatementEmailHtml(params: GenerateEmailHtmlParams): str
                 Verified Statement
               </div>
               <h1 style="margin: 0; font-size: 22px; font-weight: 800; color: #ffffff; letter-spacing: -0.5px;">
-                ${propertyName}
+                ${safePropertyName}
               </h1>
               <p style="margin: 6px 0 0 0; font-size: 13px; color: #94a3b8;">
-                ${unitName ? `${unitName} &bull; ` : ''}${billingPeriod}
+                ${safeUnitName ? `${safeUnitName} &bull; ` : ''}${safeBillingPeriod}
               </p>
             </td>
           </tr>
@@ -61,10 +101,10 @@ export function generateStatementEmailHtml(params: GenerateEmailHtmlParams): str
           <tr>
             <td style="padding: 32px 32px 24px 32px;">
               <p style="margin: 0 0 16px 0; font-size: 15px; line-height: 1.6; color: #334155;">
-                Dear <strong>${tenantName || 'Tenant'}</strong>,
+                Dear <strong>${safeTenantName}</strong>,
               </p>
               <p style="margin: 0 0 24px 0; font-size: 14px; line-height: 1.6; color: #475569;">
-                Your monthly rental and utility breakdown statement for <strong>${billingPeriod}</strong> has been prepared and verified by your landlord. An itemized PDF copy has been attached to this email for your records.
+                Your monthly rental and utility breakdown statement for <strong>${safeBillingPeriod}</strong> has been prepared and verified by your landlord. An itemized PDF copy has been attached to this email for your records.
               </p>
 
               <!-- Amount Due Banner -->
@@ -75,10 +115,10 @@ export function generateStatementEmailHtml(params: GenerateEmailHtmlParams): str
                       Total Amount Due
                     </div>
                     <div style="font-size: 28px; font-weight: 900; color: #14532d; letter-spacing: -0.5px;">
-                      ${totalAmountDueFormatted}
+                      ${safeTotalAmountDueFormatted}
                     </div>
                     <div style="font-size: 12px; color: #15803d; margin-top: 4px;">
-                      Billing Period: <strong>${billingPeriod}</strong>
+                      Billing Period: <strong>${safeBillingPeriod}</strong>
                     </div>
                   </td>
                 </tr>
@@ -88,30 +128,30 @@ export function generateStatementEmailHtml(params: GenerateEmailHtmlParams): str
               <table role="presentation" width="100%" border="0" cellpadding="0" cellspacing="0" style="margin-bottom: 28px; border-collapse: collapse; font-size: 13px;">
                 <tr style="border-bottom: 1px solid #f1f5f9;">
                   <td style="padding: 10px 0; color: #64748b; font-weight: 500;">Property:</td>
-                  <td style="padding: 10px 0; color: #0f172a; font-weight: 600; text-align: right;">${propertyName}</td>
+                  <td style="padding: 10px 0; color: #0f172a; font-weight: 600; text-align: right;">${safePropertyName}</td>
                 </tr>
-                ${unitName ? `
+                ${safeUnitName ? `
                 <tr style="border-bottom: 1px solid #f1f5f9;">
                   <td style="padding: 10px 0; color: #64748b; font-weight: 500;">Unit / Section:</td>
-                  <td style="padding: 10px 0; color: #0f172a; font-weight: 600; text-align: right;">${unitName}</td>
+                  <td style="padding: 10px 0; color: #0f172a; font-weight: 600; text-align: right;">${safeUnitName}</td>
                 </tr>` : ''}
-                ${remainingLeaseTerm ? `
+                ${safeRemainingLeaseTerm ? `
                 <tr style="border-bottom: 1px solid #f1f5f9;">
                   <td style="padding: 10px 0; color: #64748b; font-weight: 500;">Remaining Lease Term:</td>
-                  <td style="padding: 10px 0; color: #0f172a; font-weight: 600; text-align: right;">${remainingLeaseTerm}</td>
+                  <td style="padding: 10px 0; color: #0f172a; font-weight: 600; text-align: right;">${safeRemainingLeaseTerm}</td>
                 </tr>` : ''}
-                ${landlordName ? `
+                ${safeLandlordName ? `
                 <tr style="border-bottom: 1px solid #f1f5f9;">
                   <td style="padding: 10px 0; color: #64748b; font-weight: 500;">Landlord / Lessor:</td>
-                  <td style="padding: 10px 0; color: #0f172a; font-weight: 600; text-align: right;">${landlordName}</td>
+                  <td style="padding: 10px 0; color: #0f172a; font-weight: 600; text-align: right;">${safeLandlordName}</td>
                 </tr>` : ''}
                 <tr>
                   <td style="padding: 10px 0; color: #64748b; font-weight: 500;">Attachment:</td>
-                  <td style="padding: 10px 0; color: #0f172a; font-weight: 600; text-align: right;">${filename}</td>
+                  <td style="padding: 10px 0; color: #0f172a; font-weight: 600; text-align: right;">${safeFilename}</td>
                 </tr>
               </table>
 
-              ${bankingDetails && bankingDetails.accountNumber ? `
+              ${safeBankingDetails && safeBankingDetails.accountNumber ? `
               <!-- Remittance Banking Details Card -->
               <table role="presentation" width="100%" border="0" cellpadding="0" cellspacing="0" style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; margin-bottom: 28px; padding: 18px; font-size: 13px;">
                 <tr>
@@ -122,34 +162,34 @@ export function generateStatementEmailHtml(params: GenerateEmailHtmlParams): str
                     <table role="presentation" width="100%" border="0" cellpadding="0" cellspacing="0" style="font-size: 12px; border-collapse: collapse;">
                       <tr>
                         <td style="padding: 4px 0; color: #64748b; font-weight: 500; width: 40%;">Bank:</td>
-                        <td style="padding: 4px 0; color: #0f172a; font-weight: 700;">${bankingDetails.bankName}</td>
+                        <td style="padding: 4px 0; color: #0f172a; font-weight: 700;">${safeBankingDetails.bankName}</td>
                       </tr>
                       <tr>
                         <td style="padding: 4px 0; color: #64748b; font-weight: 500;">Account Holder:</td>
-                        <td style="padding: 4px 0; color: #0f172a; font-weight: 600;">${bankingDetails.accountHolder}</td>
+                        <td style="padding: 4px 0; color: #0f172a; font-weight: 600;">${safeBankingDetails.accountHolder}</td>
                       </tr>
                       <tr>
                         <td style="padding: 4px 0; color: #64748b; font-weight: 500;">Account Number:</td>
-                        <td style="padding: 4px 0; color: #0f172a; font-weight: 700; font-family: monospace; font-size: 13px;">${bankingDetails.accountNumber}</td>
+                        <td style="padding: 4px 0; color: #0f172a; font-weight: 700; font-family: monospace; font-size: 13px;">${safeBankingDetails.accountNumber}</td>
                       </tr>
                       <tr>
                         <td style="padding: 4px 0; color: #64748b; font-weight: 500;">Branch / Code:</td>
-                        <td style="padding: 4px 0; color: #0f172a; font-weight: 600; font-family: monospace;">${bankingDetails.branchCode}${bankingDetails.accountType ? ` (${bankingDetails.accountType})` : ''}</td>
+                        <td style="padding: 4px 0; color: #0f172a; font-weight: 600; font-family: monospace;">${safeBankingDetails.branchCode}${safeBankingDetails.accountType ? ` (${safeBankingDetails.accountType})` : ''}</td>
                       </tr>
-                      ${bankingDetails.swiftCode ? `
+                      ${safeBankingDetails.swiftCode ? `
                       <tr>
                         <td style="padding: 4px 0; color: #64748b; font-weight: 500;">SWIFT / BIC:</td>
-                        <td style="padding: 4px 0; color: #0f172a; font-weight: 600; font-family: monospace;">${bankingDetails.swiftCode}</td>
+                        <td style="padding: 4px 0; color: #0f172a; font-weight: 600; font-family: monospace;">${safeBankingDetails.swiftCode}</td>
                       </tr>` : ''}
-                      ${bankingDetails.paymentReference ? `
+                      ${safeBankingDetails.paymentReference ? `
                       <tr style="border-top: 1px dashed #cbd5e1;">
                         <td style="padding: 8px 0 4px 0; color: #059669; font-weight: 700;">Beneficiary Reference:</td>
-                        <td style="padding: 8px 0 4px 0; color: #059669; font-weight: 800; font-family: monospace; font-size: 13px;">${bankingDetails.paymentReference}</td>
+                        <td style="padding: 8px 0 4px 0; color: #059669; font-weight: 800; font-family: monospace; font-size: 13px;">${safeBankingDetails.paymentReference}</td>
                       </tr>` : ''}
                     </table>
-                    ${bankingDetails.remittanceInstructions ? `
+                    ${safeBankingDetails.remittanceInstructions ? `
                     <div style="font-size: 11px; color: #64748b; font-style: italic; margin-top: 10px; padding-top: 8px; border-top: 1px solid #f1f5f9;">
-                      ${bankingDetails.remittanceInstructions}
+                      ${safeBankingDetails.remittanceInstructions}
                     </div>` : ''}
                   </td>
                 </tr>
@@ -159,11 +199,11 @@ export function generateStatementEmailHtml(params: GenerateEmailHtmlParams): str
               <table role="presentation" width="100%" border="0" cellpadding="0" cellspacing="0" style="margin-bottom: 24px;">
                 <tr>
                   <td align="center">
-                    <a href="${statementUrl}" target="_blank" rel="noopener noreferrer" style="display: inline-block; background-color: #0284c7; color: #ffffff; text-decoration: none; font-size: 14px; font-weight: 700; padding: 14px 28px; border-radius: 10px; box-shadow: 0 2px 4px rgba(2, 132, 199, 0.3); letter-spacing: 0.2px;">
+                    <a href="${safeStatementUrl}" target="_blank" rel="noopener noreferrer" style="display: inline-block; background-color: #0284c7; color: #ffffff; text-decoration: none; font-size: 14px; font-weight: 700; padding: 14px 28px; border-radius: 10px; box-shadow: 0 2px 4px rgba(2, 132, 199, 0.3); letter-spacing: 0.2px;">
                       View Secure Online Statement &rarr;
                     </a>
                     <p style="margin: 10px 0 0 0; font-size: 11px; color: #64748b; text-align: center; word-break: break-all;">
-                      Direct portal link: <a href="${statementUrl}" target="_blank" rel="noopener noreferrer" style="color: #0284c7; text-decoration: underline;">${statementUrl}</a>
+                      Direct portal link: <a href="${safeStatementUrl}" target="_blank" rel="noopener noreferrer" style="color: #0284c7; text-decoration: underline;">${safeStatementUrl}</a>
                     </p>
                   </td>
                 </tr>
@@ -179,7 +219,7 @@ export function generateStatementEmailHtml(params: GenerateEmailHtmlParams): str
           <tr>
             <td style="background-color: #f8fafc; border-top: 1px solid #e2e8f0; padding: 20px 32px; text-align: center;">
               <p style="margin: 0; font-size: 11px; color: #94a3b8; line-height: 1.5;">
-                This statement was manually verified and distributed by ${landlordName || 'your property landlord'}.<br>
+                This statement was manually verified and distributed by ${safeLandlordName || 'your property landlord'}.<br>
                 For any questions or payment arrangements, please contact your landlord directly.
               </p>
             </td>

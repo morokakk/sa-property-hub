@@ -98,6 +98,18 @@ describe('hydrateFromCloud Reverse Mappers', () => {
         status: 'Occupied',
         coc_checklist: { electrical: { status: 'Certified / Valid' } },
         drive_vault: { masterFolderUrl: 'https://vault.com' },
+        province: 'Gauteng',
+        number_of_units: 6,
+        floor_area_sqm: 420,
+        meter_registry: [
+          {
+            id: 'm-1',
+            meterType: 'electricity',
+            meterNumber: 'EM-100',
+            scope: 'unit-submeter',
+            unitName: 'Unit 1',
+          },
+        ],
         notes: 'Great tenant',
         actual_sale_price_zar: null,
         net_cash_proceeds_zar: null,
@@ -127,6 +139,11 @@ describe('hydrateFromCloud Reverse Mappers', () => {
     expect(result[0].title).toBe('Morningside Executive Apartment');
     expect(result[0].marketValueZAR).toBe(2100000);
     expect(result[0].monthlyGrossRentZAR).toBe(16000);
+    expect(result[0].province).toBe('Gauteng');
+    expect(result[0].numberOfUnits).toBe(6);
+    expect(result[0].floorAreaSqm).toBe(420);
+    expect(result[0].meterRegistry).toHaveLength(1);
+    expect(result[0].meterRegistry?.[0].meterNumber).toBe('EM-100');
     expect(result[0].leases).toHaveLength(1);
     expect(result[0].leases[0].tenantName).toBe('Jane Doe');
     expect(result[0].agencyVatApplicable).toBe(true);
@@ -147,6 +164,9 @@ describe('hydrateFromCloud Reverse Mappers', () => {
         baseline_renovation_budget_zar: 450000,
         strategy: 'Flip',
         source: 'Sheriff Auction',
+        province: 'Gauteng',
+        number_of_units: 3,
+        floor_area_sqm: 350,
         estimated_duration_months: 6,
         target_exit_price_zar: 3400000,
         status: 'Active',
@@ -207,6 +227,9 @@ describe('hydrateFromCloud Reverse Mappers', () => {
     expect(result).toHaveLength(1);
     expect(result[0].id).toBe('flip-c1');
     expect(result[0].title).toBe('Parkhurst Fixer Upper');
+    expect(result[0].province).toBe('Gauteng');
+    expect(result[0].numberOfUnits).toBe(3);
+    expect(result[0].floorAreaSqm).toBe(350);
     expect(result[0].acquisitionCostsZAR).toBe(160000);
     expect(result[0].occupantRisk?.occupancyStatus).toBe('unlawful_occupant');
     expect(result[0].occupantRisk?.budgetedLegalEvictionCostZAR).toBe(40000);
@@ -417,11 +440,55 @@ describe('hydrateFromCloud Execution Engine', () => {
     expect(storeState.liquidCapitalReserve).toBe(900000);
 
     // Verify localStorage completion flags
+    expect(localStorage.setItem).toHaveBeenCalledWith('last_sync_user_id', TEST_USER_ID);
     expect(localStorage.setItem).toHaveBeenCalledWith('cloud_sync_completed', 'true');
     expect(localStorage.setItem).toHaveBeenCalledWith(
       'cloud_sync_timestamp',
       expect.any(String)
     );
+  });
+
+  it('discards stale local portfolio and prevents cross-user contamination when last_sync_user_id belongs to another user (DBSYNC-02)', async () => {
+    (supabase.auth.getUser as any).mockResolvedValue({
+      data: { user: { id: 'new-user-456', email: 'user2@example.com' } },
+      error: null,
+    });
+
+    // Simulate previous user was 'previous-user-123'
+    (localStorage.getItem as any).mockImplementation((key: string) => {
+      if (key === 'last_sync_user_id') return 'previous-user-123';
+      return null;
+    });
+
+    const cloudRental = {
+      id: 'rental-user2-cloud',
+      user_id: 'new-user-456',
+      title: 'User 2 Cloud Property',
+      address: '99 Cloud Way',
+      city: 'Cape Town',
+      market_value_zar: 3000000,
+      monthly_gross_rent_zar: 25000,
+      status: 'Occupied',
+      leases: [],
+      maintenance_history: [],
+    };
+
+    (supabase.from as any).mockImplementation((table: string) => {
+      let data: any[] = [];
+      if (table === 'properties') data = [cloudRental];
+      return {
+        select: vi.fn().mockReturnValue({
+          eq: vi.fn().mockResolvedValue({ data, error: null }),
+        }),
+      };
+    });
+
+    const result = await hydrateFromCloud();
+
+    expect(result.success).toBe(true);
+    expect(result.hydrated).toBe(true);
+    expect(result.hasNewLocalItems).toBe(false);
+    expect(localStorage.setItem).toHaveBeenCalledWith('last_sync_user_id', 'new-user-456');
   });
 
   it('fails atomically with error and leaves store intact when a partial table fetch fails', async () => {

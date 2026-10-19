@@ -5,6 +5,7 @@ export default defineConfig({
   timeout: 60_000,
   expect: { timeout: 10_000 },
   fullyParallel: false,
+  workers: 1,
   retries: 0,
   reporter: [['list'], ['html', { open: 'never', outputFolder: 'e2e/report' }]],
   webServer: {

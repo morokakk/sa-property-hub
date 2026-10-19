@@ -115,6 +115,7 @@ export type Database = {
           exit_commission_percent: number | null
           exit_notes: string | null
           exit_strategy: string | null
+          floor_area_sqm: number | null
           funding_required_zar: number | null
           id: string
           linked_funding_ids: string[]
@@ -127,6 +128,7 @@ export type Database = {
           municipal_valuation_zar: number | null
           net_cash_proceeds_zar: number | null
           notes: string | null
+          number_of_units: number | null
           occupant_risk: Json | null
           primary_funder_contact: string | null
           primary_funder_name: string | null
@@ -135,6 +137,7 @@ export type Database = {
           promised_return_rate_percent: number | null
           promised_return_type: string | null
           property_type: string | null
+          province: string | null
           purchase_date: string | null
           purchase_price_zar: number | null
           security_offered: string | null
@@ -169,6 +172,7 @@ export type Database = {
           exit_commission_percent?: number | null
           exit_notes?: string | null
           exit_strategy?: string | null
+          floor_area_sqm?: number | null
           funding_required_zar?: number | null
           id?: string
           linked_funding_ids?: string[]
@@ -181,6 +185,7 @@ export type Database = {
           municipal_valuation_zar?: number | null
           net_cash_proceeds_zar?: number | null
           notes?: string | null
+          number_of_units?: number | null
           occupant_risk?: Json | null
           primary_funder_contact?: string | null
           primary_funder_name?: string | null
@@ -189,6 +194,7 @@ export type Database = {
           promised_return_rate_percent?: number | null
           promised_return_type?: string | null
           property_type?: string | null
+          province?: string | null
           purchase_date?: string | null
           purchase_price_zar?: number | null
           security_offered?: string | null
@@ -223,6 +229,7 @@ export type Database = {
           exit_commission_percent?: number | null
           exit_notes?: string | null
           exit_strategy?: string | null
+          floor_area_sqm?: number | null
           funding_required_zar?: number | null
           id?: string
           linked_funding_ids?: string[]
@@ -235,6 +242,7 @@ export type Database = {
           municipal_valuation_zar?: number | null
           net_cash_proceeds_zar?: number | null
           notes?: string | null
+          number_of_units?: number | null
           occupant_risk?: Json | null
           primary_funder_contact?: string | null
           primary_funder_name?: string | null
@@ -243,6 +251,7 @@ export type Database = {
           promised_return_rate_percent?: number | null
           promised_return_type?: string | null
           property_type?: string | null
+          province?: string | null
           purchase_date?: string | null
           purchase_price_zar?: number | null
           security_offered?: string | null
@@ -718,6 +727,7 @@ export type Database = {
           created_at: string
           drive_vault: Json
           exit_notes: string | null
+          floor_area_sqm: number | null
           funding_required_zar: number | null
           id: string
           is_brrrr_property: boolean | null
@@ -726,6 +736,7 @@ export type Database = {
           management_type: string | null
           market_value_zar: number | null
           meter_readings: Json
+          meter_registry: Json | null
           monthly_agent_fee_zar: number | null
           monthly_bond_payment_zar: number | null
           monthly_communal_services_zar: number | null
@@ -736,6 +747,7 @@ export type Database = {
           monthly_rates_taxes_zar: number | null
           net_cash_proceeds_zar: number | null
           notes: string | null
+          number_of_units: number | null
           outstanding_bond_balance_zar: number | null
           payment_records: Json | null
           prepaid_vendor_name: string | null
@@ -746,6 +758,7 @@ export type Database = {
           promised_return_rate_percent: number | null
           promised_return_type: string | null
           property_type: string | null
+          province: string | null
           purchase_date: string | null
           purchase_price_zar: number | null
           refinance_history: Json
@@ -787,6 +800,7 @@ export type Database = {
           created_at?: string
           drive_vault?: Json
           exit_notes?: string | null
+          floor_area_sqm?: number | null
           funding_required_zar?: number | null
           id?: string
           is_brrrr_property?: boolean | null
@@ -795,6 +809,7 @@ export type Database = {
           management_type?: string | null
           market_value_zar?: number | null
           meter_readings?: Json
+          meter_registry?: Json | null
           monthly_agent_fee_zar?: number | null
           monthly_bond_payment_zar?: number | null
           monthly_communal_services_zar?: number | null
@@ -805,6 +820,7 @@ export type Database = {
           monthly_rates_taxes_zar?: number | null
           net_cash_proceeds_zar?: number | null
           notes?: string | null
+          number_of_units?: number | null
           outstanding_bond_balance_zar?: number | null
           payment_records?: Json | null
           prepaid_vendor_name?: string | null
@@ -815,6 +831,7 @@ export type Database = {
           promised_return_rate_percent?: number | null
           promised_return_type?: string | null
           property_type?: string | null
+          province?: string | null
           purchase_date?: string | null
           purchase_price_zar?: number | null
           refinance_history?: Json
@@ -856,6 +873,7 @@ export type Database = {
           created_at?: string
           drive_vault?: Json
           exit_notes?: string | null
+          floor_area_sqm?: number | null
           funding_required_zar?: number | null
           id?: string
           is_brrrr_property?: boolean | null
@@ -864,6 +882,7 @@ export type Database = {
           management_type?: string | null
           market_value_zar?: number | null
           meter_readings?: Json
+          meter_registry?: Json | null
           monthly_agent_fee_zar?: number | null
           monthly_bond_payment_zar?: number | null
           monthly_communal_services_zar?: number | null
@@ -874,6 +893,7 @@ export type Database = {
           monthly_rates_taxes_zar?: number | null
           net_cash_proceeds_zar?: number | null
           notes?: string | null
+          number_of_units?: number | null
           outstanding_bond_balance_zar?: number | null
           payment_records?: Json | null
           prepaid_vendor_name?: string | null
@@ -884,6 +904,7 @@ export type Database = {
           promised_return_rate_percent?: number | null
           promised_return_type?: string | null
           property_type?: string | null
+          province?: string | null
           purchase_date?: string | null
           purchase_price_zar?: number | null
           refinance_history?: Json

@@ -127,8 +127,11 @@ export function unmapRentals(rows: Database['public']['Tables']['properties']['R
     title: r.title,
     address: r.address,
     city: r.city,
+    province: (r as any).province || undefined,
     propertyType: (r.property_type as any) || 'Sectional Title Apartment',
     source: (r.source as any) || undefined,
+    numberOfUnits: toNullableNum((r as any).number_of_units) ?? 1,
+    floorAreaSqm: toNullableNum((r as any).floor_area_sqm) ?? undefined,
     agmDate: r.agm_date || undefined,
     marketValueZAR: toNum(r.market_value_zar, 0),
     purchasePriceZAR: toNum(r.purchase_price_zar, 0),
@@ -178,6 +181,7 @@ export function unmapRentals(rows: Database['public']['Tables']['properties']['R
     refinanceHistory: parseJson(r.refinance_history, []),
     utilityStatements: parseJson(r.utility_statements, []),
     meterReadings: parseJson(r.meter_readings, []),
+    meterRegistry: parseJson((r as any).meter_registry, []),
     taxEntityTypeOverride: (r.tax_entity_type_override as any) || undefined,
     section13sexAnnualShieldZAR: toNullableNum(r.section_13sex_annual_shield_zar),
     utilityType: (r.utility_type as any) || undefined,
@@ -234,6 +238,7 @@ export function unmapFlips(
     title: f.title,
     address: f.address,
     city: f.city,
+    province: (f as any).province || undefined,
     propertyType: (f.property_type as any) || undefined,
     agmDate: f.agm_date || undefined,
     purchaseDate: f.purchase_date || new Date().toISOString().split('T')[0],
@@ -242,6 +247,8 @@ export function unmapFlips(
     baselineRenovationBudgetZAR: toNum(f.baseline_renovation_budget_zar, 0),
     strategy: (f.strategy as any) || undefined,
     source: (f.source as any) || undefined,
+    numberOfUnits: toNullableNum((f as any).number_of_units) ?? 1,
+    floorAreaSqm: toNullableNum((f as any).floor_area_sqm) ?? undefined,
     estimatedDurationMonths: toNullableNum(f.estimated_duration_months),
     monthlyHoldingCostZAR: toNullableNum(f.monthly_holding_cost_zar),
     monthlyBondPaymentZAR: toNullableNum(f.monthly_bond_payment_zar),
@@ -579,9 +586,34 @@ export async function hydrateFromCloud(): Promise<HydrationResult> {
         analyzerDraft,
       };
 
-      // 3. Merge with current local state
+      // 3. Cross-User State Contamination Guard (DBSYNC-02)
+      // Check if localStorage portfolio belongs to a different authenticated user
       const localState = usePortfolioStore.getState();
-      const { mergedState, hasNewLocalItems } = mergePortfolioState(cloudSnapshot, localState);
+      let lastSyncUserId: string | null = null;
+      if (typeof localStorage !== 'undefined') {
+        try {
+          lastSyncUserId = localStorage.getItem('last_sync_user_id');
+        } catch (e) {
+          console.warn('Failed to read last_sync_user_id', e);
+        }
+      }
+
+      const isCrossUserContamination = Boolean(lastSyncUserId && lastSyncUserId !== user.id);
+
+      let mergedState: PortfolioStateSnapshot;
+      let hasNewLocalItems = false;
+
+      if (isCrossUserContamination) {
+        console.warn(
+          `hydrateFromCloud: Session switch detected (previous sync: ${lastSyncUserId}, current: ${user.id}). Discarding stale local state to prevent cross-account contamination.`
+        );
+        mergedState = cloudSnapshot;
+        hasNewLocalItems = false;
+      } else {
+        const mergeResult = mergePortfolioState(cloudSnapshot, localState);
+        mergedState = mergeResult.mergedState;
+        hasNewLocalItems = mergeResult.hasNewLocalItems;
+      }
 
       // 4. Update Zustand store atomically
       usePortfolioStore.getState().hydrateFromCloudState(mergedState);
@@ -601,6 +633,7 @@ export async function hydrateFromCloud(): Promise<HydrationResult> {
       // 6. Set localStorage sync indicators
       if (typeof localStorage !== 'undefined') {
         try {
+          localStorage.setItem('last_sync_user_id', user.id);
           localStorage.setItem('cloud_sync_completed', 'true');
           localStorage.setItem('cloud_sync_timestamp', new Date().toISOString());
         } catch (e) {

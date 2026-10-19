@@ -463,6 +463,7 @@ export interface Lease {
   vacationDate?: string; // 'YYYY-MM-DD' (intended or target move-out date)
   noticeReason?: TenantDepartureReason | string;
   noticeNotes?: string;
+  statementToken?: string; // 128-bit unguessable UUID token for public tenant statement portal
 }
 
 // Archived / Past Tenant Lease Record
@@ -483,6 +484,7 @@ export interface ArchivedLease {
   departureReason: TenantDepartureReason | string;
   forwardingNotes?: string;
   archivedAt: string; // ISO timestamp
+  statementToken?: string;
 }
 
 export interface AncillaryIncome {

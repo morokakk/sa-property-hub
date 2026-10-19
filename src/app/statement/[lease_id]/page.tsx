@@ -75,7 +75,7 @@ async function fetchStatementData(leaseId: string): Promise<PublicTenantStatemen
         arrears_opening_balance_zar: ('arrearsOpeningBalanceZAR' in demoLease ? demoLease.arrearsOpeningBalanceZAR : null) ?? null,
         roomType: demoLease.roomType,
         guarantorName: ('guarantorName' in demoLease ? demoLease.guarantorName : undefined),
-        guarantorContact: ('guarantorContact' in demoLease ? demoLease.guarantorContact : undefined),
+        guarantorContact: undefined,
       },
       property: {
         id: demoRental.id,
@@ -117,14 +117,23 @@ async function fetchStatementData(leaseId: string): Promise<PublicTenantStatemen
 // Dynamic SEO & Browser Tab Title
 export async function generateMetadata({ params, searchParams }: PageProps): Promise<Metadata> {
   const { lease_id } = await params;
-  if (!lease_id) return { title: 'Tenant Statement | SA Property Hub' };
+  if (!lease_id) {
+    return {
+      title: 'Tenant Statement | SA Property Hub',
+      robots: { index: false, follow: false },
+    };
+  }
 
   try {
     const payload = await fetchStatementData(lease_id);
     if (payload) {
       return {
         title: `Tenant Statement: ${payload.lease?.unitName || 'Unit'} - ${payload.property?.title || 'Property'}`,
-        description: `Official rental & utility recovery statement for ${payload.lease?.tenantName || 'Tenant'}.`,
+        description: 'Official rental & utility recovery statement.',
+        robots: {
+          index: false,
+          follow: false,
+        },
       };
     }
   } catch {
@@ -133,6 +142,10 @@ export async function generateMetadata({ params, searchParams }: PageProps): Pro
 
   return {
     title: 'Tenant Statement | SA Property Hub',
+    robots: {
+      index: false,
+      follow: false,
+    },
   };
 }
 

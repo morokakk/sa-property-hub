@@ -101,8 +101,9 @@ describe('migrateToCloud Payload Mappers', () => {
       expect(result.entity_name).toBe('Apex Properties (Pty) Ltd');
       expect(result.trading_as).toBe('Apex Capital');
       expect(result.liquid_capital_reserve_zar).toBe(250000);
+      expect(result.bio_summary).toBe('Value-add property investors');
       expect(result.rental_forecast_view).toBe('cashflow-only');
-      expect(result.ai_settings).toEqual(aiSettings);
+      expect(result.ai_settings).toEqual({ ...aiSettings, apiKey: '' });
       expect(result.analyzer_draft).toEqual(analyzerDraft);
     });
 
@@ -125,6 +126,9 @@ describe('migrateToCloud Payload Mappers', () => {
           title: 'Sandton Executive Suite',
           address: '44 Rivonia Rd',
           city: 'Sandton',
+          province: 'Gauteng',
+          numberOfUnits: 4,
+          floorAreaSqm: 280,
           propertyType: 'Sectional Title Apartment',
           marketValueZAR: 1500000,
           purchasePriceZAR: 1200000,
@@ -138,6 +142,16 @@ describe('migrateToCloud Payload Mappers', () => {
           monthlyAgentFeeZAR: 1200,
           monthlyMaintenanceReserveZAR: 500,
           status: 'Occupied',
+          meterRegistry: [
+            {
+              id: 'meter-1',
+              meterType: 'sub_meter',
+              utilityType: 'water',
+              meterNumber: 'WM-001',
+              unitName: 'Unit 4',
+              createdAt: '2026-01-01T00:00:00Z',
+            },
+          ],
           leases: [
             {
               id: 'lease-1',
@@ -161,6 +175,19 @@ describe('migrateToCloud Payload Mappers', () => {
       expect(mapped[0].id).toBe('rental-1');
       expect(mapped[0].user_id).toBe(TEST_USER_ID);
       expect(mapped[0].purchase_date).toBe('2024-05-01');
+      expect(mapped[0].province).toBe('Gauteng');
+      expect(mapped[0].number_of_units).toBe(4);
+      expect(mapped[0].floor_area_sqm).toBe(280);
+      expect(mapped[0].meter_registry).toEqual([
+        {
+          id: 'meter-1',
+          meterType: 'sub_meter',
+          utilityType: 'water',
+          meterNumber: 'WM-001',
+          unitName: 'Unit 4',
+          createdAt: '2026-01-01T00:00:00Z',
+        },
+      ]);
       expect(mapped[0].leases).toHaveLength(1);
       expect((mapped[0].leases as any)[0].tenantName).toBe('John Doe');
     });
@@ -225,6 +252,9 @@ describe('migrateToCloud Payload Mappers', () => {
           title: 'Rosebank Fixer Upper',
           address: '10 Oxford Rd',
           city: 'Johannesburg',
+          province: 'Gauteng',
+          numberOfUnits: 2,
+          floorAreaSqm: 320,
           purchaseDate: '2025-01-15',
           purchasePriceZAR: 1800000,
           acquisitionCostsZAR: 150000,
@@ -294,6 +324,9 @@ describe('migrateToCloud Payload Mappers', () => {
       expect(mappedFlips).toHaveLength(2);
       expect(mappedFlips[0].id).toBe('flip-101');
       expect(mappedFlips[0].user_id).toBe(TEST_USER_ID);
+      expect(mappedFlips[0].province).toBe('Gauteng');
+      expect(mappedFlips[0].number_of_units).toBe(2);
+      expect(mappedFlips[0].floor_area_sqm).toBe(320);
       expect(mappedFlips[0].occupant_risk).toEqual({
         occupancyStatus: 'unlawful_occupant',
         evictionRequired: true,
@@ -936,14 +969,25 @@ describe('migrateToCloud Execution Engine', () => {
         error: null,
       });
 
+      const mockIn = vi.fn().mockResolvedValue({ error: null });
       const mockDelete = vi.fn().mockReturnValue({
         eq: vi.fn().mockReturnValue({
-          not: vi.fn().mockResolvedValue({ error: null }),
+          in: mockIn,
         }),
+      });
+
+      const mockSelect = vi.fn().mockReturnValue({
+        eq: vi.fn().mockImplementation(() =>
+          Promise.resolve({
+            data: [{ id: 'rental-custom-keep-1' }, { id: 'rental-stale-delete-2' }],
+            error: null,
+          })
+        ),
       });
 
       (supabase.from as any).mockImplementation(() => ({
         upsert: mockUpsert,
+        select: mockSelect,
         delete: mockDelete,
       }));
 
@@ -971,17 +1015,44 @@ describe('migrateToCloud Execution Engine', () => {
             maintenanceHistory: [],
           },
         ],
-        flips: [],
-        funding: [],
-        opportunities: [],
-        tasks: [],
-        suppliers: [],
       };
 
       const result = await migrateToCloud({ state: customPayload });
 
       expect(result.success).toBe(true);
       expect(mockDelete).toHaveBeenCalled();
+      expect(mockIn).toHaveBeenCalledWith('id', ['rental-stale-delete-2']);
+      expect(localStorage.setItem).toHaveBeenCalledWith('last_sync_user_id', TEST_USER_ID);
+    });
+
+    it('guards against empty-array deletion wipe when cloud items exist', async () => {
+      (supabase.auth.getUser as any).mockResolvedValue({
+        data: { user: { id: TEST_USER_ID, email: 'investor@example.com' } },
+        error: null,
+      });
+
+      const mockDelete = vi.fn();
+      const mockSelect = vi.fn().mockReturnValue({
+        eq: vi.fn().mockResolvedValue({
+          data: [{ id: 'cloud-prop-1' }, { id: 'cloud-prop-2' }],
+          error: null,
+        }),
+      });
+
+      (supabase.from as any).mockImplementation(() => ({
+        upsert: mockUpsert,
+        select: mockSelect,
+        delete: mockDelete,
+      }));
+
+      const emptyPayload: PortfolioMigrationPayload = {
+        rentals: [],
+      };
+
+      const result = await migrateToCloud({ state: emptyPayload });
+
+      expect(result.success).toBe(true);
+      expect(mockDelete).not.toHaveBeenCalled();
     });
   });
 });

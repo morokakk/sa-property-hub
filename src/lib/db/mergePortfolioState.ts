@@ -249,7 +249,7 @@ export function mergePortfolioState(
   const cloudApiKey = cloudState.aiSettings?.apiKey?.trim();
   const mergedAiSettings = {
     ...baseAi,
-    apiKey: cloudApiKey || localApiKey || '',
+    apiKey: localApiKey || cloudApiKey || '',
   };
 
   // Preserve active in-flight analyzer draft if user modified it locally

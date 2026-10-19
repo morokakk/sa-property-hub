@@ -496,6 +496,7 @@ export const createRentalSlice: StateCreator<
           departureReason: params.departureReason,
           forwardingNotes: params.forwardingNotes,
           archivedAt: new Date().toISOString(),
+          statementToken: departingLease.statementToken,
         };
 
         let updatedLeases: Lease[];

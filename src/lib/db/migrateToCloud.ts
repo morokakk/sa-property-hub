@@ -251,6 +251,7 @@ export function mapProfile(
     website: profile.website || null,
     physical_address: profile.physicalAddress || null,
     logo_base64: profile.logoBase64 || null,
+    bio_summary: profile.bioSummary || null,
     default_prime_rate_percent: toNumeric(profile.defaultPrimeRatePercent, 10.75),
     baseline_hurdle_yield_percent: toNumeric(profile.baselineHurdleYieldPercent, 10.0),
     default_agent_commission_percent: toNumeric(profile.defaultAgentCommissionPercent, 5.0),
@@ -265,7 +266,9 @@ export function mapProfile(
     marginal_tax_rate_percent: toNumeric(profile.marginalTaxRatePercent, 31.0),
     liquid_capital_reserve_zar: toNumeric(extra.liquidCapitalReserve, 0),
     rental_forecast_view: extra.rentalForecastView || 'wealth-only',
-    ai_settings: (extra.aiSettings as any) || null,
+    ai_settings: extra.aiSettings
+      ? { provider: extra.aiSettings.provider, model: extra.aiSettings.model, apiKey: '' }
+      : null,
     analyzer_draft: (extra.analyzerDraft as any) || null,
     bank_name: profile.bankName || null,
     account_holder: profile.accountHolder || null,
@@ -285,8 +288,11 @@ export function mapRentals(rentals: RentalProperty[] = [], userId: string): Prop
     title: r.title || 'Untitled Rental',
     address: r.address || '',
     city: r.city || 'Johannesburg',
+    province: r.province || null,
     property_type: r.propertyType || null,
     source: r.source || null,
+    number_of_units: toNullableInteger(r.numberOfUnits) ?? 1,
+    floor_area_sqm: toNullableNumeric(r.floorAreaSqm),
     agm_date: toDateOnly(r.agmDate),
     market_value_zar: toNumeric(r.marketValueZAR, 0),
     purchase_price_zar: toNumeric(r.purchasePriceZAR, 0),
@@ -329,6 +335,7 @@ export function mapRentals(rentals: RentalProperty[] = [], userId: string): Prop
     refinance_history: (r.refinanceHistory ? JSON.parse(JSON.stringify(r.refinanceHistory)) : []) as any,
     utility_statements: (r.utilityStatements ? JSON.parse(JSON.stringify(r.utilityStatements)) : []) as any,
     meter_readings: (r.meterReadings ? JSON.parse(JSON.stringify(r.meterReadings)) : []) as any,
+    meter_registry: (r.meterRegistry ? JSON.parse(JSON.stringify(r.meterRegistry)) : []) as any,
     tax_entity_type_override: r.taxEntityTypeOverride || null,
     section_13sex_annual_shield_zar: toNullableNumeric(r.section13sexAnnualShieldZAR),
     utility_type: r.utilityType || null,
@@ -357,14 +364,17 @@ export function mapFlips(flips: FlipProject[] = [], userId: string): FlipInsert[
     title: f.title || 'Untitled Flip',
     address: f.address || '',
     city: f.city || 'Johannesburg',
+    province: f.province || null,
     property_type: f.propertyType || null,
+    source: f.source || null,
+    number_of_units: toNullableInteger(f.numberOfUnits) ?? 1,
+    floor_area_sqm: toNullableNumeric(f.floorAreaSqm),
     agm_date: toDateOnly(f.agmDate),
     purchase_date: toDateOnly(f.purchaseDate),
     purchase_price_zar: toNumeric(f.purchasePriceZAR, 0),
     acquisition_costs_zar: toNumeric(f.acquisitionCostsZAR, 0),
     baseline_renovation_budget_zar: toNumeric(f.baselineRenovationBudgetZAR, 0),
     strategy: f.strategy || null,
-    source: f.source || null,
     estimated_duration_months: toNullableInteger(f.estimatedDurationMonths),
     monthly_holding_cost_zar: toNullableNumeric(f.monthlyHoldingCostZAR),
     monthly_bond_payment_zar: toNullableNumeric(f.monthlyBondPaymentZAR),
@@ -787,7 +797,7 @@ export async function migrateToCloud(options?: {
       counts.suppliers = supplierRows.length;
     }
 
-    // Step 4.9: Deletion Reconciliation
+    // Step 4.9: Deletion Reconciliation (DBSYNC-01, DBSYNC-05)
     // Reconcile deleted records in cloud that are no longer present in local payload
     const deleteRecordsNotInPayload = async (
       table: 'properties' | 'flips' | 'boq_items' | 'funding_sources' | 'opportunities' | 'tasks' | 'suppliers',
@@ -797,19 +807,45 @@ export async function migrateToCloud(options?: {
         const tbl = supabase.from(table);
         if (typeof tbl?.delete !== 'function') return;
 
-        if (localIds.length === 0) {
-          const res = await supabase.from(table).delete().eq('user_id', userId);
-          if (res?.error) {
-            console.warn(`Deletion reconciliation error for ${table}:`, res.error.message);
-          }
-        } else {
+        // Query existing cloud record IDs for this user
+        const { data: cloudItems, error: selectErr } = await supabase
+          .from(table)
+          .select('id')
+          .eq('user_id', userId);
+
+        if (selectErr || !cloudItems) {
+          console.warn(`Deletion reconciliation query error for ${table}:`, selectErr?.message);
+          return;
+        }
+
+        // Accidental account-wipe guard (DBSYNC-01):
+        // If local payload is empty but cloud has items, skip deletion to prevent catastrophic wipe.
+        if (localIds.length === 0 && cloudItems.length > 0) {
+          console.warn(
+            `Deletion reconciliation skipped for ${table}: local payload is empty but ${cloudItems.length} cloud records exist.`
+          );
+          return;
+        }
+
+        const localIdSet = new Set(localIds);
+        const idsToDelete = cloudItems
+          .map((item: any) => item.id)
+          .filter((id: string) => !localIdSet.has(id));
+
+        if (idsToDelete.length === 0) return;
+
+        // Positive set-difference chunked deletion (batches of 50 to eliminate URI length overflow)
+        const CHUNK_SIZE = 50;
+        for (let i = 0; i < idsToDelete.length; i += CHUNK_SIZE) {
+          const chunk = idsToDelete.slice(i, i + CHUNK_SIZE);
           const res = await supabase
             .from(table)
             .delete()
             .eq('user_id', userId)
-            .not('id', 'in', `(${localIds.join(',')})`);
+            .in('id', chunk);
+
           if (res?.error) {
-            console.warn(`Deletion reconciliation error for ${table}:`, res.error.message);
+            console.warn(`Deletion reconciliation error for ${table} chunk:`, res.error.message);
           }
         }
       } catch (delErr) {
@@ -853,6 +889,7 @@ export async function migrateToCloud(options?: {
     // 5. On complete success, record flags in localStorage
     if (typeof localStorage !== 'undefined') {
       try {
+        localStorage.setItem('last_sync_user_id', userId);
         localStorage.setItem('cloud_sync_completed', 'true');
         localStorage.setItem('cloud_sync_timestamp', new Date().toISOString());
       } catch (e) {
