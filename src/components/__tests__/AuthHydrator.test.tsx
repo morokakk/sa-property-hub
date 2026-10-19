@@ -96,6 +96,42 @@ describe('AuthHydrator Component (DBSYNC-02)', () => {
     expect(hydrateFromCloud).toHaveBeenCalled();
   });
 
+  it('handles PASSWORD_RECOVERY event by redirecting to settings with recovery hash if not already on settings', async () => {
+    const mockWindow = {
+      location: {
+        pathname: '/rentals',
+        hash: '#access_token=xyz&type=recovery',
+        href: '',
+      },
+    };
+    vi.stubGlobal('window', mockWindow);
+
+    AuthHydrator();
+
+    await authCallback('PASSWORD_RECOVERY', null);
+
+    expect(mockWindow.location.href).toBe('/settings#access_token=xyz&type=recovery');
+    vi.unstubAllGlobals();
+  });
+
+  it('does not redirect on PASSWORD_RECOVERY if already on /settings', async () => {
+    const mockWindow = {
+      location: {
+        pathname: '/settings',
+        hash: '#recovery',
+        href: '',
+      },
+    };
+    vi.stubGlobal('window', mockWindow);
+
+    AuthHydrator();
+
+    await authCallback('PASSWORD_RECOVERY', null);
+
+    expect(mockWindow.location.href).toBe('');
+    vi.unstubAllGlobals();
+  });
+
   it('cleans up auth subscription on unmount', () => {
     const unsubscribeMock = vi.fn();
     (supabase.auth.onAuthStateChange as any).mockReturnValueOnce({

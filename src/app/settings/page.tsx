@@ -225,22 +225,29 @@ function SettingsContent() {
       setAuthLoading(false);
     });
 
-    // Check for password recovery hash / parameters on mount
-    if (typeof window !== 'undefined') {
-      const hash = window.location.hash || '';
-      const search = window.location.search || '';
-      if (
-        hash.includes('type=recovery') ||
-        hash.includes('recovery') ||
-        search.includes('reset_password=true')
-      ) {
-        setAuthMode('update_password');
-        setIsAuthExpanded(true);
-        setAuthInfo('Password recovery session detected. Please enter your new password below.');
-      } else if (actionParam === 'signin' || actionParam === 'cloud') {
-        setIsAuthExpanded(true);
+    // Check for password recovery hash / parameters on mount and hashchange
+    const checkRecoveryHash = () => {
+      if (typeof window !== 'undefined') {
+        const hash = window.location.hash || '';
+        const search = window.location.search || '';
+        if (
+          hash.includes('type=recovery') ||
+          hash.includes('recovery') ||
+          (hash.includes('access_token') && hash.includes('type=recovery')) ||
+          search.includes('reset_password=true') ||
+          search.includes('type=recovery')
+        ) {
+          setAuthMode('update_password');
+          setIsAuthExpanded(true);
+          setAuthInfo('Password recovery session detected. Please enter your new password below.');
+        } else if (actionParam === 'signin' || actionParam === 'cloud') {
+          setIsAuthExpanded(true);
+        }
       }
-    }
+    };
+
+    checkRecoveryHash();
+    window.addEventListener('hashchange', checkRecoveryHash);
 
     // Subscribe to auth state updates
     const {
@@ -261,6 +268,7 @@ function SettingsContent() {
     }
 
     return () => {
+      window.removeEventListener('hashchange', checkRecoveryHash);
       subscription.unsubscribe();
     };
   }, [actionParam]);
@@ -756,7 +764,15 @@ function SettingsContent() {
             </div>
 
             <div className="flex items-center gap-2 shrink-0">
-              {currentUser ? (
+              {authMode === 'update_password' ? (
+                <span
+                  data-testid="recovery-mode-badge"
+                  className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-800 border border-amber-200"
+                >
+                  <Key className="w-3.5 h-3.5 text-amber-600" />
+                  Password Recovery Mode
+                </span>
+              ) : currentUser ? (
                 <span
                   data-testid="cloud-status-badge"
                   className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200"
@@ -854,7 +870,136 @@ function SettingsContent() {
             </div>
           )}
 
-          {currentUser ? (
+          {/* Auth Feedback Banners */}
+          {authError && (
+            <div
+              data-testid="auth-error-banner"
+              className="bg-rose-50 border border-rose-200 text-rose-900 rounded-xl p-4 text-xs flex items-start gap-2.5 animate-in fade-in"
+            >
+              <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+              <div>
+                <span className="font-bold block">Authentication Notice</span>
+                <span className="text-rose-700">{authError}</span>
+              </div>
+            </div>
+          )}
+
+          {authInfo && (
+            <div
+              data-testid="auth-info-banner"
+              className="bg-sky-50 border border-sky-200 text-sky-900 rounded-xl p-4 text-xs flex items-start gap-2.5 animate-in fade-in"
+            >
+              <Info className="w-4 h-4 text-sky-600 shrink-0 mt-0.5" />
+              <div>
+                <span className="font-bold block">Authentication Notice</span>
+                <span className="text-sky-700">{authInfo}</span>
+              </div>
+            </div>
+          )}
+
+          {authMode === 'update_password' ? (
+            /* Set New Password View (Active Recovery Session / Direct Change) */
+            <div className="space-y-4 pt-2 border-t border-slate-100">
+              <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+                <div className="flex items-center gap-2">
+                  <Key className="w-4 h-4 text-emerald-600" />
+                  <div>
+                    <h3 className="font-bold text-slate-900 text-xs">Set New Password</h3>
+                    <p className="text-[11px] text-slate-500">
+                      {currentUser?.email
+                        ? `Enter a new secure password (minimum 8 characters) for ${currentUser.email}.`
+                        : 'Enter a new secure password (minimum 8 characters).'}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                    {currentUser ? 'Active Recovery Session' : 'Password Recovery'}
+                  </span>
+                  {currentUser && (
+                    <button
+                      type="button"
+                      data-testid="cancel-update-password-btn"
+                      onClick={() => {
+                        setAuthMode('signin');
+                        setAuthError(null);
+                        setAuthInfo(null);
+                        setNewPassword('');
+                        setConfirmNewPassword('');
+                        if (typeof window !== 'undefined' && window.location.hash) {
+                          window.history.replaceState(null, '', window.location.pathname);
+                        }
+                      }}
+                      className="text-xs font-semibold text-slate-600 hover:text-slate-900 inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border border-slate-200 hover:bg-slate-50 transition-colors cursor-pointer shrink-0"
+                    >
+                      <ArrowLeft className="w-3 h-3" />
+                      <span>Cancel</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              <form onSubmit={handleAuthSubmit} className="space-y-3 text-xs">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="font-semibold text-slate-700">New Password</label>
+                      <span className="text-[10px] text-slate-400 font-normal">Min. 8 characters</span>
+                    </div>
+                    <div className="relative">
+                      <Lock className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5" />
+                      <input
+                        type="password"
+                        required
+                        minLength={8}
+                        data-testid="new-password-input"
+                        placeholder="Min. 8 characters"
+                        value={newPassword}
+                        onChange={(e) => setNewPassword(e.target.value)}
+                        className="w-full pl-9 pr-3 py-2 border border-slate-300 rounded-lg text-slate-900 focus:ring-1 focus:ring-emerald-500 font-medium bg-white"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="font-semibold text-slate-700">Confirm New Password</label>
+                      <span className="text-[10px] text-slate-400 font-normal">Must match</span>
+                    </div>
+                    <div className="relative">
+                      <Lock className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5" />
+                      <input
+                        type="password"
+                        required
+                        minLength={8}
+                        data-testid="confirm-new-password-input"
+                        placeholder="Re-enter new password"
+                        value={confirmNewPassword}
+                        onChange={(e) => setConfirmNewPassword(e.target.value)}
+                        className="w-full pl-9 pr-3 py-2 border border-slate-300 rounded-lg text-slate-900 focus:ring-1 focus:ring-emerald-500 font-medium bg-white"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-1 border-t border-slate-100">
+                  <p className="text-[11px] text-slate-500">
+                    Must be at least 8 characters. You will remain signed in upon saving.
+                  </p>
+
+                  <button
+                    type="submit"
+                    data-testid="save-new-password-btn"
+                    disabled={authSubmitting}
+                    className="inline-flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 disabled:bg-slate-300 text-white font-bold py-2 px-5 rounded-lg shadow-sm text-xs transition-colors cursor-pointer"
+                  >
+                    <CheckCircle2 className="w-4 h-4" />
+                    <span>{authSubmitting ? 'Saving Password...' : 'Save New Password & Sign In'}</span>
+                  </button>
+                </div>
+              </form>
+            </div>
+          ) : currentUser ? (
             /* Authenticated View */
             <div className="pt-2 border-t border-slate-100">
               <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
@@ -873,7 +1018,21 @@ function SettingsContent() {
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <button
+                    type="button"
+                    data-testid="change-password-btn"
+                    onClick={() => {
+                      setAuthMode('update_password');
+                      setAuthError(null);
+                      setAuthInfo(null);
+                    }}
+                    className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-100 font-semibold text-xs transition-colors cursor-pointer"
+                  >
+                    <Key className="w-3.5 h-3.5 text-slate-500" />
+                    Change Password
+                  </button>
+
                   <button
                     type="button"
                     onClick={handleSignOut}
@@ -970,38 +1129,6 @@ function SettingsContent() {
                     <ArrowLeft className="w-3.5 h-3.5" />
                     <span>Back to Sign In</span>
                   </button>
-                </div>
-              )}
-
-              {/* Update Password Header */}
-              {authMode === 'update_password' && (
-                <div className="flex items-center justify-between pb-2 border-b border-slate-100">
-                  <div className="flex items-center gap-2">
-                    <Key className="w-4 h-4 text-emerald-600" />
-                    <div>
-                      <h3 className="font-bold text-slate-900 text-xs">Set New Password</h3>
-                      <p className="text-[11px] text-slate-500">
-                        Enter a new secure password (minimum 8 characters).
-                      </p>
-                    </div>
-                  </div>
-                  <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
-                    Recovery Session
-                  </span>
-                </div>
-              )}
-
-              {authError && (
-                <div className="p-3 bg-rose-50 border border-rose-200 rounded-lg text-rose-800 text-xs flex items-center gap-2">
-                  <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
-                  <span>{authError}</span>
-                </div>
-              )}
-
-              {authInfo && (
-                <div className="p-3 bg-sky-50 border border-sky-200 rounded-lg text-sky-800 text-xs flex items-center gap-2">
-                  <Info className="w-4 h-4 text-sky-600 shrink-0" />
-                  <span>{authInfo}</span>
                 </div>
               )}
 
@@ -1123,69 +1250,6 @@ function SettingsContent() {
                     >
                       <Key className="w-4 h-4" />
                       <span>{authSubmitting ? 'Sending...' : 'Send Recovery Link'}</span>
-                    </button>
-                  </div>
-                </form>
-              )}
-
-              {/* Inline Auth Form: Set New Password */}
-              {authMode === 'update_password' && (
-                <form onSubmit={handleAuthSubmit} className="space-y-3 text-xs">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div>
-                      <div className="flex items-center justify-between mb-1">
-                        <label className="font-semibold text-slate-700">New Password</label>
-                        <span className="text-[10px] text-slate-400 font-normal">Min. 8 characters</span>
-                      </div>
-                      <div className="relative">
-                        <Lock className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5" />
-                        <input
-                          type="password"
-                          required
-                          minLength={8}
-                          data-testid="new-password-input"
-                          placeholder="Min. 8 characters"
-                          value={newPassword}
-                          onChange={(e) => setNewPassword(e.target.value)}
-                          className="w-full pl-9 pr-3 py-2 border border-slate-300 rounded-lg text-slate-900 focus:ring-1 focus:ring-emerald-500 font-medium bg-white"
-                        />
-                      </div>
-                    </div>
-
-                    <div>
-                      <div className="flex items-center justify-between mb-1">
-                        <label className="font-semibold text-slate-700">Confirm New Password</label>
-                        <span className="text-[10px] text-slate-400 font-normal">Must match</span>
-                      </div>
-                      <div className="relative">
-                        <Lock className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5" />
-                        <input
-                          type="password"
-                          required
-                          minLength={8}
-                          data-testid="confirm-new-password-input"
-                          placeholder="Re-enter new password"
-                          value={confirmNewPassword}
-                          onChange={(e) => setConfirmNewPassword(e.target.value)}
-                          className="w-full pl-9 pr-3 py-2 border border-slate-300 rounded-lg text-slate-900 focus:ring-1 focus:ring-emerald-500 font-medium bg-white"
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-1 border-t border-slate-100">
-                    <p className="text-[11px] text-slate-500">
-                      Must be at least 8 characters. You will be automatically signed in upon saving.
-                    </p>
-
-                    <button
-                      type="submit"
-                      data-testid="save-new-password-btn"
-                      disabled={authSubmitting}
-                      className="inline-flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 disabled:bg-slate-300 text-white font-bold py-2 px-5 rounded-lg shadow-sm text-xs transition-colors cursor-pointer"
-                    >
-                      <CheckCircle2 className="w-4 h-4" />
-                      <span>{authSubmitting ? 'Saving Password...' : 'Save New Password & Sign In'}</span>
                     </button>
                   </div>
                 </form>
