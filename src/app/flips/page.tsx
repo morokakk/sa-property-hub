@@ -24,7 +24,6 @@ export default function FlipsManagerPage() {
   const selection = useFlipSelection();
   const modals = useFlipModalManager();
   const { financials, fundingSummary } = useFlipCalculations(selection.activeFlip);
-  const store = usePortfolioStore();
   const active = selection.activeFlip;
 
   const [convertedRentalId, setConvertedRentalId] = React.useState<string | null>(null);
@@ -74,13 +73,13 @@ export default function FlipsManagerPage() {
             financials={financials}
             fundingSummary={fundingSummary}
             onOpenModal={modals.openModal}
-            onUpdatePhase={(phase) => active && store.updateFlip(active.id, { currentPhase: phase })}
-            onUpdateFlip={(u) => active && store.updateFlip(active.id, u)}
-            onUpdateBOQItem={(id, u) => active && store.updateBOQItem(active.id, id, u)}
-            onDeleteBOQItem={(id) => active && store.deleteBOQItem(active.id, id)}
+            onUpdatePhase={(phase) => active && usePortfolioStore.getState().updateFlip(active.id, { currentPhase: phase })}
+            onUpdateFlip={(u) => active && usePortfolioStore.getState().updateFlip(active.id, u)}
+            onUpdateBOQItem={(id, u) => active && usePortfolioStore.getState().updateBOQItem(active.id, id, u)}
+            onDeleteBOQItem={(id) => active && usePortfolioStore.getState().deleteBOQItem(active.id, id)}
             onExportBOQCSV={() => active && exportFlipBOQCSV(active)}
-            onToggleDrawPhase={(k) => active && store.updateFlip(active.id, { drawSchedule: { ...active.drawSchedule, [k]: !active.drawSchedule?.[k] } as any })}
-            onSyncLedgerToDeal={() => active && store.updateFlip(active.id, { capitalRaisedZAR: fundingSummary?.totalCapitalSecuredZAR })}
+            onToggleDrawPhase={(k) => active && usePortfolioStore.getState().updateFlip(active.id, { drawSchedule: { ...active.drawSchedule, [k]: !active.drawSchedule?.[k] } as any })}
+            onSyncLedgerToDeal={() => active && usePortfolioStore.getState().updateFlip(active.id, { capitalRaisedZAR: fundingSummary?.totalCapitalSecuredZAR })}
             onSwitchToArchive={() => selection.setViewTab('archive')}
             soldFlipsCount={selection.completedFlips.length}
             copiedWhatsApp={selection.copiedWhatsApp}
@@ -88,15 +87,15 @@ export default function FlipsManagerPage() {
             whatsAppShareUrl={selection.shareViaWhatsAppUrl}
           />
         ) : (
-          <FlipSoldArchiveView completedFlips={selection.completedFlips} onReopenFlip={(id) => { store.reopenFlip(id); selection.setSelectedFlipId(id); selection.setViewTab('active'); }} onSwitchToActive={() => selection.setViewTab('active')} convertedRentalId={convertedRentalId} onClearConvertedRentalBanner={() => setConvertedRentalId(null)} />
+          <FlipSoldArchiveView completedFlips={selection.completedFlips} onReopenFlip={(id) => { usePortfolioStore.getState().reopenFlip(id); selection.setSelectedFlipId(id); selection.setViewTab('active'); }} onSwitchToActive={() => selection.setViewTab('active')} convertedRentalId={convertedRentalId} onClearConvertedRentalBanner={() => setConvertedRentalId(null)} />
         )}
       </main>
-      <FlipProjectModal isOpen={modals.isOpen('addFlip') || modals.isOpen('editFlip')} editingFlip={modals.isOpen('editFlip') ? active : null} onClose={modals.closeModal} onSave={(p, isNew) => { if (isNew) { const id = p.id || `flip-${Date.now()}`; store.addFlip({ ...p, id } as any); selection.setSelectedFlipId(id); } else if (active) { store.updateFlip(active.id, p); } modals.closeModal(); }} />
+      <FlipProjectModal isOpen={modals.isOpen('addFlip') || modals.isOpen('editFlip')} editingFlip={modals.isOpen('editFlip') ? active : null} onClose={modals.closeModal} onSave={(p, isNew) => { if (isNew) { const id = p.id || `flip-${Date.now()}`; usePortfolioStore.getState().addFlip({ ...p, id } as any); selection.setSelectedFlipId(id); } else if (active) { usePortfolioStore.getState().updateFlip(active.id, p); } modals.closeModal(); }} />
       <AddBOQItemModal isOpen={modals.isOpen('addBOQ') && Boolean(active)} flipId={selection.selectedFlipId} onClose={modals.closeModal} />
       {active && (
         <>
           <FlipExitModal isOpen={modals.isOpen('exit')} flip={active} totalCostBasisZAR={financials?.totalCostBasisZAR || active.purchasePriceZAR} onClose={modals.closeModal} onFlipCompleted={() => selection.setViewTab('archive')} />
-          <FlipToRentalModal isOpen={modals.isOpen('convert')} flip={active} totalAllInCostZAR={financials?.totalAllInCostZAR || active.purchasePriceZAR} onClose={modals.closeModal} onConverted={({ marketValuationZAR, monthlyGrossRentZAR, tenantName }) => { const created = store.convertFlipToRental({ flipId: active.id, initialGrossRentZAR: monthlyGrossRentZAR, marketValuationZAR, tenantName }); setConvertedRentalId(created.id); selection.setViewTab('archive'); }} />
+          <FlipToRentalModal isOpen={modals.isOpen('convert')} flip={active} totalAllInCostZAR={financials?.totalAllInCostZAR || active.purchasePriceZAR} onClose={modals.closeModal} onConverted={({ marketValuationZAR, monthlyGrossRentZAR, tenantName }) => { const created = usePortfolioStore.getState().convertFlipToRental({ flipId: active.id, initialGrossRentZAR: monthlyGrossRentZAR, marketValuationZAR, tenantName }); setConvertedRentalId(created.id); selection.setViewTab('archive'); }} />
           <FlipFundingModal isOpen={modals.isOpen('funding')} flip={active} totalCostBasisZAR={financials?.totalCostBasisZAR || active.purchasePriceZAR} totalCapitalSecuredZAR={fundingSummary?.totalCapitalSecuredZAR || 0} onClose={modals.closeModal} />
           {modals.isOpen('delayMatrix') && <DelayMatrixModal isOpen={modals.isOpen('delayMatrix')} flip={active} totalCostBasisZAR={financials?.totalCostBasisZAR || active.purchasePriceZAR} onClose={modals.closeModal} />}
         </>

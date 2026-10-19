@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { RentalProperty, TenantPaymentRecord } from '@/types';
 import { calculateRentalCashflow } from '@/lib/calculations/propertyMetrics';
 import { calculateGrossYield, calculateRentalTaxProvision } from '@/lib/calculations/rentals';
@@ -61,7 +61,7 @@ export interface RentalCardProps {
   onUpdateProperty: (propertyId: string, updates: Partial<RentalProperty>) => void;
 }
 
-export function RentalCard({
+function RentalCard({
   property,
   investorDefaultTaxType = 'Company (27%)',
   investorProfile,
@@ -105,14 +105,21 @@ export function RentalCard({
     };
   }, [isMoreMenuOpen]);
 
-  const calculatedCashflow = calculateRentalCashflow(property);
-  const yieldGross = calculateGrossYield(calculatedCashflow.totalGrossIncomeZAR, property.marketValueZAR);
-  const taxCalculation = calculateRentalTaxProvision(
-    property,
-    calculatedCashflow.netMonthlyCashflowZAR,
-    investorDefaultTaxType
+  const calculatedCashflow = useMemo(() => calculateRentalCashflow(property), [property]);
+  const yieldGross = useMemo(
+    () => calculateGrossYield(calculatedCashflow.totalGrossIncomeZAR, property.marketValueZAR),
+    [calculatedCashflow.totalGrossIncomeZAR, property.marketValueZAR]
   );
-  const arrearsInfo = calculatePropertyArrears(property);
+  const taxCalculation = useMemo(
+    () =>
+      calculateRentalTaxProvision(
+        property,
+        calculatedCashflow.netMonthlyCashflowZAR,
+        investorDefaultTaxType
+      ),
+    [property, calculatedCashflow.netMonthlyCashflowZAR, investorDefaultTaxType]
+  );
+  const arrearsInfo = useMemo(() => calculatePropertyArrears(property), [property]);
   const noticeLease = (property.leases || []).find((l) => l.status === 'Notice Given');
 
   return (
@@ -403,4 +410,6 @@ export function RentalCard({
   );
 }
 
-export default RentalCard;
+const MemoizedRentalCard = React.memo(RentalCard);
+export default MemoizedRentalCard;
+export { MemoizedRentalCard as RentalCard };

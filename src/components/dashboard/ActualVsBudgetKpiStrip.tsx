@@ -65,141 +65,188 @@ export default function ActualVsBudgetKpiStrip({
   defaultCollapsed = false,
 }: ActualVsBudgetKpiStripProps) {
   const [isCollapsed, setIsCollapsed] = React.useState(collapsible ? defaultCollapsed : false);
-  const activeRentals = rentals.filter((r) => r.status !== 'Sold');
-  const taxYearInfo = getSaTaxYearInfo();
-  const elapsedMonths = taxYearInfo.elapsedMonths;
+  const {
+    activeRentals,
+    taxYearInfo,
+    elapsedMonths,
+    budgetedGrossRentYTD,
+    budgetedOpexYTD,
+    budgetedBondPaymentYTD,
+    budgetedSec11aInterestYTD,
+    budgetedNetCashflowYTD,
+    effectiveActualRent,
+    effectiveActualOpex,
+    effectiveActualInterest,
+    effectiveActualNet,
+    rentVarianceZAR,
+    rentVariancePercent,
+    opexVarianceZAR,
+    opexVariancePercent,
+    netVarianceZAR,
+    totalCumulativeArrears,
+    currentTaxYearArrears,
+    hasTransactions,
+    hasLoggedPaymentRecords,
+    occupancy,
+  } = React.useMemo(() => {
+    const active = rentals.filter((r) => r.status !== 'Sold');
+    const taxInfo = getSaTaxYearInfo();
+    const months = taxInfo.elapsedMonths;
 
-  // 1. Budget Calculations (Contractual / Baseline Pro-Rated to Elapsed Months)
-  let budgetedGrossRentYTD = 0;
-  let budgetedOpexYTD = 0;
-  let budgetedBondPaymentYTD = 0;
-  let budgetedSec11aInterestYTD = 0;
+    // 1. Budget Calculations (Contractual / Baseline Pro-Rated to Elapsed Months)
+    let budgetedGrossRent = 0;
+    let budgetedOpex = 0;
+    let budgetedBond = 0;
+    let budgetedSec11a = 0;
 
-  activeRentals.forEach((r) => {
-    const isFreehold = r.propertyType === 'Freehold House';
-    const grossMonthly = r.monthlyGrossRentZAR || 0;
-    const levies = isFreehold ? 0 : (r.monthlyLeviesZAR || 0);
-    const rates = r.monthlyRatesTaxesZAR || 0;
-    const maint = r.monthlyMaintenanceReserveZAR || 0;
-    const insurance = isFreehold ? Math.round((r.annualBuildingInsuranceZAR || 0) / 12) : 0;
+    active.forEach((r) => {
+      const isFreehold = r.propertyType === 'Freehold House';
+      const grossMonthly = r.monthlyGrossRentZAR || 0;
+      const levies = isFreehold ? 0 : (r.monthlyLeviesZAR || 0);
+      const rates = r.monthlyRatesTaxesZAR || 0;
+      const maint = r.monthlyMaintenanceReserveZAR || 0;
+      const insurance = isFreehold ? Math.round((r.annualBuildingInsuranceZAR || 0) / 12) : 0;
 
-    let agentFee = 0;
-    if (r.managementType === 'Agency') {
-      if (typeof r.monthlyAgentFeeZAR === 'number' && r.monthlyAgentFeeZAR > 0) {
-        agentFee = r.monthlyAgentFeeZAR;
-      } else if (typeof r.agencyCommissionPercent === 'number' && r.agencyCommissionPercent > 0) {
-        const baseComm = grossMonthly * (r.agencyCommissionPercent / 100);
-        const vatMultiplier = r.agencyVatApplicable !== false ? 1.15 : 1.0;
-        agentFee = Math.round(baseComm * vatMultiplier);
-      }
-    }
-    const prepaidVending = r.monthlyPrepaidVendingFeeZAR || 0;
-    const monthlyOpex = levies + rates + maint + insurance + agentFee + prepaidVending;
-    const monthlyBond = r.monthlyBondPaymentZAR || 0;
-
-    const monthlyInterest = (r.outstandingBondBalanceZAR && r.bondInterestRatePercent)
-      ? Math.round((r.outstandingBondBalanceZAR * (r.bondInterestRatePercent / 100)) / 12)
-      : 0;
-
-    budgetedGrossRentYTD += grossMonthly * elapsedMonths;
-    budgetedOpexYTD += monthlyOpex * elapsedMonths;
-    budgetedBondPaymentYTD += monthlyBond * elapsedMonths;
-    budgetedSec11aInterestYTD += monthlyInterest * elapsedMonths;
-  });
-
-  const budgetedNetCashflowYTD = budgetedGrossRentYTD - budgetedOpexYTD - budgetedBondPaymentYTD;
-
-  // 2. Actuals Calculations (Audited Transactions & Recorded Payments within Tax Year)
-  let actualGrossRentYTD = 0;
-  let actualOpexYTD = 0;
-  let actualBondInterestYTD = 0;
-  let actualBondCapitalYTD = 0;
-  let totalLoggedTransactionsCount = 0;
-
-  activeRentals.forEach((r) => {
-    const txList = r.transactions || [];
-    txList.forEach((tx) => {
-      if (tx.date >= taxYearInfo.startDateStr && tx.date <= taxYearInfo.endDateStr) {
-        totalLoggedTransactionsCount += 1;
-        const amt = tx.amountZAR || 0;
-        if (tx.category === 'gross_rent') {
-          actualGrossRentYTD += amt;
-        } else if (
-          tx.category === 'rates_taxes' ||
-          tx.category === 'levies' ||
-          tx.category === 'agent_commission' ||
-          tx.category === 'repairs_maintenance' ||
-          tx.category === 'insurance' ||
-          tx.category === 'other'
-        ) {
-          actualOpexYTD += amt;
-        } else if (tx.category === 'bond_interest') {
-          actualBondInterestYTD += amt;
-        } else if (tx.category === 'bond_capital') {
-          actualBondCapitalYTD += amt;
+      let agentFee = 0;
+      if (r.managementType === 'Agency') {
+        if (typeof r.monthlyAgentFeeZAR === 'number' && r.monthlyAgentFeeZAR > 0) {
+          agentFee = r.monthlyAgentFeeZAR;
+        } else if (typeof r.agencyCommissionPercent === 'number' && r.agencyCommissionPercent > 0) {
+          const baseComm = grossMonthly * (r.agencyCommissionPercent / 100);
+          const vatMultiplier = r.agencyVatApplicable !== false ? 1.15 : 1.0;
+          agentFee = Math.round(baseComm * vatMultiplier);
         }
       }
+      const prepaidVending = r.monthlyPrepaidVendingFeeZAR || 0;
+      const monthlyOpex = levies + rates + maint + insurance + agentFee + prepaidVending;
+      const monthlyBond = r.monthlyBondPaymentZAR || 0;
+
+      const monthlyInterest = (r.outstandingBondBalanceZAR && r.bondInterestRatePercent)
+        ? Math.round((r.outstandingBondBalanceZAR * (r.bondInterestRatePercent / 100)) / 12)
+        : 0;
+
+      budgetedGrossRent += grossMonthly * months;
+      budgetedOpex += monthlyOpex * months;
+      budgetedBond += monthlyBond * months;
+      budgetedSec11a += monthlyInterest * months;
     });
-  });
 
-  // 3. Logged Payment Records (count as collected rent when manual Transaction records are absent)
-  let actualPaymentRecordsGrossRentYTD = 0;
-  let hasLoggedPaymentRecords = false;
+    const budgetedNetCashflow = budgetedGrossRent - budgetedOpex - budgetedBond;
 
-  activeRentals.forEach((r) => {
-    (r.paymentRecords || []).forEach((p) => {
-      if (p.paymentDate >= taxYearInfo.startDateStr && p.paymentDate <= taxYearInfo.endDateStr) {
-        actualPaymentRecordsGrossRentYTD += p.amountReceivedZAR || 0;
-        hasLoggedPaymentRecords = true;
-      }
+    // 2. Actuals Calculations (Audited Transactions & Recorded Payments within Tax Year)
+    let actualGrossRent = 0;
+    let actualOpex = 0;
+    let actualBondInterest = 0;
+    let actualBondCapital = 0;
+    let totalTransactions = 0;
+
+    active.forEach((r) => {
+      const txList = r.transactions || [];
+      txList.forEach((tx) => {
+        if (tx.date >= taxInfo.startDateStr && tx.date <= taxInfo.endDateStr) {
+          totalTransactions += 1;
+          const amt = tx.amountZAR || 0;
+          if (tx.category === 'gross_rent') {
+            actualGrossRent += amt;
+          } else if (
+            tx.category === 'rates_taxes' ||
+            tx.category === 'levies' ||
+            tx.category === 'agent_commission' ||
+            tx.category === 'repairs_maintenance' ||
+            tx.category === 'insurance' ||
+            tx.category === 'other'
+          ) {
+            actualOpex += amt;
+          } else if (tx.category === 'bond_interest') {
+            actualBondInterest += amt;
+          } else if (tx.category === 'bond_capital') {
+            actualBondCapital += amt;
+          }
+        }
+      });
     });
-  });
 
-  // 4. Calculate tenant arrears strictly accrued within current tax year, plus total cumulative arrears
-  const taxYearStartMonth = `${taxYearInfo.startYear}-03`;
-  const currentMonthKey = getMonthKey();
-  let currentTaxYearArrears = 0;
-  let totalCumulativeArrears = 0;
+    // 3. Logged Payment Records (count as collected rent when manual Transaction records are absent)
+    let actualPaymentRecordsGrossRent = 0;
+    let loggedPaymentRecords = false;
 
-  activeRentals.forEach((r) => {
-    const arrearsResult = calculatePropertyArrears(r);
-    totalCumulativeArrears += Math.max(0, arrearsResult.totalArrearsZAR);
+    active.forEach((r) => {
+      (r.paymentRecords || []).forEach((p) => {
+        if (p.paymentDate >= taxInfo.startDateStr && p.paymentDate <= taxInfo.endDateStr) {
+          actualPaymentRecordsGrossRent += p.amountReceivedZAR || 0;
+          loggedPaymentRecords = true;
+        }
+      });
+    });
 
-    // Sum uncollected net variance for billing months strictly within current tax year up to current month
-    const taxYearLedgerItems = (arrearsResult.ledger || []).filter(
-      (item) => item.month >= taxYearStartMonth && item.month <= currentMonthKey
-    );
-    const rentalTaxYearArrears = taxYearLedgerItems.reduce(
-      (sum, item) => sum + Math.max(0, item.netVariance),
-      0
-    );
-    currentTaxYearArrears += rentalTaxYearArrears;
-  });
+    // 4. Calculate tenant arrears strictly accrued within current tax year, plus total cumulative arrears
+    const taxYearStartMonth = `${taxInfo.startYear}-03`;
+    const currentMonthKey = getMonthKey();
+    let taxYearArrears = 0;
+    let totalCumulativeArrearsZAR = 0;
 
-  // Effective collected rent determination:
-  // Preference 1: Manual Transaction ledger records
-  // Preference 2: Logged paymentRecords within current tax year
-  // Preference 3: Budgeted gross rent minus arrears accrued strictly within current tax year
-  const hasTransactions = totalLoggedTransactionsCount > 0;
-  const effectiveActualRent = hasTransactions
-    ? actualGrossRentYTD
-    : hasLoggedPaymentRecords
-    ? actualPaymentRecordsGrossRentYTD
-    : Math.max(0, budgetedGrossRentYTD - currentTaxYearArrears);
+    active.forEach((r) => {
+      const arrearsResult = calculatePropertyArrears(r);
+      totalCumulativeArrearsZAR += Math.max(0, arrearsResult.totalArrearsZAR);
 
-  const effectiveActualOpex = hasTransactions ? actualOpexYTD : budgetedOpexYTD;
-  const effectiveActualInterest = hasTransactions ? actualBondInterestYTD : budgetedSec11aInterestYTD;
-  const effectiveActualNet = effectiveActualRent - effectiveActualOpex - (hasTransactions ? (actualBondInterestYTD + actualBondCapitalYTD) : budgetedBondPaymentYTD);
+      // Sum uncollected net variance for billing months strictly within current tax year up to current month
+      const taxYearLedgerItems = (arrearsResult.ledger || []).filter(
+        (item) => item.month >= taxYearStartMonth && item.month <= currentMonthKey
+      );
+      const rentalTaxYearArrears = taxYearLedgerItems.reduce(
+        (sum, item) => sum + Math.max(0, item.netVariance),
+        0
+      );
+      taxYearArrears += rentalTaxYearArrears;
+    });
 
-  // Variances
-  const rentVarianceZAR = effectiveActualRent - budgetedGrossRentYTD;
-  const rentVariancePercent = budgetedGrossRentYTD > 0 ? (effectiveActualRent / budgetedGrossRentYTD) * 100 : 100;
+    // Effective collected rent determination
+    const hasTx = totalTransactions > 0;
+    const effectiveRent = hasTx
+      ? actualGrossRent
+      : loggedPaymentRecords
+      ? actualPaymentRecordsGrossRent
+      : Math.max(0, budgetedGrossRent - taxYearArrears);
 
-  const opexVarianceZAR = effectiveActualOpex - budgetedOpexYTD;
-  const opexVariancePercent = budgetedOpexYTD > 0 ? (effectiveActualOpex / budgetedOpexYTD) * 100 : 100;
+    const effectiveOpex = hasTx ? actualOpex : budgetedOpex;
+    const effectiveInterest = hasTx ? actualBondInterest : budgetedSec11a;
+    const effectiveNet = effectiveRent - effectiveOpex - (hasTx ? (actualBondInterest + actualBondCapital) : budgetedBond);
 
-  const netVarianceZAR = effectiveActualNet - budgetedNetCashflowYTD;
-  const occupancy = calculatePortfolioOccupancyYtd(rentals);
+    // Variances
+    const rentVariance = effectiveRent - budgetedGrossRent;
+    const rentVariancePct = budgetedGrossRent > 0 ? (effectiveRent / budgetedGrossRent) * 100 : 100;
+
+    const opexVariance = effectiveOpex - budgetedOpex;
+    const opexVariancePct = budgetedOpex > 0 ? (effectiveOpex / budgetedOpex) * 100 : 100;
+
+    const netVariance = effectiveNet - budgetedNetCashflow;
+    const occ = calculatePortfolioOccupancyYtd(rentals);
+
+    return {
+      activeRentals: active,
+      taxYearInfo: taxInfo,
+      elapsedMonths: months,
+      budgetedGrossRentYTD: budgetedGrossRent,
+      budgetedOpexYTD: budgetedOpex,
+      budgetedBondPaymentYTD: budgetedBond,
+      budgetedSec11aInterestYTD: budgetedSec11a,
+      budgetedNetCashflowYTD: budgetedNetCashflow,
+      effectiveActualRent: effectiveRent,
+      effectiveActualOpex: effectiveOpex,
+      effectiveActualInterest: effectiveInterest,
+      effectiveActualNet: effectiveNet,
+      rentVarianceZAR: rentVariance,
+      rentVariancePercent: rentVariancePct,
+      opexVarianceZAR: opexVariance,
+      opexVariancePercent: opexVariancePct,
+      netVarianceZAR: netVariance,
+      totalCumulativeArrears: totalCumulativeArrearsZAR,
+      currentTaxYearArrears: taxYearArrears,
+      hasTransactions: hasTx,
+      hasLoggedPaymentRecords: loggedPaymentRecords,
+      occupancy: occ,
+    };
+  }, [rentals]);
 
   return (
     <div className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200 shadow-xs space-y-4">

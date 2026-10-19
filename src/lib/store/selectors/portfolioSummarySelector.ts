@@ -1,5 +1,4 @@
 import { useMemo } from 'react';
-import { useShallow } from 'zustand/react/shallow';
 import {
   RentalProperty,
   FlipProject,
@@ -254,22 +253,23 @@ export function computePortfolioSummary(state: PortfolioSummaryInput): Portfolio
  * Reactive selector hook for reading memoized portfolio summary KPIs.
  */
 export function usePortfolioSummary(): PortfolioSummary {
-  // Extract all scalar (primitive) fields via useShallow — stable comparison
-  const scalars = usePortfolioStore(
-    useShallow((state) => {
-      const summary = computePortfolioSummary(state);
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const { equityAlerts, ...rest } = summary;
-      return rest;
-    })
+  const rentals = usePortfolioStore((s) => s.rentals);
+  const flips = usePortfolioStore((s) => s.flips);
+  const funding = usePortfolioStore((s) => s.funding);
+  const liquidCapitalReserve = usePortfolioStore((s) => s.liquidCapitalReserve);
+  const investorProfile = usePortfolioStore((s) => s.investorProfile);
+  const opportunities = usePortfolioStore((s) => s.opportunities);
+
+  return useMemo(
+    () =>
+      computePortfolioSummary({
+        rentals,
+        flips,
+        funding,
+        liquidCapitalReserve,
+        investorProfile,
+        opportunities,
+      }),
+    [rentals, flips, funding, liquidCapitalReserve, investorProfile, opportunities]
   );
-
-  // Compute equityAlerts with JSON-based referential stability
-  const alertsJson = usePortfolioStore((state) => {
-    const activeRentals = (state.rentals || []).filter((r) => r && r.status !== 'Sold');
-    return JSON.stringify(computeEquityAlerts(activeRentals));
-  });
-  const equityAlerts: EquityExtractionAlert[] = useMemo(() => JSON.parse(alertsJson), [alertsJson]);
-
-  return useMemo(() => ({ ...scalars, equityAlerts }), [scalars, equityAlerts]);
 }

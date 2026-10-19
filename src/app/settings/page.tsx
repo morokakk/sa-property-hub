@@ -5,6 +5,7 @@ import { useSearchParams } from 'next/navigation';
 import TopHeader from '@/components/navigation/TopHeader';
 import PublishLinkGuidanceBanner from '@/components/rentals/PublishLinkGuidanceBanner';
 import { usePortfolioStore } from '@/lib/store/usePortfolioStore';
+import { downscaleImage } from '@/lib/utils/imageDownscale';
 import {
   Settings,
   Building,
@@ -517,8 +518,8 @@ function SettingsContent() {
     }
   };
 
-  // Handle Logo Upload as Base64
-  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Handle Logo Upload as Base64 with Canvas Downscaling Protection (PERF-04)
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     setLogoError(null);
     const file = e.target.files?.[0];
     if (!file) return;
@@ -529,20 +530,27 @@ function SettingsContent() {
       return;
     }
 
-    if (file.size > 2 * 1024 * 1024) {
+    if (file.size > 1 * 1024 * 1024) {
       const fileSizeMB = (file.size / (1024 * 1024)).toFixed(2);
-      setLogoError(`File size (${fileSizeMB}MB) exceeds the 2MB limit. Please upload a smaller image.`);
+      setLogoError(`File size (${fileSizeMB}MB) exceeds the 1MB limit. Please upload a smaller image.`);
       if (fileInputRef.current) fileInputRef.current.value = '';
       return;
     }
 
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const result = event.target?.result as string;
-      setLogoBase64(result);
+    try {
+      const downscaled = await downscaleImage(file, 360, 100, 0.85);
+      setLogoBase64(downscaled.dataUrl);
       setLogoError(null);
-    };
-    reader.readAsDataURL(file);
+    } catch {
+      // Fallback for vector formats or environments without canvas
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const result = event.target?.result as string;
+        setLogoBase64(result);
+        setLogoError(null);
+      };
+      reader.readAsDataURL(file);
+    }
   };
 
   const handleRemoveLogo = () => {

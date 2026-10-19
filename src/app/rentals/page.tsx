@@ -40,7 +40,6 @@ export default function RentalPortfolioPage() {
   const [errorModalOpen, setErrorModalOpen] = useState(false);
   const [validationErrors, setValidationErrors] = useState<ValidationErrorItem[]>([]);
   const [uploadedFileName, setUploadedFileName] = useState('');
-  const store = usePortfolioStore();
   const bulkAddRentals = usePortfolioStore((s) => s.bulkAddRentals);
 
   const handleExcelUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -170,7 +169,7 @@ export default function RentalPortfolioPage() {
             ) : (
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {activeRentals.map((property) => (
-                  <RentalCard key={property.id} property={property} investorDefaultTaxType={investorProfile?.defaultTaxEntityType} investorProfile={investorProfile} forecastView={forecastView} onForecastViewChange={setForecastView} onOpenEdit={modals.openEditRental} onOpenExit={modals.openExit} onOpenRefinance={modals.openRefinance} onOpenAuditHistory={modals.openAuditHistory} onOpenMaintenance={modals.openMaintenance} onOpenMeterModal={modals.openMeterModal} onOpenStatementModal={modals.openStatementModal} onOpenPmtCalculator={modals.openPmtCalculator} onOpenNoticeModal={modals.openNoticeModal} onOpenLogPayment={paymentModal.openLogPayment} onOpenEditPayment={(p) => paymentModal.openEditPayment(property, p)} onOpenWriteOff={writeOffModal.openWriteOff} onUpdateOpeningBalance={(id, amt, lId) => store.updateArrearsOpeningBalance(id, amt, lId)} onDeletePayment={(id, pId) => store.deleteTenantPayment(id, pId)} onDeleteWriteOff={(id, wId) => store.deleteArrearsWriteOff(id, wId)} onMarkMonthPaid={handleMarkMonthPaid} onShowToast={showToast} onDeleteProperty={handleDeleteProperty} onUpdateProperty={(id, u) => store.updateRental(id, u)} />
+                  <RentalCard key={property.id} property={property} investorDefaultTaxType={investorProfile?.defaultTaxEntityType} investorProfile={investorProfile} forecastView={forecastView} onForecastViewChange={setForecastView} onOpenEdit={modals.openEditRental} onOpenExit={modals.openExit} onOpenRefinance={modals.openRefinance} onOpenAuditHistory={modals.openAuditHistory} onOpenMaintenance={modals.openMaintenance} onOpenMeterModal={modals.openMeterModal} onOpenStatementModal={modals.openStatementModal} onOpenPmtCalculator={modals.openPmtCalculator} onOpenNoticeModal={modals.openNoticeModal} onOpenLogPayment={paymentModal.openLogPayment} onOpenEditPayment={(p) => paymentModal.openEditPayment(property, p)} onOpenWriteOff={writeOffModal.openWriteOff} onUpdateOpeningBalance={(id, amt, lId) => usePortfolioStore.getState().updateArrearsOpeningBalance(id, amt, lId)} onDeletePayment={(id, pId) => usePortfolioStore.getState().deleteTenantPayment(id, pId)} onDeleteWriteOff={(id, wId) => usePortfolioStore.getState().deleteArrearsWriteOff(id, wId)} onMarkMonthPaid={handleMarkMonthPaid} onShowToast={showToast} onDeleteProperty={handleDeleteProperty} onUpdateProperty={(id, u) => usePortfolioStore.getState().updateRental(id, u)} />
                 ))}
               </div>
             )}
@@ -182,7 +181,7 @@ export default function RentalPortfolioPage() {
         )}
       </main>
       <ExitSaleModal isOpen={modals.isExitOpen} property={modals.exitProperty} onClose={modals.closeExit} onComplete={() => { modals.closeExit(); setViewTab('archive'); }} />
-      <RefinanceModal isOpen={modals.isRefinanceOpen} property={modals.refinanceProperty} currentLiquidReserve={summary.liquidCapitalReserve} onClose={modals.closeRefinance} onSave={(p) => { store.refinanceRental(p); modals.setRefinanceSuccessBanner({ amount: p.cashEquityPulledOutZAR, propertyTitle: modals.refinanceProperty?.title || 'Rental Property' }); modals.closeRefinance(); }} />
+      <RefinanceModal isOpen={modals.isRefinanceOpen} property={modals.refinanceProperty} currentLiquidReserve={summary.liquidCapitalReserve} onClose={modals.closeRefinance} onSave={(p) => { usePortfolioStore.getState().refinanceRental(p); modals.setRefinanceSuccessBanner({ amount: p.cashEquityPulledOutZAR, propertyTitle: modals.refinanceProperty?.title || 'Rental Property' }); modals.closeRefinance(); }} />
       <RefinanceAuditModal isOpen={modals.isAuditHistoryOpen} property={modals.auditProperty} onClose={modals.closeAuditHistory} />
       <MaintenanceModal isOpen={modals.isMaintenanceOpen} property={modals.maintenanceProperty} onClose={modals.closeMaintenance} />
       <RentalFormModal isOpen={modals.isRentalFormOpen} editingProperty={modals.editingProperty} onClose={modals.closeRentalForm} onOpenNoticeModal={modals.openNoticeModal} onSave={(p, isNew) => { handleAddRental(p, isNew, modals.editingProperty?.id); modals.closeRentalForm(); }} />
@@ -196,20 +195,20 @@ export default function RentalPortfolioPage() {
         initialLeaseId={modals.noticeLeaseId}
         onClose={modals.closeNoticeModal}
         onMarkNotice={(propertyId, leaseId, notice) => {
-          store.markTenantNotice(propertyId, leaseId, notice);
+          usePortfolioStore.getState().markTenantNotice(propertyId, leaseId, notice);
           showToast('Notice recorded for tenant');
         }}
         onCancelNotice={(propertyId, leaseId) => {
-          store.cancelTenantNotice(propertyId, leaseId);
+          usePortfolioStore.getState().cancelTenantNotice(propertyId, leaseId);
           showToast('Notice retracted');
         }}
         onFinalizeMoveOut={(propertyId, leaseId, params) => {
-          store.finalizeTenantMoveOut(propertyId, leaseId, params);
+          usePortfolioStore.getState().finalizeTenantMoveOut(propertyId, leaseId, params);
           showToast(params.action === 'replacement' ? 'Lease archived & replacement tenant assigned' : 'Lease archived & unit set to vacant');
         }}
       />
-      <PaymentModal isOpen={paymentModal.isOpen && Boolean(paymentModal.property)} property={paymentModal.property} editingPayment={paymentModal.editingPayment} initialLeaseId={paymentModal.initialLeaseId} initialMonth={paymentModal.initialMonth} initialAmount={paymentModal.initialAmount} initialAllocations={paymentModal.initialAllocations} onClose={paymentModal.closePaymentModal} onSave={(p, eId) => { if (!paymentModal.property) return; if (eId) { store.updateTenantPayment(paymentModal.property.id, eId, p); showToast('Payment updated'); } else { store.recordTenantPayment(paymentModal.property.id, p); showToast('Payment recorded'); } paymentModal.closePaymentModal(); }} />
-      <WriteOffModal isOpen={writeOffModal.isOpen && Boolean(writeOffModal.property)} property={writeOffModal.property} initialLeaseId={writeOffModal.initialLeaseId} initialAmount={writeOffModal.initialAmount} initialAllocations={writeOffModal.initialAllocations} onClose={writeOffModal.closeWriteOffModal} onSave={(p) => { if (!writeOffModal.property) return; store.recordArrearsWriteOff(writeOffModal.property.id, p); showToast(`Written off ${formatZAR(p.amountZAR)}`); writeOffModal.closeWriteOffModal(); }} />
+      <PaymentModal isOpen={paymentModal.isOpen && Boolean(paymentModal.property)} property={paymentModal.property} editingPayment={paymentModal.editingPayment} initialLeaseId={paymentModal.initialLeaseId} initialMonth={paymentModal.initialMonth} initialAmount={paymentModal.initialAmount} initialAllocations={paymentModal.initialAllocations} onClose={paymentModal.closePaymentModal} onSave={(p, eId) => { if (!paymentModal.property) return; if (eId) { usePortfolioStore.getState().updateTenantPayment(paymentModal.property.id, eId, p); showToast('Payment updated'); } else { usePortfolioStore.getState().recordTenantPayment(paymentModal.property.id, p); showToast('Payment recorded'); } paymentModal.closePaymentModal(); }} />
+      <WriteOffModal isOpen={writeOffModal.isOpen && Boolean(writeOffModal.property)} property={writeOffModal.property} initialLeaseId={writeOffModal.initialLeaseId} initialAmount={writeOffModal.initialAmount} initialAllocations={writeOffModal.initialAllocations} onClose={writeOffModal.closeWriteOffModal} onSave={(p) => { if (!writeOffModal.property) return; usePortfolioStore.getState().recordArrearsWriteOff(writeOffModal.property.id, p); showToast(`Written off ${formatZAR(p.amountZAR)}`); writeOffModal.closeWriteOffModal(); }} />
       <ValidationErrorModal
         isOpen={errorModalOpen}
         onClose={() => setErrorModalOpen(false)}

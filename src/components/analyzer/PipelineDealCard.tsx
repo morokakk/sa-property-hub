@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { OpportunityDeal, PassReason, AmenityScorecard } from '@/types';
 import { PropertyTypeBadge, AgmDateChip } from '@/components/common/PropertyTypeBadge';
@@ -50,7 +50,7 @@ export interface PipelineDealCardProps {
   onCopyWhatsApp: (deal: any) => void;
 }
 
-export function PipelineDealCard({
+function PipelineDealCard({
   deal,
   displayDeal,
   selected,
@@ -102,22 +102,29 @@ export function PipelineDealCard({
   const openMarket = deal.openMarketValueZAR ?? deal.purchasePrice;
   const builtInEquity = openMarket - deal.purchasePrice;
   const builtInPercent = openMarket > 0 ? (builtInEquity / openMarket) * 100 : 0;
-  const dscrInfo = calculateDealDscr(deal, investorProfile?.defaultPrimeRatePercent);
+  const dscrInfo = useMemo(
+    () => calculateDealDscr(deal, investorProfile?.defaultPrimeRatePercent),
+    [deal, investorProfile?.defaultPrimeRatePercent]
+  );
   const dealDscr = dscrInfo.dscr;
-  const buyBoxResult = evaluateDealCriteria(
-    {
-      capRate: deal.capRate,
-      grossYield: deal.grossYield,
-      netRoi: deal.netRoi,
-      monthlyCashFlow: deal.monthlyCashFlow,
-      initialCapitalRequired: deal.initialCapitalRequired,
-      projectedFlipRoi: deal.projectedFlipRoi,
-      projectedFlipNetProfit: deal.projectedFlipNetProfit,
-      dscr: dscrInfo.rawDscr,
-      monthlyBondPayment: dscrInfo.monthlyBondPayment,
-    },
-    investorProfile,
-    deal.strategy ?? 'Rental'
+  const buyBoxResult = useMemo(
+    () =>
+      evaluateDealCriteria(
+        {
+          capRate: deal.capRate,
+          grossYield: deal.grossYield,
+          netRoi: deal.netRoi,
+          monthlyCashFlow: deal.monthlyCashFlow,
+          initialCapitalRequired: deal.initialCapitalRequired,
+          projectedFlipRoi: deal.projectedFlipRoi,
+          projectedFlipNetProfit: deal.projectedFlipNetProfit,
+          dscr: dscrInfo.rawDscr,
+          monthlyBondPayment: dscrInfo.monthlyBondPayment,
+        },
+        investorProfile,
+        deal.strategy ?? 'Rental'
+      ),
+    [deal, investorProfile, dscrInfo.rawDscr, dscrInfo.monthlyBondPayment]
   );
 
   const isFlipStrategy = deal.strategy === 'Flip';
@@ -670,4 +677,6 @@ export function PipelineDealCard({
   );
 }
 
-export default PipelineDealCard;
+const MemoizedPipelineDealCard = React.memo(PipelineDealCard);
+export default MemoizedPipelineDealCard;
+export { MemoizedPipelineDealCard as PipelineDealCard };

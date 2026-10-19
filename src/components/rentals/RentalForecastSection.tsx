@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { RentalProperty } from '@/types';
 import { generateRentalLongTermProjection } from '@/lib/calculations/propertyMetrics';
 import LongTermProjectionChart from '@/components/analytics/LongTermProjectionChart';
@@ -33,6 +33,11 @@ export function RentalForecastSection({
       setInternalExpanded((prev) => !prev);
     }
   };
+
+  const projectionData = useMemo(
+    () => generateRentalLongTermProjection(property),
+    [property]
+  );
 
   return (
     <div className="border-t border-slate-200 bg-slate-50/50">
@@ -101,7 +106,7 @@ export function RentalForecastSection({
           {/* Chart View */}
           <div className="overflow-x-hidden">
             <LongTermProjectionChart
-              data={generateRentalLongTermProjection(property)}
+              data={projectionData}
               compact={true}
               displayMode={forecastView}
               showMilestones={true}

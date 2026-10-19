@@ -209,6 +209,26 @@ export function mergePortfolioPersistedState<T extends {
 export const portfolioPersistConfig: PersistOptions<PortfolioState, PortfolioState> = {
   name: PORTFOLIO_STORAGE_KEY,
   storage: createJSONStorage<PortfolioState>(() => localStorage),
+  partialize: (state: PortfolioState) => {
+    // Strip heavy raw OCR/PDF text from utility statements to shield localStorage quota (PERF-10)
+    const sanitizedRentals = (state.rentals || []).map((r) => {
+      if (!r || !r.utilityStatements || r.utilityStatements.length === 0) return r;
+      return {
+        ...r,
+        utilityStatements: r.utilityStatements.map((us) => {
+          if (!us.rawText) return us;
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars
+          const { rawText, ...rest } = us;
+          return rest;
+        }),
+      };
+    });
+
+    return {
+      ...state,
+      rentals: sanitizedRentals,
+    };
+  },
   merge: (persistedState: unknown, currentState: PortfolioState) =>
     mergePortfolioPersistedState(persistedState, currentState),
   onRehydrateStorage: () => (state, error) => {

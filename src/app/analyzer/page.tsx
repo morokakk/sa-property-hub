@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo, useEffect, useRef } from 'react';
+import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import TopHeader from '@/components/navigation/TopHeader';
 import { usePortfolioStore } from '@/lib/store/usePortfolioStore';
 import { computeAcquisitionCosts, calculateSection13sex } from '@/lib/calculations/sarsTax';
@@ -87,7 +87,32 @@ export default function OpportunityAnalyzerPage() {
   const investorProfile = usePortfolioStore((state) => state.investorProfile);
   const liquidCapitalReserve = usePortfolioStore((state) => state.liquidCapitalReserve);
   const analyzerDraft = usePortfolioStore((state) => state.analyzerDraft);
-  const updateAnalyzerDraft = usePortfolioStore((state) => state.updateAnalyzerDraft);
+  const draftDebounceTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const pendingDraftUpdatesRef = useRef<Record<string, unknown>>({});
+
+  const debouncedUpdateAnalyzerDraft = useCallback((patch: Record<string, unknown>) => {
+    pendingDraftUpdatesRef.current = { ...pendingDraftUpdatesRef.current, ...patch };
+    if (draftDebounceTimerRef.current) {
+      clearTimeout(draftDebounceTimerRef.current);
+    }
+    draftDebounceTimerRef.current = setTimeout(() => {
+      usePortfolioStore.getState().updateAnalyzerDraft(pendingDraftUpdatesRef.current as any);
+      pendingDraftUpdatesRef.current = {};
+    }, 500);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (draftDebounceTimerRef.current) {
+        clearTimeout(draftDebounceTimerRef.current);
+        if (Object.keys(pendingDraftUpdatesRef.current).length > 0) {
+          usePortfolioStore.getState().updateAnalyzerDraft(pendingDraftUpdatesRef.current as any);
+        }
+      }
+    };
+  }, []);
+
+  const updateAnalyzerDraft = debouncedUpdateAnalyzerDraft;
 
   // Form State for Deal Sourcing Calculator
   const [title, setTitle] = useState('');
