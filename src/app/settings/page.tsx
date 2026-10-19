@@ -410,8 +410,11 @@ function SettingsContent() {
         if (!authEmail.trim()) {
           throw new Error('Please enter your email address.');
         }
+        const siteOrigin =
+          process.env.NEXT_PUBLIC_SITE_URL ||
+          (typeof window !== 'undefined' ? window.location.origin : '');
         const { error } = await supabase.auth.resetPasswordForEmail(authEmail.trim(), {
-          redirectTo: `${typeof window !== 'undefined' ? window.location.origin : ''}/settings#recovery`,
+          redirectTo: `${siteOrigin}/settings#recovery`,
         });
         if (error) throw error;
         setAuthInfo(

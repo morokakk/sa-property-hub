@@ -32,6 +32,13 @@ export default function AuthHydrator() {
         return;
       }
 
+      if (event === 'PASSWORD_RECOVERY') {
+        if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/settings')) {
+          window.location.href = `/settings${window.location.hash || '#recovery'}`;
+        }
+        return;
+      }
+
       if (session?.user && (event === 'SIGNED_IN' || event === 'INITIAL_SESSION')) {
         if (isHydratingRef.current) return;
         isHydratingRef.current = true;
