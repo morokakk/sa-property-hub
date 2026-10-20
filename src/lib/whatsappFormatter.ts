@@ -1,5 +1,5 @@
 import { formatZAR, formatPercent, formatDate } from './formatters';
-import { OpportunityDeal, FlipProject, InvestorProfile, DealStrategy, DealSource, RentalProperty, TenantPaymentRecord, OccupantRiskProfile, ReturnTermType } from '@/types';
+import { OpportunityDeal, FlipProject, InvestorProfile, DealStrategy, DealSource, RentalProperty, TenantPaymentRecord, OccupantRiskProfile, ReturnTermType, AncillaryIncome, UtilityStatement } from '@/types';
 import { generateLongTermProjection, calculateMonthlyBondRepayment, calculateDealMetrics } from './calculations/propertyMetrics';
 import { calculatePropertyArrears, formatMonthLabel, getMonthKey, calculateTenantStatementTiers } from './calculations/arrears';
 import { isEvictionActive, calculateEvictionCarryingCost } from './calculations/occupantRisk';
@@ -735,14 +735,56 @@ export interface TenantAccountStatementOptions {
   leaseId?: string;
   month?: string; // 'YYYY-MM'
   investorProfile?: InvestorProfile;
+  statementUrl?: string;
+}
+
+/**
+ * Calculates the payment due date for a given billing period.
+ * For example, a statement for '2026-04' (April 2026) is due on '1st May 2026'.
+ */
+export function getStatementDueDate(periodMonth?: string): string {
+  if (!periodMonth) return '1st of the month';
+
+  const monthNames = [
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December'
+  ];
+
+  // If format is 'YYYY-MM'
+  if (/^\d{4}-\d{2}$/.test(periodMonth.trim())) {
+    const [yStr, mStr] = periodMonth.trim().split('-');
+    const year = parseInt(yStr, 10);
+    const month = parseInt(mStr, 10); // 1 to 12
+    if (!isNaN(year) && !isNaN(month)) {
+      // 0-indexed Date month: passing month (1-12) yields the 1st of the subsequent month
+      const nextMonthDate = new Date(year, month, 1);
+      return `1st ${monthNames[nextMonthDate.getMonth()]} ${nextMonthDate.getFullYear()}`;
+    }
+  }
+
+  // If format is like 'April 2026'
+  const match = periodMonth.trim().match(/^([A-Za-z]+)\s+(\d{4})$/);
+  if (match) {
+    const currentMonthIdx = monthNames.findIndex(
+      (m) => m.toLowerCase() === match[1].toLowerCase()
+    );
+    const year = parseInt(match[2], 10);
+    if (currentMonthIdx !== -1 && !isNaN(year)) {
+      const nextMonthDate = new Date(year, currentMonthIdx + 1, 1);
+      return `1st ${monthNames[nextMonthDate.getMonth()]} ${nextMonthDate.getFullYear()}`;
+    }
+  }
+
+  return '1st of the upcoming month';
 }
 
 /**
  * Formats a 4-part account statement ready for WhatsApp transmission:
  * 1. Balance Brought Forward
- * 2. Current Period Charges (Rent + Utilities)
+ * 2. Current Period Charges (Rent + Utilities with meter readings)
  * 3. Less: Payments Received (Itemized list)
  * 4. Total Amount Due / Outstanding Balance
+ * Followed by full structured EFT banking and remittance particulars.
  */
 export function formatTenantAccountStatementForWhatsApp(
   rental: RentalProperty,
@@ -768,18 +810,19 @@ export function formatTenantAccountStatementForWhatsApp(
   const periodPayments = tiers.periodPayments;
   const periodPaymentsTotal = tiers.periodPaymentsTotal;
   const totalAmountDue = tiers.totalAmountDue;
-  const entityName = options?.investorProfile?.entityName || 'Property Landlord';
+  const profile = options?.investorProfile;
+  const entityName = profile?.entityName || 'Property Landlord';
 
-  let text = `🧾 *TENANT ACCOUNT STATEMENT & TAX INVOICE*\n`;
+  let text = `*TENANT ACCOUNT STATEMENT & TAX INVOICE*\n`;
   text += `━━━━━━━━━━━━━━━━━━━━━\n`;
-  text += `🏢 *Landlord:* ${entityName}\n`;
-  text += `🏠 *Property:* ${rental.title} — ${unitName}${roomType ? ` (${roomType})` : ''}\n`;
-  text += `📍 *Address:* ${rental.address}, ${rental.city}\n`;
-  text += `👤 *Tenant:* ${tenantName}\n`;
+  text += `• Landlord: ${entityName}\n`;
+  text += `• Property: ${rental.title} — ${unitName}${roomType ? ` (${roomType})` : ''}\n`;
+  text += `• Address: ${rental.address}, ${rental.city}\n`;
+  text += `• Tenant: ${tenantName}\n`;
   if (guarantorName) {
-    text += `🛡️ *Guarantor / Sponsor:* ${guarantorName}${guarantorContact ? ` (${guarantorContact})` : ''}\n`;
+    text += `• Guarantor / Sponsor: ${guarantorName}${guarantorContact ? ` (${guarantorContact})` : ''}\n`;
   }
-  text += `📅 *Billing Period:* ${currentMonthItem.monthLabel}\n\n`;
+  text += `• Billing Period: ${currentMonthItem.monthLabel}\n\n`;
 
   // 1. Balance Brought Forward
   text += `*1. BALANCE BROUGHT FORWARD*\n`;
@@ -800,8 +843,39 @@ export function formatTenantAccountStatementForWhatsApp(
       if (isBundled) {
         text += `• Utility Recovery (${stmt.bundledUtilityLabel || 'Water/Sewerage/Refuse'}): ${formatZAR(stmt.bundledUtilitiesZAR || 0, { includeDecimals: true })}\n`;
       } else {
-        if (stmt.electricityZAR) text += `  - Electricity: ${formatZAR(stmt.electricityZAR, { includeDecimals: true })}\n`;
-        if (stmt.waterZAR) text += `  - Water: ${formatZAR(stmt.waterZAR, { includeDecimals: true })}\n`;
+        const elecReading =
+          stmt.extractedMeterReadings?.find((r) => r.utilityType === 'electricity') ||
+          rental.meterReadings?.find(
+            (r) => r.utilityType === 'electricity' && (!stmt.statementDate || r.date.startsWith(stmt.statementDate.substring(0, 7)))
+          );
+
+        const waterReading =
+          stmt.extractedMeterReadings?.find((r) => r.utilityType === 'water') ||
+          rental.meterReadings?.find(
+            (r) => r.utilityType === 'water' && (!stmt.statementDate || r.date.startsWith(stmt.statementDate.substring(0, 7)))
+          );
+
+        const formatMeterSuffix = (
+          r?: { readingValue: number; previousReadingValue?: number; consumption?: number; readingType?: string },
+          unit = ''
+        ) => {
+          if (!r) return '';
+          if (r.previousReadingValue !== undefined && r.readingValue !== undefined) {
+            const cons = r.consumption !== undefined ? r.consumption : r.readingValue - r.previousReadingValue;
+            return ` (Reading: ${r.previousReadingValue} -> ${r.readingValue} = ${cons} ${unit}${r.readingType ? ` [${r.readingType}]` : ''})`;
+          }
+          if (r.consumption !== undefined) {
+            return ` (Consumption: ${r.consumption} ${unit}${r.readingType ? ` [${r.readingType}]` : ''})`;
+          }
+          return '';
+        };
+
+        if (stmt.electricityZAR) {
+          text += `  - Electricity: ${formatZAR(stmt.electricityZAR, { includeDecimals: true })}${formatMeterSuffix(elecReading, 'kWh')}\n`;
+        }
+        if (stmt.waterZAR) {
+          text += `  - Water: ${formatZAR(stmt.waterZAR, { includeDecimals: true })}${formatMeterSuffix(waterReading, 'kL')}\n`;
+        }
         if (stmt.refuseZAR) text += `  - Refuse: ${formatZAR(stmt.refuseZAR, { includeDecimals: true })}\n`;
         if (stmt.sewerageZAR) text += `  - Sewerage: ${formatZAR(stmt.sewerageZAR, { includeDecimals: true })}\n`;
       }
@@ -851,18 +925,195 @@ export function formatTenantAccountStatementForWhatsApp(
   // 4. Total Amount Due / Outstanding Balance
   text += `*4. TOTAL AMOUNT DUE / OUTSTANDING BALANCE*\n`;
   if (totalAmountDue > 0) {
-    text += `💰 *TOTAL AMOUNT DUE: ${formatZAR(totalAmountDue, { includeDecimals: true })}*\n`;
+    text += `• *TOTAL AMOUNT DUE: ${formatZAR(totalAmountDue, { includeDecimals: true })}*\n`;
   } else if (totalAmountDue < 0) {
-    text += `💰 *ACCOUNT IN CREDIT: -${formatZAR(Math.abs(totalAmountDue), { includeDecimals: true })}*\n`;
+    text += `• *ACCOUNT IN CREDIT: -${formatZAR(Math.abs(totalAmountDue), { includeDecimals: true })}*\n`;
   } else {
-    text += `💰 *TOTAL AMOUNT DUE: R 0.00 (PAID IN FULL ✓)*\n`;
+    text += `• *TOTAL AMOUNT DUE: R 0.00 (PAID IN FULL)*\n`;
   }
+
+  // Payment Reference: Unit + Tenant Surname (e.g., UNIT1-MOKOENA)
+  const cleanUnit = unitName.replace(/\s+/g, '').toUpperCase() || 'UNIT';
+  const tenantSurname =
+    tenantName.trim().split(/\s+/).filter(Boolean).slice(-1)[0]?.toUpperCase() || 'TENANT';
+  const paymentReference = `${cleanUnit}-${tenantSurname}`;
+  const dueDateStr = getStatementDueDate(targetMonth);
+
+  const hasBankDetails = Boolean(profile?.accountNumber && profile.accountNumber.trim().length > 0);
+
   text += `━━━━━━━━━━━━━━━━━━━━━\n`;
-  text += `📌 *Payment Terms:* Due strictly on 1st of month.\n`;
-  text += `🏦 *Payment Reference:* ${tenantName.replace(/\s+/g, '-').toUpperCase()} - ${unitName.replace(/\s+/g, '').toUpperCase()}\n`;
-  if (options?.investorProfile?.contactNumber) {
-    text += `📞 *Enquiries:* ${options.investorProfile.contactNumber}\n`;
+  text += `*BANKING & PAYMENT DETAILS*\n`;
+  if (hasBankDetails) {
+    text += `• Bank: ${profile?.bankName || 'Standard Bank'}\n`;
+    text += `• Account Name: ${profile?.accountHolder || profile?.entityName || entityName}\n`;
+    text += `• Account Number: ${profile?.accountNumber}\n`;
+    text += `• Branch Code: ${profile?.branchCode || 'Universal'}\n`;
+    if (profile?.accountType) {
+      text += `• Account Type: ${profile.accountType}\n`;
+    }
+    if (profile?.swiftCode) {
+      text += `• SWIFT / BIC: ${profile.swiftCode}\n`;
+    }
+    text += `• Payment Reference: *${paymentReference}*\n`;
+    text += `• Payment Due Date: *${dueDateStr}*\n`;
+    if (profile?.email) {
+      text += `• Proof of Payment: Send to ${profile.email}\n`;
+    }
+    if (profile?.remittanceInstructions) {
+      text += `• Instructions: ${profile.remittanceInstructions}\n`;
+    }
+  } else {
+    text += `• Account Name: ${entityName}\n`;
+    text += `• Payment Reference: *${paymentReference}*\n`;
+    text += `• Payment Due Date: *${dueDateStr}*\n`;
+    text += `• Banking Details: Please contact landlord for account details.\n`;
+    if (profile?.email) {
+      text += `• Proof of Payment: Send to ${profile.email}\n`;
+    }
   }
+  if (profile?.contactNumber) {
+    text += `• Enquiries: ${profile.contactNumber}\n`;
+  }
+  if (options?.statementUrl) {
+    text += `• Online Statement & PDF: ${options.statementUrl}\n`;
+  }
+  text += `━━━━━━━━━━━━━━━━━━━━━`;
+
+  return text;
+}
+
+export interface CommercialInvoiceWhatsAppOptions {
+  rental: RentalProperty;
+  selectedAncillary: AncillaryIncome;
+  periodStr: string;
+  activePeriodMonth?: string;
+  baseRent: number;
+  commercialVatAmount: number;
+  currentGrandTotal: number;
+  investorProfile?: InvestorProfile;
+}
+
+export function formatCommercialInvoiceForWhatsApp(options: CommercialInvoiceWhatsAppOptions): string {
+  const {
+    rental,
+    selectedAncillary,
+    periodStr,
+    activePeriodMonth,
+    baseRent,
+    commercialVatAmount,
+    currentGrandTotal,
+    investorProfile,
+  } = options;
+
+  const commRef = `INV-${selectedAncillary.tenantName.substring(0, 10).replace(/\s+/g, '').toUpperCase()}-${rental.title.substring(0, 10).replace(/\s+/g, '').toUpperCase()}`;
+  const dueDateStr = getStatementDueDate(activePeriodMonth || periodStr);
+  const hasBankDetails = Boolean(investorProfile?.accountNumber && investorProfile.accountNumber.trim().length > 0);
+
+  let text = `*COMMERCIAL TAX INVOICE & RENT REMITTANCE*\n`;
+  text += `━━━━━━━━━━━━━━━━━━━━━\n`;
+  text += `• Entity: ${investorProfile?.entityName || 'Commercial Property Lessor'}\n`;
+  text += `• Company Reg / ID: ${investorProfile?.registrationOrId || 'On Record'}\n`;
+  text += `• Property: ${rental.title}\n`;
+  text += `• Site Address: ${rental.address}, ${rental.city}\n`;
+  text += `• Commercial Tenant: ${selectedAncillary.tenantName}\n`;
+  text += `• Lease Type: ${selectedAncillary.type.replace('_', ' ').toUpperCase()} LEASE\n`;
+  text += `• Billing Period: ${periodStr}\n`;
+  text += `• Contract Expiry: ${selectedAncillary.contractEndDate} (${selectedAncillary.annualEscalationPercent}% p.a. escalation)\n\n`;
+
+  text += `*INVOICE BREAKDOWN:*\n`;
+  text += `• Net Monthly Site Lease: ${formatZAR(baseRent, { includeDecimals: true })}\n`;
+  if (selectedAncillary.vatApplicable) {
+    text += `• South African VAT (15%): ${formatZAR(commercialVatAmount, { includeDecimals: true })}\n`;
+  }
+  text += `\n━━━━━━━━━━━━━━━━━━━━━\n`;
+  text += `• *TOTAL AMOUNT DUE: ${formatZAR(currentGrandTotal, { includeDecimals: true })}*\n`;
+  text += `━━━━━━━━━━━━━━━━━━━━━\n`;
+
+  text += `*BANKING & PAYMENT DETAILS*\n`;
+  if (hasBankDetails) {
+    text += `• Bank: ${investorProfile?.bankName || 'Standard Bank'}\n`;
+    text += `• Account Name: ${investorProfile?.accountHolder || investorProfile?.entityName || 'Commercial Property Lessor'}\n`;
+    text += `• Account Number: ${investorProfile?.accountNumber}\n`;
+    text += `• Branch Code: ${investorProfile?.branchCode || 'Universal'}\n`;
+    if (investorProfile?.accountType) {
+      text += `• Account Type: ${investorProfile.accountType}\n`;
+    }
+    if (investorProfile?.swiftCode) {
+      text += `• SWIFT / BIC: ${investorProfile.swiftCode}\n`;
+    }
+    text += `• Payment Reference: *${commRef}*\n`;
+    text += `• Payment Due Date: *${dueDateStr}*\n`;
+    if (investorProfile?.email) {
+      text += `• Proof of Payment: Send to ${investorProfile.email}\n`;
+    }
+    if (investorProfile?.remittanceInstructions) {
+      text += `• Instructions: ${investorProfile.remittanceInstructions}\n`;
+    }
+  } else {
+    text += `• Account Name: ${investorProfile?.entityName || 'Commercial Property Lessor'}\n`;
+    text += `• Payment Reference: *${commRef}*\n`;
+    text += `• Payment Due Date: *${dueDateStr}*\n`;
+    text += `• Banking Details: Please contact landlord for account details.\n`;
+    if (investorProfile?.email) {
+      text += `• Proof of Payment: Send to ${investorProfile.email}\n`;
+    }
+  }
+  if (investorProfile?.contactNumber) {
+    text += `• Enquiries: ${investorProfile.contactNumber}\n`;
+  }
+  text += `━━━━━━━━━━━━━━━━━━━━━\n\n`;
+  text += `_Commercial Tax Invoice issued in terms of the South African Value-Added Tax Act. Domestic municipal utilities not applicable._`;
+
+  return text;
+}
+
+export interface ConsolidatedOverviewWhatsAppOptions {
+  rental: RentalProperty;
+  periodStr: string;
+  currentGrandTotal: number;
+  currentStatement?: UtilityStatement;
+  currentTenantUtilities: number;
+  investorProfile?: InvestorProfile;
+}
+
+export function formatConsolidatedOverviewForWhatsApp(options: ConsolidatedOverviewWhatsAppOptions): string {
+  const {
+    rental,
+    periodStr,
+    currentGrandTotal,
+    currentStatement,
+    currentTenantUtilities,
+    investorProfile,
+  } = options;
+
+  let text = `*CONSOLIDATED PROPERTY REVENUE & AUDIT STATEMENT*\n`;
+  text += `━━━━━━━━━━━━━━━━━━━━━\n`;
+  text += `• Landlord Entity: ${investorProfile?.entityName || 'Property Landlord'}\n`;
+  text += `• Property: ${rental.title}\n`;
+  text += `• Address: ${rental.address}, ${rental.city}\n`;
+  text += `• Billing Period: ${periodStr}\n\n`;
+
+  text += `*RESIDENTIAL UNITS (${rental.leases?.length || 0} Units):*\n`;
+  (rental.leases || []).forEach((l) => {
+    text += `• ${l.unitName}: ${l.tenantName || '(Vacant)'} — ${formatZAR(l.monthlyRentZAR)}/m [${l.status}]\n`;
+  });
+
+  if ((rental.ancillaryIncomes?.length || 0) > 0) {
+    text += `\n*COMMERCIAL ANCILLARY COVENANTS:*\n`;
+    rental.ancillaryIncomes?.forEach((a) => {
+      text += `• ${a.tenantName} (${a.type.replace('_', ' ')}): ${formatZAR(a.monthlyRentZAR)}/m ${a.vatApplicable ? '+15% VAT' : ''}\n`;
+    });
+  }
+
+  text += `\n*MUNICIPAL RECONCILIATION:*\n`;
+  text += `• Total Council Charges: ${formatZAR(currentStatement?.totalDueZAR || 0, { includeDecimals: true })}\n`;
+  text += `• Landlord Rates & Taxes: ${formatZAR(currentStatement?.propertyRatesZAR || 0, { includeDecimals: true })}\n`;
+  text += `• Total Tenant Recoveries Billed: ${formatZAR(currentTenantUtilities, { includeDecimals: true })}\n\n`;
+
+  text += `━━━━━━━━━━━━━━━━━━━━━\n`;
+  text += `• *TOTAL MONTHLY PORTFOLIO COLLECTION: ${formatZAR(currentGrandTotal, { includeDecimals: true })}*\n`;
+  text += `━━━━━━━━━━━━━━━━━━━━━\n`;
+  text += `• Master Audit Ref: MASTER-${rental.title.substring(0, 15).replace(/\s+/g, '').toUpperCase()}\n`;
 
   return text;
 }
@@ -882,11 +1133,11 @@ export function formatTenantPaymentReceiptForWhatsApp(
   const unitName = selectedLease?.unitName || 'Main Unit';
   const entityName = investorProfile?.entityName || 'Property Landlord';
 
-  let text = `🧾 *PAYMENT RECEIPT & CONFIRMATION*\n`;
+  let text = `*PAYMENT RECEIPT & CONFIRMATION*\n`;
   text += `━━━━━━━━━━━━━━━━━━━━━\n`;
-  text += `🏢 *Landlord:* ${entityName}\n`;
-  text += `🏠 *Property:* ${rental.title} — ${unitName}\n`;
-  text += `👤 *Tenant:* ${tenantName}\n\n`;
+  text += `• Landlord: ${entityName}\n`;
+  text += `• Property: ${rental.title} — ${unitName}\n`;
+  text += `• Tenant: ${tenantName}\n\n`;
 
   text += `*PAYMENT PARTICULARS:*\n`;
   text += `• Date Received: *${formatDate(payment.paymentDate)}*\n`;
@@ -902,7 +1153,7 @@ export function formatTenantPaymentReceiptForWhatsApp(
 
   text += `*CURRENT ACCOUNT STATUS:*\n`;
   if (arrearsResult.totalArrearsZAR <= 0) {
-    text += `• Outstanding Balance: *R 0.00 (Paid in Full ✓)*\n`;
+    text += `• Outstanding Balance: *R 0.00 (Paid in Full)*\n`;
   } else {
     text += `• Remaining Balance Due: *${formatZAR(arrearsResult.totalArrearsZAR, { includeDecimals: true })}*\n`;
   }

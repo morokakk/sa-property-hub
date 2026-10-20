@@ -5,9 +5,14 @@ import {
   formatProposalPitchForWhatsApp,
   formatPaymentStatement,
   formatPieActWhatsAppBlock,
+  formatTenantAccountStatementForWhatsApp,
+  formatTenantPaymentReceiptForWhatsApp,
+  formatCommercialInvoiceForWhatsApp,
+  formatConsolidatedOverviewForWhatsApp,
+  getStatementDueDate,
 } from '../whatsappFormatter';
 import { formatZAR, formatDate } from '../formatters';
-import { OpportunityDeal, FlipProject, InvestorProfile, OccupantRiskProfile } from '@/types';
+import { OpportunityDeal, FlipProject, InvestorProfile, OccupantRiskProfile, RentalProperty, AncillaryIncome, UtilityStatement } from '@/types';
 
 describe('whatsappFormatter - Strategy Adaptive Formatting', () => {
   const mockInvestorProfile: InvestorProfile = {
@@ -938,6 +943,205 @@ describe('whatsappFormatter - Strategy Adaptive Formatting', () => {
         date: '2026-09-25',
       });
       expect(output).not.toMatch(emojiRegex);
+    });
+
+    const sampleRental: RentalProperty = {
+      id: 'rental-test-1',
+      title: 'Sunnyridge Apartments',
+      address: '124 Main Road',
+      city: 'Randburg',
+      propertyType: 'Sectional Title Apartment',
+      marketValueZAR: 1_200_000,
+      purchasePriceZAR: 1_000_000,
+      purchaseDate: '2025-01-01',
+      outstandingBondBalanceZAR: 800_000,
+      bondInterestRatePercent: 11.5,
+      monthlyBondPaymentZAR: 8_500,
+      monthlyGrossRentZAR: 8_500,
+      monthlyLeviesZAR: 1_200,
+      monthlyRatesTaxesZAR: 600,
+      monthlyAgentFeeZAR: 0,
+      monthlyMaintenanceReserveZAR: 400,
+      maintenanceHistory: [],
+      status: 'Occupied',
+      leases: [
+        {
+          id: 'l-test-1',
+          tenantName: 'Thabo Mokoena',
+          unitName: 'Unit 1',
+          monthlyRentZAR: 8_500,
+          depositHeldZAR: 8_500,
+          leaseStartDate: '2025-01-01',
+          leaseEndDate: '2026-12-31',
+          annualEscalationPercent: 7,
+          status: 'Occupied',
+          tenantPhone: '+27 82 555 1234',
+          tenantEmail: 'thabo@example.com',
+        },
+      ],
+      paymentRecords: [
+        {
+          id: 'pay-1',
+          propertyId: 'rental-test-1',
+          leaseId: 'l-test-1',
+          paymentDate: '2026-04-02',
+          periodMonth: '2026-04',
+          amountReceivedZAR: 8_500,
+          paymentMethod: 'EFT',
+          reference: 'FNB-998811',
+          allocations: [{ periodMonth: '2026-04', amountZAR: 8_500 }],
+          createdAt: '2026-04-02T10:00:00Z',
+        },
+      ],
+      utilityStatements: [
+        {
+          id: 'util-1',
+          statementDate: '2026-04-05',
+          billingPeriod: 'April 2026',
+          provider: 'City Power',
+          electricityZAR: 850,
+          waterZAR: 320,
+          refuseZAR: 240,
+          sewerageZAR: 310,
+          totalDueZAR: 1_720,
+          parsedVia: 'manual',
+          createdAt: '2026-04-05T10:00:00Z',
+          extractedMeterReadings: [
+            {
+              date: '2026-04-05',
+              utilityType: 'electricity',
+              readingValue: 12650,
+              previousReadingValue: 12450,
+              consumption: 200,
+              readingType: 'Actual',
+              source: 'manual',
+            },
+            {
+              date: '2026-04-05',
+              utilityType: 'water',
+              readingValue: 425,
+              previousReadingValue: 410,
+              consumption: 15,
+              source: 'manual',
+            },
+          ],
+        },
+      ],
+    };
+
+    const profileWithBanking: InvestorProfile = {
+      ...mockInvestorProfile,
+      bankName: 'First National Bank (FNB)',
+      accountHolder: 'Apex Capital Properties (Pty) Ltd',
+      accountNumber: '62000000000',
+      branchCode: '250655',
+      accountType: 'Cheque / Current',
+      swiftCode: 'FIRNZAJJ',
+      remittanceInstructions: 'Please email POP with unit reference.',
+    };
+
+    it('contains zero emojis in formatTenantAccountStatementForWhatsApp', () => {
+      const output = formatTenantAccountStatementForWhatsApp(sampleRental, {
+        month: '2026-04',
+        investorProfile: profileWithBanking,
+      });
+      expect(output).not.toMatch(emojiRegex);
+    });
+
+    it('contains zero emojis in formatTenantPaymentReceiptForWhatsApp', () => {
+      const output = formatTenantPaymentReceiptForWhatsApp(
+        sampleRental,
+        sampleRental.paymentRecords![0],
+        profileWithBanking
+      );
+      expect(output).not.toMatch(emojiRegex);
+    });
+
+    it('contains zero emojis in formatCommercialInvoiceForWhatsApp', () => {
+      const ancillary: AncillaryIncome = {
+        id: 'anc-1',
+        type: 'cell_tower',
+        tenantName: 'Vodacom Group Ltd',
+        monthlyRentZAR: 15_000,
+        vatApplicable: true,
+        contractStartDate: '2024-01-01',
+        contractEndDate: '2028-12-31',
+        annualEscalationPercent: 8,
+      };
+      const output = formatCommercialInvoiceForWhatsApp({
+        rental: sampleRental,
+        selectedAncillary: ancillary,
+        periodStr: 'April 2026',
+        activePeriodMonth: '2026-04',
+        baseRent: 15_000,
+        commercialVatAmount: 2_250,
+        currentGrandTotal: 17_250,
+        investorProfile: profileWithBanking,
+      });
+      expect(output).not.toMatch(emojiRegex);
+    });
+
+    it('contains zero emojis in formatConsolidatedOverviewForWhatsApp', () => {
+      const output = formatConsolidatedOverviewForWhatsApp({
+        rental: sampleRental,
+        periodStr: 'April 2026',
+        currentGrandTotal: 10_220,
+        currentTenantUtilities: 1_720,
+        investorProfile: profileWithBanking,
+      });
+      expect(output).not.toMatch(emojiRegex);
+    });
+
+    it('renders full EFT banking details, payment reference, and due date when configured', () => {
+      const output = formatTenantAccountStatementForWhatsApp(sampleRental, {
+        month: '2026-04',
+        investorProfile: profileWithBanking,
+      });
+
+      expect(output).toContain('BANKING & PAYMENT DETAILS');
+      expect(output).toContain('• Bank: First National Bank (FNB)');
+      expect(output).toContain('• Account Name: Apex Capital Properties (Pty) Ltd');
+      expect(output).toContain('• Account Number: 62000000000');
+      expect(output).toContain('• Branch Code: 250655');
+      expect(output).toContain('• Account Type: Cheque / Current');
+      expect(output).toContain('• SWIFT / BIC: FIRNZAJJ');
+      expect(output).toContain('• Payment Reference: *UNIT1-MOKOENA*');
+      expect(output).toContain('• Payment Due Date: *1st May 2026*');
+      expect(output).toContain('• Proof of Payment: Send to deals@apexcapital.co.za');
+      expect(output).toContain('• Instructions: Please email POP with unit reference.');
+      expect(output).toContain('• Enquiries: +27 82 123 4567');
+    });
+
+    it('renders clean fallback notice when banking details are unconfigured', () => {
+      const output = formatTenantAccountStatementForWhatsApp(sampleRental, {
+        month: '2026-04',
+        investorProfile: mockInvestorProfile,
+      });
+
+      expect(output).toContain('BANKING & PAYMENT DETAILS');
+      expect(output).toContain('• Account Name: Apex Capital Properties');
+      expect(output).toContain('• Payment Reference: *UNIT1-MOKOENA*');
+      expect(output).toContain('• Payment Due Date: *1st May 2026*');
+      expect(output).toContain('• Banking Details: Please contact landlord for account details.');
+      expect(output).toContain('• Proof of Payment: Send to deals@apexcapital.co.za');
+      expect(output).not.toContain('• Account Number:');
+    });
+
+    it('renders meter consumption units and reading intervals for utilities', () => {
+      const output = formatTenantAccountStatementForWhatsApp(sampleRental, {
+        month: '2026-04',
+        investorProfile: profileWithBanking,
+      });
+
+      expect(output).toContain(`Electricity: ${formatZAR(850, { includeDecimals: true })} (Reading: 12450 -> 12650 = 200 kWh [Actual])`);
+      expect(output).toContain(`Water: ${formatZAR(320, { includeDecimals: true })} (Reading: 410 -> 425 = 15 kL)`);
+    });
+
+    it('calculates statement due dates correctly with getStatementDueDate', () => {
+      expect(getStatementDueDate('2026-04')).toBe('1st May 2026');
+      expect(getStatementDueDate('2026-12')).toBe('1st January 2027');
+      expect(getStatementDueDate('April 2026')).toBe('1st May 2026');
+      expect(getStatementDueDate(undefined)).toBe('1st of the month');
     });
   });
 });

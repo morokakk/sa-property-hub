@@ -37,7 +37,11 @@ import { parseUtilityPdf } from '@/lib/utilities/pdfParser';
 import { supabase } from '@/lib/supabaseClient';
 import { migrateToCloud } from '@/lib/db/migrateToCloud';
 import { DEMO_RENTAL_IDS, isDemoRentalProperty } from '@/lib/db/mergePortfolioState';
-import { formatTenantAccountStatementForWhatsApp } from '@/lib/whatsappFormatter';
+import {
+  formatTenantAccountStatementForWhatsApp,
+  formatCommercialInvoiceForWhatsApp,
+  formatConsolidatedOverviewForWhatsApp,
+} from '@/lib/whatsappFormatter';
 import {
   calculatePropertyArrears,
   calculateTenantStatementTiers,
@@ -441,28 +445,16 @@ export default function TenantStatement({
 
     // 1. COMMERCIAL ANCILLARY CONTRACT INVOICE
     if (isCommercial && selectedAncillary) {
-      let text = `🧾 *COMMERCIAL TAX INVOICE & RENT REMITTANCE*\n`;
-      text += `━━━━━━━━━━━━━━━━━━━━━\n`;
-      text += `🏢 *Entity:* ${investorProfile?.entityName || 'Commercial Property Lessor'}\n`;
-      text += `📋 *Company Reg / ID:* ${investorProfile?.registrationOrId || 'On Record'}\n`;
-      text += `🏛️ *Property:* ${rental.title}\n`;
-      text += `📍 *Site Address:* ${rental.address}, ${rental.city}\n`;
-      text += `🏢 *Commercial Tenant:* ${selectedAncillary.tenantName}\n`;
-      text += `📑 *Lease Type:* ${selectedAncillary.type.replace('_', ' ').toUpperCase()} LEASE\n`;
-      text += `📅 *Billing Period:* ${periodStr}\n`;
-      text += `⏳ *Contract Expiry:* ${selectedAncillary.contractEndDate} (${selectedAncillary.annualEscalationPercent}% p.a. escalation)\n\n`;
-
-      text += `*INVOICE BREAKDOWN:*\n`;
-      text += `• Net Monthly Site Lease: ${formatZAR(baseRent, { includeDecimals: true })}\n`;
-      if (selectedAncillary.vatApplicable) {
-        text += `• South African VAT (15%): ${formatZAR(commercialVatAmount, { includeDecimals: true })}\n`;
-      }
-      text += `\n━━━━━━━━━━━━━━━━━━━━━\n`;
-      text += `💰 *TOTAL AMOUNT DUE: ${formatZAR(currentGrandTotal, { includeDecimals: true })}*\n`;
-      text += `━━━━━━━━━━━━━━━━━━━━━\n`;
-      text += `📌 *Payment Terms:* Due on 1st of month per commercial contract.\n`;
-      text += `🏦 *Payment Reference:* INV-${selectedAncillary.tenantName.substring(0, 10).replace(/\s+/g, '').toUpperCase()}-${rental.title.substring(0, 10).replace(/\s+/g, '').toUpperCase()}\n\n`;
-      text += `_Commercial Tax Invoice issued in terms of the South African Value-Added Tax Act. Domestic municipal utilities not applicable._`;
+      const text = formatCommercialInvoiceForWhatsApp({
+        rental,
+        selectedAncillary,
+        periodStr,
+        activePeriodMonth,
+        baseRent,
+        commercialVatAmount,
+        currentGrandTotal,
+        investorProfile,
+      });
 
       try {
         if (navigator?.clipboard?.writeText) await navigator.clipboard.writeText(text);
@@ -475,34 +467,14 @@ export default function TenantStatement({
 
     // 2. CONSOLIDATED MASTER OVERVIEW FOR LANDLORD
     if (isConsolidated) {
-      let text = `📊 *CONSOLIDATED PROPERTY REVENUE & AUDIT STATEMENT*\n`;
-      text += `━━━━━━━━━━━━━━━━━━━━━\n`;
-      text += `🏢 *Landlord Entity:* ${investorProfile?.entityName || 'Property Landlord'}\n`;
-      text += `🏠 *Property:* ${rental.title}\n`;
-      text += `📍 *Address:* ${rental.address}, ${rental.city}\n`;
-      text += `📅 *Billing Period:* ${periodStr}\n\n`;
-
-      text += `*RESIDENTIAL UNITS (${rental.leases?.length || 0} Units):*\n`;
-      (rental.leases || []).forEach((l) => {
-        text += `• ${l.unitName}: ${l.tenantName || '(Vacant)'} — ${formatZAR(l.monthlyRentZAR)}/m [${l.status}]\n`;
+      const text = formatConsolidatedOverviewForWhatsApp({
+        rental,
+        periodStr,
+        currentGrandTotal,
+        currentStatement,
+        currentTenantUtilities,
+        investorProfile,
       });
-
-      if ((rental.ancillaryIncomes?.length || 0) > 0) {
-        text += `\n*COMMERCIAL ANCILLARY COVENANTS:*\n`;
-        rental.ancillaryIncomes?.forEach((a) => {
-          text += `• ${a.tenantName} (${a.type.replace('_', ' ')}): ${formatZAR(a.monthlyRentZAR)}/m ${a.vatApplicable ? '+15% VAT' : ''}\n`;
-        });
-      }
-
-      text += `\n*MUNICIPAL RECONCILIATION:*\n`;
-      text += `• Total Council Charges: ${formatZAR(currentStatement?.totalDueZAR || 0, { includeDecimals: true })}\n`;
-      text += `• Landlord Rates & Taxes: ${formatZAR(currentStatement?.propertyRatesZAR || 0, { includeDecimals: true })}\n`;
-      text += `• Total Tenant Recoveries Billed: ${formatZAR(currentTenantUtilities, { includeDecimals: true })}\n\n`;
-
-      text += `━━━━━━━━━━━━━━━━━━━━━\n`;
-      text += `💰 *TOTAL MONTHLY PORTFOLIO COLLECTION: ${formatZAR(currentGrandTotal, { includeDecimals: true })}*\n`;
-      text += `━━━━━━━━━━━━━━━━━━━━━\n`;
-      text += `🏦 *Master Audit Ref:* MASTER-${rental.title.substring(0, 15).replace(/\s+/g, '').toUpperCase()}\n`;
 
       try {
         if (navigator?.clipboard?.writeText) await navigator.clipboard.writeText(text);
