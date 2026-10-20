@@ -2641,6 +2641,37 @@ export const INITIAL_OPPORTUNITIES: OpportunityDeal[] = [
     undefined,
     'Rental'
   ),
+  createSampleOpportunity(
+    'opp-4',
+    'Rosebank High-Yield Urban Apartment',
+    '18 Cradock Avenue, Rosebank',
+    'Johannesburg',
+    'Gauteng',
+    'Private Agent',
+    1_250_000,
+    1_450_000, // Open Market Value (R200k built-in equity)
+    30_000,    // Cosmetic touch-up Capex
+    17_500,    // Monthly gross rent (stress-test break-even: R1,538/m at 10.75%, +R152/m at +200 bps)
+    1_400,     // Monthly Levies
+    800,       // Monthly Rates & Taxes
+    1_650_000, // Target Exit Price
+    80,        // 80% LTV (20% deposit = R250,000, Bond = R1,000,000)
+    'Screening',
+    false,
+    undefined,
+    {
+      schools: '0-5km',
+      policeStation: '0-5km',
+      medicalClinic: '0-5km',
+      shoppingMall: '0-5km',
+    },
+    'Sectional Title Apartment',
+    '2026-12-10',
+    undefined,
+    undefined,
+    undefined,
+    'Rental'
+  ),
 ];
 
 export const INITIAL_INVESTOR_PROFILE: InvestorProfile = {
@@ -2675,30 +2706,37 @@ export const INITIAL_INVESTOR_PROFILE: InvestorProfile = {
 
 export const INITIAL_ANALYZER_DRAFT: AnalyzerDraft = {
   strategy: 'Rental',
-  openMarketValue: 2_150_000,
-  purchasePrice: 1_800_000,
-  rehabCost: 200_000,
-  monthlyRent: 16_500,
-  monthlyLevies: 1_650,
-  monthlyRates: 1_100,
-  targetExitPrice: 2_450_000,
+  title: 'Rosebank High-Yield Urban Apartment',
+  address: '18 Cradock Avenue, Rosebank',
+  city: 'Johannesburg',
+  province: 'Gauteng',
+  propertyType: 'Sectional Title Apartment',
+  openMarketValue: 1_450_000,
+  purchasePrice: 1_250_000,
+  rehabCost: 30_000,
+  monthlyRent: 17_500,
+  monthlyLevies: 1_400,
+  monthlyRates: 800,
+  targetExitPrice: 1_650_000,
   auctioneerCommission: 0,
   municipalArrears: 0,
-  depositZAR: 0,
-  loanToValue: 100,
+  depositZAR: 250_000,
+  loanToValue: 80,
   annualCapitalGrowthPercent: 5.0,
   annualRentalEscalationPercent: 6.0,
   annualExpenseInflationPercent: 6.0,
   bondTermYears: 20,
-  source: 'High-Street Auction',
+  source: 'Private Agent',
   vacancyRatePercent: 6.0,
   managementFeePercent: 8.0,
   agencyVatApplicable: true,
+  monthlyMaintenanceReserveZAR: 800,
+  monthlyPrepaidVendingFeeZAR: 150,
   interestRateMargin: 0,
   vatExemptAgent: false,
   holdingPeriodMonths: 6,
   numberOfUnits: 1,
-  floorAreaSqm: 0,
+  floorAreaSqm: 68,
   isVatInclusiveDeveloperSale: false,
   tenantPlacementFeePercent: 0,
   annualSpvAdminAuditFeeZAR: 0,

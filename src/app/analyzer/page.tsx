@@ -119,24 +119,24 @@ export default function OpportunityAnalyzerPage() {
   const updateAnalyzerDraft = debouncedUpdateAnalyzerDraft;
 
   // Form State for Deal Sourcing Calculator
-  const [title, setTitle] = useState('');
-  const [address, setAddress] = useState('');
-  const [city, setCity] = useState('Johannesburg CBD & Maboneng');
-  const [province, setProvince] = useState<Province>('Gauteng');
-  const [source, setSource] = useState<DealSource>(analyzerDraft?.source ?? 'High-Street Auction');
+  const [title, setTitle] = useState(analyzerDraft?.title ?? '');
+  const [address, setAddress] = useState(analyzerDraft?.address ?? '');
+  const [city, setCity] = useState(analyzerDraft?.city ?? 'Johannesburg');
+  const [province, setProvince] = useState<Province>(analyzerDraft?.province ?? 'Gauteng');
+  const [source, setSource] = useState<DealSource>(analyzerDraft?.source ?? 'Private Agent');
   const [feeResetToast, setFeeResetToast] = useState<string | null>(null);
-  const [propertyType, setPropertyType] = useState<PropertyTitleType>('Sectional Title Apartment');
-  const [agmDate, setAgmDate] = useState<string>('');
+  const [propertyType, setPropertyType] = useState<PropertyTitleType>(analyzerDraft?.propertyType ?? 'Sectional Title Apartment');
+  const [agmDate, setAgmDate] = useState<string>(analyzerDraft?.agmDate ?? '');
 
   // Valuation vs. Purchase Price
-  const [openMarketValue, setOpenMarketValue] = useState<number>(analyzerDraft?.openMarketValue ?? 2_150_000);
-  const [purchasePrice, setPurchasePrice] = useState<number>(analyzerDraft?.purchasePrice ?? 1_800_000);
-  const [rehabCost, setRehabCost] = useState<number>(analyzerDraft?.rehabCost ?? 200_000);
-  const [monthlyRent, setMonthlyRent] = useState<number>(analyzerDraft?.monthlyRent ?? 16_500);
-  const [monthlyLevies, setMonthlyLevies] = useState<number>(analyzerDraft?.monthlyLevies ?? 1_650);
+  const [openMarketValue, setOpenMarketValue] = useState<number>(analyzerDraft?.openMarketValue ?? 1_450_000);
+  const [purchasePrice, setPurchasePrice] = useState<number>(analyzerDraft?.purchasePrice ?? 1_250_000);
+  const [rehabCost, setRehabCost] = useState<number>(analyzerDraft?.rehabCost ?? 30_000);
+  const [monthlyRent, setMonthlyRent] = useState<number>(analyzerDraft?.monthlyRent ?? 17_500);
+  const [monthlyLevies, setMonthlyLevies] = useState<number>(analyzerDraft?.monthlyLevies ?? 1_400);
   const [annualInsurance, setAnnualInsurance] = useState<number>(analyzerDraft?.annualInsurance ?? (propertyType === 'Freehold House' ? 7_200 : 0));
-  const [monthlyRates, setMonthlyRates] = useState<number>(analyzerDraft?.monthlyRates ?? 1_100);
-  const [targetExitPrice, setTargetExitPrice] = useState<number>(analyzerDraft?.targetExitPrice ?? 2_450_000);
+  const [monthlyRates, setMonthlyRates] = useState<number>(analyzerDraft?.monthlyRates ?? 800);
+  const [targetExitPrice, setTargetExitPrice] = useState<number>(analyzerDraft?.targetExitPrice ?? 1_650_000);
 
   // Vacancy Buffer & Credit Loss + Property Management State
   const [vacancyRate, setVacancyRate] = useState<number>(analyzerDraft?.vacancyRatePercent ?? 6.0);
@@ -219,10 +219,10 @@ export default function OpportunityAnalyzerPage() {
   const [clinicDistance, setClinicDistance] = useState<AmenityDistance>('0-5km');
   const [mallDistance, setMallDistance] = useState<AmenityDistance>('0-5km');
 
-  // Financing & Bidirectional Deposit / LTV (Defaults to 100% LTV / 0% Deposit)
+  // Financing & Bidirectional Deposit / LTV (Defaults to 80% LTV / 20% Deposit)
   const defaultPrimeRate = investorProfile?.defaultPrimeRatePercent ?? 10.75;
-  const [loanToValue, setLoanToValue] = useState<number>(analyzerDraft?.loanToValue ?? 100);
-  const [depositZAR, setDepositZAR] = useState<number>(analyzerDraft?.depositZAR ?? 0);
+  const [loanToValue, setLoanToValue] = useState<number>(analyzerDraft?.loanToValue ?? 80);
+  const [depositZAR, setDepositZAR] = useState<number>(analyzerDraft?.depositZAR ?? 250_000);
   const [interestRateMargin, setInterestRateMargin] = useState<number>(analyzerDraft?.interestRateMargin ?? 0.0);
   const [interestRate, setInterestRate] = useState<number>(
     Number((defaultPrimeRate + (analyzerDraft?.interestRateMargin ?? 0.0)).toFixed(2))
@@ -962,16 +962,16 @@ export default function OpportunityAnalyzerPage() {
 
   const handleCancelEdit = () => {
     setEditingDealId(null);
-    setTitle('');
-    setAddress('');
-    setPropertyType('Sectional Title Apartment');
-    setAgmDate('');
+    setTitle(analyzerDraft?.title ?? '');
+    setAddress(analyzerDraft?.address ?? '');
+    setPropertyType(analyzerDraft?.propertyType ?? 'Sectional Title Apartment');
+    setAgmDate(analyzerDraft?.agmDate ?? '');
     setAnnualInsurance(0);
-    setStrategy('Rental');
+    setStrategy(analyzerDraft?.strategy ?? 'Rental');
     setAuctioneerCommission(0);
     setMunicipalArrears(0);
-    setLoanToValue(100);
-    setDepositZAR(0);
+    setLoanToValue(analyzerDraft?.loanToValue ?? 80);
+    setDepositZAR(analyzerDraft?.depositZAR ?? 250_000);
     setInterestRateMargin(0.0);
     setInterestRate(defaultPrimeRate);
     setHoldingPeriodMonths(6);
@@ -1202,15 +1202,15 @@ export default function OpportunityAnalyzerPage() {
     setExtraMonthlyPayment(0);
     setTitle('');
     setAddress('');
-    setCity('Johannesburg CBD & Maboneng');
-    setProvince('Gauteng');
-    setPropertyType('Sectional Title Apartment');
-    setAgmDate('');
+    setCity(analyzerDraft?.city ?? 'Johannesburg');
+    setProvince(analyzerDraft?.province ?? 'Gauteng');
+    setPropertyType(analyzerDraft?.propertyType ?? 'Sectional Title Apartment');
+    setAgmDate(analyzerDraft?.agmDate ?? '');
     setAnnualInsurance(0);
     setAuctioneerCommission(0);
     setMunicipalArrears(0);
-    setLoanToValue(100);
-    setDepositZAR(0);
+    setLoanToValue(analyzerDraft?.loanToValue ?? 80);
+    setDepositZAR(analyzerDraft?.depositZAR ?? 250_000);
     setVatExemptAgent(investorProfile?.vatExemptAgent ?? false);
     setMonthlyMaintenanceReserve(analyzerDraft?.monthlyMaintenanceReserveZAR ?? 800);
     setMonthlyPrepaidVendingFee(analyzerDraft?.monthlyPrepaidVendingFeeZAR ?? 150);

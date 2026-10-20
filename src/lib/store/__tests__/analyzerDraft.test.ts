@@ -9,7 +9,7 @@ describe('usePortfolioStore Analyzer Draft & Distressed Costs', () => {
 
   it('initializes analyzerDraft with default source, zero auction outlays, and default vacancy/mgmt rates', () => {
     const draft = usePortfolioStore.getState().analyzerDraft;
-    expect(draft.source).toBe('High-Street Auction');
+    expect(draft.source).toBe('Private Agent');
     expect(draft.auctioneerCommission).toBe(0);
     expect(draft.municipalArrears).toBe(0);
     expect(draft.vacancyRatePercent).toBe(6.0);

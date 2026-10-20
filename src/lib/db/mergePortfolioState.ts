@@ -27,7 +27,7 @@ export const DEMO_BOQ_IDS = new Set([
   'boq-1', 'boq-2', 'boq-3', 'boq-4', 'boq-5', 'boq-6', 'boq-7', 'boq-8',
   'boq-9', 'boq-10', 'boq-11', 'boq-12', 'boq-13', 'boq-14', 'boq-15', 'boq-16',
 ]);
-export const DEMO_OPP_IDS = new Set(['opp-1', 'opp-2', 'opp-3']);
+export const DEMO_OPP_IDS = new Set(['opp-1', 'opp-2', 'opp-3', 'opp-4']);
 export const DEMO_FUNDING_IDS = new Set(['fund-1', 'fund-2', 'fund-3']);
 export const DEMO_TASK_IDS = new Set([
   'task-1', 'task-2', 'task-3', 'task-4', 'task-5', 'task-6', 'task-7',

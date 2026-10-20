@@ -959,6 +959,12 @@ export interface LongTermProjectionYear {
 
 // Deal Sourcing Calculator Scratchpad State
 export interface AnalyzerDraft {
+  title?: string;
+  address?: string;
+  city?: string;
+  province?: Province;
+  propertyType?: PropertyTitleType;
+  agmDate?: string;
   openMarketValue: number;
   purchasePrice: number;
   rehabCost: number;
