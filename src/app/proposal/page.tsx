@@ -5,9 +5,16 @@ import { useSearchParams } from 'next/navigation';
 import TopHeader from '@/components/navigation/TopHeader';
 import { usePortfolioStore } from '@/lib/store/usePortfolioStore';
 import { formatZAR, formatPercent, formatDate } from '@/lib/formatters';
-import { generateLongTermProjection, calculateMonthlyBondRepayment } from '@/lib/calculations/propertyMetrics';
+import {
+  generateLongTermProjection,
+  calculateMonthlyBondRepayment,
+  calculateDealDscr,
+  calculateRateShockScenarios,
+  calculatePaydownImpact,
+} from '@/lib/calculations/propertyMetrics';
 import { formatProposalPitchForWhatsApp } from '@/lib/whatsappFormatter';
 import LongTermProjectionChart from '@/components/analytics/LongTermProjectionChart';
+import RateShockStrip from '@/components/analytics/RateShockStrip';
 import AddFundingModal from '@/components/funding/AddFundingModal';
 import { DealStrategy, DealSource, OccupantRiskProfile, ReturnTermType, FundingSource } from '@/types';
 import {
@@ -403,6 +410,7 @@ function ProposalGeneratorContent() {
         annualRentalEscalationPercent: o.annualRentalEscalationPercent ?? 6.0,
         annualExpenseInflationPercent: o.annualExpenseInflationPercent ?? 6.0,
         bondTermYears: o.bondTermYears ?? o.loanTermYears ?? 20,
+        extraMonthlyPaymentZAR: o.extraMonthlyPaymentZAR,
         ancillaryIncomes: o.ancillaryIncomes || [],
         tenantArrears: 0,
         overdueMonths: 0,
@@ -516,6 +524,7 @@ function ProposalGeneratorContent() {
         annualRentalEscalationPercent: r.leases?.[0]?.annualEscalationPercent || 6.0,
         annualExpenseInflationPercent: 6.0,
         bondTermYears: 20,
+        extraMonthlyPaymentZAR: r.extraMonthlyPaymentZAR,
         ancillaryIncomes: r.ancillaryIncomes || [],
         tenantArrears: collectionMetrics.tenantArrears,
         overdueMonths: collectionMetrics.overdueMonths,
@@ -582,8 +591,66 @@ function ProposalGeneratorContent() {
       monthlyCommunalServicesZAR: d.monthlyCommunalServicesZAR,
       tenantPlacementFeePercent: d.tenantPlacementFeePercent,
       annualSpvAdminAuditFeeZAR: d.annualSpvAdminAuditFeeZAR,
+      extraMonthlyPaymentZAR: d.extraMonthlyPaymentZAR,
     });
   }, [deal, isFlip]);
+
+  const proposalPaydownImpact = useMemo(() => {
+    if (!deal || isFlip) return null;
+    const d = deal as any;
+    const extra = d.extraMonthlyPaymentZAR || 0;
+    if (extra <= 0) return null;
+    const bondDebt = deal.type === 'rental' && deal.rawRental?.outstandingBondBalanceZAR !== undefined
+      ? deal.rawRental.outstandingBondBalanceZAR
+      : Math.max(0, deal.purchasePrice - (deal.depositZAR ?? 0));
+    if (bondDebt <= 0) return null;
+    return calculatePaydownImpact({
+      principal: bondDebt,
+      annualRatePercent: deal.interestRatePercent ?? 11.75,
+      termYears: deal.bondTermYears ?? deal.loanTermYears ?? 20,
+      extraMonthlyPaymentZAR: extra,
+      startPropertyValue: deal.openMarketValue || deal.purchasePrice,
+      annualGrowthPercent: deal.annualCapitalGrowthPercent ?? 5.0,
+      refinanceLtvPercent: 75,
+    });
+  }, [deal, isFlip]);
+
+  const proposalRateShockScenarios = useMemo(() => {
+    if (!deal || isFlip) return [];
+    const d = deal as any;
+    const dscrResult = calculateDealDscr({
+      purchasePrice: deal.purchasePrice,
+      monthlyRentalEstimate: deal.monthlyRent || Math.round(deal.purchasePrice * 0.009),
+      monthlyLevies: deal.monthlyLevies || 0,
+      monthlyRatesTaxes: deal.monthlyRates || 0,
+      annualInsurance: d.annualInsurance ?? 7_200,
+      managementFeePercent: d.managementFeePercent ?? 8,
+      agencyVatApplicable: d.agencyVatApplicable ?? true,
+      vacancyRatePercent: d.vacancyRatePercent ?? 5,
+      depositZAR: deal.depositZAR,
+      bondLTV: deal.loanToValue ?? 100,
+      loanToValuePercent: deal.loanToValue ?? 100,
+      interestRatePercent: deal.interestRatePercent ?? 11.75,
+      loanTermYears: deal.bondTermYears ?? deal.loanTermYears ?? 20,
+    }, investorProfile);
+
+    const effLtv = deal.loanToValue ?? 100;
+    const deposit =
+      deal.depositZAR !== undefined
+        ? deal.depositZAR
+        : Math.max(0, Math.round(deal.purchasePrice * (1 - effLtv / 100)));
+    const debt = Math.max(0, deal.purchasePrice - deposit);
+
+    if (debt <= 0) return [];
+
+    return calculateRateShockScenarios({
+      monthlyNoi: dscrResult.monthlyNoi,
+      bondAmount: debt,
+      baseRatePercent: deal.interestRatePercent ?? 11.75,
+      loanTermYears: deal.bondTermYears ?? deal.loanTermYears ?? 20,
+      minDscr: investorProfile?.minDscr ?? 1.2,
+    });
+  }, [deal, isFlip, investorProfile]);
 
   // Proposed Investor Terms state
   const [fundingOfferType, setFundingOfferType] = useState<ReturnTermType>('Fixed Interest');
@@ -2358,6 +2425,22 @@ function ProposalGeneratorContent() {
                   <LongTermProjectionChart data={projectionData} />
                 </div>
 
+                {proposalPaydownImpact && proposalPaydownImpact.monthsSaved > 0 && (
+                  <div className="text-[11px] text-indigo-900 bg-indigo-50/90 border border-indigo-200 rounded-lg p-2.5 flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <Zap className="w-4 h-4 text-indigo-600 shrink-0" />
+                      <span>
+                        <strong>Accelerated paydown:</strong> +{formatZAR((deal as any).extraMonthlyPaymentZAR)}/m &rarr; bond settled {proposalPaydownImpact.monthsSaved} months early, {formatZAR(proposalPaydownImpact.interestSaved)} interest saved ({Math.floor(proposalPaydownImpact.acceleratedMonths / 12)} yrs {proposalPaydownImpact.acceleratedMonths % 12} mos total).
+                      </span>
+                    </div>
+                    {proposalPaydownImpact.refiReadyYearAccelerated !== null && (
+                      <span className="shrink-0 text-[10px] font-bold text-indigo-700 bg-white px-2 py-0.5 rounded border border-indigo-200">
+                        Refi Year {proposalPaydownImpact.refiReadyYearAccelerated}
+                      </span>
+                    )}
+                  </div>
+                )}
+
                 {deal.type === 'rental' && deal.collectionRate < 90 && (
                   <div className="text-[11px] text-amber-900 bg-amber-50/90 border border-amber-200 rounded-lg p-2.5 flex items-center gap-2">
                     <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
@@ -2414,6 +2497,25 @@ function ProposalGeneratorContent() {
                   </tbody>
                 </table>
               </div>
+
+              {/* Interest Rate Stress Test Strip for Rental & BRRRR Proposals */}
+              {!isFlip && (
+                <div className="pt-2 print:break-inside-avoid">
+                  {proposalRateShockScenarios.length > 0 ? (
+                    <RateShockStrip
+                      scenarios={proposalRateShockScenarios}
+                      minDscr={investorProfile?.minDscr ?? 1.2}
+                      title="Debt Service Coverage Stress Test (Lender Risk Analysis)"
+                      subtitle="Simulating +100 bps & +200 bps SARB Repo Rate Hikes against Net Operating Income"
+                    />
+                  ) : (
+                    <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-600 flex items-center justify-between print:border-slate-300">
+                      <span className="font-semibold text-slate-700">100% Equity / Cash Acquisition:</span>
+                      <span className="text-slate-500">No third-party mortgage debt required; zero interest-rate escalation vulnerability.</span>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Sign-off / Confidentiality Notice */}

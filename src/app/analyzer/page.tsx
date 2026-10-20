@@ -13,6 +13,8 @@ import {
   calculateMonthlyBondRepayment,
   evaluateDealCriteria,
   calculateEffectiveExitCommission,
+  calculateRateShockScenarios,
+  calculatePaydownImpact,
 } from '@/lib/calculations/propertyMetrics';
 import { calculateFlipMao, calculateRentalMao } from '@/lib/calculations/maoSolver';
 import { formatOpportunityForWhatsApp } from '@/lib/whatsappFormatter';
@@ -26,6 +28,7 @@ import InvestmentNodeSelect, { InvestmentNodeBanner } from '@/components/common/
 import { findInvestmentNode, getNodeComplianceProfile, INVESTMENT_REGION_GROUPS } from '@/lib/constants/investmentNodes';
 import {
   Calculator,
+  Zap,
   PlusCircle,
   Building,
   Hammer,
@@ -71,6 +74,7 @@ import ImportDropdown from '@/components/common/ImportDropdown';
 import AnalyzerModeSwitcher from '@/components/analyzer/AnalyzerModeSwitcher';
 import AnalyzerStickyRibbon from '@/components/analyzer/AnalyzerStickyRibbon';
 import AnalyzerResultsGrid from '@/components/analyzer/AnalyzerResultsGrid';
+import RateShockStrip from '@/components/analytics/RateShockStrip';
 import PipelineDealCard from '@/components/analyzer/PipelineDealCard';
 
 export default function OpportunityAnalyzerPage() {
@@ -233,6 +237,7 @@ export default function OpportunityAnalyzerPage() {
   const [annualRentalEscalation, setAnnualRentalEscalation] = useState<number>(analyzerDraft?.annualRentalEscalationPercent ?? 6.0);
   const [annualExpenseInflation, setAnnualExpenseInflation] = useState<number>(analyzerDraft?.annualExpenseInflationPercent ?? 6.0);
   const [bondTermYears, setBondTermYears] = useState<number>(analyzerDraft?.bondTermYears ?? 20);
+  const [extraMonthlyPayment, setExtraMonthlyPayment] = useState<number>(analyzerDraft?.extraMonthlyPaymentZAR ?? 0);
   const [showAdvancedAssumptions, setShowAdvancedAssumptions] = useState<boolean>(false);
 
   // Synchronize scratchpad calculator inputs when store draft changes (e.g. Clear Demo Data or Reset Demo)
@@ -260,6 +265,9 @@ export default function OpportunityAnalyzerPage() {
       if (analyzerDraft.bondTermYears !== undefined) {
         setBondTermYears(analyzerDraft.bondTermYears);
         setLoanTermYears(analyzerDraft.bondTermYears);
+      }
+      if (analyzerDraft.extraMonthlyPaymentZAR !== undefined) {
+        setExtraMonthlyPayment(analyzerDraft.extraMonthlyPaymentZAR);
       }
       if (analyzerDraft.vacancyRatePercent !== undefined) setVacancyRate(analyzerDraft.vacancyRatePercent);
       if (analyzerDraft.managementFeePercent !== undefined) setManagementFee(analyzerDraft.managementFeePercent);
@@ -422,6 +430,12 @@ export default function OpportunityAnalyzerPage() {
     updateAnalyzerDraft({ bondTermYears: safeVal });
   };
 
+  const handleExtraMonthlyPaymentChange = (val: number) => {
+    const safeVal = Math.max(0, isNaN(val) ? 0 : val);
+    setExtraMonthlyPayment(safeVal);
+    updateAnalyzerDraft({ extraMonthlyPaymentZAR: safeVal > 0 ? safeVal : undefined });
+  };
+
   // Bidirectional Handlers for Deposit, LTV, and Purchase Price
   const handlePurchasePriceChange = (val: number) => {
     const safePrice = Math.max(0, isNaN(val) ? 0 : val);
@@ -493,8 +507,9 @@ export default function OpportunityAnalyzerPage() {
       customTransferDuty: overrideTax ? customTransferDuty : (isVatInclusiveDeveloperSale ? 0 : undefined),
       customConveyancing: overrideLegal ? customConveyancing : undefined,
       isVatInclusiveDeveloperSale,
+      bondAmountZAR: Math.max(0, purchasePrice - depositZAR),
     });
-  }, [purchasePrice, loanToValue, overrideTax, customTransferDuty, overrideLegal, customConveyancing, isVatInclusiveDeveloperSale]);
+  }, [purchasePrice, loanToValue, depositZAR, overrideTax, customTransferDuty, overrideLegal, customConveyancing, isVatInclusiveDeveloperSale]);
 
   const defaultAgentCommission = investorProfile?.defaultAgentCommissionPercent ?? 5.0;
   const effectiveExitCommissionPercent = useMemo(() => {
@@ -534,7 +549,9 @@ export default function OpportunityAnalyzerPage() {
       annualCapitalGrowthPercent: annualCapitalGrowth,
       annualRentalEscalationPercent: annualRentalEscalation,
       annualExpenseInflationPercent: annualExpenseInflation,
+      extraMonthlyPaymentZAR: extraMonthlyPayment,
       costs: calculatedCosts,
+      recomputeBondRegFromDeposit: true,
       auctioneerCommissionZAR: auctioneerCommission,
       municipalArrearsZAR: municipalArrears,
       exitCommissionPercent: effectiveExitCommissionPercent,
@@ -584,12 +601,25 @@ export default function OpportunityAnalyzerPage() {
     calculatedCosts,
     auctioneerCommission,
     municipalArrears,
+    extraMonthlyPayment,
     occupantRisk,
   ]);
 
   // Day-1 Capital Required vs Liquid Capital Reserve comparison
   const reserveDelta = liquidCapitalReserve - calculatedMetrics.initialCapitalRequired;
   const isReserveSufficient = reserveDelta >= 0;
+
+  // Rate-Shock Sensitivity Scenarios (Rental & BRRRR)
+  const rateShockScenarios = useMemo(() => {
+    if (strategy === 'Flip' || calculatedMetrics.bondAmount <= 0) return [];
+    return calculateRateShockScenarios({
+      monthlyNoi: calculatedMetrics.monthlyNOI,
+      bondAmount: calculatedMetrics.bondAmount,
+      baseRatePercent: interestRate,
+      loanTermYears: bondTermYears,
+      minDscr: investorProfile?.minDscr ?? 1.2,
+    });
+  }, [strategy, calculatedMetrics.monthlyNOI, calculatedMetrics.bondAmount, interestRate, bondTermYears, investorProfile?.minDscr]);
 
   // Section 13sex Tax Incentive Engine
   const calculatedSection13 = useMemo(() => {
@@ -622,6 +652,7 @@ export default function OpportunityAnalyzerPage() {
       monthlyPrepaidVendingFeeZAR: monthlyPrepaidVendingFee,
       tenantPlacementFeePercent,
       annualSpvAdminAuditFeeZAR,
+      extraMonthlyPaymentZAR: extraMonthlyPayment,
     });
   }, [
     purchasePrice,
@@ -630,6 +661,7 @@ export default function OpportunityAnalyzerPage() {
     loanToValue,
     interestRate,
     bondTermYears,
+    extraMonthlyPayment,
     annualCapitalGrowth,
     annualRentalEscalation,
     annualExpenseInflation,
@@ -646,6 +678,30 @@ export default function OpportunityAnalyzerPage() {
     annualSpvAdminAuditFeeZAR,
     vacancyRate,
     propertyType,
+  ]);
+
+  // Comparative Paydown & BRRRR Refinance Acceleration Impact
+  const paydownImpact = useMemo(() => {
+    if (strategy === 'Flip' || extraMonthlyPayment <= 0 || calculatedMetrics.bondAmount <= 0) return null;
+    return calculatePaydownImpact({
+      principal: calculatedMetrics.bondAmount,
+      annualRatePercent: interestRate,
+      termYears: bondTermYears,
+      extraMonthlyPaymentZAR: extraMonthlyPayment,
+      startPropertyValue: openMarketValue > 0 ? openMarketValue : purchasePrice,
+      annualGrowthPercent: annualCapitalGrowth,
+      refinanceLtvPercent,
+    });
+  }, [
+    strategy,
+    extraMonthlyPayment,
+    calculatedMetrics.bondAmount,
+    interestRate,
+    bondTermYears,
+    openMarketValue,
+    purchasePrice,
+    annualCapitalGrowth,
+    refinanceLtvPercent,
   ]);
 
   // Holding reserve estimation for Flip MAO solver accounting for actual holdingPeriodMonths
@@ -786,6 +842,7 @@ export default function OpportunityAnalyzerPage() {
       annualCapitalGrowthPercent: annualCapitalGrowth,
       annualRentalEscalationPercent: annualRentalEscalation,
       annualExpenseInflationPercent: annualExpenseInflation,
+      extraMonthlyPaymentZAR: extraMonthlyPayment,
       costs: calculatedCosts,
       auctioneerCommissionZAR: auctioneerCommission,
       municipalArrearsZAR: municipalArrears,
@@ -874,6 +931,7 @@ export default function OpportunityAnalyzerPage() {
     setAnnualCapitalGrowth(deal.annualCapitalGrowthPercent ?? 5.0);
     setAnnualRentalEscalation(deal.annualRentalEscalationPercent ?? 6.0);
     setAnnualExpenseInflation(deal.annualExpenseInflationPercent ?? 6.0);
+    setExtraMonthlyPayment(deal.extraMonthlyPaymentZAR ?? 0);
     setIsSection13Eligible(!!deal.section13sex);
     setSection13TaxRate(deal.section13sex?.taxRatePercent || 27);
     if (deal.amenityScorecard) {
@@ -935,6 +993,7 @@ export default function OpportunityAnalyzerPage() {
     setAnnualCapitalGrowth(5.0);
     setAnnualRentalEscalation(6.0);
     setAnnualExpenseInflation(6.0);
+    setExtraMonthlyPayment(0);
     setBondTermYears(20);
     setLoanTermYears(20);
     setVacancyRate(analyzerDraft?.vacancyRatePercent ?? 6.0);
@@ -1007,6 +1066,7 @@ export default function OpportunityAnalyzerPage() {
         annualCapitalGrowthPercent: annualCapitalGrowth,
         annualRentalEscalationPercent: annualRentalEscalation,
         annualExpenseInflationPercent: annualExpenseInflation,
+        extraMonthlyPaymentZAR: extraMonthlyPayment > 0 ? extraMonthlyPayment : undefined,
         customTransferDuty: overrideTax ? customTransferDuty : (isVatInclusiveDeveloperSale ? 0 : undefined),
         customConveyancing: overrideLegal ? customConveyancing : undefined,
         costs: calculatedCosts,
@@ -1118,6 +1178,7 @@ export default function OpportunityAnalyzerPage() {
       annualCapitalGrowthPercent: annualCapitalGrowth,
       annualRentalEscalationPercent: annualRentalEscalation,
       annualExpenseInflationPercent: annualExpenseInflation,
+      extraMonthlyPaymentZAR: extraMonthlyPayment > 0 ? extraMonthlyPayment : undefined,
       customTransferDuty: overrideTax ? customTransferDuty : (isVatInclusiveDeveloperSale ? 0 : undefined),
       customConveyancing: overrideLegal ? customConveyancing : undefined,
       costs: calculatedCosts,
@@ -1138,6 +1199,7 @@ export default function OpportunityAnalyzerPage() {
     };
 
     addOpportunity(newDeal);
+    setExtraMonthlyPayment(0);
     setTitle('');
     setAddress('');
     setCity('Johannesburg CBD & Maboneng');
@@ -3078,7 +3140,7 @@ export default function OpportunityAnalyzerPage() {
               {showAdvancedAssumptions && (
                 <div className="p-4 sm:p-5 border-t border-slate-200 bg-slate-50/50 space-y-5">
                   {/* Assumptions Inputs Grid */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-3">
                     {/* Annual Capital Growth */}
                     <div className="bg-white p-3 rounded-xl border border-slate-200 space-y-1.5">
                       <div className="flex items-center justify-between">
@@ -3200,6 +3262,33 @@ export default function OpportunityAnalyzerPage() {
                       </div>
                       <p className="text-[10px] text-slate-400">Term for amortization & wealth buildup</p>
                     </div>
+
+                    {/* Extra Monthly Bond Payment (Voluntary Capital Injection) */}
+                    {strategy !== 'Flip' && (
+                      <div className="bg-white p-3 rounded-xl border border-slate-200 space-y-1.5">
+                        <div className="flex items-center justify-between">
+                          <label className="text-xs font-bold text-slate-800">
+                            Extra Monthly Bond
+                          </label>
+                          <span className="text-[10px] text-indigo-600 font-semibold">Accelerate Paydown</span>
+                        </div>
+                        <div className="flex items-center">
+                          <span className="mr-1.5 text-xs text-slate-500 font-bold">R</span>
+                          <input
+                            type="number"
+                            name="extraMonthlyPaymentZAR"
+                            autoComplete="off"
+                            step="500"
+                            min="0"
+                            placeholder="0"
+                            value={extraMonthlyPayment || ''}
+                            onChange={(e) => handleExtraMonthlyPaymentChange(Number(e.target.value) || 0)}
+                            className="w-full text-xs px-2.5 py-1.5 border border-slate-300 rounded-lg font-bold text-indigo-700 bg-white"
+                          />
+                        </div>
+                        <p className="text-[10px] text-slate-400">Voluntary capital: reduces principal only (Sec 11(a))</p>
+                      </div>
+                    )}
                   </div>
 
                   {/* Reset to SA Averages Button */}
@@ -3211,12 +3300,46 @@ export default function OpportunityAnalyzerPage() {
                         handleRentalEscalationChange(6.0);
                         handleExpenseInflationChange(6.0);
                         handleBondTermChange(20);
+                        handleExtraMonthlyPaymentChange(0);
                       }}
                       className="text-[11px] font-semibold text-slate-600 hover:text-slate-900 underline transition-colors cursor-pointer"
                     >
                       Reset to South African Benchmark Averages (5% Growth / 6% Escalation / 20 Yrs)
                     </button>
                   </div>
+
+                  {/* Accelerated Paydown Impact Summary Banner */}
+                  {paydownImpact && paydownImpact.monthsSaved > 0 && (
+                    <div className="p-3.5 rounded-xl border border-indigo-200 bg-indigo-50/50 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+                      <div className="space-y-0.5">
+                        <div className="flex items-center gap-1.5 font-bold text-indigo-950">
+                          <Zap className="w-4 h-4 text-indigo-600" />
+                          <span>Accelerated Paydown Impact (+{formatZAR(extraMonthlyPayment)}/m)</span>
+                        </div>
+                        <p className="text-[11px] text-indigo-700">
+                          Bond settled in{' '}
+                          <strong className="font-semibold text-indigo-950">
+                            {Math.floor(paydownImpact.acceleratedMonths / 12)} yrs {paydownImpact.acceleratedMonths % 12} mos
+                          </strong>{' '}
+                          (saves <strong className="font-semibold text-indigo-950">{paydownImpact.monthsSaved} months</strong> &amp;{' '}
+                          <strong className="font-semibold text-indigo-950">{formatZAR(paydownImpact.interestSaved)}</strong> in total bank interest).
+                        </p>
+                      </div>
+                      {paydownImpact.refiReadyYearAccelerated !== null && (
+                        <div className="shrink-0 bg-white px-2.5 py-1.5 rounded-lg border border-indigo-200 text-right">
+                          <span className="block text-[10px] uppercase font-bold text-slate-400">BRRRR Refi-Ready (≤{refinanceLtvPercent}% LTV)</span>
+                          <span className="font-bold text-indigo-900">
+                            Year {paydownImpact.refiReadyYearAccelerated}{' '}
+                            <span className="text-[10px] text-slate-500 font-normal">
+                              {paydownImpact.refiReadyYearScheduled !== null && paydownImpact.refiReadyYearScheduled !== paydownImpact.refiReadyYearAccelerated
+                                ? `(vs Year ${paydownImpact.refiReadyYearScheduled})`
+                                : ''}
+                            </span>
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  )}
 
                   {/* Embedded Custom SVG Multi-line Projection Chart */}
                   <div className="pt-2">
@@ -3316,8 +3439,8 @@ export default function OpportunityAnalyzerPage() {
                               className="w-full text-xs px-2.5 py-1.5 border border-slate-300 rounded-lg"
                             />
                           ) : (
-                            <div className="text-slate-500 text-xs py-1.5 font-medium">
-                              Auto LPC: <span className="font-semibold text-slate-800">{formatZAR(calculatedCosts.conveyancingFee)}</span>
+                            <div className="text-slate-500 text-xs py-1.5 font-medium" title="Recommended fee incl. 15% VAT (LSSA August 2025 guideline; negotiable)">
+                              LSSA guideline (Aug 2025): <span className="font-semibold text-slate-800">{formatZAR(calculatedCosts.conveyancingFee)}</span>
                             </div>
                           )}
                         </div>
@@ -3533,6 +3656,23 @@ export default function OpportunityAnalyzerPage() {
                 brrrrCashLeftInDealZAR={calculatedMetrics.brrrrCashLeftInDealZAR}
                 brrrrRefinanceLoanZAR={calculatedMetrics.brrrrRefinanceLoanZAR}
               />
+
+              {/* Interest Rate Stress-Test Strip (Rental & BRRRR) */}
+              {strategy !== 'Flip' && (
+                <div className="mt-4">
+                  {calculatedMetrics.bondAmount > 0 && rateShockScenarios.length > 0 ? (
+                    <RateShockStrip
+                      scenarios={rateShockScenarios}
+                      minDscr={investorProfile?.minDscr ?? 1.2}
+                    />
+                  ) : (
+                    <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-600 flex items-center justify-between">
+                      <span className="font-semibold text-slate-700">All-Cash Acquisition:</span>
+                      <span className="text-slate-500">100% equity funding eliminates monthly mortgage bond interest-rate risk.</span>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Submit Action & WhatsApp Copy Bar */}

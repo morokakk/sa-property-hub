@@ -39,43 +39,54 @@ export function calculateDeedsOfficeFee(propertyValue: number): number {
   return 4_200;
 }
 
+export const SA_VAT_RATE = 0.15;
+
 /**
- * Conveyancing Legal Fees based on Legal Practice Council (LPC) recommended tariff
- * (includes VAT @ 15%)
+ * LSSA Guideline of Fees – instructions received from 1 August 2025 (excl. VAT).
+ * Both transfer and bond registration guidelines share this foundational sliding scale.
  */
-export function calculateConveyancingFee(propertyValue: number): number {
-  let baseFee = 16_500;
-  if (propertyValue <= 500_000) {
-    baseFee = 16_500;
-  } else if (propertyValue <= 1_000_000) {
-    baseFee = 19_500 + (propertyValue - 500_000) * 0.015;
-  } else if (propertyValue <= 2_000_000) {
-    baseFee = 27_000 + (propertyValue - 1_000_000) * 0.012;
-  } else if (propertyValue <= 5_000_000) {
-    baseFee = 39_000 + (propertyValue - 2_000_000) * 0.008;
-  } else {
-    baseFee = 63_000 + (propertyValue - 5_000_000) * 0.005;
-  }
-  // Include standard 15% SA VAT
-  return Math.round(baseFee * 1.15);
+export const LSSA_FEE_GUIDELINE_2025_08 = {
+  effectiveFrom: '2025-08-01',
+  minFee: 6_640, // value <= R100 000
+  bands: [
+    { from: 100_000, to: 500_000, base: 6_640, step: 50_000, perStep: 1_060 },
+    { from: 500_000, to: 1_000_000, base: 15_120, step: 100_000, perStep: 2_050 },
+    { from: 1_000_000, to: 5_000_000, base: 25_370, step: 200_000, perStep: 2_050 },
+    { from: 5_000_000, to: Infinity, base: 66_370, step: 1_000_000, perStep: 5_160 },
+  ],
+} as const;
+
+/**
+ * Recommended professional legal fee (excl. VAT) on the LSSA sliding scale.
+ */
+export function calculateLssaProfessionalFee(
+  value: number,
+  scale = LSSA_FEE_GUIDELINE_2025_08
+): number {
+  if (!Number.isFinite(value) || value <= 0) return 0;
+  if (value <= 100_000) return scale.minFee;
+  const band = scale.bands.find((b) => value > b.from && value <= b.to);
+  if (!band) return scale.minFee;
+  return band.base + Math.ceil((value - band.from) / band.step) * band.perStep;
 }
 
 /**
- * Bond Registration Legal Fees (attorney fee + VAT)
+ * Conveyancing Legal Fees based on Legal Practice Council (LPC) / LSSA recommended tariff
+ * (includes standard 15% SA VAT)
+ */
+export function calculateConveyancingFee(propertyValue: number): number {
+  if (propertyValue <= 0) return 0;
+  const base = calculateLssaProfessionalFee(propertyValue);
+  return Math.round((base * 115) / 100);
+}
+
+/**
+ * Bond Registration Legal Fees based on LPC / LSSA recommended tariff (attorney fee + 15% VAT)
  */
 export function calculateBondRegistrationFee(bondAmount: number): number {
   if (bondAmount <= 0) return 0;
-  let baseFee = 14_000;
-  if (bondAmount <= 500_000) {
-    baseFee = 14_000;
-  } else if (bondAmount <= 1_000_000) {
-    baseFee = 17_000 + (bondAmount - 500_000) * 0.012;
-  } else if (bondAmount <= 2_000_000) {
-    baseFee = 23_000 + (bondAmount - 1_000_000) * 0.01;
-  } else {
-    baseFee = 33_000 + (bondAmount - 2_000_000) * 0.006;
-  }
-  return Math.round(baseFee * 1.15);
+  const base = calculateLssaProfessionalFee(bondAmount);
+  return Math.round((base * 115) / 100);
 }
 
 /**
@@ -89,6 +100,7 @@ export function computeAcquisitionCosts(
     customConveyancing?: number;
     customBondReg?: number;
     isVatInclusiveDeveloperSale?: boolean;
+    bondAmountZAR?: number;
   }
 ): AcquisitionCostBreakdown {
   if (purchasePrice <= 0) {
@@ -102,10 +114,14 @@ export function computeAcquisitionCosts(
       totalAcquisitionCost: 0,
       isTransferDutyOverridden: false,
       isConveyancingOverridden: false,
+      isBondRegOverridden: false,
     };
   }
 
-  const bondAmount = (purchasePrice * loanToValuePercent) / 100;
+  const bondAmount =
+    overrides?.bondAmountZAR !== undefined
+      ? Math.max(0, overrides.bondAmountZAR)
+      : Math.max(0, (purchasePrice * loanToValuePercent) / 100);
   
   const transferDuty =
     overrides?.customTransferDuty !== undefined && (!overrides?.isVatInclusiveDeveloperSale || overrides.customTransferDuty > 0)
@@ -143,6 +159,7 @@ export function computeAcquisitionCosts(
     totalAcquisitionCost,
     isTransferDutyOverridden: overrides?.customTransferDuty !== undefined,
     isConveyancingOverridden: overrides?.customConveyancing !== undefined,
+    isBondRegOverridden: overrides?.customBondReg !== undefined,
   };
 }
 

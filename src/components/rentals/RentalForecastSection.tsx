@@ -2,9 +2,10 @@
 
 import React, { useState, useMemo } from 'react';
 import { RentalProperty } from '@/types';
-import { generateRentalLongTermProjection } from '@/lib/calculations/propertyMetrics';
+import { generateRentalLongTermProjection, calculatePaydownImpact } from '@/lib/calculations/propertyMetrics';
+import { formatZAR } from '@/lib/formatters';
 import LongTermProjectionChart from '@/components/analytics/LongTermProjectionChart';
-import { TrendingUp, DollarSign, ChevronDown, ChevronUp } from 'lucide-react';
+import { TrendingUp, DollarSign, ChevronDown, ChevronUp, Zap } from 'lucide-react';
 
 export interface RentalForecastSectionProps {
   property: RentalProperty;
@@ -38,6 +39,21 @@ export function RentalForecastSection({
     () => generateRentalLongTermProjection(property),
     [property]
   );
+
+  const paydownImpact = useMemo(() => {
+    const extra = property.extraMonthlyPaymentZAR || 0;
+    const balance = property.outstandingBondBalanceZAR || 0;
+    if (extra <= 0 || balance <= 0) return null;
+    return calculatePaydownImpact({
+      principal: balance,
+      annualRatePercent: 11.75,
+      termYears: 20,
+      extraMonthlyPaymentZAR: extra,
+      startPropertyValue: property.marketValueZAR || property.purchasePriceZAR,
+      annualGrowthPercent: 5,
+      refinanceLtvPercent: 75,
+    });
+  }, [property]);
 
   return (
     <div className="border-t border-slate-200 bg-slate-50/50">
@@ -102,6 +118,39 @@ export function RentalForecastSection({
               </button>
             </div>
           </div>
+
+          {/* Accelerated Paydown Impact Summary Banner */}
+          {paydownImpact && paydownImpact.monthsSaved > 0 && (
+            <div className="p-3 rounded-lg border border-indigo-200 bg-indigo-50/60 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+              <div className="space-y-0.5">
+                <div className="flex items-center gap-1.5 font-bold text-indigo-950">
+                  <Zap className="w-3.5 h-3.5 text-indigo-600" />
+                  <span>Accelerated Paydown Impact (+{formatZAR(property.extraMonthlyPaymentZAR || 0)}/m)</span>
+                </div>
+                <p className="text-[11px] text-indigo-700">
+                  Bond settled in{' '}
+                  <strong className="font-semibold text-indigo-950">
+                    {Math.floor(paydownImpact.acceleratedMonths / 12)} yrs {paydownImpact.acceleratedMonths % 12} mos
+                  </strong>{' '}
+                  (saves <strong className="font-semibold text-indigo-950">{paydownImpact.monthsSaved} months</strong> &amp;{' '}
+                  <strong className="font-semibold text-indigo-950">{formatZAR(paydownImpact.interestSaved)}</strong> interest).
+                </p>
+              </div>
+              {paydownImpact.refiReadyYearAccelerated !== null && (
+                <div className="shrink-0 bg-white px-2.5 py-1 rounded-md border border-indigo-200 text-right">
+                  <span className="block text-[9px] uppercase font-bold text-slate-400">BRRRR Refi-Ready (75% LTV)</span>
+                  <span className="font-bold text-indigo-900 text-xs">
+                    Year {paydownImpact.refiReadyYearAccelerated}{' '}
+                    <span className="text-[10px] text-slate-500 font-normal">
+                      {paydownImpact.refiReadyYearScheduled !== null && paydownImpact.refiReadyYearScheduled !== paydownImpact.refiReadyYearAccelerated
+                        ? `(vs Year ${paydownImpact.refiReadyYearScheduled})`
+                        : ''}
+                    </span>
+                  </span>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Chart View */}
           <div className="overflow-x-hidden">

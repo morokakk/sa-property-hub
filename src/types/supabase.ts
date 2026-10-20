@@ -387,6 +387,7 @@ export type Database = {
           drive_vault: Json | null
           estimated_rehab_cost_zar: number | null
           exit_commission_percent: number | null
+          extra_monthly_payment_zar: number | null
           funding_required_zar: number | null
           gross_yield: number | null
           holding_period_months: number | null
@@ -462,6 +463,7 @@ export type Database = {
           drive_vault?: Json | null
           estimated_rehab_cost_zar?: number | null
           exit_commission_percent?: number | null
+          extra_monthly_payment_zar?: number | null
           funding_required_zar?: number | null
           gross_yield?: number | null
           holding_period_months?: number | null
@@ -537,6 +539,7 @@ export type Database = {
           drive_vault?: Json | null
           estimated_rehab_cost_zar?: number | null
           exit_commission_percent?: number | null
+          extra_monthly_payment_zar?: number | null
           funding_required_zar?: number | null
           gross_yield?: number | null
           holding_period_months?: number | null
@@ -727,6 +730,7 @@ export type Database = {
           created_at: string
           drive_vault: Json
           exit_notes: string | null
+          extra_monthly_payment_zar: number | null
           floor_area_sqm: number | null
           funding_required_zar: number | null
           id: string
@@ -800,6 +804,7 @@ export type Database = {
           created_at?: string
           drive_vault?: Json
           exit_notes?: string | null
+          extra_monthly_payment_zar?: number | null
           floor_area_sqm?: number | null
           funding_required_zar?: number | null
           id?: string
@@ -873,6 +878,7 @@ export type Database = {
           created_at?: string
           drive_vault?: Json
           exit_notes?: string | null
+          extra_monthly_payment_zar?: number | null
           floor_area_sqm?: number | null
           funding_required_zar?: number | null
           id?: string

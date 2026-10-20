@@ -161,19 +161,19 @@ export const GET_STARTED_STAGES: readonly JourneyStage[] = [
         id: 'analyzer',
         moduleName: 'Opportunity Analyzer',
         route: '/analyzer',
-        purpose: 'Screen a deal in minutes: transfer duty, bond, Day-1 cash, yield and maximum offer, measured against your Buy Box.',
+        purpose: 'Screen a deal in minutes: LSSA legal fees, SARS transfer duty, bond rate-shock, Day-1 cash, yield and maximum offer, measured against your Buy Box.',
         features: [
           {
             id: 'analyzer-deal-screening',
             title: 'Deal Screening & MAO',
-            summary: 'Model purchase price, source, bond, rent and PIE Act eviction drag; see transfer duty and Day-1 capital.',
+            summary: 'Model purchase price, deposit, extra principal paydown, bond, rent and PIE Act eviction drag; see LSSA legal fees, transfer duty and Day-1 capital.',
             howTo: [
               'Click Edit on a demo deal (or start fresh) to load it into the South African Acquisition & Yield Calculator.',
-              'Enter price, deal source, bond LTV and expected rent, and toggle Occupant & Eviction Risk on distressed deals to budget court litigation and security burn.',
+              'Enter price, deposit, deal source, optional extra monthly principal paydown, bond LTV and expected rent, and toggle Occupant Risk on distressed deals to budget litigation.',
               'Open the MAO Quick Solver to back-solve your Max Allowable Bid (MAO) net of legal reserves and holding drag, then save the deal to the pipeline.',
             ],
             proTip:
-              'At auctions, the buyer pays auctioneer commission and Section 118 municipal arrears, but unlawful occupants carry statutory risk under the PIE Act. Budgeting Magistrate or High Court delays directly into your MAO protects your margin before bidding.',
+              'Legal conveyancing and bond registration fees auto-calculate under the official August 2025 LSSA guideline tariffs with deposit precedence, strictly separate from SARS Transfer Duty. Adding an extra monthly principal paydown shows years shaved off debt and accelerated BRRRR refinance milestones.',
             href: '/analyzer#analyzer-calculator',
             ctaLabel: 'Open the calculator',
           },
@@ -193,15 +193,15 @@ export const GET_STARTED_STAGES: readonly JourneyStage[] = [
           },
           {
             id: 'analyzer-sensitivity',
-            title: 'Sensitivity Sliders',
-            summary: 'Stress-test holding period, exit VAT, vacancy and the prime spread.',
+            title: 'Rate-Shock & Sensitivity Sliders',
+            summary: 'Stress-test rate hikes (+100 / +200 bps) via the Rate-Shock Strip, plus holding period, exit VAT and vacancy.',
             howTo: [
-              'In the calculator, drag the Holding Period (1–12 months) slider and toggle the exit VAT option.',
-              'Stress Vacancy (0–15%) and Prime Spread (±200 bps).',
-              'Note the point where the deal stops passing. That gap is your margin of safety.',
+              'Inspect the 3-column Rate-Shock Strip beneath the results grid to see your bond payment, net cashflow and DSCR at Current, +100 bps (+1%), and +200 bps (+2%).',
+              'In the calculator, drag the Holding Period (1–12 months) slider and toggle the exit VAT option on flips.',
+              'Stress Vacancy (0–15%) and Prime Spread (±200 bps) to verify where your margin of safety holds.',
             ],
             proTip:
-              'Always test at least +2% on rates: the SARB raised the repo rate by 475 basis points between November 2021 and May 2023. A deal that only works at today\'s prime is fragile.',
+              'A deal that only passes at today\'s prime is fragile. The Rate-Shock Strip gives you instant PASS (≥1.30x), WATCH (1.00x–1.29x) or FAIL (<1.00x) status so you know whether the asset survives a SARB rate-hiking cycle before committing capital.',
             href: '/analyzer#analyzer-sensitivity',
             ctaLabel: 'Open the sliders',
           },
@@ -356,14 +356,14 @@ export const GET_STARTED_STAGES: readonly JourneyStage[] = [
           {
             id: 'rentals-tenants-ledger',
             title: 'Tenants, Ledger & Arrears',
-            summary: 'Lease details, pre-lease tenant vetting scorecard, monthly payments and arrears per property.',
+            summary: 'Lease details, tenant vetting, monthly payments, extra principal paydown, and arrears per property.',
             howTo: [
-              'On a rental card, open the Lease & Costs tab and expand Pre-Lease Tenant Vetting to score credit, debt-to-income and calculate deposit multipliers.',
-              'Switch to Payments & Arrears to log each payment as it lands and track utility cost recoveries.',
-              'Record unrecoverable amounts as a write-off so arrears and the tax reserve stay accurate.',
+              'On a rental card, open Lease & Costs and expand Pre-Lease Tenant Vetting to score credit and calculate deposit multipliers.',
+              'Use Edit Property to set your Bank Bond Repayment and optional Extra Principal Paydown to accelerate debt-free cashflow.',
+              'Switch to Payments & Arrears to log each payment as it lands, track utility cost recoveries, and record bad-debt write-offs.',
             ],
             proTip:
-              'Vet prospective tenants before signing: high debt ratios and judgment history are strong indicators of default under the PIE Act. Use the vetting scorecard to require a 1.5× to 2.0× deposit or guarantor when taking on moderate risks.',
+              'Adding an extra monthly principal payment models how fast your bond reaches zero and unlocks a paydown impact banner above the 20-Year Long-Term Forecast. Under SARS Section 11(a), capital paydowns are non-deductible, keeping your tax reserve clean.',
             href: '/rentals#rentals-portfolio',
             ctaLabel: 'Open the portfolio',
           },
@@ -468,7 +468,7 @@ export const GET_STARTED_STAGES: readonly JourneyStage[] = [
               'Choose "Save as PDF" in the print dialog and share the file.',
             ],
             proTip:
-              'Attach supporting documents (title deed search, municipal valuation, contractor quotes). Serious SA private lenders will ask for them before committing.',
+              'Attach supporting documents (title deed search, municipal valuation, quotes). Section 4 embeds the 20-year wealth forecast and accelerated debt paydown impact, while Section 5 displays the print-ready 3-scenario Rate-Shock Strip to give lenders confidence in debt coverage.',
             href: '/proposal#proposal-document',
             ctaLabel: 'View the pitch',
           },

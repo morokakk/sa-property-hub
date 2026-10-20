@@ -1,6 +1,6 @@
 import { AcquisitionCostBreakdown, AmenityDistance, AmenityScorecard, AncillaryIncome, DealStrategy, InvestorProfile, Lease, LongTermProjectionYear, OccupantRiskProfile, OpportunityDeal, PropertyTitleType, RentalProperty } from '@/types';
 import { calculateEvictionCarryingCost } from './occupantRisk';
-import { computeAcquisitionCosts } from './sarsTax';
+import { computeAcquisitionCosts, calculateBondRegistrationFee } from './sarsTax';
 
 /**
  * Computes Built-in Equity and discount percentage
@@ -203,6 +203,69 @@ export function calculateDealDscr(
   };
 }
 
+export type DscrBand = 'pass' | 'watch' | 'fail' | 'cash';
+
+export interface RateShockScenario {
+  label: string; // 'Current' | '+100 bps' | '+200 bps'
+  shockBps: number;
+  ratePercent: number;
+  monthlyBondPayment: number;
+  monthlyCashFlow: number;
+  dscr: number | null;
+  band: DscrBand;
+}
+
+/**
+ * Calculates interest rate stress-test scenarios (0 bps, +100 bps, +200 bps)
+ * evaluating monthly bond debt service, net cashflow, and DSCR hurdle status.
+ */
+export function calculateRateShockScenarios(params: {
+  monthlyNoi: number;
+  bondAmount: number;
+  baseRatePercent: number; // effective prime + margin
+  loanTermYears: number;
+  minDscr?: number; // investorProfile.minDscr ?? 1.2
+  shocksBps?: number[]; // default [0, 100, 200]
+}): RateShockScenario[] {
+  const {
+    monthlyNoi,
+    bondAmount,
+    baseRatePercent,
+    loanTermYears,
+    minDscr = 1.2,
+    shocksBps = [0, 100, 200],
+  } = params;
+
+  return shocksBps.map((bps) => {
+    const ratePercent = Number((baseRatePercent + bps / 100).toFixed(2));
+    const monthlyBondPayment =
+      bondAmount > 0
+        ? calculateMonthlyBondRepayment(bondAmount, ratePercent, loanTermYears)
+        : 0;
+    const rawDscr = monthlyBondPayment > 0 ? monthlyNoi / monthlyBondPayment : null;
+    const dscr = rawDscr !== null ? Number(rawDscr.toFixed(2)) : null;
+    const band: DscrBand =
+      dscr === null
+        ? 'cash'
+        : dscr >= minDscr
+        ? 'pass'
+        : dscr >= 1.0
+        ? 'watch'
+        : 'fail';
+    const monthlyCashFlow = Math.round(monthlyNoi - monthlyBondPayment);
+
+    return {
+      label: bps === 0 ? 'Current' : `+${bps} bps`,
+      shockBps: bps,
+      ratePercent,
+      monthlyBondPayment,
+      monthlyCashFlow,
+      dscr,
+      band,
+    };
+  });
+}
+
 /**
  * Solves the annualized Internal Rate of Return (IRR %) for an array of cashflows [CF0, CF1, ..., CFn]
  * using Newton-Raphson with a bisection fallback for numerical stability.
@@ -355,12 +418,14 @@ export function calculateDealMetrics(params: {
   interestRatePercent: number;
   interestRateMargin?: number;
   loanTermYears: number;
+  extraMonthlyPaymentZAR?: number;
   annualCapitalGrowthPercent?: number;
   annualRentalEscalationPercent?: number;
   annualExpenseInflationPercent?: number;
   costs?: AcquisitionCostBreakdown;
   auctioneerCommissionZAR?: number;
   municipalArrearsZAR?: number;
+  recomputeBondRegFromDeposit?: boolean;
   exitCommissionPercent?: number;
   defaultAgentCommissionPercent?: number;
   vatExemptAgent?: boolean;
@@ -399,9 +464,11 @@ export function calculateDealMetrics(params: {
     annualCapitalGrowthPercent = 5.0,
     annualRentalEscalationPercent = 6.0,
     annualExpenseInflationPercent = 6.0,
+    extraMonthlyPaymentZAR = 0,
     costs: providedCosts,
     auctioneerCommissionZAR,
     municipalArrearsZAR,
+    recomputeBondRegFromDeposit = false,
     exitCommissionPercent,
     defaultAgentCommissionPercent = 5.0,
     vatExemptAgent = false,
@@ -415,14 +482,24 @@ export function calculateDealMetrics(params: {
       : Math.round(purchasePrice * (1 - effectiveLTV / 100));
   const bondAmount = Math.max(0, purchasePrice - cashDeposit);
 
-  const costs: AcquisitionCostBreakdown = providedCosts ?? computeAcquisitionCosts(
+  let costs: AcquisitionCostBreakdown = providedCosts ?? computeAcquisitionCosts(
     purchasePrice,
     effectiveLTV,
     {
       customTransferDuty: customTransferDutyZAR,
       isVatInclusiveDeveloperSale,
+      bondAmountZAR: bondAmount,
     }
   );
+
+  if (providedCosts && recomputeBondRegFromDeposit && !providedCosts.isBondRegOverridden) {
+    const fee = calculateBondRegistrationFee(bondAmount);
+    costs = {
+      ...providedCosts,
+      bondRegistrationFee: fee,
+      totalAcquisitionCost: providedCosts.totalAcquisitionCost - providedCosts.bondRegistrationFee + fee,
+    };
+  }
 
   const effectiveMarketValue = openMarketValueZAR ?? openMarketValue ?? 0;
   const safeUnits = numberOfUnits && numberOfUnits > 0 ? numberOfUnits : 1;
@@ -563,9 +640,15 @@ export function calculateDealMetrics(params: {
     const factor = Math.pow(1 + monthlyRate, totalLoanMonths);
     exactPmt = (bondAmount * (monthlyRate * factor)) / (factor - 1);
   }
+  const extraPmt = Number.isFinite(extraMonthlyPaymentZAR)
+    ? Math.max(0, extraMonthlyPaymentZAR)
+    : 0;
+
   const annualBondPayments5Y: number[] = [];
+  const annualExtraPayments5Y: number[] = [];
   for (let y = 1; y <= 5; y++) {
     let yearBondPaid = 0;
+    let yearExtraPaid = 0;
     for (let m = 1; m <= 12; m++) {
       if (remainingBondYear5 <= 0) {
         remainingBondYear5 = 0;
@@ -579,9 +662,17 @@ export function calculateDealMetrics(params: {
       } else {
         remainingBondYear5 -= principalPaid;
         yearBondPaid += exactPmt;
+
+        // Apply voluntary extra principal paydown
+        if (extraPmt > 0 && remainingBondYear5 > 0) {
+          const applied = Math.min(extraPmt, remainingBondYear5);
+          remainingBondYear5 -= applied;
+          yearExtraPaid += applied;
+        }
       }
     }
     annualBondPayments5Y.push(yearBondPaid);
+    annualExtraPayments5Y.push(yearExtraPaid);
   }
 
   const baseAnnualGrossRent = grossMonthlyRent * 12;
@@ -591,7 +682,8 @@ export function calculateDealMetrics(params: {
     const yrRent = baseAnnualGrossRent * Math.pow(1 + annualRentalEscalationPercent / 100, y - 1);
     const yrCosts = baseAnnualOpExAndVacancy * Math.pow(1 + annualExpenseInflationPercent / 100, y - 1);
     const yrBond = annualBondPayments5Y[y - 1] ?? 0;
-    let yrNetCf = yrRent - yrCosts - yrBond;
+    const yrExtra = annualExtraPayments5Y[y - 1] ?? 0;
+    let yrNetCf = yrRent - yrCosts - yrBond - yrExtra;
     if (y === 5) {
       const year5ExitComm = year5GrossDisposalValue * commissionRate;
       const netExitProceeds = year5GrossDisposalValue - year5ExitComm - remainingBondYear5;
@@ -972,6 +1064,7 @@ export function generateLongTermProjection(
     monthlyPrepaidVendingFeeZAR?: number;
     tenantPlacementFeePercent?: number;
     annualSpvAdminAuditFeeZAR?: number;
+    extraMonthlyPaymentZAR?: number;
   }
 ): LongTermProjectionYear[] {
   const purchasePrice = deal.purchasePrice ?? 0;
@@ -1006,31 +1099,47 @@ export function generateLongTermProjection(
     pmt = (bondPrincipal * (monthlyRate * factor)) / (factor - 1);
   }
 
+  const extra = Number.isFinite(deal.extraMonthlyPaymentZAR)
+    ? Math.max(0, deal.extraMonthlyPaymentZAR!)
+    : 0;
+
   // Simulate month-by-month bond amortization schedule
   let currentBalance = bondPrincipal;
   const balancesAtEndOfYear: number[] = [];
   const annualBondPayments: number[] = [];
+  const annualExtraPrincipal: number[] = [];
+  const annualInterest: number[] = [];
 
   for (let y = 1; y <= termYears; y++) {
     let yearPayments = 0;
+    let yearExtra = 0;
+    let yearInterest = 0;
     for (let m = 1; m <= 12; m++) {
       if (currentBalance <= 0) {
         currentBalance = 0;
         continue;
       }
       const interest = currentBalance * monthlyRate;
+      yearInterest += interest;
       const principalPaid = pmt - interest;
 
       // Final month of loan or principal exceeds remaining balance
       if (y === termYears && m === 12) {
         yearPayments += interest + currentBalance;
         currentBalance = 0;
-      } else if (principalPaid > currentBalance) {
+      } else if (principalPaid >= currentBalance) {
         yearPayments += interest + currentBalance;
         currentBalance = 0;
       } else {
         currentBalance -= principalPaid;
         yearPayments += pmt;
+
+        // Apply voluntary extra monthly payment strictly against principal balance
+        if (extra > 0 && currentBalance > 0) {
+          const applied = Math.min(extra, currentBalance);
+          currentBalance -= applied;
+          yearExtra += applied;
+        }
       }
     }
     if (y === termYears) {
@@ -1038,6 +1147,8 @@ export function generateLongTermProjection(
     }
     balancesAtEndOfYear.push(Math.round(currentBalance));
     annualBondPayments.push(Math.round(yearPayments));
+    annualExtraPrincipal.push(Math.round(yearExtra));
+    annualInterest.push(Math.round(yearInterest));
   }
 
   // Baseline Annual Rental and Operating Costs
@@ -1076,7 +1187,11 @@ export function generateLongTermProjection(
     const escalatedRent = Math.round(baseAnnualRent * Math.pow(1 + rentEscalation / 100, y - 1));
     const escalatedCosts = Math.round(baseAnnualCosts * Math.pow(1 + expenseInflation / 100, y - 1));
     const bondPayment = annualBondPayments[y - 1] ?? 0;
-    const netCashflow = escalatedRent - escalatedCosts - bondPayment;
+    const extraPrincipalPaid = annualExtraPrincipal[y - 1] ?? 0;
+
+    // Section 11(a) integrity: costs remains strictly operating OpEx (untainted by extra capital).
+    // netCashflow accounts for real cash outlay (rent - costs - contractual bond - voluntary extra principal).
+    const netCashflow = escalatedRent - escalatedCosts - bondPayment - extraPrincipalPaid;
 
     const propertyValue = Math.round(openMarketValue * Math.pow(1 + capitalGrowth / 100, y));
     const outstandingBond = balancesAtEndOfYear[y - 1] ?? 0;
@@ -1091,6 +1206,7 @@ export function generateLongTermProjection(
       propertyValue,
       outstandingBond,
       netEquity,
+      ...(extra > 0 ? { extraPrincipalPaid, interestPaid: annualInterest[y - 1] ?? 0 } : {}),
     });
   }
 
@@ -1148,7 +1264,140 @@ export function generateRentalLongTermProjection(property: RentalProperty): Long
     monthlyMaintenanceReserveZAR: property.monthlyMaintenanceReserveZAR || 0,
     monthlyPrepaidVendingFeeZAR: property.monthlyPrepaidVendingFeeZAR || 0,
     monthlyCommunalServicesZAR: property.monthlyCommunalServicesZAR || 0,
+    extraMonthlyPaymentZAR: property.extraMonthlyPaymentZAR,
   });
+}
+
+export interface PaydownImpact {
+  scheduledMonths: number;
+  acceleratedMonths: number;
+  monthsSaved: number;
+  interestScheduled: number;
+  interestAccelerated: number;
+  interestSaved: number;
+  refiReadyYearScheduled: number | null; // first year-end where balance <= value * refiLtv
+  refiReadyYearAccelerated: number | null;
+}
+
+/**
+ * Calculates comparative paydown metrics between scheduled mortgage amortization
+ * and accelerated voluntary extra principal injections (months saved, interest saved,
+ * and BRRRR refinance eligibility milestone acceleration).
+ */
+export function calculatePaydownImpact(params: {
+  principal: number;
+  annualRatePercent: number;
+  termYears: number;
+  extraMonthlyPaymentZAR: number;
+  startPropertyValue: number;
+  annualGrowthPercent: number;
+  refinanceLtvPercent?: number; // default 75
+}): PaydownImpact {
+  const {
+    principal,
+    annualRatePercent,
+    termYears,
+    extraMonthlyPaymentZAR,
+    startPropertyValue,
+    annualGrowthPercent,
+    refinanceLtvPercent = 75,
+  } = params;
+
+  if (principal <= 0 || annualRatePercent <= 0 || termYears <= 0) {
+    return {
+      scheduledMonths: 0,
+      acceleratedMonths: 0,
+      monthsSaved: 0,
+      interestScheduled: 0,
+      interestAccelerated: 0,
+      interestSaved: 0,
+      refiReadyYearScheduled: null,
+      refiReadyYearAccelerated: null,
+    };
+  }
+
+  const monthlyRate = (annualRatePercent / 100) / 12;
+  const totalMonths = termYears * 12;
+  const factor = Math.pow(1 + monthlyRate, totalMonths);
+  const pmt = (principal * (monthlyRate * factor)) / (factor - 1);
+  const extra = Math.max(0, extraMonthlyPaymentZAR || 0);
+
+  // 1. Scheduled run
+  let balSched = principal;
+  let interestSched = 0;
+  let monthsSched = 0;
+  let refiYearSched: number | null = null;
+
+  for (let m = 1; m <= totalMonths; m++) {
+    if (balSched <= 0) break;
+    const interest = balSched * monthlyRate;
+    interestSched += interest;
+    const principalPaid = pmt - interest;
+    if (m === totalMonths || principalPaid >= balSched) {
+      balSched = 0;
+    } else {
+      balSched -= principalPaid;
+    }
+    monthsSched = m;
+
+    if (m % 12 === 0 && refiYearSched === null) {
+      const yearIndex = m / 12;
+      const propVal = startPropertyValue * Math.pow(1 + annualGrowthPercent / 100, yearIndex);
+      const targetDebtCap = propVal * (refinanceLtvPercent / 100);
+      if (balSched <= targetDebtCap) {
+        refiYearSched = yearIndex;
+      }
+    }
+  }
+
+  // 2. Accelerated run
+  let balAccel = principal;
+  let interestAccel = 0;
+  let monthsAccel = 0;
+  let refiYearAccel: number | null = null;
+
+  for (let m = 1; m <= totalMonths; m++) {
+    if (balAccel <= 0) break;
+    const interest = balAccel * monthlyRate;
+    interestAccel += interest;
+    const principalPaid = pmt - interest;
+    if (m === totalMonths || principalPaid >= balAccel) {
+      balAccel = 0;
+    } else {
+      balAccel -= principalPaid;
+      if (extra > 0 && balAccel > 0) {
+        const applied = Math.min(extra, balAccel);
+        balAccel -= applied;
+      }
+    }
+    monthsAccel = m;
+
+    if (m % 12 === 0 && refiYearAccel === null) {
+      const yearIndex = m / 12;
+      const propVal = startPropertyValue * Math.pow(1 + annualGrowthPercent / 100, yearIndex);
+      const targetDebtCap = propVal * (refinanceLtvPercent / 100);
+      if (balAccel <= targetDebtCap) {
+        refiYearAccel = yearIndex;
+      }
+    }
+  }
+
+  // If already <= refi LTV at day 1
+  if (principal <= startPropertyValue * (refinanceLtvPercent / 100)) {
+    refiYearSched = 0;
+    refiYearAccel = 0;
+  }
+
+  return {
+    scheduledMonths: monthsSched,
+    acceleratedMonths: monthsAccel,
+    monthsSaved: Math.max(0, monthsSched - monthsAccel),
+    interestScheduled: Math.round(interestSched),
+    interestAccelerated: Math.round(interestAccel),
+    interestSaved: Math.max(0, Math.round(interestSched - interestAccel)),
+    refiReadyYearScheduled: refiYearSched,
+    refiReadyYearAccelerated: refiYearAccel,
+  };
 }
 
 

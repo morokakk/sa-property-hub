@@ -42,6 +42,7 @@ export interface AcquisitionCostBreakdown {
   totalAcquisitionCost: number;
   isTransferDutyOverridden?: boolean;
   isConveyancingOverridden?: boolean;
+  isBondRegOverridden?: boolean;
 }
 
 // SARS Section 13sex Tax Shield Model (Off-plan / New Developer Units)
@@ -186,6 +187,7 @@ export interface OpportunityDeal {
   depositZAR: number; // e.g. R 0 or R 200,000
   interestRatePercent: number; // SA Prime ~11.75%
   loanTermYears: number; // e.g. 20
+  extraMonthlyPaymentZAR?: number; // Optional voluntary extra capital repayment on the bond (ZAR/month). Principal only. Default 0.
   // Long-Term Projections & Escalation Assumptions
   annualCapitalGrowthPercent?: number; // e.g. 5%
   annualRentalEscalationPercent?: number; // e.g. 6%
@@ -595,6 +597,7 @@ export interface RentalProperty {
   outstandingBondBalanceZAR: number;
   bondInterestRatePercent: number; // e.g. 11.5%
   monthlyBondPaymentZAR: number;
+  extraMonthlyPaymentZAR?: number; // Optional voluntary extra capital repayment on the bond (ZAR/month). Principal only. Default 0.
   bondPaymentEffectiveDate?: string; // e.g. '2026-04' (upcoming forward-only month)
   bondRevisionNote?: string; // e.g. 'SARB 25bps repo rate cut'
   // Tenant & Lease details
@@ -948,6 +951,10 @@ export interface LongTermProjectionYear {
   propertyValue: number;
   outstandingBond: number;
   netEquity: number;
+  /** Voluntary extra principal repaid this year (emitted only when > 0). Not a deductible expense. */
+  extraPrincipalPaid?: number;
+  /** Interest portion of bond payments this year (emitted only when an extra payment is active). */
+  interestPaid?: number;
 }
 
 // Deal Sourcing Calculator Scratchpad State
@@ -964,6 +971,7 @@ export interface AnalyzerDraft {
   municipalArrears: number;
   depositZAR: number;
   loanToValue: number;
+  extraMonthlyPaymentZAR?: number;
   annualCapitalGrowthPercent?: number;
   annualRentalEscalationPercent?: number;
   annualExpenseInflationPercent?: number;

@@ -64,6 +64,8 @@ export interface RentalFormModalProps {
   setMonthlyRates?: (v: number) => void;
   monthlyBondPayment?: number;
   setMonthlyBondPayment?: (v: number) => void;
+  extraMonthlyPayment?: number;
+  setExtraMonthlyPayment?: (v: number) => void;
   bondPaymentEffectiveDate?: string;
   setBondPaymentEffectiveDate?: (v: string) => void;
   bondRevisionNote?: string;
@@ -139,6 +141,8 @@ export const RentalFormModal: React.FC<RentalFormModalProps> = ({
   setMonthlyRates: propSetMonthlyRates,
   monthlyBondPayment: propMonthlyBondPayment,
   setMonthlyBondPayment: propSetMonthlyBondPayment,
+  extraMonthlyPayment: propExtraMonthlyPayment,
+  setExtraMonthlyPayment: propSetExtraMonthlyPayment,
   bondPaymentEffectiveDate: propBondPaymentEffectiveDate,
   setBondPaymentEffectiveDate: propSetBondPaymentEffectiveDate,
   bondRevisionNote: propBondRevisionNote,
@@ -196,6 +200,7 @@ export const RentalFormModal: React.FC<RentalFormModalProps> = ({
   const [localAnnualBuildingInsurance, setLocalAnnualBuildingInsurance] = useState(0);
   const [localMonthlyRates, setLocalMonthlyRates] = useState(1100);
   const [localMonthlyBondPayment, setLocalMonthlyBondPayment] = useState(0);
+  const [localExtraMonthlyPayment, setLocalExtraMonthlyPayment] = useState(0);
   const [localBondPaymentEffectiveDate, setLocalBondPaymentEffectiveDate] = useState('');
   const [localBondRevisionNote, setLocalBondRevisionNote] = useState('');
   const [localUnpaidUtilityArrears, setLocalUnpaidUtilityArrears] = useState(0);
@@ -234,6 +239,7 @@ export const RentalFormModal: React.FC<RentalFormModalProps> = ({
         setLocalAnnualBuildingInsurance(editingProperty.annualBuildingInsuranceZAR || 0);
         setLocalMonthlyRates(editingProperty.monthlyRatesTaxesZAR);
         setLocalMonthlyBondPayment(editingProperty.monthlyBondPaymentZAR || 0);
+        setLocalExtraMonthlyPayment(editingProperty.extraMonthlyPaymentZAR || 0);
         setLocalBondPaymentEffectiveDate(editingProperty.bondPaymentEffectiveDate || '');
         setLocalBondRevisionNote(editingProperty.bondRevisionNote || '');
         setLocalUnpaidUtilityArrears(editingProperty.unpaidUtilityArrearsZAR || 0);
@@ -275,6 +281,7 @@ export const RentalFormModal: React.FC<RentalFormModalProps> = ({
         setLocalAnnualBuildingInsurance(0);
         setLocalMonthlyRates(1100);
         setLocalMonthlyBondPayment(0);
+        setLocalExtraMonthlyPayment(0);
         setLocalBondPaymentEffectiveDate('');
         setLocalBondRevisionNote('');
         setLocalUnpaidUtilityArrears(0);
@@ -341,6 +348,8 @@ export const RentalFormModal: React.FC<RentalFormModalProps> = ({
   const setMonthlyRates = propSetMonthlyRates || setLocalMonthlyRates;
   const monthlyBondPayment = propMonthlyBondPayment !== undefined ? propMonthlyBondPayment : localMonthlyBondPayment;
   const setMonthlyBondPayment = propSetMonthlyBondPayment || setLocalMonthlyBondPayment;
+  const extraMonthlyPayment = propExtraMonthlyPayment !== undefined ? propExtraMonthlyPayment : localExtraMonthlyPayment;
+  const setExtraMonthlyPayment = propSetExtraMonthlyPayment || setLocalExtraMonthlyPayment;
   const bondPaymentEffectiveDate = propBondPaymentEffectiveDate !== undefined ? propBondPaymentEffectiveDate : localBondPaymentEffectiveDate;
   const setBondPaymentEffectiveDate = propSetBondPaymentEffectiveDate || setLocalBondPaymentEffectiveDate;
   const bondRevisionNote = propBondRevisionNote !== undefined ? propBondRevisionNote : localBondRevisionNote;
@@ -425,6 +434,7 @@ export const RentalFormModal: React.FC<RentalFormModalProps> = ({
       purchasePriceZAR: purchasePrice,
       outstandingBondBalanceZAR: bondBalance,
       monthlyBondPaymentZAR: finalBondPayment,
+      extraMonthlyPaymentZAR: extraMonthlyPayment > 0 ? extraMonthlyPayment : undefined,
       bondPaymentEffectiveDate: bondPaymentEffectiveDate.trim() || undefined,
       bondRevisionNote: bondRevisionNote.trim() || undefined,
       leases: finalLeases,
@@ -859,8 +869,8 @@ export const RentalFormModal: React.FC<RentalFormModalProps> = ({
             </p>
           </div>
 
-          {/* Bank Bond Repayment & Effective Month Inputs */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 bg-slate-50 rounded-lg border border-slate-200">
+          {/* Bank Bond Repayment & Extra Paydown & Effective Month Inputs */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-3 bg-slate-50 rounded-lg border border-slate-200">
             <div>
               <div className="flex items-center justify-between mb-1">
                 <label className="block font-semibold text-slate-700 text-xs">Bank Bond Repayment (Debit Order)</label>
@@ -887,6 +897,27 @@ export const RentalFormModal: React.FC<RentalFormModalProps> = ({
                 className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg bg-white font-bold text-slate-900 text-xs"
               />
               <span className="text-[10px] text-slate-400 block mt-0.5">Owner-paid direct debit order</span>
+            </div>
+
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block font-semibold text-slate-700 text-xs">Extra Principal Paydown</label>
+                {extraMonthlyPayment > 0 && (
+                  <span className="text-[10px] text-emerald-600 font-semibold">Accelerated</span>
+                )}
+              </div>
+              <input
+                type="number"
+                name="extraMonthlyPaymentZAR"
+                autoComplete="off"
+                min="0"
+                step="100"
+                value={extraMonthlyPayment || ''}
+                onChange={(e) => setExtraMonthlyPayment(Number(e.target.value))}
+                placeholder="e.g. 1500"
+                className="w-full px-2.5 py-1.5 border border-emerald-300 focus:border-emerald-500 rounded-lg bg-white font-bold text-slate-900 text-xs"
+              />
+              <span className="text-[10px] text-slate-400 block mt-0.5">Optional monthly capital paydown</span>
             </div>
 
             <div>
