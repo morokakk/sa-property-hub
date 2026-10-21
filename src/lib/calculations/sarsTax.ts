@@ -41,11 +41,41 @@ export function calculateDeedsOfficeFee(propertyValue: number): number {
 
 export const SA_VAT_RATE = 0.15;
 
+export interface LssaFeeBand {
+  readonly from: number;
+  readonly to: number;
+  readonly base: number;
+  readonly step: number;
+  readonly perStep: number;
+}
+
+export interface LssaFeeGuideline {
+  readonly effectiveFrom: string;
+  readonly minFee: number;
+  readonly bands: readonly LssaFeeBand[];
+}
+
 /**
- * LSSA Guideline of Fees – instructions received from 1 August 2025 (excl. VAT).
+ * LSSA Guideline of Fees – instructions received from 1 July 2026 (excl. VAT).
+ * Derived from the official 2026 tariff schedule (CPI reference January 2026, 3.5%).
  * Both transfer and bond registration guidelines share this foundational sliding scale.
  */
-export const LSSA_FEE_GUIDELINE_2025_08 = {
+export const LSSA_FEE_GUIDELINE_2026_07: LssaFeeGuideline = {
+  effectiveFrom: '2026-07-01',
+  minFee: 6_875, // value <= R100 000
+  bands: [
+    { from: 100_000, to: 500_000, base: 6_875, step: 50_000, perStep: 1_100 },
+    { from: 500_000, to: 1_000_000, base: 15_675, step: 100_000, perStep: 2_120 },
+    { from: 1_000_000, to: 5_000_000, base: 26_275, step: 200_000, perStep: 2_120 },
+    { from: 5_000_000, to: Infinity, base: 68_675, step: 1_000_000, perStep: 5_340 },
+  ],
+} as const;
+
+/**
+ * Historical scale: LSSA Guideline of Fees – instructions received from 1 August 2025 (excl. VAT).
+ * Both transfer and bond registration guidelines share this foundational sliding scale.
+ */
+export const LSSA_FEE_GUIDELINE_2025_08: LssaFeeGuideline = {
   effectiveFrom: '2025-08-01',
   minFee: 6_640, // value <= R100 000
   bands: [
@@ -61,7 +91,7 @@ export const LSSA_FEE_GUIDELINE_2025_08 = {
  */
 export function calculateLssaProfessionalFee(
   value: number,
-  scale = LSSA_FEE_GUIDELINE_2025_08
+  scale: LssaFeeGuideline = LSSA_FEE_GUIDELINE_2026_07
 ): number {
   if (!Number.isFinite(value) || value <= 0) return 0;
   if (value <= 100_000) return scale.minFee;

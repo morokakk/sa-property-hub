@@ -3439,8 +3439,8 @@ export default function OpportunityAnalyzerPage() {
                               className="w-full text-xs px-2.5 py-1.5 border border-slate-300 rounded-lg"
                             />
                           ) : (
-                            <div className="text-slate-500 text-xs py-1.5 font-medium" title="Recommended fee incl. 15% VAT (LSSA August 2025 guideline; negotiable)">
-                              LSSA guideline (Aug 2025): <span className="font-semibold text-slate-800">{formatZAR(calculatedCosts.conveyancingFee)}</span>
+                            <div className="text-slate-500 text-xs py-1.5 font-medium" title="Recommended fee incl. 15% VAT (LSSA July 2026 guideline; negotiable)">
+                              LSSA guideline (July 2026): <span className="font-semibold text-slate-800">{formatZAR(calculatedCosts.conveyancingFee)}</span>
                             </div>
                           )}
                         </div>

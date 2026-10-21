@@ -173,7 +173,7 @@ export const GET_STARTED_STAGES: readonly JourneyStage[] = [
               'Open the MAO Quick Solver to back-solve your Max Allowable Bid (MAO) net of legal reserves and holding drag, then save the deal to the pipeline.',
             ],
             proTip:
-              'Legal conveyancing and bond registration fees auto-calculate under the official August 2025 LSSA guideline tariffs with deposit precedence, strictly separate from SARS Transfer Duty. Adding an extra monthly principal paydown shows years shaved off debt and accelerated BRRRR refinance milestones.',
+              'Legal conveyancing and bond registration fees auto-calculate under the official July 2026 LSSA guideline tariffs with deposit precedence, strictly separate from SARS Transfer Duty. Adding an extra monthly principal paydown shows years shaved off debt and accelerated BRRRR refinance milestones.',
             href: '/analyzer#analyzer-calculator',
             ctaLabel: 'Open the calculator',
           },
