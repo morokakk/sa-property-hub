@@ -23,6 +23,8 @@ import {
   AnalyzerDraft,
   AiSettings,
   PortfolioSummary,
+  AnalyzerSectionId,
+  AnalyzerLayoutPreset,
 } from '@/types';
 import type { PortfolioStateSnapshot } from '@/lib/db/mergePortfolioState';
 
@@ -191,6 +193,8 @@ export interface SettingsSliceState {
   aiSettings: AiSettings;
   rentalForecastView: 'wealth-only' | 'cashflow-only';
   completedGuideSteps: string[];
+  analyzerSectionOrder: AnalyzerSectionId[];
+  hiddenAnalyzerSections: AnalyzerSectionId[];
 }
 export interface SettingsSliceActions {
   updateLiquidReserve: (amount: number) => void;
@@ -200,6 +204,9 @@ export interface SettingsSliceActions {
   setRentalForecastView: (mode: 'wealth-only' | 'cashflow-only') => void;
   toggleGuideStep: (stepId: string) => void;
   resetGuideProgress: () => void;
+  toggleAnalyzerSectionVisibility: (id: AnalyzerSectionId) => void;
+  moveAnalyzerSection: (id: AnalyzerSectionId, direction: 'up' | 'down') => void;
+  applyAnalyzerLayoutPreset: (preset: AnalyzerLayoutPreset) => void;
 }
 export type SettingsSlice = SettingsSliceState & SettingsSliceActions;
 

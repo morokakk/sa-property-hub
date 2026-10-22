@@ -71,6 +71,9 @@ describe('Refactoring Phase 3: Zustand Slice Pattern Migration Architectural Tes
       expect(state.aiSettings).toBeDefined();
       expect(state.rentalForecastView).toBe('wealth-only');
       expect(state.completedGuideSteps).toEqual([]);
+      expect(Array.isArray(state.analyzerSectionOrder)).toBe(true);
+      expect(state.analyzerSectionOrder).toHaveLength(9);
+      expect(state.hiddenAnalyzerSections).toEqual([]);
 
       // 10. SystemSlice
       expect(typeof state.getSummary).toBe('function');
@@ -80,7 +83,7 @@ describe('Refactoring Phase 3: Zustand Slice Pattern Migration Architectural Tes
       expect(typeof state.importPortfolioJSON).toBe('function');
     });
 
-    it('verifies all 49 distinct store action signatures are mounted on the root facade', () => {
+    it('verifies all 52 distinct store action signatures are mounted on the root facade', () => {
       const store = usePortfolioStore.getState();
 
       // RentalSlice (9 actions)
@@ -159,7 +162,7 @@ describe('Refactoring Phase 3: Zustand Slice Pattern Migration Architectural Tes
       expect(store.deleteMunicipalContact).toBeTypeOf('function');
       expect(store.resetMunicipalDirectory).toBeTypeOf('function');
 
-      // SettingsSlice (7 actions)
+      // SettingsSlice (10 actions)
       expect(store.updateLiquidReserve).toBeTypeOf('function');
       expect(store.updateInvestorProfile).toBeTypeOf('function');
       expect(store.updateAiSettings).toBeTypeOf('function');
@@ -167,6 +170,9 @@ describe('Refactoring Phase 3: Zustand Slice Pattern Migration Architectural Tes
       expect(store.setRentalForecastView).toBeTypeOf('function');
       expect(store.toggleGuideStep).toBeTypeOf('function');
       expect(store.resetGuideProgress).toBeTypeOf('function');
+      expect(store.toggleAnalyzerSectionVisibility).toBeTypeOf('function');
+      expect(store.moveAnalyzerSection).toBeTypeOf('function');
+      expect(store.applyAnalyzerLayoutPreset).toBeTypeOf('function');
 
       // SystemSlice (5 actions)
       expect(store.getSummary).toBeTypeOf('function');
@@ -350,6 +356,65 @@ describe('Refactoring Phase 3: Zustand Slice Pattern Migration Architectural Tes
       expect(flip?.notes).toContain('4 Units');
       expect(flip?.notes).toContain('250 m²');
       expect(flip?.notes).toContain('VAT-Inclusive Developer Sale');
+    });
+
+    it('toggles analyzer section visibility, reorders sections safely, and applies presets', () => {
+      const store = usePortfolioStore.getState();
+
+      // Initial state
+      expect(store.analyzerSectionOrder).toEqual([
+        'scorecard',
+        'holdingExit',
+        'vacancyAgent',
+        'opexReserves',
+        'auctionDistressed',
+        'pieActRisk',
+        'mortgageEngine',
+        'longTermProjections',
+        'stressTaxOverrides',
+      ]);
+      expect(store.hiddenAnalyzerSections).toEqual([]);
+
+      // 1. Toggle visibility
+      store.toggleAnalyzerSectionVisibility('scorecard');
+      expect(usePortfolioStore.getState().hiddenAnalyzerSections).toEqual(['scorecard']);
+
+      store.toggleAnalyzerSectionVisibility('scorecard');
+      expect(usePortfolioStore.getState().hiddenAnalyzerSections).toEqual([]);
+
+      // 2. Move section up / down
+      // Boundary check: move first section up does nothing
+      store.moveAnalyzerSection('scorecard', 'up');
+      expect(usePortfolioStore.getState().analyzerSectionOrder[0]).toBe('scorecard');
+
+      // Move scorecard down
+      store.moveAnalyzerSection('scorecard', 'down');
+      expect(usePortfolioStore.getState().analyzerSectionOrder[0]).toBe('holdingExit');
+      expect(usePortfolioStore.getState().analyzerSectionOrder[1]).toBe('scorecard');
+
+      // Boundary check: move last section down does nothing
+      store.moveAnalyzerSection('stressTaxOverrides', 'down');
+      expect(usePortfolioStore.getState().analyzerSectionOrder[8]).toBe('stressTaxOverrides');
+
+      // 3. Apply 'napkin' preset
+      store.applyAnalyzerLayoutPreset('napkin');
+      const napkinState = usePortfolioStore.getState();
+      expect(napkinState.hiddenAnalyzerSections).toContain('scorecard');
+      expect(napkinState.hiddenAnalyzerSections).toContain('holdingExit');
+      expect(napkinState.hiddenAnalyzerSections).toContain('opexReserves');
+      expect(napkinState.hiddenAnalyzerSections).toContain('auctionDistressed');
+      expect(napkinState.hiddenAnalyzerSections).toContain('pieActRisk');
+      expect(napkinState.hiddenAnalyzerSections).toContain('longTermProjections');
+      expect(napkinState.hiddenAnalyzerSections).toContain('stressTaxOverrides');
+      expect(napkinState.hiddenAnalyzerSections).not.toContain('vacancyAgent');
+      expect(napkinState.hiddenAnalyzerSections).not.toContain('mortgageEngine');
+
+      // 4. Apply 'full' preset (resets order and clears hidden)
+      store.applyAnalyzerLayoutPreset('full');
+      const fullState = usePortfolioStore.getState();
+      expect(fullState.hiddenAnalyzerSections).toEqual([]);
+      expect(fullState.analyzerSectionOrder[0]).toBe('scorecard');
+      expect(fullState.analyzerSectionOrder[1]).toBe('holdingExit');
     });
   });
 

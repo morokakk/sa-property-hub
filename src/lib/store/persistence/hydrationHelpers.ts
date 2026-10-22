@@ -1,3 +1,6 @@
+import { AnalyzerSectionId } from '@/types';
+import { DEFAULT_ANALYZER_SECTION_ORDER } from '../initialData';
+
 /**
  * Hydration Helpers for Zustand Portfolio Persistence
  * Pure state sanitizers and normalization functions used during store rehydration.
@@ -57,4 +60,50 @@ export function healClearwaterAgencyFee(rental: any): {
     agencyVatApplicable,
     agencyCommissionPercent,
   };
+}
+
+/**
+ * Normalises persisted Analyzer section order: guarantees all valid section IDs exist
+ * in the returned array without duplicates or missing sections.
+ */
+export function sanitizeAnalyzerSectionOrder(raw: unknown): AnalyzerSectionId[] {
+  const validSet = new Set<AnalyzerSectionId>(DEFAULT_ANALYZER_SECTION_ORDER);
+  const result: AnalyzerSectionId[] = [];
+  const seen = new Set<AnalyzerSectionId>();
+
+  if (Array.isArray(raw)) {
+    for (const item of raw) {
+      if (typeof item === 'string' && validSet.has(item as AnalyzerSectionId) && !seen.has(item as AnalyzerSectionId)) {
+        seen.add(item as AnalyzerSectionId);
+        result.push(item as AnalyzerSectionId);
+      }
+    }
+  }
+
+  for (const defaultId of DEFAULT_ANALYZER_SECTION_ORDER) {
+    if (!seen.has(defaultId)) {
+      result.push(defaultId);
+    }
+  }
+
+  return result;
+}
+
+/**
+ * Normalises persisted hidden Analyzer sections: ensures only valid section IDs are kept.
+ */
+export function sanitizeHiddenAnalyzerSections(raw: unknown): AnalyzerSectionId[] {
+  if (!Array.isArray(raw)) return [];
+  const validSet = new Set<AnalyzerSectionId>(DEFAULT_ANALYZER_SECTION_ORDER);
+  const result: AnalyzerSectionId[] = [];
+  const seen = new Set<AnalyzerSectionId>();
+
+  for (const item of raw) {
+    if (typeof item === 'string' && validSet.has(item as AnalyzerSectionId) && !seen.has(item as AnalyzerSectionId)) {
+      seen.add(item as AnalyzerSectionId);
+      result.push(item as AnalyzerSectionId);
+    }
+  }
+
+  return result;
 }

@@ -43,5 +43,9 @@ export {
   computeEquityAlerts,
 } from './selectors/portfolioSummarySelector';
 export { syncLeaseExpiryTasks, syncAgmReminderTask } from './utils/taskSync';
-export { sanitizeCompletedGuideSteps } from './persistence/hydrationHelpers';
+export {
+  sanitizeCompletedGuideSteps,
+  sanitizeAnalyzerSectionOrder,
+  sanitizeHiddenAnalyzerSections,
+} from './persistence/hydrationHelpers';
 export type { RootStoreState, PortfolioState };

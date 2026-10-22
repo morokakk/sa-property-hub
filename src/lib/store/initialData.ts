@@ -14,6 +14,7 @@ import {
   PropertyMeter,
   OccupantRiskProfile,
   TenantVettingScorecard,
+  AnalyzerSectionId,
 } from '@/types';
 import { computeAcquisitionCosts, calculateSection13sex } from '@/lib/calculations/sarsTax';
 import {
@@ -2774,6 +2775,23 @@ export const EMPTY_ANALYZER_DRAFT: AnalyzerDraft = {
   annualSpvAdminAuditFeeZAR: 0,
   refinanceLtvPercent: 75,
 };
+
+export const DEFAULT_ANALYZER_SECTION_ORDER: AnalyzerSectionId[] = [
+  'scorecard',
+  'holdingExit',
+  'vacancyAgent',
+  'opexReserves',
+  'auctionDistressed',
+  'pieActRisk',
+  'mortgageEngine',
+  'longTermProjections',
+  'stressTaxOverrides',
+];
+
+export const NAPKIN_VISIBLE_ANALYZER_SECTIONS: AnalyzerSectionId[] = [
+  'vacancyAgent',
+  'mortgageEngine',
+];
 
 export const DEFAULT_AI_SETTINGS: AiSettings = {
   provider: 'anthropic',

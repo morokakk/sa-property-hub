@@ -8,6 +8,7 @@ import type {
   InvestorProfile,
   AnalyzerDraft,
   AiSettings,
+  AnalyzerSectionId,
 } from '@/types';
 import {
   INITIAL_ANALYZER_DRAFT,
@@ -47,6 +48,8 @@ export interface PortfolioStateSnapshot {
   rentalForecastView?: 'wealth-only' | 'cashflow-only';
   aiSettings?: AiSettings;
   analyzerDraft?: AnalyzerDraft;
+  analyzerSectionOrder?: AnalyzerSectionId[];
+  hiddenAnalyzerSections?: AnalyzerSectionId[];
 }
 
 export interface MergeResult {
@@ -275,6 +278,10 @@ export function mergePortfolioState(
       rentalForecastView: mergedForecast,
       aiSettings: mergedAiSettings,
       analyzerDraft: mergedAnalyzerDraft,
+      analyzerSectionOrder:
+        cloudState.analyzerSectionOrder || localState.analyzerSectionOrder,
+      hiddenAnalyzerSections:
+        cloudState.hiddenAnalyzerSections || localState.hiddenAnalyzerSections,
     },
     hasNewLocalItems,
   };

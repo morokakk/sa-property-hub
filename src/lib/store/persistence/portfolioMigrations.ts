@@ -4,6 +4,7 @@ import {
   OpportunityDeal,
   MunicipalContact,
   AiSettings,
+  AnalyzerSectionId,
 } from '@/types';
 import { normalizeAiModel } from '@/lib/ai/modelConfig';
 import { DEFAULT_AI_SETTINGS } from '../initialData';
@@ -11,6 +12,8 @@ import { migrateNegativeArrearsToRental } from '@/lib/calculations/arrears';
 import {
   sanitizeCompletedGuideSteps,
   healClearwaterAgencyFee,
+  sanitizeAnalyzerSectionOrder,
+  sanitizeHiddenAnalyzerSections,
 } from './hydrationHelpers';
 import type { PortfolioState } from '../types';
 
@@ -165,6 +168,8 @@ export function mergePortfolioPersistedState<T extends {
   municipalDirectory?: MunicipalContact[];
   aiSettings?: AiSettings;
   completedGuideSteps?: string[];
+  analyzerSectionOrder?: AnalyzerSectionId[];
+  hiddenAnalyzerSections?: AnalyzerSectionId[];
 }>(
   persistedState: unknown,
   currentState: T
@@ -200,6 +205,12 @@ export function mergePortfolioPersistedState<T extends {
       model: migratedModel,
     },
     completedGuideSteps: sanitizeCompletedGuideSteps(pState.completedGuideSteps),
+    analyzerSectionOrder: sanitizeAnalyzerSectionOrder(
+      (pState as any).analyzerSectionOrder ?? (currentState as any).analyzerSectionOrder
+    ),
+    hiddenAnalyzerSections: sanitizeHiddenAnalyzerSections(
+      (pState as any).hiddenAnalyzerSections ?? (currentState as any).hiddenAnalyzerSections
+    ),
   };
 }
 

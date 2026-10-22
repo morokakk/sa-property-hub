@@ -19,7 +19,7 @@ import {
 import { calculateFlipMao, calculateRentalMao } from '@/lib/calculations/maoSolver';
 import { formatOpportunityForWhatsApp } from '@/lib/whatsappFormatter';
 import { formatZAR, formatPercent } from '@/lib/formatters';
-import { OpportunityDeal, DealSource, AmenityDistance, AmenityScorecard, PropertyTitleType, DealStrategy, PassReason, OccupantRiskProfile, Province } from '@/types';
+import { OpportunityDeal, DealSource, AmenityDistance, AmenityScorecard, PropertyTitleType, DealStrategy, PassReason, OccupantRiskProfile, Province, AnalyzerSectionId } from '@/types';
 import { PropertyTypeBadge, AgmDateChip } from '@/components/common/PropertyTypeBadge';
 import LongTermProjectionChart from '@/components/analytics/LongTermProjectionChart';
 import { OccupancyRiskCard } from '@/components/analyzer/OccupancyRiskCard';
@@ -76,6 +76,7 @@ import AnalyzerStickyRibbon from '@/components/analyzer/AnalyzerStickyRibbon';
 import AnalyzerResultsGrid from '@/components/analyzer/AnalyzerResultsGrid';
 import RateShockStrip from '@/components/analytics/RateShockStrip';
 import PipelineDealCard from '@/components/analyzer/PipelineDealCard';
+import AnalyzerLayoutCustomizer from '@/components/analyzer/AnalyzerLayoutCustomizer';
 
 export default function OpportunityAnalyzerPage() {
   const opportunities = usePortfolioStore((state) => state.opportunities);
@@ -91,6 +92,11 @@ export default function OpportunityAnalyzerPage() {
   const investorProfile = usePortfolioStore((state) => state.investorProfile);
   const liquidCapitalReserve = usePortfolioStore((state) => state.liquidCapitalReserve);
   const analyzerDraft = usePortfolioStore((state) => state.analyzerDraft);
+  const analyzerSectionOrder = usePortfolioStore((state) => state.analyzerSectionOrder);
+  const hiddenAnalyzerSections = usePortfolioStore((state) => state.hiddenAnalyzerSections);
+  const toggleAnalyzerSectionVisibility = usePortfolioStore((state) => state.toggleAnalyzerSectionVisibility);
+  const moveAnalyzerSection = usePortfolioStore((state) => state.moveAnalyzerSection);
+  const applyAnalyzerLayoutPreset = usePortfolioStore((state) => state.applyAnalyzerLayoutPreset);
   const draftDebounceTimerRef = useRef<NodeJS.Timeout | null>(null);
   const pendingDraftUpdatesRef = useRef<Record<string, unknown>>({});
 
@@ -788,6 +794,77 @@ export default function OpportunityAnalyzerPage() {
     setShowMaoSolver(false);
   };
 
+  const activeOverrides = useMemo<Partial<Record<AnalyzerSectionId, { active: boolean; label?: string }>>>(() => {
+    return {
+      scorecard: {
+        active: false,
+      },
+      holdingExit: {
+        active: holdingPeriodMonths !== 6 || vatExemptAgent !== (investorProfile?.vatExemptAgent ?? false),
+        label: holdingPeriodMonths !== 6 ? `${holdingPeriodMonths} mos holding` : (vatExemptAgent ? 'VAT-exempt agent' : undefined),
+      },
+      vacancyAgent: {
+        active: vacancyRate !== 6.0 || managementFee !== 8.0 || !agencyVatApplicable,
+        label: vacancyRate !== 6.0 ? `${vacancyRate}% vacancy` : (managementFee !== 8.0 ? `${managementFee}% agent fee` : 'VAT-exempt agency'),
+      },
+      opexReserves: {
+        active: strategy !== 'Flip' && (
+          monthlyMaintenanceReserve !== 800 ||
+          monthlyPrepaidVendingFee !== 150 ||
+          monthlyCommunalServices > 0 ||
+          tenantPlacementFeePercent > 0 ||
+          annualSpvAdminAuditFeeZAR > 0
+        ),
+        label: 'Non-default OpEx reserves',
+      },
+      auctionDistressed: {
+        active: (auctioneerCommission || 0) > 0 || (municipalArrears || 0) > 0,
+        label: auctioneerCommission > 0 ? `Auction fee: ${formatZAR(auctioneerCommission)}` : `Municipal arrears: ${formatZAR(municipalArrears)}`,
+      },
+      pieActRisk: {
+        active: occupantRisk.occupancyStatus === 'unlawful_occupant' || (calculatedMetrics.totalOccupantCostZAR ?? 0) > 0,
+        label: occupantRisk.occupancyStatus === 'unlawful_occupant' ? `Unlawful occupants (${formatZAR(calculatedMetrics.totalOccupantCostZAR ?? 0)})` : undefined,
+      },
+      mortgageEngine: {
+        active: interestRateMargin !== 0,
+        label: interestRateMargin !== 0 ? `Rate margin: ${interestRateMargin > 0 ? '+' : ''}${interestRateMargin}%` : undefined,
+      },
+      longTermProjections: {
+        active: extraMonthlyPayment > 0 || annualCapitalGrowth !== 5.0 || annualRentalEscalation !== 6.0 || annualExpenseInflation !== 6.0,
+        label: extraMonthlyPayment > 0 ? `+${formatZAR(extraMonthlyPayment)}/m extra bond` : 'Non-default growth/escalation',
+      },
+      stressTaxOverrides: {
+        active: overrideTax || overrideLegal || isSection13Eligible,
+        label: isSection13Eligible ? 'Sec 13sex active' : (overrideTax ? 'Custom transfer duty' : 'Custom legal fee'),
+      },
+    };
+  }, [
+    holdingPeriodMonths,
+    vatExemptAgent,
+    investorProfile?.vatExemptAgent,
+    vacancyRate,
+    managementFee,
+    agencyVatApplicable,
+    strategy,
+    monthlyMaintenanceReserve,
+    monthlyPrepaidVendingFee,
+    monthlyCommunalServices,
+    tenantPlacementFeePercent,
+    annualSpvAdminAuditFeeZAR,
+    auctioneerCommission,
+    municipalArrears,
+    occupantRisk.occupancyStatus,
+    calculatedMetrics.totalOccupantCostZAR,
+    interestRateMargin,
+    extraMonthlyPayment,
+    annualCapitalGrowth,
+    annualRentalEscalation,
+    annualExpenseInflation,
+    overrideTax,
+    overrideLegal,
+    isSection13Eligible,
+  ]);
+
   const handleCopyCurrentCalcWhatsApp = () => {
     const isScheme = propertyType === 'Sectional Title Apartment' || propertyType === 'Townhouse / Cluster';
     const finalAgmDate = isScheme && agmDate ? agmDate : undefined;
@@ -1257,6 +1334,1382 @@ export default function OpportunityAnalyzerPage() {
     });
   }, [pipelineFilter, activeDeals, passedDeals, promotedDeals, showPromoted, regionFilter]);
 
+  const renderModularSection = (sectionId: AnalyzerSectionId) => {
+    switch (sectionId) {
+      case 'scorecard':
+        return (
+          <div key="scorecard" data-section-id="scorecard" className="rounded-xl border border-slate-200 bg-slate-50/70 overflow-hidden shadow-2xs">
+            <button
+              type="button"
+              onClick={() => setIsScorecardOpen(!isScorecardOpen)}
+              className="w-full p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-left hover:bg-slate-100/60 transition-colors cursor-pointer"
+            >
+              <div className="flex items-center gap-2">
+                <MapPin className="w-4 h-4 text-emerald-600 shrink-0" />
+                <div>
+                  <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
+                    Location & Amenity Scorecard
+                  </h3>
+                  <span className="text-[10px] text-slate-500">Qualitative Macro-Accessibility & Node Proximity</span>
+                </div>
+              </div>
+
+              {/* Live Composite Grade Badge & Expand Chevron */}
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] text-slate-500 font-medium">Composite Grade:</span>
+                <span
+                  className={`px-2.5 py-0.5 rounded-full text-xs font-bold shadow-2xs ${
+                    calculatedAmenityScorecard.compositeGrade === 'A-Grade (Prime Hub)'
+                      ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                      : calculatedAmenityScorecard.compositeGrade === 'B-Grade (Accessible)'
+                      ? 'bg-teal-100 text-teal-800 border border-teal-300'
+                      : 'bg-amber-100 text-amber-800 border border-amber-300'
+                  }`}
+                >
+                  {calculatedAmenityScorecard.compositeGrade} ({calculatedAmenityScorecard.compositeScore}/12 Pts)
+                </span>
+                <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${isScorecardOpen ? 'rotate-180' : ''}`} />
+              </div>
+            </button>
+
+            {isScorecardOpen && (
+              <div className="p-4 pt-0 border-t border-slate-200/70">
+                {/* 4 Amenity Distance Pill Groups */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-3">
+                  {/* 1. Schools */}
+                  <div className="bg-white p-3 rounded-lg border border-slate-200 shadow-2xs space-y-1.5">
+                    <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-800">
+                      <GraduationCap className="w-4 h-4 text-indigo-600" />
+                      <span>Schools & Education</span>
+                    </div>
+                    <div className="grid grid-cols-3 gap-1 pt-1">
+                      {(['0-5km', '6-10km', '10+km'] as AmenityDistance[]).map((dist) => (
+                        <button
+                          key={dist}
+                          type="button"
+                          onClick={() => setSchoolsDistance(dist)}
+                          className={`py-1 text-[11px] font-semibold rounded-md transition-all ${
+                            schoolsDistance === dist
+                              ? 'bg-slate-900 text-white shadow-xs'
+                              : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                          }`}
+                        >
+                          {dist}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* 2. Police Station */}
+                  <div className="bg-white p-3 rounded-lg border border-slate-200 shadow-2xs space-y-1.5">
+                    <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-800">
+                      <ShieldAlert className="w-4 h-4 text-rose-600" />
+                      <span>Police Station (SAPS)</span>
+                    </div>
+                    <div className="grid grid-cols-3 gap-1 pt-1">
+                      {(['0-5km', '6-10km', '10+km'] as AmenityDistance[]).map((dist) => (
+                        <button
+                          key={dist}
+                          type="button"
+                          onClick={() => setPoliceDistance(dist)}
+                          className={`py-1 text-[11px] font-semibold rounded-md transition-all ${
+                            policeDistance === dist
+                              ? 'bg-slate-900 text-white shadow-xs'
+                              : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                          }`}
+                        >
+                          {dist}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* 3. Hospital / Medical Clinic */}
+                  <div className="bg-white p-3 rounded-lg border border-slate-200 shadow-2xs space-y-1.5">
+                    <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-800">
+                      <Stethoscope className="w-4 h-4 text-teal-600" />
+                      <span>Hospital / Medical Clinic</span>
+                    </div>
+                    <div className="grid grid-cols-3 gap-1 pt-1">
+                      {(['0-5km', '6-10km', '10+km'] as AmenityDistance[]).map((dist) => (
+                        <button
+                          key={dist}
+                          type="button"
+                          onClick={() => setClinicDistance(dist)}
+                          className={`py-1 text-[11px] font-semibold rounded-md transition-all ${
+                            clinicDistance === dist
+                              ? 'bg-slate-900 text-white shadow-xs'
+                              : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                          }`}
+                        >
+                          {dist}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* 4. Major Shopping Mall */}
+                  <div className="bg-white p-3 rounded-lg border border-slate-200 shadow-2xs space-y-1.5">
+                    <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-800">
+                      <ShoppingBag className="w-4 h-4 text-amber-600" />
+                      <span>Major Shopping Mall</span>
+                    </div>
+                    <div className="grid grid-cols-3 gap-1 pt-1">
+                      {(['0-5km', '6-10km', '10+km'] as AmenityDistance[]).map((dist) => (
+                        <button
+                          key={dist}
+                          type="button"
+                          onClick={() => setMallDistance(dist)}
+                          className={`py-1 text-[11px] font-semibold rounded-md transition-all ${
+                            mallDistance === dist
+                              ? 'bg-slate-900 text-white shadow-xs'
+                              : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                          }`}
+                        >
+                          {dist}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        );
+
+      case 'holdingExit':
+        return (
+          <div key="holdingExit" data-section-id="holdingExit" id="analyzer-sensitivity" className="scroll-mt-20 rounded-xl bg-slate-50 border border-slate-200 overflow-hidden shadow-2xs">
+            {strategy === 'Rental' ? (
+              <div>
+                <button
+                  type="button"
+                  onClick={() => setIsHoldingOpen(!isHoldingOpen)}
+                  className="w-full p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-left hover:bg-slate-100/60 transition-colors cursor-pointer"
+                >
+                  <div className="flex items-center gap-2">
+                    <Sliders className="w-4 h-4 text-indigo-600 shrink-0" />
+                    <div>
+                      <span className="text-xs font-bold text-slate-900 uppercase tracking-wider block">
+                        Holding Period & Exit VAT Sensitivity
+                      </span>
+                      <span className="text-[10px] text-slate-500">Fine-tune holding duration & sales commission</span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold text-indigo-900 bg-indigo-50 px-2.5 py-0.5 rounded border border-indigo-200">
+                      {holdingPeriodMonths} Mos &bull; Exit Comm: {formatPercent(effectiveExitCommissionPercent)}
+                    </span>
+                    <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${isHoldingOpen ? 'rotate-180' : ''}`} />
+                  </div>
+                </button>
+
+                {isHoldingOpen && (
+                  <div className="p-4 pt-0 border-t border-slate-200/70 space-y-3 pt-3">
+                    <div>
+                      <div className="flex items-center justify-between text-[11px] mb-1">
+                        <span className="font-semibold text-slate-700">Holding Period Duration</span>
+                        <span className="font-mono font-bold text-indigo-800">{holdingPeriodMonths} Months</span>
+                      </div>
+                      <input
+                        type="range"
+                        min="1"
+                        max="12"
+                        step="1"
+                        value={holdingPeriodMonths}
+                        onChange={(e) => {
+                          const val = Number(e.target.value);
+                          setHoldingPeriodMonths(val);
+                          updateAnalyzerDraft({ holdingPeriodMonths: val });
+                        }}
+                        className="w-full accent-indigo-600 cursor-pointer h-1.5 bg-slate-200 rounded-lg"
+                      />
+                      <div className="flex justify-between text-[9px] text-slate-400 font-medium px-0.5 mt-0.5">
+                        <span>1 Mo (Quick Flip)</span>
+                        <span>3 Mo</span>
+                        <span>6 Mo (Standard)</span>
+                        <span>9 Mo</span>
+                        <span>12 Mo (Long Reno)</span>
+                      </div>
+                    </div>
+
+                    <div className="pt-2 border-t border-slate-200/80 flex items-center justify-between">
+                      <label className="flex items-center gap-2 text-xs font-semibold text-slate-700 cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          checked={vatExemptAgent}
+                          onChange={(e) => {
+                            const checked = e.target.checked;
+                            setVatExemptAgent(checked);
+                            updateAnalyzerDraft({ vatExemptAgent: checked });
+                          }}
+                          className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500"
+                        />
+                        <span>VAT-Exempt Real Estate Agent (Off-market / Private Seller, skips 15% VAT)</span>
+                      </label>
+                      <span className="text-[10px] font-bold text-slate-600 bg-white px-2 py-0.5 rounded border border-slate-200">
+                        {vatExemptAgent ? `${defaultAgentCommission.toFixed(1)}% (Exempt)` : `${calculateEffectiveExitCommission(defaultAgentCommission, false).toFixed(2)}% (Standard ${defaultAgentCommission.toFixed(1)}% + 15% VAT)`}
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="p-4 space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                  <div className="flex items-center gap-2">
+                    <Sliders className="w-4 h-4 text-indigo-600" />
+                    <span className="text-xs font-bold text-slate-900 uppercase tracking-wider">
+                      Holding Period & Exit VAT Sensitivity
+                    </span>
+                  </div>
+                  <span className="text-xs font-bold text-indigo-900 bg-indigo-50 px-2.5 py-0.5 rounded border border-indigo-200 self-start sm:self-auto">
+                    {holdingPeriodMonths} Months Holding &bull; Exit Comm: {formatPercent(effectiveExitCommissionPercent)}
+                  </span>
+                </div>
+
+                <div>
+                  <div className="flex items-center justify-between text-[11px] mb-1">
+                    <span className="font-semibold text-slate-700">Holding Period Duration</span>
+                    <span className="font-mono font-bold text-indigo-800">{holdingPeriodMonths} Months</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="1"
+                    max="12"
+                    step="1"
+                    value={holdingPeriodMonths}
+                    onChange={(e) => {
+                      const val = Number(e.target.value);
+                      setHoldingPeriodMonths(val);
+                      updateAnalyzerDraft({ holdingPeriodMonths: val });
+                    }}
+                    className="w-full accent-indigo-600 cursor-pointer h-1.5 bg-slate-200 rounded-lg"
+                  />
+                  <div className="flex justify-between text-[9px] text-slate-400 font-medium px-0.5 mt-0.5">
+                    <span>1 Mo (Quick Flip)</span>
+                    <span>3 Mo</span>
+                    <span>6 Mo (Standard)</span>
+                    <span>9 Mo</span>
+                    <span>12 Mo (Long Reno)</span>
+                  </div>
+                </div>
+
+                <div className="pt-2 border-t border-slate-200/80 flex items-center justify-between">
+                  <label className="flex items-center gap-2 text-xs font-semibold text-slate-700 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={vatExemptAgent}
+                      onChange={(e) => {
+                        const checked = e.target.checked;
+                        setVatExemptAgent(checked);
+                        updateAnalyzerDraft({ vatExemptAgent: checked });
+                      }}
+                      className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500"
+                    />
+                    <span>VAT-Exempt Real Estate Agent (Off-market / Private Seller, skips 15% VAT)</span>
+                  </label>
+                  <span className="text-[10px] font-bold text-slate-600 bg-white px-2 py-0.5 rounded border border-slate-200">
+                    {vatExemptAgent ? `${defaultAgentCommission.toFixed(1)}% (Exempt)` : `${calculateEffectiveExitCommission(defaultAgentCommission, false).toFixed(2)}% (Standard ${defaultAgentCommission.toFixed(1)}% + 15% VAT)`}
+                  </span>
+                </div>
+              </div>
+            )}
+          </div>
+        );
+
+      case 'vacancyAgent':
+        return (
+          <div key="vacancyAgent" data-section-id="vacancyAgent" className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 rounded-xl bg-slate-50 border border-slate-200 shadow-2xs">
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-[11px] font-semibold text-slate-700">
+                  Vacancy & Credit Loss Buffer (%)
+                </label>
+                <span className="text-[10px] font-bold text-amber-800 bg-amber-100/80 px-1.5 py-0.5 rounded">
+                  -{formatZAR(Math.round(monthlyRent * (vacancyRate / 100)))}/pm
+                </span>
+              </div>
+              <div className="relative">
+                <input
+                  type="number"
+                  name="vacancyRatePercent"
+                  autoComplete="off"
+                  min="0"
+                  max="30"
+                  step="any"
+                  value={vacancyRate}
+                  onChange={(e) => {
+                    const val = Number(e.target.value);
+                    setVacancyRate(val);
+                    updateAnalyzerDraft({ vacancyRatePercent: val });
+                  }}
+                  className="w-full text-xs px-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-emerald-500 font-semibold text-slate-900 bg-white"
+                />
+                <span className="absolute right-3 top-2 text-xs text-slate-400 font-bold">%</span>
+              </div>
+              {/* Vacancy Sensitivity Range Slider 0-15% */}
+              <div className="pt-2">
+                <div className="flex items-center justify-between text-[10px] text-slate-500 mb-0.5">
+                  <span className="font-semibold flex items-center gap-1 text-slate-700">
+                    <Sliders className="w-3 h-3 text-amber-600" />
+                    Vacancy Sensitivity (0–15%)
+                  </span>
+                  <span className="font-bold text-amber-800">{vacancyRate}%</span>
+                </div>
+                <input
+                  type="range"
+                  min="0"
+                  max="15"
+                  step="0.5"
+                  value={vacancyRate}
+                  onChange={(e) => {
+                    const val = Number(e.target.value);
+                    setVacancyRate(val);
+                    updateAnalyzerDraft({ vacancyRatePercent: val });
+                  }}
+                  className="w-full accent-amber-600 cursor-pointer h-1.5 bg-slate-200 rounded-lg"
+                />
+                <div className="flex justify-between text-[9px] text-slate-400 font-medium px-0.5 mt-0.5">
+                  <span>0% (Full Occ.)</span>
+                  <span>5% (SA Avg)</span>
+                  <span>10% (Suburban)</span>
+                  <span>15% (Stress)</span>
+                </div>
+              </div>
+              <p className="text-[10px] text-slate-500 mt-1">
+                Deducts from gross rent before computing NOI, Cap Rate, and Cash-on-Cash yields. Default: 6.0%.
+              </p>
+            </div>
+
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <div className="flex items-center gap-2">
+                  <label className="block text-[11px] font-semibold text-slate-700">
+                    Managing Agent Fee (%)
+                  </label>
+                  <label className="inline-flex items-center gap-1 cursor-pointer text-[10px] font-semibold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 px-1.5 py-0.5 rounded transition-colors select-none">
+                    <input
+                      type="checkbox"
+                      checked={agencyVatApplicable}
+                      onChange={(e) => {
+                        const checked = e.target.checked;
+                        setAgencyVatApplicable(checked);
+                        updateAnalyzerDraft({ agencyVatApplicable: checked });
+                      }}
+                      className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 w-3 h-3 cursor-pointer"
+                    />
+                    <span>+ 15% VAT</span>
+                  </label>
+                </div>
+                <span className="text-[10px] font-bold text-indigo-800 bg-indigo-100/80 px-1.5 py-0.5 rounded">
+                  {agencyVatApplicable ? (
+                    <>
+                      {managementFee}% + VAT = {(managementFee * 1.15).toFixed(1)}% &bull; -{formatZAR(Math.round(monthlyRent * (managementFee / 100) * 1.15))}/pm
+                    </>
+                  ) : (
+                    <>
+                      {managementFee.toFixed(1)}% (VAT Incl.) &bull; -{formatZAR(Math.round(monthlyRent * (managementFee / 100)))}/pm
+                    </>
+                  )}
+                </span>
+              </div>
+              <div className="relative">
+                <input
+                  type="number"
+                  name="managementFeePercent"
+                  autoComplete="off"
+                  min="0"
+                  max="20"
+                  step="any"
+                  value={managementFee}
+                  onChange={(e) => {
+                    const val = Number(e.target.value);
+                    setManagementFee(val);
+                    updateAnalyzerDraft({ managementFeePercent: val });
+                  }}
+                  className="w-full text-xs px-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-emerald-500 font-semibold text-slate-900 bg-white"
+                />
+                <span className="absolute right-3 top-2 text-xs text-slate-400 font-bold">%</span>
+              </div>
+              <p className="text-[10px] text-slate-500 mt-1">
+                Professional rental agent tenant placement & collection fee (iGrow / WeconnectU baseline: 8.0%{agencyVatApplicable ? ' + 15% VAT = 9.2%' : ''}).
+              </p>
+            </div>
+          </div>
+        );
+
+      case 'opexReserves':
+        if (strategy === 'Flip') return null;
+        return (
+          <div key="opexReserves" data-section-id="opexReserves" className="rounded-xl border border-slate-200 bg-slate-50/70 overflow-hidden shadow-2xs">
+            <button
+              type="button"
+              onClick={() => setIsOpExReservesOpen(!isOpExReservesOpen)}
+              className="w-full p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-left hover:bg-slate-100/60 transition-colors cursor-pointer"
+            >
+              <div className="flex items-center gap-2">
+                <Sliders className="w-4 h-4 text-emerald-600 shrink-0" />
+                <div>
+                  <span className="text-xs font-bold text-slate-900 uppercase tracking-wider block">
+                    Fine-Tune OpEx Reserves
+                  </span>
+                  <span className="text-[10px] text-slate-500">
+                    Maintenance, Prepaid Vending, Communal Services, Placement &amp; SPV Audit Fees
+                  </span>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] font-semibold text-slate-700 bg-white px-2.5 py-0.5 rounded border border-slate-200">
+                  Total Reserves: <strong className="text-emerald-700">-{formatZAR(monthlyMaintenanceReserve + monthlyPrepaidVendingFee + (monthlyCommunalServices || 0) + (calculatedMetrics.monthlyPlacementFeeZAR || 0) + (calculatedMetrics.monthlySpvAdminZAR || 0))}/pm</strong>
+                </span>
+                <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${isOpExReservesOpen ? 'rotate-180' : ''}`} />
+              </div>
+            </button>
+
+            {isOpExReservesOpen && (
+              <div className="p-4 pt-0 border-t border-slate-200/70">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 pt-3">
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="block text-[11px] font-semibold text-slate-700">
+                        Monthly Maintenance Reserve (ZAR)
+                      </label>
+                      <span className="text-[10px] font-bold text-slate-700 bg-slate-200 px-1.5 py-0.5 rounded">
+                        -{formatZAR(monthlyMaintenanceReserve)}/pm
+                      </span>
+                    </div>
+                    <div className="relative">
+                      <span className="absolute left-3 top-2 text-xs text-slate-400 font-bold">R</span>
+                      <input
+                        type="number"
+                        name="monthlyMaintenanceReserveZAR"
+                        autoComplete="off"
+                        min="0"
+                        step="50"
+                        value={monthlyMaintenanceReserve}
+                        onChange={(e) => {
+                          const val = Number(e.target.value);
+                          setMonthlyMaintenanceReserve(val);
+                          updateAnalyzerDraft({ monthlyMaintenanceReserveZAR: val });
+                        }}
+                        className="w-full text-xs pl-7 pr-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-emerald-500 font-semibold text-slate-900 bg-white"
+                      />
+                    </div>
+                    <p className="text-[10px] text-slate-500 mt-1">
+                      Provisioning for general repairs, wear-and-tear, and appliance servicing. Default: R 800.
+                    </p>
+                  </div>
+
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="block text-[11px] font-semibold text-slate-700">
+                        Prepaid Meter Vending Fee (ZAR)
+                      </label>
+                      <span className="text-[10px] font-bold text-slate-700 bg-slate-200 px-1.5 py-0.5 rounded">
+                        -{formatZAR(monthlyPrepaidVendingFee)}/pm
+                      </span>
+                    </div>
+                    <div className="relative">
+                      <span className="absolute left-3 top-2 text-xs text-slate-400 font-bold">R</span>
+                      <input
+                        type="number"
+                        name="monthlyPrepaidVendingFeeZAR"
+                        autoComplete="off"
+                        min="0"
+                        step="10"
+                        value={monthlyPrepaidVendingFee}
+                        onChange={(e) => {
+                          const val = Number(e.target.value);
+                          setMonthlyPrepaidVendingFee(val);
+                          updateAnalyzerDraft({ monthlyPrepaidVendingFeeZAR: val });
+                        }}
+                        className="w-full text-xs pl-7 pr-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-emerald-500 font-semibold text-slate-900 bg-white"
+                      />
+                    </div>
+                    <p className="text-[10px] text-slate-500 mt-1">
+                      CitiQ / Recharger monthly fixed admin fee for prepaid electricity/water recovery. Default: R 150.
+                    </p>
+                  </div>
+
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="block text-[11px] font-semibold text-slate-700">
+                        Communal / Serviced OpEx (ZAR)
+                      </label>
+                      <span className="text-[10px] font-bold text-slate-700 bg-slate-200 px-1.5 py-0.5 rounded">
+                        -{formatZAR(monthlyCommunalServices)}/pm
+                      </span>
+                    </div>
+                    <div className="relative">
+                      <span className="absolute left-3 top-2 text-xs text-slate-400 font-bold">R</span>
+                      <input
+                        type="number"
+                        name="monthlyCommunalServicesZAR"
+                        autoComplete="off"
+                        min="0"
+                        step="50"
+                        value={monthlyCommunalServices || ''}
+                        onChange={(e) => {
+                          const val = Number(e.target.value);
+                          setMonthlyCommunalServices(val);
+                          updateAnalyzerDraft({ monthlyCommunalServicesZAR: val });
+                        }}
+                        placeholder="0"
+                        className="w-full text-xs pl-7 pr-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-emerald-500 font-semibold text-slate-900 bg-white"
+                      />
+                    </div>
+                    <p className="text-[10px] text-slate-500 mt-1">
+                      Consolidated communal amenities (uncapped Wi-Fi, communal cleaning, security, garden care). Default: R 0.
+                    </p>
+                  </div>
+
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="block text-[11px] font-semibold text-slate-700">
+                        Tenant Placement Fee (% Rent)
+                      </label>
+                      <span className="text-[10px] font-bold text-slate-700 bg-slate-200 px-1.5 py-0.5 rounded">
+                        -{formatZAR(calculatedMetrics.monthlyPlacementFeeZAR)}/pm
+                      </span>
+                    </div>
+                    <div className="relative">
+                      <input
+                        type="number"
+                        name="tenantPlacementFeePercent"
+                        autoComplete="off"
+                        min="0"
+                        max="20"
+                        step="0.5"
+                        value={tenantPlacementFeePercent || ''}
+                        placeholder="0"
+                        onChange={(e) => {
+                          const val = Math.max(0, Number(e.target.value) || 0);
+                          setTenantPlacementFeePercent(val);
+                          updateAnalyzerDraft({ tenantPlacementFeePercent: val });
+                        }}
+                        className="w-full text-xs px-3 pr-7 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-emerald-500 font-semibold text-slate-900 bg-white"
+                      />
+                      <span className="absolute right-3 top-2 text-xs text-slate-400 font-bold">%</span>
+                    </div>
+                    <p className="text-[10px] text-slate-500 mt-1">
+                      Amortized leasing / procurement commission{agencyVatApplicable ? ' (+15% VAT applied)' : ''}. Default: 0%.
+                    </p>
+                  </div>
+
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="block text-[11px] font-semibold text-slate-700">
+                        Annual SPV Audit / Admin (ZAR/yr)
+                      </label>
+                      <span className="text-[10px] font-bold text-slate-700 bg-slate-200 px-1.5 py-0.5 rounded">
+                        -{formatZAR(calculatedMetrics.monthlySpvAdminZAR)}/pm
+                      </span>
+                    </div>
+                    <div className="relative">
+                      <span className="absolute left-3 top-2 text-xs text-slate-400 font-bold">R</span>
+                      <input
+                        type="number"
+                        name="annualSpvAdminAuditFeeZAR"
+                        autoComplete="off"
+                        min="0"
+                        step="1000"
+                        value={annualSpvAdminAuditFeeZAR || ''}
+                        placeholder="0"
+                        onChange={(e) => {
+                          const val = Math.max(0, Number(e.target.value) || 0);
+                          setAnnualSpvAdminAuditFeeZAR(val);
+                          updateAnalyzerDraft({ annualSpvAdminAuditFeeZAR: val });
+                        }}
+                        className="w-full text-xs pl-7 pr-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-emerald-500 font-semibold text-slate-900 bg-white"
+                      />
+                    </div>
+                    <p className="text-[10px] text-slate-500 mt-1">
+                      For syndications, body corporate audits, or Pty Ltd accounting — divided by 12 p.m.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        );
+
+      case 'auctionDistressed':
+        if (!isDistressedSource) return null;
+        return (
+          <div key="auctionDistressed" data-section-id="auctionDistressed" className="p-4 rounded-xl bg-amber-50/70 border border-amber-200 space-y-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-amber-200/80 pb-2">
+              <div className="flex items-center gap-2">
+                <Scale className="w-4 h-4 text-amber-700" />
+                <div>
+                  <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
+                    Auction / Distressed Costs
+                  </h4>
+                  <span className="text-[10px] text-slate-500">
+                    Immediate Day-1 cash outlays: buyer&apos;s commission & municipal clearance debt
+                  </span>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] font-semibold text-slate-600">Total Auction Outlays:</span>
+                <span className="text-xs font-bold text-amber-900 bg-amber-100 px-2.5 py-0.5 rounded border border-amber-300">
+                  {formatZAR((auctioneerCommission || 0) + (municipalArrears || 0))}
+                </span>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* 1. Auctioneer Commission */}
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-[11px] font-semibold text-slate-700">
+                    Auctioneer Commission / Buyer&apos;s Premium (ZAR)
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const fee = Math.round(purchasePrice * 0.10 * 1.15);
+                      setAuctioneerCommission(fee);
+                      updateAnalyzerDraft({ auctioneerCommission: fee });
+                    }}
+                    className="text-[10px] text-amber-900 hover:text-amber-950 font-bold bg-amber-100/90 hover:bg-amber-200 px-2 py-0.5 rounded border border-amber-300 transition-colors cursor-pointer"
+                    title="Auto-calculate standard SA auction commission: 10% + 15% VAT = 11.5% of hammer price"
+                  >
+                    Calc 10% + VAT
+                  </button>
+                </div>
+                <div className="relative">
+                  <span className="absolute left-2.5 top-2 text-xs text-slate-400 font-bold">R</span>
+                  <input
+                    type="number"
+                    name="auctioneerCommissionZAR"
+                    autoComplete="off"
+                    min="0"
+                    step="any"
+                    value={auctioneerCommission || ''}
+                    onChange={(e) => {
+                      const val = Number(e.target.value);
+                      setAuctioneerCommission(val);
+                      updateAnalyzerDraft({ auctioneerCommission: val });
+                    }}
+                    placeholder="0"
+                    className="w-full text-xs pl-7 pr-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-amber-500 font-semibold text-slate-900 bg-white"
+                  />
+                </div>
+                <span className="text-[10px] text-slate-500 mt-1 block">
+                  Mandatory buyer&apos;s premium payable immediately on auction day.
+                </span>
+              </div>
+
+              {/* 2. Municipal Arrears */}
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-[11px] font-semibold text-slate-700">
+                    Municipal Arrears & Taxes Settlement (ZAR)
+                  </label>
+                  <span className="text-[10px] text-amber-800 font-bold bg-amber-100 px-1.5 py-0.2 rounded">
+                    Section 118
+                  </span>
+                </div>
+                <div className="relative">
+                  <span className="absolute left-2.5 top-2 text-xs text-slate-400 font-bold">R</span>
+                  <input
+                    type="number"
+                    name="municipalArrearsZAR"
+                    autoComplete="off"
+                    min="0"
+                    step="any"
+                    value={municipalArrears || ''}
+                    onChange={(e) => {
+                      const val = Number(e.target.value);
+                      setMunicipalArrears(val);
+                      updateAnalyzerDraft({ municipalArrears: val });
+                    }}
+                    placeholder="0"
+                    className="w-full text-xs pl-7 pr-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-amber-500 font-semibold text-slate-900 bg-white"
+                  />
+                </div>
+                <span className="text-[10px] text-slate-500 mt-1 block">
+                  Historical city council rates/water debt settlement required for transfer clearance.
+                </span>
+              </div>
+            </div>
+          </div>
+        );
+
+      case 'pieActRisk':
+        return (
+          <div key="pieActRisk" data-section-id="pieActRisk">
+            <OccupancyRiskCard
+              value={occupantRisk}
+              onChange={(updated) => {
+                setOccupantRisk(updated);
+                updateAnalyzerDraft({ occupantRisk: updated });
+              }}
+              maoReductionZAR={
+                strategy === 'Flip'
+                  ? computedFlipMao.occupantRiskReductionZAR
+                  : computedRentalMao.occupantRiskReductionZAR
+              }
+              evictionDelayBurnZAR={calculatedMetrics.evictionDelayBurnZAR ?? 0}
+              totalOccupantCostZAR={calculatedMetrics.totalOccupantCostZAR ?? 0}
+              maoMode={strategy === 'Flip' ? 'Flip' : 'Rental'}
+            />
+          </div>
+        );
+
+      case 'mortgageEngine':
+        return (
+          <div key="mortgageEngine" data-section-id="mortgageEngine" className="p-4 sm:p-5 rounded-xl border border-slate-200 bg-white shadow-2xs space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2">
+                <div className="p-1.5 bg-emerald-50 rounded-lg text-emerald-700">
+                  <Scale className="w-4 h-4" />
+                </div>
+                <div>
+                  <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
+                    Mortgage Financing & Cash Deposit Engine
+                  </h4>
+                  <p className="text-[11px] text-slate-500">
+                    Bidirectional LTV & down-payment sync with live principal calculation
+                  </p>
+                </div>
+              </div>
+
+              {/* Live Financed Principal Readout Badge */}
+              <div className="flex items-center gap-2 bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-200">
+                <span className="text-[11px] text-slate-500 font-medium">Financed Bond:</span>
+                <span className="text-xs font-black text-slate-900 font-mono">
+                  {formatZAR(calculatedMetrics.bondAmount)}
+                </span>
+                <span className="text-[10px] text-slate-400 font-semibold">
+                  ({loanToValue}% LTV)
+                </span>
+              </div>
+            </div>
+
+            {/* Main Inputs: Side-by-Side Deposit ZAR and LTV Slider */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-4">
+              {/* Column 1: Deposit (ZAR) */}
+              <div className="lg:col-span-4 bg-slate-50/70 p-3.5 rounded-xl border border-slate-200 space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold text-slate-800">
+                    Cash Deposit (ZAR)
+                  </label>
+                  <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                    {purchasePrice > 0 ? ((depositZAR / purchasePrice) * 100).toFixed(1) : 0}% Equity
+                  </span>
+                </div>
+                <div className="relative">
+                  <span className="absolute left-3 top-2 text-xs text-slate-400 font-bold">R</span>
+                  <input
+                    type="number"
+                    name="depositZAR"
+                    autoComplete="off"
+                    min="0"
+                    max={purchasePrice}
+                    step="any"
+                    value={depositZAR}
+                    onChange={(e) => handleDepositChange(Number(e.target.value))}
+                    className="w-full text-xs pl-7 pr-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-emerald-500 font-bold text-slate-900 bg-white"
+                    placeholder="0"
+                  />
+                </div>
+                <p className="text-[10px] text-slate-500 leading-tight">
+                  Paid directly to conveyancing attorney upon transfer.
+                </p>
+              </div>
+
+              {/* Column 2: Bond LTV (%) Slider + Presets */}
+              <div className="lg:col-span-5 bg-slate-50/70 p-3.5 rounded-xl border border-slate-200 space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold text-slate-800">
+                    Bond Loan-to-Value (LTV)
+                  </label>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs font-extrabold text-emerald-800 font-mono bg-white px-2 py-0.5 rounded border border-slate-200">
+                      {loanToValue}%
+                    </span>
+                  </div>
+                </div>
+
+                {/* LTV Range Slider */}
+                <div className="pt-1">
+                  <input
+                    type="range"
+                    name="loanToValuePercent"
+                    autoComplete="off"
+                    min="0"
+                    max="100"
+                    step="1"
+                    value={loanToValue}
+                    onChange={(e) => handleLTVChange(Number(e.target.value))}
+                    className="w-full accent-emerald-600 cursor-pointer h-2 bg-slate-200 rounded-lg"
+                  />
+                  <div className="flex justify-between text-[10px] text-slate-400 font-medium px-0.5">
+                    <span>0% (All Cash)</span>
+                    <span>50%</span>
+                    <span>80%</span>
+                    <span>90%</span>
+                    <span>100% (Zero Down)</span>
+                  </div>
+                </div>
+
+                {/* Quick Preset Buttons */}
+                <div className="flex items-center gap-1.5 pt-1">
+                  {[
+                    { ltv: 100, label: '100% (0% Dep)' },
+                    { ltv: 90, label: '90% (10% Dep)' },
+                    { ltv: 80, label: '80% (20% Dep)' },
+                    { ltv: 0, label: '0% (All Cash)' },
+                  ].map((preset) => (
+                    <button
+                      key={preset.ltv}
+                      type="button"
+                      onClick={() => handleLTVChange(preset.ltv)}
+                      className={`flex-1 text-[10px] py-1 px-1.5 rounded-md font-semibold border transition-all ${
+                        loanToValue === preset.ltv
+                          ? 'bg-emerald-600 text-white border-emerald-600 shadow-2xs'
+                          : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-100'
+                      }`}
+                    >
+                      {preset.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Column 3: Interest Rate & Loan Term & Monthly Bond Repayment */}
+              <div className="lg:col-span-3 bg-slate-50/70 p-3.5 rounded-xl border border-slate-200 flex flex-col justify-between space-y-2">
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-[10px] font-semibold text-slate-600 mb-1">Interest Rate</label>
+                    <div className="flex items-center">
+                      <input
+                        type="number"
+                        name="interestRatePercent"
+                        autoComplete="off"
+                        min="0"
+                        step="any"
+                        value={interestRate}
+                        onChange={(e) => setInterestRate(Number(e.target.value))}
+                        className="w-full text-xs px-2 py-1.5 border border-slate-300 rounded-lg font-semibold bg-white"
+                      />
+                      <span className="ml-1 text-xs text-slate-500 font-bold">%</span>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-semibold text-slate-600 mb-1">Loan Term</label>
+                    <div className="flex items-center">
+                      <input
+                        type="number"
+                        name="loanTermYears"
+                        autoComplete="off"
+                        min="5"
+                        max="30"
+                        value={loanTermYears}
+                        onChange={(e) => {
+                          const val = Number(e.target.value);
+                          setLoanTermYears(val);
+                          handleBondTermChange(val);
+                        }}
+                        className="w-full text-xs px-2 py-1.5 border border-slate-300 rounded-lg font-semibold bg-white"
+                      />
+                      <span className="ml-1 text-xs text-slate-500 font-bold">yr</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Prime Spread (±200 bps) Sensitivity Slider */}
+                <div className="pt-2 border-t border-slate-200">
+                  <div className="flex items-center justify-between text-[10px] mb-1">
+                    <span className="font-bold text-slate-700 flex items-center gap-1">
+                      <Sliders className="w-3 h-3 text-emerald-600" />
+                      Prime Spread (±200 bps)
+                    </span>
+                    <span className="font-mono font-bold text-emerald-800 bg-white px-1.5 py-0.5 rounded border border-slate-200">
+                      {interestRateMargin >= 0 ? `+${interestRateMargin.toFixed(2)}%` : `${interestRateMargin.toFixed(2)}%`} ({((interestRateMargin) * 100).toFixed(0)} bps)
+                    </span>
+                  </div>
+                  <input
+                    type="range"
+                    min="-2"
+                    max="2"
+                    step="0.25"
+                    value={interestRateMargin}
+                    onChange={(e) => {
+                      const margin = Number(e.target.value);
+                      setInterestRateMargin(margin);
+                      const prime = investorProfile?.defaultPrimeRatePercent ?? 10.75;
+                      setInterestRate(Number((prime + margin).toFixed(2)));
+                      updateAnalyzerDraft({ interestRateMargin: margin });
+                    }}
+                    className="w-full accent-emerald-600 cursor-pointer h-1.5 bg-slate-200 rounded-lg"
+                  />
+                  <div className="flex justify-between text-[9px] text-slate-400 font-mono mt-0.5">
+                    <span>-200 bps</span>
+                    <span>Prime ({(investorProfile?.defaultPrimeRatePercent ?? 10.75).toFixed(2)}%)</span>
+                    <span>+200 bps</span>
+                  </div>
+                </div>
+
+                <div className="p-2 rounded-lg bg-white border border-slate-200">
+                  <span className="text-[10px] text-slate-500 block">Monthly Bond Repayment:</span>
+                  <span className="text-xs font-black text-slate-900 font-mono">
+                    {loanToValue > 0 ? `${formatZAR(calculatedMetrics.monthlyBondPayment)}/pm` : 'R 0 (Cash Deal)'}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+
+      case 'longTermProjections':
+        return (
+          <div key="longTermProjections" data-section-id="longTermProjections" className="rounded-xl border border-slate-200 bg-white overflow-hidden shadow-2xs">
+            <button
+              type="button"
+              onClick={() => setShowAdvancedAssumptions(!showAdvancedAssumptions)}
+              className="w-full p-4 flex items-center justify-between text-left hover:bg-slate-50 transition-colors cursor-pointer"
+            >
+              <div className="flex items-center gap-2.5">
+                <div className="p-1.5 bg-indigo-50 text-indigo-600 rounded-lg">
+                  <TrendingUp className="w-4 h-4" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
+                      Advanced Assumptions & Long-Term Wealth Projections
+                    </h4>
+                    <span className="text-[10px] font-semibold bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-full border border-indigo-200">
+                      {bondTermYears}-Year Model
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-500 mt-0.5">
+                    Model 20/30-year capital appreciation, rent escalation, inflation, and bond amortization
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] font-semibold text-slate-500 hidden sm:inline">
+                  {showAdvancedAssumptions ? 'Hide Projections' : 'Expand Projections & Graph'}
+                </span>
+                <div className="p-1 rounded-md text-slate-400">
+                  {showAdvancedAssumptions ? (
+                    <ChevronUp className="w-4 h-4" />
+                  ) : (
+                    <ChevronDown className="w-4 h-4" />
+                  )}
+                </div>
+              </div>
+            </button>
+
+            {showAdvancedAssumptions && (
+              <div className="p-4 sm:p-5 border-t border-slate-200 bg-slate-50/50 space-y-5">
+                {/* Assumptions Inputs Grid */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+                  {/* Annual Capital Growth */}
+                  <div className="bg-white p-3 rounded-xl border border-slate-200 space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-bold text-slate-800">
+                        Annual Capital Growth
+                      </label>
+                      <span className="text-[10px] text-slate-400 font-medium">SA Avg: 5.0%</span>
+                    </div>
+                    <div className="flex items-center">
+                      <input
+                        type="number"
+                        name="annualCapitalGrowthPercent"
+                        autoComplete="off"
+                        step="any"
+                        min="0"
+                        max="25"
+                        value={annualCapitalGrowth}
+                        onChange={(e) => handleCapitalGrowthChange(Number(e.target.value))}
+                        className="w-full text-xs px-2.5 py-1.5 border border-slate-300 rounded-lg font-bold text-emerald-700 bg-white"
+                      />
+                      <span className="ml-1.5 text-xs text-slate-500 font-bold">% p.a.</span>
+                    </div>
+                    <p className="text-[10px] text-slate-400">Annual property valuation appreciation</p>
+                  </div>
+
+                  {/* Annual Rental Escalation */}
+                  <div className="bg-white p-3 rounded-xl border border-slate-200 space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-bold text-slate-800">
+                        Rental Escalation
+                      </label>
+                      <span className="text-[10px] text-slate-400 font-medium">SA Avg: 6.0%</span>
+                    </div>
+                    <div className="flex items-center">
+                      <input
+                        type="number"
+                        name="annualRentalEscalationPercent"
+                        autoComplete="off"
+                        step="any"
+                        min="0"
+                        max="25"
+                        value={annualRentalEscalation}
+                        onChange={(e) => handleRentalEscalationChange(Number(e.target.value))}
+                        className="w-full text-xs px-2.5 py-1.5 border border-slate-300 rounded-lg font-bold text-indigo-700 bg-white"
+                      />
+                      <span className="ml-1.5 text-xs text-slate-500 font-bold">% p.a.</span>
+                    </div>
+                    <p className="text-[10px] text-slate-400">Compounding yearly tenant lease increase</p>
+                  </div>
+
+                  {/* Annual Expense Inflation */}
+                  <div className="bg-white p-3 rounded-xl border border-slate-200 space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-bold text-slate-800">
+                        Expense Inflation
+                      </label>
+                      <span className="text-[10px] text-slate-400 font-medium">SA Avg: 6.0%</span>
+                    </div>
+                    <div className="flex items-center">
+                      <input
+                        type="number"
+                        name="annualExpenseInflationPercent"
+                        autoComplete="off"
+                        step="any"
+                        min="0"
+                        max="25"
+                        value={annualExpenseInflation}
+                        onChange={(e) => handleExpenseInflationChange(Number(e.target.value))}
+                        className="w-full text-xs px-2.5 py-1.5 border border-slate-300 rounded-lg font-bold text-amber-700 bg-white"
+                      />
+                      <span className="ml-1.5 text-xs text-slate-500 font-bold">% p.a.</span>
+                    </div>
+                    <p className="text-[10px] text-slate-400">Municipal rates & levy inflation</p>
+                  </div>
+
+                  {/* Bond / Projection Term */}
+                  <div className="bg-white p-3 rounded-xl border border-slate-200 space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-bold text-slate-800">
+                        Projection Horizon
+                      </label>
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => handleBondTermChange(20)}
+                          className={`text-[10px] px-1.5 py-0.5 rounded font-bold transition-colors ${
+                            bondTermYears === 20
+                              ? 'bg-emerald-600 text-white'
+                              : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                          }`}
+                        >
+                          20y
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleBondTermChange(30)}
+                          className={`text-[10px] px-1.5 py-0.5 rounded font-bold transition-colors ${
+                            bondTermYears === 30
+                              ? 'bg-emerald-600 text-white'
+                              : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                          }`}
+                        >
+                          30y
+                        </button>
+                      </div>
+                    </div>
+                    <div className="flex items-center">
+                      <input
+                        type="number"
+                        name="bondTermYears"
+                        autoComplete="off"
+                        min="5"
+                        max="35"
+                        value={bondTermYears}
+                        onChange={(e) => handleBondTermChange(Number(e.target.value))}
+                        className="w-full text-xs px-2.5 py-1.5 border border-slate-300 rounded-lg font-bold text-slate-900 bg-white"
+                      />
+                      <span className="ml-1.5 text-xs text-slate-500 font-bold">Years</span>
+                    </div>
+                    <p className="text-[10px] text-slate-400">Term for amortization & wealth buildup</p>
+                  </div>
+
+                  {/* Extra Monthly Bond Payment (Voluntary Capital Injection) */}
+                  {strategy !== 'Flip' && (
+                    <div className="bg-white p-3 rounded-xl border border-slate-200 space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <label className="text-xs font-bold text-slate-800">
+                          Extra Monthly Bond
+                        </label>
+                        <span className="text-[10px] text-indigo-600 font-semibold">Accelerate Paydown</span>
+                      </div>
+                      <div className="flex items-center">
+                        <span className="mr-1.5 text-xs text-slate-500 font-bold">R</span>
+                        <input
+                          type="number"
+                          name="extraMonthlyPaymentZAR"
+                          autoComplete="off"
+                          step="500"
+                          min="0"
+                          placeholder="0"
+                          value={extraMonthlyPayment || ''}
+                          onChange={(e) => handleExtraMonthlyPaymentChange(Number(e.target.value) || 0)}
+                          className="w-full text-xs px-2.5 py-1.5 border border-slate-300 rounded-lg font-bold text-indigo-700 bg-white"
+                        />
+                      </div>
+                      <p className="text-[10px] text-slate-400">Voluntary capital: reduces principal only (Sec 11(a))</p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Reset to SA Averages Button */}
+                <div className="flex items-center justify-end">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      handleCapitalGrowthChange(5.0);
+                      handleRentalEscalationChange(6.0);
+                      handleExpenseInflationChange(6.0);
+                      handleBondTermChange(20);
+                      handleExtraMonthlyPaymentChange(0);
+                    }}
+                    className="text-[11px] font-semibold text-slate-600 hover:text-slate-900 underline transition-colors cursor-pointer"
+                  >
+                    Reset to South African Benchmark Averages (5% Growth / 6% Escalation / 20 Yrs)
+                  </button>
+                </div>
+
+                {/* Accelerated Paydown Impact Summary Banner */}
+                {paydownImpact && paydownImpact.monthsSaved > 0 && (
+                  <div className="p-3.5 rounded-xl border border-indigo-200 bg-indigo-50/50 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+                    <div className="space-y-0.5">
+                      <div className="flex items-center gap-1.5 font-bold text-indigo-950">
+                        <Zap className="w-4 h-4 text-indigo-600" />
+                        <span>Accelerated Paydown Impact (+{formatZAR(extraMonthlyPayment)}/m)</span>
+                      </div>
+                      <p className="text-[11px] text-indigo-700">
+                        Bond settled in{' '}
+                        <strong className="font-semibold text-indigo-950">
+                          {Math.floor(paydownImpact.acceleratedMonths / 12)} yrs {paydownImpact.acceleratedMonths % 12} mos
+                        </strong>{' '}
+                        (saves <strong className="font-semibold text-indigo-950">{paydownImpact.monthsSaved} months</strong> &amp;{' '}
+                        <strong className="font-semibold text-indigo-950">{formatZAR(paydownImpact.interestSaved)}</strong> in total bank interest).
+                      </p>
+                    </div>
+                    {paydownImpact.refiReadyYearAccelerated !== null && (
+                      <div className="shrink-0 bg-white px-2.5 py-1.5 rounded-lg border border-indigo-200 text-right">
+                        <span className="block text-[10px] uppercase font-bold text-slate-400">BRRRR Refi-Ready (≤{refinanceLtvPercent}% LTV)</span>
+                        <span className="font-bold text-indigo-900">
+                          Year {paydownImpact.refiReadyYearAccelerated}{' '}
+                          <span className="text-[10px] text-slate-500 font-normal">
+                            {paydownImpact.refiReadyYearScheduled !== null && paydownImpact.refiReadyYearScheduled !== paydownImpact.refiReadyYearAccelerated
+                              ? `(vs Year ${paydownImpact.refiReadyYearScheduled})`
+                              : ''}
+                          </span>
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Embedded Custom SVG Multi-line Projection Chart */}
+                <div className="pt-2">
+                  <LongTermProjectionChart data={calculatedProjections} />
+                </div>
+              </div>
+            )}
+          </div>
+        );
+
+      case 'stressTaxOverrides':
+        return (
+          <div key="stressTaxOverrides" data-section-id="stressTaxOverrides" className="rounded-xl border border-slate-200 bg-slate-50/70 overflow-hidden shadow-2xs">
+            <button
+              type="button"
+              onClick={() => setIsStressAndTaxOpen(!isStressAndTaxOpen)}
+              className="w-full p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-left hover:bg-slate-100/60 transition-colors cursor-pointer"
+            >
+              <div className="flex items-center gap-2">
+                <Scale className="w-4 h-4 text-emerald-600 shrink-0" />
+                <div>
+                  <span className="text-xs font-bold text-slate-900 uppercase tracking-wider block">
+                    Stress-Test & Tax Overrides
+                  </span>
+                  <span className="text-[10px] text-slate-500">
+                    Conveyancing, SARS Transfer Duty Overrides & Section 13sex Tax Shield
+                  </span>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 flex-wrap">
+                {numberOfUnits >= 5 && (
+                  <span className="text-[10px] font-bold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full border border-emerald-300">
+                    ✓ Meets SARS ≥5-Unit Sec 13sex Threshold
+                  </span>
+                )}
+                <span className="text-[11px] font-semibold text-slate-700 bg-white px-2.5 py-0.5 rounded border border-slate-200">
+                  {overrideTax || overrideLegal ? 'Custom Overrides Active' : `Auto SARS: ${formatZAR(calculatedCosts.transferDuty)}`}
+                  {isSection13Eligible ? ` • Sec 13sex (+${formatZAR(calculatedSection13.annualTaxSavingsZAR)}/yr)` : ''}
+                </span>
+                <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${isStressAndTaxOpen ? 'rotate-180' : ''}`} />
+              </div>
+            </button>
+
+            {isStressAndTaxOpen && (
+              <div className="p-4 pt-0 border-t border-slate-200/70">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-3">
+                  {/* SARS Tax & Legal Overrides */}
+                  <div className="p-4 rounded-xl border border-slate-200 bg-white">
+                    <h4 className="text-xs font-bold text-slate-800 mb-3 flex items-center justify-between">
+                      <span>SARS Tax & Legal Overrides</span>
+                      <span className="text-[11px] text-emerald-600 font-semibold">Automated Formulas Active</span>
+                    </h4>
+                    <div className="grid grid-cols-2 gap-3 text-xs">
+                      <div>
+                        <label className="flex items-center gap-1.5 text-[11px] font-medium text-slate-700 mb-1 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={overrideTax}
+                            onChange={(e) => setOverrideTax(e.target.checked)}
+                            className="rounded border-slate-300 text-emerald-600"
+                          />
+                          <span>Override Transfer Duty</span>
+                        </label>
+                        {overrideTax ? (
+                          <input
+                            type="number"
+                            name="customTransferDutyZAR"
+                            autoComplete="off"
+                            placeholder="R Amount"
+                            value={customTransferDuty}
+                            onChange={(e) => setCustomTransferDuty(Number(e.target.value))}
+                            className="w-full text-xs px-2.5 py-1.5 border border-slate-300 rounded-lg"
+                          />
+                        ) : (
+                          <div className="text-slate-500 text-xs py-1.5 font-medium">
+                            Auto SARS: <span className="font-semibold text-slate-800">{formatZAR(calculatedCosts.transferDuty)}</span>
+                          </div>
+                        )}
+                      </div>
+
+                      <div>
+                        <label className="flex items-center gap-1.5 text-[11px] font-medium text-slate-700 mb-1 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={overrideLegal}
+                            onChange={(e) => setOverrideLegal(e.target.checked)}
+                            className="rounded border-slate-300 text-emerald-600"
+                          />
+                          <span>Override Conveyancing</span>
+                        </label>
+                        {overrideLegal ? (
+                          <input
+                            type="number"
+                            name="customConveyancingZAR"
+                            autoComplete="off"
+                            placeholder="R Amount"
+                            value={customConveyancing}
+                            onChange={(e) => setCustomConveyancing(Number(e.target.value))}
+                            className="w-full text-xs px-2.5 py-1.5 border border-slate-300 rounded-lg"
+                          />
+                        ) : (
+                          <div className="text-slate-500 text-xs py-1.5 font-medium" title="Recommended fee incl. 15% VAT (LSSA July 2026 guideline; negotiable)">
+                            LSSA guideline (July 2026): <span className="font-semibold text-slate-800">{formatZAR(calculatedCosts.conveyancingFee)}</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Section 13sex SARS Estimator Engine */}
+                  <div className="p-4 rounded-xl border border-emerald-200 bg-emerald-50/40">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-1.5">
+                        <Sparkles className="w-4 h-4 text-emerald-700" />
+                        <h4 className="text-xs font-bold text-slate-900">SARS Section 13sex Tax Shield</h4>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        {numberOfUnits >= 5 && (
+                          <span className="text-[10px] font-bold bg-emerald-200/80 text-emerald-900 px-2 py-0.5 rounded-full">
+                            ✓ ≥5 Units ({numberOfUnits})
+                          </span>
+                        )}
+                        <span className="text-[10px] font-semibold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full">
+                          55% Base • 20 Yrs
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2.5 text-xs">
+                      <div className="flex items-center justify-between">
+                        <label className="flex items-center gap-2 font-semibold text-slate-800 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={isSection13Eligible}
+                            onChange={(e) => setIsSection13Eligible(e.target.checked)}
+                            className="w-4 h-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
+                          />
+                          <span className="text-[11px]">Section 13sex Eligible (New / Off-plan)</span>
+                        </label>
+
+                        {isSection13Eligible && (
+                          <select
+                            value={section13TaxRate}
+                            onChange={(e) => setSection13TaxRate(Number(e.target.value))}
+                            className="text-[11px] font-semibold py-1 px-2 border border-emerald-300 rounded-md bg-white text-emerald-900"
+                          >
+                            <option value={27}>27% (Company/Trust)</option>
+                            <option value={31}>31% (Mid Individual)</option>
+                            <option value={45}>45% (Top Marginal)</option>
+                          </select>
+                        )}
+                      </div>
+
+                      {isSection13Eligible ? (
+                        <div className="grid grid-cols-2 gap-2 pt-1 border-t border-emerald-200/60">
+                          <div className="bg-white p-2 rounded-lg border border-emerald-100 shadow-2xs">
+                            <span className="text-[10px] text-slate-500 block">55% Building Base</span>
+                            <span className="font-bold text-slate-800 text-xs">
+                              {formatZAR(calculatedSection13.buildingDeductionBaseZAR)}
+                            </span>
+                          </div>
+                          <div className="bg-white p-2 rounded-lg border border-emerald-100 shadow-2xs">
+                            <span className="text-[10px] text-slate-500 block">Annual Write-off (5%)</span>
+                            <span className="font-bold text-emerald-700 text-xs">
+                              {formatZAR(calculatedSection13.annualAllowanceZAR)}/yr
+                            </span>
+                          </div>
+                          <div className="bg-emerald-100/70 p-2 rounded-lg border border-emerald-200 col-span-2 flex items-center justify-between">
+                            <div>
+                              <span className="text-[10px] text-emerald-900 font-medium block">
+                                Annual Tax Shield Cash Savings
+                              </span>
+                              <span className="text-sm font-extrabold text-emerald-800">
+                                +{formatZAR(calculatedSection13.annualTaxSavingsZAR)}/year
+                              </span>
+                            </div>
+                            <div className="text-right">
+                              <span className="text-[9px] text-slate-500 block">20-Yr Cumulative</span>
+                              <span className="text-xs font-bold text-slate-800">
+                                {formatZAR(calculatedSection13.twentyYearCumulativeSavingsZAR)}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      ) : (
+                        <p className="text-[11px] text-slate-500 leading-tight">
+                          For new residential units acquired for letting (min 5 units). SARS allows a 55% building deduction amortized at 5% annually for 20 years.
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        );
+
+      default:
+        return null;
+    }
+  };
+
   return (
     <div className="flex-1 flex flex-col">
       <TopHeader
@@ -1530,6 +2983,18 @@ export default function OpportunityAnalyzerPage() {
                 )}
               </div>
 
+              {/* Customize Layout Popover Button */}
+              <AnalyzerLayoutCustomizer
+                sectionOrder={analyzerSectionOrder}
+                hiddenSections={hiddenAnalyzerSections}
+                onToggleVisibility={toggleAnalyzerSectionVisibility}
+                onMoveSection={moveAnalyzerSection}
+                onApplyPreset={applyAnalyzerLayoutPreset}
+                activeOverrides={activeOverrides}
+                isDistressedSource={isDistressedSource}
+                strategy={strategy}
+              />
+
               <span className="text-xs font-semibold bg-emerald-100 text-emerald-800 px-2.5 py-1 rounded-full flex items-center gap-1">
                 <Scale className="w-3.5 h-3.5" /> SARS 2024–2026 Brackets
               </span>
@@ -1794,145 +3259,6 @@ export default function OpportunityAnalyzerPage() {
                   </div>
                 )}
               </div>
-            </div>
-
-            {/* Location & Amenity Scorecard */}
-            <div className="rounded-xl border border-slate-200 bg-slate-50/70 overflow-hidden shadow-2xs">
-              <button
-                type="button"
-                onClick={() => setIsScorecardOpen(!isScorecardOpen)}
-                className="w-full p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-left hover:bg-slate-100/60 transition-colors cursor-pointer"
-              >
-                <div className="flex items-center gap-2">
-                  <MapPin className="w-4 h-4 text-emerald-600 shrink-0" />
-                  <div>
-                    <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
-                      Location & Amenity Scorecard
-                    </h3>
-                    <span className="text-[10px] text-slate-500">Qualitative Macro-Accessibility & Node Proximity</span>
-                  </div>
-                </div>
-
-                {/* Live Composite Grade Badge & Expand Chevron */}
-                <div className="flex items-center gap-2">
-                  <span className="text-[11px] text-slate-500 font-medium">Composite Grade:</span>
-                  <span
-                    className={`px-2.5 py-0.5 rounded-full text-xs font-bold shadow-2xs ${
-                      calculatedAmenityScorecard.compositeGrade === 'A-Grade (Prime Hub)'
-                        ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
-                        : calculatedAmenityScorecard.compositeGrade === 'B-Grade (Accessible)'
-                        ? 'bg-teal-100 text-teal-800 border border-teal-300'
-                        : 'bg-amber-100 text-amber-800 border border-amber-300'
-                    }`}
-                  >
-                    {calculatedAmenityScorecard.compositeGrade} ({calculatedAmenityScorecard.compositeScore}/12 Pts)
-                  </span>
-                  <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${isScorecardOpen ? 'rotate-180' : ''}`} />
-                </div>
-              </button>
-
-              {isScorecardOpen && (
-                <div className="p-4 pt-0 border-t border-slate-200/70">
-                  {/* 4 Amenity Distance Pill Groups */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-3">
-                    {/* 1. Schools */}
-                    <div className="bg-white p-3 rounded-lg border border-slate-200 shadow-2xs space-y-1.5">
-                      <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-800">
-                        <GraduationCap className="w-4 h-4 text-indigo-600" />
-                        <span>Schools & Education</span>
-                      </div>
-                      <div className="grid grid-cols-3 gap-1 pt-1">
-                        {(['0-5km', '6-10km', '10+km'] as AmenityDistance[]).map((dist) => (
-                          <button
-                            key={dist}
-                            type="button"
-                            onClick={() => setSchoolsDistance(dist)}
-                            className={`py-1 text-[11px] font-semibold rounded-md transition-all ${
-                              schoolsDistance === dist
-                                ? 'bg-slate-900 text-white shadow-xs'
-                                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                            }`}
-                          >
-                            {dist}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* 2. Police Station */}
-                    <div className="bg-white p-3 rounded-lg border border-slate-200 shadow-2xs space-y-1.5">
-                      <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-800">
-                        <ShieldAlert className="w-4 h-4 text-rose-600" />
-                        <span>Police Station (SAPS)</span>
-                      </div>
-                      <div className="grid grid-cols-3 gap-1 pt-1">
-                        {(['0-5km', '6-10km', '10+km'] as AmenityDistance[]).map((dist) => (
-                          <button
-                            key={dist}
-                            type="button"
-                            onClick={() => setPoliceDistance(dist)}
-                            className={`py-1 text-[11px] font-semibold rounded-md transition-all ${
-                              policeDistance === dist
-                                ? 'bg-slate-900 text-white shadow-xs'
-                                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                            }`}
-                          >
-                            {dist}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* 3. Hospital / Medical Clinic */}
-                    <div className="bg-white p-3 rounded-lg border border-slate-200 shadow-2xs space-y-1.5">
-                      <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-800">
-                        <Stethoscope className="w-4 h-4 text-teal-600" />
-                        <span>Hospital / Medical Clinic</span>
-                      </div>
-                      <div className="grid grid-cols-3 gap-1 pt-1">
-                        {(['0-5km', '6-10km', '10+km'] as AmenityDistance[]).map((dist) => (
-                          <button
-                            key={dist}
-                            type="button"
-                            onClick={() => setClinicDistance(dist)}
-                            className={`py-1 text-[11px] font-semibold rounded-md transition-all ${
-                              clinicDistance === dist
-                                ? 'bg-slate-900 text-white shadow-xs'
-                                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                            }`}
-                          >
-                            {dist}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* 4. Major Shopping Mall */}
-                    <div className="bg-white p-3 rounded-lg border border-slate-200 shadow-2xs space-y-1.5">
-                      <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-800">
-                        <ShoppingBag className="w-4 h-4 text-amber-600" />
-                        <span>Major Shopping Mall</span>
-                      </div>
-                      <div className="grid grid-cols-3 gap-1 pt-1">
-                        {(['0-5km', '6-10km', '10+km'] as AmenityDistance[]).map((dist) => (
-                          <button
-                            key={dist}
-                            type="button"
-                            onClick={() => setMallDistance(dist)}
-                            className={`py-1 text-[11px] font-semibold rounded-md transition-all ${
-                              mallDistance === dist
-                                ? 'bg-slate-900 text-white shadow-xs'
-                                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                            }`}
-                          >
-                            {dist}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
             </div>
 
             {/* Valuation vs. Purchase Price & Built-in Equity */}
@@ -2322,1217 +3648,10 @@ export default function OpportunityAnalyzerPage() {
               </div>
             )}
 
-            {/* Holding Period Sensitivity (1-12 Months) & Agent Commission VAT */}
-            <div id="analyzer-sensitivity" className="scroll-mt-20 rounded-xl bg-slate-50 border border-slate-200 overflow-hidden shadow-2xs">
-              {strategy === 'Rental' ? (
-                <div>
-                  <button
-                    type="button"
-                    onClick={() => setIsHoldingOpen(!isHoldingOpen)}
-                    className="w-full p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-left hover:bg-slate-100/60 transition-colors cursor-pointer"
-                  >
-                    <div className="flex items-center gap-2">
-                      <Sliders className="w-4 h-4 text-indigo-600 shrink-0" />
-                      <div>
-                        <span className="text-xs font-bold text-slate-900 uppercase tracking-wider block">
-                          Holding Period & Exit VAT Sensitivity
-                        </span>
-                        <span className="text-[10px] text-slate-500">Fine-tune holding duration & sales commission</span>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-bold text-indigo-900 bg-indigo-50 px-2.5 py-0.5 rounded border border-indigo-200">
-                        {holdingPeriodMonths} Mos &bull; Exit Comm: {formatPercent(effectiveExitCommissionPercent)}
-                      </span>
-                      <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${isHoldingOpen ? 'rotate-180' : ''}`} />
-                    </div>
-                  </button>
-
-                  {isHoldingOpen && (
-                    <div className="p-4 pt-0 border-t border-slate-200/70 space-y-3 pt-3">
-                      <div>
-                        <div className="flex items-center justify-between text-[11px] mb-1">
-                          <span className="font-semibold text-slate-700">Holding Period Duration</span>
-                          <span className="font-mono font-bold text-indigo-800">{holdingPeriodMonths} Months</span>
-                        </div>
-                        <input
-                          type="range"
-                          min="1"
-                          max="12"
-                          step="1"
-                          value={holdingPeriodMonths}
-                          onChange={(e) => {
-                            const val = Number(e.target.value);
-                            setHoldingPeriodMonths(val);
-                            updateAnalyzerDraft({ holdingPeriodMonths: val });
-                          }}
-                          className="w-full accent-indigo-600 cursor-pointer h-1.5 bg-slate-200 rounded-lg"
-                        />
-                        <div className="flex justify-between text-[9px] text-slate-400 font-medium px-0.5 mt-0.5">
-                          <span>1 Mo (Quick Flip)</span>
-                          <span>3 Mo</span>
-                          <span>6 Mo (Standard)</span>
-                          <span>9 Mo</span>
-                          <span>12 Mo (Long Reno)</span>
-                        </div>
-                      </div>
-
-                      <div className="pt-2 border-t border-slate-200/80 flex items-center justify-between">
-                        <label className="flex items-center gap-2 text-xs font-semibold text-slate-700 cursor-pointer select-none">
-                          <input
-                            type="checkbox"
-                            checked={vatExemptAgent}
-                            onChange={(e) => {
-                              const checked = e.target.checked;
-                              setVatExemptAgent(checked);
-                              updateAnalyzerDraft({ vatExemptAgent: checked });
-                            }}
-                            className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500"
-                          />
-                          <span>VAT-Exempt Real Estate Agent (Off-market / Private Seller, skips 15% VAT)</span>
-                        </label>
-                        <span className="text-[10px] font-bold text-slate-600 bg-white px-2 py-0.5 rounded border border-slate-200">
-                          {vatExemptAgent ? `${defaultAgentCommission.toFixed(1)}% (Exempt)` : `${calculateEffectiveExitCommission(defaultAgentCommission, false).toFixed(2)}% (Standard ${defaultAgentCommission.toFixed(1)}% + 15% VAT)`}
-                        </span>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <div className="p-4 space-y-3">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
-                    <div className="flex items-center gap-2">
-                      <Sliders className="w-4 h-4 text-indigo-600" />
-                      <span className="text-xs font-bold text-slate-900 uppercase tracking-wider">
-                        Holding Period & Exit VAT Sensitivity
-                      </span>
-                    </div>
-                    <span className="text-xs font-bold text-indigo-900 bg-indigo-50 px-2.5 py-0.5 rounded border border-indigo-200 self-start sm:self-auto">
-                      {holdingPeriodMonths} Months Holding &bull; Exit Comm: {formatPercent(effectiveExitCommissionPercent)}
-                    </span>
-                  </div>
-
-                  <div>
-                    <div className="flex items-center justify-between text-[11px] mb-1">
-                      <span className="font-semibold text-slate-700">Holding Period Duration</span>
-                      <span className="font-mono font-bold text-indigo-800">{holdingPeriodMonths} Months</span>
-                    </div>
-                    <input
-                      type="range"
-                      min="1"
-                      max="12"
-                      step="1"
-                      value={holdingPeriodMonths}
-                      onChange={(e) => {
-                        const val = Number(e.target.value);
-                        setHoldingPeriodMonths(val);
-                        updateAnalyzerDraft({ holdingPeriodMonths: val });
-                      }}
-                      className="w-full accent-indigo-600 cursor-pointer h-1.5 bg-slate-200 rounded-lg"
-                    />
-                    <div className="flex justify-between text-[9px] text-slate-400 font-medium px-0.5 mt-0.5">
-                      <span>1 Mo (Quick Flip)</span>
-                      <span>3 Mo</span>
-                      <span>6 Mo (Standard)</span>
-                      <span>9 Mo</span>
-                      <span>12 Mo (Long Reno)</span>
-                    </div>
-                  </div>
-
-                  <div className="pt-2 border-t border-slate-200/80 flex items-center justify-between">
-                    <label className="flex items-center gap-2 text-xs font-semibold text-slate-700 cursor-pointer select-none">
-                      <input
-                        type="checkbox"
-                        checked={vatExemptAgent}
-                        onChange={(e) => {
-                          const checked = e.target.checked;
-                          setVatExemptAgent(checked);
-                          updateAnalyzerDraft({ vatExemptAgent: checked });
-                        }}
-                        className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500"
-                      />
-                      <span>VAT-Exempt Real Estate Agent (Off-market / Private Seller, skips 15% VAT)</span>
-                    </label>
-                    <span className="text-[10px] font-bold text-slate-600 bg-white px-2 py-0.5 rounded border border-slate-200">
-                      {vatExemptAgent ? `${defaultAgentCommission.toFixed(1)}% (Exempt)` : `${calculateEffectiveExitCommission(defaultAgentCommission, false).toFixed(2)}% (Standard ${defaultAgentCommission.toFixed(1)}% + 15% VAT)`}
-                    </span>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Vacancy Buffer & Managing Agent Fee */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 rounded-xl bg-slate-50 border border-slate-200 shadow-2xs">
-              <div>
-                <div className="flex items-center justify-between mb-1">
-                  <label className="block text-[11px] font-semibold text-slate-700">
-                    Vacancy & Credit Loss Buffer (%)
-                  </label>
-                  <span className="text-[10px] font-bold text-amber-800 bg-amber-100/80 px-1.5 py-0.5 rounded">
-                    -{formatZAR(Math.round(monthlyRent * (vacancyRate / 100)))}/pm
-                  </span>
-                </div>
-                <div className="relative">
-                  <input
-                    type="number"
-                    name="vacancyRatePercent"
-                    autoComplete="off"
-                    min="0"
-                    max="30"
-                    step="any"
-                    value={vacancyRate}
-                    onChange={(e) => {
-                      const val = Number(e.target.value);
-                      setVacancyRate(val);
-                      updateAnalyzerDraft({ vacancyRatePercent: val });
-                    }}
-                    className="w-full text-xs px-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-emerald-500 font-semibold text-slate-900 bg-white"
-                  />
-                  <span className="absolute right-3 top-2 text-xs text-slate-400 font-bold">%</span>
-                </div>
-                {/* Vacancy Sensitivity Range Slider 0-15% */}
-                <div className="pt-2">
-                  <div className="flex items-center justify-between text-[10px] text-slate-500 mb-0.5">
-                    <span className="font-semibold flex items-center gap-1 text-slate-700">
-                      <Sliders className="w-3 h-3 text-amber-600" />
-                      Vacancy Sensitivity (0–15%)
-                    </span>
-                    <span className="font-bold text-amber-800">{vacancyRate}%</span>
-                  </div>
-                  <input
-                    type="range"
-                    min="0"
-                    max="15"
-                    step="0.5"
-                    value={vacancyRate}
-                    onChange={(e) => {
-                      const val = Number(e.target.value);
-                      setVacancyRate(val);
-                      updateAnalyzerDraft({ vacancyRatePercent: val });
-                    }}
-                    className="w-full accent-amber-600 cursor-pointer h-1.5 bg-slate-200 rounded-lg"
-                  />
-                  <div className="flex justify-between text-[9px] text-slate-400 font-medium px-0.5 mt-0.5">
-                    <span>0% (Full Occ.)</span>
-                    <span>5% (SA Avg)</span>
-                    <span>10% (Suburban)</span>
-                    <span>15% (Stress)</span>
-                  </div>
-                </div>
-                <p className="text-[10px] text-slate-500 mt-1">
-                  Deducts from gross rent before computing NOI, Cap Rate, and Cash-on-Cash yields. Default: 6.0%.
-                </p>
-              </div>
-
-              <div>
-                <div className="flex items-center justify-between mb-1">
-                  <div className="flex items-center gap-2">
-                    <label className="block text-[11px] font-semibold text-slate-700">
-                      Managing Agent Fee (%)
-                    </label>
-                    <label className="inline-flex items-center gap-1 cursor-pointer text-[10px] font-semibold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 px-1.5 py-0.5 rounded transition-colors select-none">
-                      <input
-                        type="checkbox"
-                        checked={agencyVatApplicable}
-                        onChange={(e) => {
-                          const checked = e.target.checked;
-                          setAgencyVatApplicable(checked);
-                          updateAnalyzerDraft({ agencyVatApplicable: checked });
-                        }}
-                        className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 w-3 h-3 cursor-pointer"
-                      />
-                      <span>+ 15% VAT</span>
-                    </label>
-                  </div>
-                  <span className="text-[10px] font-bold text-indigo-800 bg-indigo-100/80 px-1.5 py-0.5 rounded">
-                    {agencyVatApplicable ? (
-                      <>
-                        {managementFee}% + VAT = {(managementFee * 1.15).toFixed(1)}% &bull; -{formatZAR(Math.round(monthlyRent * (managementFee / 100) * 1.15))}/pm
-                      </>
-                    ) : (
-                      <>
-                        {managementFee.toFixed(1)}% (VAT Incl.) &bull; -{formatZAR(Math.round(monthlyRent * (managementFee / 100)))}/pm
-                      </>
-                    )}
-                  </span>
-                </div>
-                <div className="relative">
-                  <input
-                    type="number"
-                    name="managementFeePercent"
-                    autoComplete="off"
-                    min="0"
-                    max="20"
-                    step="any"
-                    value={managementFee}
-                    onChange={(e) => {
-                      const val = Number(e.target.value);
-                      setManagementFee(val);
-                      updateAnalyzerDraft({ managementFeePercent: val });
-                    }}
-                    className="w-full text-xs px-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-emerald-500 font-semibold text-slate-900 bg-white"
-                  />
-                  <span className="absolute right-3 top-2 text-xs text-slate-400 font-bold">%</span>
-                </div>
-                <p className="text-[10px] text-slate-500 mt-1">
-                  Professional rental agent tenant placement & collection fee (iGrow / WeconnectU baseline: 8.0%{agencyVatApplicable ? ' + 15% VAT = 9.2%' : ''}).
-                </p>
-              </div>
-            </div>
-
-            {/* Fine-Tune OpEx Reserves Accordion */}
-            {strategy !== 'Flip' && (
-              <div className="rounded-xl border border-slate-200 bg-slate-50/70 overflow-hidden shadow-2xs">
-                <button
-                  type="button"
-                  onClick={() => setIsOpExReservesOpen(!isOpExReservesOpen)}
-                  className="w-full p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-left hover:bg-slate-100/60 transition-colors cursor-pointer"
-                >
-                  <div className="flex items-center gap-2">
-                    <Sliders className="w-4 h-4 text-emerald-600 shrink-0" />
-                    <div>
-                      <span className="text-xs font-bold text-slate-900 uppercase tracking-wider block">
-                        Fine-Tune OpEx Reserves
-                      </span>
-                      <span className="text-[10px] text-slate-500">
-                        Maintenance, Prepaid Vending, Communal Services, Placement &amp; SPV Audit Fees
-                      </span>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-[11px] font-semibold text-slate-700 bg-white px-2.5 py-0.5 rounded border border-slate-200">
-                      Total Reserves: <strong className="text-emerald-700">-{formatZAR(monthlyMaintenanceReserve + monthlyPrepaidVendingFee + (monthlyCommunalServices || 0) + (calculatedMetrics.monthlyPlacementFeeZAR || 0) + (calculatedMetrics.monthlySpvAdminZAR || 0))}/pm</strong>
-                    </span>
-                    <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${isOpExReservesOpen ? 'rotate-180' : ''}`} />
-                  </div>
-                </button>
-
-                {isOpExReservesOpen && (
-                  <div className="p-4 pt-0 border-t border-slate-200/70">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 pt-3">
-                      <div>
-                        <div className="flex items-center justify-between mb-1">
-                          <label className="block text-[11px] font-semibold text-slate-700">
-                            Monthly Maintenance Reserve (ZAR)
-                          </label>
-                          <span className="text-[10px] font-bold text-slate-700 bg-slate-200 px-1.5 py-0.5 rounded">
-                            -{formatZAR(monthlyMaintenanceReserve)}/pm
-                          </span>
-                        </div>
-                        <div className="relative">
-                          <span className="absolute left-3 top-2 text-xs text-slate-400 font-bold">R</span>
-                          <input
-                            type="number"
-                            name="monthlyMaintenanceReserveZAR"
-                            autoComplete="off"
-                            min="0"
-                            step="50"
-                            value={monthlyMaintenanceReserve}
-                            onChange={(e) => {
-                              const val = Number(e.target.value);
-                              setMonthlyMaintenanceReserve(val);
-                              updateAnalyzerDraft({ monthlyMaintenanceReserveZAR: val });
-                            }}
-                            className="w-full text-xs pl-7 pr-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-emerald-500 font-semibold text-slate-900 bg-white"
-                          />
-                        </div>
-                        <p className="text-[10px] text-slate-500 mt-1">
-                          Provisioning for general repairs, wear-and-tear, and appliance servicing. Default: R 800.
-                        </p>
-                      </div>
-
-                      <div>
-                        <div className="flex items-center justify-between mb-1">
-                          <label className="block text-[11px] font-semibold text-slate-700">
-                            Prepaid Meter Vending Fee (ZAR)
-                          </label>
-                          <span className="text-[10px] font-bold text-slate-700 bg-slate-200 px-1.5 py-0.5 rounded">
-                            -{formatZAR(monthlyPrepaidVendingFee)}/pm
-                          </span>
-                        </div>
-                        <div className="relative">
-                          <span className="absolute left-3 top-2 text-xs text-slate-400 font-bold">R</span>
-                          <input
-                            type="number"
-                            name="monthlyPrepaidVendingFeeZAR"
-                            autoComplete="off"
-                            min="0"
-                            step="10"
-                            value={monthlyPrepaidVendingFee}
-                            onChange={(e) => {
-                              const val = Number(e.target.value);
-                              setMonthlyPrepaidVendingFee(val);
-                              updateAnalyzerDraft({ monthlyPrepaidVendingFeeZAR: val });
-                            }}
-                            className="w-full text-xs pl-7 pr-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-emerald-500 font-semibold text-slate-900 bg-white"
-                          />
-                        </div>
-                        <p className="text-[10px] text-slate-500 mt-1">
-                          CitiQ / Recharger monthly fixed admin fee for prepaid electricity/water recovery. Default: R 150.
-                        </p>
-                      </div>
-
-                      <div>
-                        <div className="flex items-center justify-between mb-1">
-                          <label className="block text-[11px] font-semibold text-slate-700">
-                            Communal / Serviced OpEx (ZAR)
-                          </label>
-                          <span className="text-[10px] font-bold text-slate-700 bg-slate-200 px-1.5 py-0.5 rounded">
-                            -{formatZAR(monthlyCommunalServices)}/pm
-                          </span>
-                        </div>
-                        <div className="relative">
-                          <span className="absolute left-3 top-2 text-xs text-slate-400 font-bold">R</span>
-                          <input
-                            type="number"
-                            name="monthlyCommunalServicesZAR"
-                            autoComplete="off"
-                            min="0"
-                            step="50"
-                            value={monthlyCommunalServices || ''}
-                            onChange={(e) => {
-                              const val = Number(e.target.value);
-                              setMonthlyCommunalServices(val);
-                              updateAnalyzerDraft({ monthlyCommunalServicesZAR: val });
-                            }}
-                            placeholder="0"
-                            className="w-full text-xs pl-7 pr-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-emerald-500 font-semibold text-slate-900 bg-white"
-                          />
-                        </div>
-                        <p className="text-[10px] text-slate-500 mt-1">
-                          Consolidated communal amenities (uncapped Wi-Fi, communal cleaning, security, garden care). Default: R 0.
-                        </p>
-                      </div>
-
-                      <div>
-                        <div className="flex items-center justify-between mb-1">
-                          <label className="block text-[11px] font-semibold text-slate-700">
-                            Tenant Placement Fee (% Rent)
-                          </label>
-                          <span className="text-[10px] font-bold text-slate-700 bg-slate-200 px-1.5 py-0.5 rounded">
-                            -{formatZAR(calculatedMetrics.monthlyPlacementFeeZAR)}/pm
-                          </span>
-                        </div>
-                        <div className="relative">
-                          <input
-                            type="number"
-                            name="tenantPlacementFeePercent"
-                            autoComplete="off"
-                            min="0"
-                            max="20"
-                            step="0.5"
-                            value={tenantPlacementFeePercent || ''}
-                            placeholder="0"
-                            onChange={(e) => {
-                              const val = Math.max(0, Number(e.target.value) || 0);
-                              setTenantPlacementFeePercent(val);
-                              updateAnalyzerDraft({ tenantPlacementFeePercent: val });
-                            }}
-                            className="w-full text-xs px-3 pr-7 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-emerald-500 font-semibold text-slate-900 bg-white"
-                          />
-                          <span className="absolute right-3 top-2 text-xs text-slate-400 font-bold">%</span>
-                        </div>
-                        <p className="text-[10px] text-slate-500 mt-1">
-                          Amortized leasing / procurement commission{agencyVatApplicable ? ' (+15% VAT applied)' : ''}. Default: 0%.
-                        </p>
-                      </div>
-
-                      <div>
-                        <div className="flex items-center justify-between mb-1">
-                          <label className="block text-[11px] font-semibold text-slate-700">
-                            Annual SPV Audit / Admin (ZAR/yr)
-                          </label>
-                          <span className="text-[10px] font-bold text-slate-700 bg-slate-200 px-1.5 py-0.5 rounded">
-                            -{formatZAR(calculatedMetrics.monthlySpvAdminZAR)}/pm
-                          </span>
-                        </div>
-                        <div className="relative">
-                          <span className="absolute left-3 top-2 text-xs text-slate-400 font-bold">R</span>
-                          <input
-                            type="number"
-                            name="annualSpvAdminAuditFeeZAR"
-                            autoComplete="off"
-                            min="0"
-                            step="1000"
-                            value={annualSpvAdminAuditFeeZAR || ''}
-                            placeholder="0"
-                            onChange={(e) => {
-                              const val = Math.max(0, Number(e.target.value) || 0);
-                              setAnnualSpvAdminAuditFeeZAR(val);
-                              updateAnalyzerDraft({ annualSpvAdminAuditFeeZAR: val });
-                            }}
-                            className="w-full text-xs pl-7 pr-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-emerald-500 font-semibold text-slate-900 bg-white"
-                          />
-                        </div>
-                        <p className="text-[10px] text-slate-500 mt-1">
-                          For syndications, body corporate audits, or Pty Ltd accounting — divided by 12 p.m.
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Auction / Distressed Costs Input Row - Conditionally rendered only for Auction & Distressed Bank Repo */}
-            {isDistressedSource && (
-              <div className="p-4 rounded-xl bg-amber-50/70 border border-amber-200 space-y-3">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-amber-200/80 pb-2">
-                  <div className="flex items-center gap-2">
-                    <Scale className="w-4 h-4 text-amber-700" />
-                    <div>
-                      <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
-                        Auction / Distressed Costs
-                      </h4>
-                      <span className="text-[10px] text-slate-500">
-                        Immediate Day-1 cash outlays: buyer&apos;s commission & municipal clearance debt
-                      </span>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-[11px] font-semibold text-slate-600">Total Auction Outlays:</span>
-                    <span className="text-xs font-bold text-amber-900 bg-amber-100 px-2.5 py-0.5 rounded border border-amber-300">
-                      {formatZAR((auctioneerCommission || 0) + (municipalArrears || 0))}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {/* 1. Auctioneer Commission */}
-                  <div>
-                    <div className="flex items-center justify-between mb-1">
-                      <label className="text-[11px] font-semibold text-slate-700">
-                        Auctioneer Commission / Buyer&apos;s Premium (ZAR)
-                      </label>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const fee = Math.round(purchasePrice * 0.10 * 1.15);
-                          setAuctioneerCommission(fee);
-                          updateAnalyzerDraft({ auctioneerCommission: fee });
-                        }}
-                        className="text-[10px] text-amber-900 hover:text-amber-950 font-bold bg-amber-100/90 hover:bg-amber-200 px-2 py-0.5 rounded border border-amber-300 transition-colors cursor-pointer"
-                        title="Auto-calculate standard SA auction commission: 10% + 15% VAT = 11.5% of hammer price"
-                      >
-                        Calc 10% + VAT
-                      </button>
-                    </div>
-                    <div className="relative">
-                      <span className="absolute left-2.5 top-2 text-xs text-slate-400 font-bold">R</span>
-                      <input
-                        type="number"
-                        name="auctioneerCommissionZAR"
-                        autoComplete="off"
-                        min="0"
-                        step="any"
-                        value={auctioneerCommission || ''}
-                        onChange={(e) => {
-                          const val = Number(e.target.value);
-                          setAuctioneerCommission(val);
-                          updateAnalyzerDraft({ auctioneerCommission: val });
-                        }}
-                        placeholder="0"
-                        className="w-full text-xs pl-7 pr-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-amber-500 font-semibold text-slate-900 bg-white"
-                      />
-                    </div>
-                    <span className="text-[10px] text-slate-500 mt-1 block">
-                      Mandatory buyer&apos;s premium payable immediately on auction day.
-                    </span>
-                  </div>
-
-                  {/* 2. Municipal Arrears */}
-                  <div>
-                    <div className="flex items-center justify-between mb-1">
-                      <label className="text-[11px] font-semibold text-slate-700">
-                        Municipal Arrears & Taxes Settlement (ZAR)
-                      </label>
-                      <span className="text-[10px] text-amber-800 font-bold bg-amber-100 px-1.5 py-0.2 rounded">
-                        Section 118
-                      </span>
-                    </div>
-                    <div className="relative">
-                      <span className="absolute left-2.5 top-2 text-xs text-slate-400 font-bold">R</span>
-                      <input
-                        type="number"
-                        name="municipalArrearsZAR"
-                        autoComplete="off"
-                        min="0"
-                        step="any"
-                        value={municipalArrears || ''}
-                        onChange={(e) => {
-                          const val = Number(e.target.value);
-                          setMunicipalArrears(val);
-                          updateAnalyzerDraft({ municipalArrears: val });
-                        }}
-                        placeholder="0"
-                        className="w-full text-xs pl-7 pr-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-amber-500 font-semibold text-slate-900 bg-white"
-                      />
-                    </div>
-                    <span className="text-[10px] text-slate-500 mt-1 block">
-                      Historical city council rates/water debt settlement required for transfer clearance.
-                    </span>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Occupancy & Site Possession (PIE Act Eviction Risk Engine) */}
-            <OccupancyRiskCard
-              value={occupantRisk}
-              onChange={(updated) => {
-                setOccupantRisk(updated);
-                updateAnalyzerDraft({ occupantRisk: updated });
-              }}
-              maoReductionZAR={
-                strategy === 'Flip'
-                  ? computedFlipMao.occupantRiskReductionZAR
-                  : computedRentalMao.occupantRiskReductionZAR
-              }
-              evictionDelayBurnZAR={calculatedMetrics.evictionDelayBurnZAR ?? 0}
-              totalOccupantCostZAR={calculatedMetrics.totalOccupantCostZAR ?? 0}
-              maoMode={strategy === 'Flip' ? 'Flip' : 'Rental'}
-            />
-
-            {/* Mortgage / Bond Financing & Cash Deposit Sync Engine */}
-            <div className="p-4 sm:p-5 rounded-xl border border-slate-200 bg-white shadow-2xs space-y-4">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-100">
-                <div className="flex items-center gap-2">
-                  <div className="p-1.5 bg-emerald-50 rounded-lg text-emerald-700">
-                    <Scale className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
-                      Mortgage Financing & Cash Deposit Engine
-                    </h4>
-                    <p className="text-[11px] text-slate-500">
-                      Bidirectional LTV & down-payment sync with live principal calculation
-                    </p>
-                  </div>
-                </div>
-
-                {/* Live Financed Principal Readout Badge */}
-                <div className="flex items-center gap-2 bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-200">
-                  <span className="text-[11px] text-slate-500 font-medium">Financed Bond:</span>
-                  <span className="text-xs font-black text-slate-900 font-mono">
-                    {formatZAR(calculatedMetrics.bondAmount)}
-                  </span>
-                  <span className="text-[10px] text-slate-400 font-semibold">
-                    ({loanToValue}% LTV)
-                  </span>
-                </div>
-              </div>
-
-              {/* Main Inputs: Side-by-Side Deposit ZAR and LTV Slider */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-4">
-                {/* Column 1: Deposit (ZAR) */}
-                <div className="lg:col-span-4 bg-slate-50/70 p-3.5 rounded-xl border border-slate-200 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <label className="text-xs font-bold text-slate-800">
-                      Cash Deposit (ZAR)
-                    </label>
-                    <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
-                      {purchasePrice > 0 ? ((depositZAR / purchasePrice) * 100).toFixed(1) : 0}% Equity
-                    </span>
-                  </div>
-                  <div className="relative">
-                    <span className="absolute left-3 top-2 text-xs text-slate-400 font-bold">R</span>
-                    <input
-                      type="number"
-                      name="depositZAR"
-                      autoComplete="off"
-                      min="0"
-                      max={purchasePrice}
-                      step="any"
-                      value={depositZAR}
-                      onChange={(e) => handleDepositChange(Number(e.target.value))}
-                      className="w-full text-xs pl-7 pr-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-emerald-500 font-bold text-slate-900 bg-white"
-                      placeholder="0"
-                    />
-                  </div>
-                  <p className="text-[10px] text-slate-500 leading-tight">
-                    Paid directly to conveyancing attorney upon transfer.
-                  </p>
-                </div>
-
-                {/* Column 2: Bond LTV (%) Slider + Presets */}
-                <div className="lg:col-span-5 bg-slate-50/70 p-3.5 rounded-xl border border-slate-200 space-y-2.5">
-                  <div className="flex items-center justify-between">
-                    <label className="text-xs font-bold text-slate-800">
-                      Bond Loan-to-Value (LTV)
-                    </label>
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-xs font-extrabold text-emerald-800 font-mono bg-white px-2 py-0.5 rounded border border-slate-200">
-                        {loanToValue}%
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* LTV Range Slider */}
-                  <div className="pt-1">
-                    <input
-                      type="range"
-                      name="loanToValuePercent"
-                      autoComplete="off"
-                      min="0"
-                      max="100"
-                      step="1"
-                      value={loanToValue}
-                      onChange={(e) => handleLTVChange(Number(e.target.value))}
-                      className="w-full accent-emerald-600 cursor-pointer h-2 bg-slate-200 rounded-lg"
-                    />
-                    <div className="flex justify-between text-[10px] text-slate-400 font-medium px-0.5">
-                      <span>0% (All Cash)</span>
-                      <span>50%</span>
-                      <span>80%</span>
-                      <span>90%</span>
-                      <span>100% (Zero Down)</span>
-                    </div>
-                  </div>
-
-                  {/* Quick Preset Buttons */}
-                  <div className="flex items-center gap-1.5 pt-1">
-                    {[
-                      { ltv: 100, label: '100% (0% Dep)' },
-                      { ltv: 90, label: '90% (10% Dep)' },
-                      { ltv: 80, label: '80% (20% Dep)' },
-                      { ltv: 0, label: '0% (All Cash)' },
-                    ].map((preset) => (
-                      <button
-                        key={preset.ltv}
-                        type="button"
-                        onClick={() => handleLTVChange(preset.ltv)}
-                        className={`flex-1 text-[10px] py-1 px-1.5 rounded-md font-semibold border transition-all ${
-                          loanToValue === preset.ltv
-                            ? 'bg-emerald-600 text-white border-emerald-600 shadow-2xs'
-                            : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-100'
-                        }`}
-                      >
-                        {preset.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Column 3: Interest Rate & Loan Term & Monthly Bond Repayment */}
-                <div className="lg:col-span-3 bg-slate-50/70 p-3.5 rounded-xl border border-slate-200 flex flex-col justify-between space-y-2">
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <label className="block text-[10px] font-semibold text-slate-600 mb-1">Interest Rate</label>
-                      <div className="flex items-center">
-                        <input
-                          type="number"
-                          name="interestRatePercent"
-                          autoComplete="off"
-                          min="0"
-                          step="any"
-                          value={interestRate}
-                          onChange={(e) => setInterestRate(Number(e.target.value))}
-                          className="w-full text-xs px-2 py-1.5 border border-slate-300 rounded-lg font-semibold bg-white"
-                        />
-                        <span className="ml-1 text-xs text-slate-500 font-bold">%</span>
-                      </div>
-                    </div>
-                    <div>
-                      <label className="block text-[10px] font-semibold text-slate-600 mb-1">Loan Term</label>
-                      <div className="flex items-center">
-                        <input
-                          type="number"
-                          name="loanTermYears"
-                          autoComplete="off"
-                          min="5"
-                          max="30"
-                          value={loanTermYears}
-                          onChange={(e) => {
-                            const val = Number(e.target.value);
-                            setLoanTermYears(val);
-                            handleBondTermChange(val);
-                          }}
-                          className="w-full text-xs px-2 py-1.5 border border-slate-300 rounded-lg font-semibold bg-white"
-                        />
-                        <span className="ml-1 text-xs text-slate-500 font-bold">yr</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Prime Spread (±200 bps) Sensitivity Slider */}
-                  <div className="pt-2 border-t border-slate-200">
-                    <div className="flex items-center justify-between text-[10px] mb-1">
-                      <span className="font-bold text-slate-700 flex items-center gap-1">
-                        <Sliders className="w-3 h-3 text-emerald-600" />
-                        Prime Spread (±200 bps)
-                      </span>
-                      <span className="font-mono font-bold text-emerald-800 bg-white px-1.5 py-0.5 rounded border border-slate-200">
-                        {interestRateMargin >= 0 ? `+${interestRateMargin.toFixed(2)}%` : `${interestRateMargin.toFixed(2)}%`} ({((interestRateMargin) * 100).toFixed(0)} bps)
-                      </span>
-                    </div>
-                    <input
-                      type="range"
-                      min="-2"
-                      max="2"
-                      step="0.25"
-                      value={interestRateMargin}
-                      onChange={(e) => {
-                        const margin = Number(e.target.value);
-                        setInterestRateMargin(margin);
-                        const prime = investorProfile?.defaultPrimeRatePercent ?? 10.75;
-                        setInterestRate(Number((prime + margin).toFixed(2)));
-                        updateAnalyzerDraft({ interestRateMargin: margin });
-                      }}
-                      className="w-full accent-emerald-600 cursor-pointer h-1.5 bg-slate-200 rounded-lg"
-                    />
-                    <div className="flex justify-between text-[9px] text-slate-400 font-mono mt-0.5">
-                      <span>-200 bps</span>
-                      <span>Prime ({(investorProfile?.defaultPrimeRatePercent ?? 10.75).toFixed(2)}%)</span>
-                      <span>+200 bps</span>
-                    </div>
-                  </div>
-
-                  <div className="p-2 rounded-lg bg-white border border-slate-200">
-                    <span className="text-[10px] text-slate-500 block">Monthly Bond Repayment:</span>
-                    <span className="text-xs font-black text-slate-900 font-mono">
-                      {loanToValue > 0 ? `${formatZAR(calculatedMetrics.monthlyBondPayment)}/pm` : 'R 0 (Cash Deal)'}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Advanced Assumptions & Long-Term Projections Collapsible Section */}
-            <div className="rounded-xl border border-slate-200 bg-white overflow-hidden shadow-2xs">
-              <button
-                type="button"
-                onClick={() => setShowAdvancedAssumptions(!showAdvancedAssumptions)}
-                className="w-full p-4 flex items-center justify-between text-left hover:bg-slate-50 transition-colors cursor-pointer"
-              >
-                <div className="flex items-center gap-2.5">
-                  <div className="p-1.5 bg-indigo-50 text-indigo-600 rounded-lg">
-                    <TrendingUp className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
-                        Advanced Assumptions & Long-Term Wealth Projections
-                      </h4>
-                      <span className="text-[10px] font-semibold bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-full border border-indigo-200">
-                        {bondTermYears}-Year Model
-                      </span>
-                    </div>
-                    <p className="text-[11px] text-slate-500 mt-0.5">
-                      Model 20/30-year capital appreciation, rent escalation, inflation, and bond amortization
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <span className="text-[11px] font-semibold text-slate-500 hidden sm:inline">
-                    {showAdvancedAssumptions ? 'Hide Projections' : 'Expand Projections & Graph'}
-                  </span>
-                  <div className="p-1 rounded-md text-slate-400">
-                    {showAdvancedAssumptions ? (
-                      <ChevronUp className="w-4 h-4" />
-                    ) : (
-                      <ChevronDown className="w-4 h-4" />
-                    )}
-                  </div>
-                </div>
-              </button>
-
-              {showAdvancedAssumptions && (
-                <div className="p-4 sm:p-5 border-t border-slate-200 bg-slate-50/50 space-y-5">
-                  {/* Assumptions Inputs Grid */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-3">
-                    {/* Annual Capital Growth */}
-                    <div className="bg-white p-3 rounded-xl border border-slate-200 space-y-1.5">
-                      <div className="flex items-center justify-between">
-                        <label className="text-xs font-bold text-slate-800">
-                          Annual Capital Growth
-                        </label>
-                        <span className="text-[10px] text-slate-400 font-medium">SA Avg: 5.0%</span>
-                      </div>
-                      <div className="flex items-center">
-                        <input
-                          type="number"
-                          name="annualCapitalGrowthPercent"
-                          autoComplete="off"
-                          step="any"
-                          min="0"
-                          max="25"
-                          value={annualCapitalGrowth}
-                          onChange={(e) => handleCapitalGrowthChange(Number(e.target.value))}
-                          className="w-full text-xs px-2.5 py-1.5 border border-slate-300 rounded-lg font-bold text-emerald-700 bg-white"
-                        />
-                        <span className="ml-1.5 text-xs text-slate-500 font-bold">% p.a.</span>
-                      </div>
-                      <p className="text-[10px] text-slate-400">Annual property valuation appreciation</p>
-                    </div>
-
-                    {/* Annual Rental Escalation */}
-                    <div className="bg-white p-3 rounded-xl border border-slate-200 space-y-1.5">
-                      <div className="flex items-center justify-between">
-                        <label className="text-xs font-bold text-slate-800">
-                          Rental Escalation
-                        </label>
-                        <span className="text-[10px] text-slate-400 font-medium">SA Avg: 6.0%</span>
-                      </div>
-                      <div className="flex items-center">
-                        <input
-                          type="number"
-                          name="annualRentalEscalationPercent"
-                          autoComplete="off"
-                          step="any"
-                          min="0"
-                          max="25"
-                          value={annualRentalEscalation}
-                          onChange={(e) => handleRentalEscalationChange(Number(e.target.value))}
-                          className="w-full text-xs px-2.5 py-1.5 border border-slate-300 rounded-lg font-bold text-indigo-700 bg-white"
-                        />
-                        <span className="ml-1.5 text-xs text-slate-500 font-bold">% p.a.</span>
-                      </div>
-                      <p className="text-[10px] text-slate-400">Compounding yearly tenant lease increase</p>
-                    </div>
-
-                    {/* Annual Expense Inflation */}
-                    <div className="bg-white p-3 rounded-xl border border-slate-200 space-y-1.5">
-                      <div className="flex items-center justify-between">
-                        <label className="text-xs font-bold text-slate-800">
-                          Expense Inflation
-                        </label>
-                        <span className="text-[10px] text-slate-400 font-medium">SA Avg: 6.0%</span>
-                      </div>
-                      <div className="flex items-center">
-                        <input
-                          type="number"
-                          name="annualExpenseInflationPercent"
-                          autoComplete="off"
-                          step="any"
-                          min="0"
-                          max="25"
-                          value={annualExpenseInflation}
-                          onChange={(e) => handleExpenseInflationChange(Number(e.target.value))}
-                          className="w-full text-xs px-2.5 py-1.5 border border-slate-300 rounded-lg font-bold text-amber-700 bg-white"
-                        />
-                        <span className="ml-1.5 text-xs text-slate-500 font-bold">% p.a.</span>
-                      </div>
-                      <p className="text-[10px] text-slate-400">Municipal rates & levy inflation</p>
-                    </div>
-
-                    {/* Bond / Projection Term */}
-                    <div className="bg-white p-3 rounded-xl border border-slate-200 space-y-1.5">
-                      <div className="flex items-center justify-between">
-                        <label className="text-xs font-bold text-slate-800">
-                          Projection Horizon
-                        </label>
-                        <div className="flex items-center gap-1">
-                          <button
-                            type="button"
-                            onClick={() => handleBondTermChange(20)}
-                            className={`text-[10px] px-1.5 py-0.5 rounded font-bold transition-colors ${
-                              bondTermYears === 20
-                                ? 'bg-emerald-600 text-white'
-                                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                            }`}
-                          >
-                            20y
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleBondTermChange(30)}
-                            className={`text-[10px] px-1.5 py-0.5 rounded font-bold transition-colors ${
-                              bondTermYears === 30
-                                ? 'bg-emerald-600 text-white'
-                                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                            }`}
-                          >
-                            30y
-                          </button>
-                        </div>
-                      </div>
-                      <div className="flex items-center">
-                        <input
-                          type="number"
-                          name="bondTermYears"
-                          autoComplete="off"
-                          min="5"
-                          max="35"
-                          value={bondTermYears}
-                          onChange={(e) => handleBondTermChange(Number(e.target.value))}
-                          className="w-full text-xs px-2.5 py-1.5 border border-slate-300 rounded-lg font-bold text-slate-900 bg-white"
-                        />
-                        <span className="ml-1.5 text-xs text-slate-500 font-bold">Years</span>
-                      </div>
-                      <p className="text-[10px] text-slate-400">Term for amortization & wealth buildup</p>
-                    </div>
-
-                    {/* Extra Monthly Bond Payment (Voluntary Capital Injection) */}
-                    {strategy !== 'Flip' && (
-                      <div className="bg-white p-3 rounded-xl border border-slate-200 space-y-1.5">
-                        <div className="flex items-center justify-between">
-                          <label className="text-xs font-bold text-slate-800">
-                            Extra Monthly Bond
-                          </label>
-                          <span className="text-[10px] text-indigo-600 font-semibold">Accelerate Paydown</span>
-                        </div>
-                        <div className="flex items-center">
-                          <span className="mr-1.5 text-xs text-slate-500 font-bold">R</span>
-                          <input
-                            type="number"
-                            name="extraMonthlyPaymentZAR"
-                            autoComplete="off"
-                            step="500"
-                            min="0"
-                            placeholder="0"
-                            value={extraMonthlyPayment || ''}
-                            onChange={(e) => handleExtraMonthlyPaymentChange(Number(e.target.value) || 0)}
-                            className="w-full text-xs px-2.5 py-1.5 border border-slate-300 rounded-lg font-bold text-indigo-700 bg-white"
-                          />
-                        </div>
-                        <p className="text-[10px] text-slate-400">Voluntary capital: reduces principal only (Sec 11(a))</p>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Reset to SA Averages Button */}
-                  <div className="flex items-center justify-end">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        handleCapitalGrowthChange(5.0);
-                        handleRentalEscalationChange(6.0);
-                        handleExpenseInflationChange(6.0);
-                        handleBondTermChange(20);
-                        handleExtraMonthlyPaymentChange(0);
-                      }}
-                      className="text-[11px] font-semibold text-slate-600 hover:text-slate-900 underline transition-colors cursor-pointer"
-                    >
-                      Reset to South African Benchmark Averages (5% Growth / 6% Escalation / 20 Yrs)
-                    </button>
-                  </div>
-
-                  {/* Accelerated Paydown Impact Summary Banner */}
-                  {paydownImpact && paydownImpact.monthsSaved > 0 && (
-                    <div className="p-3.5 rounded-xl border border-indigo-200 bg-indigo-50/50 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
-                      <div className="space-y-0.5">
-                        <div className="flex items-center gap-1.5 font-bold text-indigo-950">
-                          <Zap className="w-4 h-4 text-indigo-600" />
-                          <span>Accelerated Paydown Impact (+{formatZAR(extraMonthlyPayment)}/m)</span>
-                        </div>
-                        <p className="text-[11px] text-indigo-700">
-                          Bond settled in{' '}
-                          <strong className="font-semibold text-indigo-950">
-                            {Math.floor(paydownImpact.acceleratedMonths / 12)} yrs {paydownImpact.acceleratedMonths % 12} mos
-                          </strong>{' '}
-                          (saves <strong className="font-semibold text-indigo-950">{paydownImpact.monthsSaved} months</strong> &amp;{' '}
-                          <strong className="font-semibold text-indigo-950">{formatZAR(paydownImpact.interestSaved)}</strong> in total bank interest).
-                        </p>
-                      </div>
-                      {paydownImpact.refiReadyYearAccelerated !== null && (
-                        <div className="shrink-0 bg-white px-2.5 py-1.5 rounded-lg border border-indigo-200 text-right">
-                          <span className="block text-[10px] uppercase font-bold text-slate-400">BRRRR Refi-Ready (≤{refinanceLtvPercent}% LTV)</span>
-                          <span className="font-bold text-indigo-900">
-                            Year {paydownImpact.refiReadyYearAccelerated}{' '}
-                            <span className="text-[10px] text-slate-500 font-normal">
-                              {paydownImpact.refiReadyYearScheduled !== null && paydownImpact.refiReadyYearScheduled !== paydownImpact.refiReadyYearAccelerated
-                                ? `(vs Year ${paydownImpact.refiReadyYearScheduled})`
-                                : ''}
-                            </span>
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Embedded Custom SVG Multi-line Projection Chart */}
-                  <div className="pt-2">
-                    <LongTermProjectionChart data={calculatedProjections} />
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Stress-Test & Tax Overrides Accordion */}
-            <div className="rounded-xl border border-slate-200 bg-slate-50/70 overflow-hidden shadow-2xs">
-              <button
-                type="button"
-                onClick={() => setIsStressAndTaxOpen(!isStressAndTaxOpen)}
-                className="w-full p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-left hover:bg-slate-100/60 transition-colors cursor-pointer"
-              >
-                <div className="flex items-center gap-2">
-                  <Scale className="w-4 h-4 text-emerald-600 shrink-0" />
-                  <div>
-                    <span className="text-xs font-bold text-slate-900 uppercase tracking-wider block">
-                      Stress-Test & Tax Overrides
-                    </span>
-                    <span className="text-[10px] text-slate-500">
-                      Conveyancing, SARS Transfer Duty Overrides & Section 13sex Tax Shield
-                    </span>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2 flex-wrap">
-                  {numberOfUnits >= 5 && (
-                    <span className="text-[10px] font-bold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full border border-emerald-300">
-                      ✓ Meets SARS ≥5-Unit Sec 13sex Threshold
-                    </span>
-                  )}
-                  <span className="text-[11px] font-semibold text-slate-700 bg-white px-2.5 py-0.5 rounded border border-slate-200">
-                    {overrideTax || overrideLegal ? 'Custom Overrides Active' : `Auto SARS: ${formatZAR(calculatedCosts.transferDuty)}`}
-                    {isSection13Eligible ? ` • Sec 13sex (+${formatZAR(calculatedSection13.annualTaxSavingsZAR)}/yr)` : ''}
-                  </span>
-                  <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${isStressAndTaxOpen ? 'rotate-180' : ''}`} />
-                </div>
-              </button>
-
-              {isStressAndTaxOpen && (
-                <div className="p-4 pt-0 border-t border-slate-200/70">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-3">
-                    {/* SARS Tax & Legal Overrides */}
-                    <div className="p-4 rounded-xl border border-slate-200 bg-white">
-                      <h4 className="text-xs font-bold text-slate-800 mb-3 flex items-center justify-between">
-                        <span>SARS Tax & Legal Overrides</span>
-                        <span className="text-[11px] text-emerald-600 font-semibold">Automated Formulas Active</span>
-                      </h4>
-                      <div className="grid grid-cols-2 gap-3 text-xs">
-                        <div>
-                          <label className="flex items-center gap-1.5 text-[11px] font-medium text-slate-700 mb-1 cursor-pointer">
-                            <input
-                              type="checkbox"
-                              checked={overrideTax}
-                              onChange={(e) => setOverrideTax(e.target.checked)}
-                              className="rounded border-slate-300 text-emerald-600"
-                            />
-                            <span>Override Transfer Duty</span>
-                          </label>
-                          {overrideTax ? (
-                            <input
-                              type="number"
-                              name="customTransferDutyZAR"
-                              autoComplete="off"
-                              placeholder="R Amount"
-                              value={customTransferDuty}
-                              onChange={(e) => setCustomTransferDuty(Number(e.target.value))}
-                              className="w-full text-xs px-2.5 py-1.5 border border-slate-300 rounded-lg"
-                            />
-                          ) : (
-                            <div className="text-slate-500 text-xs py-1.5 font-medium">
-                              Auto SARS: <span className="font-semibold text-slate-800">{formatZAR(calculatedCosts.transferDuty)}</span>
-                            </div>
-                          )}
-                        </div>
-
-                        <div>
-                          <label className="flex items-center gap-1.5 text-[11px] font-medium text-slate-700 mb-1 cursor-pointer">
-                            <input
-                              type="checkbox"
-                              checked={overrideLegal}
-                              onChange={(e) => setOverrideLegal(e.target.checked)}
-                              className="rounded border-slate-300 text-emerald-600"
-                            />
-                            <span>Override Conveyancing</span>
-                          </label>
-                          {overrideLegal ? (
-                            <input
-                              type="number"
-                              name="customConveyancingZAR"
-                              autoComplete="off"
-                              placeholder="R Amount"
-                              value={customConveyancing}
-                              onChange={(e) => setCustomConveyancing(Number(e.target.value))}
-                              className="w-full text-xs px-2.5 py-1.5 border border-slate-300 rounded-lg"
-                            />
-                          ) : (
-                            <div className="text-slate-500 text-xs py-1.5 font-medium" title="Recommended fee incl. 15% VAT (LSSA July 2026 guideline; negotiable)">
-                              LSSA guideline (July 2026): <span className="font-semibold text-slate-800">{formatZAR(calculatedCosts.conveyancingFee)}</span>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Section 13sex SARS Estimator Engine */}
-                    <div className="p-4 rounded-xl border border-emerald-200 bg-emerald-50/40">
-                      <div className="flex items-center justify-between mb-2">
-                        <div className="flex items-center gap-1.5">
-                          <Sparkles className="w-4 h-4 text-emerald-700" />
-                          <h4 className="text-xs font-bold text-slate-900">SARS Section 13sex Tax Shield</h4>
-                        </div>
-                        <div className="flex items-center gap-1.5">
-                          {numberOfUnits >= 5 && (
-                            <span className="text-[10px] font-bold bg-emerald-200/80 text-emerald-900 px-2 py-0.5 rounded-full">
-                              ✓ ≥5 Units ({numberOfUnits})
-                            </span>
-                          )}
-                          <span className="text-[10px] font-semibold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full">
-                            55% Base • 20 Yrs
-                          </span>
-                        </div>
-                      </div>
-
-                      <div className="space-y-2.5 text-xs">
-                        <div className="flex items-center justify-between">
-                          <label className="flex items-center gap-2 font-semibold text-slate-800 cursor-pointer">
-                            <input
-                              type="checkbox"
-                              checked={isSection13Eligible}
-                              onChange={(e) => setIsSection13Eligible(e.target.checked)}
-                              className="w-4 h-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
-                            />
-                            <span className="text-[11px]">Section 13sex Eligible (New / Off-plan)</span>
-                          </label>
-
-                          {isSection13Eligible && (
-                            <select
-                              value={section13TaxRate}
-                              onChange={(e) => setSection13TaxRate(Number(e.target.value))}
-                              className="text-[11px] font-semibold py-1 px-2 border border-emerald-300 rounded-md bg-white text-emerald-900"
-                            >
-                              <option value={27}>27% (Company/Trust)</option>
-                              <option value={31}>31% (Mid Individual)</option>
-                              <option value={45}>45% (Top Marginal)</option>
-                            </select>
-                          )}
-                        </div>
-
-                        {isSection13Eligible ? (
-                          <div className="grid grid-cols-2 gap-2 pt-1 border-t border-emerald-200/60">
-                            <div className="bg-white p-2 rounded-lg border border-emerald-100 shadow-2xs">
-                              <span className="text-[10px] text-slate-500 block">55% Building Base</span>
-                              <span className="font-bold text-slate-800 text-xs">
-                                {formatZAR(calculatedSection13.buildingDeductionBaseZAR)}
-                              </span>
-                            </div>
-                            <div className="bg-white p-2 rounded-lg border border-emerald-100 shadow-2xs">
-                              <span className="text-[10px] text-slate-500 block">Annual Write-off (5%)</span>
-                              <span className="font-bold text-emerald-700 text-xs">
-                                {formatZAR(calculatedSection13.annualAllowanceZAR)}/yr
-                              </span>
-                            </div>
-                            <div className="bg-emerald-100/70 p-2 rounded-lg border border-emerald-200 col-span-2 flex items-center justify-between">
-                              <div>
-                                <span className="text-[10px] text-emerald-900 font-medium block">
-                                  Annual Tax Shield Cash Savings
-                                </span>
-                                <span className="text-sm font-extrabold text-emerald-800">
-                                  +{formatZAR(calculatedSection13.annualTaxSavingsZAR)}/year
-                                </span>
-                              </div>
-                              <div className="text-right">
-                                <span className="text-[9px] text-slate-500 block">20-Yr Cumulative</span>
-                                <span className="text-xs font-bold text-slate-800">
-                                  {formatZAR(calculatedSection13.twentyYearCumulativeSavingsZAR)}
-                                </span>
-                              </div>
-                            </div>
-                          </div>
-                        ) : (
-                          <p className="text-[11px] text-slate-500 leading-tight">
-                            For new residential units acquired for letting (min 5 units). SARS allows a 55% building deduction amortized at 5% annually for 20 years.
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
+            {/* Dynamic Modular Underwriting Sections (Hide, Show & Reorder) */}
+            {analyzerSectionOrder
+              .filter((id) => !hiddenAnalyzerSections.includes(id))
+              .map((sectionId) => renderModularSection(sectionId))}
 
             {/* Real-time Calculation Result Bar */}
             <div id="analyzer-results" className="scroll-mt-28 p-4 sm:p-5 rounded-xl bg-slate-900 text-white border border-slate-800 shadow-xs space-y-3.5">

@@ -110,6 +110,20 @@ export type PassReason =
   | 'Funding Not Secured'
   | 'Other';
 
+// Opportunity Analyzer Modular Section Layout Customizer
+export type AnalyzerSectionId =
+  | 'scorecard'
+  | 'holdingExit'
+  | 'vacancyAgent'
+  | 'opexReserves'
+  | 'auctionDistressed'
+  | 'pieActRisk'
+  | 'mortgageEngine'
+  | 'longTermProjections'
+  | 'stressTaxOverrides';
+
+export type AnalyzerLayoutPreset = 'full' | 'napkin';
+
 // Occupancy & PIE Act Eviction Risk Profile
 export type OccupancyStatus = 'vacant' | 'tenanted_verified' | 'unlawful_occupant';
 export type EvictionJurisdiction = 'none' | 'magistrates_court' | 'high_court';

@@ -16,6 +16,7 @@ import {
   INITIAL_ANALYZER_DRAFT,
   EMPTY_ANALYZER_DRAFT,
   DEFAULT_AI_SETTINGS,
+  DEFAULT_ANALYZER_SECTION_ORDER,
 } from '../initialData';
 
 export const createSystemSlice: StateCreator<
@@ -50,6 +51,10 @@ export const createSystemSlice: StateCreator<
           }
         : state.aiSettings,
       analyzerDraft: snapshot.analyzerDraft ?? state.analyzerDraft,
+      analyzerSectionOrder:
+        snapshot.analyzerSectionOrder ?? state.analyzerSectionOrder,
+      hiddenAnalyzerSections:
+        snapshot.hiddenAnalyzerSections ?? state.hiddenAnalyzerSections,
     })),
 
   resetToDemoData: () => {
@@ -74,6 +79,8 @@ export const createSystemSlice: StateCreator<
       analyzerDraft: INITIAL_ANALYZER_DRAFT,
       aiSettings: DEFAULT_AI_SETTINGS,
       rentalForecastView: 'wealth-only',
+      analyzerSectionOrder: [...DEFAULT_ANALYZER_SECTION_ORDER],
+      hiddenAnalyzerSections: [],
     });
   },
 
