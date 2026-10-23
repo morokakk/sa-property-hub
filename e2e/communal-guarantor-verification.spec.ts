@@ -21,9 +21,11 @@ test.describe('Communal OpEx, Room Classification & Third-Party Guarantors', () 
     const firstCard = page.locator('[data-testid^="rental-card-"]').first();
     await expect(firstCard).toBeVisible();
 
-    // Click "Edit" on the first rental card
-    const editButton = firstCard.locator('button:has-text("Edit")');
-    await editButton.scrollIntoViewIfNeeded();
+    // Click "Edit" on the first rental card via the More actions menu
+    const moreBtn = firstCard.locator('button[title="More actions"], [data-testid^="rental-card-more-"]');
+    await moreBtn.scrollIntoViewIfNeeded();
+    await moreBtn.click();
+    const editButton = page.locator('button:has-text("Edit Property")');
     await editButton.click();
 
     // Verify modal is displayed
@@ -51,7 +53,13 @@ test.describe('Communal OpEx, Room Classification & Third-Party Guarantors', () 
       await rentInput.fill('12000');
     }
 
-    const guarantorNameInput = page.locator('input[placeholder*="Parent Name (Deed of Suretyship)"]').last();
+    // Expand Guarantor accordion on the new unit if collapsed
+    const guarantorToggle = page.locator('text=Guarantor / Corporate Sponsor').last();
+    if (await guarantorToggle.isVisible()) {
+      await guarantorToggle.click();
+    }
+
+    const guarantorNameInput = page.locator('input[placeholder*="Parent Name"]').last();
     await guarantorNameInput.fill('Acme Corp SA');
 
     const guarantorContactInput = page.locator('input[placeholder*="legal@corp.co.za"]').last();
@@ -65,6 +73,12 @@ test.describe('Communal OpEx, Room Classification & Third-Party Guarantors', () 
     await expect(page.locator('h3:has-text("Edit Rental Property")')).toBeHidden();
 
     // 6. Verify property card reflections
+    // Expand OpEx breakdown if collapsed
+    const expandFirstOpEx = firstCard.locator('button:has-text("View Itemized OpEx")');
+    if (await expandFirstOpEx.isVisible()) {
+      await expandFirstOpEx.click();
+    }
+
     // Line item for Communal / Serviced: - R 3,000 (en-ZA uses non-breaking space as thousands separator)
     await expect(firstCard.locator('text=Communal / Serviced:')).toBeVisible();
     await expect(firstCard.getByText(/-\s*R\s*3[\s\u00a0,.]000/)).toBeVisible();
@@ -105,6 +119,12 @@ test.describe('Communal OpEx, Room Classification & Third-Party Guarantors', () 
     // Look for rental-4 card (Kempton Park Student Commune or multi-unit)
     const communeCard = page.locator('[data-testid="rental-card-rental-4"]');
     if (await communeCard.isVisible()) {
+      // Expand OpEx breakdown if collapsed
+      const expandCommuneOpEx = communeCard.locator('button:has-text("View Itemized OpEx")');
+      if (await expandCommuneOpEx.isVisible()) {
+        await expandCommuneOpEx.click();
+      }
+
       // Check pre-seeded communal services line item: R 2,500
       await expect(communeCard.locator('text=Communal / Serviced:')).toBeVisible();
       await expect(communeCard.getByText(/-\s*R\s*2[\s\u00a0,.]500/)).toBeVisible();

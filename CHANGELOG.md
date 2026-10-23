@@ -2,6 +2,41 @@
 
 All notable changes to this project will be documented in this file.
 
+## [E2E Test Suite Stabilization & Root Cause Analysis] - 2026-10-23
+
+### Fixed
+- **Root Cause Analysis & Spec Alignment across Target Test Suites**:
+  - `e2e/cloud-hydration.spec.ts`: Expanded collapsed inline auth accordion (`[data-testid="toggle-cloud-auth-btn"]`) prior to submitting credentials, resolving form input detachment timeouts.
+  - `e2e/communal-guarantor-verification.spec.ts`:
+    - Updated rental property edit trigger to navigate via the card's secondary actions overflow menu (`button[title="More actions"]` &rarr; `Edit Property`).
+    - Aligned guarantor name placeholder selector with current form markup (`input[placeholder*="Parent Name"]`) and expanded lease guarantor accordion (`text=Guarantor / Corporate Sponsor`).
+    - Handled collapsible OpEx accordion expansion (`button:has-text("View Itemized OpEx")`) before asserting `Communal / Serviced` line items on both active and pre-seeded communal cards (`rental-4`).
+  - `e2e/competitor-upgrades.spec.ts`:
+    - Switched to the `Underwriting, Buy Box & SARS Tax` tab in Settings to render Section 5 Buy Box Hurdles & SARS Criteria and VAT-exempt settings.
+    - Switched between the `Deal Sourcing Pipeline` and `Deal Calculator` tabs in Analyzer to test deal badges and sensitivity sliders.
+    - Interacted with deal card overflow menu (`button[title="More actions"]` &rarr; `Duplicate Scenario`) for scenario cloning.
+    - Expanded the Dashboard 5-Card Tax Audit accordion (`button:has-text("Expand 5-Card Tax Audit")`) and targeted exact text for Section 11(a) deductible interest.
+    - Opened the top-header `Data & Exports` dropdown on `/rentals` to trigger the `SARS ITR12 Tax Schedule (.xlsx)` export.
+  - Zero application code regressions; strict preservation of production business logic and UI components.
+
+## [Dependencies Update] - 2026-10-23
+
+### Updated
+- Ran `npm update` upgrading runtime dependencies to their latest compatible semver releases:
+  - **`next`** (`16.4.2` &rarr; `16.4.3`): Framework patch update with Turbopack and compilation optimizations.
+  - **`lucide-react`** (`1.59.0` &rarr; `1.61.0`): Icon component library update.
+  - **`zustand`** (`5.0.15` &rarr; `5.0.16`): Store state management patch release.
+
+## [E2E Workflow Live Browser Verification] - 2026-10-23
+
+### Added
+- **Multi-Module End-to-End Browser Workflow Verification**:
+  - Live interactive Playwright verification of the complete real estate deal lifecycle with comprehensive audit artifact report (`workflow_verification_report.md`):
+    - **Opportunity Analyzer (`/analyzer`)**: Verified modular `Customize Layout` popover drawer and `⚡ Quick Napkin Screen` preset (middle underwriting sections cleanly collapse down to Vacancy/Agent and Mortgage Financing while keeping core Valuation and Results cards pinned). Verified live real-time recalculation of Day-1 Cash outlay (`R 745,326`), Net Cap Rate (`7.1%`), and DSCR (`0.78x`) on the sticky bottom ribbon for *7th Avenue Parktown North* (R 2,400,000 purchase price, R 350,000 rehab, R 24,000/mo rent, 90% LTV bond). Confirmed pipeline save action.
+    - **Deal Sourcing Pipeline Triage**: Located candidate deal in the pipeline view, validated Buy Box match badge, calculated built-in equity highlight (`+R 400,000 / +14.3%`), and promoted candidate to `Buy-and-Flip`.
+    - **Executive Investor Pitch (`/proposal`)**: Verified active deal selection with strategy/source tags (`[RENTAL • Private Agent]`), configured target pitch terms (`R 600,000` facility, `15% p.a. Fixed Interest`, `Personal Suretyship + 2nd Bond`), and validated interactive `WhatsApp Pitch` generator reflecting holding burn, project outlay, and debt terms.
+    - **Capital Funding Ledger (`/funding`)**: Verified `+ Add to Capital Ledger` modal auto-prefilling with exact pitch facility parameters (`R 600,000` at `15% p.a.`), locked facility under *Atlas Private Capital (Pty) Ltd*, and confirmed standby capacity tracking with exact drawn (`R 0`) and undrawn (`R 600,000`) amounts in the debt ledger.
+
 ## [Opportunity Analyzer & Cross-Module Syndication Underwriting] - 2026-10-16
 
 ### Added

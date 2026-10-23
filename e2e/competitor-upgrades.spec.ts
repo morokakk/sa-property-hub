@@ -7,6 +7,11 @@ test.describe('Competitor-Inspired Upgrades Verification', () => {
       await page.goto('/settings', { waitUntil: 'domcontentloaded' });
       await page.locator('text=Initializing SA Property Hub...').waitFor({ state: 'detached', timeout: 30_000 }).catch(() => {});
 
+      // Switch to Underwriting & Buy Box tab
+      const underwritingTab = page.locator('button:has-text("Underwriting, Buy Box")');
+      await expect(underwritingTab).toBeVisible({ timeout: 15_000 });
+      await underwritingTab.click();
+
       // Verify Section 4 heading
       const section4Heading = page.locator('text=Strategy-Aware Buy Box Hurdles & SARS Criteria');
       await expect(section4Heading).toBeVisible({ timeout: 15_000 });
@@ -29,6 +34,11 @@ test.describe('Competitor-Inspired Upgrades Verification', () => {
       await page.goto('/analyzer', { waitUntil: 'domcontentloaded' });
       await page.locator('text=Initializing SA Property Hub...').waitFor({ state: 'detached', timeout: 30_000 }).catch(() => {});
 
+      // Switch to Deal Sourcing Pipeline tab to inspect deal badges
+      const pipelineTab = page.locator('button:has-text("Deal Sourcing Pipeline")');
+      await expect(pipelineTab).toBeVisible({ timeout: 15_000 });
+      await pipelineTab.click();
+
       // Wait for deals pipeline to load
       const buyBoxBadges = page.locator('span:has-text("Buy Box Match")');
       await expect(buyBoxBadges.first()).toBeVisible({ timeout: 15_000 });
@@ -41,6 +51,11 @@ test.describe('Competitor-Inspired Upgrades Verification', () => {
       const sec11aBadges = page.locator('span:has-text("Sec 11(a) Compliant")');
       await expect(sec11aBadges.first()).toBeVisible();
 
+      // Switch to Calculator tab to inspect calculator controls
+      const calcTab = page.locator('button:has-text("Deal Calculator")');
+      await expect(calcTab).toBeVisible();
+      await calcTab.click();
+
       // Verify Prime Spread slider in calculator form
       const primeSpreadLabel = page.locator('text=Prime Spread (±200 bps)');
       await expect(primeSpreadLabel).toBeVisible();
@@ -48,7 +63,9 @@ test.describe('Competitor-Inspired Upgrades Verification', () => {
       await expect(spreadSlider).toBeVisible();
 
       // Verify Holding Period & Exit VAT sensitivity section in calculator
-      await expect(page.locator('text=Holding Period & Exit VAT Sensitivity')).toBeVisible();
+      const holdingToggle = page.locator('button:has-text("Holding Period & Exit VAT Sensitivity")');
+      await expect(holdingToggle).toBeVisible();
+      await holdingToggle.click();
       const holdingSlider = page.locator('input[type="range"][min="1"][max="12"]');
       await expect(holdingSlider).toBeVisible();
 
@@ -68,14 +85,24 @@ test.describe('Competitor-Inspired Upgrades Verification', () => {
       await page.goto('/analyzer', { waitUntil: 'domcontentloaded' });
       await page.locator('text=Initializing SA Property Hub...').waitFor({ state: 'detached', timeout: 30_000 }).catch(() => {});
 
+      // Switch to Deal Sourcing Pipeline tab
+      const pipelineTab = page.locator('button:has-text("Deal Sourcing Pipeline")');
+      await expect(pipelineTab).toBeVisible({ timeout: 15_000 });
+      await pipelineTab.click();
+
+      // Open first deal card's More actions menu
+      const moreBtn = page.locator('button[title="More actions"]').first();
+      await expect(moreBtn).toBeVisible({ timeout: 15_000 });
+      await moreBtn.click();
+
       // Locate duplicate scenario button
-      const duplicateBtns = page.locator('button:has-text("Duplicate Scenario")');
-      await expect(duplicateBtns.first()).toBeVisible({ timeout: 15_000 });
+      const duplicateBtn = page.locator('button:has-text("Duplicate Scenario")');
+      await expect(duplicateBtn).toBeVisible({ timeout: 5_000 });
 
       const initialCount = await page.locator('h4:has-text("(Scenario)")').count();
 
-      // Click the first duplicate button
-      await duplicateBtns.first().click();
+      // Click duplicate scenario button
+      await duplicateBtn.click();
 
       // Verify that a new card with "(Scenario)" appears
       const scenarioTitles = page.locator('h4:has-text("(Scenario)")');
@@ -86,6 +113,11 @@ test.describe('Competitor-Inspired Upgrades Verification', () => {
     test('Selects multiple deals and opens Side-by-Side Comparison modal', async ({ page }) => {
       await page.goto('/analyzer', { waitUntil: 'domcontentloaded' });
       await page.locator('text=Initializing SA Property Hub...').waitFor({ state: 'detached', timeout: 30_000 }).catch(() => {});
+
+      // Switch to Deal Sourcing Pipeline tab
+      const pipelineTab = page.locator('button:has-text("Deal Sourcing Pipeline")');
+      await expect(pipelineTab).toBeVisible({ timeout: 15_000 });
+      await pipelineTab.click();
 
       // Find compare checkboxes
       const compareLabels = page.locator('label:has-text("Compare")');
@@ -146,19 +178,25 @@ test.describe('Competitor-Inspired Upgrades Verification', () => {
       const taxYearBadge = page.locator('span:has-text("SA Tax Year")');
       await expect(taxYearBadge).toBeVisible();
 
-      // Verify 4-Column KPI items
+      // Expand 5-Card Tax Audit accordion if collapsed
+      const expandAuditBtn = page.locator('button:has-text("Expand 5-Card Tax Audit")');
+      if (await expandAuditBtn.isVisible()) {
+        await expandAuditBtn.click();
+      }
+
+      // Verify 4-Column / 5-Column KPI items
       await expect(page.locator('text=Collected Rent (Code 4210)')).toBeVisible();
       await expect(page.locator('text=Opex Burn (Levies, Rates, Fees)')).toBeVisible();
       await expect(page.locator('text=Net Cash Flow YTD')).toBeVisible();
-      await expect(page.locator('text=Sec 11(a) Deductible Interest')).toBeVisible();
+      await expect(page.getByText('Sec 11(a) Deductible Interest', { exact: true })).toBeVisible();
 
       // Verify Section 11(a) ITR12 Code 4216 badge
-      await expect(page.locator('text=ITR12 Code 4216')).toBeVisible();
+      await expect(page.locator('text=ITR12 Code 4216').first()).toBeVisible();
       await expect(page.locator('text=SARS Shield Active')).toBeVisible();
 
-      // Verify Rental Tax Reserve card
-      await expect(page.locator('span:has-text("Rental Tax Reserve")')).toBeVisible();
-      await expect(page.locator('span:has-text("Total SARS Provisional Tax Reserve")')).toBeVisible();
+      // Verify Consolidated Tax Reserve card
+      await expect(page.locator('text=SARS Provisional Tax & ITR12 Reserve')).toBeVisible();
+      await expect(page.locator('h3:has-text("Total Provisional Tax Reserve")')).toBeVisible();
     });
 
     test('Rentals page renders Actuals vs Budget KPI Strip and SARS ITR12 Export button', async ({ page }) => {
@@ -169,8 +207,13 @@ test.describe('Competitor-Inspired Upgrades Verification', () => {
       const kpiStripTitle = page.locator('text=Actuals YTD vs. Budget (SA Tax Year)');
       await expect(kpiStripTitle).toBeVisible({ timeout: 15_000 });
 
-      // Verify SARS ITR12 Export button
-      const itr12Btn = page.locator('button:has-text("SARS ITR12 Export")');
+      // Open Data & Exports dropdown
+      const exportDropdownBtn = page.locator('[data-testid="rentals-export-csv-dropdown"], button:has-text("Data & Exports")');
+      await expect(exportDropdownBtn).toBeVisible({ timeout: 10_000 });
+      await exportDropdownBtn.click();
+
+      // Verify SARS ITR12 Export option
+      const itr12Btn = page.locator('[data-testid="export-sars-itr12"], button:has-text("SARS ITR12")');
       await expect(itr12Btn).toBeVisible({ timeout: 10_000 });
 
       // Trigger export and verify download event

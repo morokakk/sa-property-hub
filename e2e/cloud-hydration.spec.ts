@@ -150,6 +150,12 @@ test.describe('Cross-Device Cloud Hydration and Safe Data Merge', () => {
     const cloudSyncCard = page.locator('[data-testid="cloud-sync-card"]');
     await expect(cloudSyncCard).toBeVisible({ timeout: 30000 });
 
+    // Expand Cloud Sync inline auth controls if collapsed
+    const toggleBtn = page.locator('[data-testid="toggle-cloud-auth-btn"]');
+    if (await toggleBtn.isVisible()) {
+      await toggleBtn.click();
+    }
+
     const emailInput = cloudSyncCard.locator('input[type="email"]');
     const passwordInput = cloudSyncCard.locator('input[type="password"]');
     const signInBtn = cloudSyncCard.locator('button[type="submit"]');
