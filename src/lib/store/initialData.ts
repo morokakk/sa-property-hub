@@ -2688,6 +2688,7 @@ export const INITIAL_INVESTOR_PROFILE: InvestorProfile = {
   defaultPrimeRatePercent: 10.75,
   baselineHurdleYieldPercent: 10.0,
   defaultAgentCommissionPercent: 5.0,
+  defaultBondCancellationFeeZAR: 5200,
   minNetYieldPercent: 8.0,
   minMonthlyCashflowZAR: 1500,
   minNetRoiPercent: 8.0,

@@ -369,6 +369,10 @@ export interface OpportunityMetricsResult {
   evictionLegalCostZAR?: number;
   evictionDelayBurnZAR?: number;
   totalOccupantCostZAR?: number;
+  exitCommissionZAR?: number;
+  bondCancellationFeeZAR?: number;
+  earlyPenaltyZAR?: number;
+  totalExitFrictionZAR?: number;
 }
 
 /**
@@ -429,6 +433,10 @@ export function calculateDealMetrics(params: {
   exitCommissionPercent?: number;
   defaultAgentCommissionPercent?: number;
   vatExemptAgent?: boolean;
+  bondCancellationFeeZAR?: number;
+  defaultBondCancellationFeeZAR?: number;
+  earlyTerminationNoticeGiven?: boolean;
+  earlyTerminationPenaltyZAR?: number;
   occupantRisk?: OccupantRiskProfile;
 }): OpportunityMetricsResult {
   const {
@@ -472,6 +480,10 @@ export function calculateDealMetrics(params: {
     exitCommissionPercent,
     defaultAgentCommissionPercent = 5.0,
     vatExemptAgent = false,
+    bondCancellationFeeZAR: providedBondCancellationFee,
+    defaultBondCancellationFeeZAR = 5200,
+    earlyTerminationNoticeGiven = true,
+    earlyTerminationPenaltyZAR: providedEarlyPenalty,
     occupantRisk,
   } = params;
 
@@ -606,12 +618,32 @@ export function calculateDealMetrics(params: {
     monthlyBondPayment + monthlyLevies + monthlyRatesTaxes + monthlyInsurance + (occupantRisk?.monthlySiteSecurityZAR || 0)
   );
 
+  // Active Bond Exit Friction: Bond Cancellation Legal Fee & 90-Day Early Settlement Penalty
+  const hasActiveBond = bondAmount > 0;
+  const bondCancellationFeeZAR = !hasActiveBond
+    ? 0
+    : (providedBondCancellationFee !== undefined && providedBondCancellationFee !== null
+        ? providedBondCancellationFee
+        : defaultBondCancellationFeeZAR);
+
+  let earlyPenaltyZAR = 0;
+  if (hasActiveBond && earlyTerminationNoticeGiven === false) {
+    if (providedEarlyPenalty !== undefined && providedEarlyPenalty !== null) {
+      earlyPenaltyZAR = Math.max(0, providedEarlyPenalty);
+    } else {
+      // 90 days bank early settlement interest: bondAmount * (interestRatePercent / 100) * (90 / 365)
+      earlyPenaltyZAR = Math.round(bondAmount * (interestRatePercent / 100) * (90 / 365));
+    }
+  }
+  const exitLegalCosts = bondCancellationFeeZAR + earlyPenaltyZAR;
+
   const totalFlipCosts =
     effectiveTotalAcquisitionCost +
     estimatedRehabCost +
     auctionCosts +
     totalHoldingCosts +
     exitCommission +
+    exitLegalCosts +
     totalEvictionBurden;
 
   const projectedFlipNetProfit = targetExitPrice - totalFlipCosts;
@@ -686,7 +718,12 @@ export function calculateDealMetrics(params: {
     let yrNetCf = yrRent - yrCosts - yrBond - yrExtra;
     if (y === 5) {
       const year5ExitComm = year5GrossDisposalValue * commissionRate;
-      const netExitProceeds = year5GrossDisposalValue - year5ExitComm - remainingBondYear5;
+      const year5BondCancel = remainingBondYear5 > 0
+        ? (providedBondCancellationFee !== undefined && providedBondCancellationFee !== null
+            ? providedBondCancellationFee
+            : defaultBondCancellationFeeZAR)
+        : 0;
+      const netExitProceeds = year5GrossDisposalValue - year5ExitComm - year5BondCancel - remainingBondYear5;
       yrNetCf += netExitProceeds;
     }
     irrCashflows.push(yrNetCf);
@@ -742,6 +779,10 @@ export function calculateDealMetrics(params: {
     evictionLegalCostZAR: evictionLegalFee,
     evictionDelayBurnZAR: evictionHoldingBurn,
     totalOccupantCostZAR: totalEvictionBurden,
+    exitCommissionZAR: Math.round(exitCommission),
+    bondCancellationFeeZAR,
+    earlyPenaltyZAR,
+    totalExitFrictionZAR: Math.round(exitCommission + exitLegalCosts),
   };
 }
 

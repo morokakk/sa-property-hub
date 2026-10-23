@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { RentalProperty } from '@/types';
 import { formatZAR, formatDate } from '@/lib/formatters';
 import { calculateDisposalMetrics } from '@/lib/calculations/rentals';
-import { CheckCircle2, X } from 'lucide-react';
+import { CheckCircle2, X, AlertTriangle, ShieldCheck, FileText } from 'lucide-react';
 import { usePortfolioStore } from '@/lib/store/usePortfolioStore';
 
 export interface ExitSaleModalProps {
@@ -40,28 +40,70 @@ export const ExitSaleModal: React.FC<ExitSaleModalProps> = ({
   onSubmit: propOnSubmit,
 }) => {
   const markRentalAsSold = usePortfolioStore((s) => s.markRentalAsSold);
+  const investorProfile = usePortfolioStore((s) => s.investorProfile);
+
+  const defaultComm = investorProfile?.vatExemptAgent
+    ? (investorProfile?.defaultAgentCommissionPercent ?? 5.0)
+    : Number(((investorProfile?.defaultAgentCommissionPercent ?? 5.0) * 1.15).toFixed(2));
+  const defaultBondCancel = investorProfile?.defaultBondCancellationFeeZAR ?? 5200;
+  const hasActiveBond = (property?.outstandingBondBalanceZAR || 0) > 0;
 
   const [localSalePrice, setLocalSalePrice] = useState<number>(0);
   const [localNetProceeds, setLocalNetProceeds] = useState<number>(0);
   const [localSoldDate, setLocalSoldDate] = useState<string>('');
   const [localNotes, setLocalNotes] = useState<string>('');
+  const [commissionPercent, setCommissionPercent] = useState<number>(defaultComm);
+  const [isPrivateSale, setIsPrivateSale] = useState<boolean>(false);
+  const [bondCancellationFee, setBondCancellationFee] = useState<number>(defaultBondCancel);
+  const [earlyNoticeGiven, setEarlyNoticeGiven] = useState<boolean>(true);
+  const [customPenalty, setCustomPenalty] = useState<string>('');
+  const [isManualNetProceeds, setIsManualNetProceeds] = useState<boolean>(false);
 
   useEffect(() => {
     if (property && isOpen) {
       const estSale = property.marketValueZAR || property.purchasePriceZAR || 0;
+      const initialComm = property.exitCommissionPercent !== undefined
+        ? property.exitCommissionPercent
+        : defaultComm;
+      const initialPrivate = initialComm === 0;
+      const initialBondCancel = !hasActiveBond
+        ? 0
+        : (property.bondCancellationFeeZAR ?? defaultBondCancel);
+      const initialNotice = property.earlyTerminationNoticeGiven ?? true;
+      const initialPenalty = property.earlyTerminationPenaltyZAR !== undefined
+        ? String(property.earlyTerminationPenaltyZAR)
+        : '';
+
+      setCommissionPercent(initialComm > 0 ? initialComm : defaultComm);
+      setIsPrivateSale(initialPrivate);
+      setBondCancellationFee(initialBondCancel);
+      setEarlyNoticeGiven(initialNotice);
+      setCustomPenalty(initialPenalty);
+
       const metrics = calculateDisposalMetrics(
         estSale,
         property.purchasePriceZAR || 0,
-        property.outstandingBondBalanceZAR || 0
+        property.outstandingBondBalanceZAR || 0,
+        {
+          exitCommissionPercent: initialPrivate ? 0 : (initialComm > 0 ? initialComm : defaultComm),
+          bondCancellationFeeZAR: initialBondCancel,
+          earlyTerminationNoticeGiven: initialNotice,
+          earlyPenaltyZAR: initialPenalty !== '' ? Number(initialPenalty) : undefined,
+          bondInterestRatePercent: property.bondInterestRatePercent || 11.5,
+          hasActiveBond,
+          defaultBondCancellationFeeZAR: defaultBondCancel,
+        }
       );
+
       if (propSalePrice === undefined) {
         setLocalSalePrice(estSale);
         setLocalNetProceeds(metrics.netCashProceedsZAR);
         setLocalSoldDate(new Date().toISOString().split('T')[0]);
         setLocalNotes('');
+        setIsManualNetProceeds(false);
       }
     }
-  }, [property, isOpen, propSalePrice]);
+  }, [property, isOpen, propSalePrice, defaultComm, defaultBondCancel, hasActiveBond]);
 
   if (!isOpen || !property) return null;
 
@@ -70,27 +112,63 @@ export const ExitSaleModal: React.FC<ExitSaleModalProps> = ({
   const soldDate = propSoldDate !== undefined ? propSoldDate : localSoldDate;
   const notes = propNotes !== undefined ? propNotes : localNotes;
 
+  const currentMetrics = calculateDisposalMetrics(
+    salePrice,
+    property.purchasePriceZAR || 0,
+    property.outstandingBondBalanceZAR || 0,
+    {
+      exitCommissionPercent: isPrivateSale ? 0 : commissionPercent,
+      bondCancellationFeeZAR: hasActiveBond ? bondCancellationFee : 0,
+      earlyTerminationNoticeGiven: earlyNoticeGiven,
+      earlyPenaltyZAR: customPenalty !== '' ? Number(customPenalty) : undefined,
+      bondInterestRatePercent: property.bondInterestRatePercent || 11.5,
+      hasActiveBond,
+      defaultBondCancellationFeeZAR: defaultBondCancel,
+    }
+  );
+
+  const recomputeNetProceeds = (
+    newSalePrice: number,
+    privateSale: boolean,
+    commPct: number,
+    bondCancel: number,
+    notice: boolean,
+    penaltyStr: string
+  ) => {
+    const calc = calculateDisposalMetrics(
+      newSalePrice,
+      property.purchasePriceZAR || 0,
+      property.outstandingBondBalanceZAR || 0,
+      {
+        exitCommissionPercent: privateSale ? 0 : commPct,
+        bondCancellationFeeZAR: hasActiveBond ? bondCancel : 0,
+        earlyTerminationNoticeGiven: notice,
+        earlyPenaltyZAR: penaltyStr !== '' ? Number(penaltyStr) : undefined,
+        bondInterestRatePercent: property.bondInterestRatePercent || 11.5,
+        hasActiveBond,
+        defaultBondCancellationFeeZAR: defaultBondCancel,
+      }
+    );
+    if (!isManualNetProceeds) {
+      if (propSetNetProceeds) {
+        propSetNetProceeds(calc.netCashProceedsZAR);
+      } else {
+        setLocalNetProceeds(calc.netCashProceedsZAR);
+      }
+    }
+  };
+
   const handleSalePriceChange = (val: number) => {
     if (propSetSalePrice) {
       propSetSalePrice(val);
     } else {
       setLocalSalePrice(val);
     }
-
-    const calculatedProceeds = calculateDisposalMetrics(
-      val,
-      property.purchasePriceZAR || 0,
-      property.outstandingBondBalanceZAR || 0
-    ).netCashProceedsZAR;
-
-    if (propSetNetProceeds) {
-      propSetNetProceeds(calculatedProceeds);
-    } else {
-      setLocalNetProceeds(calculatedProceeds);
-    }
+    recomputeNetProceeds(val, isPrivateSale, commissionPercent, bondCancellationFee, earlyNoticeGiven, customPenalty);
   };
 
   const handleNetProceedsChange = (val: number) => {
+    setIsManualNetProceeds(true);
     if (propSetNetProceeds) {
       propSetNetProceeds(val);
     } else {
@@ -181,6 +259,140 @@ export const ExitSaleModal: React.FC<ExitSaleModalProps> = ({
             />
           </div>
 
+          {/* Itemized Exit Friction Section */}
+          <div className="p-3 rounded-lg border border-slate-200 bg-slate-50/70 space-y-3">
+            <div className="flex items-center justify-between pb-1.5 border-b border-slate-200/60">
+              <span className="font-bold text-slate-800 flex items-center gap-1.5">
+                <FileText className="w-3.5 h-3.5 text-indigo-600" />
+                Exit Friction &amp; Legal Deductions
+              </span>
+              <span className="text-[11px] font-semibold text-rose-600">
+                -{formatZAR(currentMetrics.totalExitFrictionZAR)}
+              </span>
+            </div>
+
+            {/* Estate Agent Sales Commission */}
+            <div className="space-y-1">
+              <div className="flex items-center justify-between">
+                <label className="font-semibold text-slate-700">Estate Agent Commission</label>
+                <label className="flex items-center gap-1 text-[11px] text-slate-600 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={isPrivateSale}
+                    onChange={(e) => {
+                      setIsPrivateSale(e.target.checked);
+                      recomputeNetProceeds(salePrice, e.target.checked, commissionPercent, bondCancellationFee, earlyNoticeGiven, customPenalty);
+                    }}
+                    className="rounded text-indigo-600 focus:ring-indigo-500 h-3 w-3"
+                  />
+                  <span>Private Sale (0%)</span>
+                </label>
+              </div>
+              {!isPrivateSale && (
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    step="0.05"
+                    min="0"
+                    value={commissionPercent}
+                    onChange={(e) => {
+                      const val = Number(e.target.value);
+                      setCommissionPercent(val);
+                      recomputeNetProceeds(salePrice, isPrivateSale, val, bondCancellationFee, earlyNoticeGiven, customPenalty);
+                    }}
+                    className="w-24 px-2 py-1 border border-slate-300 rounded bg-white font-medium"
+                  />
+                  <span className="text-slate-500">%</span>
+                  <span className="ml-auto text-slate-700 font-semibold">
+                    -{formatZAR(currentMetrics.exitCommissionZAR)}
+                  </span>
+                </div>
+              )}
+            </div>
+
+            {/* Bond Cancellation Attorney Fee */}
+            {hasActiveBond && (
+              <div className="space-y-1 pt-1.5 border-t border-slate-200/60">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <label className="font-semibold text-slate-700 block">Bond Cancellation Conveyance Fee</label>
+                    <span className="text-[10px] text-slate-400">LSSA tariff, cancellation levy &amp; VAT</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <span className="text-slate-500">R</span>
+                    <input
+                      type="number"
+                      min="0"
+                      value={bondCancellationFee}
+                      onChange={(e) => {
+                        const val = Number(e.target.value);
+                        setBondCancellationFee(val);
+                        recomputeNetProceeds(salePrice, isPrivateSale, commissionPercent, val, earlyNoticeGiven, customPenalty);
+                      }}
+                      className="w-24 px-2 py-1 border border-slate-300 rounded bg-white font-medium text-right"
+                    />
+                  </div>
+                </div>
+
+                {/* 90-Day Early Termination Notice Toggle */}
+                <div className="pt-2">
+                  <label className="flex items-center gap-1.5 text-slate-700 font-medium cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={!earlyNoticeGiven}
+                      onChange={(e) => {
+                        const noNotice = e.target.checked;
+                        setEarlyNoticeGiven(!noNotice);
+                        recomputeNetProceeds(salePrice, isPrivateSale, commissionPercent, bondCancellationFee, !noNotice, customPenalty);
+                      }}
+                      className="rounded text-amber-600 focus:ring-amber-500 h-3.5 w-3.5"
+                    />
+                    <span>No 90-Day Bond Cancellation Notice Given (Apply Penalty)</span>
+                  </label>
+
+                  {!earlyNoticeGiven && (
+                    <div className="mt-1.5 pl-5 space-y-1">
+                      <div className="flex items-center justify-between text-[11px]">
+                        <span className="text-slate-500">Bank Penalty (90 days interest):</span>
+                        <div className="flex items-center gap-1">
+                          <span className="text-slate-500">R</span>
+                          <input
+                            type="number"
+                            min="0"
+                            placeholder={String(currentMetrics.earlyPenaltyZAR)}
+                            value={customPenalty}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setCustomPenalty(val);
+                              recomputeNetProceeds(salePrice, isPrivateSale, commissionPercent, bondCancellationFee, earlyNoticeGiven, val);
+                            }}
+                            className="w-28 px-2 py-1 border border-slate-300 rounded bg-white font-medium text-right text-rose-700"
+                          />
+                        </div>
+                      </div>
+                      <p className="text-[10px] text-slate-400">
+                        Default calculated from NCA 90-day interest on R{Math.round(property.outstandingBondBalanceZAR).toLocaleString('en-ZA')}. Override if bank issued written quote.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Point 5: Negative Equity / Shortfall Warning Callout */}
+          {currentMetrics.shortfallToSettleZAR > 0 && (
+            <div className="p-3 bg-rose-50 border border-rose-200 rounded-lg text-rose-800 text-xs">
+              <div className="flex items-center gap-1.5 font-bold text-rose-900 mb-1">
+                <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
+                <span>Negative Equity / Cash Shortfall Warning</span>
+              </div>
+              <p>
+                Estimated net sale proceeds are insufficient to cover the outstanding bond balance and exit friction. You will need to contribute <strong>{formatZAR(currentMetrics.shortfallToSettleZAR)}</strong> in cash at transfer to obtain bond clearance from the bank.
+              </p>
+            </div>
+          )}
+
           <div>
             <div className="flex items-center justify-between mb-1">
               <label className="block font-semibold text-slate-700">
@@ -202,6 +414,22 @@ export const ExitSaleModal: React.FC<ExitSaleModalProps> = ({
               className="w-full px-3 py-2 border border-slate-300 rounded-lg font-bold text-slate-900 text-sm"
               placeholder="Net cash received after bond settlement & agent fee"
             />
+            {isManualNetProceeds && (
+              <button
+                type="button"
+                onClick={() => {
+                  setIsManualNetProceeds(false);
+                  if (propSetNetProceeds) {
+                    propSetNetProceeds(currentMetrics.netCashProceedsZAR);
+                  } else {
+                    setLocalNetProceeds(currentMetrics.netCashProceedsZAR);
+                  }
+                }}
+                className="text-[10px] text-indigo-600 hover:underline mt-1 block"
+              >
+                Reset to calculated proceeds ({formatZAR(currentMetrics.netCashProceedsZAR)})
+              </button>
+            )}
           </div>
 
           <div className="grid grid-cols-2 gap-3">

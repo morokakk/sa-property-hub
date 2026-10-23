@@ -41,6 +41,10 @@ export interface ProposalPitchParams {
     monthlyRates?: number;
     depositZAR?: number;
     loanToValue?: number;
+    bondLTV?: number;
+    bondCancellationFeeZAR?: number;
+    earlyTerminationNoticeGiven?: boolean;
+    earlyTerminationPenaltyZAR?: number;
     interestRatePercent?: number;
     loanTermYears?: number;
     bondTermYears?: number;
@@ -157,8 +161,16 @@ export function formatOpportunityForWhatsApp(
 
     const exitCommissionPercent = deal.exitCommissionPercent ?? 5.75;
     const exitCommission = (deal.targetExitPrice || 0) > 0 ? ((deal.targetExitPrice || 0) * exitCommissionPercent) / 100 : 0;
+    const hasBond = monthlyBond > 0 || (deal.bondLTV ?? deal.loanToValuePercent ?? 0) > 0;
+    const bondCancellationFee = hasBond
+      ? (deal.bondCancellationFeeZAR !== undefined && deal.bondCancellationFeeZAR !== null ? deal.bondCancellationFeeZAR : 5200)
+      : 0;
+    const earlyPenalty = hasBond && deal.earlyTerminationNoticeGiven === false
+      ? (deal.earlyTerminationPenaltyZAR !== undefined && deal.earlyTerminationPenaltyZAR !== null ? deal.earlyTerminationPenaltyZAR : Math.round(3 * monthlyBond))
+      : 0;
+    const exitLegalCosts = bondCancellationFee + earlyPenalty;
     const acquisitionLegalAndDuty = deal.costs.totalAcquisitionCost - deal.purchasePrice;
-    const totalProjectCost = deal.purchasePrice + acquisitionLegalAndDuty + deal.estimatedRehabCost + legalEvictionReserve + totalHoldingReserve + exitCommission;
+    const totalProjectCost = deal.purchasePrice + acquisitionLegalAndDuty + deal.estimatedRehabCost + legalEvictionReserve + totalHoldingReserve + exitCommission + exitLegalCosts;
     const projectedNetProfit = (deal.targetExitPrice || 0) - totalProjectCost;
     const projectROI = totalProjectCost > 0 ? (projectedNetProfit / totalProjectCost) * 100 : 0;
 
@@ -183,6 +195,9 @@ export function formatOpportunityForWhatsApp(
     text += `  ↳ Bond: ${formatZAR(monthlyBond)} | Levies: ${formatZAR(monthlyLevies)} | Rates: ${formatZAR(monthlyRates)} | Security: ${formatZAR(monthlyOther)}\n`;
     if (exitCommission > 0) {
       text += `• Exit Commission (${exitCommissionPercent}%): ${formatZAR(exitCommission)}\n`;
+    }
+    if (exitLegalCosts > 0) {
+      text += `• Bond Cancellation & Exit Legal: ${formatZAR(exitLegalCosts)}${earlyPenalty > 0 ? ' (incl. 90-day early settlement penalty)' : ''}\n`;
     }
     text += `• Total Project Outlay: *${formatZAR(totalProjectCost)}*\n`;
     text += `• Initial Capital Required (Day 1): *${formatZAR(initialCap)}*\n`;
@@ -393,7 +408,15 @@ export function formatFlipForWhatsApp(
     (flip.municipalClearance?.advanceCouncilDepositZAR || 0);
   const exitCommissionPercent = flip.exitCommissionPercent ?? 5.75;
   const exitCommission = flip.targetExitPriceZAR > 0 ? (flip.targetExitPriceZAR * exitCommissionPercent) / 100 : 0;
-  const totalCost = flip.purchasePriceZAR + flip.acquisitionCostsZAR + totalBoq + legalEvictionReserve + totalHoldingReserve + sec118Cost + exitCommission;
+  const hasBond = (flip.monthlyBondPaymentZAR ?? 0) > 0;
+  const bondCancellationFee = hasBond
+    ? (flip.bondCancellationFeeZAR !== undefined && flip.bondCancellationFeeZAR !== null ? flip.bondCancellationFeeZAR : 5200)
+    : 0;
+  const earlyPenalty = hasBond && flip.earlyTerminationNoticeGiven === false
+    ? (flip.earlyTerminationPenaltyZAR !== undefined && flip.earlyTerminationPenaltyZAR !== null ? flip.earlyTerminationPenaltyZAR : Math.round(3 * (flip.monthlyBondPaymentZAR ?? 0)))
+    : 0;
+  const exitLegalCosts = bondCancellationFee + earlyPenalty;
+  const totalCost = flip.purchasePriceZAR + flip.acquisitionCostsZAR + totalBoq + legalEvictionReserve + totalHoldingReserve + sec118Cost + exitCommission + exitLegalCosts;
   const netProfit = flip.targetExitPriceZAR - totalCost;
   const nominalRoi = totalCost > 0 ? (netProfit / totalCost) * 100 : 0;
   const annualizedRoi = holdingDuration > 0 ? nominalRoi * (12 / holdingDuration) : nominalRoi;
@@ -495,6 +518,15 @@ export function formatProposalPitchForWhatsApp(
   const exitCommissionPercent = deal.exitCommissionPercent ?? 5.75;
   const exitCommission = isFlip && deal.targetExitPrice > 0 ? (deal.targetExitPrice * exitCommissionPercent) / 100 : 0;
 
+  const hasBond = (deal.monthlyBondHolding ?? 0) > 0 || (deal.bondLTV ?? 0) > 0;
+  const bondCancellationFee = isFlip && hasBond
+    ? (deal.bondCancellationFeeZAR !== undefined && deal.bondCancellationFeeZAR !== null ? deal.bondCancellationFeeZAR : 5200)
+    : 0;
+  const earlyPenalty = isFlip && hasBond && deal.earlyTerminationNoticeGiven === false
+    ? (deal.earlyTerminationPenaltyZAR !== undefined && deal.earlyTerminationPenaltyZAR !== null ? deal.earlyTerminationPenaltyZAR : Math.round(3 * (deal.monthlyBondHolding || 0)))
+    : 0;
+  const exitLegalCosts = bondCancellationFee + earlyPenalty;
+
   const totalProjectCost =
     deal.purchasePrice +
     deal.acquisitionCosts +
@@ -503,7 +535,8 @@ export function formatProposalPitchForWhatsApp(
     holdingReserve +
     auctionFee +
     arrears +
-    exitCommission;
+    exitCommission +
+    exitLegalCosts;
   const projectedNetProfit = deal.targetExitPrice - totalProjectCost;
   const projectROI = totalProjectCost > 0 ? (projectedNetProfit / totalProjectCost) * 100 : 0;
   const loanToCost = totalProjectCost > 0 ? (capitalRequested / totalProjectCost) * 100 : 0;
@@ -615,6 +648,9 @@ export function formatProposalPitchForWhatsApp(
     text += `• Holding Cost Escrow: *${formatZAR(holdingReserve)}* (${isEviction ? `${holdingDuration}m works + ~${deal.occupantRisk?.estimatedEvictionDelayDays}d legal` : `${holdingDuration} mos`} @ ${formatZAR(monthlyBurn)}/m)\n`;
     if (exitCommission > 0) {
       text += `• Exit Commission (${exitCommissionPercent}%): ${formatZAR(exitCommission)}\n`;
+    }
+    if (exitLegalCosts > 0) {
+      text += `• Bond Cancellation & Exit Legal: ${formatZAR(exitLegalCosts)}${earlyPenalty > 0 ? ' (incl. 90-day early settlement penalty)' : ''}\n`;
     }
   }
   text += `• Total Project Outlay: *${formatZAR(totalProjectCost)}*\n`;

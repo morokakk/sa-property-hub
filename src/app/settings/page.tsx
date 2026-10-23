@@ -107,6 +107,9 @@ function SettingsContent() {
   const [defaultCommission, setDefaultCommission] = useState<number>(
     investorProfile.defaultAgentCommissionPercent || 5.0
   );
+  const [defaultBondCancellationFee, setDefaultBondCancellationFee] = useState<number>(
+    investorProfile.defaultBondCancellationFeeZAR ?? 5200
+  );
   const [defaultTaxEntity, setDefaultTaxEntity] = useState<'Company (27%)' | 'Individual (45%)' | 'Pre-Tax' | undefined>(
     investorProfile.defaultTaxEntityType
   );
@@ -295,6 +298,7 @@ function SettingsContent() {
       defaultPrimeRate !== (investorProfile.defaultPrimeRatePercent || 10.75) ||
       baselineHurdleYield !== (investorProfile.baselineHurdleYieldPercent || 10.0) ||
       defaultCommission !== (investorProfile.defaultAgentCommissionPercent || 5.0) ||
+      defaultBondCancellationFee !== (investorProfile.defaultBondCancellationFeeZAR ?? 5200) ||
       defaultTaxEntity !== investorProfile.defaultTaxEntityType ||
       vatExemptAgent !== (investorProfile.vatExemptAgent ?? false) ||
       minNetYield !== (investorProfile.minNetYieldPercent ?? 8.0) ||
@@ -330,6 +334,7 @@ function SettingsContent() {
     defaultPrimeRate,
     baselineHurdleYield,
     defaultCommission,
+    defaultBondCancellationFee,
     defaultTaxEntity,
     vatExemptAgent,
     minNetYield,
@@ -364,6 +369,7 @@ function SettingsContent() {
     setDefaultPrimeRate(investorProfile.defaultPrimeRatePercent || 10.75);
     setBaselineHurdleYield(investorProfile.baselineHurdleYieldPercent || 10.0);
     setDefaultCommission(investorProfile.defaultAgentCommissionPercent || 5.0);
+    setDefaultBondCancellationFee(investorProfile.defaultBondCancellationFeeZAR ?? 5200);
     setDefaultTaxEntity(investorProfile.defaultTaxEntityType);
     setVatExemptAgent(investorProfile.vatExemptAgent ?? false);
     setMinNetYield(investorProfile.minNetYieldPercent ?? 8.0);
@@ -608,6 +614,7 @@ function SettingsContent() {
       defaultPrimeRatePercent: defaultPrimeRate,
       baselineHurdleYieldPercent: baselineHurdleYield,
       defaultAgentCommissionPercent: defaultCommission,
+      defaultBondCancellationFeeZAR: defaultBondCancellationFee,
       defaultTaxEntityType: defaultTaxEntity,
       vatExemptAgent,
       minNetYieldPercent: minNetYield,
@@ -1747,7 +1754,7 @@ function SettingsContent() {
                   </span>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
                   <div className="p-3.5 rounded-lg bg-slate-50 border border-slate-200">
                     <label className="block font-semibold text-slate-700 mb-1">
                       Default SA Prime Lending Rate
@@ -1815,6 +1822,28 @@ function SettingsContent() {
                       />
                       <span className="font-medium">Agency is VAT-Exempt (no 1.15x VAT)</span>
                     </label>
+                  </div>
+
+                  <div className="p-3.5 rounded-lg bg-slate-50 border border-slate-200">
+                    <label className="block font-semibold text-slate-700 mb-1">
+                      Default Bond Cancellation Legal Fee
+                    </label>
+                    <p className="text-[10px] text-slate-400 mb-2">
+                      Includes LSSA base cancellation tariff, Deeds Office cancellation levy, bank instruction fee &amp; 15% VAT
+                    </p>
+                    <div className="flex items-center">
+                      <span className="mr-1.5 font-bold text-slate-600">R</span>
+                      <input
+                        type="number"
+                        name="defaultBondCancellationFee"
+                        autoComplete="off"
+                        min="0"
+                        step="any"
+                        value={defaultBondCancellationFee}
+                        onChange={(e) => setDefaultBondCancellationFee(Number(e.target.value))}
+                        className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg font-bold text-slate-900 bg-white"
+                      />
+                    </div>
                   </div>
                 </div>
 

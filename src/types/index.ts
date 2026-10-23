@@ -178,6 +178,9 @@ export interface OpportunityDeal {
   vacancyRatePercent: number; // e.g. 5%
   targetExitPrice: number; // For flip exit
   exitCommissionPercent?: number; // e.g. 5.75% default or 0% override
+  bondCancellationFeeZAR?: number; // Conveyancer fee to cancel active bond (defaults to 5200 if bonded)
+  earlyTerminationNoticeGiven?: boolean; // Defaults to true (0 penalty); if false, 90 days bank penalty applies
+  earlyTerminationPenaltyZAR?: number; // Optional custom bank quote or auto-calculated 90-day interest
   vatExemptAgent?: boolean;
   holdingPeriodMonths: number;
   strategy?: DealStrategy; // 'Flip' | 'Rental' | 'BRRRR'
@@ -352,6 +355,9 @@ export interface FlipProject {
   bondPaymentEffectiveDate?: string; // e.g. '2026-04'
   targetExitPriceZAR: number;
   exitCommissionPercent?: number; // Defaults to 5.75% (5% + 15% VAT). Set 0 for direct/off-market private sales
+  bondCancellationFeeZAR?: number; // Legal fee for bond cancellation (defaults to 5200 if bonded, 0 if cash)
+  earlyTerminationNoticeGiven?: boolean; // Defaults to true; if false, 90 days bank penalty applies
+  earlyTerminationPenaltyZAR?: number; // 90-day early settlement penalty
   targetCompletionDate: string;
   currentPhase: 'Acquisition & Conveyancing' | 'Strip & Demolition' | 'First Fix (Plumbing/Elec)' | 'Finishes & Tiling' | 'Snagging' | 'Staging & Marketing' | 'Sold / Awaiting Transfer';
   boq: BOQItem[];
@@ -611,6 +617,10 @@ export interface RentalProperty {
   outstandingBondBalanceZAR: number;
   bondInterestRatePercent: number; // e.g. 11.5%
   monthlyBondPaymentZAR: number;
+  bondCancellationFeeZAR?: number; // Conveyancer fee to cancel active bond upon disposal (defaults to 5200 if bonded)
+  earlyTerminationNoticeGiven?: boolean; // Defaults to true; if false, 90 days bank penalty applies
+  earlyTerminationPenaltyZAR?: number; // 90-day bank early settlement penalty
+  exitCommissionPercent?: number; // Defaults to profile default (e.g. 5.75%), 0% for private sale
   extraMonthlyPaymentZAR?: number; // Optional voluntary extra capital repayment on the bond (ZAR/month). Principal only. Default 0.
   bondPaymentEffectiveDate?: string; // e.g. '2026-04' (upcoming forward-only month)
   bondRevisionNote?: string; // e.g. 'SARB 25bps repo rate cut'
@@ -923,6 +933,7 @@ export interface InvestorProfile {
   defaultPrimeRatePercent: number; // e.g. 10.75%
   baselineHurdleYieldPercent: number; // e.g. 10.0%
   defaultAgentCommissionPercent: number; // e.g. 5.0%
+  defaultBondCancellationFeeZAR?: number; // e.g. 5200 ZAR
   defaultTaxEntityType?: 'Company (27%)' | 'Individual (45%)' | 'Pre-Tax';
   // Strategy-Aware Buy Box Hurdles & SARS Settings
   minNetYieldPercent?: number; // default 8.0%
@@ -987,6 +998,9 @@ export interface AnalyzerDraft {
   monthlyRates: number;
   targetExitPrice: number;
   exitCommissionPercent?: number;
+  bondCancellationFeeZAR?: number;
+  earlyTerminationNoticeGiven?: boolean;
+  earlyTerminationPenaltyZAR?: number;
   auctioneerCommission: number;
   municipalArrears: number;
   depositZAR: number;

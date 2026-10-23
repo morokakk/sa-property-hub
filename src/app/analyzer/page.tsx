@@ -166,6 +166,9 @@ export default function OpportunityAnalyzerPage() {
   // Exit VAT & Holding Sensitivity State
   const [holdingPeriodMonths, setHoldingPeriodMonths] = useState<number>(analyzerDraft?.holdingPeriodMonths ?? 6);
   const [vatExemptAgent, setVatExemptAgent] = useState<boolean>(analyzerDraft?.vatExemptAgent ?? investorProfile?.vatExemptAgent ?? false);
+  const [bondCancellationFee, setBondCancellationFee] = useState<number | undefined>(analyzerDraft?.bondCancellationFeeZAR);
+  const [earlyTerminationNoticeGiven, setEarlyTerminationNoticeGiven] = useState<boolean>(analyzerDraft?.earlyTerminationNoticeGiven ?? true);
+  const [earlyTerminationPenalty, setEarlyTerminationPenalty] = useState<number | undefined>(analyzerDraft?.earlyTerminationPenaltyZAR);
 
   // MAO Quick Solver State
   const [showMaoSolver, setShowMaoSolver] = useState(false);
@@ -561,6 +564,10 @@ export default function OpportunityAnalyzerPage() {
       auctioneerCommissionZAR: auctioneerCommission,
       municipalArrearsZAR: municipalArrears,
       exitCommissionPercent: effectiveExitCommissionPercent,
+      bondCancellationFeeZAR: bondCancellationFee,
+      defaultBondCancellationFeeZAR: investorProfile?.defaultBondCancellationFeeZAR ?? 5200,
+      earlyTerminationNoticeGiven,
+      earlyTerminationPenaltyZAR: earlyTerminationPenalty,
       monthlyMaintenanceReserveZAR: monthlyMaintenanceReserve,
       monthlyPrepaidVendingFeeZAR: monthlyPrepaidVendingFee,
       monthlyCommunalServicesZAR: monthlyCommunalServices,
@@ -609,6 +616,10 @@ export default function OpportunityAnalyzerPage() {
     municipalArrears,
     extraMonthlyPayment,
     occupantRisk,
+    bondCancellationFee,
+    earlyTerminationNoticeGiven,
+    earlyTerminationPenalty,
+    investorProfile?.defaultBondCancellationFeeZAR,
   ]);
 
   // Day-1 Capital Required vs Liquid Capital Reserve comparison
@@ -729,6 +740,10 @@ export default function OpportunityAnalyzerPage() {
       estimatedAcquisitionCostRate: 0.05,
       exitCommissionPercent: effectiveExitCommissionPercent,
       municipalClearanceZAR: municipalArrears,
+      bondCancellationFeeZAR: bondCancellationFee,
+      defaultBondCancellationFeeZAR: investorProfile?.defaultBondCancellationFeeZAR ?? 5200,
+      earlyTerminationNoticeGiven,
+      earlyPenaltyZAR: earlyTerminationPenalty,
       occupantRisk,
       bondLtvPercent: loanToValue,
       bondInterestRatePercent: interestRate,
@@ -741,6 +756,10 @@ export default function OpportunityAnalyzerPage() {
     holdingPeriodMonths,
     effectiveExitCommissionPercent,
     municipalArrears,
+    bondCancellationFee,
+    earlyTerminationNoticeGiven,
+    earlyTerminationPenalty,
+    investorProfile?.defaultBondCancellationFeeZAR,
     occupantRisk,
     loanToValue,
     interestRate,
@@ -1551,6 +1570,70 @@ export default function OpportunityAnalyzerPage() {
                         {vatExemptAgent ? `${defaultAgentCommission.toFixed(1)}% (Exempt)` : `${calculateEffectiveExitCommission(defaultAgentCommission, false).toFixed(2)}% (Standard ${defaultAgentCommission.toFixed(1)}% + 15% VAT)`}
                       </span>
                     </div>
+
+                    {/* Active Bond Exit Friction: Bond Cancellation & 90-Day Notice */}
+                    {loanToValue > 0 && (
+                      <div className="pt-2.5 border-t border-slate-200/80 space-y-2">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                          <div>
+                            <span className="text-xs font-semibold text-slate-800 block">
+                              Bond Cancellation Attorney Fee
+                            </span>
+                            <span className="text-[10px] text-slate-400">
+                              LSSA base tariff, Deeds Office levy, bank instruction fee &amp; 15% VAT
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <span className="text-xs text-slate-400 font-bold">R</span>
+                            <input
+                              type="number"
+                              min="0"
+                              value={bondCancellationFee !== undefined ? bondCancellationFee : (investorProfile?.defaultBondCancellationFeeZAR ?? 5200)}
+                              onChange={(e) => {
+                                const val = Number(e.target.value);
+                                setBondCancellationFee(val);
+                                updateAnalyzerDraft({ bondCancellationFeeZAR: val });
+                              }}
+                              className="w-24 text-xs px-2 py-1 border border-slate-300 rounded font-semibold text-right bg-white"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="pt-1.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                          <label className="flex items-center gap-2 text-xs font-semibold text-slate-700 cursor-pointer select-none">
+                            <input
+                              type="checkbox"
+                              checked={!earlyTerminationNoticeGiven}
+                              onChange={(e) => {
+                                const noNotice = e.target.checked;
+                                setEarlyTerminationNoticeGiven(!noNotice);
+                                updateAnalyzerDraft({ earlyTerminationNoticeGiven: !noNotice });
+                              }}
+                              className="w-4 h-4 rounded text-amber-600 focus:ring-amber-500"
+                            />
+                            <span>No 90-Day Bond Cancellation Notice Given (Apply Bank Early Penalty)</span>
+                          </label>
+                          {!earlyTerminationNoticeGiven && (
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-[11px] text-slate-500 font-medium">Penalty:</span>
+                              <span className="text-xs text-slate-400 font-bold">R</span>
+                              <input
+                                type="number"
+                                min="0"
+                                placeholder={String(calculatedMetrics.earlyPenaltyZAR ?? 0)}
+                                value={earlyTerminationPenalty !== undefined ? earlyTerminationPenalty : ''}
+                                onChange={(e) => {
+                                  const val = e.target.value !== '' ? Number(e.target.value) : undefined;
+                                  setEarlyTerminationPenalty(val);
+                                  updateAnalyzerDraft({ earlyTerminationPenaltyZAR: val });
+                                }}
+                                className="w-28 text-xs px-2 py-1 border border-slate-300 rounded font-bold text-rose-700 text-right bg-white"
+                              />
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -1613,6 +1696,70 @@ export default function OpportunityAnalyzerPage() {
                     {vatExemptAgent ? `${defaultAgentCommission.toFixed(1)}% (Exempt)` : `${calculateEffectiveExitCommission(defaultAgentCommission, false).toFixed(2)}% (Standard ${defaultAgentCommission.toFixed(1)}% + 15% VAT)`}
                   </span>
                 </div>
+
+                {/* Active Bond Exit Friction: Bond Cancellation & 90-Day Notice */}
+                {loanToValue > 0 && (
+                  <div className="pt-2.5 border-t border-slate-200/80 space-y-2">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                      <div>
+                        <span className="text-xs font-semibold text-slate-800 block">
+                          Bond Cancellation Attorney Fee
+                        </span>
+                        <span className="text-[10px] text-slate-400">
+                          LSSA base tariff, Deeds Office levy, bank instruction fee &amp; 15% VAT
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <span className="text-xs text-slate-400 font-bold">R</span>
+                        <input
+                          type="number"
+                          min="0"
+                          value={bondCancellationFee !== undefined ? bondCancellationFee : (investorProfile?.defaultBondCancellationFeeZAR ?? 5200)}
+                          onChange={(e) => {
+                            const val = Number(e.target.value);
+                            setBondCancellationFee(val);
+                            updateAnalyzerDraft({ bondCancellationFeeZAR: val });
+                          }}
+                          className="w-24 text-xs px-2 py-1 border border-slate-300 rounded font-semibold text-right bg-white"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="pt-1.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                      <label className="flex items-center gap-2 text-xs font-semibold text-slate-700 cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          checked={!earlyTerminationNoticeGiven}
+                          onChange={(e) => {
+                            const noNotice = e.target.checked;
+                            setEarlyTerminationNoticeGiven(!noNotice);
+                            updateAnalyzerDraft({ earlyTerminationNoticeGiven: !noNotice });
+                          }}
+                          className="w-4 h-4 rounded text-amber-600 focus:ring-amber-500"
+                        />
+                        <span>No 90-Day Bond Cancellation Notice Given (Apply Bank Early Penalty)</span>
+                      </label>
+                      {!earlyTerminationNoticeGiven && (
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[11px] text-slate-500 font-medium">Penalty:</span>
+                          <span className="text-xs text-slate-400 font-bold">R</span>
+                          <input
+                            type="number"
+                            min="0"
+                            placeholder={String(calculatedMetrics.earlyPenaltyZAR ?? 0)}
+                            value={earlyTerminationPenalty !== undefined ? earlyTerminationPenalty : ''}
+                            onChange={(e) => {
+                              const val = e.target.value !== '' ? Number(e.target.value) : undefined;
+                              setEarlyTerminationPenalty(val);
+                              updateAnalyzerDraft({ earlyTerminationPenaltyZAR: val });
+                            }}
+                            className="w-28 text-xs px-2 py-1 border border-slate-300 rounded font-bold text-rose-700 text-right bg-white"
+                          />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>

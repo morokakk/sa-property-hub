@@ -176,28 +176,80 @@ export function calculateAgencyCommission(
  * 5. Disposal Realized Sale Metrics
  * Extracted from lines 2729–2733 of src/app/rentals/page.tsx.
  */
+export interface DisposalOptions {
+  exitCommissionPercent?: number; // e.g. 5.75% default or 0% override
+  bondCancellationFeeZAR?: number; // e.g. 5200 ZAR
+  earlyTerminationNoticeGiven?: boolean; // Defaults to true
+  earlyPenaltyZAR?: number; // Custom bank penalty quote or auto-calculated
+  bondInterestRatePercent?: number; // e.g. 11.5%
+  hasActiveBond?: boolean;
+  defaultBondCancellationFeeZAR?: number; // Defaults to 5200
+}
+
 export interface DisposalMetrics {
   grossCapitalGainZAR: number;
   capitalGainPercent: number;
   netCashProceedsZAR: number;
+  rawNetProceedsZAR: number;
+  shortfallToSettleZAR: number;
+  exitCommissionZAR: number;
+  bondCancellationFeeZAR: number;
+  earlyPenaltyZAR: number;
+  totalExitFrictionZAR: number;
 }
 
 export function calculateDisposalMetrics(
   actualSalePriceZAR: number,
   purchasePriceZAR: number,
-  outstandingBondBalanceZAR: number = 0
+  outstandingBondBalanceZAR: number = 0,
+  options?: DisposalOptions
 ): DisposalMetrics {
   const sale = actualSalePriceZAR || 0;
   const purchase = purchasePriceZAR || 0;
   const bond = outstandingBondBalanceZAR || 0;
   const grossCapitalGainZAR = sale - purchase;
   const capitalGainPercent = purchase > 0 ? (grossCapitalGainZAR / purchase) * 100 : 0;
-  const netCashProceedsZAR = Math.max(0, sale - bond);
+
+  const hasBond = options?.hasActiveBond !== undefined
+    ? options.hasActiveBond
+    : bond > 0;
+
+  const defaultBondCancel = options?.defaultBondCancellationFeeZAR ?? 5200;
+  // Point 2: Strict Zero-Override Guard
+  const bondCancellationFeeZAR = !hasBond
+    ? 0
+    : (options?.bondCancellationFeeZAR !== undefined && options?.bondCancellationFeeZAR !== null
+        ? options.bondCancellationFeeZAR
+        : defaultBondCancel);
+
+  const exitCommRate = options?.exitCommissionPercent ?? 0;
+  const exitCommissionZAR = Math.round(sale * (exitCommRate / 100));
+
+  let earlyPenaltyZAR = 0;
+  if (hasBond && options?.earlyTerminationNoticeGiven === false) {
+    if (options?.earlyPenaltyZAR !== undefined && options?.earlyPenaltyZAR !== null) {
+      earlyPenaltyZAR = Math.max(0, options.earlyPenaltyZAR);
+    } else {
+      const rate = options?.bondInterestRatePercent ?? 11.5;
+      earlyPenaltyZAR = Math.round(bond * (rate / 100) * (90 / 365));
+    }
+  }
+
+  const totalExitFrictionZAR = exitCommissionZAR + bondCancellationFeeZAR + earlyPenaltyZAR;
+  const rawNetProceedsZAR = sale - bond - totalExitFrictionZAR;
+  const netCashProceedsZAR = Math.max(0, rawNetProceedsZAR);
+  const shortfallToSettleZAR = Math.max(0, -rawNetProceedsZAR);
 
   return {
     grossCapitalGainZAR,
     capitalGainPercent,
     netCashProceedsZAR,
+    rawNetProceedsZAR,
+    shortfallToSettleZAR,
+    exitCommissionZAR,
+    bondCancellationFeeZAR,
+    earlyPenaltyZAR,
+    totalExitFrictionZAR,
   };
 }
 

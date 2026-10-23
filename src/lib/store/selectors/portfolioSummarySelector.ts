@@ -194,9 +194,10 @@ export function computePortfolioSummary(state: PortfolioSummaryInput): Portfolio
   // 3. Projected Flip Profits & SARS Provisional Tax Reserve:
   let totalGrossProjectedFlipProfits = 0;
   let totalSarsFlipTaxReserve = 0;
+  const defaultBondCancellationFeeZAR = state?.investorProfile?.defaultBondCancellationFeeZAR ?? 5200;
 
   activeFlips.forEach((f) => {
-    const fin = calculateFlipFinancials(f);
+    const fin = calculateFlipFinancials(f, defaultBondCancellationFeeZAR);
     totalGrossProjectedFlipProfits += fin.projectedNetProfitZAR;
     totalSarsFlipTaxReserve += fin.estimatedTaxProvisionZAR;
   });
@@ -210,7 +211,7 @@ export function computePortfolioSummary(state: PortfolioSummaryInput): Portfolio
   // Realized profit on completed/sold flips (excludes BRRRR converted rentals)
   const totalRealizedFlipProfits = completedFlips.reduce((sum, f) => {
     if (f.exitStrategy === 'BRRRR') return sum;
-    const arch = calculateArchivedFlipFinancials(f);
+    const arch = calculateArchivedFlipFinancials(f, defaultBondCancellationFeeZAR);
     return sum + arch.realizedNetProfitZAR;
   }, 0);
 

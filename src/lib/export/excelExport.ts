@@ -7,6 +7,7 @@ import {
   InvestorProfile,
 } from '@/types';
 import { calculateRentalCashflow } from '@/lib/calculations/propertyMetrics';
+import { calculateFlipFinancials, calculateArchivedFlipFinancials } from '@/lib/calculations/flips';
 
 interface ExportPortfolioData {
   rentals: RentalProperty[];
@@ -178,25 +179,16 @@ export async function exportPortfolioToExcel(data: ExportPortfolioData) {
   ];
 
   const flipsData = flips.map((f) => {
-    const totalBoq = (f.boq || []).reduce(
-      (sum, b) => sum + (b.actualCostZAR || b.baselineTotalZAR || 0),
-      0
-    );
-    const renoCost = totalBoq > 0 ? totalBoq : f.baselineRenovationBudgetZAR || 0;
-    const durationMonths = f.estimatedDurationMonths ?? 6;
-    const monthlyHolding = f.monthlyHoldingCostZAR ?? 0;
-    const totalHoldingCost = durationMonths * monthlyHolding;
-    const sec118Cost =
-      (f.municipalClearance?.sec118ArrearsZAR || 0) +
-      (f.municipalClearance?.advanceCouncilDepositZAR || 0);
-    const exitCommissionPercent = typeof f.exitCommissionPercent === 'number' ? f.exitCommissionPercent : 5.75;
-    const exitCommission = f.targetExitPriceZAR > 0 ? (f.targetExitPriceZAR * exitCommissionPercent) / 100 : 0;
-    const totalOutlay = (f.purchasePriceZAR || 0) + (f.acquisitionCostsZAR || 0) + renoCost + totalHoldingCost + sec118Cost + exitCommission;
-    const projectedProfit = (f.targetExitPriceZAR || 0) - totalOutlay;
+    const defaultBondFee = investorProfile.defaultBondCancellationFeeZAR ?? 5200;
+    const fin = calculateFlipFinancials(f, defaultBondFee);
+    const arch = calculateArchivedFlipFinancials(f, defaultBondFee);
+    const renoCost = fin.effectiveRenoCostZAR;
+    const durationMonths = fin.flipHoldingMonths;
+    const monthlyHolding = fin.flipMonthlyHoldingCostZAR;
+    const totalHoldingCost = fin.totalHoldingCostZAR;
+    const projectedProfit = fin.projectedNetProfitZAR;
     const actualSale = f.actualSalePriceZAR ?? (f.status === 'Completed' ? f.targetExitPriceZAR : undefined);
-    const realizedExitCommission = actualSale ? (actualSale * exitCommissionPercent) / 100 : 0;
-    const realizedTotalOutlay = (f.purchasePriceZAR || 0) + (f.acquisitionCostsZAR || 0) + renoCost + totalHoldingCost + sec118Cost + realizedExitCommission;
-    const realizedProfit = actualSale ? actualSale - realizedTotalOutlay : undefined;
+    const realizedProfit = f.status === 'Completed' ? arch.realizedNetProfitZAR : undefined;
 
     return [
       f.title,

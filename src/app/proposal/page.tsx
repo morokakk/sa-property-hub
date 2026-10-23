@@ -256,6 +256,10 @@ function ProposalGeneratorContent() {
         isSection13Eligible: false,
         holdingDurationMonths: f.estimatedDurationMonths ?? 6,
         exitCommissionPercent: f.exitCommissionPercent ?? 5.75,
+        bondCancellationFeeZAR: f.bondCancellationFeeZAR,
+        earlyTerminationNoticeGiven: f.earlyTerminationNoticeGiven,
+        earlyTerminationPenaltyZAR: f.earlyTerminationPenaltyZAR,
+        bondLTV: (f.monthlyBondPaymentZAR ?? 0) > 0 ? 80 : 0,
         monthlyBondHolding: f.monthlyBondPaymentZAR ?? 0,
         monthlyLeviesHolding: f.monthlyLeviesZAR ?? 0,
         monthlyRatesHolding: f.monthlyRatesTaxesZAR ?? 0,
@@ -360,6 +364,10 @@ function ProposalGeneratorContent() {
         section13Allowance: o.section13sex?.annualAllowanceZAR ?? 0,
         holdingDurationMonths: o.holdingPeriodMonths ?? 6,
         exitCommissionPercent: o.exitCommissionPercent ?? 5.75,
+        bondCancellationFeeZAR: o.bondCancellationFeeZAR,
+        earlyTerminationNoticeGiven: o.earlyTerminationNoticeGiven,
+        earlyTerminationPenaltyZAR: o.earlyTerminationPenaltyZAR,
+        bondLTV: o.bondLTV,
         monthlyBondHolding: o.monthlyBondPaymentZAR ?? (o.bondLTV ? calculateMonthlyBondRepayment(o.purchasePrice * (o.bondLTV / 100), o.interestRatePercent ?? 11.75, o.loanTermYears ?? 20) : 0),
         monthlyLeviesHolding: o.monthlyLevies ?? 0,
         monthlyRatesHolding: o.monthlyRatesTaxes ?? 0,
@@ -487,6 +495,10 @@ function ProposalGeneratorContent() {
         monthlyHoldingCost: holdingCosts.monthlyHoldingCost,
         targetExitPrice: openMarket,
         exitCommissionPercent: 5.75,
+        bondCancellationFeeZAR: r.bondCancellationFeeZAR,
+        earlyTerminationNoticeGiven: r.earlyTerminationNoticeGiven,
+        earlyTerminationPenaltyZAR: r.earlyTerminationPenaltyZAR,
+        bondLTV: (r.outstandingBondBalanceZAR || 0) > 0 && openMarket > 0 ? Math.round(((r.outstandingBondBalanceZAR || 0) / openMarket) * 100) : 0,
         completionDate: r.leases?.[0]?.leaseEndDate || new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
         boq: [],
         notes: r.notes || `Seasoned portfolio asset. Tenant: ${showTenantNames ? (r.leases?.[0]?.tenantName || 'In-place') : 'In-Place (Masked)'}. Gross Rent: ${formatZAR(r.monthlyGrossRentZAR)}/mo. Bond balance: ${formatZAR(r.outstandingBondBalanceZAR || 0)}.`,
@@ -832,6 +844,20 @@ function ProposalGeneratorContent() {
   const exitCommissionPercent = deal?.exitCommissionPercent ?? 5.75;
   const exitCommission = isFlip && (deal?.targetExitPrice || 0) > 0 ? ((deal?.targetExitPrice || 0) * exitCommissionPercent) / 100 : 0;
 
+  const hasBond = (deal?.monthlyBondHolding ?? 0) > 0 || (deal?.bondLTV ?? 0) > 0;
+  const defaultBondCancel = investorProfile?.defaultBondCancellationFeeZAR ?? 5200;
+  const bondCancellationFee = isFlip && hasBond
+    ? (deal?.bondCancellationFeeZAR !== undefined && deal?.bondCancellationFeeZAR !== null
+        ? deal.bondCancellationFeeZAR
+        : defaultBondCancel)
+    : 0;
+  const earlyPenalty = isFlip && hasBond && deal?.earlyTerminationNoticeGiven === false
+    ? (deal?.earlyTerminationPenaltyZAR !== undefined && deal?.earlyTerminationPenaltyZAR !== null
+        ? deal.earlyTerminationPenaltyZAR
+        : Math.round(3 * (deal?.monthlyBondHolding || 0)))
+    : 0;
+  const exitLegalCost = bondCancellationFee + earlyPenalty;
+
   const totalProjectCost =
     (deal?.purchasePrice || 0) +
     (deal?.acquisitionCosts || 0) +
@@ -840,7 +866,8 @@ function ProposalGeneratorContent() {
     totalHoldingReserve +
     auctioneerCommission +
     municipalArrears +
-    exitCommission;
+    exitCommission +
+    exitLegalCost;
 
   const projectedNetProfit = (deal?.targetExitPrice || 0) - totalProjectCost;
   const netProjectROI = totalProjectCost > 0 ? (projectedNetProfit / totalProjectCost) * 100 : 0;
@@ -1846,6 +1873,19 @@ function ProposalGeneratorContent() {
                         <td className="p-2.5 font-bold">{formatZAR(exitCommission)}</td>
                         <td className="p-2.5">{totalProjectCost > 0 ? formatPercent((exitCommission / totalProjectCost) * 100) : '0%'}</td>
                         <td className="p-2.5 text-slate-500">Settled from gross sales proceeds upon transfer</td>
+                      </tr>
+                    )}
+                    {isFlip && exitLegalCost > 0 && (
+                      <tr data-testid="exit-legal-cancellation-row">
+                        <td className="p-2.5 font-medium flex items-center gap-1.5 flex-wrap">
+                          <span>Bond Cancellation &amp; Exit Legal ({formatZAR(bondCancellationFee)}{earlyPenalty > 0 ? ` + ${formatZAR(earlyPenalty)} penalty` : ''})</span>
+                          <span className="text-[10px] bg-slate-100 text-slate-700 font-bold px-1.5 py-0.2 rounded border border-slate-200">
+                            Conveyancing
+                          </span>
+                        </td>
+                        <td className="p-2.5 font-bold">{formatZAR(exitLegalCost)}</td>
+                        <td className="p-2.5">{totalProjectCost > 0 ? formatPercent((exitLegalCost / totalProjectCost) * 100) : '0%'}</td>
+                        <td className="p-2.5 text-slate-500">Bank cancellation conveyancer fee &amp; Deeds Office lodgement</td>
                       </tr>
                     )}
                     <tr className="bg-slate-50 font-bold">

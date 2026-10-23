@@ -422,6 +422,8 @@ describe('MAO Solver Engine', () => {
       rehabCost: 300_000,
       holdingCost: 90_000,
       estimatedAcquisitionCostRate: 0.05,
+      bondLtvPercent: 80,
+      interestRatePercent: 11.75,
     };
 
     it('Flip MAO solver returns lower bid limits for unlawful occupant properties', () => {
@@ -521,6 +523,73 @@ describe('MAO Solver Engine', () => {
       });
 
       expect(clamped.maxAllowableBid).toBe(0);
+    });
+  });
+
+  describe('Bond Cancellation & 90-Day Early Settlement Penalty', () => {
+    const baseParams = {
+      targetExitPrice: 2_000_000,
+      desiredRoiPercent: 15,
+      rehabCost: 200_000,
+      holdingCost: 60_000,
+      estimatedAcquisitionCostRate: 0.05,
+    };
+
+    it('deducts default R5,200 bond cancellation fee when bondLtvPercent > 0', () => {
+      const cashDeal = calculateFlipMao({ ...baseParams, bondLtvPercent: 0 });
+      const bondedDeal = calculateFlipMao({ ...baseParams, bondLtvPercent: 80, interestRatePercent: 11.5 });
+
+      expect(cashDeal.nonPurchaseCosts).toBe(260_000);
+      expect(bondedDeal.nonPurchaseCosts).toBe(260_000 + 5_200);
+      expect(bondedDeal.maxAllowableBid).toBeLessThan(cashDeal.maxAllowableBid);
+    });
+
+    it('preserves strict R0 bond cancellation fee override (negotiated bank waiver)', () => {
+      const bondedDeal = calculateFlipMao({
+        ...baseParams,
+        bondLtvPercent: 80,
+        interestRatePercent: 11.5,
+        bondCancellationFeeZAR: 0,
+      });
+
+      expect(bondedDeal.nonPurchaseCosts).toBe(260_000); // 0 fee added
+    });
+
+    it('applies closed-form 90-day early termination penalty when notice was not given', () => {
+      const noticeGiven = calculateFlipMao({
+        ...baseParams,
+        bondLtvPercent: 80,
+        interestRatePercent: 11.5,
+        earlyTerminationNoticeGiven: true,
+      });
+
+      const noNotice = calculateFlipMao({
+        ...baseParams,
+        bondLtvPercent: 80,
+        interestRatePercent: 11.5,
+        earlyTerminationNoticeGiven: false,
+      });
+
+      expect(noNotice.maxAllowableBid).toBeLessThan(noticeGiven.maxAllowableBid);
+
+      // Verify that the solved bid satisfies:
+      // totalOutlay = bid * (1 + acqRate) + nonPurchaseCosts + (bid * LTV * rate * 90/365)
+      const bid = noNotice.maxAllowableBid;
+      const penaltyAtMao = bid * 0.80 * 0.115 * (90 / 365);
+      const totalOutlay = bid * 1.05 + noNotice.nonPurchaseCosts + penaltyAtMao;
+      expect(totalOutlay).toBeCloseTo(noNotice.totalAllowableOutlay, -1);
+    });
+
+    it('deducts custom bank penalty quote directly from nonPurchaseCosts', () => {
+      const customQuote = calculateFlipMao({
+        ...baseParams,
+        bondLtvPercent: 80,
+        interestRatePercent: 11.5,
+        earlyTerminationNoticeGiven: false,
+        earlyPenaltyZAR: 18_500,
+      });
+
+      expect(customQuote.nonPurchaseCosts).toBe(260_000 + 5_200 + 18_500);
     });
   });
 });

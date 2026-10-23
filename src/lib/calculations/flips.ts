@@ -21,6 +21,10 @@ export interface FlipFinancialSummary {
   exitCommissionPercent: number;
   exitCommissionZAR: number;
 
+  bondCancellationFeeZAR: number;
+  earlyPenaltyZAR: number;
+  totalExitLegalCostZAR: number;
+
   totalAllInCostZAR: number;
   projectedNetProfitZAR: number;
   projectedRoiPercent: number;
@@ -71,6 +75,9 @@ export interface ArchivedFlipFinancials {
   realizedRoiPercent: number;
   brrrrTargetValuationZAR: number;
   brrrrEquityCreatedZAR: number;
+  bondCancellationFeeZAR?: number;
+  earlyTerminationPenaltyZAR?: number;
+  exitLegalCostsZAR?: number;
 }
 
 /**
@@ -97,7 +104,10 @@ export function calculateMilestonePhaseTargets(
  * Pure calculation of comprehensive financial metrics for an active Flip project.
  * Extracted from lines 517–593 of src/app/flips/page.tsx.
  */
-export function calculateFlipFinancials(flip?: FlipProject | null): FlipFinancialSummary {
+export function calculateFlipFinancials(
+  flip?: FlipProject | null,
+  defaultBondCancellationFeeZAR: number = 5200
+): FlipFinancialSummary {
   if (!flip) {
     return {
       totalBOQBaselineZAR: 0,
@@ -115,6 +125,9 @@ export function calculateFlipFinancials(flip?: FlipProject | null): FlipFinancia
       isRccDisputed: false,
       exitCommissionPercent: 5.75,
       exitCommissionZAR: 0,
+      bondCancellationFeeZAR: 0,
+      earlyPenaltyZAR: 0,
+      totalExitLegalCostZAR: 0,
       totalAllInCostZAR: 0,
       projectedNetProfitZAR: 0,
       projectedRoiPercent: 0,
@@ -157,7 +170,31 @@ export function calculateFlipFinancials(flip?: FlipProject | null): FlipFinancia
   const exitCommissionPercent = flip.exitCommissionPercent ?? 5.75;
   const exitCommissionZAR = Math.round((flip.targetExitPriceZAR || 0) * (exitCommissionPercent / 100));
 
-  const totalAllInCostZAR = totalCostBasisZAR + totalHoldingCostZAR + totalMunicipalClearanceOutlayZAR + exitCommissionZAR;
+  // Active Bond Exit Costs: Bond Cancellation Legal Fee & 90-Day Early Termination Penalty
+  const hasBond = (flip.monthlyBondPaymentZAR ?? 0) > 0;
+  const bondCancellationFeeZAR = !hasBond
+    ? 0
+    : (flip.bondCancellationFeeZAR !== undefined && flip.bondCancellationFeeZAR !== null
+        ? flip.bondCancellationFeeZAR
+        : defaultBondCancellationFeeZAR);
+
+  let earlyPenaltyZAR = 0;
+  if (hasBond && flip.earlyTerminationNoticeGiven === false) {
+    if (flip.earlyTerminationPenaltyZAR !== undefined && flip.earlyTerminationPenaltyZAR !== null) {
+      earlyPenaltyZAR = Math.max(0, flip.earlyTerminationPenaltyZAR);
+    } else {
+      // 3 * monthly interim bond payment
+      earlyPenaltyZAR = Math.round(3 * (flip.monthlyBondPaymentZAR ?? 0));
+    }
+  }
+  const totalExitLegalCostZAR = bondCancellationFeeZAR + earlyPenaltyZAR;
+
+  const totalAllInCostZAR =
+    totalCostBasisZAR +
+    totalHoldingCostZAR +
+    totalMunicipalClearanceOutlayZAR +
+    exitCommissionZAR +
+    totalExitLegalCostZAR;
   const projectedNetProfitZAR = (flip.targetExitPriceZAR || 0) - totalAllInCostZAR;
   const projectedRoiPercent = totalAllInCostZAR > 0 ? (projectedNetProfitZAR / totalAllInCostZAR) * 100 : 0;
 
@@ -210,6 +247,9 @@ export function calculateFlipFinancials(flip?: FlipProject | null): FlipFinancia
     isRccDisputed,
     exitCommissionPercent,
     exitCommissionZAR,
+    bondCancellationFeeZAR,
+    earlyPenaltyZAR,
+    totalExitLegalCostZAR,
     totalAllInCostZAR,
     projectedNetProfitZAR,
     projectedRoiPercent,
@@ -263,7 +303,10 @@ export function calculateFundingCampaignSummary(
  * Operates on flat fields of FlipProject from src/types/index.ts (lines 314–320)
  * matching src/app/flips/page.tsx:1847–1870.
  */
-export function calculateArchivedFlipFinancials(flip?: FlipProject | null): ArchivedFlipFinancials {
+export function calculateArchivedFlipFinancials(
+  flip?: FlipProject | null,
+  defaultBondCancellationFeeZAR: number = 5200
+): ArchivedFlipFinancials {
   if (!flip) {
     return {
       fullCostBasisZAR: 0,
@@ -272,6 +315,9 @@ export function calculateArchivedFlipFinancials(flip?: FlipProject | null): Arch
       realizedRoiPercent: 0,
       brrrrTargetValuationZAR: 0,
       brrrrEquityCreatedZAR: 0,
+      bondCancellationFeeZAR: 0,
+      earlyTerminationPenaltyZAR: 0,
+      exitLegalCostsZAR: 0,
     };
   }
 
@@ -293,7 +339,26 @@ export function calculateArchivedFlipFinancials(flip?: FlipProject | null): Arch
   const salePrice = flip.actualSalePriceZAR ?? (flip.targetExitPriceZAR || 0);
   const exitCommRate = typeof flip.exitCommissionPercent === 'number' ? flip.exitCommissionPercent : 5.75;
   const exitCommission = isBrrrr ? 0 : Math.round(salePrice * (exitCommRate / 100));
-  const fullCostBasisZAR = costBasis + totalHoldingCost + sec118Cost + exitCommission;
+
+  // Point 1: Include bond cancellation and early penalty in archived cost basis to avoid profit jump
+  const hasBond = (flip.monthlyBondPaymentZAR ?? 0) > 0;
+  const bondCancellationFeeZAR = !hasBond
+    ? 0
+    : (flip.bondCancellationFeeZAR !== undefined && flip.bondCancellationFeeZAR !== null
+        ? flip.bondCancellationFeeZAR
+        : defaultBondCancellationFeeZAR);
+
+  let earlyTerminationPenaltyZAR = 0;
+  if (hasBond && flip.earlyTerminationNoticeGiven === false) {
+    if (flip.earlyTerminationPenaltyZAR !== undefined && flip.earlyTerminationPenaltyZAR !== null) {
+      earlyTerminationPenaltyZAR = Math.max(0, flip.earlyTerminationPenaltyZAR);
+    } else {
+      earlyTerminationPenaltyZAR = Math.round(3 * (flip.monthlyBondPaymentZAR ?? 0));
+    }
+  }
+
+  const exitLegalCostsZAR = bondCancellationFeeZAR + earlyTerminationPenaltyZAR;
+  const fullCostBasisZAR = costBasis + totalHoldingCost + sec118Cost + exitCommission + exitLegalCostsZAR;
   const realizedNetProfitZAR = salePrice - fullCostBasisZAR;
   const realizedRoiPercent = fullCostBasisZAR > 0 ? (realizedNetProfitZAR / fullCostBasisZAR) * 100 : 0;
   const brrrrTargetValuationZAR = flip.targetExitPriceZAR || fullCostBasisZAR;
@@ -306,6 +371,9 @@ export function calculateArchivedFlipFinancials(flip?: FlipProject | null): Arch
     realizedRoiPercent,
     brrrrTargetValuationZAR,
     brrrrEquityCreatedZAR,
+    bondCancellationFeeZAR,
+    earlyTerminationPenaltyZAR,
+    exitLegalCostsZAR,
   };
 }
 

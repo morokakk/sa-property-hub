@@ -242,6 +242,46 @@ describe('Flips Pure Calculations Engine', () => {
       expect(finNull.projectedNetProfitZAR).toBe(0);
       expect(finNull.milestoneDraws.deposit).toBe(0);
     });
+
+    it('deducts default R5,200 bond cancellation fee when flip has an active interim bond', () => {
+      const bondedFlip: FlipProject = {
+        ...sampleFlip,
+        monthlyBondPaymentZAR: 9_500,
+      };
+      const unbondedFin = calculateFlipFinancials(sampleFlip);
+      const bondedFin = calculateFlipFinancials(bondedFlip);
+
+      expect(bondedFin.bondCancellationFeeZAR).toBe(5_200);
+      expect(bondedFin.earlyPenaltyZAR).toBe(0);
+      expect(bondedFin.totalExitLegalCostZAR).toBe(5_200);
+      expect(bondedFin.totalAllInCostZAR).toBe(unbondedFin.totalAllInCostZAR + 5_200);
+      expect(bondedFin.projectedNetProfitZAR).toBe(unbondedFin.projectedNetProfitZAR - 5_200);
+    });
+
+    it('applies 3 months interim bond penalty when earlyTerminationNoticeGiven is false', () => {
+      const noNoticeFlip: FlipProject = {
+        ...sampleFlip,
+        monthlyBondPaymentZAR: 10_000,
+        earlyTerminationNoticeGiven: false,
+      };
+      const fin = calculateFlipFinancials(noNoticeFlip);
+
+      expect(fin.bondCancellationFeeZAR).toBe(5_200);
+      expect(fin.earlyPenaltyZAR).toBe(30_000); // 3 * 10,000
+      expect(fin.totalExitLegalCostZAR).toBe(35_200);
+    });
+
+    it('preserves strict zero-override for bond cancellation fee', () => {
+      const zeroFeeFlip: FlipProject = {
+        ...sampleFlip,
+        monthlyBondPaymentZAR: 9_500,
+        bondCancellationFeeZAR: 0,
+      };
+      const fin = calculateFlipFinancials(zeroFeeFlip);
+
+      expect(fin.bondCancellationFeeZAR).toBe(0);
+      expect(fin.totalExitLegalCostZAR).toBe(0);
+    });
   });
 
   describe('calculateFundingCampaignSummary', () => {
@@ -364,6 +404,90 @@ describe('Flips Pure Calculations Engine', () => {
       expect(arch.brrrrTargetValuationZAR).toBe(3_500_000);
       // Equity created: 3,500,000 - 2,456,000 = 1,044,000
       expect(arch.brrrrEquityCreatedZAR).toBe(1_044_000);
+    });
+
+    it('includes bond cancellation fee and 90-day early penalty in fullCostBasis for a bonded Sold flip (preventing profit jump)', () => {
+      const bondedSoldFlip: FlipProject = {
+        ...sampleFlip,
+        status: 'Completed',
+        exitStrategy: 'Sold',
+        actualSalePriceZAR: 3_300_000,
+        exitCommissionPercent: 5.0,
+        monthlyBondPaymentZAR: 10_000,
+        earlyTerminationNoticeGiven: false,
+      };
+
+      const arch = calculateArchivedFlipFinancials(bondedSoldFlip);
+
+      // Exit commission = 165,000
+      // Bond cancellation = 5,200
+      // Early penalty = 3 * 10,000 = 30,000
+      // Total exit legal = 35,200
+      // Full cost basis = 2,621,000 (unbonded) + 35,200 = 2,656,200
+      expect(arch.bondCancellationFeeZAR).toBe(5_200);
+      expect(arch.earlyTerminationPenaltyZAR).toBe(30_000);
+      expect(arch.exitLegalCostsZAR).toBe(35_200);
+      expect(arch.fullCostBasisZAR).toBe(2_656_200);
+      expect(arch.realizedNetProfitZAR).toBe(3_300_000 - 2_656_200);
+    });
+
+    it('applies bond cancellation fee on bonded BRRRR flip while keeping exit commission at 0', () => {
+      const bondedBrrrrFlip: FlipProject = {
+        ...sampleFlip,
+        status: 'Completed',
+        exitStrategy: 'BRRRR',
+        targetExitPriceZAR: 3_500_000,
+        monthlyBondPaymentZAR: 8_000,
+      };
+
+      const arch = calculateArchivedFlipFinancials(bondedBrrrrFlip);
+
+      // Unbonded BRRRR full cost basis = 2,456,000
+      // Bond cancellation = 5,200
+      // Bonded full cost basis = 2,456,000 + 5,200 = 2,461,200
+      expect(arch.bondCancellationFeeZAR).toBe(5_200);
+      expect(arch.earlyTerminationPenaltyZAR).toBe(0);
+      expect(arch.exitLegalCostsZAR).toBe(5_200);
+      expect(arch.fullCostBasisZAR).toBe(2_461_200);
+      expect(arch.brrrrEquityCreatedZAR).toBe(3_500_000 - 2_461_200); // 1,038,800
+    });
+
+    it('preserves strict zero-override for bond cancellation fee on archived flip', () => {
+      const zeroFeeArchivedFlip: FlipProject = {
+        ...sampleFlip,
+        status: 'Completed',
+        exitStrategy: 'Sold',
+        actualSalePriceZAR: 3_300_000,
+        exitCommissionPercent: 5.0,
+        monthlyBondPaymentZAR: 10_000,
+        bondCancellationFeeZAR: 0,
+      };
+
+      const arch = calculateArchivedFlipFinancials(zeroFeeArchivedFlip);
+
+      expect(arch.bondCancellationFeeZAR).toBe(0);
+      expect(arch.exitLegalCostsZAR).toBe(0);
+      expect(arch.fullCostBasisZAR).toBe(2_621_000);
+    });
+
+    it('respects custom bank quote override for early termination penalty on archived flip', () => {
+      const customPenaltyArchivedFlip: FlipProject = {
+        ...sampleFlip,
+        status: 'Completed',
+        exitStrategy: 'Sold',
+        actualSalePriceZAR: 3_300_000,
+        exitCommissionPercent: 5.0,
+        monthlyBondPaymentZAR: 10_000,
+        earlyTerminationNoticeGiven: false,
+        earlyTerminationPenaltyZAR: 12_500,
+      };
+
+      const arch = calculateArchivedFlipFinancials(customPenaltyArchivedFlip);
+
+      expect(arch.bondCancellationFeeZAR).toBe(5_200);
+      expect(arch.earlyTerminationPenaltyZAR).toBe(12_500);
+      expect(arch.exitLegalCostsZAR).toBe(17_700);
+      expect(arch.fullCostBasisZAR).toBe(2_621_000 + 17_700);
     });
 
     it('handles null or undefined flip safely in calculateArchivedFlipFinancials', () => {

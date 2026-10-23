@@ -22,6 +22,10 @@ export interface FlipMaoParams {
   estimatedAcquisitionCostRate?: number; // e.g. 0.05 (5% duty + legal friction approximation)
   exitCommissionPercent?: number; // Optional exit sales commission (e.g. 5.75 for 5.75%)
   municipalClearanceZAR?: number; // Section 118 municipal arrears and council clearance
+  bondCancellationFeeZAR?: number; // Conveyancer fee to cancel active bond
+  defaultBondCancellationFeeZAR?: number; // e.g. 5200 ZAR
+  earlyTerminationNoticeGiven?: boolean; // Defaults to true; if false, 90-day bank penalty applies
+  earlyPenaltyZAR?: number; // Custom fixed penalty quote from bank
   // PIE Act Eviction Risk Adjustments
   occupantRisk?: OccupantRiskProfile;
   evictionLegalCostZAR?: number;
@@ -141,7 +145,22 @@ export function calculateFlipMao(params: FlipMaoParams): FlipMaoResult {
     ? Math.round(targetExitPrice * (exitCommissionPercent / 100))
     : 0;
   const municipalClearance = Math.max(0, municipalClearanceZAR || 0);
-  const nonPurchaseCosts = rehabCost + resolvedHoldingCost + exitCommission + municipalClearance;
+
+  // Active bond indicator & Bond Cancellation Legal Fee
+  const ltv = Math.max(0, bondLtvPercent);
+  const rate = Math.max(0, interestRatePercent || (params.bondInterestRatePercent ?? 0));
+  const hasBond = ltv > 0;
+  const defaultBondCancel = params.defaultBondCancellationFeeZAR ?? 5200;
+  const bondCancellation = !hasBond
+    ? 0
+    : (params.bondCancellationFeeZAR ?? defaultBondCancel);
+
+  // 90-Day Early Settlement Penalty (Point 2 & 3: Strict Zero Guard & Closed-Form Factor)
+  const isPenaltyActive = hasBond && params.earlyTerminationNoticeGiven === false;
+  const hasFixedPenalty = isPenaltyActive && params.earlyPenaltyZAR !== undefined && params.earlyPenaltyZAR !== null;
+  const fixedPenalty = hasFixedPenalty ? Math.max(0, params.earlyPenaltyZAR!) : 0;
+
+  const nonPurchaseCosts = rehabCost + resolvedHoldingCost + exitCommission + municipalClearance + bondCancellation + fixedPenalty;
   const allowableForAcquisition = totalAllowableOutlay - nonPurchaseCosts;
 
   // Baseline risk-free acquisition friction
@@ -161,25 +180,29 @@ export function calculateFlipMao(params: FlipMaoParams): FlipMaoResult {
   const fixedBurn = riskActive
     ? params.occupantRisk!.monthlySiteSecurityZAR
     : Math.max(0, evictionMonthlyFixedBurnZAR);
-  const ltv = Math.max(0, bondLtvPercent);
-  const rate = Math.max(0, interestRatePercent || (params.bondInterestRatePercent ?? 0));
 
   let finalMaxBid = Math.max(0, riskFreeMaxBid);
   let occupantRiskReductionZAR = 0;
   let evictionCostAtMaoZAR = 0;
 
-  if (legal > 0 || delayDays > 0) {
-    const evictionMonths = delayDays / DAYS_PER_MONTH;
-    const fixedEvictionCost = legal + fixedBurn * evictionMonths;
-    const k = (ltv / 100) * (rate / 100 / 12) * evictionMonths;
+  // Closed-form k factors for eviction delay interest AND 90-day early termination penalty
+  const evictionMonths = delayDays > 0 ? delayDays / DAYS_PER_MONTH : 0;
+  const fixedEvictionCost = legal + fixedBurn * evictionMonths;
+  const kEviction = (ltv / 100) * (rate / 100 / 12) * evictionMonths;
+  const kPenalty = (isPenaltyActive && !hasFixedPenalty)
+    ? (ltv / 100) * (rate / 100) * (90 / 365)
+    : 0;
+  const totalK = kEviction + kPenalty;
+
+  if (legal > 0 || delayDays > 0 || totalK > 0) {
     const netAllowable = allowableForAcquisition - fixedEvictionCost;
 
     finalMaxBid = netAllowable > 0
-      ? Math.max(0, Math.round(netAllowable / (1 + acqRate + k)))
+      ? Math.max(0, Math.round(netAllowable / (1 + acqRate + totalK)))
       : 0;
 
     occupantRiskReductionZAR = Math.max(0, riskFreeMaxBid - finalMaxBid);
-    const bondInterestAtMao = finalMaxBid * k;
+    const bondInterestAtMao = finalMaxBid * kEviction;
     evictionCostAtMaoZAR = Math.round(fixedEvictionCost + bondInterestAtMao);
   }
 

@@ -261,7 +261,7 @@ describe('Rentals Pure Calculations Engine', () => {
   });
 
   describe('calculateDisposalMetrics', () => {
-    it('calculates gross capital gain, percentage gain, and net liquid cash proceeds', () => {
+    it('calculates gross capital gain, percentage gain, and net liquid cash proceeds with default R5,200 bond cancellation', () => {
       const salePrice = 2_200_000;
       const purchasePrice = 1_500_000;
       const bondBalance = 900_000;
@@ -269,20 +269,45 @@ describe('Rentals Pure Calculations Engine', () => {
       const metrics = calculateDisposalMetrics(salePrice, purchasePrice, bondBalance);
       expect(metrics.grossCapitalGainZAR).toBe(700_000);
       expect(metrics.capitalGainPercent).toBeCloseTo((700_000 / 1_500_000) * 100, 2);
-      expect(metrics.netCashProceedsZAR).toBe(1_300_000); // 2,200,000 - 900,000
+      expect(metrics.bondCancellationFeeZAR).toBe(5_200);
+      expect(metrics.netCashProceedsZAR).toBe(1_294_800); // 2,200,000 - 900,000 - 5,200
+      expect(metrics.shortfallToSettleZAR).toBe(0);
     });
 
-    it('floors net cash proceeds to 0 when outstanding bond exceeds sale price', () => {
+    it('respects zero bond cancellation fee override (negotiated bank waiver)', () => {
+      const metrics = calculateDisposalMetrics(2_200_000, 1_500_000, 900_000, {
+        bondCancellationFeeZAR: 0,
+      });
+      expect(metrics.bondCancellationFeeZAR).toBe(0);
+      expect(metrics.netCashProceedsZAR).toBe(1_300_000);
+    });
+
+    it('floors net cash proceeds to 0 and computes cash shortfall when outstanding debt exceeds sale price', () => {
       const metrics = calculateDisposalMetrics(1_000_000, 1_200_000, 1_300_000);
       expect(metrics.grossCapitalGainZAR).toBe(-200_000);
       expect(metrics.netCashProceedsZAR).toBe(0);
+      expect(metrics.shortfallToSettleZAR).toBe(305_200); // 1,300,000 + 5,200 - 1,000,000
     });
 
     it('handles 0 purchase price without division by zero', () => {
       const metrics = calculateDisposalMetrics(1_500_000, 0, 500_000);
       expect(metrics.grossCapitalGainZAR).toBe(1_500_000);
       expect(metrics.capitalGainPercent).toBe(0);
-      expect(metrics.netCashProceedsZAR).toBe(1_000_000);
+      expect(metrics.netCashProceedsZAR).toBe(994_800); // 1,500,000 - 500,000 - 5,200
+    });
+
+    it('deducts exit commission and 90-day early termination penalty when notice was not given', () => {
+      const metrics = calculateDisposalMetrics(2_000_000, 1_200_000, 1_000_000, {
+        exitCommissionPercent: 5.75, // R115,000
+        bondCancellationFeeZAR: 5_200,
+        earlyTerminationNoticeGiven: false,
+        bondInterestRatePercent: 11.5, // 90 days interest = 1,000,000 * 0.115 * 90 / 365 = 28,356
+      });
+      expect(metrics.exitCommissionZAR).toBe(115_000);
+      expect(metrics.bondCancellationFeeZAR).toBe(5_200);
+      expect(metrics.earlyPenaltyZAR).toBe(28_356);
+      expect(metrics.totalExitFrictionZAR).toBe(115_000 + 5_200 + 28_356);
+      expect(metrics.netCashProceedsZAR).toBe(2_000_000 - 1_000_000 - (115_000 + 5_200 + 28_356));
     });
   });
 

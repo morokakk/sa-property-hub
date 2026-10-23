@@ -21,7 +21,15 @@ export function RentalSoldCard({ property, onReopenProperty }: RentalSoldCardPro
   } = calculateDisposalMetrics(
     salePrice,
     purchasePrice,
-    property.outstandingBondBalanceZAR || 0
+    property.outstandingBondBalanceZAR || 0,
+    {
+      exitCommissionPercent: property.exitCommissionPercent,
+      bondCancellationFeeZAR: property.bondCancellationFeeZAR,
+      earlyTerminationNoticeGiven: property.earlyTerminationNoticeGiven,
+      earlyPenaltyZAR: property.earlyTerminationPenaltyZAR,
+      bondInterestRatePercent: property.bondInterestRatePercent,
+      hasActiveBond: (property.outstandingBondBalanceZAR || 0) > 0,
+    }
   );
 
   return (
