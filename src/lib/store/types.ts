@@ -2,6 +2,7 @@ import { StateCreator } from 'zustand';
 import {
   RentalProperty,
   Lease,
+  LeaseInspectionRecord,
   ExtractedRentalUnit,
   RentalRefinanceParams,
   FlipProject,
@@ -67,6 +68,8 @@ export interface RentalSliceActions {
       forwardingNotes?: string;
       action: 'vacant' | 'replacement';
       replacementLease?: Partial<Lease>;
+      inspectionRecord?: LeaseInspectionRecord;
+      depositRefundedZAR?: number;
     }
   ) => void;
 }

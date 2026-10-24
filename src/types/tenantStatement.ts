@@ -1,4 +1,4 @@
-import { UtilityStatement, MeterReading, TenantPaymentRecord, ArrearsWriteOff } from '@/types';
+import { UtilityStatement, MeterReading, TenantPaymentRecord, ArrearsWriteOff, LeaseInspectionRecord } from '@/types';
 
 export interface PublicTenantStatementPayload {
   lease: {
@@ -11,12 +11,14 @@ export interface PublicTenantStatementPayload {
     leaseEndDate: string;
     monthlyRentZAR: number;
     depositHeldZAR: number;
+    depositRefundedZAR?: number;
     annualEscalationPercent?: number;
     status?: string;
     arrears_opening_balance_zar?: number | null;
     roomType?: string;
     guarantorName?: string;
     guarantorContact?: string;
+    inspectionRecord?: LeaseInspectionRecord;
   };
   property: {
     id: string;

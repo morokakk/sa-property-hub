@@ -1,8 +1,9 @@
 import { formatZAR, formatPercent, formatDate } from './formatters';
-import { OpportunityDeal, FlipProject, InvestorProfile, DealStrategy, DealSource, RentalProperty, TenantPaymentRecord, OccupantRiskProfile, ReturnTermType, AncillaryIncome, UtilityStatement } from '@/types';
+import { OpportunityDeal, FlipProject, InvestorProfile, DealStrategy, DealSource, RentalProperty, TenantPaymentRecord, OccupantRiskProfile, ReturnTermType, AncillaryIncome, UtilityStatement, LeaseInspectionRecord } from '@/types';
 import { generateLongTermProjection, calculateMonthlyBondRepayment, calculateDealMetrics } from './calculations/propertyMetrics';
 import { calculatePropertyArrears, formatMonthLabel, getMonthKey, calculateTenantStatementTiers } from './calculations/arrears';
 import { isEvictionActive, calculateEvictionCarryingCost } from './calculations/occupantRisk';
+import { calculateInspectionDepositSummary, ensureInspectionItems } from './calculations/inspections';
 
 export interface ProposalPitchParams {
   deal: {
@@ -1195,6 +1196,117 @@ export function formatTenantPaymentReceiptForWhatsApp(
   }
   text += `━━━━━━━━━━━━━━━━━━━━━\n`;
   text += `Thank you for your prompt payment! This serves as official electronic confirmation.`;
+
+  return text;
+}
+
+export interface FormatInspectionWhatsAppParams {
+  propertyTitle: string;
+  unitName: string;
+  tenantName: string;
+  mode: 'ingoing' | 'exit';
+  depositHeldZAR: number;
+  record: LeaseInspectionRecord;
+  portalUrl?: string;
+  landlordEntityName?: string;
+}
+
+/**
+ * Formats a clean, professional, emoji-free WhatsApp report for Joint Ingoing/Exit
+ * property inspections compliant with Section 5 of the SA Rental Housing Act (Act 50 of 1999).
+ */
+export function formatInspectionForWhatsApp(params: {
+  propertyTitle: string;
+  unitName: string;
+  tenantName: string;
+  mode: 'ingoing' | 'exit';
+  depositHeldZAR: number;
+  record: LeaseInspectionRecord;
+  portalUrl?: string;
+  landlordEntityName?: string;
+}): string {
+  const {
+    propertyTitle,
+    unitName,
+    tenantName,
+    mode,
+    depositHeldZAR,
+    record,
+    portalUrl,
+    landlordEntityName,
+  } = params;
+
+  const isIngoing = mode === 'ingoing';
+  const inspectionDate = isIngoing ? record.ingoingDate : record.exitDate;
+  const isAgreed = isIngoing ? record.ingoingTenantAgreed : record.exitTenantAgreed;
+  const agreedDate = isIngoing ? record.ingoingTenantAgreedDate : record.exitTenantAgreedDate;
+  const photoVaultUrl = isIngoing ? record.ingoingPhotoVaultUrl : record.exitPhotoVaultUrl;
+
+  const items = ensureInspectionItems(record.items);
+  const summary = calculateInspectionDepositSummary(depositHeldZAR, record);
+
+  let text = isIngoing
+    ? `*JOINT INGOING PROPERTY INSPECTION REPORT (RHA SEC 5)*\n`
+    : `*JOINT EXIT PROPERTY INSPECTION & DEPOSIT SETTLEMENT (RHA SEC 5)*\n`;
+  text += `━━━━━━━━━━━━━━━━━━━━━\n`;
+  if (landlordEntityName) {
+    text += `• Landlord: ${landlordEntityName}\n`;
+  }
+  text += `• Property: ${propertyTitle} — ${unitName}\n`;
+  text += `• Tenant: ${tenantName}\n`;
+  if (inspectionDate) {
+    text += `• Inspection Date: *${formatDate(inspectionDate)}*\n`;
+  }
+  text += `• Sign-Off Status: *${isAgreed ? `[Tenant Agreed - ${formatDate(agreedDate || inspectionDate || '')}]` : '[Pending Tenant Sign-Off]'}*\n\n`;
+
+  text += `*8-POINT CHECKLIST PARTICULARS:*\n`;
+  items.forEach((item) => {
+    if (isIngoing) {
+      text += `• ${item.category}: *[${item.ingoingCondition}]*`;
+      if (item.ingoingNotes && item.ingoingNotes.trim()) {
+        text += `\n  Note: ${item.ingoingNotes.trim()}`;
+      }
+      text += `\n`;
+    } else {
+      const exitCond = item.exitCondition || 'Good';
+      text += `• ${item.category}: Ingoing [${item.ingoingCondition}] -> Exit *[${exitCond}]*`;
+      if (item.repairDeductionZAR && item.repairDeductionZAR > 0) {
+        text += `\n  Deduction: *${formatZAR(item.repairDeductionZAR, { includeDecimals: true })}*`;
+      }
+      if (item.exitNotes && item.exitNotes.trim()) {
+        text += `\n  Exit Note: ${item.exitNotes.trim()}`;
+      }
+      text += `\n`;
+    }
+  });
+
+  text += `\n`;
+  if (isIngoing) {
+    text += `*DEPOSIT PARTICULARS:*\n`;
+    text += `• Deposit Held in Trust: *${formatZAR(depositHeldZAR, { includeDecimals: true })}*\n`;
+  } else {
+    text += `*DEPOSIT SETTLEMENT BREAKDOWN:*\n`;
+    text += `• Deposit Held in Trust: *${formatZAR(depositHeldZAR, { includeDecimals: true })}*\n`;
+    text += `• Total Repair Deductions: *${formatZAR(summary.totalRepairDeductionsZAR, { includeDecimals: true })}*\n`;
+    text += `• Net Deposit Refundable: *${formatZAR(summary.netDepositRefundableZAR, { includeDecimals: true })}*\n`;
+    if (summary.excessDamageShortfallZAR > 0) {
+      text += `• Excess Damage Shortfall Due by Tenant: *${formatZAR(summary.excessDamageShortfallZAR, { includeDecimals: true })}*\n`;
+    }
+  }
+
+  if (photoVaultUrl && photoVaultUrl.trim()) {
+    text += `\n*PHOTOGRAPHIC EVIDENCE VAULT:*\n• ${photoVaultUrl.trim()}\n`;
+  }
+
+  if (portalUrl && portalUrl.trim()) {
+    text += `\n*ONLINE STATEMENT & INSPECTION PORTAL:*\n• ${portalUrl.trim()}\n`;
+  }
+
+  text += `━━━━━━━━━━━━━━━━━━━━━\n`;
+  text += `*SECTION 5 RENTAL HOUSING ACT NOTICE:*\n`;
+  text += `Under Act 50 of 1999, joint property inspections protect both parties. Please review this report and reply with:\n`;
+  text += `*AGREED*\n`;
+  text += `to confirm your electronic acknowledgement of this inspection record.`;
 
   return text;
 }

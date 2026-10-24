@@ -1,7 +1,15 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { RentalProperty, Lease, TenantDepartureReason } from '@/types';
+import React, { useState, useEffect, useMemo } from 'react';
+import {
+  RentalProperty,
+  Lease,
+  TenantDepartureReason,
+  LeaseInspectionRecord,
+  InspectionCondition,
+  InspectionCategory,
+  InspectionItem,
+} from '@/types';
 import { formatZAR, formatDate } from '@/lib/formatters';
 import {
   X,
@@ -14,7 +22,19 @@ import {
   CheckCircle2,
   Clock,
   Building2,
+  ClipboardCheck,
+  Share2,
+  Copy,
+  Check,
+  Camera,
+  ShieldAlert,
 } from 'lucide-react';
+import {
+  calculateInspectionDepositSummary,
+  ensureInspectionItems,
+  normalizeWhatsAppPhone,
+} from '@/lib/calculations/inspections';
+import { formatInspectionForWhatsApp } from '@/lib/whatsappFormatter';
 
 export interface TenantNoticeModalProps {
   isOpen: boolean;
@@ -41,6 +61,8 @@ export interface TenantNoticeModalProps {
       forwardingNotes?: string;
       action: 'vacant' | 'replacement';
       replacementLease?: Partial<Lease>;
+      inspectionRecord?: LeaseInspectionRecord;
+      depositRefundedZAR?: number;
     }
   ) => void;
 }
@@ -89,8 +111,44 @@ export function TenantNoticeModal({
   const [newMonthlyRent, setNewMonthlyRent] = useState<number>(0);
   const [newDepositHeld, setNewDepositHeld] = useState<number>(0);
 
+  // Exit inspection & deposit settlement states
+  const [exitRecord, setExitRecord] = useState<LeaseInspectionRecord | null>(null);
+  const [isDepositOverridden, setIsDepositOverridden] = useState<boolean>(false);
+  const [customDepositRefund, setCustomDepositRefund] = useState<string>('');
+  const [exitCopyFeedback, setExitCopyFeedback] = useState<boolean>(false);
+
   const leases = property?.leases || [];
   const currentLease = leases.find((l) => l.id === selectedLeaseId) || leases[0];
+
+  const initializeExitRecord = (lease?: Lease, vacDate?: string) => {
+    const fallbackDate = vacDate || new Date().toISOString().split('T')[0];
+    if (lease?.inspectionRecord) {
+      const items = ensureInspectionItems(lease.inspectionRecord.items).map((item) => ({
+        ...item,
+        exitCondition: item.exitCondition || item.ingoingCondition || 'Good',
+        repairDeductionZAR: item.repairDeductionZAR ?? 0,
+      }));
+      setExitRecord({
+        ...lease.inspectionRecord,
+        exitDate: lease.inspectionRecord.exitDate || fallbackDate,
+        exitTenantAgreed: lease.inspectionRecord.exitTenantAgreed || false,
+        items,
+      });
+    } else {
+      const items = ensureInspectionItems([]).map((item) => ({
+        ...item,
+        exitCondition: 'Good' as InspectionCondition,
+        repairDeductionZAR: 0,
+      }));
+      setExitRecord({
+        exitDate: fallbackDate,
+        exitTenantAgreed: false,
+        items,
+      });
+    }
+    setIsDepositOverridden(false);
+    setCustomDepositRefund('');
+  };
 
   useEffect(() => {
     if (isOpen && property) {
@@ -115,6 +173,7 @@ export function TenantNoticeModal({
 
         setFinalVacationDate(targetLease.vacationDate || todayStr);
         setFinalReason(targetLease.noticeReason || DEPARTURE_REASONS[0]);
+        initializeExitRecord(targetLease, targetLease.vacationDate || todayStr);
       } else {
         setActiveView('notice');
         setNoticeGivenDate(todayStr);
@@ -124,6 +183,7 @@ export function TenantNoticeModal({
 
         setFinalVacationDate(todayStr);
         setFinalReason(DEPARTURE_REASONS[0]);
+        initializeExitRecord(targetLease, todayStr);
       }
 
       setForwardingNotes('');
@@ -148,10 +208,75 @@ export function TenantNoticeModal({
     const target = leases.find((l) => l.id === leaseId);
     if (target?.status === 'Notice Given') {
       setActiveView('finalize');
-      setFinalVacationDate(target.vacationDate || new Date().toISOString().split('T')[0]);
+      const vacDate = target.vacationDate || new Date().toISOString().split('T')[0];
+      setFinalVacationDate(vacDate);
       setFinalReason(target.noticeReason || DEPARTURE_REASONS[0]);
+      initializeExitRecord(target, vacDate);
     } else {
       setActiveView('notice');
+      initializeExitRecord(target, new Date().toISOString().split('T')[0]);
+    }
+  };
+
+  const inspectionSummary = calculateInspectionDepositSummary(
+    currentLease.depositHeldZAR,
+    exitRecord || undefined
+  );
+
+  const effectiveDepositRefunded = isDepositOverridden
+    ? Number(customDepositRefund || 0)
+    : inspectionSummary.netDepositRefundableZAR;
+
+  const handleUpdateExitItem = (
+    category: InspectionCategory,
+    updates: Partial<InspectionItem>
+  ) => {
+    if (!exitRecord) return;
+    const items = ensureInspectionItems(exitRecord.items).map((item) => {
+      if (item.category !== category) return item;
+      const updated = { ...item, ...updates };
+      // If condition reset to Good or N/A and deduction wasn't explicitly changed, reset deduction
+      if (
+        (updates.exitCondition === 'Good' || updates.exitCondition === 'N/A') &&
+        updates.repairDeductionZAR === undefined
+      ) {
+        updated.repairDeductionZAR = 0;
+      }
+      return updated;
+    });
+    setExitRecord({ ...exitRecord, items });
+  };
+
+  const handleSendExitWhatsApp = () => {
+    if (!exitRecord) return;
+    const origin = typeof window !== 'undefined' ? window.location.origin : '';
+    const portalUrl = currentLease.statementToken
+      ? `${origin}/statement/${currentLease.statementToken}?tab=inspection`
+      : undefined;
+
+    const messageText = formatInspectionForWhatsApp({
+      propertyTitle: property.title,
+      unitName: currentLease.unitName,
+      tenantName: currentLease.tenantName,
+      mode: 'exit',
+      depositHeldZAR: currentLease.depositHeldZAR,
+      record: exitRecord,
+      portalUrl,
+    });
+
+    if (typeof navigator !== 'undefined' && navigator.clipboard) {
+      navigator.clipboard.writeText(messageText);
+      setExitCopyFeedback(true);
+      setTimeout(() => setExitCopyFeedback(false), 3000);
+    }
+
+    const normalizedPhone = normalizeWhatsAppPhone(currentLease.tenantPhone);
+    const waUrl = normalizedPhone
+      ? `https://wa.me/${normalizedPhone}?text=${encodeURIComponent(messageText)}`
+      : `https://wa.me/?text=${encodeURIComponent(messageText)}`;
+
+    if (typeof window !== 'undefined') {
+      window.open(waUrl, '_blank', 'noopener,noreferrer');
     }
   };
 
@@ -191,12 +316,21 @@ export function TenantNoticeModal({
       };
     }
 
+    const finalizedInspectionRecord: LeaseInspectionRecord | undefined = exitRecord
+      ? {
+          ...exitRecord,
+          exitDate: finalVacationDate,
+        }
+      : currentLease.inspectionRecord;
+
     onFinalizeMoveOut(property.id, currentLease.id, {
       vacationDate: finalVacationDate,
       departureReason: finalReason,
       forwardingNotes: forwardingNotes.trim() || undefined,
       action: transitionAction,
       replacementLease,
+      inspectionRecord: finalizedInspectionRecord,
+      depositRefundedZAR: Math.max(0, effectiveDepositRefunded),
     });
     onClose();
   };
@@ -443,16 +577,324 @@ export function TenantNoticeModal({
 
               <div>
                 <label className="block text-[11px] font-semibold text-slate-700 mb-1">
-                  Forwarding Address & Inspection Notes
+                  Forwarding Address & Move-Out Notes
                 </label>
                 <textarea
                   rows={2}
-                  placeholder="e.g. Deposit full refund approved following exit inspection; forwarding address noted."
+                  placeholder="e.g. Forwarding address: 14 Maple Street. Key remotes returned."
                   value={forwardingNotes}
                   onChange={(e) => setForwardingNotes(e.target.value)}
                   className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-1 focus:ring-slate-900 focus:border-slate-900 bg-white"
                 />
               </div>
+
+              {/* 8-Point Exit Inspection & Deposit Settlement Engine (RHA Sec 5) */}
+              {exitRecord && (
+                <div className="p-3.5 rounded-xl border border-indigo-200 bg-slate-50/70 space-y-3.5">
+                  <div className="flex items-center justify-between flex-wrap gap-2">
+                    <div className="flex items-center gap-2">
+                      <div className="p-1 rounded bg-indigo-100 text-indigo-700">
+                        <ClipboardCheck className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <h4 className="text-xs font-bold text-slate-900">
+                          Joint Exit Inspection & Deposit Settlement
+                        </h4>
+                        <p className="text-[10px] text-slate-500">
+                          SA Rental Housing Act Section 5 joint inspection & deduction ledger
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 text-[11px]">
+                      <span className="text-slate-500">Exit Date:</span>
+                      <input
+                        type="date"
+                        value={exitRecord.exitDate || finalVacationDate}
+                        onChange={(e) => setExitRecord({ ...exitRecord, exitDate: e.target.value })}
+                        className="px-2 py-0.5 text-[11px] border border-slate-300 rounded bg-white"
+                      />
+                    </div>
+                  </div>
+
+                  {/* RHA Section 5 Compliance Warning / Success Banner */}
+                  {!inspectionSummary.isRhaCompliantForDeductions ? (
+                    <div className="p-2.5 rounded-lg bg-amber-50 border border-amber-300 text-amber-900 space-y-1">
+                      <div className="font-bold flex items-center gap-1.5 text-[11px]">
+                        <ShieldAlert className="w-3.5 h-3.5 text-amber-700 shrink-0" />
+                        <span>RHA Section 5 Notice: Ingoing Inspection Not Agreed</span>
+                      </div>
+                      <p className="text-[10px] text-amber-800 leading-relaxed">
+                        Under Section 5(3)(e)-(k) of the SA Rental Housing Act (Act 50 of 1999), landlords who fail to conduct a joint ingoing inspection are deemed to have acknowledged the property was received in good condition, and tenant damage deductions may be disputed at the Rental Housing Tribunal.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="p-2 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-900 text-[11px] flex items-center justify-between flex-wrap gap-2">
+                      <span className="font-semibold flex items-center gap-1.5">
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                        <span>
+                          RHA Compliant • Agreed Ingoing on {formatDate(exitRecord.ingoingTenantAgreedDate || exitRecord.ingoingDate || '')}
+                        </span>
+                      </span>
+                      {exitRecord.ingoingPhotoVaultUrl && (
+                        <a
+                          href={exitRecord.ingoingPhotoVaultUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-[10px] font-bold text-indigo-700 hover:underline"
+                        >
+                          View Ingoing Vault ↗
+                        </a>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Side-by-Side 8 Categories Audit */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between text-[11px] font-bold text-slate-700 px-0.5">
+                      <span>Condition Audit & Deductions</span>
+                      <span className="text-[10px] font-normal text-slate-500">
+                        {inspectionSummary.degradedItemsCount > 0
+                          ? `${inspectionSummary.degradedItemsCount} degraded item(s)`
+                          : 'All items in good standing'}
+                      </span>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      {ensureInspectionItems(exitRecord.items).map((item) => {
+                        const exitCond = item.exitCondition || 'Good';
+                        const isDegraded =
+                          (item.ingoingCondition === 'Good' && exitCond === 'Fair') ||
+                          exitCond === 'Defective' ||
+                          (item.repairDeductionZAR !== undefined && item.repairDeductionZAR > 0) ||
+                          Boolean(item.exitNotes && item.exitNotes.trim());
+
+                        return (
+                          <div
+                            key={item.category}
+                            className={`p-2.5 rounded-lg border transition-colors shadow-2xs space-y-1.5 ${
+                              isDegraded
+                                ? 'bg-amber-50/40 border-amber-300'
+                                : 'bg-white border-slate-200'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between flex-wrap gap-2">
+                              <div>
+                                <span className="font-bold text-slate-800 text-[11px]">
+                                  {item.category}
+                                </span>
+                                <div className="text-[10px] text-slate-500 flex items-center gap-1">
+                                  <span>Ingoing:</span>
+                                  <span className="font-semibold text-slate-700">[{item.ingoingCondition}]</span>
+                                  {item.ingoingNotes && (
+                                    <span className="italic truncate max-w-[180px]">({item.ingoingNotes})</span>
+                                  )}
+                                </div>
+                              </div>
+
+                              {/* Exit Condition Pills */}
+                              <div className="flex items-center gap-1">
+                                {(['Good', 'Fair', 'Defective', 'N/A'] as InspectionCondition[]).map((cond) => {
+                                  const isSelected = exitCond === cond;
+                                  let pillClass = 'bg-slate-100 text-slate-600 border-slate-200 hover:bg-slate-200';
+                                  if (isSelected) {
+                                    if (cond === 'Good') pillClass = 'bg-emerald-600 text-white font-bold border-emerald-600 shadow-2xs';
+                                    else if (cond === 'Fair') pillClass = 'bg-amber-500 text-white font-bold border-amber-500 shadow-2xs';
+                                    else if (cond === 'Defective') pillClass = 'bg-rose-600 text-white font-bold border-rose-600 shadow-2xs';
+                                    else pillClass = 'bg-slate-700 text-white font-bold border-slate-700 shadow-2xs';
+                                  }
+
+                                  return (
+                                    <button
+                                      key={cond}
+                                      type="button"
+                                      onClick={() => handleUpdateExitItem(item.category, { exitCondition: cond })}
+                                      className={`px-2 py-0.5 rounded text-[10px] border transition-all cursor-pointer ${pillClass}`}
+                                    >
+                                      {cond}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            </div>
+
+                            {/* Inline Repair Deduction & Exit Notes if degraded/defective */}
+                            {isDegraded && (
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1 border-t border-slate-200/80">
+                                <div>
+                                  <label className="block text-[10px] font-semibold text-rose-800 mb-0.5">
+                                    Repair Deduction (ZAR)
+                                  </label>
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    step="10"
+                                    placeholder="R 0"
+                                    value={item.repairDeductionZAR ?? ''}
+                                    onChange={(e) =>
+                                      handleUpdateExitItem(item.category, {
+                                        repairDeductionZAR: Math.max(0, Number(e.target.value)),
+                                      })
+                                    }
+                                    className="w-full px-2 py-1 text-xs border border-rose-300 rounded bg-white text-rose-900 font-bold focus:outline-hidden focus:ring-1 focus:ring-rose-500"
+                                  />
+                                </div>
+                                <div>
+                                  <label className="block text-[10px] font-semibold text-slate-600 mb-0.5">
+                                    Exit Damage Note / Contractor Quote
+                                  </label>
+                                  <input
+                                    type="text"
+                                    placeholder="e.g. Deep gouge in tile; replace 3 tiles"
+                                    value={item.exitNotes || ''}
+                                    onChange={(e) =>
+                                      handleUpdateExitItem(item.category, { exitNotes: e.target.value })
+                                    }
+                                    className="w-full px-2 py-1 text-xs border border-slate-300 rounded bg-white focus:outline-hidden focus:ring-1 focus:ring-indigo-500"
+                                  />
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Exit Photographic Evidence Vault */}
+                  <div>
+                    <label className="block text-[10px] font-semibold text-slate-600 mb-1 flex items-center gap-1">
+                      <Camera className="w-3 h-3 text-slate-400" />
+                      <span>Exit Photo Evidence Vault URL</span>
+                    </label>
+                    <input
+                      type="url"
+                      placeholder="e.g. Google Drive / iCloud / Dropbox link for exit photos"
+                      value={exitRecord.exitPhotoVaultUrl || ''}
+                      onChange={(e) => setExitRecord({ ...exitRecord, exitPhotoVaultUrl: e.target.value })}
+                      className="w-full px-2.5 py-1.5 text-xs border border-slate-300 rounded-md bg-white focus:outline-hidden focus:ring-1 focus:ring-indigo-500"
+                    />
+                  </div>
+
+                  {/* Automated Live Settlement Math Bar */}
+                  <div className="p-3 bg-white rounded-lg border border-indigo-200 shadow-2xs space-y-2">
+                    <div className="flex items-center justify-between text-xs font-bold text-slate-800">
+                      <span>Deposit Settlement Calculation</span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (isDepositOverridden) {
+                            setIsDepositOverridden(false);
+                            setCustomDepositRefund('');
+                          } else {
+                            setIsDepositOverridden(true);
+                            setCustomDepositRefund(String(inspectionSummary.netDepositRefundableZAR));
+                          }
+                        }}
+                        className="text-[10px] font-semibold text-indigo-700 hover:underline cursor-pointer"
+                      >
+                        {isDepositOverridden ? 'Reset to Auto-Calc' : 'Manual Override'}
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-2 text-center text-xs">
+                      <div className="p-2 rounded bg-slate-50 border border-slate-200">
+                        <span className="text-[10px] text-slate-500 block">Deposit Held</span>
+                        <strong className="text-slate-900">{formatZAR(currentLease.depositHeldZAR)}</strong>
+                      </div>
+                      <div className="p-2 rounded bg-rose-50 border border-rose-200">
+                        <span className="text-[10px] text-rose-700 block">Repair Deductions</span>
+                        <strong className="text-rose-900">
+                          - {formatZAR(inspectionSummary.totalRepairDeductionsZAR)}
+                        </strong>
+                      </div>
+                      <div className="p-2 rounded bg-emerald-50 border border-emerald-200">
+                        <span className="text-[10px] text-emerald-700 block">Net Refundable</span>
+                        <strong className="text-emerald-950 font-black">
+                          {formatZAR(effectiveDepositRefunded)}
+                        </strong>
+                      </div>
+                    </div>
+
+                    {isDepositOverridden && (
+                      <div className="p-2 bg-indigo-50/50 rounded border border-indigo-200 flex items-center justify-between gap-2">
+                        <span className="text-[11px] font-semibold text-indigo-950">
+                          Custom Deposit Refund Amount (ZAR):
+                        </span>
+                        <input
+                          type="number"
+                          min="0"
+                          value={customDepositRefund}
+                          onChange={(e) => setCustomDepositRefund(e.target.value)}
+                          className="w-32 px-2 py-1 text-xs border border-indigo-300 rounded font-bold text-indigo-900 bg-white"
+                        />
+                      </div>
+                    )}
+
+                    {inspectionSummary.excessDamageShortfallZAR > 0 && (
+                      <div className="p-2 rounded bg-rose-100/70 border border-rose-300 text-[11px] text-rose-900 font-semibold">
+                        ⚠️ Excess Damage Shortfall: Repairs exceed deposit held by{' '}
+                        <strong>{formatZAR(inspectionSummary.excessDamageShortfallZAR)}</strong>. The tenant owes this balance.
+                      </div>
+                    )}
+                  </div>
+
+                  {/* WhatsApp Exit Settlement Sharing & Sign-Off */}
+                  <div className="p-3 bg-indigo-50/70 rounded-lg border border-indigo-200 space-y-2.5">
+                    <div className="flex items-center justify-between flex-wrap gap-2">
+                      <span className="text-[11px] font-bold text-indigo-950 flex items-center gap-1.5">
+                        <Share2 className="w-3.5 h-3.5 text-indigo-700" />
+                        <span>Exit Settlement WhatsApp Sign-Off</span>
+                      </span>
+                      <button
+                        type="button"
+                        onClick={handleSendExitWhatsApp}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 rounded-lg shadow-2xs transition-colors cursor-pointer"
+                      >
+                        {exitCopyFeedback ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                        <span>{exitCopyFeedback ? 'Copied & Opening WhatsApp...' : 'Send Exit Report via WhatsApp'}</span>
+                      </button>
+                    </div>
+
+                    <div className="flex items-center justify-between flex-wrap gap-2 pt-1 border-t border-indigo-100">
+                      <label className="flex items-center gap-2 cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          checked={Boolean(exitRecord.exitTenantAgreed)}
+                          onChange={(e) => {
+                            const isChecked = e.target.checked;
+                            setExitRecord({
+                              ...exitRecord,
+                              exitTenantAgreed: isChecked,
+                              exitTenantAgreedDate: isChecked
+                                ? new Date().toISOString().split('T')[0]
+                                : undefined,
+                            });
+                          }}
+                          className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 border-slate-300"
+                        />
+                        <span className="text-xs font-semibold text-slate-800">
+                          Tenant Agreed to Exit Deductions via WhatsApp
+                        </span>
+                      </label>
+
+                      {exitRecord.exitTenantAgreed && (
+                        <div className="flex items-center gap-1.5 text-[11px] text-slate-600">
+                          <span className="text-slate-500">Agreed Date:</span>
+                          <input
+                            type="date"
+                            value={exitRecord.exitTenantAgreedDate || new Date().toISOString().split('T')[0]}
+                            onChange={(e) =>
+                              setExitRecord({ ...exitRecord, exitTenantAgreedDate: e.target.value })
+                            }
+                            className="px-2 py-0.5 text-[11px] border border-slate-300 rounded bg-white"
+                          />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Unit Transition Options */}
               <div className="pt-2 border-t border-slate-100">

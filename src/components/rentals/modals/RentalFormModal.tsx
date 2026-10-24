@@ -15,6 +15,7 @@ import { calculateMonthlyBondRepayment } from '@/lib/calculations/propertyMetric
 import { calculateAgencyCommission, reconcilePropertyStatus } from '@/lib/calculations/rentals';
 import { usePortfolioStore } from '@/lib/store/usePortfolioStore';
 import { TenantVettingDrawer } from './TenantVettingDrawer';
+import { LeaseInspectionDrawer } from './LeaseInspectionDrawer';
 import InvestmentNodeSelect, { InvestmentNodeBanner } from '@/components/common/InvestmentNodeSelect';
 import { getNodeComplianceProfile } from '@/lib/constants/investmentNodes';
 
@@ -1304,6 +1305,24 @@ export const RentalFormModal: React.FC<RentalFormModalProps> = ({
                     setFormLeases((prev) =>
                       prev.map((l) =>
                         l.id === lease.id ? { ...l, depositHeldZAR: depositAmount } : l
+                      )
+                    );
+                  }}
+                />
+
+                {/* 8-Point Ingoing Property Inspection Checklist (RHA Sec 5) */}
+                <LeaseInspectionDrawer
+                  inspectionRecord={lease.inspectionRecord}
+                  depositHeldZAR={lease.depositHeldZAR}
+                  propertyTitle={title || 'Rental Property'}
+                  unitName={lease.unitName || 'Main Unit'}
+                  tenantName={lease.tenantName || 'Tenant'}
+                  tenantPhone={lease.tenantPhone}
+                  statementToken={lease.statementToken || lease.id}
+                  onUpdateInspection={(record) => {
+                    setFormLeases((prev) =>
+                      prev.map((l) =>
+                        l.id === lease.id ? { ...l, inspectionRecord: record } : l
                       )
                     );
                   }}

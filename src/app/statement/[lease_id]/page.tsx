@@ -11,6 +11,7 @@ interface PageProps {
   }>;
   searchParams?: Promise<{
     month?: string;
+    tab?: string;
   }>;
 }
 
@@ -76,6 +77,8 @@ async function fetchStatementData(leaseId: string): Promise<PublicTenantStatemen
         roomType: demoLease.roomType,
         guarantorName: ('guarantorName' in demoLease ? demoLease.guarantorName : undefined),
         guarantorContact: undefined,
+        inspectionRecord: demoLease.inspectionRecord,
+        depositRefundedZAR: ('depositRefundedZAR' in demoLease ? demoLease.depositRefundedZAR : undefined),
       },
       property: {
         id: demoRental.id,
@@ -153,6 +156,7 @@ export default async function TenantStatementPage({ params, searchParams }: Page
   const { lease_id } = await params;
   const resolvedSearchParams = searchParams ? await searchParams : undefined;
   const initialMonth = resolvedSearchParams?.month;
+  const initialTab = resolvedSearchParams?.tab as 'ledger' | 'inspection' | undefined;
 
   if (!lease_id || typeof lease_id !== 'string') {
     notFound();
@@ -164,5 +168,11 @@ export default async function TenantStatementPage({ params, searchParams }: Page
     notFound();
   }
 
-  return <TenantStatementViewer statementData={statementData} initialMonth={initialMonth} />;
+  return (
+    <TenantStatementViewer
+      statementData={statementData}
+      initialMonth={initialMonth}
+      initialTab={initialTab}
+    />
+  );
 }

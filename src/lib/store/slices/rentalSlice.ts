@@ -489,6 +489,7 @@ export const createRentalSlice: StateCreator<
           leaseEndDate: departingLease.leaseEndDate,
           monthlyRentZAR: departingLease.monthlyRentZAR,
           depositHeldZAR: departingLease.depositHeldZAR,
+          depositRefundedZAR: params.depositRefundedZAR,
           annualEscalationPercent: departingLease.annualEscalationPercent,
           roomType: departingLease.roomType,
           noticeGivenDate: departingLease.noticeGivenDate || params.vacationDate,
@@ -497,6 +498,7 @@ export const createRentalSlice: StateCreator<
           forwardingNotes: params.forwardingNotes,
           archivedAt: new Date().toISOString(),
           statementToken: departingLease.statementToken,
+          inspectionRecord: params.inspectionRecord ?? departingLease.inspectionRecord,
         };
 
         let updatedLeases: Lease[];
@@ -516,6 +518,7 @@ export const createRentalSlice: StateCreator<
             annualEscalationPercent: params.replacementLease.annualEscalationPercent ?? 7.0,
             status: 'Occupied',
             roomType: departingLease.roomType,
+            inspectionRecord: undefined,
           };
           updatedLeases = (r.leases || []).map((l) => (l.id === leaseId ? replacement : l));
         } else {
@@ -531,6 +534,7 @@ export const createRentalSlice: StateCreator<
             vacationDate: undefined,
             noticeReason: undefined,
             noticeNotes: undefined,
+            inspectionRecord: undefined,
           };
           updatedLeases = (r.leases || []).map((l) => (l.id === leaseId ? vacantLease : l));
         }

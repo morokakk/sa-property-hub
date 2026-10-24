@@ -18,9 +18,15 @@ import {
   Landmark,
   Copy,
   Check,
+  ClipboardCheck,
+  Camera,
+  Share2,
+  ExternalLink,
+  ShieldCheck,
+  AlertTriangle,
 } from 'lucide-react';
 import { PublicTenantStatementPayload } from '@/types/tenantStatement';
-import { RentalProperty, TenantPaymentRecord, ArrearsWriteOff } from '@/types';
+import { RentalProperty, TenantPaymentRecord, ArrearsWriteOff, InspectionCondition } from '@/types';
 import { formatZAR, formatDate } from '@/lib/formatters';
 import {
   formatAllocationsSummary,
@@ -31,15 +37,22 @@ import {
   formatMonthLabel,
   calculateRemainingLeaseTerm,
 } from '@/lib/calculations/arrears';
+import {
+  calculateInspectionDepositSummary,
+  ensureInspectionItems,
+  normalizeWhatsAppPhone,
+} from '@/lib/calculations/inspections';
 
 interface TenantStatementViewerProps {
   statementData: PublicTenantStatementPayload;
   initialMonth?: string;
+  initialTab?: 'ledger' | 'inspection';
 }
 
 export default function TenantStatementViewer({
   statementData,
   initialMonth,
+  initialTab,
 }: TenantStatementViewerProps) {
   const { lease, property, landlord, utility_statements = [] } = statementData;
 
@@ -113,8 +126,49 @@ export default function TenantStatementViewer({
   }, [viewerRental, lease.id]);
 
   const [selectedPeriodMonth, setSelectedPeriodMonth] = useState<string>(initialMonth || '');
+  const [activeTab, setActiveTab] = useState<'ledger' | 'inspection'>(() => {
+    if (initialTab === 'inspection' && lease.inspectionRecord) return 'inspection';
+    return 'ledger';
+  });
   const [isBroughtForwardExpanded, setIsBroughtForwardExpanded] = useState<boolean>(false);
   const [copiedBankField, setCopiedBankField] = useState<string | null>(null);
+  const [tenantAgreedFeedback, setTenantAgreedFeedback] = useState<boolean>(false);
+
+  const inspectionSummary = useMemo(() => {
+    return calculateInspectionDepositSummary(
+      lease.depositHeldZAR || 0,
+      lease.inspectionRecord
+    );
+  }, [lease.depositHeldZAR, lease.inspectionRecord]);
+
+  const inspectionItems = useMemo(() => {
+    return ensureInspectionItems(lease.inspectionRecord?.items);
+  }, [lease.inspectionRecord]);
+
+  const handleTenantConfirmInspectionWhatsApp = () => {
+    const isExit = Boolean(lease.inspectionRecord?.exitDate);
+    const modeLabel = isExit ? 'Exit' : 'Ingoing';
+    const insDate = isExit
+      ? (lease.inspectionRecord?.exitDate || '')
+      : (lease.inspectionRecord?.ingoingDate || '');
+    const landlordPhone = normalizeWhatsAppPhone(landlord.contact_number || undefined);
+
+    const confirmationText = `I, ${lease.tenantName}, confirm and agree to the ${modeLabel} Inspection Report dated ${formatDate(insDate)} for ${lease.unitName}, ${property.title}.`;
+
+    if (typeof navigator !== 'undefined' && navigator.clipboard) {
+      navigator.clipboard.writeText(confirmationText);
+      setTenantAgreedFeedback(true);
+      setTimeout(() => setTenantAgreedFeedback(false), 3000);
+    }
+
+    const waUrl = landlordPhone
+      ? `https://wa.me/${landlordPhone}?text=${encodeURIComponent(confirmationText)}`
+      : `https://wa.me/?text=${encodeURIComponent(confirmationText)}`;
+
+    if (typeof window !== 'undefined') {
+      window.open(waUrl, '_blank', 'noopener,noreferrer');
+    }
+  };
 
   const handleCopyAccount = (text: string) => {
     if (!text) return;
@@ -432,13 +486,409 @@ export default function TenantStatementViewer({
           </div>
         </div>
 
+        {/* Tab Navigation (When Inspection Record exists) */}
+        {lease.inspectionRecord && (
+          <div className="bg-white border border-slate-200/90 rounded-2xl p-2 shadow-2xs flex items-center justify-between flex-wrap gap-2 print-hidden-element">
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <button
+                type="button"
+                onClick={() => setActiveTab('ledger')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                  activeTab === 'ledger'
+                    ? 'bg-slate-900 text-white shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                }`}
+              >
+                Monthly Statement Ledger
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab('inspection')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                  activeTab === 'inspection'
+                    ? 'bg-indigo-700 text-white shadow-xs'
+                    : 'text-slate-600 hover:text-indigo-900 hover:bg-indigo-50'
+                }`}
+              >
+                <ClipboardCheck className="w-3.5 h-3.5" />
+                <span>Inspection & Condition Report (RHA Sec 5)</span>
+                {lease.inspectionRecord.ingoingTenantAgreed ? (
+                  <span className="px-1.5 py-0.2 rounded-full text-[9px] bg-emerald-500 text-white font-black">
+                    Agreed
+                  </span>
+                ) : (
+                  <span className="px-1.5 py-0.2 rounded-full text-[9px] bg-amber-500 text-white font-black">
+                    Sign-Off Pending
+                  </span>
+                )}
+              </button>
+            </div>
+
+            <div className="text-[11px] text-slate-500 pr-2 hidden sm:block">
+              Viewing: <strong className="text-slate-800">{activeTab === 'ledger' ? 'Statement Ledger' : 'Condition Checklist'}</strong>
+            </div>
+          </div>
+        )}
+
         {/* Statement A4 Container (The Document Root) */}
         <div
           id="tenant-statement-print-root"
           data-testid="statement-document"
           className="bg-white border border-slate-200/90 rounded-2xl p-6 sm:p-8 shadow-sm space-y-6"
         >
-          {/* 1. Header: Landlord Branding & Invoice Summary */}
+          {activeTab === 'inspection' && lease.inspectionRecord ? (
+            /* Inspection & Condition Report Document */
+            <div className="space-y-6">
+              {/* Inspection Header */}
+              <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-6 pb-6 border-b border-slate-200/80">
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    {landlord.logo_base64 ? (
+                      <img
+                        src={landlord.logo_base64}
+                        alt={landlord.entity_name}
+                        className="w-10 h-10 object-contain rounded-lg border border-slate-200 p-0.5"
+                      />
+                    ) : (
+                      <div className="w-10 h-10 rounded-xl bg-indigo-50 border border-indigo-200 flex items-center justify-center text-indigo-700">
+                        <Building className="w-5 h-5" />
+                      </div>
+                    )}
+                    <div>
+                      <h2 className="text-base sm:text-lg font-extrabold text-slate-900 tracking-tight">
+                        {landlord.entity_name}
+                      </h2>
+                      {landlord.trading_as && (
+                        <p className="text-xs text-slate-500">Trading as: {landlord.trading_as}</p>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="text-xs text-slate-500 space-y-0.5 pt-1">
+                    {landlord.physical_address && (
+                      <p className="flex items-center gap-1.5">
+                        <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                        <span>{landlord.physical_address}</span>
+                      </p>
+                    )}
+                    <div className="flex items-center gap-3 flex-wrap">
+                      {landlord.email && (
+                        <span className="flex items-center gap-1">
+                          <Mail className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                          <span>{landlord.email}</span>
+                        </span>
+                      )}
+                      {landlord.contact_number && (
+                        <span className="flex items-center gap-1">
+                          <Phone className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                          <span>{landlord.contact_number}</span>
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="sm:text-right space-y-1 sm:self-start">
+                  <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-indigo-50 text-indigo-800 border border-indigo-200">
+                    Joint Property Inspection Record
+                  </span>
+                  <div className="text-xs text-slate-500 pt-1">
+                    <p>
+                      <strong>SA Rental Housing Act:</strong> Act 50 of 1999 (Sec 5)
+                    </p>
+                    <p>
+                      <strong>Sign-Off:</strong>{' '}
+                      <span className={lease.inspectionRecord.ingoingTenantAgreed ? 'text-emerald-700 font-bold' : 'text-amber-700 font-bold'}>
+                        {lease.inspectionRecord.ingoingTenantAgreed
+                          ? `Agreed (${formatDate(lease.inspectionRecord.ingoingTenantAgreedDate || lease.inspectionRecord.ingoingDate || '')})`
+                          : 'Awaiting Tenant Sign-Off'}
+                      </span>
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Tenancy & Deposit Particulars */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 rounded-xl bg-slate-50/70 border border-slate-200 text-xs">
+                <div>
+                  <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider block mb-1">
+                    Property & Unit
+                  </span>
+                  <p className="font-bold text-slate-900 text-sm">{property.title}</p>
+                  <p className="text-slate-600">{property.address}, {property.city}</p>
+                  <p className="text-slate-700 font-medium mt-1">
+                    Unit: <strong>{lease.unitName}</strong>{lease.roomType ? ` (${lease.roomType})` : ''}
+                  </p>
+                  <p className="text-slate-500">
+                    Tenancy: {formatDate(lease.leaseStartDate)} – {formatDate(lease.leaseEndDate)}
+                  </p>
+                </div>
+
+                <div className="sm:text-right space-y-1">
+                  <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider block mb-1">
+                    Tenant Particulars
+                  </span>
+                  <p className="font-bold text-slate-900 text-sm">{lease.tenantName}</p>
+                  {lease.tenantPhone && <p className="text-slate-600">{lease.tenantPhone}</p>}
+                  {lease.tenantEmail && <p className="text-slate-600">{lease.tenantEmail}</p>}
+                  <p className="text-slate-600 font-mono">
+                    Deposit Held: <strong>{formatZAR(lease.depositHeldZAR)}</strong>
+                  </p>
+                </div>
+              </div>
+
+              {/* Inspection Summary Stats Bar */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="p-3 rounded-xl bg-white border border-slate-200 shadow-2xs space-y-1">
+                  <div className="flex items-center justify-between text-[11px] text-slate-500">
+                    <span>Ingoing Inspection</span>
+                    {lease.inspectionRecord.ingoingTenantAgreed ? (
+                      <span className="text-emerald-700 font-bold flex items-center gap-1">
+                        <CheckCircle2 className="w-3 h-3" /> Agreed
+                      </span>
+                    ) : (
+                      <span className="text-amber-700 font-bold flex items-center gap-1">
+                        <AlertTriangle className="w-3 h-3" /> Pending
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-sm font-bold text-slate-900">
+                    {lease.inspectionRecord.ingoingDate ? formatDate(lease.inspectionRecord.ingoingDate) : 'Not recorded'}
+                  </div>
+                  {lease.inspectionRecord.ingoingPhotoVaultUrl && (
+                    <a
+                      href={lease.inspectionRecord.ingoingPhotoVaultUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[10px] font-semibold text-indigo-700 hover:underline flex items-center gap-1 pt-1"
+                    >
+                      <Camera className="w-3 h-3" />
+                      <span>Ingoing Photo Vault ↗</span>
+                    </a>
+                  )}
+                </div>
+
+                <div className="p-3 rounded-xl bg-white border border-slate-200 shadow-2xs space-y-1">
+                  <div className="flex items-center justify-between text-[11px] text-slate-500">
+                    <span>Exit Inspection</span>
+                    {lease.inspectionRecord.exitDate ? (
+                      lease.inspectionRecord.exitTenantAgreed ? (
+                        <span className="text-emerald-700 font-bold flex items-center gap-1">
+                          <CheckCircle2 className="w-3 h-3" /> Agreed
+                        </span>
+                      ) : (
+                        <span className="text-blue-700 font-bold">Recorded</span>
+                      )
+                    ) : (
+                      <span className="text-slate-400">At Move-Out</span>
+                    )}
+                  </div>
+                  <div className="text-sm font-bold text-slate-900">
+                    {lease.inspectionRecord.exitDate ? formatDate(lease.inspectionRecord.exitDate) : 'Pending Vacating'}
+                  </div>
+                  {lease.inspectionRecord.exitPhotoVaultUrl && (
+                    <a
+                      href={lease.inspectionRecord.exitPhotoVaultUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[10px] font-semibold text-indigo-700 hover:underline flex items-center gap-1 pt-1"
+                    >
+                      <Camera className="w-3 h-3" />
+                      <span>Exit Photo Vault ↗</span>
+                    </a>
+                  )}
+                </div>
+
+                <div className="p-3 rounded-xl bg-white border border-slate-200 shadow-2xs space-y-1">
+                  <div className="flex items-center justify-between text-[11px] text-slate-500">
+                    <span>Deposit Settlement</span>
+                    <span className="font-bold text-emerald-800">
+                      {lease.inspectionRecord.exitDate ? 'Finalized' : 'Trust Held'}
+                    </span>
+                  </div>
+                  <div className="text-sm font-bold text-emerald-950 font-mono">
+                    {formatZAR(
+                      lease.depositRefundedZAR !== undefined
+                        ? lease.depositRefundedZAR
+                        : inspectionSummary.netDepositRefundableZAR
+                    )}
+                  </div>
+                  <div className="text-[10px] text-slate-500">
+                    {inspectionSummary.totalRepairDeductionsZAR > 0
+                      ? `Less ${formatZAR(inspectionSummary.totalRepairDeductionsZAR)} repair deductions`
+                      : 'Zero damage deductions recorded'}
+                  </div>
+                </div>
+              </div>
+
+              {/* 8-Point Condition Table */}
+              <div className="space-y-2">
+                <h3 className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+                  <ClipboardCheck className="w-4 h-4 text-indigo-600" />
+                  <span>8-Point Statutory Condition Checklist</span>
+                </h3>
+
+                <div className="overflow-x-auto rounded-xl border border-slate-200">
+                  <table className="w-full text-left text-xs border-collapse">
+                    <thead>
+                      <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 font-semibold text-[11px]">
+                        <th className="py-2.5 px-3">Item / Category</th>
+                        <th className="py-2.5 px-3">Ingoing Condition</th>
+                        <th className="py-2.5 px-3">Ingoing Notes</th>
+                        <th className="py-2.5 px-3">Exit Condition</th>
+                        <th className="py-2.5 px-3 text-right">Deduction (ZAR)</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {inspectionItems.map((item) => {
+                        const exitCond = item.exitCondition || '—';
+                        const isDefective = exitCond === 'Defective';
+                        return (
+                          <tr
+                            key={item.category}
+                            className={`hover:bg-slate-50/50 transition-colors ${
+                              isDefective ? 'bg-rose-50/30' : ''
+                            }`}
+                          >
+                            <td className="py-2.5 px-3 font-semibold text-slate-900">
+                              {item.category}
+                            </td>
+                            <td className="py-2.5 px-3">
+                              <span
+                                className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold ${
+                                  item.ingoingCondition === 'Good'
+                                    ? 'bg-emerald-100 text-emerald-800'
+                                    : item.ingoingCondition === 'Fair'
+                                    ? 'bg-amber-100 text-amber-800'
+                                    : item.ingoingCondition === 'Defective'
+                                    ? 'bg-rose-100 text-rose-800'
+                                    : 'bg-slate-100 text-slate-700'
+                                }`}
+                              >
+                                {item.ingoingCondition}
+                              </span>
+                            </td>
+                            <td className="py-2.5 px-3 text-slate-600 text-[11px]">
+                              {item.ingoingNotes || <span className="text-slate-400 italic">None</span>}
+                            </td>
+                            <td className="py-2.5 px-3">
+                              {item.exitCondition ? (
+                                <span
+                                  className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold ${
+                                    item.exitCondition === 'Good'
+                                      ? 'bg-emerald-100 text-emerald-800'
+                                      : item.exitCondition === 'Fair'
+                                      ? 'bg-amber-100 text-amber-800'
+                                      : item.exitCondition === 'Defective'
+                                      ? 'bg-rose-100 text-rose-800'
+                                      : 'bg-slate-100 text-slate-700'
+                                  }`}
+                                >
+                                  {item.exitCondition}
+                                </span>
+                              ) : (
+                                <span className="text-slate-400 text-[11px]">—</span>
+                              )}
+                              {item.exitNotes && (
+                                <p className="text-[10px] text-slate-500 italic mt-0.5">{item.exitNotes}</p>
+                              )}
+                            </td>
+                            <td className="py-2.5 px-3 text-right font-mono font-bold text-slate-800">
+                              {item.repairDeductionZAR && item.repairDeductionZAR > 0 ? (
+                                <span className="text-rose-700">
+                                  - {formatZAR(item.repairDeductionZAR)}
+                                </span>
+                              ) : (
+                                <span className="text-slate-400 font-normal">R 0.00</span>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* WhatsApp Electronic Sign-Off Prompt for Tenant (Print-Hidden) */}
+              <div className="p-4 bg-emerald-50 rounded-xl border border-emerald-200 space-y-2 print-hidden-element">
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <div>
+                    <h4 className="text-xs font-bold text-emerald-950 flex items-center gap-1.5">
+                      <Share2 className="w-4 h-4 text-emerald-700" />
+                      <span>Confirm & Agree via WhatsApp (RHA Section 5 Sign-Off)</span>
+                    </h4>
+                    <p className="text-[11px] text-emerald-800 mt-0.5">
+                      1-click electronic agreement under Act 50 of 1999 sent straight to the landlord&apos;s WhatsApp.
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleTenantConfirmInspectionWhatsApp}
+                    className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-white bg-emerald-700 hover:bg-emerald-800 active:bg-emerald-900 rounded-xl shadow-xs transition-colors cursor-pointer"
+                  >
+                    {tenantAgreedFeedback ? <Check className="w-3.5 h-3.5" /> : <Share2 className="w-3.5 h-3.5" />}
+                    <span>{tenantAgreedFeedback ? 'Agreement Sent / Copied!' : 'Confirm & Agree via WhatsApp'}</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Statutory Legal Declaration & Printable Signatures */}
+              <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 text-[11px] text-slate-600 space-y-4">
+                <p className="leading-relaxed">
+                  <strong>Statutory Declaration under Act 50 of 1999:</strong> In terms of Section 5(3)(e)–(k) of the South African Rental Housing Act, this joint property inspection record reflects the acknowledged physical condition of the premises. Repair costs may only be deducted from the tenant deposit where supported by joint inspection records and proven repair invoices.
+                </p>
+
+                <div className="grid grid-cols-2 gap-8 pt-4 border-t border-slate-200 text-xs">
+                  <div>
+                    <div className="border-b border-slate-400 h-8" />
+                    <p className="font-semibold text-slate-800 mt-1">Landlord / Authorized Agent</p>
+                    <p className="text-[10px] text-slate-400">Date: ________________________</p>
+                  </div>
+                  <div>
+                    <div className="border-b border-slate-400 h-8" />
+                    <p className="font-semibold text-slate-800 mt-1">Tenant ({lease.tenantName})</p>
+                    <p className="text-[10px] text-slate-400">Date: ________________________</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Footer Notice */}
+              <div className="pt-4 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-2 text-[10px] text-slate-400">
+                <span>Generated electronically via SA Property Hub • Legally binding inspection report</span>
+                <span>Page 1 of 1</span>
+              </div>
+            </div>
+          ) : (
+            <>
+              {/* RHA Inspection Quick Callout on Ledger */}
+              {lease.inspectionRecord && (
+                <div className="p-3 bg-indigo-50/60 rounded-xl border border-indigo-200 flex items-center justify-between flex-wrap gap-2 print-hidden-element">
+                  <div className="flex items-center gap-2">
+                    <ClipboardCheck className="w-4 h-4 text-indigo-700 shrink-0" />
+                    <div>
+                      <span className="text-xs font-bold text-indigo-950">
+                        Joint Property Inspection Record on File (RHA Sec 5)
+                      </span>
+                      <span className="text-[10px] text-indigo-700 block">
+                        {lease.inspectionRecord.ingoingTenantAgreed
+                          ? `Agreed by tenant on ${formatDate(lease.inspectionRecord.ingoingTenantAgreedDate || lease.inspectionRecord.ingoingDate || '')}`
+                          : 'Awaiting tenant electronic sign-off'}
+                      </span>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('inspection')}
+                    className="px-2.5 py-1 text-xs font-bold text-indigo-700 bg-white hover:bg-indigo-100 rounded-lg border border-indigo-300 transition-colors cursor-pointer"
+                  >
+                    View Inspection Report ↗
+                  </button>
+                </div>
+              )}
+
+              {/* 1. Header: Landlord Branding & Invoice Summary */}
           <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-6 pb-6 border-b border-slate-200/80">
             <div className="space-y-2">
               <div className="flex items-center gap-2">
@@ -1053,6 +1503,8 @@ export default function TenantStatementViewer({
             <span>Generated electronically via SA Property Hub • Legally binding statement</span>
             <span>Page 1 of 1</span>
           </div>
+            </>
+          )}
         </div>
       </div>
     </div>

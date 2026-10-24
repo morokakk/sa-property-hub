@@ -451,6 +451,40 @@ export interface TenantVettingScorecardOutputs {
 
 export interface TenantVettingScorecard extends TenantVettingScorecardInputs, TenantVettingScorecardOutputs {}
 
+// 8-Point Property Inspection & Deposit Deduction Engine (SA Rental Housing Act Section 5)
+export type InspectionCondition = 'Good' | 'Fair' | 'Defective' | 'N/A';
+
+export type InspectionCategory =
+  | 'Walls, Paint & Ceilings'
+  | 'Floors, Tiles & Skirting'
+  | 'Doors, Locks, Keys & Remotes'
+  | 'Windows, Glass & Blinds'
+  | 'Plumbing, Taps & Geyser'
+  | 'Electrical, Lights & Plugs'
+  | 'Kitchen Stove, Oven & Cupboards'
+  | 'Meters, Exterior & Parking';
+
+export interface InspectionItem {
+  category: InspectionCategory;
+  ingoingCondition: InspectionCondition;
+  ingoingNotes?: string;
+  exitCondition?: InspectionCondition;
+  exitNotes?: string;
+  repairDeductionZAR?: number; // Deducted from deposit on Exit
+}
+
+export interface LeaseInspectionRecord {
+  ingoingDate?: string; // YYYY-MM-DD
+  ingoingTenantAgreed?: boolean;
+  ingoingTenantAgreedDate?: string; // YYYY-MM-DD
+  ingoingPhotoVaultUrl?: string;
+  exitDate?: string; // YYYY-MM-DD
+  exitTenantAgreed?: boolean;
+  exitTenantAgreedDate?: string; // YYYY-MM-DD
+  exitPhotoVaultUrl?: string;
+  items: InspectionItem[];
+}
+
 export type TenantDepartureReason =
   | 'Relocating / work transfer'
   | 'Lease expired / non-renewal'
@@ -480,6 +514,7 @@ export interface Lease {
   guarantorContact?: string; // phone or corporate AP email
   deedOfSuretyshipRef?: string; // Reference to signed Deed of Suretyship doc / vault link
   vettingScorecard?: TenantVettingScorecard;
+  inspectionRecord?: LeaseInspectionRecord;
   roomType?: string; // e.g. Executive Suite, En-Suite Single, Shared Room, Garden Cottage
   noticeGivenDate?: string; // 'YYYY-MM-DD'
   vacationDate?: string; // 'YYYY-MM-DD' (intended or target move-out date)
@@ -499,6 +534,7 @@ export interface ArchivedLease {
   leaseEndDate: string;
   monthlyRentZAR: number;
   depositHeldZAR: number;
+  depositRefundedZAR?: number; // Actual net deposit refunded to departing tenant
   annualEscalationPercent?: number;
   roomType?: string;
   noticeGivenDate?: string;
@@ -507,6 +543,7 @@ export interface ArchivedLease {
   forwardingNotes?: string;
   archivedAt: string; // ISO timestamp
   statementToken?: string;
+  inspectionRecord?: LeaseInspectionRecord;
 }
 
 export interface AncillaryIncome {

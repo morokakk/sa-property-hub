@@ -31,7 +31,7 @@ import {
 import { exportFundingCSV } from '@/lib/export/csvExport';
 import { formatPaymentStatement } from '@/lib/whatsappFormatter';
 
-export function getFundingDrawnAndUndrawn(f: FundingSource) {
+function getFundingDrawnAndUndrawn(f: FundingSource) {
   if (f.status === 'Standby') {
     return { drawn: 0, undrawn: f.capitalAmountZAR, drawnCount: 0, totalTranches: 0, hasTranches: false };
   }

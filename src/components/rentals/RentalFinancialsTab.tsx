@@ -513,6 +513,17 @@ export function RentalFinancialsTab({
                       {formatZAR(archived.monthlyRentZAR)}/m
                     </span>
                   </div>
+                  {archived.depositRefundedZAR !== undefined && (
+                    <div className="text-[11px] text-slate-600 flex items-center justify-between">
+                      <span className="text-slate-500">Deposit Held: {formatZAR(archived.depositHeldZAR)} • Refunded:</span>
+                      <strong className="text-emerald-700 font-bold">{formatZAR(archived.depositRefundedZAR)}</strong>
+                    </div>
+                  )}
+                  {archived.inspectionRecord && (
+                    <div className="flex items-center gap-1.5 text-[10px] text-indigo-700 font-medium">
+                      <span>✓ RHA Sec 5 Joint Inspection Recorded</span>
+                    </div>
+                  )}
                   {archived.forwardingNotes && (
                     <p className="text-[10px] text-slate-500 italic bg-slate-50 p-1.5 rounded mt-1 border border-slate-100">
                       Notes: {archived.forwardingNotes}
