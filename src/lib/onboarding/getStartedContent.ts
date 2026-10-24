@@ -355,15 +355,15 @@ export const GET_STARTED_STAGES: readonly JourneyStage[] = [
         features: [
           {
             id: 'rentals-tenants-ledger',
-            title: 'Tenants, Ledger & Arrears',
-            summary: 'Lease details, tenant vetting, monthly payments, extra principal paydown, and arrears per property.',
+            title: 'Tenants, Ledger & Inspections',
+            summary: 'Lease details, tenant vetting, RHA Section 5 joint inspections, bond paydown, and monthly arrears.',
             howTo: [
-              'On a rental card, open Lease & Costs and expand Pre-Lease Tenant Vetting to score credit and calculate deposit multipliers.',
-              'Use Edit Property to set your Bank Bond Repayment and optional Extra Principal Paydown to accelerate debt-free cashflow.',
-              'Switch to Payments & Arrears to log each payment as it lands, track utility cost recoveries, and record bad-debt write-offs.',
+              'On a rental card, open Lease & Costs to score credit with Pre-Lease Vetting and record an 8-Point Ingoing Inspection (RHA Sec 5).',
+              'When a tenant vacates, use Notice & Move-Out to run a joint Exit Inspection, log repair deductions, and settle the net deposit refund.',
+              'Switch to Payments & Arrears to log monthly rent, track utility cost recoveries, and record bad-debt write-offs.',
             ],
             proTip:
-              'Adding an extra monthly principal payment models how fast your bond reaches zero and unlocks a paydown impact banner above the 20-Year Long-Term Forecast. Under SARS Section 11(a), capital paydowns are non-deductible, keeping your tax reserve clean.',
+              'Under Section 5 of the SA Rental Housing Act, landlords who fail to conduct a joint ingoing inspection forfeit the statutory right to deduct damage repairs from a tenant\'s deposit. Adding extra monthly bond payments accelerates debt-free cashflow without altering your SARS Section 11(a) tax reserve.',
             href: '/rentals#rentals-portfolio',
             ctaLabel: 'Open the portfolio',
           },
@@ -397,15 +397,15 @@ export const GET_STARTED_STAGES: readonly JourneyStage[] = [
           },
           {
             id: 'rentals-tenant-statements',
-            title: 'Tenant Statements & Sharing',
-            summary: 'Verify monthly rental and utility ledgers, email PDF statements via Resend, and share secure portal links.',
+            title: 'Tenant Statements & Inspections',
+            summary: 'Verify monthly rental ledgers, share statutory RHA inspection reports, and distribute portal links via WhatsApp or email.',
             howTo: [
               'On a rental card, click Utilities & Statement to inspect the current period ledger, utility recoveries and arrears.',
-              'Click Share Statement to open the distribution menu: choose "Email Statement & Copy Link" or "Copy Secure Link".',
-              'Once verified, dispatch the statement to email the PDF directly to the tenant and copy the live link to your clipboard.',
+              'Click Share Statement to email PDF statements via Resend or copy the public tenant portal link (/statement/[token]).',
+              'Tenants can review their billing ledger or switch to the Inspection & Condition Report tab for 1-click WhatsApp statutory sign-off.',
             ],
             proTip:
-              'Ensure your landlord banking details are saved in Settings and the tenant has an email on file. Generated PDFs hide variance badges for a clean, professional print layout.',
+              'Public tenant portal links allow tenants to inspect their itemized 8-point condition audit and agree to move-in/exit deductions via WhatsApp with zero paperwork. Generated PDFs automatically preserve a clean print layout.',
             href: '/rentals#rentals-portfolio',
             ctaLabel: 'View rental statements',
           },

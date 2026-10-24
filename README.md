@@ -7,9 +7,9 @@
 [![React](https://img.shields.io/badge/React-19.3-blue.svg)](https://react.dev/)
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind-v4.3-38bdf8.svg)](https://tailwindcss.com/)
 [![Zustand](https://img.shields.io/badge/Zustand-v5.0-orange.svg)](https://github.com/pmndrs/zustand)
-[![Tests](https://img.shields.io/badge/Vitest-718%20Passed-brightgreen.svg)](https://vitest.dev/)
+[![Tests](https://img.shields.io/badge/Vitest-771%20Passed-brightgreen.svg)](https://vitest.dev/)
 [![E2E](https://img.shields.io/badge/Playwright-Multi--Device-purple.svg)](https://playwright.dev/)
-[![Compliance](https://img.shields.io/badge/SARS%20%2F%20LPC-2026%20Compliant-emerald.svg)]()
+[![Compliance](https://img.shields.io/badge/SARS%20%2F%20LPC%20%2F%20RHA-2026%20Compliant-emerald.svg)]()
 
 ---
 
@@ -37,7 +37,8 @@ The **SA Property Investment Hub** addresses the structural complexities unique 
 * **Live Route:** [`src/app/analyzer/page.tsx`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/app/analyzer/page.tsx)
 * **Deal-Sourcing Triage:** Multi-channel deal ingestion supporting Auction purchases (with buyer's premium and VAT calculations), Distressed Sales (Section 118 municipal arrears isolation), iGrow developer units, private treaty agent listings, and direct off-market owners.
 * **Statutory Cost Engines:** Pure calculation engines computing 2026 progressive SARS Transfer Duty ([`calculateSarsTransferDuty`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/lib/calculations/sarsTax.ts)), Deeds Office registration tiers, LPC conveyancing legal fees, and bond registration costs.
-* **MAO Inverse Solver:** Maximum Allowable Offer solver ([`maoSolver.ts`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/lib/calculations/maoSolver.ts)) determining maximum strike bids based on hurdle internal rates of return (IRR), desired flip ROI, target net cap rates, and PIE Act eviction risk reserves.
+* **Bond Cancellation & Exit Legal Friction:** Models statutory conveyancing cancellation fees (default `R5,200` incl. 15% VAT based on the 1 July 2026 LSSA base cancellation tariff + Deeds Office cancellation levy + bank instruction fee) and the **National Credit Act (NCA) Section 125 90-Day Early Settlement Penalty** toggle (`Notice Given = R0` penalty vs. `No 90-Day Notice = 90 days' bond interest` or custom bank settlement quote override).
+* **Closed-Form MAO Inverse Solver:** Maximum Allowable Offer solver ([`maoSolver.ts`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/lib/calculations/maoSolver.ts)) determining maximum strike bids based on hurdle internal rates of return (IRR), desired flip ROI, target net cap rates, and PIE Act eviction risk reserves. When early termination notice is not given on a geared flip, the engine incorporates the bid-dependent 90-day penalty factor $k_{\text{penalty}} = (\text{LTV}/100) \times (\text{Rate}/100) \times (90/365)$ into the closed-form denominator in $O(1)$ without circular iteration.
 * **Location Scorecard:** 4-node spatial amenity evaluation measuring accessibility to transport corridors, employment nodes, educational institutions, and retail hubs.
 * **One-Click Promotion Pipeline:** Seamlessly promotes screened deals to active execution:
   - `promoteOpportunityToFlip`: Automatically transfers purchase basis, rehabilitation budgets, and initializes regional Certificate of Compliance (CoC) trackers.
@@ -54,6 +55,7 @@ The **SA Property Investment Hub** addresses the structural complexities unique 
   4. *Phase 4 (20%):* Snag list resolution, Certificate of Compliance handover, and final retention release.
 * **Time-Decay Holding Sensitivity:** Real-time matrix calculating financial burn under 30, 60, 90, and 120-day delays driven by Deeds Office lodgement queues and Section 118 council backlogs, identifying zero-margin collapse thresholds.
 * **Region-Smart CoC Engine:** City of Cape Town / Coastal beetle & plumbing by-law compliance vs. Inland Gauteng electrical & electric fence mandates.
+* **Itemized Exit Friction & Refinance Accounting:** Full legal and agent fee breakdowns in [`FlipExitModal.tsx`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/components/flips/modals/FlipExitModal.tsx), [`calculateFlipFinancials`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/lib/calculations/flips.ts), and [`calculateArchivedFlipFinancials`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/lib/calculations/flips.ts). On open-market flip dispositions, estate agent commission, bond cancellation fees (`R5,200`), and NCA 90-day penalty interest are deducted from net proceeds; on BRRRR equity extractions (`convertFlipToRental`), estate agent commission is eliminated (`R0`) while retaining necessary bond cancellation and refinancing legal costs to prevent post-conversion profit distortion.
 * **Dual Exit Execution:**
   - `markFlipAsCompleted`: Records net proceeds, settles linked facilities, and credits capital to `liquidCapitalReserve`.
   - `convertFlipToRental`: Transitions flip to rental portfolio, carrying forward cumulative renovation costs into purchase price basis, re-pointing syndicate funding debt, and initializing Section 13sex tax shield tracking.
@@ -61,6 +63,11 @@ The **SA Property Investment Hub** addresses the structural complexities unique 
 ### 2.4 Rental Portfolio Manager (`/rentals`)
 * **Live Route:** [`src/app/rentals/page.tsx`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/app/rentals/page.tsx)
 * **Multi-Let Lease Architecture:** Canonical `leases[]` array supporting single residential units, dual-living configurations, block-of-flats, and student communes without flat-field anti-patterns.
+* **8-Point Property Inspection & Deposit Deduction Engine (`inspections.ts`):** Fully compliant with **Section 5(3)(e)–(k) of the South African Rental Housing Act (Act 50 of 1999)**:
+  - **Onboarding ([`LeaseInspectionDrawer.tsx`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/components/rentals/modals/LeaseInspectionDrawer.tsx)):** 15-second mobile "Tap-Only-What's-Broken" 8-category checklist (`Walls, Paint & Ceilings`, `Floors, Tiles & Skirting`, `Doors, Locks, Keys & Remotes`, `Windows, Glass & Blinds`, `Plumbing, Taps & Geyser`, `Electrical, Lights & Plugs`, `Kitchen Stove, Oven & Cupboards`, `Meters, Exterior & Parking`), Cloud Photo Vault URL attachment, and 1-click WhatsApp inspection delivery for electronic tenant acknowledgement.
+  - **Move-Out & Settlement ([`TenantNoticeModal.tsx`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/components/rentals/modals/TenantNoticeModal.tsx)):** Side-by-side Ingoing vs. Exit condition diffing, automated degraded-item detection (`Good`/`Fair` ingoing degraded to `Defective` exit), itemized contractor repair deductions, live `netDepositRefundableZAR` auto-sync, excess damage shortfall alerts (`excessDamageShortfallZAR`), and 5-year statutory audit trail retention on `ArchivedLease`.
+  - **Public Tenant Portal ([`TenantStatementViewer.tsx`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/components/statements/TenantStatementViewer.tsx)):** Secure tokenized viewer with a dual-tab switcher (`Monthly Statement Ledger` | `Inspection & Condition Report` via `?tab=inspection`) featuring itemized defect photos and a 1-click **"Confirm & Agree via WhatsApp"** digital handshake for statutory compliance.
+* **Disposal & Exit Settlement Engine ([`ExitSaleModal.tsx`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/components/rentals/modals/ExitSaleModal.tsx) & [`calculateDisposalMetrics`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/lib/calculations/rentals.ts)):** Reconciles gross capital gains, estate agent commission (private treaty vs. agent), bond cancellation fees (`R5,200`), NCA 90-day early termination penalties, and negative-equity settlement shortfall warnings (`shortfallToSettleZAR`) when debt and legal friction exceed realized sale value.
 * **Ancillary Income Matrix:** Commercial non-lease revenue aggregation (MNO cellular towers, rooftop advertising billboards, dedicated parking bays, storage units).
 * **Prepaid Sub-Metering vs. Post-Paid Ledger:** Transparent reconciliation of vending platform fees (8–15% deductions from Net Operating Income) against direct municipal utility statements.
 * **Municipal Dispute State Machine:** Full lifecycle handling of inaccurate council billing (Logged -> Dispute Lodged -> In Escalation -> Credit Passed -> Ombudsman Referral) with automated formal PDF dispute letter generation.
@@ -69,10 +76,15 @@ The **SA Property Investment Hub** addresses the structural complexities unique 
 
 ### 2.5 Proposal Generator & Universal Financial Exports (`/proposal`)
 * **Live Route:** [`src/app/proposal/page.tsx`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/app/proposal/page.tsx)
-* **Institutional PDF Tear-Sheets:** Dynamic, client-side PDF generation producing institutional investor memorandums with executive summaries, photo vaults, return waterfalls, and capital repayment tranches.
-* **1-Click WhatsApp Syndication:** Generates concise, pre-formatted deal pitch copy and mobile WhatsApp URLs for rapid syndicate outreach.
+* **Institutional PDF Tear-Sheets:** Dynamic, client-side PDF generation producing institutional investor memorandums with executive summaries, photo vaults, return waterfalls, and capital repayment tranches. Reconciles 100.0% of exit legal friction and bond cancellation costs within the "Use of Funds" and net return schedules.
+* **1-Click WhatsApp Syndication:** Generates concise, pre-formatted deal pitch copy and mobile WhatsApp URLs for rapid syndicate outreach, incorporating itemized acquisition and exit legal friction.
 * **Universal Accountant GL Journal CSV:** Exports general ledger journal entries pre-configured with debit/credit double-entry rows and South African VAT tags (Standard 15% vs. Exempt Residential Rent) for direct ingestion into Xero, Sage South Africa, and QuickBooks.
 * **SARS ITR12 Tax Schedules:** Pre-formatted annual income tax schedules grouping rental gross revenue, Section 11(a) deductible operational costs, bond interest, and Section 13sex capital allowances.
+
+### 2.6 Global Settings & Investor Profile (`/settings`)
+* **Live Route:** [`src/app/settings/page.tsx`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/app/settings/page.tsx)
+* **Investor Profile & Corporate Tax Routing:** Configures tax entity (`Company (27%)`, `Individual (45%)`, or `Pre-Tax`), VAT-exempt managing agency toggle, buy-box investment hurdle thresholds, and LLM provider API credentials.
+* **Conveyancing & Transfer Legal Settings:** Configures `defaultBondCancellationFeeZAR` (defaulting to `R5,200` incl. 15% VAT per 1 July 2026 LSSA tariffs + Deeds Office cancellation levy + bank instruction fee), synchronizing baseline exit legal cost assumptions across `/analyzer`, `/flips`, `/rentals`, and `/proposal`.
 
 ---
 
@@ -158,8 +170,8 @@ npm run build
 │   ├── components/               # Tier 3: Modular Component Trees & Modals
 │   │   ├── dashboard/            # KPI strips, allocation graphs, tax widgets
 │   │   ├── analyzer/             # Underwriting cards, scorecards, input forms
-│   │   ├── flips/                # BOQ tables, phase checklists, delay matrix
-│   │   ├── rentals/              # Rental cards, meter modals, verification UI
+│   │   ├── flips/                # BOQ tables, phase checklists, delay matrix, exit modal
+│   │   ├── rentals/              # Rental cards, meter modals, inspection drawer, move-out & exit modals
 │   │   └── common/               # Shared modals, badges, inputs, buttons
 │   ├── hooks/                    # Tier 2: Headless Domain UI State Hooks
 │   │   ├── flips/                # useFlipCalculations, useFlipModalManager, useBoqForm
@@ -167,9 +179,10 @@ npm run build
 │   ├── lib/
 │   │   ├── calculations/         # Tier 4: Pure 100% Deterministic ZAR Engines
 │   │   │   ├── propertyMetrics.ts# Cap rates, cashflow, IRR, DSCR formulas
-│   │   │   ├── flips.ts          # Renovation milestone draws, sponsor savings, holding costs
+│   │   │   ├── flips.ts          # Renovation milestone draws, sponsor savings, holding & exit costs
 │   │   │   ├── arrears.ts        # Dynamic monthly tenant ledger, allocation engine
-│   │   │   ├── maoSolver.ts      # Maximum Allowable Offer solver (Flip & Rental)
+│   │   │   ├── inspections.ts    # RHA Section 5 8-point checklist & deposit deduction engine
+│   │   │   ├── maoSolver.ts      # Maximum Allowable Offer solver (Flip & Rental with penalty factor)
 │   │   │   ├── sarsTax.ts        # SARS Transfer Duty, Deeds Office, Section 13sex
 │   │   │   ├── holdingSensitivity.ts # Delay holding burn matrix (+30/60/90/120d)
 │   │   │   ├── municipalTariffs.ts   # Water/power sliding municipal tariff scales
