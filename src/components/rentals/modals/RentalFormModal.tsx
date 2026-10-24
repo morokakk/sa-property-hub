@@ -10,7 +10,7 @@ import {
   Province,
 } from '@/types';
 import { formatZAR } from '@/lib/formatters';
-import { Building2, ChevronDown, ChevronUp, AlertTriangle, ArrowRight } from 'lucide-react';
+import { Building2, ChevronDown, ChevronUp, AlertTriangle, ArrowRight, X } from 'lucide-react';
 import { calculateMonthlyBondRepayment } from '@/lib/calculations/propertyMetrics';
 import { calculateAgencyCommission, reconcilePropertyStatus } from '@/lib/calculations/rentals';
 import { usePortfolioStore } from '@/lib/store/usePortfolioStore';
@@ -222,6 +222,7 @@ export const RentalFormModal: React.FC<RentalFormModalProps> = ({
   const [localTaxEntityOverride, setLocalTaxEntityOverride] = useState<'Company (27%)' | 'Individual (45%)' | 'Pre-Tax' | undefined>(undefined);
   const [localFormAncillaryIncomes, setLocalFormAncillaryIncomes] = useState<AncillaryIncome[]>([]);
   const [expandedGuarantors, setExpandedGuarantors] = useState<Record<string, boolean>>({});
+  const [isVaultExpanded, setIsVaultExpanded] = useState<boolean>(false);
 
   useEffect(() => {
     if (isOpen && propTitle === undefined) {
@@ -248,6 +249,13 @@ export const RentalFormModal: React.FC<RentalFormModalProps> = ({
         setLocalRentalOtpUrl(editingProperty.driveVault?.otpDocumentUrl || '');
         setLocalRentalRatesBillUrl(editingProperty.driveVault?.ratesBillUrl || '');
         setLocalRentalTitleDeedUrl(editingProperty.driveVault?.titleDeedUrl || '');
+        const hasInitialVaultDocs = Boolean(
+          editingProperty.driveVault?.masterFolderUrl ||
+          editingProperty.driveVault?.otpDocumentUrl ||
+          editingProperty.driveVault?.ratesBillUrl ||
+          editingProperty.driveVault?.titleDeedUrl
+        );
+        setIsVaultExpanded(hasInitialVaultDocs);
         setLocalManagementType(editingProperty.managementType || 'Self-Managed');
         setLocalAgencyName(editingProperty.agencyName || '');
         setLocalAgencyCommissionPercent(editingProperty.agencyCommissionPercent || 8.0);
@@ -290,6 +298,7 @@ export const RentalFormModal: React.FC<RentalFormModalProps> = ({
         setLocalRentalOtpUrl('');
         setLocalRentalRatesBillUrl('');
         setLocalRentalTitleDeedUrl('');
+        setIsVaultExpanded(false);
         setLocalManagementType('Agency');
         setLocalAgencyName('Pam Golding Sandton');
         setLocalAgencyCommissionPercent(8.0);
@@ -318,8 +327,6 @@ export const RentalFormModal: React.FC<RentalFormModalProps> = ({
       }
     }
   }, [isOpen, editingProperty, propTitle]);
-
-  if (!isOpen) return null;
 
   const title = propTitle !== undefined ? propTitle : localTitle;
   const setTitle = propSetTitle || setLocalTitle;
@@ -390,6 +397,30 @@ export const RentalFormModal: React.FC<RentalFormModalProps> = ({
   const rentalTitleDeedUrl = propRentalTitleDeedUrl !== undefined ? propRentalTitleDeedUrl : localRentalTitleDeedUrl;
   const setRentalTitleDeedUrl = propSetRentalTitleDeedUrl || setLocalRentalTitleDeedUrl;
 
+  const activeUnits = formLeases.filter((l) => l.status !== 'Vacant');
+  const activeLeaseRentSum = activeUnits.reduce((sum, l) => sum + (l.monthlyRentZAR || 0), 0);
+  const isAutoSummedRent = formLeases.length > 0 && activeLeaseRentSum > 0;
+
+  useEffect(() => {
+    if (isOpen && isAutoSummedRent && monthlyGrossRent !== activeLeaseRentSum) {
+      setMonthlyGrossRent(activeLeaseRentSum);
+    }
+  }, [isOpen, isAutoSummedRent, activeLeaseRentSum, monthlyGrossRent, setMonthlyGrossRent]);
+
+  const scrollToSection = (sectionId: string) => {
+    const el = document.getElementById(sectionId);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  };
+
+  const attachedVaultLinksCount = [
+    rentalMasterFolderUrl,
+    rentalOtpUrl,
+    rentalRatesBillUrl,
+    rentalTitleDeedUrl,
+  ].filter((url) => Boolean(url && url.trim())).length;
+
   const handleSubmit = (e: React.FormEvent) => {
     if (propOnSubmit) {
       propOnSubmit(e);
@@ -402,7 +433,7 @@ export const RentalFormModal: React.FC<RentalFormModalProps> = ({
     const finalBondPayment = monthlyBondPayment > 0 ? monthlyBondPayment : calcBond;
 
     const computedGrossRent = formLeases
-      .filter((l) => l.status === 'Occupied')
+      .filter((l) => l.status !== 'Vacant')
       .reduce((sum, l) => sum + (l.monthlyRentZAR || 0), 0);
     const finalGrossRent = computedGrossRent > 0 ? computedGrossRent : monthlyGrossRent;
 
@@ -468,1268 +499,1433 @@ export const RentalFormModal: React.FC<RentalFormModalProps> = ({
     onClose();
   };
 
+  if (!isOpen) return null;
+
   return (
     <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 z-50">
-      <div className="bg-white rounded-t-3xl sm:rounded-xl max-w-lg w-full p-5 sm:p-6 shadow-xl border border-slate-200 max-h-[92vh] sm:max-h-[90vh] overflow-y-auto">
-        <div className="w-12 h-1.5 bg-slate-300 rounded-full mx-auto mb-3 sm:hidden" />
-        <div className="flex items-center justify-between pb-3 mb-3 border-b border-slate-100">
-          <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
-            <Building2 className="w-5 h-5 text-emerald-600" />
-            <span>{editingProperty ? 'Edit Rental Property & Agency Mandate' : 'Add Rental Property to Portfolio'}</span>
-          </h3>
-          {editingProperty && (
-            <span className="text-[10px] font-semibold bg-indigo-100 text-indigo-800 px-2 py-0.5 rounded-full">
-              Editing Active Unit
-            </span>
-          )}
-        </div>
+      <div className="bg-white rounded-t-3xl sm:rounded-xl max-w-lg sm:max-w-2xl w-full shadow-xl border border-slate-200 max-h-[92vh] sm:max-h-[90vh] flex flex-col overflow-hidden">
+        {/* Mobile Drag Handle */}
+        <div className="w-12 h-1.5 bg-slate-300 rounded-full mx-auto mt-2.5 mb-1 sm:hidden shrink-0" />
 
-        <form onSubmit={handleSubmit} noValidate className="space-y-4 text-xs">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label className="block font-semibold text-slate-700 mb-1">Property Name *</label>
-              <input
-                type="text"
-                name="rentalTitle"
-                autoComplete="off"
-                required
-                placeholder="e.g. Melrose Arch Luxury Loft"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg"
-              />
-            </div>
-            <div>
-              <InvestmentNodeSelect
-                label="City / Region"
-                name="propertyCity"
-                value={city}
-                province={province}
-                onChange={(newCity, newProvince) => {
-                  setCity(newCity);
-                  setProvince(newProvince);
-                }}
-                showProfileBanner={false}
-                selectClassName="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs bg-white font-medium text-slate-800"
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="block font-semibold text-slate-700 mb-1">Address</label>
-            <input
-              type="text"
-              name="propertyAddress"
-              autoComplete="off"
-              placeholder="e.g. 10 High Street, Melrose"
-              value={address}
-              onChange={(e) => setAddress(e.target.value)}
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg"
-            />
-          </div>
-
-          {/* Selected Investment Node Profile & Regional Compliance Strip */}
-          <InvestmentNodeBanner city={city} province={province} />
-
-          {/* Property Title Type & Body Corporate AGM Section */}
-          <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 space-y-3">
-            <div>
-              <div className="flex items-center justify-between mb-1.5">
-                <label className="block font-bold text-slate-800 text-[11px] uppercase tracking-wider">
-                  Property Title Type
-                </label>
-                <span className="text-[10px] text-slate-500">STSMA & Governance Classification</span>
-              </div>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
-                {(
-                  [
-                    { id: 'Sectional Title Apartment', label: '🏢 Sectional Title' },
-                    { id: 'Freehold House', label: '🏡 Freehold House' },
-                    { id: 'Townhouse / Cluster', label: '🏘️ Townhouse / Cluster' },
-                    { id: 'Multi-unit Commercial', label: '🏬 Commercial' },
-                  ] as const
-                ).map((pt) => (
-                  <button
-                    key={pt.id}
-                    type="button"
-                    onClick={() => {
-                      setPropertyType(pt.id);
-                      if (pt.id === 'Freehold House') {
-                        setMonthlyLevies(0);
-                        setAnnualBuildingInsurance((prev) => (prev > 0 ? prev : 7_200));
-                      } else {
-                        setAnnualBuildingInsurance(0);
-                      }
-                    }}
-                    className={`py-1.5 px-2 rounded-lg text-[11px] font-semibold transition-all text-center border ${
-                      propertyType === pt.id
-                        ? 'bg-slate-900 text-white border-slate-900 shadow-2xs font-bold'
-                        : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100'
-                    }`}
-                  >
-                    {pt.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {(propertyType === 'Sectional Title Apartment' || propertyType === 'Townhouse / Cluster') && (
-              <div className="pt-2 border-t border-slate-200">
-                <div className="flex items-center justify-between mb-1">
-                  <label className="block font-semibold text-slate-700">
-                    📅 Body Corporate AGM Date
-                  </label>
-                  <span className="text-[10px] text-indigo-600 font-medium">
-                    Auto-schedules reminder task 14 days prior
-                  </span>
-                </div>
-                <input
-                  type="date"
-                  value={agmDate}
-                  onChange={(e) => setAgmDate(e.target.value)}
-                  className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg bg-white"
-                />
-              </div>
-            )}
-          </div>
-
-          {/* Property Management Mandate Section */}
-          <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 space-y-3">
+        <form onSubmit={handleSubmit} noValidate className="flex flex-col flex-1 min-h-0 overflow-hidden text-xs">
+          {/* Sticky Header */}
+          <div className="shrink-0 sticky top-0 z-20 bg-white/95 backdrop-blur border-b border-slate-200 px-6 py-4 space-y-3">
             <div className="flex items-center justify-between">
-              <span className="font-bold text-slate-800 text-[11px] uppercase tracking-wider">Property Management Mandate</span>
-              <div className="flex bg-slate-200 p-0.5 rounded-lg text-xs font-semibold">
-                <button
-                  type="button"
-                  onClick={() => setManagementType('Self-Managed')}
-                  className={`px-3 py-1 rounded-md transition-all ${
-                    managementType === 'Self-Managed'
-                      ? 'bg-white text-slate-900 shadow-2xs font-bold'
-                      : 'text-slate-600 hover:text-slate-900'
-                  }`}
-                >
-                  👤 Self-Managed
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setManagementType('Agency')}
-                  className={`px-3 py-1 rounded-md transition-all ${
-                    managementType === 'Agency'
-                      ? 'bg-white text-indigo-900 shadow-2xs font-bold'
-                      : 'text-slate-600 hover:text-slate-900'
-                  }`}
-                >
-                  🏢 Agency Managed
-                </button>
-              </div>
-            </div>
-
-            {managementType === 'Agency' ? (
-              <div className="space-y-3 pt-1">
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block font-semibold text-slate-700 mb-1">Managing Agency Name *</label>
-                    <input
-                      type="text"
-                      required={managementType === 'Agency'}
-                      placeholder="e.g. Pam Golding, RE/MAX, Seeff"
-                      value={agencyName}
-                      onChange={(e) => setAgencyName(e.target.value)}
-                      className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg bg-white font-medium"
-                    />
-                  </div>
-                  <div>
-                    <label className="block font-semibold text-slate-700 mb-1">Agent Contact (Tel / WhatsApp)</label>
-                    <input
-                      type="text"
-                      placeholder="e.g. +27 82 555 1234"
-                      value={agencyContact}
-                      onChange={(e) => setAgencyContact(e.target.value)}
-                      className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg bg-white"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-center">
-                  <div>
-                    <div className="flex items-center justify-between mb-1">
-                      <label className="block font-semibold text-slate-700">Commission Rate (%)</label>
-                      <div className="flex gap-1 text-[10px]">
-                        <button
-                          type="button"
-                          onClick={() => setAgencyCommissionPercent(8.0)}
-                          className={`px-1.5 py-0.5 rounded border ${
-                            agencyCommissionPercent === 8.0 ? 'bg-indigo-600 text-white border-indigo-600 font-bold' : 'bg-white text-slate-600'
-                          }`}
-                        >
-                          8%
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setAgencyCommissionPercent(10.0)}
-                          className={`px-1.5 py-0.5 rounded border ${
-                            agencyCommissionPercent === 10.0 ? 'bg-indigo-600 text-white border-indigo-600 font-bold' : 'bg-white text-slate-600'
-                          }`}
-                        >
-                          10%
-                        </button>
-                      </div>
-                    </div>
-                    <input
-                      type="number"
-                      name="agencyCommissionPercent"
-                      autoComplete="off"
-                      min="0"
-                      max="30"
-                      step="any"
-                      value={agencyCommissionPercent}
-                      onChange={(e) => setAgencyCommissionPercent(Number(e.target.value))}
-                      className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg bg-white font-bold"
-                    />
-                  </div>
-
-                  <div className="pt-2">
-                    <label className="flex items-center gap-2 cursor-pointer select-none">
-                      <input
-                        type="checkbox"
-                        checked={agencyVatApplicable}
-                        onChange={(e) => setAgencyVatApplicable(e.target.checked)}
-                        className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 w-4 h-4"
-                      />
-                      <span className="text-slate-700 font-medium text-[11px]">
-                        Subject to 15% SARS VAT (+15%)
-                      </span>
-                    </label>
-                    <p className="text-[10px] text-slate-400 mt-0.5">
-                      Standard SA estate agency mandate structure
-                    </p>
-                  </div>
-                </div>
-
-                {/* Commission Calculation Preview */}
-                <div className="p-2.5 bg-indigo-50/80 rounded-lg border border-indigo-100 flex items-center justify-between text-xs">
-                  <div>
-                    <span className="text-[10px] text-indigo-800 font-semibold block uppercase">Calculated Monthly Fee</span>
-                    <span className="text-slate-600 text-[11px]">
-                      {agencyCommissionPercent}% of {formatZAR(monthlyGrossRent)}
-                      {agencyVatApplicable ? ' + 15% VAT (effective ' + (agencyCommissionPercent * 1.15).toFixed(2) + '%)' : ''}
-                    </span>
-                  </div>
-                  <div className="text-right">
-                    <strong className="text-rose-600 font-bold text-sm block">
-                      - {formatZAR(calculateAgencyCommission(monthlyGrossRent, agencyCommissionPercent, agencyVatApplicable, agencyName).monthlyAgentFeeZAR)}/m
-                    </strong>
-                    <span className="text-[10px] text-slate-500">Deducted from gross rent</span>
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div className="p-2.5 bg-slate-100 rounded-lg text-slate-600 text-xs flex items-center gap-2">
-                <span className="text-sm">💡</span>
-                <span><strong>Self-Managed Unit:</strong> Direct landlord administration. <strong>R 0</strong> agency commission deducted from cash flow.</span>
-              </div>
-            )}
-          </div>
-
-          <div className="grid grid-cols-3 gap-3">
-            <div>
-              <label className="block font-semibold text-slate-700 mb-1">Market Value (ZAR)</label>
-              <input
-                type="number"
-                name="marketValueZAR"
-                autoComplete="off"
-                min="0"
-                step="any"
-                value={marketValue}
-                onChange={(e) => setMarketValue(Number(e.target.value))}
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg"
-              />
-            </div>
-            <div>
-              <label className="block font-semibold text-slate-700 mb-1">Purchase Price (ZAR)</label>
-              <input
-                type="number"
-                name="purchasePriceZAR"
-                autoComplete="off"
-                min="0"
-                step="any"
-                value={purchasePrice}
-                onChange={(e) => setPurchasePrice(Number(e.target.value))}
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg"
-              />
-            </div>
-            <div>
-              <label className="block font-semibold text-slate-700 mb-1">Bond Balance (ZAR)</label>
-              <input
-                type="number"
-                name="bondBalanceZAR"
-                autoComplete="off"
-                min="0"
-                step="any"
-                value={bondBalance}
-                onChange={(e) => setBondBalance(Number(e.target.value))}
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg"
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-3 gap-3">
-            <div>
-              <label className="block font-semibold text-slate-700 mb-1">Gross Monthly Rent (ZAR)</label>
-              <input
-                type="number"
-                name="grossRentZAR"
-                autoComplete="off"
-                min="0"
-                step="any"
-                value={monthlyGrossRent}
-                onChange={(e) => setMonthlyGrossRent(Number(e.target.value))}
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg font-bold"
-              />
-            </div>
-            {propertyType === 'Freehold House' ? (
-              <div>
-                <div className="flex items-center justify-between mb-1">
-                  <label className="block font-semibold text-slate-700">
-                    Annual Building Insurance
-                  </label>
-                  <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-200">
-                    R {Math.round(annualBuildingInsurance / 12).toLocaleString()}/m
-                  </span>
-                </div>
-                <input
-                  type="number"
-                  name="annualInsuranceZAR"
-                  autoComplete="off"
-                  min="0"
-                  step="any"
-                  value={annualBuildingInsurance}
-                  onChange={(e) => setAnnualBuildingInsurance(Number(e.target.value))}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg font-semibold"
-                />
-              </div>
-            ) : (
-              <div>
-                <div className="flex items-center justify-between mb-1">
-                  <label className="block font-semibold text-slate-700">
-                    Body Corporate Levies
-                  </label>
-                </div>
-                <input
-                  type="number"
-                  name="monthlyLeviesZAR"
-                  autoComplete="off"
-                  min="0"
-                  step="any"
-                  value={monthlyLevies}
-                  onChange={(e) => setMonthlyLevies(Number(e.target.value))}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg"
-                />
-              </div>
-            )}
-            <div>
-              <label className="block font-semibold text-slate-700 mb-1">Rates & Taxes</label>
-              <input
-                type="number"
-                name="monthlyRatesZAR"
-                autoComplete="off"
-                min="0"
-                step="any"
-                value={monthlyRates}
-                onChange={(e) => setMonthlyRates(Number(e.target.value))}
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg"
-              />
-            </div>
-          </div>
-
-          {/* Communal / Serviced Services Section */}
-          <div className="p-3 bg-slate-50 rounded-lg border border-slate-200">
-            <div className="flex items-center justify-between mb-1">
-              <label className="block font-semibold text-slate-700 text-xs">
-                Communal / Serviced Services (ZAR/mo)
-              </label>
-              <span className="text-[10px] font-bold text-slate-700 bg-slate-200 px-1.5 py-0.5 rounded">
-                -{formatZAR(monthlyCommunalServices)}/pm
-              </span>
-            </div>
-            <div className="relative">
-              <span className="absolute left-3 top-2 text-xs text-slate-400 font-bold">R</span>
-              <input
-                type="number"
-                name="monthlyCommunalServicesZAR"
-                autoComplete="off"
-                min="0"
-                step="50"
-                value={monthlyCommunalServices || ''}
-                onChange={(e) => setMonthlyCommunalServices(Number(e.target.value))}
-                placeholder="0"
-                className="w-full pl-7 pr-3 py-1.5 border border-slate-300 rounded-lg bg-white font-semibold text-slate-900 text-xs"
-              />
-            </div>
-            <p className="text-[10px] text-slate-500 mt-1">
-              All-inclusive amenities: Uncapped Wi-Fi, communal cleaner, armed response, garden maintenance.
-            </p>
-          </div>
-
-          {/* Bank Bond Repayment & Extra Paydown & Effective Month Inputs */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-3 bg-slate-50 rounded-lg border border-slate-200">
-            <div>
-              <div className="flex items-center justify-between mb-1">
-                <label className="block font-semibold text-slate-700 text-xs">Bank Bond Repayment (Debit Order)</label>
-                {bondBalance > 0 && (
-                  <button
-                    type="button"
-                    onClick={() => setMonthlyBondPayment(calculateMonthlyBondRepayment(bondBalance, 11.75, 20))}
-                    className="text-[10px] text-indigo-600 hover:text-indigo-800 font-semibold cursor-pointer"
-                    title="Auto-calculate 20-year bond at 11.75%"
-                  >
-                    Auto-PMT: {formatZAR(calculateMonthlyBondRepayment(bondBalance, 11.75, 20))}
-                  </button>
-                )}
-              </div>
-              <input
-                type="number"
-                name="monthlyBondPaymentZAR"
-                autoComplete="off"
-                min="0"
-                step="any"
-                value={monthlyBondPayment || ''}
-                onChange={(e) => setMonthlyBondPayment(Number(e.target.value))}
-                placeholder="e.g. 11800"
-                className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg bg-white font-bold text-slate-900 text-xs"
-              />
-              <span className="text-[10px] text-slate-400 block mt-0.5">Owner-paid direct debit order</span>
-            </div>
-
-            <div>
-              <div className="flex items-center justify-between mb-1">
-                <label className="block font-semibold text-slate-700 text-xs">Extra Principal Paydown</label>
-                {extraMonthlyPayment > 0 && (
-                  <span className="text-[10px] text-emerald-600 font-semibold">Accelerated</span>
-                )}
-              </div>
-              <input
-                type="number"
-                name="extraMonthlyPaymentZAR"
-                autoComplete="off"
-                min="0"
-                step="100"
-                value={extraMonthlyPayment || ''}
-                onChange={(e) => setExtraMonthlyPayment(Number(e.target.value))}
-                placeholder="e.g. 1500"
-                className="w-full px-2.5 py-1.5 border border-emerald-300 focus:border-emerald-500 rounded-lg bg-white font-bold text-slate-900 text-xs"
-              />
-              <span className="text-[10px] text-slate-400 block mt-0.5">Optional monthly capital paydown</span>
-            </div>
-
-            <div>
-              <label className="block font-semibold text-slate-700 mb-1 text-xs">Bond Effective Month (Forward-Only)</label>
-              <input
-                type="text"
-                name="bondPaymentEffectiveDate"
-                autoComplete="off"
-                placeholder="e.g. Apr 2026 or 2026-04"
-                value={bondPaymentEffectiveDate}
-                onChange={(e) => setBondPaymentEffectiveDate(e.target.value)}
-                className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg bg-white text-slate-900 text-xs font-semibold"
-              />
-              <span className="text-[10px] text-slate-400 block mt-0.5">Upcoming effective payment date</span>
-            </div>
-          </div>
-
-          {/* Tenant Utility Arrears Section */}
-          <div className={`p-3 rounded-lg border transition-colors ${
-            unpaidUtilityArrears > 0
-              ? 'bg-rose-50/70 border-rose-200'
-              : 'bg-slate-50 border-slate-200'
-          }`}>
-            <div className="flex items-center justify-between mb-1.5">
-              <div className="flex items-center gap-1.5">
-                <label className="block font-bold text-slate-800 text-[11px] uppercase tracking-wider">
-                  Tenant Utility Arrears (Water & Lights)
-                </label>
-                {unpaidUtilityArrears > 0 && (
-                  <span className="text-[10px] font-bold text-rose-700 bg-rose-100 px-1.5 py-0.5 rounded border border-rose-300">
-                    ⚠️ Tenant Default Risk
+              <div className="flex items-center gap-2">
+                <Building2 className="w-5 h-5 text-emerald-600 shrink-0" />
+                <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                  <span>{editingProperty ? 'Edit Rental Property & Agency Mandate' : 'Add Rental Property to Portfolio'}</span>
+                </h3>
+                {editingProperty && (
+                  <span className="text-[10px] font-semibold bg-indigo-100 text-indigo-800 px-2 py-0.5 rounded-full shrink-0">
+                    Editing Active Unit
                   </span>
                 )}
               </div>
-              <span className="text-[10px] text-slate-500">Deducts directly from Net Monthly Cashflow</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="relative flex-1">
-                <span className="absolute left-3 top-2 text-slate-400 font-bold text-xs">R</span>
-                <input
-                  type="number"
-                  name="unpaidUtilityArrearsZAR"
-                  autoComplete="off"
-                  min="0"
-                  step="any"
-                  value={unpaidUtilityArrears}
-                  onChange={(e) => setUnpaidUtilityArrears(Math.max(0, Number(e.target.value)))}
-                  className={`w-full pl-7 pr-3 py-1.5 border rounded-lg font-bold text-xs bg-white ${
-                    unpaidUtilityArrears > 0
-                      ? 'border-rose-300 text-rose-700 focus:ring-rose-400'
-                      : 'border-slate-300 text-slate-800 focus:ring-emerald-400'
-                  }`}
-                  placeholder="0"
-                />
-              </div>
-              {unpaidUtilityArrears > 0 && (
-                <button
-                  type="button"
-                  onClick={() => setUnpaidUtilityArrears(0)}
-                  className="text-xs px-2.5 py-1.5 bg-white text-slate-600 hover:text-emerald-700 border border-slate-200 rounded-lg hover:border-emerald-300 transition-colors cursor-pointer"
-                >
-                  Clear to R 0
-                </button>
-              )}
-            </div>
-            <p className="text-[10px] text-slate-500 mt-1">
-              SA municipal utility debt remains attached to the property. Unrecovered balances directly impair monthly net cashflow.
-            </p>
-          </div>
-
-          {/* Multi-Let Lease Management */}
-          <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="font-bold text-slate-800 block text-[11px] uppercase tracking-wider">Lease Units ({formLeases.length})</span>
               <button
                 type="button"
-                onClick={() => setFormLeases((prev) => [...prev, {
-                  id: crypto.randomUUID(),
-                  unitName: `Unit ${prev.length + 1}`,
-                  tenantName: '',
-                  tenantPhone: '',
-                  tenantEmail: '',
-                  leaseStartDate: new Date().toISOString().split('T')[0],
-                  leaseEndDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-                  monthlyRentZAR: 0,
-                  depositHeldZAR: 0,
-                  annualEscalationPercent: 7,
-                  status: 'Vacant',
-                }])}
-                className="text-[10px] font-bold text-emerald-700 hover:text-emerald-900 bg-emerald-50 hover:bg-emerald-100 px-2 py-1 rounded border border-emerald-200 cursor-pointer transition-colors"
+                onClick={onClose}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
+                aria-label="Close modal"
               >
-                + Add Unit
+                <X className="w-5 h-5" />
               </button>
             </div>
 
-            {formLeases.map((lease, idx) => (
-              <div key={lease.id} className="p-2.5 bg-white rounded-lg border border-slate-200 space-y-2">
+            {/* 4-Pill Section Jump Bar */}
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 text-[11px] font-medium text-slate-600 no-scrollbar">
+              <button
+                type="button"
+                onClick={() => scrollToSection('rental-sec-identity')}
+                className="px-2.5 py-1 rounded-full bg-slate-100 hover:bg-slate-200 hover:text-slate-900 text-slate-700 transition-colors whitespace-nowrap cursor-pointer shrink-0"
+              >
+                1. Identity & Mandate
+              </button>
+              <button
+                type="button"
+                onClick={() => scrollToSection('rental-sec-valuation')}
+                className="px-2.5 py-1 rounded-full bg-slate-100 hover:bg-slate-200 hover:text-slate-900 text-slate-700 transition-colors whitespace-nowrap cursor-pointer shrink-0"
+              >
+                2. Valuation & Bond
+              </button>
+              <button
+                type="button"
+                onClick={() => scrollToSection('rental-sec-leases')}
+                className="px-2.5 py-1 rounded-full bg-slate-100 hover:bg-slate-200 hover:text-slate-900 text-slate-700 transition-colors whitespace-nowrap cursor-pointer shrink-0"
+              >
+                3. Leases & Compliance
+              </button>
+              <button
+                type="button"
+                onClick={() => scrollToSection('rental-sec-tax-vault')}
+                className="px-2.5 py-1 rounded-full bg-slate-100 hover:bg-slate-200 hover:text-slate-900 text-slate-700 transition-colors whitespace-nowrap cursor-pointer shrink-0"
+              >
+                4. Tax & Vault
+              </button>
+            </div>
+          </div>
+
+          {/* Scrollable Body */}
+          <div className="flex-1 overflow-y-auto px-6 py-5 space-y-6">
+            {/* Section 1: Identity & Mandate */}
+            <div id="rental-sec-identity" className="scroll-mt-4 space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Property Name *</label>
+                  <input
+                    type="text"
+                    name="rentalTitle"
+                    autoComplete="off"
+                    required
+                    placeholder="e.g. Melrose Arch Luxury Loft"
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs"
+                  />
+                </div>
+                <div>
+                  <InvestmentNodeSelect
+                    label="City / Region"
+                    name="propertyCity"
+                    value={city}
+                    province={province}
+                    onChange={(newCity, newProvince) => {
+                      setCity(newCity);
+                      setProvince(newProvince);
+                    }}
+                    showProfileBanner={false}
+                    selectClassName="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs bg-white font-medium text-slate-800"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">Address</label>
+                <input
+                  type="text"
+                  name="propertyAddress"
+                  autoComplete="off"
+                  placeholder="e.g. 10 High Street, Melrose"
+                  value={address}
+                  onChange={(e) => setAddress(e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs"
+                />
+              </div>
+
+              {/* Selected Investment Node Profile & Regional Compliance Strip */}
+              <InvestmentNodeBanner city={city} province={province} />
+
+              {/* Property Title Type & Body Corporate AGM Section */}
+              <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 space-y-3">
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="block font-bold text-slate-800 text-[11px] uppercase tracking-wider">
+                      Property Title Type
+                    </label>
+                    <span className="text-[10px] text-slate-500">STSMA & Governance Classification</span>
+                  </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
+                    {(
+                      [
+                        { id: 'Sectional Title Apartment', label: '🏢 Sectional Title' },
+                        { id: 'Freehold House', label: '🏡 Freehold House' },
+                        { id: 'Townhouse / Cluster', label: '🏘️ Townhouse / Cluster' },
+                        { id: 'Multi-unit Commercial', label: '🏬 Commercial' },
+                      ] as const
+                    ).map((pt) => (
+                      <button
+                        key={pt.id}
+                        type="button"
+                        onClick={() => {
+                          setPropertyType(pt.id);
+                          if (pt.id === 'Freehold House') {
+                            setMonthlyLevies(0);
+                            setAnnualBuildingInsurance((prev) => (prev > 0 ? prev : 7_200));
+                          } else {
+                            setAnnualBuildingInsurance(0);
+                          }
+                        }}
+                        className={`py-1.5 px-2 rounded-lg text-[11px] font-semibold transition-all text-center border cursor-pointer ${
+                          propertyType === pt.id
+                            ? 'bg-slate-900 text-white border-slate-900 shadow-2xs font-bold'
+                            : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100'
+                        }`}
+                      >
+                        {pt.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {(propertyType === 'Sectional Title Apartment' || propertyType === 'Townhouse / Cluster') && (
+                  <div className="pt-2 border-t border-slate-200">
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="block font-semibold text-slate-700">
+                        📅 Body Corporate AGM Date
+                      </label>
+                      <span className="text-[10px] text-indigo-600 font-medium">
+                        Auto-schedules reminder task 14 days prior
+                      </span>
+                    </div>
+                    <input
+                      type="date"
+                      value={agmDate}
+                      onChange={(e) => setAgmDate(e.target.value)}
+                      className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg bg-white text-xs"
+                    />
+                  </div>
+                )}
+              </div>
+
+              {/* Property Management Mandate Section */}
+              <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 space-y-3">
                 <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-bold text-slate-600 uppercase">
-                    {lease.unitName || `Unit ${idx + 1}`}
-                  </span>
-                  {formLeases.length > 1 && (
+                  <span className="font-bold text-slate-800 text-[11px] uppercase tracking-wider">Property Management Mandate</span>
+                  <div className="flex bg-slate-200 p-0.5 rounded-lg text-xs font-semibold">
                     <button
                       type="button"
-                      onClick={() => setFormLeases((prev) => prev.filter((l) => l.id !== lease.id))}
-                      className="text-[10px] text-rose-600 hover:text-rose-800 font-semibold cursor-pointer"
-                    >
-                      Remove
-                    </button>
-                  )}
-                </div>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                  <div>
-                    <label className="block text-[10px] font-semibold text-slate-600 mb-0.5">Unit Name</label>
-                    <input
-                      type="text"
-                      placeholder="e.g. Unit A"
-                      value={lease.unitName}
-                      onChange={(e) => setFormLeases((prev) => prev.map((l) => l.id === lease.id ? { ...l, unitName: e.target.value } : l))}
-                      className="w-full px-2 py-1 text-[11px] border border-slate-300 rounded-lg bg-white"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-semibold text-slate-600 mb-0.5">Room / Unit Classification</label>
-                    <input
-                      type="text"
-                      list="room-type-suggestions"
-                      placeholder="e.g. Executive Suite"
-                      value={lease.roomType || ''}
-                      onChange={(e) => setFormLeases((prev) => prev.map((l) => l.id === lease.id ? { ...l, roomType: e.target.value } : l))}
-                      className="w-full px-2 py-1 text-[11px] border border-slate-300 rounded-lg bg-white"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-semibold text-slate-600 mb-0.5">Tenant Name</label>
-                    <input
-                      type="text"
-                      placeholder="e.g. Sipho Dlamini"
-                      value={lease.tenantName}
-                      onChange={(e) => setFormLeases((prev) => prev.map((l) => l.id === lease.id ? { ...l, tenantName: e.target.value } : l))}
-                      className="w-full px-2 py-1 text-[11px] border border-slate-300 rounded-lg bg-white"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-semibold text-slate-600 mb-0.5">Status</label>
-                    <select
-                      value={lease.status}
-                      onChange={(e) => {
-                        const nextStatus = e.target.value as Lease['status'];
-                        setFormLeases((prev) =>
-                          prev.map((l) => {
-                            if (l.id !== lease.id) return l;
-                            if (nextStatus === 'Notice Given') {
-                              const today = new Date().toISOString().split('T')[0];
-                              const defaultVacation =
-                                l.leaseEndDate && l.leaseEndDate >= today
-                                  ? l.leaseEndDate
-                                  : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
-                                      .toISOString()
-                                      .split('T')[0];
-                              return {
-                                ...l,
-                                status: nextStatus,
-                                noticeGivenDate: l.noticeGivenDate || today,
-                                vacationDate: l.vacationDate || defaultVacation,
-                                noticeReason: l.noticeReason || 'Relocating / work transfer',
-                              };
-                            }
-                            return { ...l, status: nextStatus };
-                          })
-                        );
-                      }}
-                      className={`w-full px-2 py-1 text-[11px] border rounded-lg font-medium ${
-                        lease.status === 'Notice Given'
-                          ? 'border-amber-400 bg-amber-50 text-amber-900 font-bold'
-                          : 'border-slate-300 bg-white text-slate-900'
+                      onClick={() => setManagementType('Self-Managed')}
+                      className={`px-3 py-1 rounded-md transition-all cursor-pointer ${
+                        managementType === 'Self-Managed'
+                          ? 'bg-white text-slate-900 shadow-2xs font-bold'
+                          : 'text-slate-600 hover:text-slate-900'
                       }`}
                     >
-                      <option value="Occupied">Occupied</option>
-                      <option value="Vacant">Vacant</option>
-                      <option value="Notice Given">Notice Given</option>
-                    </select>
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                  <div>
-                    <label className="block text-[10px] font-semibold text-slate-600 mb-0.5">Monthly Rent (ZAR)</label>
-                    <input
-                      type="number"
-                      min="0"
-                      step="any"
-                      value={lease.monthlyRentZAR}
-                      onChange={(e) => setFormLeases((prev) => prev.map((l) => l.id === lease.id ? { ...l, monthlyRentZAR: Number(e.target.value) } : l))}
-                      className="w-full px-2 py-1 text-[11px] border border-slate-300 rounded-lg bg-white font-bold"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-semibold text-slate-600 mb-0.5">Deposit (ZAR)</label>
-                    <input
-                      type="number"
-                      min="0"
-                      step="any"
-                      value={lease.depositHeldZAR}
-                      onChange={(e) => setFormLeases((prev) => prev.map((l) => l.id === lease.id ? { ...l, depositHeldZAR: Number(e.target.value) } : l))}
-                      className="w-full px-2 py-1 text-[11px] border border-slate-300 rounded-lg bg-white"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-semibold text-slate-600 mb-0.5">Lease Start</label>
-                    <input
-                      type="date"
-                      value={lease.leaseStartDate}
-                      onChange={(e) => setFormLeases((prev) => prev.map((l) => l.id === lease.id ? { ...l, leaseStartDate: e.target.value } : l))}
-                      className="w-full px-2 py-1 text-[11px] border border-slate-300 rounded-lg bg-white"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-semibold text-slate-600 mb-0.5">Lease End</label>
-                    <input
-                      type="date"
-                      value={lease.leaseEndDate}
-                      onChange={(e) => setFormLeases((prev) => prev.map((l) => l.id === lease.id ? { ...l, leaseEndDate: e.target.value } : l))}
-                      className="w-full px-2 py-1 text-[11px] border border-slate-300 rounded-lg bg-white"
-                    />
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                  <div>
-                    <label className="block text-[10px] font-semibold text-slate-600 mb-0.5">Phone</label>
-                    <input
-                      type="tel"
-                      placeholder="+27 82 000 0000"
-                      value={lease.tenantPhone || ''}
-                      onChange={(e) => setFormLeases((prev) => prev.map((l) => l.id === lease.id ? { ...l, tenantPhone: e.target.value } : l))}
-                      className="w-full px-2 py-1 text-[11px] border border-slate-300 rounded-lg bg-white"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-semibold text-slate-600 mb-0.5">Email</label>
-                    <input
-                      type="email"
-                      placeholder="tenant@email.co.za"
-                      value={lease.tenantEmail || ''}
-                      onChange={(e) => setFormLeases((prev) => prev.map((l) => l.id === lease.id ? { ...l, tenantEmail: e.target.value } : l))}
-                      className="w-full px-2 py-1 text-[11px] border border-slate-300 rounded-lg bg-white"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-semibold text-slate-600 mb-0.5">Annual Escalation %</label>
-                    <input
-                      type="number"
-                      min="0"
-                      max="30"
-                      step="any"
-                      value={lease.annualEscalationPercent}
-                      onChange={(e) => setFormLeases((prev) => prev.map((l) => l.id === lease.id ? { ...l, annualEscalationPercent: Number(e.target.value) } : l))}
-                      className="w-full px-2 py-1 text-[11px] border border-slate-300 rounded-lg bg-white"
-                    />
+                      👤 Self-Managed
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setManagementType('Agency')}
+                      className={`px-3 py-1 rounded-md transition-all cursor-pointer ${
+                        managementType === 'Agency'
+                          ? 'bg-white text-indigo-900 shadow-2xs font-bold'
+                          : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      🏢 Agency Managed
+                    </button>
                   </div>
                 </div>
 
-                {/* Inline Notice Given & Move-Out Schedule Panel */}
-                {lease.status === 'Notice Given' && (
-                  <div className="p-3 bg-amber-50/90 rounded-lg border border-amber-300 space-y-2.5 animate-in fade-in">
-                    <div className="flex items-center justify-between flex-wrap gap-1.5">
-                      <div className="flex items-center gap-1.5 text-amber-950 font-bold text-[11px]">
-                        <AlertTriangle className="w-3.5 h-3.5 text-amber-600 shrink-0" />
-                        <span>Notice Given & Move-Out Schedule</span>
+                {managementType === 'Agency' ? (
+                  <div className="space-y-3 pt-1">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="block font-semibold text-slate-700 mb-1">Managing Agency Name *</label>
+                        <input
+                          type="text"
+                          required={managementType === 'Agency'}
+                          placeholder="e.g. Pam Golding, RE/MAX, Seeff"
+                          value={agencyName}
+                          onChange={(e) => setAgencyName(e.target.value)}
+                          className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg bg-white font-medium text-xs"
+                        />
                       </div>
-                      {onOpenNoticeModal && editingProperty && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            onClose();
-                            onOpenNoticeModal(editingProperty, lease.id);
-                          }}
-                          className="text-[10px] font-semibold text-amber-900 hover:text-amber-950 bg-amber-100 hover:bg-amber-200 px-2 py-0.5 rounded border border-amber-300 flex items-center gap-1 cursor-pointer transition-colors"
-                          title="Open dedicated modal to log formal move-out or immediate replacement"
-                        >
-                          <span>Launch Full Notice / Move-Out Modal</span>
-                          <ArrowRight className="w-3 h-3" />
-                        </button>
-                      )}
+                      <div>
+                        <label className="block font-semibold text-slate-700 mb-1">Agent Contact (Tel / WhatsApp)</label>
+                        <input
+                          type="text"
+                          placeholder="e.g. +27 82 555 1234"
+                          value={agencyContact}
+                          onChange={(e) => setAgencyContact(e.target.value)}
+                          className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg bg-white text-xs"
+                        />
+                      </div>
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-center">
                       <div>
-                        <label className="block text-[10px] font-semibold text-amber-900 mb-0.5">
-                          Notice Given Date
-                        </label>
+                        <div className="flex items-center justify-between mb-1">
+                          <label className="block font-semibold text-slate-700">Commission Rate (%)</label>
+                          <div className="flex gap-1 text-[10px]">
+                            <button
+                              type="button"
+                              onClick={() => setAgencyCommissionPercent(8.0)}
+                              className={`px-1.5 py-0.5 rounded border cursor-pointer ${
+                                agencyCommissionPercent === 8.0 ? 'bg-indigo-600 text-white border-indigo-600 font-bold' : 'bg-white text-slate-600'
+                              }`}
+                            >
+                              8%
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setAgencyCommissionPercent(10.0)}
+                              className={`px-1.5 py-0.5 rounded border cursor-pointer ${
+                                agencyCommissionPercent === 10.0 ? 'bg-indigo-600 text-white border-indigo-600 font-bold' : 'bg-white text-slate-600'
+                              }`}
+                            >
+                              10%
+                            </button>
+                          </div>
+                        </div>
                         <input
-                          type="date"
-                          value={lease.noticeGivenDate || ''}
-                          onChange={(e) =>
-                            setFormLeases((prev) =>
-                              prev.map((l) =>
-                                l.id === lease.id ? { ...l, noticeGivenDate: e.target.value } : l
-                              )
-                            )
-                          }
-                          className="w-full px-2 py-1 text-[11px] border border-amber-300 rounded-lg bg-white"
+                          type="number"
+                          name="agencyCommissionPercent"
+                          autoComplete="off"
+                          min="0"
+                          max="30"
+                          step="any"
+                          value={agencyCommissionPercent}
+                          onChange={(e) => setAgencyCommissionPercent(Number(e.target.value))}
+                          className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg bg-white font-bold text-xs"
                         />
                       </div>
 
-                      <div>
-                        <label className="block text-[10px] font-semibold text-amber-900 mb-0.5">
-                          Target Vacation Date
+                      <div className="pt-2">
+                        <label className="flex items-center gap-2 cursor-pointer select-none">
+                          <input
+                            type="checkbox"
+                            checked={agencyVatApplicable}
+                            onChange={(e) => setAgencyVatApplicable(e.target.checked)}
+                            className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 w-4 h-4 cursor-pointer"
+                          />
+                          <span className="text-slate-700 font-medium text-[11px]">
+                            Subject to 15% SARS VAT (+15%)
+                          </span>
                         </label>
-                        <input
-                          type="date"
-                          value={lease.vacationDate || ''}
-                          onChange={(e) =>
-                            setFormLeases((prev) =>
-                              prev.map((l) =>
-                                l.id === lease.id ? { ...l, vacationDate: e.target.value } : l
-                              )
-                            )
-                          }
-                          className="w-full px-2 py-1 text-[11px] border border-amber-300 rounded-lg bg-white font-medium"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-[10px] font-semibold text-amber-900 mb-0.5">
-                          Departure Reason
-                        </label>
-                        <select
-                          value={lease.noticeReason || 'Relocating / work transfer'}
-                          onChange={(e) =>
-                            setFormLeases((prev) =>
-                              prev.map((l) =>
-                                l.id === lease.id ? { ...l, noticeReason: e.target.value } : l
-                              )
-                            )
-                          }
-                          className="w-full px-2 py-1 text-[11px] border border-amber-300 rounded-lg bg-white"
-                        >
-                          {DEPARTURE_REASONS.map((reason) => (
-                            <option key={reason} value={reason}>
-                              {reason}
-                            </option>
-                          ))}
-                        </select>
+                        <p className="text-[10px] text-slate-400 mt-0.5">
+                          Standard SA estate agency mandate structure
+                        </p>
                       </div>
                     </div>
 
-                    <div>
-                      <label className="block text-[10px] font-semibold text-amber-900 mb-0.5">
-                        Move-Out Handover Notes / Key Return Instructions (Optional)
-                      </label>
-                      <input
-                        type="text"
-                        placeholder="e.g. Exit inspection scheduled for 31 Oct, keys to be returned to concierge"
-                        value={lease.noticeNotes || ''}
-                        onChange={(e) =>
-                          setFormLeases((prev) =>
-                            prev.map((l) =>
-                              l.id === lease.id ? { ...l, noticeNotes: e.target.value } : l
-                            )
-                          )
-                        }
-                        className="w-full px-2 py-1 text-[11px] border border-amber-300 rounded-lg bg-white"
-                      />
+                    {/* Commission Calculation Preview */}
+                    <div className="p-2.5 bg-indigo-50/80 rounded-lg border border-indigo-100 flex items-center justify-between text-xs">
+                      <div>
+                        <span className="text-[10px] text-indigo-800 font-semibold block uppercase">Calculated Monthly Fee</span>
+                        <span className="text-slate-600 text-[11px]">
+                          {agencyCommissionPercent}% of {formatZAR(monthlyGrossRent)}
+                          {agencyVatApplicable ? ' + 15% VAT (effective ' + (agencyCommissionPercent * 1.15).toFixed(2) + '%)' : ''}
+                        </span>
+                      </div>
+                      <div className="text-right">
+                        <strong className="text-rose-600 font-bold text-sm block">
+                          - {formatZAR(calculateAgencyCommission(monthlyGrossRent, agencyCommissionPercent, agencyVatApplicable, agencyName).monthlyAgentFeeZAR)}/m
+                        </strong>
+                        <span className="text-[10px] text-slate-500">Deducted from gross rent</span>
+                      </div>
                     </div>
+                  </div>
+                ) : (
+                  <div className="p-2.5 bg-slate-100 rounded-lg text-slate-600 text-xs flex items-center gap-2">
+                    <span className="text-sm">💡</span>
+                    <span><strong>Self-Managed Unit:</strong> Direct landlord administration. <strong>R 0</strong> agency commission deducted from cash flow.</span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Section 2: Valuation & Bond */}
+            <div id="rental-sec-valuation" className="scroll-mt-4 space-y-4">
+              {/* Valuation 3-Column Grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                  <div className="flex items-center justify-between mb-1 gap-1">
+                    <label className="block font-semibold text-slate-700 truncate">Market Value (ZAR)</label>
+                    <span className="text-[10px] font-medium text-slate-500 shrink-0">
+                      {formatZAR(marketValue, { compact: true })}
+                    </span>
+                  </div>
+                  <input
+                    type="number"
+                    name="marketValueZAR"
+                    autoComplete="off"
+                    min="0"
+                    step="any"
+                    value={marketValue}
+                    onChange={(e) => setMarketValue(Number(e.target.value))}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs"
+                  />
+                  <span className="text-[10px] text-slate-400 block mt-0.5">{formatZAR(marketValue)}</span>
+                </div>
+
+                <div>
+                  <div className="flex items-center justify-between mb-1 gap-1">
+                    <label className="block font-semibold text-slate-700 truncate">Purchase Price (ZAR)</label>
+                    <span className="text-[10px] font-medium text-slate-500 shrink-0">
+                      {formatZAR(purchasePrice, { compact: true })}
+                    </span>
+                  </div>
+                  <input
+                    type="number"
+                    name="purchasePriceZAR"
+                    autoComplete="off"
+                    min="0"
+                    step="any"
+                    value={purchasePrice}
+                    onChange={(e) => setPurchasePrice(Number(e.target.value))}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs"
+                  />
+                  <span className="text-[10px] text-slate-400 block mt-0.5">{formatZAR(purchasePrice)}</span>
+                </div>
+
+                <div>
+                  <div className="flex items-center justify-between mb-1 gap-1">
+                    <label className="block font-semibold text-slate-700 truncate">Bond Balance (ZAR)</label>
+                    <span className="text-[10px] font-medium text-slate-500 shrink-0">
+                      {formatZAR(bondBalance, { compact: true })}
+                    </span>
+                  </div>
+                  <input
+                    type="number"
+                    name="bondBalanceZAR"
+                    autoComplete="off"
+                    min="0"
+                    step="any"
+                    value={bondBalance}
+                    onChange={(e) => setBondBalance(Number(e.target.value))}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs"
+                  />
+                  <span className="text-[10px] text-slate-400 block mt-0.5">{formatZAR(bondBalance)}</span>
+                </div>
+              </div>
+
+              {/* Rent, Levies/Insurance, Rates 3-Column Grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                  <div className="flex items-center justify-between mb-1 gap-1">
+                    <label className="block font-semibold text-slate-700 truncate">Gross Monthly Rent (ZAR)</label>
+                    {isAutoSummedRent && (
+                      <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded shrink-0">
+                        Auto-summed from {activeUnits.length} unit{activeUnits.length === 1 ? '' : 's'}
+                      </span>
+                    )}
+                  </div>
+                  <input
+                    type="number"
+                    name="grossRentZAR"
+                    autoComplete="off"
+                    min="0"
+                    step="any"
+                    readOnly={isAutoSummedRent}
+                    value={monthlyGrossRent}
+                    onChange={(e) => setMonthlyGrossRent(Number(e.target.value))}
+                    className={`w-full px-3 py-2 border rounded-lg font-bold text-xs ${
+                      isAutoSummedRent
+                        ? 'bg-slate-100/80 border-slate-200 text-slate-700 cursor-not-allowed'
+                        : 'bg-white border-slate-300 text-slate-900'
+                    }`}
+                  />
+                  <span className="text-[10px] text-slate-400 block mt-0.5">{formatZAR(monthlyGrossRent)} / month</span>
+                </div>
+
+                {propertyType === 'Freehold House' ? (
+                  <div>
+                    <div className="flex items-center justify-between mb-1 gap-1">
+                      <label className="block font-semibold text-slate-700 truncate">Annual Building Insurance</label>
+                      <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200 shrink-0">
+                        R {Math.round(annualBuildingInsurance / 12).toLocaleString()}/m
+                      </span>
+                    </div>
+                    <input
+                      type="number"
+                      name="annualInsuranceZAR"
+                      autoComplete="off"
+                      min="0"
+                      step="any"
+                      value={annualBuildingInsurance}
+                      onChange={(e) => setAnnualBuildingInsurance(Number(e.target.value))}
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg font-semibold text-xs"
+                    />
+                    <span className="text-[10px] text-slate-400 block mt-0.5">Freehold homeowners structure cover</span>
+                  </div>
+                ) : (
+                  <div>
+                    <div className="flex items-center justify-between mb-1 gap-1">
+                      <label className="block font-semibold text-slate-700 truncate">Body Corporate Levies</label>
+                      <span className="text-[10px] font-medium text-slate-500 shrink-0">{formatZAR(monthlyLevies)}/m</span>
+                    </div>
+                    <input
+                      type="number"
+                      name="monthlyLeviesZAR"
+                      autoComplete="off"
+                      min="0"
+                      step="any"
+                      value={monthlyLevies}
+                      onChange={(e) => setMonthlyLevies(Number(e.target.value))}
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs"
+                    />
+                    <span className="text-[10px] text-slate-400 block mt-0.5">Sectional title body corporate levy</span>
                   </div>
                 )}
 
-                {/* Pre-Lease Tenant Vetting & PIE Act Risk Assessment Drawer */}
-                <TenantVettingDrawer
-                  scorecard={lease.vettingScorecard}
-                  monthlyRentZAR={lease.monthlyRentZAR}
-                  onUpdateScorecard={(scorecard) => {
-                    setFormLeases((prev) =>
-                      prev.map((l) =>
-                        l.id === lease.id ? { ...l, vettingScorecard: scorecard } : l
-                      )
-                    );
-                    // Automatically uncollapse guarantor accordion if Grade C (High Risk)
-                    if (scorecard.riskGrade === 'Grade C (High Risk)') {
-                      setExpandedGuarantors((prev) => ({ ...prev, [lease.id]: true }));
-                    }
-                  }}
-                  onApplyDeposit={(depositAmount) => {
-                    setFormLeases((prev) =>
-                      prev.map((l) =>
-                        l.id === lease.id ? { ...l, depositHeldZAR: depositAmount } : l
-                      )
-                    );
-                  }}
-                />
+                <div>
+                  <div className="flex items-center justify-between mb-1 gap-1">
+                    <label className="block font-semibold text-slate-700 truncate">Rates & Taxes</label>
+                    <span className="text-[10px] font-medium text-slate-500 shrink-0">{formatZAR(monthlyRates)}/m</span>
+                  </div>
+                  <input
+                    type="number"
+                    name="monthlyRatesZAR"
+                    autoComplete="off"
+                    min="0"
+                    step="any"
+                    value={monthlyRates}
+                    onChange={(e) => setMonthlyRates(Number(e.target.value))}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs"
+                  />
+                  <span className="text-[10px] text-slate-400 block mt-0.5">Municipal property assessment rates</span>
+                </div>
+              </div>
 
-                {/* 8-Point Ingoing Property Inspection Checklist (RHA Sec 5) */}
-                <LeaseInspectionDrawer
-                  inspectionRecord={lease.inspectionRecord}
-                  depositHeldZAR={lease.depositHeldZAR}
-                  propertyTitle={title || 'Rental Property'}
-                  unitName={lease.unitName || 'Main Unit'}
-                  tenantName={lease.tenantName || 'Tenant'}
-                  tenantPhone={lease.tenantPhone}
-                  statementToken={lease.statementToken || lease.id}
-                  onUpdateInspection={(record) => {
-                    setFormLeases((prev) =>
-                      prev.map((l) =>
-                        l.id === lease.id ? { ...l, inspectionRecord: record } : l
-                      )
-                    );
-                  }}
-                />
+              {/* Communal / Serviced Services Section */}
+              <div className="p-3 bg-slate-50 rounded-lg border border-slate-200">
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block font-semibold text-slate-700 text-xs">
+                    Communal / Serviced Services (ZAR/mo)
+                  </label>
+                  <span className="text-[10px] font-bold text-slate-700 bg-slate-200 px-1.5 py-0.5 rounded">
+                    -{formatZAR(monthlyCommunalServices)}/pm
+                  </span>
+                </div>
+                <div className="relative">
+                  <span className="absolute left-3 top-2 text-xs text-slate-400 font-bold">R</span>
+                  <input
+                    type="number"
+                    name="monthlyCommunalServicesZAR"
+                    autoComplete="off"
+                    min="0"
+                    step="50"
+                    value={monthlyCommunalServices || ''}
+                    onChange={(e) => setMonthlyCommunalServices(Number(e.target.value))}
+                    placeholder="0"
+                    className="w-full pl-7 pr-3 py-1.5 border border-slate-300 rounded-lg bg-white font-semibold text-slate-900 text-xs"
+                  />
+                </div>
+                <p className="text-[10px] text-slate-500 mt-1">
+                  All-inclusive amenities: Uncapped Wi-Fi, communal cleaner, armed response, garden maintenance.
+                </p>
+              </div>
 
-                {/* Guarantor / Corporate Sponsor subsection (Collapsible Accordion) */}
-                {(() => {
-                  const isGuarantorMandated =
-                    lease.vettingScorecard?.riskGrade === 'Grade C (High Risk)';
-                  const isGuarantorExpanded =
-                    expandedGuarantors[lease.id] ??
-                    Boolean(
-                      lease.guarantorName ||
-                        lease.guarantorContact ||
-                        lease.deedOfSuretyshipRef ||
-                        isGuarantorMandated
-                    );
+              {/* Bank Bond Repayment & Extra Paydown & Effective Month Inputs */}
+              <div className="p-3.5 bg-slate-50 rounded-lg border border-slate-200">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-start">
+                  <div>
+                    <label className="block font-semibold text-slate-700 mb-1 text-xs truncate">
+                      Bond Debit Order (ZAR/m)
+                    </label>
+                    <input
+                      type="number"
+                      name="monthlyBondPaymentZAR"
+                      autoComplete="off"
+                      min="0"
+                      step="any"
+                      value={monthlyBondPayment || ''}
+                      onChange={(e) => setMonthlyBondPayment(Number(e.target.value))}
+                      placeholder="e.g. 11800"
+                      className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg bg-white font-bold text-slate-900 text-xs"
+                    />
+                    {bondBalance > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setMonthlyBondPayment(calculateMonthlyBondRepayment(bondBalance, 11.75, 20))}
+                        className="mt-1.5 inline-flex items-center gap-1 text-[10px] text-indigo-700 hover:text-indigo-900 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 px-2 py-0.5 rounded-full font-semibold cursor-pointer transition-colors"
+                        title="Auto-calculate 20-year bond at 11.75%"
+                      >
+                        <span>⚡ Apply SARB Auto-PMT ({formatZAR(calculateMonthlyBondRepayment(bondBalance, 11.75, 20))}/m)</span>
+                      </button>
+                    )}
+                    <span className="text-[10px] text-slate-400 block mt-1">Owner-paid direct debit order</span>
+                  </div>
 
-                  return (
-                    <div
-                      className={`rounded-lg border transition-all ${
-                        isGuarantorMandated
-                          ? 'bg-amber-50/40 border-amber-300'
-                          : 'bg-slate-50/80 border-slate-200/80'
-                      }`}
-                    >
+                  <div>
+                    <div className="flex items-center justify-between mb-1 gap-1">
+                      <label className="block font-semibold text-slate-700 text-xs truncate">
+                        Extra Principal Paydown
+                      </label>
+                      {extraMonthlyPayment > 0 && (
+                        <span className="text-[9px] text-emerald-600 font-semibold shrink-0">Accelerated</span>
+                      )}
+                    </div>
+                    <input
+                      type="number"
+                      name="extraMonthlyPaymentZAR"
+                      autoComplete="off"
+                      min="0"
+                      step="100"
+                      value={extraMonthlyPayment || ''}
+                      onChange={(e) => setExtraMonthlyPayment(Number(e.target.value))}
+                      placeholder="e.g. 1500"
+                      className="w-full px-2.5 py-1.5 border border-emerald-300 focus:border-emerald-500 rounded-lg bg-white font-bold text-slate-900 text-xs"
+                    />
+                    <span className="text-[10px] text-slate-400 block mt-1">Optional monthly capital paydown</span>
+                  </div>
+
+                  <div>
+                    <label className="block font-semibold text-slate-700 mb-1 text-xs truncate">
+                      Bond Effective Month
+                    </label>
+                    <input
+                      type="text"
+                      name="bondPaymentEffectiveDate"
+                      autoComplete="off"
+                      placeholder="e.g. Apr 2026 or 2026-04"
+                      value={bondPaymentEffectiveDate}
+                      onChange={(e) => setBondPaymentEffectiveDate(e.target.value)}
+                      className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg bg-white text-slate-900 text-xs font-semibold"
+                    />
+                    <span className="text-[10px] text-slate-400 block mt-1">Upcoming effective payment date</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Section 3: Leases & Compliance */}
+            <div id="rental-sec-leases" className="scroll-mt-4 p-3 bg-slate-50 rounded-lg border border-slate-200 space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="font-bold text-slate-800 block text-[11px] uppercase tracking-wider">
+                  Lease Units ({formLeases.length})
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setFormLeases((prev) => [...prev, {
+                    id: crypto.randomUUID(),
+                    unitName: `Unit ${prev.length + 1}`,
+                    tenantName: '',
+                    tenantPhone: '',
+                    tenantEmail: '',
+                    leaseStartDate: new Date().toISOString().split('T')[0],
+                    leaseEndDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+                    monthlyRentZAR: 0,
+                    depositHeldZAR: 0,
+                    annualEscalationPercent: 7,
+                    status: 'Vacant',
+                  }])}
+                  className="text-[10px] font-bold text-emerald-700 hover:text-emerald-900 bg-emerald-50 hover:bg-emerald-100 px-2 py-1 rounded border border-emerald-200 cursor-pointer transition-colors"
+                >
+                  + Add Unit
+                </button>
+              </div>
+
+              {formLeases.map((lease, idx) => (
+                <div key={lease.id} className="p-3 bg-white rounded-lg border border-slate-200 space-y-3 shadow-2xs">
+                  <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                    <span className="text-[11px] font-bold text-slate-700 uppercase tracking-wide">
+                      {lease.unitName || `Unit ${idx + 1}`}
+                    </span>
+                    {formLeases.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => setFormLeases((prev) => prev.filter((l) => l.id !== lease.id))}
+                        className="text-[10px] text-rose-600 hover:text-rose-800 font-semibold cursor-pointer"
+                      >
+                        Remove
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Row 1: Unit Name, Classification, Occupancy Status */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div>
+                      <label className="block text-[10px] font-semibold text-slate-600 mb-1">Unit Name</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. Unit A"
+                        value={lease.unitName}
+                        onChange={(e) => setFormLeases((prev) => prev.map((l) => l.id === lease.id ? { ...l, unitName: e.target.value } : l))}
+                        className="w-full px-2.5 py-1.5 text-xs border border-slate-300 rounded-lg bg-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-semibold text-slate-600 mb-1">Unit Classification</label>
+                      <input
+                        type="text"
+                        list="room-type-suggestions"
+                        placeholder="e.g. Executive Suite"
+                        value={lease.roomType || ''}
+                        onChange={(e) => setFormLeases((prev) => prev.map((l) => l.id === lease.id ? { ...l, roomType: e.target.value } : l))}
+                        className="w-full px-2.5 py-1.5 text-xs border border-slate-300 rounded-lg bg-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-semibold text-slate-600 mb-1">Occupancy Status</label>
+                      <select
+                        value={lease.status}
+                        onChange={(e) => {
+                          const nextStatus = e.target.value as Lease['status'];
+                          setFormLeases((prev) =>
+                            prev.map((l) => {
+                              if (l.id !== lease.id) return l;
+                              if (nextStatus === 'Notice Given') {
+                                const today = new Date().toISOString().split('T')[0];
+                                const defaultVacation =
+                                  l.leaseEndDate && l.leaseEndDate >= today
+                                    ? l.leaseEndDate
+                                    : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+                                        .toISOString()
+                                        .split('T')[0];
+                                return {
+                                  ...l,
+                                  status: nextStatus,
+                                  noticeGivenDate: l.noticeGivenDate || today,
+                                  vacationDate: l.vacationDate || defaultVacation,
+                                  noticeReason: l.noticeReason || 'Relocating / work transfer',
+                                };
+                              }
+                              return { ...l, status: nextStatus };
+                            })
+                          );
+                        }}
+                        className={`w-full px-2.5 py-1.5 text-xs border rounded-lg font-medium ${
+                          lease.status === 'Notice Given'
+                            ? 'border-amber-400 bg-amber-50 text-amber-900 font-bold'
+                            : 'border-slate-300 bg-white text-slate-900'
+                        }`}
+                      >
+                        <option value="Occupied">Occupied</option>
+                        <option value="Vacant">Vacant</option>
+                        <option value="Notice Given">Notice Given</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Row 2: Tenant Name, Phone, Email */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div>
+                      <label className="block text-[10px] font-semibold text-slate-600 mb-1">Tenant Full Name</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. Sipho Dlamini"
+                        value={lease.tenantName}
+                        onChange={(e) => setFormLeases((prev) => prev.map((l) => l.id === lease.id ? { ...l, tenantName: e.target.value } : l))}
+                        className="w-full px-2.5 py-1.5 text-xs border border-slate-300 rounded-lg bg-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-semibold text-slate-600 mb-1">Phone (WhatsApp)</label>
+                      <input
+                        type="tel"
+                        placeholder="+27 82 000 0000"
+                        value={lease.tenantPhone || ''}
+                        onChange={(e) => setFormLeases((prev) => prev.map((l) => l.id === lease.id ? { ...l, tenantPhone: e.target.value } : l))}
+                        className="w-full px-2.5 py-1.5 text-xs border border-slate-300 rounded-lg bg-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-semibold text-slate-600 mb-1">Tenant Email</label>
+                      <input
+                        type="email"
+                        placeholder="tenant@email.co.za"
+                        value={lease.tenantEmail || ''}
+                        onChange={(e) => setFormLeases((prev) => prev.map((l) => l.id === lease.id ? { ...l, tenantEmail: e.target.value } : l))}
+                        className="w-full px-2.5 py-1.5 text-xs border border-slate-300 rounded-lg bg-white"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Row 3: Monthly Rent, Deposit, Escalation */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div>
+                      <label className="block text-[10px] font-semibold text-slate-600 mb-1">Monthly Rent (ZAR)</label>
+                      <input
+                        type="number"
+                        min="0"
+                        step="any"
+                        value={lease.monthlyRentZAR}
+                        onChange={(e) => setFormLeases((prev) => prev.map((l) => l.id === lease.id ? { ...l, monthlyRentZAR: Number(e.target.value) } : l))}
+                        className="w-full px-2.5 py-1.5 text-xs border border-slate-300 rounded-lg bg-white font-bold"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-semibold text-slate-600 mb-1">Deposit Held (ZAR)</label>
+                      <input
+                        type="number"
+                        min="0"
+                        step="any"
+                        value={lease.depositHeldZAR}
+                        onChange={(e) => setFormLeases((prev) => prev.map((l) => l.id === lease.id ? { ...l, depositHeldZAR: Number(e.target.value) } : l))}
+                        className="w-full px-2.5 py-1.5 text-xs border border-slate-300 rounded-lg bg-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-semibold text-slate-600 mb-1">Annual Escalation %</label>
+                      <input
+                        type="number"
+                        min="0"
+                        max="30"
+                        step="any"
+                        value={lease.annualEscalationPercent}
+                        onChange={(e) => setFormLeases((prev) => prev.map((l) => l.id === lease.id ? { ...l, annualEscalationPercent: Number(e.target.value) } : l))}
+                        className="w-full px-2.5 py-1.5 text-xs border border-slate-300 rounded-lg bg-white"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Row 4: Lease Start & End Dates (full 50% width) */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[10px] font-semibold text-slate-600 mb-1">Lease Start Date</label>
+                      <input
+                        type="date"
+                        value={lease.leaseStartDate}
+                        onChange={(e) => setFormLeases((prev) => prev.map((l) => l.id === lease.id ? { ...l, leaseStartDate: e.target.value } : l))}
+                        className="w-full px-2.5 py-1.5 text-xs border border-slate-300 rounded-lg bg-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-semibold text-slate-600 mb-1">Lease End Date</label>
+                      <input
+                        type="date"
+                        value={lease.leaseEndDate}
+                        onChange={(e) => setFormLeases((prev) => prev.map((l) => l.id === lease.id ? { ...l, leaseEndDate: e.target.value } : l))}
+                        className="w-full px-2.5 py-1.5 text-xs border border-slate-300 rounded-lg bg-white"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Inline Notice Given & Move-Out Schedule Panel */}
+                  {lease.status === 'Notice Given' && (
+                    <div className="p-3 bg-amber-50/90 rounded-lg border border-amber-300 space-y-2.5 animate-in fade-in">
+                      <div className="flex items-center justify-between flex-wrap gap-1.5">
+                        <div className="flex items-center gap-1.5 text-amber-950 font-bold text-[11px]">
+                          <AlertTriangle className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                          <span>Notice Given & Move-Out Schedule</span>
+                        </div>
+                        {onOpenNoticeModal && editingProperty && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              onClose();
+                              onOpenNoticeModal(editingProperty, lease.id);
+                            }}
+                            className="text-[10px] font-semibold text-amber-900 hover:text-amber-950 bg-amber-100 hover:bg-amber-200 px-2 py-0.5 rounded border border-amber-300 flex items-center gap-1 cursor-pointer transition-colors"
+                            title="Open dedicated modal to log formal move-out or immediate replacement"
+                          >
+                            <span>Launch Full Notice / Move-Out Modal</span>
+                            <ArrowRight className="w-3 h-3" />
+                          </button>
+                        )}
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                        <div>
+                          <label className="block text-[10px] font-semibold text-amber-900 mb-0.5">
+                            Notice Given Date
+                          </label>
+                          <input
+                            type="date"
+                            value={lease.noticeGivenDate || ''}
+                            onChange={(e) =>
+                              setFormLeases((prev) =>
+                                prev.map((l) =>
+                                  l.id === lease.id ? { ...l, noticeGivenDate: e.target.value } : l
+                                )
+                              )
+                            }
+                            className="w-full px-2 py-1 text-[11px] border border-amber-300 rounded-lg bg-white"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-[10px] font-semibold text-amber-900 mb-0.5">
+                            Target Vacation Date
+                          </label>
+                          <input
+                            type="date"
+                            value={lease.vacationDate || ''}
+                            onChange={(e) =>
+                              setFormLeases((prev) =>
+                                prev.map((l) =>
+                                  l.id === lease.id ? { ...l, vacationDate: e.target.value } : l
+                                )
+                              )
+                            }
+                            className="w-full px-2 py-1 text-[11px] border border-amber-300 rounded-lg bg-white font-medium"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-[10px] font-semibold text-amber-900 mb-0.5">
+                            Departure Reason
+                          </label>
+                          <select
+                            value={lease.noticeReason || 'Relocating / work transfer'}
+                            onChange={(e) =>
+                              setFormLeases((prev) =>
+                                prev.map((l) =>
+                                  l.id === lease.id ? { ...l, noticeReason: e.target.value } : l
+                                )
+                              )
+                            }
+                            className="w-full px-2 py-1 text-[11px] border border-amber-300 rounded-lg bg-white"
+                          >
+                            {DEPARTURE_REASONS.map((reason) => (
+                              <option key={reason} value={reason}>
+                                {reason}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-[10px] font-semibold text-amber-900 mb-0.5">
+                          Move-Out Handover Notes / Key Return Instructions (Optional)
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="e.g. Exit inspection scheduled for 31 Oct, keys to be returned to concierge"
+                          value={lease.noticeNotes || ''}
+                          onChange={(e) =>
+                            setFormLeases((prev) =>
+                              prev.map((l) =>
+                                l.id === lease.id ? { ...l, noticeNotes: e.target.value } : l
+                              )
+                            )
+                          }
+                          className="w-full px-2 py-1 text-[11px] border border-amber-300 rounded-lg bg-white"
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Pre-Lease Tenant Vetting & PIE Act Risk Assessment Drawer */}
+                  <TenantVettingDrawer
+                    scorecard={lease.vettingScorecard}
+                    monthlyRentZAR={lease.monthlyRentZAR}
+                    onUpdateScorecard={(scorecard) => {
+                      setFormLeases((prev) =>
+                        prev.map((l) =>
+                          l.id === lease.id ? { ...l, vettingScorecard: scorecard } : l
+                        )
+                      );
+                      // Automatically uncollapse guarantor accordion if Grade C (High Risk)
+                      if (scorecard.riskGrade === 'Grade C (High Risk)') {
+                        setExpandedGuarantors((prev) => ({ ...prev, [lease.id]: true }));
+                      }
+                    }}
+                    onApplyDeposit={(depositAmount) => {
+                      setFormLeases((prev) =>
+                        prev.map((l) =>
+                          l.id === lease.id ? { ...l, depositHeldZAR: depositAmount } : l
+                        )
+                      );
+                    }}
+                  />
+
+                  {/* 8-Point Ingoing Property Inspection Checklist (RHA Sec 5) */}
+                  <LeaseInspectionDrawer
+                    inspectionRecord={lease.inspectionRecord}
+                    depositHeldZAR={lease.depositHeldZAR}
+                    propertyTitle={title || 'Rental Property'}
+                    unitName={lease.unitName || 'Main Unit'}
+                    tenantName={lease.tenantName || 'Tenant'}
+                    tenantPhone={lease.tenantPhone}
+                    statementToken={lease.statementToken || lease.id}
+                    onUpdateInspection={(record) => {
+                      setFormLeases((prev) =>
+                        prev.map((l) =>
+                          l.id === lease.id ? { ...l, inspectionRecord: record } : l
+                        )
+                      );
+                    }}
+                  />
+
+                  {/* Guarantor / Corporate Sponsor subsection (Collapsible Accordion) */}
+                  {(() => {
+                    const isGuarantorMandated =
+                      lease.vettingScorecard?.riskGrade === 'Grade C (High Risk)';
+                    const isGuarantorExpanded =
+                      expandedGuarantors[lease.id] ??
+                      Boolean(
+                        lease.guarantorName ||
+                          lease.guarantorContact ||
+                          lease.deedOfSuretyshipRef ||
+                          isGuarantorMandated
+                      );
+
+                    return (
                       <div
-                        onClick={() =>
-                          setExpandedGuarantors((prev) => ({
-                            ...prev,
-                            [lease.id]: !isGuarantorExpanded,
-                          }))
-                        }
-                        className="px-2.5 py-1.5 flex items-center justify-between cursor-pointer hover:bg-slate-100/60 rounded-t-lg transition-colors"
-                        role="button"
-                        tabIndex={0}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter' || e.key === ' ') {
-                            e.preventDefault();
+                        className={`rounded-lg border transition-all ${
+                          isGuarantorMandated
+                            ? 'bg-amber-50/40 border-amber-300'
+                            : 'bg-slate-50/80 border-slate-200/80'
+                        }`}
+                      >
+                        <div
+                          onClick={() =>
                             setExpandedGuarantors((prev) => ({
                               ...prev,
                               [lease.id]: !isGuarantorExpanded,
-                            }));
+                            }))
                           }
-                        }}
-                        aria-expanded={isGuarantorExpanded}
-                      >
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-[10px] font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1">
-                            <span>🛡️</span> Guarantor / Corporate Sponsor
-                          </span>
-                          {isGuarantorMandated && (
-                            <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-100 text-amber-800 border border-amber-300">
-                              Mandatory (Grade C Tenant)
+                          className="px-2.5 py-1.5 flex items-center justify-between cursor-pointer hover:bg-slate-100/60 rounded-t-lg transition-colors"
+                          role="button"
+                          tabIndex={0}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              e.preventDefault();
+                              setExpandedGuarantors((prev) => ({
+                                ...prev,
+                                [lease.id]: !isGuarantorExpanded,
+                              }));
+                            }
+                          }}
+                          aria-expanded={isGuarantorExpanded}
+                        >
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[10px] font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1">
+                              <span>🛡️</span> Guarantor / Corporate Sponsor
                             </span>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-1.5 text-slate-400">
-                          <span className="text-[9px]">
-                            {isGuarantorMandated
-                              ? 'Required under PIE Act underwriting'
-                              : 'Optional third-party guarantee'}
-                          </span>
-                          {isGuarantorExpanded ? (
-                            <ChevronUp className="w-3.5 h-3.5" />
-                          ) : (
-                            <ChevronDown className="w-3.5 h-3.5" />
-                          )}
-                        </div>
-                      </div>
-
-                      {isGuarantorExpanded && (
-                        <div className="p-2 pt-1 border-t border-slate-200/60 space-y-2">
-                          {isGuarantorMandated && (
-                            <p className="text-[9px] text-amber-800 leading-tight">
-                              ⚠️ <strong>PIE Act Risk Mitigation:</strong> Prospective tenant requires a legally bound guarantor and signed Deed of Suretyship to enforce rent recovery in the event of default.
-                            </p>
-                          )}
-                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                            <div>
-                              <label className="block text-[9px] font-semibold text-slate-600 mb-0.5">
-                                Guarantor / Sponsoring Company {isGuarantorMandated && <span className="text-amber-600">*</span>}
-                              </label>
-                              <input
-                                type="text"
-                                placeholder="e.g. Parent Name or Employer Entity"
-                                value={lease.guarantorName || ''}
-                                onChange={(e) =>
-                                  setFormLeases((prev) =>
-                                    prev.map((l) =>
-                                      l.id === lease.id ? { ...l, guarantorName: e.target.value } : l
-                                    )
-                                  )
-                                }
-                                className="w-full px-2 py-1 text-[11px] border border-slate-300 rounded bg-white"
-                              />
-                            </div>
-                            <div>
-                              <label className="block text-[9px] font-semibold text-slate-600 mb-0.5">
-                                Guarantor Contact (Phone / Email) {isGuarantorMandated && <span className="text-amber-600">*</span>}
-                              </label>
-                              <input
-                                type="text"
-                                autoComplete="tel email"
-                                placeholder="e.g. +27 82 111 2233 or legal@corp.co.za"
-                                value={lease.guarantorContact || ''}
-                                onChange={(e) =>
-                                  setFormLeases((prev) =>
-                                    prev.map((l) =>
-                                      l.id === lease.id ? { ...l, guarantorContact: e.target.value } : l
-                                    )
-                                  )
-                                }
-                                className="w-full px-2 py-1 text-[11px] border border-slate-300 rounded bg-white"
-                              />
-                            </div>
-                            <div>
-                              <label className="block text-[9px] font-semibold text-slate-600 mb-0.5">
-                                Deed of Suretyship Reference {isGuarantorMandated && <span className="text-amber-600">*</span>}
-                              </label>
-                              <input
-                                type="text"
-                                placeholder="e.g. Suretyship Doc Vault URL or Ref #"
-                                value={lease.deedOfSuretyshipRef || ''}
-                                onChange={(e) =>
-                                  setFormLeases((prev) =>
-                                    prev.map((l) =>
-                                      l.id === lease.id ? { ...l, deedOfSuretyshipRef: e.target.value } : l
-                                    )
-                                  )
-                                }
-                                className="w-full px-2 py-1 text-[11px] border border-slate-300 rounded bg-white"
-                              />
-                            </div>
+                            {isGuarantorMandated && (
+                              <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-100 text-amber-800 border border-amber-300">
+                                Mandatory (Grade C Tenant)
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-1.5 text-slate-400">
+                            <span className="text-[9px]">
+                              {isGuarantorMandated
+                                ? 'Required under PIE Act underwriting'
+                                : 'Optional third-party guarantee'}
+                            </span>
+                            {isGuarantorExpanded ? (
+                              <ChevronUp className="w-3.5 h-3.5" />
+                            ) : (
+                              <ChevronDown className="w-3.5 h-3.5" />
+                            )}
                           </div>
                         </div>
+
+                        {isGuarantorExpanded && (
+                          <div className="p-2 pt-1 border-t border-slate-200/60 space-y-2">
+                            {isGuarantorMandated && (
+                              <p className="text-[9px] text-amber-800 leading-tight">
+                                ⚠️ <strong>PIE Act Risk Mitigation:</strong> Prospective tenant requires a legally bound guarantor and signed Deed of Suretyship to enforce rent recovery in the event of default.
+                              </p>
+                            )}
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                              <div>
+                                <label className="block text-[9px] font-semibold text-slate-600 mb-0.5">
+                                  Guarantor / Sponsoring Company {isGuarantorMandated && <span className="text-amber-600">*</span>}
+                                </label>
+                                <input
+                                  type="text"
+                                  placeholder="e.g. Parent Name or Employer Entity"
+                                  value={lease.guarantorName || ''}
+                                  onChange={(e) =>
+                                    setFormLeases((prev) =>
+                                      prev.map((l) =>
+                                        l.id === lease.id ? { ...l, guarantorName: e.target.value } : l
+                                      )
+                                    )
+                                  }
+                                  className="w-full px-2 py-1 text-[11px] border border-slate-300 rounded bg-white"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-[9px] font-semibold text-slate-600 mb-0.5">
+                                  Guarantor Contact (Phone / Email) {isGuarantorMandated && <span className="text-amber-600">*</span>}
+                                </label>
+                                <input
+                                  type="text"
+                                  autoComplete="tel email"
+                                  placeholder="e.g. +27 82 111 2233 or legal@corp.co.za"
+                                  value={lease.guarantorContact || ''}
+                                  onChange={(e) =>
+                                    setFormLeases((prev) =>
+                                      prev.map((l) =>
+                                        l.id === lease.id ? { ...l, guarantorContact: e.target.value } : l
+                                      )
+                                    )
+                                  }
+                                  className="w-full px-2 py-1 text-[11px] border border-slate-300 rounded bg-white"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-[9px] font-semibold text-slate-600 mb-0.5">
+                                  Deed of Suretyship Reference {isGuarantorMandated && <span className="text-amber-600">*</span>}
+                                </label>
+                                <input
+                                  type="text"
+                                  placeholder="e.g. Suretyship Doc Vault URL or Ref #"
+                                  value={lease.deedOfSuretyshipRef || ''}
+                                  onChange={(e) =>
+                                    setFormLeases((prev) =>
+                                      prev.map((l) =>
+                                        l.id === lease.id ? { ...l, deedOfSuretyshipRef: e.target.value } : l
+                                      )
+                                    )
+                                  }
+                                  className="w-full px-2 py-1 text-[11px] border border-slate-300 rounded bg-white"
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
+                </div>
+              ))}
+
+              <datalist id="room-type-suggestions">
+                <option value="Executive Suite" />
+                <option value="En-Suite Room" />
+                <option value="Standard Room" />
+                <option value="Shared Ablution" />
+                <option value="Garden Cottage" />
+              </datalist>
+            </div>
+
+            {/* Section 4: Tax & Vault */}
+            <div id="rental-sec-tax-vault" className="scroll-mt-4 space-y-4">
+              {/* Unified Utilities, Arrears & Tax Configuration Card */}
+              <div className="p-3.5 bg-slate-50 rounded-lg border border-slate-200 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-slate-800 text-[11px] uppercase tracking-wider">
+                    Utilities, Arrears & Tax Configuration
+                  </span>
+                  <span className="text-[10px] text-slate-500">Municipal, Billing & Fiscal Profile</span>
+                </div>
+
+                {/* 3-Column Grid: Utility Type, Tax Entity, Tenant Utility Arrears */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-start">
+                  {/* 1. Utility Type */}
+                  <div>
+                    <label className="block text-[10px] font-semibold text-slate-600 mb-1">Utility Type</label>
+                    <select
+                      value={utilityType}
+                      onChange={(e) => setUtilityType(e.target.value as 'postpaid' | 'prepaid_submeter' | 'hybrid')}
+                      className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg bg-white text-xs font-semibold"
+                    >
+                      <option value="postpaid">Post-Paid Municipal</option>
+                      <option value="prepaid_submeter">Prepaid Sub-Meter</option>
+                      <option value="hybrid">Hybrid</option>
+                    </select>
+                    <span className="text-[10px] text-slate-400 block mt-1">Water & electricity metering model</span>
+                  </div>
+
+                  {/* 2. Tax Entity Override */}
+                  <div>
+                    <div className="flex items-center justify-between mb-1 gap-1">
+                      <label className="block text-[10px] font-semibold text-slate-600 truncate">Tax Entity (Override)</label>
+                    </div>
+                    <select
+                      value={taxEntityOverride || ''}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setTaxEntityOverride(val === '' ? undefined : (val as 'Company (27%)' | 'Individual (45%)' | 'Pre-Tax'));
+                      }}
+                      className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg bg-white text-xs font-semibold"
+                    >
+                      <option value="">Default ({investorProfile?.defaultTaxEntityType || 'Company (27%)'})</option>
+                      <option value="Company (27%)">Company (27%)</option>
+                      <option value="Individual (45%)">Individual (45%)</option>
+                      <option value="Pre-Tax">Pre-Tax</option>
+                    </select>
+                    <span className="text-[10px] text-slate-400 block mt-1">SARS corporate vs individual rate</span>
+                  </div>
+
+                  {/* 3. Tenant Utility Arrears */}
+                  <div>
+                    <div className="flex items-center justify-between mb-1 gap-1">
+                      <label className="block text-[10px] font-semibold text-slate-600 truncate">
+                        Tenant Utility Arrears
+                      </label>
+                      {unpaidUtilityArrears > 0 && (
+                        <span className="text-[9px] font-bold text-rose-700 bg-rose-100 px-1 py-0.5 rounded border border-rose-300 shrink-0">
+                          ⚠️ Risk
+                        </span>
                       )}
                     </div>
-                  );
-                })()}
-              </div>
-            ))}
-
-            <datalist id="room-type-suggestions">
-              <option value="Executive Suite" />
-              <option value="En-Suite Room" />
-              <option value="Standard Room" />
-              <option value="Shared Ablution" />
-              <option value="Garden Cottage" />
-            </datalist>
-          </div>
-
-          {/* Utility Type Selector */}
-          <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 space-y-3">
-            <span className="font-bold text-slate-800 block text-[11px] uppercase tracking-wider">Utility Type</span>
-            <select
-              value={utilityType}
-              onChange={(e) => setUtilityType(e.target.value as 'postpaid' | 'prepaid_submeter' | 'hybrid')}
-              className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg bg-white text-xs font-semibold"
-            >
-              <option value="postpaid">Post-Paid Municipal</option>
-              <option value="prepaid_submeter">Prepaid Sub-Meter</option>
-              <option value="hybrid">Hybrid</option>
-            </select>
-
-            {(utilityType === 'prepaid_submeter' || utilityType === 'hybrid') && (
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-[10px] font-semibold text-slate-600 mb-0.5">Prepaid Vendor Name</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. Citiq, Recharger"
-                    value={prepaidVendorName}
-                    onChange={(e) => setPrepaidVendorName(e.target.value)}
-                    className="w-full px-2 py-1 text-[11px] border border-slate-300 rounded-lg bg-white"
-                  />
+                    <div className="relative">
+                      <span className="absolute left-2.5 top-1.5 text-slate-400 font-bold text-xs">R</span>
+                      <input
+                        type="number"
+                        name="unpaidUtilityArrearsZAR"
+                        autoComplete="off"
+                        min="0"
+                        step="any"
+                        value={unpaidUtilityArrears}
+                        onChange={(e) => setUnpaidUtilityArrears(Math.max(0, Number(e.target.value)))}
+                        className={`w-full pl-6 pr-2.5 py-1.5 border rounded-lg font-bold text-xs bg-white ${
+                          unpaidUtilityArrears > 0
+                            ? 'border-rose-300 text-rose-700 focus:ring-rose-400'
+                            : 'border-slate-300 text-slate-800 focus:ring-emerald-400'
+                        }`}
+                        placeholder="0"
+                      />
+                    </div>
+                    <div className="flex items-center justify-between mt-1">
+                      <span className="text-[10px] text-slate-400">Deducts from net cashflow</span>
+                      {unpaidUtilityArrears > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => setUnpaidUtilityArrears(0)}
+                          className="text-[10px] text-slate-600 hover:text-emerald-700 font-medium underline cursor-pointer"
+                        >
+                          Clear to R 0
+                        </button>
+                      )}
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <label className="block text-[10px] font-semibold text-slate-600 mb-0.5">Monthly Vending Fee (ZAR)</label>
-                  <input
-                    type="number"
-                    min="0"
-                    step="any"
-                    value={monthlyPrepaidVendingFee}
-                    onChange={(e) => setMonthlyPrepaidVendingFee(Number(e.target.value))}
-                    className="w-full px-2 py-1 text-[11px] border border-slate-300 rounded-lg bg-white font-semibold"
-                  />
-                </div>
+
+                {/* Conditional 2-Column Sub-row for Prepaid Submeter / Hybrid */}
+                {(utilityType === 'prepaid_submeter' || utilityType === 'hybrid') && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-slate-200">
+                    <div>
+                      <label className="block text-[10px] font-semibold text-slate-600 mb-1">Prepaid Vendor Name</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. Citiq, Recharger"
+                        value={prepaidVendorName}
+                        onChange={(e) => setPrepaidVendorName(e.target.value)}
+                        className="w-full px-2.5 py-1.5 text-xs border border-slate-300 rounded-lg bg-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-semibold text-slate-600 mb-1">Monthly Vending Fee (ZAR)</label>
+                      <input
+                        type="number"
+                        min="0"
+                        step="any"
+                        value={monthlyPrepaidVendingFee}
+                        onChange={(e) => setMonthlyPrepaidVendingFee(Number(e.target.value))}
+                        className="w-full px-2.5 py-1.5 text-xs border border-slate-300 rounded-lg bg-white font-semibold"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {/* Unified Note */}
+                <p className="text-[10px] text-slate-500 pt-1">
+                  Municipal arrears remain attached to the title deed in South Africa. Tax entity overrides determine Section 11(a) provisioning against net income.
+                </p>
               </div>
-            )}
-          </div>
 
-          {/* Tax Entity Override */}
-          <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="font-bold text-slate-800 text-[11px] uppercase tracking-wider">Tax Entity (override)</span>
-              <span className="text-[10px] text-slate-400">Inherits from Settings if not set</span>
-            </div>
-            <select
-              value={taxEntityOverride || ''}
-              onChange={(e) => {
-                const val = e.target.value;
-                setTaxEntityOverride(val === '' ? undefined : (val as 'Company (27%)' | 'Individual (45%)' | 'Pre-Tax'));
-              }}
-              className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg bg-white text-xs font-semibold"
-            >
-              <option value="">Use Default ({investorProfile?.defaultTaxEntityType || 'Company (27%)'})</option>
-              <option value="Company (27%)">Company (27%)</option>
-              <option value="Individual (45%)">Individual (45%)</option>
-              <option value="Pre-Tax">Pre-Tax</option>
-            </select>
-          </div>
-
-          {/* Ancillary Income Management */}
-          <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="font-bold text-slate-800 text-[11px] uppercase tracking-wider">Ancillary Income ({formAncillaryIncomes.length})</span>
-              <button
-                type="button"
-                onClick={() => setFormAncillaryIncomes((prev) => [...prev, {
-                  id: crypto.randomUUID(),
-                  type: 'cell_tower',
-                  tenantName: '',
-                  monthlyRentZAR: 0,
-                  annualEscalationPercent: 7,
-                  contractStartDate: new Date().toISOString().split('T')[0],
-                  contractEndDate: new Date(Date.now() + 5 * 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-                  vatApplicable: false,
-                }])}
-                className="text-[10px] font-bold text-teal-700 hover:text-teal-900 bg-teal-50 hover:bg-teal-100 px-2 py-1 rounded border border-teal-200 cursor-pointer transition-colors"
-              >
-                + Add Ancillary Income
-              </button>
-            </div>
-
-            {formAncillaryIncomes.map((ai, idx) => (
-              <div key={ai.id} className="p-2.5 bg-white rounded-lg border border-slate-200 space-y-2">
+              {/* Ancillary Income Management */}
+              <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 space-y-3">
                 <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-bold text-slate-600 uppercase">Ancillary #{idx + 1}</span>
+                  <span className="font-bold text-slate-800 text-[11px] uppercase tracking-wider">
+                    Ancillary Income ({formAncillaryIncomes.length})
+                  </span>
                   <button
                     type="button"
-                    onClick={() => setFormAncillaryIncomes((prev) => prev.filter((a) => a.id !== ai.id))}
-                    className="text-[10px] text-rose-600 hover:text-rose-800 font-semibold cursor-pointer"
+                    onClick={() => setFormAncillaryIncomes((prev) => [...prev, {
+                      id: crypto.randomUUID(),
+                      type: 'cell_tower',
+                      tenantName: '',
+                      monthlyRentZAR: 0,
+                      annualEscalationPercent: 7,
+                      contractStartDate: new Date().toISOString().split('T')[0],
+                      contractEndDate: new Date(Date.now() + 5 * 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+                      vatApplicable: false,
+                    }])}
+                    className="text-[10px] font-bold text-teal-700 hover:text-teal-900 bg-teal-50 hover:bg-teal-100 px-2 py-1 rounded border border-teal-200 cursor-pointer transition-colors"
                   >
-                    Remove
+                    + Add Ancillary Income
                   </button>
                 </div>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                  <div>
-                    <label className="block text-[10px] font-semibold text-slate-600 mb-0.5">Type</label>
-                    <select
-                      value={ai.type}
-                      onChange={(e) => setFormAncillaryIncomes((prev) => prev.map((a) => a.id === ai.id ? { ...a, type: e.target.value as AncillaryIncome['type'] } : a))}
-                      className="w-full px-2 py-1 text-[11px] border border-slate-300 rounded-lg bg-white"
-                    >
-                      <option value="cell_tower">Cell Tower</option>
-                      <option value="billboard">Billboard</option>
-                      <option value="parking">Parking</option>
-                      <option value="storage">Storage</option>
-                      <option value="other">Other</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-semibold text-slate-600 mb-0.5">Tenant Name</label>
-                    <input
-                      type="text"
-                      placeholder="e.g. Vodacom, Primedia"
-                      value={ai.tenantName}
-                      onChange={(e) => setFormAncillaryIncomes((prev) => prev.map((a) => a.id === ai.id ? { ...a, tenantName: e.target.value } : a))}
-                      className="w-full px-2 py-1 text-[11px] border border-slate-300 rounded-lg bg-white"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-semibold text-slate-600 mb-0.5">Monthly Rent (ZAR)</label>
-                    <input
-                      type="number"
-                      min="0"
-                      step="any"
-                      value={ai.monthlyRentZAR}
-                      onChange={(e) => setFormAncillaryIncomes((prev) => prev.map((a) => a.id === ai.id ? { ...a, monthlyRentZAR: Number(e.target.value) } : a))}
-                      className="w-full px-2 py-1 text-[11px] border border-slate-300 rounded-lg bg-white font-bold"
-                    />
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                  <div>
-                    <label className="block text-[10px] font-semibold text-slate-600 mb-0.5">Escalation %</label>
-                    <input
-                      type="number"
-                      min="0"
-                      max="30"
-                      step="any"
-                      value={ai.annualEscalationPercent}
-                      onChange={(e) => setFormAncillaryIncomes((prev) => prev.map((a) => a.id === ai.id ? { ...a, annualEscalationPercent: Number(e.target.value) } : a))}
-                      className="w-full px-2 py-1 text-[11px] border border-slate-300 rounded-lg bg-white"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-semibold text-slate-600 mb-0.5">Contract Start</label>
-                    <input
-                      type="date"
-                      value={ai.contractStartDate}
-                      onChange={(e) => setFormAncillaryIncomes((prev) => prev.map((a) => a.id === ai.id ? { ...a, contractStartDate: e.target.value } : a))}
-                      className="w-full px-2 py-1 text-[11px] border border-slate-300 rounded-lg bg-white"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-semibold text-slate-600 mb-0.5">Contract End</label>
-                    <input
-                      type="date"
-                      value={ai.contractEndDate}
-                      onChange={(e) => setFormAncillaryIncomes((prev) => prev.map((a) => a.id === ai.id ? { ...a, contractEndDate: e.target.value } : a))}
-                      className="w-full px-2 py-1 text-[11px] border border-slate-300 rounded-lg bg-white"
-                    />
-                  </div>
-                  <div className="flex items-end pb-0.5">
-                    <label className="flex items-center gap-1.5 cursor-pointer select-none">
+
+                {formAncillaryIncomes.map((ai, idx) => (
+                  <div key={ai.id} className="p-2.5 bg-white rounded-lg border border-slate-200 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-bold text-slate-600 uppercase">Ancillary #{idx + 1}</span>
+                      <button
+                        type="button"
+                        onClick={() => setFormAncillaryIncomes((prev) => prev.filter((a) => a.id !== ai.id))}
+                        className="text-[10px] text-rose-600 hover:text-rose-800 font-semibold cursor-pointer"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                      <div>
+                        <label className="block text-[10px] font-semibold text-slate-600 mb-0.5">Type</label>
+                        <select
+                          value={ai.type}
+                          onChange={(e) => setFormAncillaryIncomes((prev) => prev.map((a) => a.id === ai.id ? { ...a, type: e.target.value as AncillaryIncome['type'] } : a))}
+                          className="w-full px-2 py-1 text-[11px] border border-slate-300 rounded-lg bg-white"
+                        >
+                          <option value="cell_tower">Cell Tower</option>
+                          <option value="billboard">Billboard</option>
+                          <option value="parking">Parking</option>
+                          <option value="storage">Storage</option>
+                          <option value="other">Other</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-semibold text-slate-600 mb-0.5">Tenant Name</label>
+                        <input
+                          type="text"
+                          placeholder="e.g. Vodacom, Primedia"
+                          value={ai.tenantName}
+                          onChange={(e) => setFormAncillaryIncomes((prev) => prev.map((a) => a.id === ai.id ? { ...a, tenantName: e.target.value } : a))}
+                          className="w-full px-2 py-1 text-[11px] border border-slate-300 rounded-lg bg-white"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-semibold text-slate-600 mb-0.5">Monthly Rent (ZAR)</label>
+                        <input
+                          type="number"
+                          min="0"
+                          step="any"
+                          value={ai.monthlyRentZAR}
+                          onChange={(e) => setFormAncillaryIncomes((prev) => prev.map((a) => a.id === ai.id ? { ...a, monthlyRentZAR: Number(e.target.value) } : a))}
+                          className="w-full px-2 py-1 text-[11px] border border-slate-300 rounded-lg bg-white font-bold"
+                        />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                      <div>
+                        <label className="block text-[10px] font-semibold text-slate-600 mb-0.5">Escalation %</label>
+                        <input
+                          type="number"
+                          min="0"
+                          max="30"
+                          step="any"
+                          value={ai.annualEscalationPercent}
+                          onChange={(e) => setFormAncillaryIncomes((prev) => prev.map((a) => a.id === ai.id ? { ...a, annualEscalationPercent: Number(e.target.value) } : a))}
+                          className="w-full px-2 py-1 text-[11px] border border-slate-300 rounded-lg bg-white"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-semibold text-slate-600 mb-0.5">Contract Start</label>
+                        <input
+                          type="date"
+                          value={ai.contractStartDate}
+                          onChange={(e) => setFormAncillaryIncomes((prev) => prev.map((a) => a.id === ai.id ? { ...a, contractStartDate: e.target.value } : a))}
+                          className="w-full px-2 py-1 text-[11px] border border-slate-300 rounded-lg bg-white"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-semibold text-slate-600 mb-0.5">Contract End</label>
+                        <input
+                          type="date"
+                          value={ai.contractEndDate}
+                          onChange={(e) => setFormAncillaryIncomes((prev) => prev.map((a) => a.id === ai.id ? { ...a, contractEndDate: e.target.value } : a))}
+                          className="w-full px-2 py-1 text-[11px] border border-slate-300 rounded-lg bg-white"
+                        />
+                      </div>
+                      <div className="flex items-end pb-0.5">
+                        <label className="flex items-center gap-1.5 cursor-pointer select-none">
+                          <input
+                            type="checkbox"
+                            checked={ai.vatApplicable}
+                            onChange={(e) => setFormAncillaryIncomes((prev) => prev.map((a) => a.id === ai.id ? { ...a, vatApplicable: e.target.checked } : a))}
+                            className="rounded border-slate-300 text-teal-600 focus:ring-teal-500 w-3.5 h-3.5"
+                          />
+                          <span className="text-[10px] text-slate-700 font-medium">15% VAT</span>
+                        </label>
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-semibold text-slate-600 mb-0.5">Notes (optional)</label>
                       <input
-                        type="checkbox"
-                        checked={ai.vatApplicable}
-                        onChange={(e) => setFormAncillaryIncomes((prev) => prev.map((a) => a.id === ai.id ? { ...a, vatApplicable: e.target.checked } : a))}
-                        className="rounded border-slate-300 text-teal-600 focus:ring-teal-500 w-3.5 h-3.5"
+                        type="text"
+                        placeholder="Additional details..."
+                        value={ai.notes || ''}
+                        onChange={(e) => setFormAncillaryIncomes((prev) => prev.map((a) => a.id === ai.id ? { ...a, notes: e.target.value || undefined } : a))}
+                        className="w-full px-2 py-1 text-[11px] border border-slate-300 rounded-lg bg-white"
                       />
-                      <span className="text-[10px] text-slate-700 font-medium">15% VAT</span>
-                    </label>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Collapsible Cloud & Web Document Vault */}
+              <div className="rounded-lg border border-slate-200 bg-slate-50/80 transition-all">
+                <div
+                  onClick={() => setIsVaultExpanded(!isVaultExpanded)}
+                  className="px-3 py-2 flex items-center justify-between cursor-pointer hover:bg-slate-100/60 rounded-t-lg transition-colors"
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      setIsVaultExpanded(!isVaultExpanded);
+                    }
+                  }}
+                  aria-expanded={isVaultExpanded}
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-slate-800 text-[11px] uppercase tracking-wider flex items-center gap-1.5">
+                      <span>☁️</span> Cloud & Web Document Vault
+                    </span>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-slate-200 text-slate-700">
+                      {attachedVaultLinksCount}/4 Links Attached
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 text-slate-400">
+                    <span className="text-[10px] text-slate-500 hidden sm:inline">OneDrive • GDrive • Dropbox</span>
+                    {isVaultExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                   </div>
                 </div>
-                <div>
-                  <label className="block text-[10px] font-semibold text-slate-600 mb-0.5">Notes (optional)</label>
-                  <input
-                    type="text"
-                    placeholder="Additional details..."
-                    value={ai.notes || ''}
-                    onChange={(e) => setFormAncillaryIncomes((prev) => prev.map((a) => a.id === ai.id ? { ...a, notes: e.target.value || undefined } : a))}
-                    className="w-full px-2 py-1 text-[11px] border border-slate-300 rounded-lg bg-white"
-                  />
-                </div>
+
+                {isVaultExpanded && (
+                  <div className="p-3 pt-2 border-t border-slate-200 space-y-2">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                      <div>
+                        <label className="block text-[11px] font-semibold text-slate-600 mb-1">Deal Folder URL</label>
+                        <input
+                          type="url"
+                          placeholder="https://1drv.ms/... or drive.google.com/..."
+                          value={rentalMasterFolderUrl}
+                          onChange={(e) => setRentalMasterFolderUrl(e.target.value)}
+                          className="w-full px-2.5 py-1.5 text-xs border border-slate-300 rounded-lg bg-white"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-semibold text-slate-600 mb-1">Signed Lease / OTP PDF URL</label>
+                        <input
+                          type="url"
+                          placeholder="https://..."
+                          value={rentalOtpUrl}
+                          onChange={(e) => setRentalOtpUrl(e.target.value)}
+                          className="w-full px-2.5 py-1.5 text-xs border border-slate-300 rounded-lg bg-white"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-semibold text-slate-600 mb-1">Rates & Levies Statement</label>
+                        <input
+                          type="url"
+                          placeholder="https://..."
+                          value={rentalRatesBillUrl}
+                          onChange={(e) => setRentalRatesBillUrl(e.target.value)}
+                          className="w-full px-2.5 py-1.5 text-xs border border-slate-300 rounded-lg bg-white"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-semibold text-slate-600 mb-1">Title Deed / Sectional Plan</label>
+                        <input
+                          type="url"
+                          placeholder="https://..."
+                          value={rentalTitleDeedUrl}
+                          onChange={(e) => setRentalTitleDeedUrl(e.target.value)}
+                          className="w-full px-2.5 py-1.5 text-xs border border-slate-300 rounded-lg bg-white"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
-            ))}
+            </div>
           </div>
 
-          {/* Cloud & Web Document Vault Section */}
-          <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 space-y-2.5">
-            <div className="flex items-center justify-between">
-              <span className="font-bold text-[11px] text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
-                <span>☁️ Cloud & Web Document Vault</span>
+          {/* Sticky Footer */}
+          <div className="shrink-0 sticky bottom-0 z-20 bg-white/95 backdrop-blur border-t border-slate-200 px-6 py-3.5 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-semibold text-slate-800 bg-slate-100 border border-slate-200 px-2.5 py-1 rounded-lg">
+                Gross Rent: <strong className="text-emerald-700 font-bold">{formatZAR(monthlyGrossRent)}/m</strong> • Units: <strong className="text-slate-900 font-bold">{formLeases.length}</strong>
               </span>
-              <span className="text-[10px] text-slate-500">OneDrive • GDrive • Dropbox</span>
             </div>
-            <div className="grid grid-cols-2 gap-2 text-xs">
-              <div>
-                <label className="block text-[11px] font-semibold text-slate-600 mb-1">Deal Folder URL</label>
-                <input
-                  type="url"
-                  placeholder="https://1drv.ms/... or drive.google.com/..."
-                  value={rentalMasterFolderUrl}
-                  onChange={(e) => setRentalMasterFolderUrl(e.target.value)}
-                  className="w-full px-2 py-1 text-[11px] border border-slate-300 rounded-lg bg-white"
-                />
-              </div>
-              <div>
-                <label className="block text-[11px] font-semibold text-slate-600 mb-1">Signed Lease / OTP PDF URL</label>
-                <input
-                  type="url"
-                  placeholder="https://..."
-                  value={rentalOtpUrl}
-                  onChange={(e) => setRentalOtpUrl(e.target.value)}
-                  className="w-full px-2 py-1 text-[11px] border border-slate-300 rounded-lg bg-white"
-                />
-              </div>
-              <div>
-                <label className="block text-[11px] font-semibold text-slate-600 mb-1">Rates & Levies Statement</label>
-                <input
-                  type="url"
-                  placeholder="https://..."
-                  value={rentalRatesBillUrl}
-                  onChange={(e) => setRentalRatesBillUrl(e.target.value)}
-                  className="w-full px-2 py-1 text-[11px] border border-slate-300 rounded-lg bg-white"
-                />
-              </div>
-              <div>
-                <label className="block text-[11px] font-semibold text-slate-600 mb-1">Title Deed / Sectional Plan</label>
-                <input
-                  type="url"
-                  placeholder="https://..."
-                  value={rentalTitleDeedUrl}
-                  onChange={(e) => setRentalTitleDeedUrl(e.target.value)}
-                  className="w-full px-2 py-1 text-[11px] border border-slate-300 rounded-lg bg-white"
-                />
-              </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={onClose}
+                className="px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50 font-semibold cursor-pointer transition-colors text-xs"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-semibold cursor-pointer transition-colors shadow-xs text-xs"
+              >
+                {editingProperty ? 'Update Rental Property' : 'Save Rental Property'}
+              </button>
             </div>
-          </div>
-
-          <div className="flex items-center justify-end gap-2 pt-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50 font-semibold cursor-pointer"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-semibold cursor-pointer"
-            >
-              {editingProperty ? 'Update Rental Property' : 'Save Rental Property'}
-            </button>
           </div>
         </form>
       </div>
