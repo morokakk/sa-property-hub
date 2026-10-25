@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { LocalSupplier } from '@/types';
-import { Store, Trash2, X } from 'lucide-react';
+import { Store, Trash2, X, Pencil } from 'lucide-react';
 import { usePortfolioStore } from '@/lib/store/usePortfolioStore';
 
 export interface SupplierDirectoryModalProps {
@@ -12,12 +12,15 @@ export interface SupplierDirectoryModalProps {
   suppliers?: LocalSupplier[];
   onDeleteSupplier?: (id: string) => void;
   onAddSupplier?: (supplier: LocalSupplier) => void;
+  onUpdateSupplier?: (id: string, updates: Partial<LocalSupplier>) => void;
   supName?: string;
   setSupName?: (val: string) => void;
   supCategory?: LocalSupplier['category'];
   setSupCategory?: (val: LocalSupplier['category']) => void;
   supBranch?: string;
   setSupBranch?: (val: string) => void;
+  supContactPerson?: string;
+  setSupContactPerson?: (val: string) => void;
   supPhone?: string;
   setSupPhone?: (val: string) => void;
   supDiscount?: string;
@@ -33,12 +36,15 @@ export const SupplierDirectoryModal: React.FC<SupplierDirectoryModalProps> = ({
   suppliers: propSuppliers,
   onDeleteSupplier: propOnDeleteSupplier,
   onAddSupplier: propOnAddSupplier,
+  onUpdateSupplier: propOnUpdateSupplier,
   supName: propSupName,
   setSupName: propSetSupName,
   supCategory: propSupCategory,
   setSupCategory: propSetSupCategory,
   supBranch: propSupBranch,
   setSupBranch: propSetSupBranch,
+  supContactPerson: propSupContactPerson,
+  setSupContactPerson: propSetSupContactPerson,
   supPhone: propSupPhone,
   setSupPhone: propSetSupPhone,
   supDiscount: propSupDiscount,
@@ -49,15 +55,22 @@ export const SupplierDirectoryModal: React.FC<SupplierDirectoryModalProps> = ({
 }) => {
   const storeSuppliers = usePortfolioStore((s) => s.suppliers);
   const storeAddSupplier = usePortfolioStore((s) => s.addSupplier);
+  const storeUpdateSupplier = usePortfolioStore((s) => s.updateSupplier);
   const storeDeleteSupplier = usePortfolioStore((s) => s.deleteSupplier);
 
   const suppliers = propSuppliers || storeSuppliers;
   const deleteSupplier = propOnDeleteSupplier || storeDeleteSupplier;
+  const updateSupplier = propOnUpdateSupplier || storeUpdateSupplier;
+
+  // Track if we are editing an existing supplier
+  const [editingSupplierId, setEditingSupplierId] = useState<string | null>(null);
+  const formRef = useRef<HTMLDivElement>(null);
 
   // Local state fallbacks
   const [localName, setLocalName] = useState('');
   const [localCategory, setLocalCategory] = useState<LocalSupplier['category']>('Hardware & Timber');
   const [localBranch, setLocalBranch] = useState('');
+  const [localContactPerson, setLocalContactPerson] = useState('');
   const [localPhone, setLocalPhone] = useState('');
   const [localDiscount, setLocalDiscount] = useState('');
   const [localHasCoc, setLocalHasCoc] = useState(false);
@@ -68,6 +81,8 @@ export const SupplierDirectoryModal: React.FC<SupplierDirectoryModalProps> = ({
   const setSupCategory = propSetSupCategory || setLocalCategory;
   const supBranch = propSupBranch !== undefined ? propSupBranch : localBranch;
   const setSupBranch = propSetSupBranch || setLocalBranch;
+  const supContactPerson = propSupContactPerson !== undefined ? propSupContactPerson : localContactPerson;
+  const setSupContactPerson = propSetSupContactPerson || setLocalContactPerson;
   const supPhone = propSupPhone !== undefined ? propSupPhone : localPhone;
   const setSupPhone = propSetSupPhone || setLocalPhone;
   const supDiscount = propSupDiscount !== undefined ? propSupDiscount : localDiscount;
@@ -75,7 +90,42 @@ export const SupplierDirectoryModal: React.FC<SupplierDirectoryModalProps> = ({
   const supHasCoc = propSupHasCoc !== undefined ? propSupHasCoc : localHasCoc;
   const setSupHasCoc = propSetSupHasCoc || setLocalHasCoc;
 
+  // Keyboard accessibility: exit modal on Escape
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
   if (!isOpen) return null;
+
+  const handleStartEdit = (sup: LocalSupplier) => {
+    setEditingSupplierId(sup.id);
+    setSupName(sup.name);
+    setSupCategory(sup.category);
+    setSupBranch(sup.branchLocation || '');
+    setSupContactPerson(sup.contactPerson || '');
+    setSupPhone(sup.phone || '');
+    setSupDiscount(sup.discountTerms || '');
+    setSupHasCoc(!!sup.hasCoC);
+    formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  };
+
+  const handleCancelEdit = () => {
+    setEditingSupplierId(null);
+    setSupName('');
+    setSupBranch('');
+    setSupContactPerson('');
+    setSupPhone('');
+    setSupDiscount('');
+    setSupHasCoc(false);
+    setSupCategory('Hardware & Timber');
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -86,33 +136,55 @@ export const SupplierDirectoryModal: React.FC<SupplierDirectoryModalProps> = ({
 
     if (!supName.trim()) return;
 
-    const newSup: LocalSupplier = {
-      id: `sup-${Date.now()}`,
-      name: supName.trim(),
-      category: supCategory,
-      branchLocation: supBranch.trim(),
-      phone: supPhone.trim(),
-      discountTerms: supDiscount.trim(),
-      hasCoC: supHasCoc,
-      rating: 5,
-    };
+    if (editingSupplierId) {
+      const updates: Partial<LocalSupplier> = {
+        name: supName.trim(),
+        category: supCategory,
+        branchLocation: supBranch.trim(),
+        contactPerson: supContactPerson.trim() || undefined,
+        phone: supPhone.trim(),
+        discountTerms: supDiscount.trim() || undefined,
+        hasCoC: supHasCoc,
+      };
 
-    if (propOnAddSupplier) {
-      propOnAddSupplier(newSup);
+      updateSupplier(editingSupplierId, updates);
+      handleCancelEdit();
     } else {
-      storeAddSupplier(newSup);
-    }
+      const newSup: LocalSupplier = {
+        id: `sup-${Date.now()}`,
+        name: supName.trim(),
+        category: supCategory,
+        branchLocation: supBranch.trim(),
+        contactPerson: supContactPerson.trim() || undefined,
+        phone: supPhone.trim(),
+        discountTerms: supDiscount.trim() || undefined,
+        hasCoC: supHasCoc,
+        rating: 5,
+      };
 
-    setSupName('');
-    setSupBranch('');
-    setSupPhone('');
-    setSupDiscount('');
-    setSupHasCoc(false);
+      if (propOnAddSupplier) {
+        propOnAddSupplier(newSup);
+      } else {
+        storeAddSupplier(newSup);
+      }
+
+      handleCancelEdit();
+    }
   };
 
   return (
-    <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 z-50">
-      <div className="bg-white rounded-t-3xl sm:rounded-xl max-w-2xl w-full p-5 sm:p-6 shadow-xl border border-slate-200 max-h-[92vh] sm:max-h-[85vh] overflow-y-auto">
+    <div
+      className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 z-50 cursor-pointer"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) {
+          onClose();
+        }
+      }}
+    >
+      <div
+        className="bg-white rounded-t-3xl sm:rounded-xl max-w-2xl w-full p-5 sm:p-6 shadow-xl border border-slate-200 max-h-[92vh] sm:max-h-[85vh] overflow-y-auto cursor-default"
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="w-12 h-1.5 bg-slate-300 rounded-full mx-auto mb-3 sm:hidden" />
         <div className="flex items-center justify-between mb-4 border-b border-slate-200 pb-3">
           <div>
@@ -139,7 +211,11 @@ export const SupplierDirectoryModal: React.FC<SupplierDirectoryModalProps> = ({
           {suppliers.map((sup) => (
             <div
               key={sup.id}
-              className="p-3 rounded-lg border border-slate-200 bg-slate-50 flex items-start justify-between gap-3 text-xs"
+              className={`p-3 rounded-lg border transition-colors flex items-start justify-between gap-3 text-xs ${
+                editingSupplierId === sup.id
+                  ? 'border-indigo-400 bg-indigo-50/40 ring-1 ring-indigo-400'
+                  : 'border-slate-200 bg-slate-50'
+              }`}
             >
               <div>
                 <div className="flex items-center gap-2">
@@ -150,6 +226,11 @@ export const SupplierDirectoryModal: React.FC<SupplierDirectoryModalProps> = ({
                   {sup.hasCoC && (
                     <span className="text-[10px] bg-emerald-100 text-emerald-800 px-1.5 py-0.2 rounded font-bold">
                       Wireman CoC Certified
+                    </span>
+                  )}
+                  {editingSupplierId === sup.id && (
+                    <span className="text-[10px] bg-indigo-600 text-white px-1.5 py-0.2 rounded font-bold">
+                      Editing
                     </span>
                   )}
                 </div>
@@ -163,22 +244,57 @@ export const SupplierDirectoryModal: React.FC<SupplierDirectoryModalProps> = ({
                   )}
                 </div>
               </div>
-              <button
-                onClick={() => deleteSupplier(sup.id)}
-                className="p-1 text-slate-400 hover:text-rose-600 rounded cursor-pointer"
-                title="Remove supplier"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-              </button>
+              <div className="flex items-center gap-1 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => handleStartEdit(sup)}
+                  className={`p-1.5 rounded cursor-pointer transition-colors ${
+                    editingSupplierId === sup.id
+                      ? 'text-indigo-600 bg-indigo-100'
+                      : 'text-slate-400 hover:text-indigo-600 hover:bg-slate-200/60'
+                  }`}
+                  title="Edit supplier"
+                  aria-label={`Edit ${sup.name}`}
+                >
+                  <Pencil className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (editingSupplierId === sup.id) {
+                      handleCancelEdit();
+                    }
+                    deleteSupplier(sup.id);
+                  }}
+                  className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-slate-200/60 rounded cursor-pointer transition-colors"
+                  title="Remove supplier"
+                  aria-label={`Remove ${sup.name}`}
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              </div>
             </div>
           ))}
         </div>
 
-        {/* Add New Supplier Form */}
-        <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/50">
-          <h4 className="font-bold text-xs text-slate-800 mb-3">Add Local Supplier / Contractor</h4>
+        {/* Add / Edit Supplier Form */}
+        <div ref={formRef} className="p-4 rounded-xl border border-slate-200 bg-slate-50/50">
+          <div className="flex items-center justify-between mb-3">
+            <h4 className="font-bold text-xs text-slate-800">
+              {editingSupplierId ? 'Edit Local Supplier / Contractor' : 'Add Local Supplier / Contractor'}
+            </h4>
+            {editingSupplierId && (
+              <button
+                type="button"
+                onClick={handleCancelEdit}
+                className="text-[11px] text-slate-500 hover:text-slate-800 underline cursor-pointer"
+              >
+                Cancel edit
+              </button>
+            )}
+          </div>
           <form onSubmit={handleSubmit} noValidate className="space-y-3 text-xs">
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="block text-[11px] font-semibold text-slate-600 mb-1">Supplier / Contractor Name *</label>
                 <input
@@ -209,7 +325,7 @@ export const SupplierDirectoryModal: React.FC<SupplierDirectoryModalProps> = ({
               </div>
             </div>
 
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div>
                 <label className="block text-[11px] font-semibold text-slate-600 mb-1">Branch / Location</label>
                 <input
@@ -219,6 +335,18 @@ export const SupplierDirectoryModal: React.FC<SupplierDirectoryModalProps> = ({
                   placeholder="e.g. Paarden Eiland"
                   value={supBranch}
                   onChange={(e) => setSupBranch(e.target.value)}
+                  className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg bg-white"
+                />
+              </div>
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-600 mb-1">Contact Person</label>
+                <input
+                  type="text"
+                  name="contactPerson"
+                  autoComplete="name"
+                  placeholder="e.g. David Khumalo"
+                  value={supContactPerson}
+                  onChange={(e) => setSupContactPerson(e.target.value)}
                   className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg bg-white"
                 />
               </div>
@@ -234,6 +362,9 @@ export const SupplierDirectoryModal: React.FC<SupplierDirectoryModalProps> = ({
                   className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg bg-white"
                 />
               </div>
+            </div>
+
+            <div className="grid grid-cols-1 gap-3">
               <div>
                 <label className="block text-[11px] font-semibold text-slate-600 mb-1">Trade Discount Terms</label>
                 <input
@@ -248,7 +379,7 @@ export const SupplierDirectoryModal: React.FC<SupplierDirectoryModalProps> = ({
               </div>
             </div>
 
-            <div className="flex items-center justify-between pt-2">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pt-2">
               <label className="flex items-center gap-1.5 cursor-pointer">
                 <input
                   type="checkbox"
@@ -258,12 +389,23 @@ export const SupplierDirectoryModal: React.FC<SupplierDirectoryModalProps> = ({
                 />
                 <span className="text-[11px] font-medium text-slate-700">Has CoC Accreditation (Electrical / Plumbing)</span>
               </label>
-              <button
-                type="submit"
-                className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-lg text-xs cursor-pointer"
-              >
-                Save Supplier
-              </button>
+              <div className="flex items-center gap-2 self-end sm:self-auto">
+                {editingSupplierId && (
+                  <button
+                    type="button"
+                    onClick={handleCancelEdit}
+                    className="px-3 py-1.5 border border-slate-300 text-slate-700 hover:bg-slate-100 font-semibold rounded-lg text-xs cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                )}
+                <button
+                  type="submit"
+                  className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-lg text-xs cursor-pointer"
+                >
+                  {editingSupplierId ? 'Update Supplier' : 'Save Supplier'}
+                </button>
+              </div>
             </div>
           </form>
         </div>

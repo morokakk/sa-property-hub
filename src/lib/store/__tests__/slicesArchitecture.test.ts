@@ -154,8 +154,9 @@ describe('Refactoring Phase 3: Zustand Slice Pattern Migration Architectural Tes
       expect(store.updateTask).toBeTypeOf('function');
       expect(store.deleteTask).toBeTypeOf('function');
 
-      // DirectorySlice (6 actions)
+      // DirectorySlice (7 actions)
       expect(store.addSupplier).toBeTypeOf('function');
+      expect(store.updateSupplier).toBeTypeOf('function');
       expect(store.deleteSupplier).toBeTypeOf('function');
       expect(store.addMunicipalContact).toBeTypeOf('function');
       expect(store.updateMunicipalContact).toBeTypeOf('function');

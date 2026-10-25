@@ -18,6 +18,13 @@ export const createDirectorySlice: StateCreator<
   addSupplier: (supplier) =>
     set((state) => ({ suppliers: [supplier, ...state.suppliers] })),
 
+  updateSupplier: (id, updates) =>
+    set((state) => ({
+      suppliers: state.suppliers.map((s) =>
+        s.id === id ? { ...s, ...updates } : s
+      ),
+    })),
+
   deleteSupplier: (id) =>
     set((state) => ({
       suppliers: state.suppliers.filter((s) => s.id !== id),

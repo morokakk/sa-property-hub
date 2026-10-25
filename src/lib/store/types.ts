@@ -180,6 +180,7 @@ export interface DirectorySliceState {
 }
 export interface DirectorySliceActions {
   addSupplier: (supplier: LocalSupplier) => void;
+  updateSupplier: (id: string, updates: Partial<LocalSupplier>) => void;
   deleteSupplier: (id: string) => void;
   addMunicipalContact: (contact: Omit<MunicipalContact, 'id'>) => void;
   updateMunicipalContact: (id: string, updates: Partial<MunicipalContact>) => void;
