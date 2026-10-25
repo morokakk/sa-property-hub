@@ -166,14 +166,14 @@ export const GET_STARTED_STAGES: readonly JourneyStage[] = [
           {
             id: 'analyzer-deal-screening',
             title: 'Deal Screening & MAO',
-            summary: 'Model purchase price, deposit, extra principal paydown, bond, rent and PIE Act eviction drag; see LSSA legal fees, transfer duty and Day-1 capital.',
+            summary: 'Model purchase price, deposit, DFI 15-year / retail 20-year bonds, per-unit build costs, rent and PIE Act eviction drag; see LSSA legal fees, transfer duty and Day-1 capital.',
             howTo: [
               'Click Edit on a demo deal (or start fresh) to load it into the South African Acquisition & Yield Calculator.',
-              'Enter price, deposit, deal source, optional extra monthly principal paydown, bond LTV and expected rent, and toggle Occupant Risk on distressed deals to budget litigation.',
-              'Open the MAO Quick Solver to back-solve your Max Allowable Bid (MAO) net of legal reserves and holding drag, then save the deal to the pipeline.',
+              'Enter price, deposit, deal source, optional extra monthly principal paydown, bond preset (Retail 20y, DFI 15y or Comm 10y) and expected rent, and toggle Occupant Risk on distressed deals to budget litigation.',
+              'When Units / Rooms > 1, inspect the Build / Unit and All-In / Unit benchmarks, or open the MAO Quick Solver to back-solve your Max Allowable Bid (MAO) before saving.',
             ],
             proTip:
-              'Legal conveyancing and bond registration fees auto-calculate under the official July 2026 LSSA guideline tariffs with deposit precedence, strictly separate from SARS Transfer Duty. Adding an extra monthly principal paydown shows years shaved off debt and accelerated BRRRR refinance milestones.',
+              'Development financiers like TUHF and uMaStandi typically amortize multi-let builds over 15 years at Prime + 2% to 4% rather than 20-year retail terms. Use the 1-click DFI 15y preset and Build / Unit badge to verify room-level construction economics alongside July 2026 LSSA legal fees and SARS Transfer Duty.',
             href: '/analyzer#analyzer-calculator',
             ctaLabel: 'Open the calculator',
           },
@@ -256,15 +256,15 @@ export const GET_STARTED_STAGES: readonly JourneyStage[] = [
           },
           {
             id: 'funding-partner-capital',
-            title: 'Partner & Lender Capital',
-            summary: 'Record private loans, JV partners and bank facilities with their terms.',
+            title: 'Partner, Stokvel & Phased Cash Capital',
+            summary: 'Record private loans, JV partners, stokvel syndicates, DFI facilities and phased "brick-by-brick" cash builds.',
             howTo: [
               'Click Add Capital Source in the Funding header.',
-              'Enter the lender or partner, amount, interest or profit-share terms, and maturity date.',
-              'Use Log Payment to Lender as you repay, so the Capital Ledger always shows what is still owed.',
+              'Enter the lender or partner, or click a 1-click 4-Phase BOQ Template (🧱 Brick-by-Brick Cash, 🤝 Stokvel / Syndicate, or 🏗️ DFI) to scaffold Foundation, Roof, 1st Fix and Practical Completion tranches.',
+              'Use Log Payment to Lender as you repay external facilities, while self-funded Brick-by-Brick rows are badged as R 0 External Debt.',
             ],
             proTip:
-              'Put every private loan in a signed written agreement that states the interest rate, term and security. If you raise money from many members of the public, take legal advice first, because deposit-taking and investment rules can apply.',
+              'Phased own-cash ("brick-by-brick") builds let you fund ground-up or backroom developments out of monthly personal cash flow with 0% interest and R 0 external debt liability. For private loans or stokvel syndicates, always put the interest rate, profit-share and security in a signed written agreement.',
             href: '/funding#funding-ledger',
             ctaLabel: 'Open the Capital Ledger',
           },
@@ -305,15 +305,15 @@ export const GET_STARTED_STAGES: readonly JourneyStage[] = [
         features: [
           {
             id: 'flips-promote-deal',
-            title: 'Promote a Deal',
-            summary: 'Turn an Analyzer deal into a live flip (or rental) with its numbers carried over.',
+            title: 'Promote a Deal & Build-to-Rent Mode',
+            summary: 'Turn an Analyzer deal into a live flip or multi-let Build-to-Rent project with its numbers carried over.',
             howTo: [
-              'In the Analyzer pipeline, advance the deal with Submit Offer → and Begin DD →.',
-              'Click Promote to Flip (or Promote to Rental) on the card and confirm.',
-              'Open Buy-and-Flip Manager (or Rental Portfolio) to find the project pre-filled.',
+              'In the Analyzer pipeline, advance the deal with Submit Offer → and Begin DD →, then click Promote to Flip.',
+              'In the project modal, choose 🔄 Flip for Sale (Resale Exit) or 🏘️ Build-to-Rent (Hold for Multi-Let Cashflow) and set Units / Rooms.',
+              'When a Build-to-Rent project finishes construction, click Graduate to Rental to auto-scaffold Unit 1..N leases and prepaid sub-meters in Rental Portfolio.',
             ],
             proTip:
-              'Promote only after the offer to purchase is signed and suspensive conditions (bond approval, sale of another property) are met. Until then, keep the deal in Due Diligence.',
+              'Toggling Build-to-Rent lets micro-developers use the full 10-trade BOQ and contractor retention controls during construction while zeroing out phantom resale agent commission, bond cancellation fees and SARS flip tax — reporting Post-Build Equity Created instead.',
             href: '/analyzer#analyzer-pipeline',
             ctaLabel: 'Promote from the pipeline',
           },

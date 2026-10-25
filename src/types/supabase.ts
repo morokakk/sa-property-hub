@@ -136,6 +136,7 @@ export type Database = {
           promised_payout_schedule: string | null
           promised_return_rate_percent: number | null
           promised_return_type: string | null
+          project_strategy: string | null
           property_type: string | null
           province: string | null
           purchase_date: string | null
@@ -193,6 +194,7 @@ export type Database = {
           promised_payout_schedule?: string | null
           promised_return_rate_percent?: number | null
           promised_return_type?: string | null
+          project_strategy?: string | null
           property_type?: string | null
           province?: string | null
           purchase_date?: string | null
@@ -250,6 +252,7 @@ export type Database = {
           promised_payout_schedule?: string | null
           promised_return_rate_percent?: number | null
           promised_return_type?: string | null
+          project_strategy?: string | null
           property_type?: string | null
           province?: string | null
           purchase_date?: string | null
@@ -736,6 +739,7 @@ export type Database = {
           id: string
           is_brrrr_property: boolean | null
           leases: Json
+          loan_term_years: number | null
           maintenance_history: Json
           management_type: string | null
           market_value_zar: number | null
@@ -810,6 +814,7 @@ export type Database = {
           id?: string
           is_brrrr_property?: boolean | null
           leases?: Json
+          loan_term_years?: number | null
           maintenance_history?: Json
           management_type?: string | null
           market_value_zar?: number | null
@@ -884,6 +889,7 @@ export type Database = {
           id?: string
           is_brrrr_property?: boolean | null
           leases?: Json
+          loan_term_years?: number | null
           maintenance_history?: Json
           management_type?: string | null
           market_value_zar?: number | null
