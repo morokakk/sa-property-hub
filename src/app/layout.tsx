@@ -4,7 +4,7 @@ import Sidebar from '@/components/navigation/Sidebar';
 import ClientOnly from '@/components/ClientOnly';
 
 export const metadata: Metadata = {
-  title: 'SA Property Investment Hub | Real Estate Portfolio Dashboard',
+  title: 'Moremela Property Investment Hub | Real Estate Portfolio Dashboard',
   description:
     'Unified South African real estate investment dashboard for flips, rentals, capital sourcing, and deal flow with ZAR formatting and SARS tax calculations.',
 };

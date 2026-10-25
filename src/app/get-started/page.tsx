@@ -411,7 +411,7 @@ export default function GetStartedPage() {
           {doneCount === TOTAL_STEPS && (
             <p className="sm:ml-8 flex items-center gap-1.5 text-xs font-semibold text-emerald-300">
               <CheckCircle2 className="w-4 h-4" aria-hidden="true" />
-              All steps complete. You know your way around SA Property Hub.
+              All steps complete. You know your way around Moremela Property Hub.
             </p>
           )}
         </section>

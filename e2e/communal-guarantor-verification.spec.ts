@@ -2,7 +2,7 @@ import { test, expect, type Page } from '@playwright/test';
 
 async function waitForApp(page: Page) {
   await page
-    .locator('text=Initializing SA Property Hub...')
+    .locator('text=Initializing Moremela Property Hub...')
     .waitFor({ state: 'detached', timeout: 30_000 })
     .catch(() => {});
 }

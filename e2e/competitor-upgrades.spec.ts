@@ -5,7 +5,7 @@ test.describe('Competitor-Inspired Upgrades Verification', () => {
   test.describe('Phase 1: Strategy-Aware Buy Box, Exit VAT & Dynamic Rates', () => {
     test('Settings page renders Section 4 Buy Box Hurdles & SARS Criteria and VAT-Exempt toggle', async ({ page }) => {
       await page.goto('/settings', { waitUntil: 'domcontentloaded' });
-      await page.locator('text=Initializing SA Property Hub...').waitFor({ state: 'detached', timeout: 30_000 }).catch(() => {});
+      await page.locator('text=Initializing Moremela Property Hub...').waitFor({ state: 'detached', timeout: 30_000 }).catch(() => {});
 
       // Switch to Underwriting & Buy Box tab
       const underwritingTab = page.locator('button:has-text("Underwriting, Buy Box")');
@@ -32,7 +32,7 @@ test.describe('Competitor-Inspired Upgrades Verification', () => {
 
     test('Analyzer renders Buy Box badge, DSCR, Prime Spread slider, and Exit VAT toggle', async ({ page }) => {
       await page.goto('/analyzer', { waitUntil: 'domcontentloaded' });
-      await page.locator('text=Initializing SA Property Hub...').waitFor({ state: 'detached', timeout: 30_000 }).catch(() => {});
+      await page.locator('text=Initializing Moremela Property Hub...').waitFor({ state: 'detached', timeout: 30_000 }).catch(() => {});
 
       // Switch to Deal Sourcing Pipeline tab to inspect deal badges
       const pipelineTab = page.locator('button:has-text("Deal Sourcing Pipeline")');
@@ -83,7 +83,7 @@ test.describe('Competitor-Inspired Upgrades Verification', () => {
   test.describe('Phase 2: Side-by-Side Comparisons & Deep-Cloned Scenarios', () => {
     test('Clones an opportunity deal as a what-if scenario', async ({ page }) => {
       await page.goto('/analyzer', { waitUntil: 'domcontentloaded' });
-      await page.locator('text=Initializing SA Property Hub...').waitFor({ state: 'detached', timeout: 30_000 }).catch(() => {});
+      await page.locator('text=Initializing Moremela Property Hub...').waitFor({ state: 'detached', timeout: 30_000 }).catch(() => {});
 
       // Switch to Deal Sourcing Pipeline tab
       const pipelineTab = page.locator('button:has-text("Deal Sourcing Pipeline")');
@@ -112,7 +112,7 @@ test.describe('Competitor-Inspired Upgrades Verification', () => {
 
     test('Selects multiple deals and opens Side-by-Side Comparison modal', async ({ page }) => {
       await page.goto('/analyzer', { waitUntil: 'domcontentloaded' });
-      await page.locator('text=Initializing SA Property Hub...').waitFor({ state: 'detached', timeout: 30_000 }).catch(() => {});
+      await page.locator('text=Initializing Moremela Property Hub...').waitFor({ state: 'detached', timeout: 30_000 }).catch(() => {});
 
       // Switch to Deal Sourcing Pipeline tab
       const pipelineTab = page.locator('button:has-text("Deal Sourcing Pipeline")');
@@ -168,7 +168,7 @@ test.describe('Competitor-Inspired Upgrades Verification', () => {
   test.describe('Phase 3: Actuals vs Budget KPI Strip, Section 11(a) & ITR12 Export', () => {
     test('Dashboard renders Actuals vs Budget KPI Strip with SA Tax Year and 4 KPI columns', async ({ page }) => {
       await page.goto('/', { waitUntil: 'domcontentloaded' });
-      await page.locator('text=Initializing SA Property Hub...').waitFor({ state: 'detached', timeout: 30_000 }).catch(() => {});
+      await page.locator('text=Initializing Moremela Property Hub...').waitFor({ state: 'detached', timeout: 30_000 }).catch(() => {});
 
       // Verify Actuals vs Budget KPI Strip
       const kpiStripTitle = page.locator('text=Actuals YTD vs. Budget (SA Tax Year)');
@@ -201,7 +201,7 @@ test.describe('Competitor-Inspired Upgrades Verification', () => {
 
     test('Rentals page renders Actuals vs Budget KPI Strip and SARS ITR12 Export button', async ({ page }) => {
       await page.goto('/rentals', { waitUntil: 'domcontentloaded' });
-      await page.locator('text=Initializing SA Property Hub...').waitFor({ state: 'detached', timeout: 30_000 }).catch(() => {});
+      await page.locator('text=Initializing Moremela Property Hub...').waitFor({ state: 'detached', timeout: 30_000 }).catch(() => {});
 
       // Verify Actuals vs Budget KPI Strip on Rentals
       const kpiStripTitle = page.locator('text=Actuals YTD vs. Budget (SA Tax Year)');

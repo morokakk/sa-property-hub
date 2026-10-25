@@ -1,4 +1,4 @@
-# SA Property Investment Hub: System Architecture & AI Context Blueprint
+# Moremela Property Investment Hub: System Architecture & AI Context Blueprint
 
 > **Status:** Institutional Reference & Definitive Architectural Standard  
 > **Target Audience:** Principal Systems Architects, Full-Stack Engineers, and Autonomous AI Coding Agents  
@@ -9,7 +9,7 @@
 
 ## 1. Architectural Philosophy: The 5-Tier Separation of Concerns (SoC)
 
-The SA Property Investment Hub adheres to a rigid 5-tier unidirectional dependency architecture. To maintain long-term maintainability, eliminate circular references, and prevent logic fragmentation, code must never cross tier boundaries in an unauthorized direction.
+The Moremela Property Investment Hub adheres to a rigid 5-tier unidirectional dependency architecture. To maintain long-term maintainability, eliminate circular references, and prevent logic fragmentation, code must never cross tier boundaries in an unauthorized direction.
 
 ```mermaid
 flowchart TD

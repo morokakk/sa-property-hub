@@ -122,7 +122,7 @@ export async function generateMetadata({ params, searchParams }: PageProps): Pro
   const { lease_id } = await params;
   if (!lease_id) {
     return {
-      title: 'Tenant Statement | SA Property Hub',
+      title: 'Tenant Statement | Moremela Property Hub',
       robots: { index: false, follow: false },
     };
   }
@@ -144,7 +144,7 @@ export async function generateMetadata({ params, searchParams }: PageProps): Pro
   }
 
   return {
-    title: 'Tenant Statement | SA Property Hub',
+    title: 'Tenant Statement | Moremela Property Hub',
     robots: {
       index: false,
       follow: false,

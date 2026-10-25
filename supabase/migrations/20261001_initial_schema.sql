@@ -1,5 +1,5 @@
 -- Migration: 20261001_initial_schema.sql
--- Description: Baseline DDL for all 8 SA Property Portfolio Hub tables, covering indexes, and RLS policies (DBSYNC-04, DBSYNC-09, DBSYNC-10)
+-- Description: Baseline DDL for all 8 Moremela Property Hub tables, covering indexes, and RLS policies (DBSYNC-04, DBSYNC-09, DBSYNC-10)
 
 -- Enable UUID extension
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";

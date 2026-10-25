@@ -1,7 +1,7 @@
 # Architecture Audit & Decomposition Blueprint: Separation of Concerns (SoC) & Component Slicing
 
 > **Document Type:** Production Architecture Audit & Component Slicing Master Blueprint  
-> **Target System:** SA Property Portfolio Hub (`L and M trading`)  
+> **Target System:** Moremela Property Hub (`L and M trading`)  
 > **Audit Mode:** Strictly Read-Only  
 > **Auditors:** Architecture Audit Team (Specialist & Synthesis Worker `teamwork_preview_worker_synthesis_1`)  
 > **Audit Date:** 2026-10-09  
@@ -67,7 +67,7 @@
 
 ### 1.1 Architectural Vision & Target State
 
-The **SA Property Portfolio Hub** is an advanced South African real estate investment, asset management, and accounting platform built on modern web technologies:
+The **Moremela Property Hub** is an advanced South African real estate investment, asset management, and accounting platform built on modern web technologies:
 - **Framework & Routing**: Next.js 16+ App Router (`src/app/`).
 - **UI & Presentation**: React 19 functional components, Tailwind CSS, Lucide React icons.
 - **Client State Management**: Zustand with `persist` middleware (`src/lib/store/`).

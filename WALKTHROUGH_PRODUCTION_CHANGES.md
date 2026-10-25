@@ -9,7 +9,7 @@
 
 ## Executive Summary
 
-Today we performed a comprehensive, zero-bloat production-readiness audit of the **SA Property Portfolio Hub** and executed all four implementation phases:
+Today we performed a comprehensive, zero-bloat production-readiness audit of the **Moremela Property Hub** and executed all four implementation phases:
 1. **Prompt 1: Security & POPIA Essentials** (Privacy, tenant data protection, secret handling).
 2. **Prompt 2: Database & Cloud Sync Integrity** (Schema parity, batch deletion safety, database indexing).
 3. **Prompt 3: Bundle & Asset Optimization** (Dynamic imports for heavy libraries, modal code-splitting, public SSR).
@@ -105,7 +105,7 @@ Today we performed a comprehensive, zero-bloat production-readiness audit of the
 * **Solution:** Converted all 19 modal imports across [`src/app/rentals/page.tsx`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/app/rentals/page.tsx) and [`src/app/flips/page.tsx`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/app/flips/page.tsx) to `next/dynamic` with `{ ssr: false }`, slashing initial chunk sizes by ~1MB.
 
 #### 4. Server-Side Rendering for Public Tenant Route (`F-04`)
-* **Problem:** The public `/statement/[lease_id]` route was wrapped in a client-only mount gate that showed "Initializing SA Property Hub..." spinner instead of immediate server-rendered content.
+* **Problem:** The public `/statement/[lease_id]` route was wrapped in a client-only mount gate that showed "Initializing Moremela Property Hub..." spinner instead of immediate server-rendered content.
 * **Solution:** Updated [`src/components/ClientOnly.tsx`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/components/ClientOnly.tsx) to inspect `pathname?.startsWith('/statement')` and immediately bypass the mount gate for public tenant statements, while preserving the mount gate for internal local-first dashboard routes to prevent React hydration mismatch errors.
 
 ---

@@ -31,7 +31,7 @@ export async function exportPortfolioToExcel(data: ExportPortfolioData) {
   // Sheet 1: Executive Summary
   // -------------------------------------------------------------
   const summaryRows = [
-    ['SA PROPERTY INVESTMENT HUB - EXECUTIVE PORTFOLIO SUMMARY'],
+    ['MOREMELA PROPERTY INVESTMENT HUB - EXECUTIVE PORTFOLIO SUMMARY'],
     ['Generated On', new Date().toLocaleString('en-ZA')],
     ['Investor / Entity', investorProfile.tradingAs || investorProfile.entityName || 'Sole Proprietor'],
     ['Registration / ID', investorProfile.registrationOrId || 'N/A'],

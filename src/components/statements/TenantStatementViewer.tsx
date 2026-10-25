@@ -856,7 +856,7 @@ export default function TenantStatementViewer({
 
               {/* Footer Notice */}
               <div className="pt-4 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-2 text-[10px] text-slate-400">
-                <span>Generated electronically via SA Property Hub • Legally binding inspection report</span>
+                <span>Generated electronically via Moremela Property Hub • Legally binding inspection report</span>
                 <span>Page 1 of 1</span>
               </div>
             </div>
@@ -1500,7 +1500,7 @@ export default function TenantStatementViewer({
 
           {/* Footer Notice */}
           <div className="pt-4 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-2 text-[10px] text-slate-400">
-            <span>Generated electronically via SA Property Hub • Legally binding statement</span>
+            <span>Generated electronically via Moremela Property Hub • Legally binding statement</span>
             <span>Page 1 of 1</span>
           </div>
             </>

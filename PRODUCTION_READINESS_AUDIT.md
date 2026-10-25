@@ -23,7 +23,7 @@
 
 ### 1.2 Core Executive Assessment
 
-The **SA Property Portfolio Hub** is an exceptionally well-engineered application from a functional perspective. It delivers deep, domain-accurate South African real estate underwriting: SARS Section 11(a) and 13*sex* tax provisions, municipal utility reconciliation with dispute letter compilation, multi-lease tenancy tracking, and multi-unit flip syndication calculators. Its hybrid local-first architecture (combining Zustand `localStorage` persistence with opt-in Supabase cloud sync) offers zero-friction onboarding for property investors.
+The **Moremela Property Hub** is an exceptionally well-engineered application from a functional perspective. It delivers deep, domain-accurate South African real estate underwriting: SARS Section 11(a) and 13*sex* tax provisions, municipal utility reconciliation with dispute letter compilation, multi-lease tenancy tracking, and multi-unit flip syndication calculators. Its hybrid local-first architecture (combining Zustand `localStorage` persistence with opt-in Supabase cloud sync) offers zero-friction onboarding for property investors.
 
 However, **deploying the current codebase to live production users is strictly blocked by 15 critical (P0) vulnerabilities**:
 
@@ -525,7 +525,7 @@ Below are **4 bite-sized, sequential, self-contained implementation prompts** de
    - Do not edit `src/app/layout.tsx`, and do not add `suppressHydrationWarning` to store-driven components.
    - If `TenantStatementViewer` now logs a hydration warning (e.g. `new Date()` default month or locale formatting), fix it locally inside that component only.
    Verify:
-   - With `npm run build && npm run start`, the server HTML for `/statement/lease-1` (e.g. `curl.exe -s http://localhost:3000/statement/lease-1` on Windows PowerShell) contains statement content and NOT "Initializing SA Property Hub...".
+   - With `npm run build && npm run start`, the server HTML for `/statement/lease-1` (e.g. `curl.exe -s http://localhost:3000/statement/lease-1` on Windows PowerShell) contains statement content and NOT "Initializing Moremela Property Hub...".
    - The server HTML for `/rentals` still contains the spinner (gate intact).
    - With a modified `localStorage` portfolio, loading `/`, `/rentals`, `/flips`, `/analyzer` shows zero "Hydration failed" console errors.
    - `npx playwright test e2e/tenant-statement-portal.spec.ts` passes.

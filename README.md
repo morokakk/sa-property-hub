@@ -1,4 +1,4 @@
-# SA Property Investment Hub (ZAR Institutional Suite)
+# Moremela Property Investment Hub
 
 > **The Step-Stone Platform**: Mobile-first real estate underwriting, buy-and-flip project management, multi-let rental operations, and private-lender syndication command center engineered specifically for South African property entrepreneurs, dealmakers, and micro-syndicates.
 
@@ -15,7 +15,7 @@
 
 ## 1. Platform Identity & Value Proposition
 
-The **SA Property Investment Hub** addresses the structural complexities unique to the South African property ecosystem:
+The **Moremela Property Investment Hub** addresses the structural complexities unique to the South African property ecosystem:
 - **Statutory Municipal Realities:** Volatile municipal billing (City of Johannesburg, City of Cape Town, eThekwini, Eskom direct), Section 118 clearance arrears, advance 4–6 month municipal deposits, and municipal dispute resolution procedures.
 - **South African Tax & Legal Frameworks:** Progressive SARS Transfer Duty schedules (2024–2026 tax bands), Legal Practice Council (LPC) recommended conveyancing tariffs, Section 11(a) operating deductions vs. Section 13sex 5% annual commercial residential building allowances, and Section 12(a) VAT exemptions on residential rental supplies.
 - **Operational Archetypes:** Grounded in proven South African execution models:

@@ -371,7 +371,7 @@ export function formatOpportunityForWhatsApp(
   }
 
   text += `━━━━━━━━━━━━━━━━━━━━━\n`;
-  text += `_Confidential Deal Sheet • SA Property Investment Hub_`;
+  text += `_Confidential Deal Sheet • Moremela Property Investment Hub_`;
 
   return text;
 }
@@ -482,7 +482,7 @@ export function formatFlipForWhatsApp(
   }
 
   text += `━━━━━━━━━━━━━━━━━━━━━\n`;
-  text += `_Confidential Syndicate Update • SA Property Investment Hub_`;
+  text += `_Confidential Syndicate Update • Moremela Property Investment Hub_`;
 
   return text;
 }

@@ -2423,7 +2423,7 @@ export default function TenantStatement({
 
         {/* Print Footer Notice */}
           <div className="p-3 text-[10px] text-slate-400 border-t border-slate-200 text-center bg-slate-50/50">
-            Payment is due on or before the 1st of each month. Generated via SA Property Portfolio Hub.
+            Payment is due on or before the 1st of each month. Generated via Moremela Property Hub.
           </div>
         </div>
       </div>

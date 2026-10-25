@@ -243,9 +243,8 @@ export default function Sidebar() {
           </div>
           <div>
             <div className="font-semibold tracking-tight text-white flex items-center gap-1.5 text-sm">
-              SA Property Hub
+              Moremela Property Hub
             </div>
-            <p className="text-[10px] uppercase tracking-widest text-emerald-400/90 font-semibold">ZAR INSTITUTIONAL SUITE</p>
           </div>
         </div>
 
@@ -332,10 +331,7 @@ export default function Sidebar() {
           </div>
           <div>
             <span className="font-semibold tracking-tight text-white text-sm block leading-none">
-              SA Property Hub
-            </span>
-            <span className="text-[10px] text-emerald-400/90 font-semibold uppercase tracking-widest">
-              ZAR INSTITUTIONAL SUITE
+              Moremela Property Hub
             </span>
           </div>
         </Link>
@@ -368,8 +364,7 @@ export default function Sidebar() {
                     <Building2 className="w-4 h-4 text-white" strokeWidth={2} />
                   </div>
                   <div>
-                    <span className="font-semibold tracking-tight text-white text-sm block">SA Property Hub</span>
-                    <span className="text-[10px] text-emerald-400/90 font-semibold uppercase tracking-widest">ZAR INSTITUTIONAL SUITE</span>
+                    <span className="font-semibold tracking-tight text-white text-sm block">Moremela Property Hub</span>
                   </div>
                 </div>
 

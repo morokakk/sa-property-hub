@@ -6,7 +6,7 @@ test.describe('Municipal Bill Dispute Letter & Meter Registry Flow', () => {
     await page.goto('/rentals', { waitUntil: 'domcontentloaded' });
 
     // Wait for client hydration to complete
-    await page.locator('text=Initializing SA Property Hub...').waitFor({ state: 'detached', timeout: 30_000 });
+    await page.locator('text=Initializing Moremela Property Hub...').waitFor({ state: 'detached', timeout: 30_000 });
 
     // Open Meter Readings for the 2nd rental property (Umhlanga Ridge Coastal Vista, which has active dispute in demo data)
     const logMeterButtons = page.locator('button:has-text("Log Meter")');
