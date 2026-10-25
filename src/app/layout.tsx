@@ -7,6 +7,14 @@ export const metadata: Metadata = {
   title: 'Moremela Property Investment Hub | Real Estate Portfolio Dashboard',
   description:
     'Unified South African real estate investment dashboard for flips, rentals, capital sourcing, and deal flow with ZAR formatting and SARS tax calculations.',
+  icons: {
+    icon: [
+      { url: '/moremela-icon.svg?v=3', type: 'image/svg+xml' },
+      { url: '/favicon.ico?v=3', sizes: '32x32' },
+    ],
+    shortcut: '/moremela-icon.svg?v=3',
+    apple: '/apple-icon.png?v=3',
+  },
 };
 
 export default function RootLayout({

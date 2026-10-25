@@ -237,11 +237,13 @@ export default function Sidebar() {
       {/* ========================================================================= */}
       <aside className="no-print hidden md:flex w-64 bg-slate-900 text-slate-100 flex-col shrink-0 min-h-screen border-r border-slate-800">
         {/* Brand Header */}
-        <div className="p-5 border-b border-slate-800 flex items-center gap-3">
-          <div className="w-8 h-8 rounded-md bg-emerald-600 border border-emerald-400/30 flex items-center justify-center text-white shrink-0 shadow-xs">
-            <Building2 className="w-4 h-4 text-white" strokeWidth={2} />
-          </div>
-          <div>
+        <div className="p-4 border-b border-slate-800 flex items-center gap-3">
+          <img
+            src="/moremela-logo.svg"
+            alt="Moremela Properties Logo"
+            className="w-14 h-14 rounded-lg object-contain shrink-0 shadow-xs"
+          />
+          <div className="min-w-0">
             <div className="font-semibold tracking-tight text-white flex items-center gap-1.5 text-sm">
               Moremela Property Hub
             </div>
@@ -326,9 +328,11 @@ export default function Sidebar() {
       {/* ========================================================================= */}
       <header className="no-print md:hidden bg-slate-900 text-white px-4 py-3 border-b border-slate-800 flex items-center justify-between sticky top-0 z-40 shadow-xs">
         <Link href="/" className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-md bg-emerald-600 border border-emerald-400/30 flex items-center justify-center text-white shrink-0 shadow-xs">
-            <Building2 className="w-4 h-4 text-white" strokeWidth={2} />
-          </div>
+          <img
+            src="/moremela-logo.svg"
+            alt="Moremela Properties Logo"
+            className="w-8 h-8 rounded-md object-contain shrink-0 shadow-xs"
+          />
           <div>
             <span className="font-semibold tracking-tight text-white text-sm block leading-none">
               Moremela Property Hub
@@ -359,11 +363,13 @@ export default function Sidebar() {
             <div className="flex-1 overflow-y-auto">
               {/* Drawer Brand Header */}
               <div className="p-4 border-b border-slate-800 flex items-center justify-between sticky top-0 bg-slate-900/95 backdrop-blur-xs z-10">
-                <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-md bg-emerald-600 border border-emerald-400/30 flex items-center justify-center text-white shrink-0 shadow-xs">
-                    <Building2 className="w-4 h-4 text-white" strokeWidth={2} />
-                  </div>
-                  <div>
+                <div className="flex items-center gap-3">
+                  <img
+                    src="/moremela-logo.svg"
+                    alt="Moremela Properties Logo"
+                    className="w-12 h-12 rounded-lg object-contain shrink-0 shadow-xs"
+                  />
+                  <div className="min-w-0">
                     <span className="font-semibold tracking-tight text-white text-sm block">Moremela Property Hub</span>
                   </div>
                 </div>
