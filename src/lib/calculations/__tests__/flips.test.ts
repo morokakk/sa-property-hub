@@ -282,6 +282,37 @@ describe('Flips Pure Calculations Engine', () => {
       expect(fin.bondCancellationFeeZAR).toBe(0);
       expect(fin.totalExitLegalCostZAR).toBe(0);
     });
+
+    it('zeroes out exit commission, bond cancellation fees, early termination penalties, and SARS flip tax when projectStrategy is build_to_rent and computes per-unit build economics', () => {
+      const buildToRentFlip: FlipProject = {
+        ...sampleFlip,
+        projectStrategy: 'build_to_rent',
+        numberOfUnits: 8,
+        monthlyBondPaymentZAR: 10_000,
+        earlyTerminationNoticeGiven: false,
+      };
+      const fin = calculateFlipFinancials(buildToRentFlip);
+
+      expect(fin.isBuildToRent).toBe(true);
+      expect(fin.exitCommissionPercent).toBe(0);
+      expect(fin.exitCommissionZAR).toBe(0);
+      expect(fin.bondCancellationFeeZAR).toBe(0);
+      expect(fin.earlyPenaltyZAR).toBe(0);
+      expect(fin.totalExitLegalCostZAR).toBe(0);
+      expect(fin.effectiveTaxRatePercent).toBe(0);
+      expect(fin.estimatedTaxProvisionZAR).toBe(0);
+
+      // Total All-In Cost for build_to_rent: 2,330,000 (cost basis) + 90,000 (holding) + 36,000 (municipal) = 2,456,000
+      expect(fin.totalAllInCostZAR).toBe(2_456_000);
+      // Post-Build Equity Created: 3,200,000 - 2,456,000 = 744,000
+      expect(fin.projectedNetProfitZAR).toBe(744_000);
+      expect(fin.netProfitAfterTaxZAR).toBe(744_000);
+
+      // Unit economics across 8 units:
+      expect(fin.numberOfUnits).toBe(8);
+      expect(fin.rehabCostPerUnitZAR).toBe(Math.round(170_000 / 8)); // 21,250
+      expect(fin.allInCostPerUnitZAR).toBe(Math.round(2_456_000 / 8)); // 307,000
+    });
   });
 
   describe('calculateFundingCampaignSummary', () => {

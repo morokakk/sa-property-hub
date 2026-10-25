@@ -14,6 +14,8 @@ export interface FlipToRentalModalProps {
   onConverted: (conversionDetails: {
     marketValuationZAR: number;
     monthlyGrossRentZAR: number;
+    numberOfUnits?: number;
+    loanTermYears?: number;
     tenantName?: string;
   }) => void;
   // Breakdown & controlled props for Phase 4A backward compatibility
@@ -79,6 +81,8 @@ export const FlipToRentalModal: React.FC<FlipToRentalModalProps> = ({
   const [localAgencyName, setLocalAgencyName] = useState<string>('Pam Golding Sandton');
   const [localAgencyCommission, setLocalAgencyCommission] = useState<number>(8.0);
   const [localNotes, setLocalNotes] = useState<string>('');
+  const [localNumberOfUnits, setLocalNumberOfUnits] = useState<number>(1);
+  const [localLoanTermYears, setLocalLoanTermYears] = useState<number>(20);
 
   useEffect(() => {
     if (flip && isOpen && propMarketValue === undefined) {
@@ -91,6 +95,8 @@ export const FlipToRentalModal: React.FC<FlipToRentalModalProps> = ({
       setLocalAgencyName('Pam Golding Sandton');
       setLocalAgencyCommission(8.0);
       setLocalNotes('');
+      setLocalNumberOfUnits(Math.max(1, flip.numberOfUnits || 1));
+      setLocalLoanTermYears((flip.numberOfUnits || 1) > 1 || flip.projectStrategy === 'build_to_rent' ? 15 : 20);
     }
   }, [flip, isOpen, propMarketValue]);
 
@@ -161,6 +167,8 @@ export const FlipToRentalModal: React.FC<FlipToRentalModalProps> = ({
     onConverted({
       marketValuationZAR: marketValue,
       monthlyGrossRentZAR: grossRent,
+      numberOfUnits: Math.max(1, localNumberOfUnits),
+      loanTermYears: localLoanTermYears,
       tenantName: tenantName || undefined,
     });
     onClose();
@@ -264,7 +272,50 @@ export const FlipToRentalModal: React.FC<FlipToRentalModalProps> = ({
                 placeholder="e.g. 24000"
               />
               <span className="text-[10px] text-slate-400 mt-0.5 block">
-                Starting rental rate for incoming lease
+                {localNumberOfUnits > 1
+                  ? `Scaffolds ${localNumberOfUnits} leases at ~${formatZAR(Math.round(grossRent / localNumberOfUnits))}/unit/mo`
+                  : 'Starting rental rate for incoming lease'}
+              </span>
+            </div>
+          </div>
+
+          {/* Multi-Unit Lease Scaffolding & Loan Term */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 bg-slate-50 rounded-xl border border-slate-200">
+            <div>
+              <label className="block font-semibold text-slate-700 mb-1">
+                Units to Scaffold in Leases[]
+              </label>
+              <input
+                type="number"
+                min="1"
+                step="1"
+                value={localNumberOfUnits}
+                onChange={(e) => setLocalNumberOfUnits(Math.max(1, Number(e.target.value) || 1))}
+                className="w-full px-3 py-1.5 border border-slate-300 rounded-lg bg-white font-bold text-indigo-700"
+              />
+              <span className="text-[10px] text-slate-500 mt-0.5 block">
+                {localNumberOfUnits > 1
+                  ? `Auto-creates Unit 1..${localNumberOfUnits} + defaults utility to Prepaid Sub-Meter`
+                  : 'Single-unit lease (Main Unit)'}
+              </span>
+            </div>
+            <div>
+              <label className="block font-semibold text-slate-700 mb-1">
+                Facility Amortization Term
+              </label>
+              <select
+                value={localLoanTermYears}
+                onChange={(e) => setLocalLoanTermYears(Number(e.target.value))}
+                className="w-full px-3 py-1.5 border border-slate-300 rounded-lg bg-white font-semibold text-slate-800"
+              >
+                <option value={5}>5 Years (Micro / Bridge)</option>
+                <option value={10}>10 Years (Commercial Bank)</option>
+                <option value={15}>15 Years (DFI: TUHF / uMaStandi)</option>
+                <option value={20}>20 Years (Retail Home Loan)</option>
+                <option value={30}>30 Years (Extended Retail)</option>
+              </select>
+              <span className="text-[10px] text-slate-500 mt-0.5 block">
+                Used to derive bond balance &amp; long-term payoff curve
               </span>
             </div>
           </div>

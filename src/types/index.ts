@@ -3,9 +3,17 @@ export type DealStrategy = 'Flip' | 'Rental' | 'BRRRR';
 
 export type DealSource = 'iGrow Rentals' | 'High-Street Auction' | 'Distressed Sale / Repo' | 'Private Agent' | 'Direct Owner';
 
-export type FundingType = 'Proposal-backed' | 'Ad-hoc Friends & Family' | 'Private Lender' | 'Equity Partner' | 'Bank Bond';
+export type FundingType =
+  | 'Proposal-backed'
+  | 'Ad-hoc Friends & Family'
+  | 'Private Lender'
+  | 'Equity Partner'
+  | 'Bank Bond'
+  | 'Phased Own-Cash (Brick-by-Brick)'
+  | 'Stokvel / Micro-Syndicate'
+  | 'DFI / Commercial Facility';
 
-export type ReturnTermType = 'Fixed Interest' | 'Monthly Coupon' | 'Equity Profit Split' | 'Bullet Repayment';
+export type ReturnTermType = 'Fixed Interest' | 'Monthly Coupon' | 'Equity Profit Split' | 'Bullet Repayment' | 'Zero Interest';
 
 export type TaskPriority = 'Urgent' | 'High' | 'Medium' | 'Low';
 export type TaskStatus = 'Pending' | 'In Progress' | 'Completed';
@@ -241,7 +249,7 @@ export interface OpportunityDeal {
   primaryFunderContact?: string;
   primaryFunderType?: 'Private Lender' | 'Syndicate JV Partner' | 'Friends & Family' | 'Equity Partner';
   coFundersNotes?: string;
-  promisedReturnType?: 'Fixed Interest' | 'Equity Profit Split' | 'Monthly Coupon' | 'Bullet Repayment';
+  promisedReturnType?: ReturnTermType;
   promisedReturnRatePercent?: number;
   promisedPayoutSchedule?: 'Monthly Interest' | 'Quarterly' | 'At Exit (Maturity)' | 'Bi-Annual';
   securityOffered?: string;
@@ -341,6 +349,7 @@ export interface FlipProject {
   acquisitionCostsZAR: number; // Transfer + legal
   baselineRenovationBudgetZAR: number;
   strategy?: DealStrategy; // Defaults to 'Flip'
+  projectStrategy?: 'flip_for_sale' | 'build_to_rent'; // 'flip_for_sale' (default) vs 'build_to_rent' (hold for multi-let rental)
   source?: DealSource;
   numberOfUnits?: number; // e.g. 1 or multi-unit block
   floorAreaSqm?: number; // Total floor area in square metres (m²)
@@ -373,7 +382,7 @@ export interface FlipProject {
   primaryFunderContact?: string;
   primaryFunderType?: 'Private Lender' | 'Syndicate JV Partner' | 'Friends & Family' | 'Equity Partner';
   coFundersNotes?: string;
-  promisedReturnType?: 'Fixed Interest' | 'Equity Profit Split' | 'Monthly Coupon' | 'Bullet Repayment';
+  promisedReturnType?: ReturnTermType;
   promisedReturnRatePercent?: number;
   promisedPayoutSchedule?: 'Monthly Interest' | 'Quarterly' | 'At Exit (Maturity)' | 'Bi-Annual';
   securityOffered?: string;
@@ -653,6 +662,7 @@ export interface RentalProperty {
   purchaseDate: string;
   outstandingBondBalanceZAR: number;
   bondInterestRatePercent: number; // e.g. 11.5%
+  loanTermYears?: number; // e.g. 20 (Retail), 15 (DFI / uMaStandi / TUHF), 10 (Commercial)
   monthlyBondPaymentZAR: number;
   bondCancellationFeeZAR?: number; // Conveyancer fee to cancel active bond upon disposal (defaults to 5200 if bonded)
   earlyTerminationNoticeGiven?: boolean; // Defaults to true; if false, 90 days bank penalty applies
@@ -890,6 +900,9 @@ export interface FlipToRentalConversionParams {
   flipId: string;
   initialGrossRentZAR: number;
   marketValuationZAR?: number;
+  numberOfUnits?: number;
+  loanTermYears?: number;
+  bondInterestRatePercent?: number;
   tenantName?: string;
   tenantPhone?: string;
   tenantEmail?: string;

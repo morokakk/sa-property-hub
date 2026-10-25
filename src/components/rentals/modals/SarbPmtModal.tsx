@@ -53,7 +53,7 @@ export const SarbPmtModal: React.FC<SarbPmtModalProps> = ({
     if (property && isOpen && propInterestRate === undefined) {
       setLocalInterestRate(property.bondInterestRatePercent || 11.5);
       setLocalLoanBalance(property.outstandingBondBalanceZAR || 0);
-      setLocalLoanYears(20);
+      setLocalLoanYears(property.loanTermYears ?? 20);
 
       const now = new Date();
       const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
@@ -108,6 +108,7 @@ export const SarbPmtModal: React.FC<SarbPmtModalProps> = ({
       monthlyBondPaymentZAR: newPayment,
       outstandingBondBalanceZAR: loanBalance,
       bondInterestRatePercent: interestRate,
+      loanTermYears: loanYears,
       bondPaymentEffectiveDate: effectiveMonth.trim() || undefined,
       bondRevisionNote: revisionNote.trim() || undefined,
     });
@@ -187,7 +188,25 @@ export const SarbPmtModal: React.FC<SarbPmtModalProps> = ({
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block font-semibold text-slate-700 mb-1">Remaining Term (Years)</label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block font-semibold text-slate-700">Remaining Term (Years)</label>
+                <div className="flex items-center gap-1">
+                  {[10, 15, 20, 30].map((yr) => (
+                    <button
+                      key={yr}
+                      type="button"
+                      onClick={() => handleLoanYearsChange(yr)}
+                      className={`text-[9px] px-1.5 py-0.5 rounded font-bold cursor-pointer ${
+                        loanYears === yr
+                          ? 'bg-indigo-600 text-white'
+                          : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                      }`}
+                    >
+                      {yr}y
+                    </button>
+                  ))}
+                </div>
+              </div>
               <input
                 type="number"
                 min="1"

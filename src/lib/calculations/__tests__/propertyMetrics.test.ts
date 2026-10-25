@@ -7,6 +7,8 @@ import {
 } from '../propertyMetrics';
 import { calculateRentalMao } from '../maoSolver';
 import { RentalProperty } from '@/types';
+import { computePortfolioSummary } from '@/lib/store/selectors/portfolioSummarySelector';
+import { usePortfolioStore } from '@/lib/store/usePortfolioStore';
 
 describe('Property Metrics Calculation Engine & Communal Services OpEx', () => {
   const baseRental: RentalProperty = {
@@ -456,6 +458,126 @@ describe('Property Metrics Calculation Engine & Communal Services OpEx', () => {
       });
 
       expect(overriddenMetrics.transferDutyZAR).toBe(75_000);
+    });
+
+    it('computes rehabCostPerUnit and allInCostPerUnit for multi-let developments', () => {
+      const multiLetMetrics = calculateDealMetrics({
+        purchasePrice: 600_000,
+        openMarketValue: 1_400_000,
+        numberOfUnits: 8,
+        estimatedRehabCost: 520_000, // R65,000 per room
+        monthlyRentalEstimate: 22_400, // R2,800 per room
+        monthlyLevies: 0,
+        monthlyRatesTaxes: 1_200,
+        targetExitPrice: 1_400_000,
+        loanToValuePercent: 80,
+        interestRatePercent: 13.25,
+        loanTermYears: 15,
+      });
+
+      expect(multiLetMetrics.rehabCostPerUnit).toBe(65_000);
+      expect(multiLetMetrics.allInCostPerUnit).toBeGreaterThan(140_000);
+    });
+
+    it('scaffolds N unit leases, sets prepaid_submeter utilityType, and applies loanTermYears in convertFlipToRental', () => {
+      usePortfolioStore.setState({
+        flips: [
+          {
+            id: 'flip-btr-8',
+            title: 'Tembisa 8-Room Infill (Flip)',
+            address: '14 Ivory Park Rd',
+            city: 'Midrand & Waterfall',
+            province: 'Gauteng',
+            propertyType: 'Freehold House',
+            projectStrategy: 'build_to_rent',
+            numberOfUnits: 8,
+            floorAreaSqm: 192,
+            purchaseDate: '2026-01-15',
+            purchasePriceZAR: 550_000,
+            acquisitionCostsZAR: 35_000,
+            baselineRenovationBudgetZAR: 520_000,
+            monthlyBondPaymentZAR: 11_500,
+            targetExitPriceZAR: 1_450_000,
+            targetCompletionDate: '2026-08-01',
+            currentPhase: 'Snagging',
+            boq: [],
+            linkedFundingIds: [],
+            status: 'Active',
+          },
+        ],
+        rentals: [],
+      });
+
+      const createdRental = usePortfolioStore.getState().convertFlipToRental({
+        flipId: 'flip-btr-8',
+        initialGrossRentZAR: 22_400,
+        marketValuationZAR: 1_450_000,
+        loanTermYears: 15,
+      });
+
+      expect(createdRental.numberOfUnits).toBe(8);
+      expect(createdRental.floorAreaSqm).toBe(192);
+      expect(createdRental.loanTermYears).toBe(15);
+      expect(createdRental.utilityType).toBe('prepaid_submeter');
+      expect(createdRental.leases).toHaveLength(8);
+      expect(createdRental.leases[0].unitName).toBe('Unit 1');
+      expect(createdRental.leases[7].unitName).toBe('Unit 8');
+      expect(createdRental.leases.reduce((s, l) => s + l.monthlyRentZAR, 0)).toBe(22_400);
+    });
+
+    it('excludes Phased Own-Cash (Brick-by-Brick) from totalPrivateFundingLiability and newlyDrawnCapital', () => {
+      const summary = computePortfolioSummary({
+        rentals: [],
+        flips: [],
+        liquidCapitalReserve: 300_000,
+        funding: [
+          {
+            id: 'fund-brick-1',
+            lenderName: 'Personal Cashflow Build',
+            entityOrContact: 'Self',
+            emailPhone: '',
+            fundingType: 'Phased Own-Cash (Brick-by-Brick)',
+            capitalAmountZAR: 400_000,
+            disbursementDate: '2026-03-01',
+            maturityDate: '2027-03-01',
+            returnTermsType: 'Zero Interest',
+            returnRatePercent: 0,
+            paymentSchedule: 'At Exit (Maturity)',
+            totalRepaidZAR: 0,
+            status: 'Active',
+            tranches: [
+              { id: 't1', name: 'Phase 1', amountZAR: 100_000, isDisbursed: true, linkedMilestonePhase: 'Deposit' },
+              { id: 't2', name: 'Phase 2', amountZAR: 300_000, isDisbursed: false, linkedMilestonePhase: 'First Fix / Wet Works' },
+            ],
+          },
+          {
+            id: 'fund-stokvel-1',
+            lenderName: 'Kasi Builders Stokvel',
+            entityOrContact: 'Syndicate',
+            emailPhone: '',
+            fundingType: 'Stokvel / Micro-Syndicate',
+            capitalAmountZAR: 200_000,
+            disbursementDate: '2026-03-01',
+            maturityDate: '2027-03-01',
+            returnTermsType: 'Fixed Interest',
+            returnRatePercent: 15,
+            paymentSchedule: 'Monthly Interest',
+            linkedDealId: 'flip-btr-8',
+            linkedDealName: 'Tembisa 8-Room Infill',
+            totalRepaidZAR: 0,
+            status: 'Active',
+            tranches: [
+              { id: 'st1', name: 'Phase 1', amountZAR: 80_000, isDisbursed: true, linkedMilestonePhase: 'Deposit' },
+              { id: 'st2', name: 'Phase 2', amountZAR: 120_000, isDisbursed: false, linkedMilestonePhase: 'Finishes' },
+            ],
+          },
+        ],
+      });
+
+      // Only the drawn Stokvel tranche (R80,000) is external debt; Phased Own-Cash (R100,000) is excluded!
+      expect(summary.totalPrivateFundingLiability).toBe(80_000);
+      // Liquid Capital Reserve remains R300,000 (not inflated by Phased Own-Cash)
+      expect(summary.liquidCapitalReserve).toBe(300_000);
     });
   });
 });

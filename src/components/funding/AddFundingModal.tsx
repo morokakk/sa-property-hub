@@ -112,29 +112,70 @@ export default function AddFundingModal({
   const handleReturnTermsChange = (newStructure: ReturnTermType) => {
     setReturnTermsType(newStructure);
 
-    if (newStructure === 'Equity Profit Split') {
+    if (newStructure === 'Zero Interest') {
+      setReturnRatePercent(0);
+    } else if (newStructure === 'Equity Profit Split') {
       setPaymentSchedule('At Exit (Maturity)');
-      if (returnRatePercent === 14 || returnRatePercent === 14.5) {
+      if (returnRatePercent === 14 || returnRatePercent === 14.5 || returnRatePercent === 0) {
         setReturnRatePercent(50);
       }
     } else if (newStructure === 'Bullet Repayment') {
       setPaymentSchedule('At Exit (Maturity)');
-      if (returnRatePercent === 50) {
+      if (returnRatePercent === 50 || returnRatePercent === 0) {
         setReturnRatePercent(14);
       }
     } else if (newStructure === 'Monthly Coupon') {
       setPaymentSchedule('Monthly Interest');
-      if (returnRatePercent === 50) {
+      if (returnRatePercent === 50 || returnRatePercent === 0) {
         setReturnRatePercent(14);
       }
     } else if (newStructure === 'Fixed Interest') {
       if (paymentSchedule === 'At Exit (Maturity)') {
         setPaymentSchedule('Monthly Interest');
       }
-      if (returnRatePercent === 50) {
+      if (returnRatePercent === 50 || returnRatePercent === 0) {
         setReturnRatePercent(14);
       }
     }
+  };
+
+  const applyFourPhaseMilestonePreset = (totalAmount: number) => {
+    const base = Math.max(0, totalAmount || 500000);
+    const t1 = Math.round(base * 0.25);
+    const t2 = Math.round(base * 0.35);
+    const t3 = Math.round(base * 0.30);
+    const t4 = Math.max(0, base - t1 - t2 - t3);
+    setEnableTranches(true);
+    setCustomTranches([
+      {
+        id: `tr-${Date.now()}-1`,
+        name: 'Phase 1: Deposit & Foundation (25%)',
+        amountZAR: t1,
+        isDisbursed: true,
+        linkedMilestonePhase: 'Deposit',
+      },
+      {
+        id: `tr-${Date.now()}-2`,
+        name: 'Phase 2: First Fix & Wet Works (35%)',
+        amountZAR: t2,
+        isDisbursed: false,
+        linkedMilestonePhase: 'First Fix / Wet Works',
+      },
+      {
+        id: `tr-${Date.now()}-3`,
+        name: 'Phase 3: Finishes & Sub-Meters (30%)',
+        amountZAR: t3,
+        isDisbursed: false,
+        linkedMilestonePhase: 'Finishes',
+      },
+      {
+        id: `tr-${Date.now()}-4`,
+        name: 'Phase 4: Snagging & Retention (10%)',
+        amountZAR: t4,
+        isDisbursed: false,
+        linkedMilestonePhase: 'Retention',
+      },
+    ]);
   };
 
   const handleAddFunding = (e: React.FormEvent) => {
@@ -200,7 +241,7 @@ export default function AddFundingModal({
 
   return (
     <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 z-50">
-      <div className="bg-white rounded-t-3xl sm:rounded-xl max-w-xl w-full p-5 sm:p-6 shadow-xl border border-slate-200 max-h-[92vh] sm:max-h-none overflow-y-auto">
+      <div className="bg-white rounded-t-3xl sm:rounded-xl max-w-xl w-full p-5 sm:p-6 shadow-xl border border-slate-200 max-h-[92vh] overflow-y-auto">
         <div className="w-12 h-1.5 bg-slate-300 rounded-full mx-auto mb-3 sm:hidden" />
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
@@ -218,6 +259,82 @@ export default function AddFundingModal({
         </div>
 
         <form onSubmit={handleAddFunding} noValidate className="space-y-4 text-xs">
+          {/* Quick Micro-Developer & Build-to-Rent Facility Templates */}
+          <div className="p-2.5 bg-slate-50 rounded-xl border border-slate-200 space-y-1.5">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-600">
+                Quick Construction &amp; Micro-Developer Templates (4-Phase BOQ Tranches)
+              </span>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-1.5">
+              <button
+                type="button"
+                onClick={() => {
+                  if (!lenderName.trim()) setLenderName('Personal Cashflow Build');
+                  setFundingType('Phased Own-Cash (Brick-by-Brick)');
+                  setReturnTermsType('Zero Interest');
+                  setReturnRatePercent(0);
+                  setPaymentSchedule('At Exit (Maturity)');
+                  applyFourPhaseMilestonePreset(capitalAmountZAR);
+                }}
+                className={`py-1.5 px-2 rounded-lg text-[11px] font-semibold border transition-all text-left cursor-pointer ${
+                  fundingType === 'Phased Own-Cash (Brick-by-Brick)'
+                    ? 'bg-emerald-700 text-white border-emerald-700 shadow-2xs'
+                    : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
+                }`}
+              >
+                <div className="font-bold">🧱 Brick-by-Brick Cash</div>
+                <div className={`text-[9px] ${fundingType === 'Phased Own-Cash (Brick-by-Brick)' ? 'text-emerald-100' : 'text-slate-400'}`}>
+                  0% Interest • R 0 External Debt
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  if (!lenderName.trim()) setLenderName('Property Stokvel Syndicate');
+                  setFundingType('Stokvel / Micro-Syndicate');
+                  setReturnTermsType('Fixed Interest');
+                  setReturnRatePercent(15);
+                  setPaymentSchedule('Monthly Interest');
+                  applyFourPhaseMilestonePreset(capitalAmountZAR);
+                }}
+                className={`py-1.5 px-2 rounded-lg text-[11px] font-semibold border transition-all text-left cursor-pointer ${
+                  fundingType === 'Stokvel / Micro-Syndicate'
+                    ? 'bg-indigo-600 text-white border-indigo-600 shadow-2xs'
+                    : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
+                }`}
+              >
+                <div className="font-bold">🤝 Stokvel / Syndicate</div>
+                <div className={`text-[9px] ${fundingType === 'Stokvel / Micro-Syndicate' ? 'text-indigo-100' : 'text-slate-400'}`}>
+                  Phased Draws • Pooled Return
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  if (!lenderName.trim()) setLenderName('uMaStandi / TUHF Development Facility');
+                  setFundingType('DFI / Commercial Facility');
+                  setReturnTermsType('Fixed Interest');
+                  setReturnRatePercent(13.25);
+                  setPaymentSchedule('Monthly Interest');
+                  applyFourPhaseMilestonePreset(capitalAmountZAR);
+                }}
+                className={`py-1.5 px-2 rounded-lg text-[11px] font-semibold border transition-all text-left cursor-pointer ${
+                  fundingType === 'DFI / Commercial Facility'
+                    ? 'bg-slate-900 text-white border-slate-900 shadow-2xs'
+                    : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
+                }`}
+              >
+                <div className="font-bold">🏗️ DFI (TUHF / uMaStandi)</div>
+                <div className={`text-[9px] ${fundingType === 'DFI / Commercial Facility' ? 'text-slate-300' : 'text-slate-400'}`}>
+                  Prime + 2.5% • 4-Stage Draws
+                </div>
+              </button>
+            </div>
+          </div>
+
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="block font-semibold text-slate-700 mb-1">Lender / Investor Name *</label>
@@ -251,13 +368,24 @@ export default function AddFundingModal({
               <label className="block font-semibold text-slate-700 mb-1">Funding Category</label>
               <select
                 value={fundingType}
-                onChange={(e) => setFundingType(e.target.value as FundingType)}
+                onChange={(e) => {
+                  const nextType = e.target.value as FundingType;
+                  setFundingType(nextType);
+                  if (nextType === 'Phased Own-Cash (Brick-by-Brick)') {
+                    setReturnTermsType('Zero Interest');
+                    setReturnRatePercent(0);
+                  }
+                }}
                 className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white"
               >
                 <option value="Private Lender">Private Lender (Angel / HNW)</option>
                 <option value="Proposal-backed">Proposal-backed (Syndicate / JV)</option>
-                <option value="Ad-hoc Friends & Family">Ad-hoc Friends & Family</option>
+                <option value="Ad-hoc Friends & Family">Ad-hoc Friends &amp; Family</option>
                 <option value="Equity Partner">Equity Partner</option>
+                <option value="Bank Bond">Bank Bond</option>
+                <option value="Phased Own-Cash (Brick-by-Brick)">Phased Own-Cash (Brick-by-Brick)</option>
+                <option value="Stokvel / Micro-Syndicate">Stokvel / Micro-Syndicate</option>
+                <option value="DFI / Commercial Facility">DFI / Commercial Facility (TUHF / uMaStandi)</option>
               </select>
             </div>
             <div>
@@ -298,6 +426,7 @@ export default function AddFundingModal({
                 <option value="Equity Profit Split">Equity Profit Split (% of Net Profit)</option>
                 <option value="Monthly Coupon">Monthly Coupon</option>
                 <option value="Bullet Repayment">Bullet Repayment</option>
+                <option value="Zero Interest">Zero Interest (0% Self-Funded / Interest-Free)</option>
               </select>
             </div>
             <div>

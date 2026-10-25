@@ -201,6 +201,7 @@ export const RentalFormModal: React.FC<RentalFormModalProps> = ({
   const [localAnnualBuildingInsurance, setLocalAnnualBuildingInsurance] = useState(0);
   const [localMonthlyRates, setLocalMonthlyRates] = useState(1100);
   const [localMonthlyBondPayment, setLocalMonthlyBondPayment] = useState(0);
+  const [localLoanTermYears, setLocalLoanTermYears] = useState(20);
   const [localExtraMonthlyPayment, setLocalExtraMonthlyPayment] = useState(0);
   const [localBondPaymentEffectiveDate, setLocalBondPaymentEffectiveDate] = useState('');
   const [localBondRevisionNote, setLocalBondRevisionNote] = useState('');
@@ -241,6 +242,7 @@ export const RentalFormModal: React.FC<RentalFormModalProps> = ({
         setLocalAnnualBuildingInsurance(editingProperty.annualBuildingInsuranceZAR || 0);
         setLocalMonthlyRates(editingProperty.monthlyRatesTaxesZAR);
         setLocalMonthlyBondPayment(editingProperty.monthlyBondPaymentZAR || 0);
+        setLocalLoanTermYears(editingProperty.loanTermYears ?? 20);
         setLocalExtraMonthlyPayment(editingProperty.extraMonthlyPaymentZAR || 0);
         setLocalBondPaymentEffectiveDate(editingProperty.bondPaymentEffectiveDate || '');
         setLocalBondRevisionNote(editingProperty.bondRevisionNote || '');
@@ -290,6 +292,7 @@ export const RentalFormModal: React.FC<RentalFormModalProps> = ({
         setLocalAnnualBuildingInsurance(0);
         setLocalMonthlyRates(1100);
         setLocalMonthlyBondPayment(0);
+        setLocalLoanTermYears(20);
         setLocalExtraMonthlyPayment(0);
         setLocalBondPaymentEffectiveDate('');
         setLocalBondRevisionNote('');
@@ -429,7 +432,8 @@ export const RentalFormModal: React.FC<RentalFormModalProps> = ({
     e.preventDefault();
     if (!title) return;
 
-    const calcBond = bondBalance > 0 ? calculateMonthlyBondRepayment(bondBalance, 11.75, 20) : 0;
+    const effectiveBondRate = editingProperty?.bondInterestRatePercent || 11.75;
+    const calcBond = bondBalance > 0 ? calculateMonthlyBondRepayment(bondBalance, effectiveBondRate, localLoanTermYears || 20) : 0;
     const finalBondPayment = monthlyBondPayment > 0 ? monthlyBondPayment : calcBond;
 
     const computedGrossRent = formLeases
@@ -465,6 +469,7 @@ export const RentalFormModal: React.FC<RentalFormModalProps> = ({
       marketValueZAR: marketValue,
       purchasePriceZAR: purchasePrice,
       outstandingBondBalanceZAR: bondBalance,
+      loanTermYears: localLoanTermYears || 20,
       monthlyBondPaymentZAR: finalBondPayment,
       extraMonthlyPaymentZAR: extraMonthlyPayment > 0 ? extraMonthlyPayment : undefined,
       bondPaymentEffectiveDate: bondPaymentEffectiveDate.trim() || undefined,
@@ -999,7 +1004,7 @@ export const RentalFormModal: React.FC<RentalFormModalProps> = ({
 
               {/* Bank Bond Repayment & Extra Paydown & Effective Month Inputs */}
               <div className="p-3.5 bg-slate-50 rounded-lg border border-slate-200">
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-start">
+                <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 items-start">
                   <div>
                     <label className="block font-semibold text-slate-700 mb-1 text-xs truncate">
                       Bond Debit Order (ZAR/m)
@@ -1018,14 +1023,43 @@ export const RentalFormModal: React.FC<RentalFormModalProps> = ({
                     {bondBalance > 0 && (
                       <button
                         type="button"
-                        onClick={() => setMonthlyBondPayment(calculateMonthlyBondRepayment(bondBalance, 11.75, 20))}
+                        onClick={() =>
+                          setMonthlyBondPayment(
+                            calculateMonthlyBondRepayment(
+                              bondBalance,
+                              editingProperty?.bondInterestRatePercent || 11.75,
+                              localLoanTermYears || 20
+                            )
+                          )
+                        }
                         className="mt-1.5 inline-flex items-center gap-1 text-[10px] text-indigo-700 hover:text-indigo-900 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 px-2 py-0.5 rounded-full font-semibold cursor-pointer transition-colors"
-                        title="Auto-calculate 20-year bond at 11.75%"
+                        title={`Auto-calculate ${localLoanTermYears || 20}-year bond at ${editingProperty?.bondInterestRatePercent || 11.75}%`}
                       >
-                        <span>⚡ Apply SARB Auto-PMT ({formatZAR(calculateMonthlyBondRepayment(bondBalance, 11.75, 20))}/m)</span>
+                        <span>
+                          ⚡ Auto-PMT ({localLoanTermYears}y: {formatZAR(calculateMonthlyBondRepayment(bondBalance, editingProperty?.bondInterestRatePercent || 11.75, localLoanTermYears || 20))}/m)
+                        </span>
                       </button>
                     )}
                     <span className="text-[10px] text-slate-400 block mt-1">Owner-paid direct debit order</span>
+                  </div>
+
+                  <div>
+                    <label className="block font-semibold text-slate-700 mb-1 text-xs truncate">
+                      Loan Term (Years)
+                    </label>
+                    <select
+                      name="loanTermYears"
+                      value={localLoanTermYears}
+                      onChange={(e) => setLocalLoanTermYears(Number(e.target.value))}
+                      className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg bg-white font-semibold text-slate-900 text-xs"
+                    >
+                      <option value={5}>5 Yrs (Micro)</option>
+                      <option value={10}>10 Yrs (Commercial)</option>
+                      <option value={15}>15 Yrs (DFI: TUHF/uMaStandi)</option>
+                      <option value={20}>20 Yrs (Retail Bank)</option>
+                      <option value={30}>30 Yrs (Extended)</option>
+                    </select>
+                    <span className="text-[10px] text-slate-400 block mt-1">Amortization horizon</span>
                   </div>
 
                   <div>

@@ -203,38 +203,79 @@ export const createFlipSlice: StateCreator<
       ? calculateAgencyCommission(initialRent, commPercent, true, params.agencyName).monthlyAgentFeeZAR
       : 0;
     const marketVal = params.marketValuationZAR || flip.targetExitPriceZAR || totalCostBasis;
+    const unitCount = Math.max(1, Math.round(params.numberOfUnits ?? flip.numberOfUnits ?? 1));
+    const loanTermYears = params.loanTermYears ?? 20;
+    const bondRate = params.bondInterestRatePercent ?? 11.75;
+    const leaseStartDate = params.leaseStartDate || new Date().toISOString().split('T')[0];
+    const leaseEndDate =
+      params.leaseEndDate ||
+      new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+    const hasInitialTenant = Boolean(
+      params.tenantName && params.tenantName !== 'Tenant Pending Placement'
+    );
+
+    const leases =
+      unitCount > 1
+        ? Array.from({ length: unitCount }, (_, idx) => {
+            const baseUnitRent = Math.floor(initialRent / unitCount);
+            const remainder = initialRent - baseUnitRent * unitCount;
+            const unitRent = idx === 0 ? baseUnitRent + remainder : baseUnitRent;
+            const isFirstOccupied = idx === 0 && hasInitialTenant;
+            return {
+              id: `lease-${Date.now()}-${idx + 1}`,
+              unitName: `Unit ${idx + 1}`,
+              tenantName: isFirstOccupied ? params.tenantName! : 'Tenant Pending Placement',
+              tenantPhone: isFirstOccupied ? (params.tenantPhone || '+27 —') : '+27 —',
+              tenantEmail: isFirstOccupied ? (params.tenantEmail || 'pending@tenant.co.za') : 'pending@tenant.co.za',
+              leaseStartDate,
+              leaseEndDate,
+              monthlyRentZAR: unitRent,
+              depositHeldZAR: idx === 0 && params.depositHeldZAR !== undefined ? params.depositHeldZAR : unitRent * 2,
+              annualEscalationPercent: 7.0,
+              status: isFirstOccupied ? ('Occupied' as const) : ('Vacant' as const),
+            };
+          })
+        : [
+            {
+              id: `lease-${Date.now()}`,
+              unitName: 'Main Unit',
+              tenantName: params.tenantName || 'Tenant Pending Placement',
+              tenantPhone: params.tenantPhone || '+27 —',
+              tenantEmail: params.tenantEmail || 'pending@tenant.co.za',
+              leaseStartDate,
+              leaseEndDate,
+              monthlyRentZAR: initialRent,
+              depositHeldZAR: params.depositHeldZAR ?? initialRent * 2,
+              annualEscalationPercent: 7.0,
+              status: hasInitialTenant ? ('Occupied' as const) : ('Vacant' as const),
+            },
+          ];
+
+    const isMultiLetOrBuildToRent = unitCount > 1 || flip.projectStrategy === 'build_to_rent';
 
     const newRental: RentalProperty = {
       id: newRentalId,
       title: flip.title.replace(/\s*\(Flip\)$/i, '') + ' (Rental)',
       address: flip.address,
       city: flip.city,
+      province: flip.province,
+      source: flip.source,
+      numberOfUnits: unitCount,
+      floorAreaSqm: flip.floorAreaSqm,
       propertyType: flip.propertyType || 'Freehold House',
       agmDate: flip.agmDate,
       marketValueZAR: marketVal,
       purchasePriceZAR: totalCostBasis,
       purchaseDate: flip.purchaseDate || new Date().toISOString().split('T')[0],
       outstandingBondBalanceZAR: flip.monthlyBondPaymentZAR
-        ? calculateBondPrincipalFromRepayment(flip.monthlyBondPaymentZAR, 11.75, 20)
+        ? calculateBondPrincipalFromRepayment(flip.monthlyBondPaymentZAR, bondRate, loanTermYears)
         : 0,
-      bondInterestRatePercent: 11.75,
+      bondInterestRatePercent: bondRate,
+      loanTermYears,
       monthlyBondPaymentZAR: flip.monthlyBondPaymentZAR || 0,
       bondPaymentEffectiveDate: flip.bondPaymentEffectiveDate,
-      leases: [{
-        id: `lease-${Date.now()}`,
-        unitName: 'Main Unit',
-        tenantName: params.tenantName || 'Tenant Pending Placement',
-        tenantPhone: params.tenantPhone || '+27 —',
-        tenantEmail: params.tenantEmail || 'pending@tenant.co.za',
-        leaseStartDate: params.leaseStartDate || new Date().toISOString().split('T')[0],
-        leaseEndDate:
-          params.leaseEndDate ||
-          new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-        monthlyRentZAR: initialRent,
-        depositHeldZAR: params.depositHeldZAR ?? initialRent * 2,
-        annualEscalationPercent: 7.0,
-        status: params.tenantName && params.tenantName !== 'Tenant Pending Placement' ? 'Occupied' : 'Vacant',
-      }],
+      leases,
+      utilityType: isMultiLetOrBuildToRent ? 'prepaid_submeter' : undefined,
       managementType: params.managementType || 'Agency',
       agencyName: params.agencyName || 'Pam Golding Rentals',
       agencyCommissionPercent: commPercent,
@@ -245,7 +286,11 @@ export const createFlipSlice: StateCreator<
       monthlyAgentFeeZAR: agentFee,
       monthlyMaintenanceReserveZAR: 500,
       maintenanceHistory: [],
-      status: params.tenantName && params.tenantName !== 'Tenant Pending Placement' ? 'Occupied' : 'Vacant',
+      status: hasInitialTenant
+        ? unitCount > 1
+          ? 'Partially Vacant'
+          : 'Occupied'
+        : 'Vacant',
       cocChecklist: flip.cocChecklist ? { ...flip.cocChecklist } : undefined,
       driveVault: flip.driveVault ? { ...flip.driveVault } : undefined,
       convertedFromFlipId: flip.id,

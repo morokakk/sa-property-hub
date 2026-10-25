@@ -169,6 +169,10 @@ export const createOpportunitySlice: StateCreator<
       acquisitionCostsZAR: totalAcquisitionCosts,
       baselineRenovationBudgetZAR: opp.estimatedRehabCost || 250_000,
       strategy: opp.strategy || 'Flip',
+      projectStrategy:
+        opp.strategy === 'Rental' || opp.strategy === 'BRRRR' || (opp.numberOfUnits && opp.numberOfUnits > 1)
+          ? 'build_to_rent'
+          : 'flip_for_sale',
       source: opp.source,
       numberOfUnits: opp.numberOfUnits,
       floorAreaSqm: opp.floorAreaSqm,
@@ -386,6 +390,7 @@ export const createOpportunitySlice: StateCreator<
       purchaseDate: new Date().toISOString().split('T')[0],
       outstandingBondBalanceZAR: bondAmount,
       bondInterestRatePercent: opp.interestRatePercent || 11.75,
+      loanTermYears: opp.loanTermYears || 20,
       monthlyBondPaymentZAR: opp.costs
         ? calculateMonthlyBondRepayment(
             bondAmount,

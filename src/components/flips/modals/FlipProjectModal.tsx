@@ -195,6 +195,8 @@ export const FlipProjectModal: React.FC<FlipProjectModalProps> = ({
   const [localExtractedValuation, setLocalExtractedValuation] = useState<number | null>(null);
   const [localIsParsingPdf, setLocalIsParsingPdf] = useState(false);
   const [cachedUploadFiles, setCachedUploadFiles] = useState<File[]>([]);
+  const [localProjectStrategy, setLocalProjectStrategy] = useState<'flip_for_sale' | 'build_to_rent'>('flip_for_sale');
+  const [localNumberOfUnits, setLocalNumberOfUnits] = useState<number>(1);
 
   useEffect(() => {
     if (editingFlip && isOpen && propFlipTitle === undefined) {
@@ -228,6 +230,8 @@ export const FlipProjectModal: React.FC<FlipProjectModalProps> = ({
       setLocalDisputeNotes(editingFlip.municipalClearance?.disputeNotes || '');
       setLocalPropertyType(editingFlip.propertyType || 'Freehold House');
       setLocalAgmDate(editingFlip.agmDate || '');
+      setLocalProjectStrategy(editingFlip.projectStrategy || 'flip_for_sale');
+      setLocalNumberOfUnits(editingFlip.numberOfUnits || 1);
       setLocalMasterFolderUrl(editingFlip.driveVault?.masterFolderUrl || '');
       setLocalOtpUrl(editingFlip.driveVault?.otpDocumentUrl || '');
       setLocalRatesBillUrl(editingFlip.driveVault?.ratesBillUrl || '');
@@ -258,6 +262,8 @@ export const FlipProjectModal: React.FC<FlipProjectModalProps> = ({
       setLocalDisputeNotes('');
       setLocalPropertyType('Freehold House');
       setLocalAgmDate('');
+      setLocalProjectStrategy('flip_for_sale');
+      setLocalNumberOfUnits(1);
       setLocalMasterFolderUrl('');
       setLocalOtpUrl('');
       setLocalRatesBillUrl('');
@@ -485,6 +491,8 @@ export const FlipProjectModal: React.FC<FlipProjectModalProps> = ({
       province: flipProvince,
       cocChecklist: editingFlip?.cocChecklist || getNodeComplianceProfile(flipCity, flipProvince).defaultCertificates,
       propertyType: flipPropertyType,
+      projectStrategy: localProjectStrategy,
+      numberOfUnits: Math.max(1, Number(localNumberOfUnits) || 1),
       agmDate: isScheme && flipAgmDate ? flipAgmDate : undefined,
       purchasePriceZAR: Number(flipPurchasePrice),
       acquisitionCostsZAR: Number(flipAcquisitionCosts),
@@ -518,6 +526,8 @@ export const FlipProjectModal: React.FC<FlipProjectModalProps> = ({
           province: flipProvince,
           cocChecklist: getNodeComplianceProfile(flipCity, flipProvince).defaultCertificates,
           propertyType: flipPropertyType,
+          projectStrategy: localProjectStrategy,
+          numberOfUnits: Math.max(1, Number(localNumberOfUnits) || 1),
           agmDate: isScheme && flipAgmDate ? flipAgmDate : undefined,
           purchaseDate: new Date().toISOString().split('T')[0],
           purchasePriceZAR: Number(flipPurchasePrice),
@@ -638,18 +648,71 @@ export const FlipProjectModal: React.FC<FlipProjectModalProps> = ({
         )}
 
         <form onSubmit={handleSubmit} noValidate className="space-y-4 text-xs">
-          <div>
-            <label className="block font-semibold text-slate-700 mb-1">Project Name *</label>
-            <input
-              type="text"
-              name="projectName"
-              autoComplete="off"
-              required
-              placeholder="e.g. Camps Bay Sunset Redesign"
-              value={flipTitle}
-              onChange={(e) => setFlipTitle(e.target.value)}
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg font-bold text-slate-900"
-            />
+          {/* Project Strategy Toggle (Flip for Sale vs Build-to-Rent Multi-Let) */}
+          <div className="p-2.5 bg-slate-50 rounded-lg border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+            <div>
+              <span className="block font-bold text-slate-800 text-[11px] uppercase tracking-wider">
+                Project Strategy
+              </span>
+              <span className="text-[10px] text-slate-500">
+                {localProjectStrategy === 'build_to_rent'
+                  ? 'R 0 sale commission & R 0 flip tax • Evaluates Post-Build Equity & Cost/Unit'
+                  : 'Standard resale flip • Includes agent commission & SARS flip tax reserve'}
+              </span>
+            </div>
+            <div className="inline-flex rounded-lg border border-slate-300 bg-white p-0.5 shrink-0">
+              <button
+                type="button"
+                onClick={() => setLocalProjectStrategy('flip_for_sale')}
+                className={`px-2.5 py-1 rounded-md text-[11px] font-semibold transition-all cursor-pointer ${
+                  localProjectStrategy === 'flip_for_sale'
+                    ? 'bg-slate-900 text-white shadow-2xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                🔨 Flip for Sale
+              </button>
+              <button
+                type="button"
+                onClick={() => setLocalProjectStrategy('build_to_rent')}
+                className={`px-2.5 py-1 rounded-md text-[11px] font-semibold transition-all cursor-pointer ${
+                  localProjectStrategy === 'build_to_rent'
+                    ? 'bg-indigo-600 text-white shadow-2xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                🏘️ Build-to-Rent
+              </button>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="sm:col-span-2">
+              <label className="block font-semibold text-slate-700 mb-1">Project Name *</label>
+              <input
+                type="text"
+                name="projectName"
+                autoComplete="off"
+                required
+                placeholder="e.g. Tembisa 8-Unit Multi-Let Build"
+                value={flipTitle}
+                onChange={(e) => setFlipTitle(e.target.value)}
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg font-bold text-slate-900"
+              />
+            </div>
+            <div>
+              <label className="block font-semibold text-slate-700 mb-1">Units / Rooms</label>
+              <input
+                type="number"
+                name="numberOfUnits"
+                min="1"
+                step="1"
+                value={localNumberOfUnits}
+                onChange={(e) => setLocalNumberOfUnits(Math.max(1, Number(e.target.value) || 1))}
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg font-bold text-indigo-700"
+                title="Number of residential units or rooms (scaffolds leases on rental graduation)"
+              />
+            </div>
           </div>
 
           <div className="grid grid-cols-2 gap-3">

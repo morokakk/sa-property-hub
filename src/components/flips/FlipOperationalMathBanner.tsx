@@ -38,6 +38,7 @@ export function FlipOperationalMathBanner({
     totalRetailBOQZAR: totalRetailBOQ,
     totalActualCashBOQZAR: totalActualCashBOQ,
     totalSponsorSavingsZAR: totalSponsorSavings,
+    isBuildToRent,
   } = financials;
 
   const preTaxProfit = projectedNetProfit;
@@ -169,12 +170,14 @@ export function FlipOperationalMathBanner({
             </>
           ) : (
             <div>
-              <span className="text-slate-500 font-medium mr-1.5 text-xs">= Pre-Tax Net Profit:</span>
+              <span className="text-slate-500 font-medium mr-1.5 text-xs">
+                {isBuildToRent ? '= Post-Build Equity Created (ARV − All-In Cost):' : '= Pre-Tax Net Profit:'}
+              </span>
               <strong className="text-emerald-700 font-black text-sm">
                 {formatZAR(projectedNetProfit)}
               </strong>
               <span className="ml-1 text-[10px] font-bold text-emerald-800 bg-emerald-100 px-1.5 py-0.2 rounded">
-                {formatPercent(projectedROI)} Pre-Tax
+                {isBuildToRent ? `${formatPercent(projectedROI)} Equity Gain (0% Sale Tax)` : `${formatPercent(projectedROI)} Pre-Tax`}
               </span>
             </div>
           )}

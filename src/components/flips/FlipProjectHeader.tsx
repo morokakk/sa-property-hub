@@ -64,6 +64,22 @@ export function FlipProjectHeader({
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2 flex-wrap mb-1.5">
           <PropertyTypeBadge type={flip.propertyType} />
+          {flip.projectStrategy === 'build_to_rent' && (
+            <span
+              className="inline-flex items-center gap-1 text-[10px] font-bold bg-indigo-100 text-indigo-800 border border-indigo-300 px-2 py-0.5 rounded-full"
+              title="Build-to-Rent / Multi-Let Hold: R 0 sale commission & R 0 flip tax reserve during construction"
+            >
+              🏘️ Build-to-Rent{flip.numberOfUnits && flip.numberOfUnits > 1 ? ` • ${flip.numberOfUnits} Units` : ''}
+            </span>
+          )}
+          {flip.projectStrategy !== 'build_to_rent' && flip.numberOfUnits && flip.numberOfUnits > 1 && (
+            <span
+              className="inline-flex items-center gap-1 text-[10px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200 px-2 py-0.5 rounded-full"
+              title={`Multi-Unit Project (${flip.numberOfUnits} Units)`}
+            >
+              🏢 {flip.numberOfUnits} Units
+            </span>
+          )}
           {(() => {
             const sqm = flip.floorAreaSqm || (flip.notes ? Number(flip.notes.match(/(\d+)\s*m²/)?.[1]) : undefined);
             if (!sqm || sqm <= 0) return null;

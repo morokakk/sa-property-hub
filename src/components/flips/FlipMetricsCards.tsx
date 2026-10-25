@@ -29,7 +29,12 @@ export function FlipMetricsCards({
     effectiveTaxRatePercent: effectiveTaxRate,
     netProfitAfterTaxZAR: netProfitAfterTax,
     afterTaxRoiPercent: afterTaxROI,
+    numberOfUnits,
+    rehabCostPerUnitZAR,
+    allInCostPerUnitZAR,
+    isBuildToRent,
   } = financials;
+  const isMultiUnit = (numberOfUnits || 1) > 1;
 
   // Calculate BOQ Baseline vs Master Budget Contingency
   const boqBaselineTotal = (flip.boq || []).reduce((acc, item) => acc + (item.baselineTotalZAR || 0), 0);
@@ -47,12 +52,18 @@ export function FlipMetricsCards({
         </div>
         <div
           className="text-[11px] text-slate-500 mt-1 leading-tight"
-          title={`Purchase Price: ${formatZAR(flip.purchasePriceZAR)} • Conveyancing & Duty: ${formatZAR(flip.acquisitionCostsZAR)}${totalMunicipalClearanceOutlay > 0 ? ` • Sec 118 RCC Outlay: ${formatZAR(totalMunicipalClearanceOutlay)}` : ''}`}
+          title={`Purchase Price: ${formatZAR(flip.purchasePriceZAR)} • Conveyancing & Duty: ${formatZAR(flip.acquisitionCostsZAR)}${totalMunicipalClearanceOutlay > 0 ? ` • Sec 118 RCC Outlay: ${formatZAR(totalMunicipalClearanceOutlay)}` : ''}${isMultiUnit ? ` • All-In Cost / Unit: ${formatZAR(allInCostPerUnitZAR)}` : ''}`}
         >
           <div>Acq &amp; Legal: {formatZAR(flip.purchasePriceZAR + flip.acquisitionCostsZAR, { compact: true })}</div>
-          <div className="text-[10px] text-slate-400">
-            {totalMunicipalClearanceOutlay > 0 ? `Sec 118: ${formatZAR(totalMunicipalClearanceOutlay, { compact: true })}` : 'Rates Clearance: R 0'}
-          </div>
+          {isMultiUnit ? (
+            <div className="text-[10px] font-bold text-indigo-700">
+              All-In: {formatZAR(allInCostPerUnitZAR, { compact: true })} / unit ({numberOfUnits}u)
+            </div>
+          ) : (
+            <div className="text-[10px] text-slate-400">
+              {totalMunicipalClearanceOutlay > 0 ? `Sec 118: ${formatZAR(totalMunicipalClearanceOutlay, { compact: true })}` : 'Rates Clearance: R 0'}
+            </div>
+          )}
         </div>
       </div>
 
@@ -66,10 +77,16 @@ export function FlipMetricsCards({
         </div>
         <div
           className="text-[11px] text-slate-500 mt-1 leading-tight"
-          title={`Master Budget: ${formatZAR(flip.baselineRenovationBudgetZAR)} (${formatZAR(boqBaselineTotal)} allocated BOQ baseline + ${formatZAR(contingencyBufferZAR)} unallocated contingency buffer)`}
+          title={`Master Budget: ${formatZAR(flip.baselineRenovationBudgetZAR)} (${formatZAR(boqBaselineTotal)} allocated BOQ baseline + ${formatZAR(contingencyBufferZAR)} unallocated contingency buffer)${isMultiUnit ? ` • Build Cost / Unit: ${formatZAR(rehabCostPerUnitZAR)}` : ''}`}
         >
           <div>BOQ Baseline: {formatZAR(boqBaselineTotal, { compact: true })}</div>
-          <div className="text-[10px] text-emerald-600 font-medium">Contingency: {formatZAR(contingencyBufferZAR, { compact: true })} Buffer</div>
+          {isMultiUnit ? (
+            <div className="text-[10px] text-indigo-600 font-bold">
+              Build: {formatZAR(rehabCostPerUnitZAR, { compact: true })} / unit
+            </div>
+          ) : (
+            <div className="text-[10px] text-emerald-600 font-medium">Contingency: {formatZAR(contingencyBufferZAR, { compact: true })} Buffer</div>
+          )}
         </div>
       </div>
 
@@ -165,21 +182,30 @@ export function FlipMetricsCards({
         </div>
       </div>
 
-      {/* 6. Projected Net Upside */}
+      {/* 6. Projected Net Upside / Post-Build Equity Created */}
       <div className="bg-slate-900 text-white p-3.5 rounded-xl border border-slate-800 shadow-xs flex flex-col justify-between min-h-[112px]">
         <div>
-          <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Projected Net Upside</span>
+          <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
+            {isBuildToRent ? 'Post-Build Equity Created' : 'Projected Net Upside'}
+          </span>
           <div className="text-xl font-bold text-emerald-400 tabular-nums tracking-tight mt-0.5">
             {effectiveTaxRate > 0 ? formatZAR(netProfitAfterTax) : formatZAR(projectedNetProfit)}
           </div>
         </div>
-        <div className="text-[11px] text-slate-300 mt-1 font-semibold leading-tight flex items-center justify-between">
+        <div className="text-[11px] text-slate-300 mt-1 font-semibold leading-tight flex items-center justify-between gap-1">
           <span>
-            {effectiveTaxRate > 0 ? formatPercent(afterTaxROI) : formatPercent(projectedROI)}{' '}
-            {effectiveTaxRate > 0 ? 'After-Tax ROI' : 'Net ROI'}
+            {isBuildToRent
+              ? `${formatPercent(projectedROI)} Equity Gain`
+              : `${effectiveTaxRate > 0 ? formatPercent(afterTaxROI) : formatPercent(projectedROI)} ${
+                  effectiveTaxRate > 0 ? 'After-Tax ROI' : 'Net ROI'
+                }`}
           </span>
           <span className="text-[10px] text-emerald-400 font-medium bg-slate-800 border border-slate-700 px-1.5 py-0.5 rounded tabular-nums">
-            {effectiveTaxRate > 0 ? `${effectiveTaxRate}% Tax` : 'Pre-Tax'}
+            {isBuildToRent
+              ? 'Hold for Rent (0% Tax)'
+              : effectiveTaxRate > 0
+                ? `${effectiveTaxRate}% Tax`
+                : 'Pre-Tax'}
           </span>
         </div>
       </div>

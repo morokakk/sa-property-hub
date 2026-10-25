@@ -22,6 +22,8 @@ export interface AnalyzerResultsGridProps {
   valuationPerSqm?: number;
   numberOfUnits?: number;
   averagePricePerUnit?: number;
+  rehabCostPerUnit?: number;
+  allInCostPerUnit?: number;
   projectedFlipNetProfit: number;
   projectedFlipRoi: number;
   annualizedFlipRoi?: number;
@@ -55,6 +57,8 @@ export function AnalyzerResultsGrid({
   valuationPerSqm = 0,
   numberOfUnits = 1,
   averagePricePerUnit = 0,
+  rehabCostPerUnit = 0,
+  allInCostPerUnit = 0,
   projectedFlipNetProfit,
   projectedFlipRoi,
   annualizedFlipRoi = 0,
@@ -110,9 +114,19 @@ export function AnalyzerResultsGrid({
           <div className="text-sm sm:text-base font-bold text-white font-mono">
             {formatZAR(totalAcquisitionCost)}
           </div>
-          <span className="text-[10px] text-slate-400 block">
-            Purchase + Duty + Legal + Capex
-          </span>
+          <div className="space-y-0.5">
+            <span className="text-[10px] text-slate-400 block">
+              Purchase + Duty + Legal + Capex
+            </span>
+            {numberOfUnits > 1 && allInCostPerUnit > 0 && (
+              <span
+                className="text-[9px] text-indigo-300 font-mono block truncate"
+                title={`All-In Cost per Unit: ${formatZAR(allInCostPerUnit)} (${numberOfUnits} units)${rehabCostPerUnit > 0 ? ` • Rehab/Build per Unit: ${formatZAR(rehabCostPerUnit)}` : ''}`}
+              >
+                All-In {formatZAR(allInCostPerUnit)}/u{rehabCostPerUnit > 0 ? ` • Build ${formatZAR(rehabCostPerUnit)}/u` : ''}
+              </span>
+            )}
+          </div>
         </div>
 
         {/* Metric 3: Gross Rental Yield (Universal) */}

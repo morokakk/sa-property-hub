@@ -69,6 +69,7 @@ export function computePortfolioSummary(state: PortfolioSummaryInput): Portfolio
         f.id !== 'fund-standby-1' &&
         f.status !== 'Standby' &&
         f.status !== 'Settled' &&
+        f.fundingType !== 'Phased Own-Cash (Brick-by-Brick)' &&
         (!f.linkedDealId ||
           f.linkedDealName === 'General Portfolio Liquidity' ||
           f.linkedDealName === 'General Operational Reserve' ||
@@ -96,6 +97,7 @@ export function computePortfolioSummary(state: PortfolioSummaryInput): Portfolio
           f.linkedDealName === 'General Portfolio Liquidity' ||
           f.linkedDealName === 'General Operational Reserve' ||
           f.linkedDealName === 'Liquid Operational Reserve') &&
+        f.fundingType !== 'Phased Own-Cash (Brick-by-Brick)' &&
         (f.status === 'Active' || f.status === 'Accruing' || f.status === 'Standby')
     )
     .reduce((sum, f) => {
@@ -110,9 +112,9 @@ export function computePortfolioSummary(state: PortfolioSummaryInput): Portfolio
       return sum;
     }, 0);
 
-  // Private funding liability calculated strictly from drawn capital minus repayments (undrawn tranches, standby lines, and settled facilities carry R 0 debt)
+  // Private funding liability calculated strictly from drawn capital minus repayments (undrawn tranches, standby lines, settled facilities, and Phased Own-Cash carry R 0 external debt)
   const totalPrivateFundingLiability = funding
-    .filter((f) => f && f.status !== 'Settled')
+    .filter((f) => f && f.status !== 'Settled' && f.fundingType !== 'Phased Own-Cash (Brick-by-Brick)')
     .reduce((sum, f) => {
       let drawn = 0;
       if (f.status === 'Standby') {

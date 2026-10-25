@@ -2328,6 +2328,64 @@ export default function OpportunityAnalyzerPage() {
 
               {/* Column 3: Interest Rate & Loan Term & Monthly Bond Repayment */}
               <div className="lg:col-span-3 bg-slate-50/70 p-3.5 rounded-xl border border-slate-200 flex flex-col justify-between space-y-2">
+                {/* Facility Archetype Presets (Retail 20y vs DFI / uMaStandi 15y vs Commercial 10y) */}
+                <div>
+                  <span className="block text-[9px] font-bold uppercase tracking-wider text-slate-500 mb-1">
+                    Facility Preset
+                  </span>
+                  <div className="grid grid-cols-3 gap-1">
+                    {[
+                      {
+                        label: 'Retail 20y',
+                        title: 'Retail Home Loan: 20-Yr Term, 90% LTV (10% Dep), Prime + 0%',
+                        term: 20,
+                        ltv: 90,
+                        margin: 0,
+                      },
+                      {
+                        label: 'DFI 15y',
+                        title: 'DFI / uMaStandi / TUHF Multi-Let Facility: 15-Yr Term, 80% LTV (20% Dep), Prime + 2.5%',
+                        term: 15,
+                        ltv: 80,
+                        margin: 2.5,
+                      },
+                      {
+                        label: 'Comm 10y',
+                        title: 'Commercial Bank Facility: 10-Yr Term, 75% LTV (25% Dep), Prime + 2.0%',
+                        term: 10,
+                        ltv: 75,
+                        margin: 2.0,
+                      },
+                    ].map((fp) => {
+                      const isActive = loanTermYears === fp.term && loanToValue === fp.ltv;
+                      return (
+                        <button
+                          key={fp.label}
+                          type="button"
+                          title={fp.title}
+                          onClick={() => {
+                            const prime = investorProfile?.defaultPrimeRatePercent ?? 10.75;
+                            const nextRate = Number((prime + fp.margin).toFixed(2));
+                            handleLTVChange(fp.ltv);
+                            setLoanTermYears(fp.term);
+                            handleBondTermChange(fp.term);
+                            setInterestRateMargin(fp.margin);
+                            setInterestRate(nextRate);
+                            updateAnalyzerDraft({ interestRateMargin: fp.margin });
+                          }}
+                          className={`text-[10px] py-1 px-1 rounded-md font-bold border transition-all cursor-pointer ${
+                            isActive
+                              ? 'bg-indigo-600 text-white border-indigo-600 shadow-2xs'
+                              : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-100'
+                          }`}
+                        >
+                          {fp.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
                 <div className="grid grid-cols-2 gap-2">
                   <div>
                     <label className="block text-[10px] font-semibold text-slate-600 mb-1">Interest Rate</label>
@@ -2381,7 +2439,7 @@ export default function OpportunityAnalyzerPage() {
                   <input
                     type="range"
                     min="-2"
-                    max="2"
+                    max="4"
                     step="0.25"
                     value={interestRateMargin}
                     onChange={(e) => {
@@ -2396,7 +2454,7 @@ export default function OpportunityAnalyzerPage() {
                   <div className="flex justify-between text-[9px] text-slate-400 font-mono mt-0.5">
                     <span>-200 bps</span>
                     <span>Prime ({(investorProfile?.defaultPrimeRatePercent ?? 10.75).toFixed(2)}%)</span>
-                    <span>+200 bps</span>
+                    <span>+400 bps (DFI)</span>
                   </div>
                 </div>
 
@@ -2538,28 +2596,20 @@ export default function OpportunityAnalyzerPage() {
                         Projection Horizon
                       </label>
                       <div className="flex items-center gap-1">
-                        <button
-                          type="button"
-                          onClick={() => handleBondTermChange(20)}
-                          className={`text-[10px] px-1.5 py-0.5 rounded font-bold transition-colors ${
-                            bondTermYears === 20
-                              ? 'bg-emerald-600 text-white'
-                              : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                          }`}
-                        >
-                          20y
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleBondTermChange(30)}
-                          className={`text-[10px] px-1.5 py-0.5 rounded font-bold transition-colors ${
-                            bondTermYears === 30
-                              ? 'bg-emerald-600 text-white'
-                              : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                          }`}
-                        >
-                          30y
-                        </button>
+                        {[10, 15, 20, 30].map((yr) => (
+                          <button
+                            key={yr}
+                            type="button"
+                            onClick={() => handleBondTermChange(yr)}
+                            className={`text-[10px] px-1.5 py-0.5 rounded font-bold transition-colors ${
+                              bondTermYears === yr
+                                ? 'bg-emerald-600 text-white'
+                                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                            }`}
+                          >
+                            {yr}y
+                          </button>
+                        ))}
                       </div>
                     </div>
                     <div className="flex items-center">
@@ -3560,6 +3610,16 @@ export default function OpportunityAnalyzerPage() {
                     className="w-full text-xs pl-7 pr-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-emerald-500 font-semibold text-slate-900 bg-white"
                   />
                 </div>
+                {numberOfUnits > 1 && (
+                  <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[10px] font-semibold text-indigo-700">
+                    <span className="bg-indigo-50 border border-indigo-200 px-1.5 py-0.5 rounded tabular-nums">
+                      Build / Unit: {formatZAR(calculatedMetrics.rehabCostPerUnit)}
+                    </span>
+                    <span className="bg-slate-100 border border-slate-200 text-slate-700 px-1.5 py-0.5 rounded tabular-nums">
+                      All-In / Unit: {formatZAR(calculatedMetrics.allInCostPerUnit)}
+                    </span>
+                  </div>
+                )}
               </div>
 
               <div>
@@ -3581,6 +3641,13 @@ export default function OpportunityAnalyzerPage() {
                     className="w-full text-xs pl-7 pr-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-emerald-500 font-semibold text-slate-900 bg-white"
                   />
                 </div>
+                {numberOfUnits > 1 && monthlyRent > 0 && (
+                  <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[10px] font-semibold text-emerald-700">
+                    <span className="bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded tabular-nums">
+                      Rent / Unit: {formatZAR(Math.round(monthlyRent / numberOfUnits))}/m
+                    </span>
+                  </div>
+                )}
               </div>
 
               {propertyType === 'Freehold House' ? (
@@ -3914,6 +3981,8 @@ export default function OpportunityAnalyzerPage() {
                 valuationPerSqm={calculatedMetrics.valuationPerSqm}
                 numberOfUnits={numberOfUnits}
                 averagePricePerUnit={calculatedMetrics.averagePricePerUnit}
+                rehabCostPerUnit={calculatedMetrics.rehabCostPerUnit}
+                allInCostPerUnit={calculatedMetrics.allInCostPerUnit}
                 annualizedFlipRoi={calculatedMetrics.annualizedFlipRoi}
                 monthlyHoldingBurnZAR={calculatedMetrics.monthlyHoldingBurnZAR}
                 holdingPeriodMonths={holdingPeriodMonths}

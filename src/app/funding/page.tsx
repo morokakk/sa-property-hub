@@ -328,7 +328,7 @@ export default function FundingTrackerPage() {
           <div className="bg-white rounded-xl p-4 border border-slate-200/90 shadow-2xs">
             <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Outstanding Liability</span>
             <div className="text-xl font-bold text-slate-900 tabular-nums tracking-tight mt-1">{formatZAR(totalOutstanding)}</div>
-            <p className="text-[11px] text-slate-500 mt-0.5">Excluding mortgage bonds</p>
+            <p className="text-[11px] text-slate-500 mt-0.5">Excludes bonds &amp; own-cash builds</p>
           </div>
 
           <div className="bg-white rounded-xl p-4 border border-slate-200/90 shadow-2xs">
@@ -414,6 +414,11 @@ export default function FundingTrackerPage() {
                         <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-100 text-slate-800">
                           {item.fundingType}
                         </span>
+                        {item.fundingType === 'Phased Own-Cash (Brick-by-Brick)' && (
+                          <span className="block mt-1 text-[9px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded w-fit">
+                            🧱 SELF-FUNDED (R 0 EXTERNAL DEBT)
+                          </span>
+                        )}
                       </td>
                       <td className="p-3.5">
                         <div className="font-bold text-slate-900">{formatZAR(item.capitalAmountZAR)}</div>

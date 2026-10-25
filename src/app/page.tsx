@@ -333,7 +333,10 @@ export default function GlobalDashboardPage() {
           </div>
 
           {/* Flip Pipeline Upside */}
-          <div className="bg-white rounded-xl p-4 border border-slate-200/90 shadow-2xs flex flex-col justify-between">
+          <div
+            className="bg-white rounded-xl p-4 border border-slate-200/90 shadow-2xs flex flex-col justify-between"
+            title="Reflects Projected Flip Profits & Build-to-Rent Equity across active construction projects (Build-to-Rent holds incur R 0 sale commission and R 0 SARS flip disposal tax)."
+          >
             <div>
               <div className="flex items-center justify-between text-slate-500 mb-1">
                 <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Projected Flip Profits</span>
@@ -358,9 +361,11 @@ export default function GlobalDashboardPage() {
                 </div>
               </div>
             </div>
-            <div className="text-[10px] text-slate-400 mt-2 flex items-center justify-between">
-              <span>Pipeline Realizable Equity</span>
-              <span className="text-indigo-600 font-medium">{summary.activeFlipsCount} in progress</span>
+            <div className="text-[10px] text-slate-400 mt-2 flex items-center justify-between gap-1">
+              <span className="truncate" title="Projected Flip Profits & Build-to-Rent Equity">
+                Projected Flip Profits &amp; Build-to-Rent Equity
+              </span>
+              <span className="text-indigo-600 font-medium shrink-0">{summary.activeFlipsCount} in progress</span>
             </div>
           </div>
         </div>

@@ -358,6 +358,8 @@ export interface OpportunityMetricsResult {
   purchasePricePerSqm: number;
   valuationPerSqm: number;
   averagePricePerUnit: number;
+  rehabCostPerUnit: number;
+  allInCostPerUnit: number;
   transferDutyZAR: number;
   monthlyPlacementFeeZAR: number;
   monthlySpvAdminZAR: number;
@@ -552,6 +554,8 @@ export function calculateDealMetrics(params: {
 
   // Total Capital Outlay & Day-1 Initial Capital Required
   const totalCost = effectiveTotalAcquisitionCost + estimatedRehabCost + auctionCosts + totalEvictionBurden;
+  const rehabCostPerUnit = safeUnits > 0 ? Math.round(estimatedRehabCost / safeUnits) : Math.round(estimatedRehabCost);
+  const allInCostPerUnit = safeUnits > 0 ? Math.round(totalCost / safeUnits) : Math.round(totalCost);
   const cashFees = effectiveTotalAcquisitionCost - purchasePrice;
   const initialCapitalRequired = cashDeposit + cashFees + estimatedRehabCost + auctionCosts + evictionLegalFee;
   const totalCashRequired = initialCapitalRequired;
@@ -768,6 +772,8 @@ export function calculateDealMetrics(params: {
     purchasePricePerSqm,
     valuationPerSqm,
     averagePricePerUnit,
+    rehabCostPerUnit,
+    allInCostPerUnit,
     transferDutyZAR: Math.round(transferDutyZAR),
     monthlyPlacementFeeZAR: Math.round(monthlyPlacementFee),
     monthlySpvAdminZAR: Math.round(monthlySpvAdminZAR),
@@ -1292,7 +1298,7 @@ export function generateRentalLongTermProjection(property: RentalProperty): Long
     openMarketValueZAR: property.marketValueZAR || property.purchasePriceZAR || 0,
     depositZAR,
     interestRatePercent: property.bondInterestRatePercent || 11.75,
-    bondTermYears: 20,
+    bondTermYears: property.loanTermYears ?? 20,
     annualCapitalGrowthPercent: 5.0,
     annualRentalEscalationPercent: property.leases?.[0]?.annualEscalationPercent || 6.0,
     annualExpenseInflationPercent: 6.0,

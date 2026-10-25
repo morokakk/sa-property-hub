@@ -219,7 +219,12 @@ export function FlipBOQTable({
                 {formatZAR(totalBaselineZAR)}
               </td>
               <td className="py-3.5 px-3.5 font-bold text-indigo-900 whitespace-nowrap">
-                {formatZAR(totalActualCostZAR)}
+                <div>{formatZAR(totalActualCostZAR)}</div>
+                {(flip.numberOfUnits || 1) > 1 && (
+                  <div className="text-[10px] font-semibold text-indigo-600">
+                    {formatZAR(Math.round((totalActualCostZAR || flip.baselineRenovationBudgetZAR || 0) / Math.max(1, flip.numberOfUnits || 1)), { compact: true })} / unit
+                  </div>
+                )}
               </td>
               <td className="py-3.5 px-3.5 whitespace-nowrap">
                 <span className={`font-black ${totalVarianceZAR <= 0 ? 'text-emerald-700' : 'text-rose-600'}`}>

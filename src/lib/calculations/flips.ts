@@ -11,6 +11,10 @@ export interface FlipFinancialSummary {
   totalHoldingCostZAR: number;
 
   totalCostBasisZAR: number;
+  numberOfUnits: number;
+  rehabCostPerUnitZAR: number;
+  allInCostPerUnitZAR: number;
+  isBuildToRent: boolean;
 
   sec118ArrearsZAR: number;
   advanceCouncilDepositZAR: number;
@@ -118,6 +122,10 @@ export function calculateFlipFinancials(
       flipMonthlyHoldingCostZAR: 0,
       totalHoldingCostZAR: 0,
       totalCostBasisZAR: 0,
+      numberOfUnits: 1,
+      rehabCostPerUnitZAR: 0,
+      allInCostPerUnitZAR: 0,
+      isBuildToRent: false,
       sec118ArrearsZAR: 0,
       advanceCouncilDepositZAR: 0,
       totalMunicipalClearanceOutlayZAR: 0,
@@ -160,6 +168,9 @@ export function calculateFlipFinancials(
   const totalHoldingCostZAR = flipHoldingMonths * flipMonthlyHoldingCostZAR;
 
   const totalCostBasisZAR = (flip.purchasePriceZAR || 0) + (flip.acquisitionCostsZAR || 0) + effectiveRenoCostZAR;
+  const numberOfUnits = Math.max(1, flip.numberOfUnits || 1);
+  const rehabCostPerUnitZAR = Math.round(effectiveRenoCostZAR / numberOfUnits);
+  const isBuildToRent = flip.projectStrategy === 'build_to_rent';
 
   const sec118ArrearsZAR = flip.municipalClearance?.sec118ArrearsZAR || 0;
   const advanceCouncilDepositZAR = flip.municipalClearance?.advanceCouncilDepositZAR || 0;
@@ -167,11 +178,14 @@ export function calculateFlipFinancials(
   const rccStatus = flip.municipalClearance?.rccStatus || 'Pending Application';
   const isRccDisputed = rccStatus === 'Disputed';
 
-  const exitCommissionPercent = flip.exitCommissionPercent ?? 5.75;
-  const exitCommissionZAR = Math.round((flip.targetExitPriceZAR || 0) * (exitCommissionPercent / 100));
+  const exitCommissionPercent = isBuildToRent ? 0 : (flip.exitCommissionPercent ?? 5.75);
+  const exitCommissionZAR = isBuildToRent
+    ? 0
+    : Math.round((flip.targetExitPriceZAR || 0) * (exitCommissionPercent / 100));
 
   // Active Bond Exit Costs: Bond Cancellation Legal Fee & 90-Day Early Termination Penalty
-  const hasBond = (flip.monthlyBondPaymentZAR ?? 0) > 0;
+  // Zeroed out for build_to_rent projects since the investor is holding/refinancing, not cancelling upon sale.
+  const hasBond = !isBuildToRent && (flip.monthlyBondPaymentZAR ?? 0) > 0;
   const bondCancellationFeeZAR = !hasBond
     ? 0
     : (flip.bondCancellationFeeZAR !== undefined && flip.bondCancellationFeeZAR !== null
@@ -195,12 +209,21 @@ export function calculateFlipFinancials(
     totalMunicipalClearanceOutlayZAR +
     exitCommissionZAR +
     totalExitLegalCostZAR;
+  const allInCostPerUnitZAR = Math.round(totalAllInCostZAR / numberOfUnits);
   const projectedNetProfitZAR = (flip.targetExitPriceZAR || 0) - totalAllInCostZAR;
   const projectedRoiPercent = totalAllInCostZAR > 0 ? (projectedNetProfitZAR / totalAllInCostZAR) * 100 : 0;
 
   const taxEntityType = flip.taxEntityType || 'Company (27%)';
-  const effectiveTaxRatePercent = taxEntityType === 'Company (27%)' ? 27 : taxEntityType === 'Individual (45%)' ? 45 : 0;
-  const estimatedTaxProvisionZAR = Math.max(0, Math.round(projectedNetProfitZAR * (effectiveTaxRatePercent / 100)));
+  const effectiveTaxRatePercent = isBuildToRent
+    ? 0
+    : taxEntityType === 'Company (27%)'
+      ? 27
+      : taxEntityType === 'Individual (45%)'
+        ? 45
+        : 0;
+  const estimatedTaxProvisionZAR = isBuildToRent
+    ? 0
+    : Math.max(0, Math.round(projectedNetProfitZAR * (effectiveTaxRatePercent / 100)));
   const netProfitAfterTaxZAR = projectedNetProfitZAR - estimatedTaxProvisionZAR;
   const afterTaxRoiPercent = totalAllInCostZAR > 0 ? (netProfitAfterTaxZAR / totalAllInCostZAR) * 100 : 0;
 
@@ -240,6 +263,10 @@ export function calculateFlipFinancials(
     flipMonthlyHoldingCostZAR,
     totalHoldingCostZAR,
     totalCostBasisZAR,
+    numberOfUnits,
+    rehabCostPerUnitZAR,
+    allInCostPerUnitZAR,
+    isBuildToRent,
     sec118ArrearsZAR,
     advanceCouncilDepositZAR,
     totalMunicipalClearanceOutlayZAR,
