@@ -46,6 +46,8 @@ describe('Official POPIA Privacy Policy (/privacy) & Legal Footers', () => {
 
     expect(html).toContain('1. What Information Do We Collect?');
     expect(html).toContain('1A. Local-First Storage vs. Opt-In Cloud Synchronization');
+    expect(html).toContain('Google OAuth 2.0 Single Sign-On');
+    expect(html).toContain('openid');
     expect(html).toContain('1B. Personal Information You Disclose to Us');
     expect(html).toContain('1C. Bring Your Own Key (BYOK) AI Credentials');
     expect(html).toContain('1D. No Platform Payment Processing or Card Storage');
@@ -61,6 +63,7 @@ describe('Official POPIA Privacy Policy (/privacy) & Legal Footers', () => {
     expect(html).toContain('3. When and With Whom Do We Share Your Personal Information?');
     expect(html).toContain('Vercel');
     expect(html).toContain('Supabase (eu-central-1)');
+    expect(html).toContain('Supabase Auth &amp; Google OAuth 2.0');
     expect(html).toContain('Resend');
     expect(html).toContain('Anthropic (Claude API)');
     expect(html).toContain('Google (Gemini API)');

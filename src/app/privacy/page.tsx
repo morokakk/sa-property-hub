@@ -324,7 +324,11 @@ export default function PrivacyNoticePage() {
                     sa_property_portfolio_hub_v1
                   </code>
                   ). We only collect and persist your portfolio data on our cloud servers when you explicitly create an
-                  account and click <strong>Sync Local Data to Cloud</strong> in the Settings workspace.
+                  account or sign in (via email/password or optional <strong>Google OAuth 2.0 Single Sign-On</strong>,
+                  which shares only your basic OpenID Connect identity scopes: <code className="font-mono text-xs bg-white px-1 py-0.5 rounded">openid</code>,{' '}
+                  <code className="font-mono text-xs bg-white px-1 py-0.5 rounded">email</code>, and{' '}
+                  <code className="font-mono text-xs bg-white px-1 py-0.5 rounded">profile</code>) and click{' '}
+                  <strong>Sync Local Data to Cloud</strong> in the Settings workspace.
                 </p>
               </div>
 
@@ -512,9 +516,10 @@ export default function PrivacyNoticePage() {
                 <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 block">
                   User Account Registration &amp; Authentication
                 </span>
-                <span className="font-bold text-slate-900">Supabase Auth</span>
+                <span className="font-bold text-slate-900">Supabase Auth &amp; Google OAuth 2.0</span>
                 <p className="text-xs text-slate-600 mt-0.5">
-                  Manages encrypted password hashing, JWT sessions, and password recovery flows.
+                  Manages encrypted password hashing, optional Google OAuth 2.0 single sign-on, JWT sessions, and
+                  password recovery flows.
                 </p>
               </div>
 
