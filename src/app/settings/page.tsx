@@ -765,7 +765,13 @@ function SettingsContent() {
                   </span>
                 </div>
                 <p className="text-xs text-slate-500 truncate">
-                  POC Zero-Gate Experience: Securely backup and replicate your local portfolio into PostgreSQL.
+                  POC Zero-Gate Experience: Securely backup and replicate your local portfolio into PostgreSQL.{' '}
+                  <Link
+                    href="/privacy"
+                    className="text-emerald-700 hover:text-emerald-800 underline font-semibold"
+                  >
+                    Privacy &amp; POPIA Policy
+                  </Link>
                 </p>
               </div>
             </div>
@@ -2227,12 +2233,22 @@ function SettingsContent() {
 
           {/* Footer Navigation Bar */}
           <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-4 border-t border-slate-200 text-xs">
-            <Link
-              href="/proposal"
-              className="font-semibold text-indigo-600 hover:text-indigo-800 flex items-center gap-1.5"
-            >
-              ← Go to Proposal Generator
-            </Link>
+            <div className="flex items-center gap-3 flex-wrap">
+              <Link
+                href="/proposal"
+                className="font-semibold text-indigo-600 hover:text-indigo-800 flex items-center gap-1.5"
+              >
+                ← Go to Proposal Generator
+              </Link>
+              <span className="text-slate-300">•</span>
+              <Link
+                href="/privacy"
+                className="font-semibold text-emerald-700 hover:text-emerald-800 flex items-center gap-1"
+              >
+                <ShieldCheck className="w-3.5 h-3.5" />
+                <span>Privacy &amp; POPIA Policy</span>
+              </Link>
+            </div>
 
             <div className="flex items-center gap-3">
               <Link

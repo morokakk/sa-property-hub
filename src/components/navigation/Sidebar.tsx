@@ -31,8 +31,8 @@ import { exportAccountantJournalCSV } from '@/lib/export/csvExport';
 export default function Sidebar() {
   const pathname = usePathname();
 
-  // Hide sidebar completely on tenant statement portal
-  if (pathname.startsWith('/statement')) {
+  // Hide sidebar completely on tenant statement portal and standalone privacy/legal page
+  if (pathname.startsWith('/statement') || pathname.startsWith('/privacy')) {
     return null;
   }
 
@@ -309,8 +309,8 @@ export default function Sidebar() {
         </nav>
 
         {/* System Status / Regional Badge */}
-        <div className="p-4 border-t border-slate-800 text-xs text-slate-400 bg-slate-950/40">
-          <div className="flex items-center justify-between mb-2">
+        <div className="p-4 border-t border-slate-800 text-xs text-slate-400 bg-slate-950/40 space-y-2">
+          <div className="flex items-center justify-between">
             <span className="flex items-center gap-1.5 text-slate-300 font-medium">
               <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
               SARS Tax Engine v2025/26
@@ -320,6 +320,19 @@ export default function Sidebar() {
           <p className="text-[11px] text-slate-500 leading-relaxed">
             Legal Practice Council fee scales & SARS transfer brackets integrated.
           </p>
+          <div className="pt-2 border-t border-slate-800/80 space-y-1 text-[10px] text-slate-500">
+            <p className="font-medium text-slate-400">
+              Moremela Properties (Pty) Ltd (2026/838397/07) • POC Estimates Only
+            </p>
+            <Link
+              href="/privacy"
+              data-testid="sidebar-privacy-link"
+              className="inline-flex items-center gap-1 text-emerald-400 hover:text-emerald-300 hover:underline font-semibold transition-colors"
+            >
+              <ShieldCheck className="w-3 h-3 shrink-0" />
+              <span>Privacy, POPIA &amp; Legal Disclaimer</span>
+            </Link>
+          </div>
         </div>
       </aside>
 
@@ -505,8 +518,8 @@ export default function Sidebar() {
             </div>
 
             {/* Drawer Footer Status */}
-            <div className="p-4 border-t border-slate-800 bg-slate-950/60 text-xs text-slate-400 shrink-0">
-              <div className="flex items-center justify-between mb-1.5">
+            <div className="p-4 border-t border-slate-800 bg-slate-950/60 text-xs text-slate-400 shrink-0 space-y-2">
+              <div className="flex items-center justify-between">
                 <span className="flex items-center gap-1.5 text-slate-300 font-medium text-[11px]">
                   <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
                   SARS Tax Engine v2025/26
@@ -518,6 +531,20 @@ export default function Sidebar() {
               <p className="text-[10px] text-slate-500">
                 LPC sliding fee scales & SARS brackets configured.
               </p>
+              <div className="pt-2 border-t border-slate-800/80 space-y-1 text-[10px] text-slate-500">
+                <p className="font-medium text-slate-400">
+                  Moremela Properties (Pty) Ltd (2026/838397/07) • POC Estimates Only
+                </p>
+                <Link
+                  href="/privacy"
+                  onClick={() => setIsMobileDrawerOpen(false)}
+                  data-testid="sidebar-mobile-privacy-link"
+                  className="inline-flex items-center gap-1 text-emerald-400 hover:text-emerald-300 hover:underline font-semibold transition-colors"
+                >
+                  <ShieldCheck className="w-3 h-3 shrink-0" />
+                  <span>Privacy, POPIA &amp; Legal Disclaimer</span>
+                </Link>
+              </div>
             </div>
           </div>
         </div>

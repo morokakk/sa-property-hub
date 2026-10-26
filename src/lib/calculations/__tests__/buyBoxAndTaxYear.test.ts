@@ -232,6 +232,7 @@ describe('Phase 1 & 2: Strategy-Aware Buy Box Hurdles & DSCR Evaluation', () => 
         totalAcquisitionCost: 1_050_000,
       },
       exitCommissionPercent: 5.0,
+      bondCancellationFeeZAR: 0,
     });
 
     // Exit commission = 1,500,000 * 5% = 75,000
