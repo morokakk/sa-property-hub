@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import './globals.css';
 import Sidebar from '@/components/navigation/Sidebar';
 import ClientOnly from '@/components/ClientOnly';
+import { PostHogProvider } from '@/components/analytics/PostHogProvider';
 
 export const metadata: Metadata = {
   title: 'Moremela Property Investment Hub | Real Estate Portfolio Dashboard',
@@ -28,10 +29,12 @@ export default function RootLayout({
         suppressHydrationWarning
         className="bg-slate-50 min-h-screen flex flex-col md:flex-row antialiased selection:bg-emerald-500 selection:text-white"
       >
-        <Sidebar />
-        <div className="flex-1 flex flex-col min-w-0 overflow-x-clip min-h-screen pb-16 md:pb-0">
-          <ClientOnly>{children}</ClientOnly>
-        </div>
+        <PostHogProvider>
+          <Sidebar />
+          <div className="flex-1 flex flex-col min-w-0 overflow-x-clip min-h-screen pb-16 md:pb-0">
+            <ClientOnly>{children}</ClientOnly>
+          </div>
+        </PostHogProvider>
       </body>
     </html>
   );
