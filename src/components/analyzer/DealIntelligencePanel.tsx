@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import { DealStrategy } from '@/types';
 import {
   ThreeStrategyMatrixResult,
@@ -17,6 +17,8 @@ import {
   Building2,
   Hammer,
   RefreshCw,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
 
 export interface DealIntelligencePanelProps {
@@ -25,6 +27,7 @@ export interface DealIntelligencePanelProps {
   repairPrescription: DealRepairPrescription;
   onSelectStrategy: (strategy: DealStrategy) => void;
   onApplyRepairLever: (lever: DealRepairLever) => void;
+  defaultExpanded?: boolean;
 }
 
 export function DealIntelligencePanel({
@@ -33,7 +36,10 @@ export function DealIntelligencePanel({
   repairPrescription,
   onSelectStrategy,
   onApplyRepairLever,
+  defaultExpanded = false,
 }: DealIntelligencePanelProps) {
+  const [isExpanded, setIsExpanded] = useState(defaultExpanded);
+
   const strategyIcons: Record<DealStrategy, React.ComponentType<{ className?: string }>> = {
     Rental: Building2,
     Flip: Hammer,
@@ -43,44 +49,107 @@ export function DealIntelligencePanel({
   return (
     <div
       data-testid="deal-intelligence-panel"
-      className="rounded-xl bg-slate-950/80 border border-slate-800 p-3.5 sm:p-4 space-y-4 text-xs"
+      className="rounded-xl bg-slate-950/80 border border-slate-800 p-3 sm:px-4 sm:py-3 text-xs transition-all"
     >
-      {/* Header Row: Strategy Recommendation Summary */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2.5 border-b border-slate-800">
-        <div className="flex items-center gap-2">
+      {/* Compact Header Bar: Always visible (Minimised by default) */}
+      <div
+        role="button"
+        tabIndex={0}
+        aria-expanded={isExpanded}
+        onClick={() => setIsExpanded((prev) => !prev)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            setIsExpanded((prev) => !prev);
+          }
+        }}
+        className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 cursor-pointer select-none"
+      >
+        <div className="flex items-center gap-2.5 min-w-0">
           <div className="w-7 h-7 rounded-lg bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center shrink-0">
             <Sparkles className="w-4 h-4 text-emerald-400" />
           </div>
-          <div>
-            <div className="flex items-center gap-2 flex-wrap">
+          <div className="min-w-0">
+            <div className="flex items-center gap-1.5 flex-wrap">
               <span className="text-xs font-bold uppercase tracking-wider text-white">
                 Deterministic Strategy Verdict &amp; Deal-Repair Engine
               </span>
               <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-700/60">
                 Recommended: {strategyMatrix.strategies[strategyMatrix.recommendedStrategy].label}
               </span>
+              {repairPrescription.meetsBuyBox ? (
+                <span
+                  data-testid="deal-intelligence-status-pill"
+                  className="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-300 border border-emerald-500/40 inline-flex items-center gap-1"
+                >
+                  <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+                  <span>
+                    {repairPrescription.passedCount}/{repairPrescription.totalCount} Passed
+                  </span>
+                </span>
+              ) : (
+                <span
+                  data-testid="deal-intelligence-status-pill"
+                  className="text-[10px] font-bold px-2 py-0.5 rounded bg-amber-950/90 text-amber-300 border border-amber-700/60 inline-flex items-center gap-1"
+                >
+                  <AlertTriangle className="w-3 h-3 text-amber-400" />
+                  <span>
+                    {repairPrescription.passedCount}/{repairPrescription.totalCount} Hurdles •{' '}
+                    {repairPrescription.levers.length}{' '}
+                    {repairPrescription.levers.length === 1 ? 'Fix' : 'Fixes'} Available
+                  </span>
+                </span>
+              )}
             </div>
-            <p className="text-[11px] text-slate-400 mt-0.5">
+            <p className="text-[11px] text-slate-400 mt-0.5 truncate">
               {strategyMatrix.recommendationReason}
             </p>
           </div>
         </div>
 
-        {strategyMatrix.recommendedStrategy !== activeStrategy && (
+        <div className="flex items-center gap-2 shrink-0 self-start sm:self-center">
+          {strategyMatrix.recommendedStrategy !== activeStrategy && (
+            <button
+              type="button"
+              data-testid="switch-recommended-strategy-btn"
+              onClick={(e) => {
+                e.stopPropagation();
+                onSelectStrategy(strategyMatrix.recommendedStrategy);
+              }}
+              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white shadow-xs transition-colors cursor-pointer"
+            >
+              <span>Switch to {strategyMatrix.recommendedStrategy}</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </button>
+          )}
+
           <button
             type="button"
-            data-testid="switch-recommended-strategy-btn"
-            onClick={() => onSelectStrategy(strategyMatrix.recommendedStrategy)}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white shadow-xs transition-colors cursor-pointer shrink-0 self-start sm:self-center"
+            data-testid="toggle-deal-intelligence-btn"
+            aria-expanded={isExpanded}
+            onClick={(e) => {
+              e.stopPropagation();
+              setIsExpanded((prev) => !prev);
+            }}
+            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-700/80 transition-colors cursor-pointer"
           >
-            <span>Switch to {strategyMatrix.recommendedStrategy}</span>
-            <ArrowRight className="w-3.5 h-3.5" />
+            <span>{isExpanded ? 'Minimise' : 'Expand Verdict & Fixes'}</span>
+            {isExpanded ? (
+              <ChevronUp className="w-3.5 h-3.5 text-slate-400" />
+            ) : (
+              <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+            )}
           </button>
-        )}
+        </div>
       </div>
 
-      {/* Part A: Side-by-Side 3-Strategy Comparison Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5">
+      {isExpanded && (
+        <div
+          data-testid="deal-intelligence-expanded-body"
+          className="pt-3.5 mt-3 border-t border-slate-800 space-y-4 animate-fadeIn"
+        >
+          {/* Part A: Side-by-Side 3-Strategy Comparison Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5">
         {(['Rental', 'Flip', 'BRRRR'] as const).map((stratKey) => {
           const item = strategyMatrix.strategies[stratKey];
           const Icon = strategyIcons[stratKey];
@@ -270,6 +339,8 @@ export function DealIntelligencePanel({
               Adjust acquisition price, rental income, or financing leverage simultaneously to bring this opportunity within Buy-Box thresholds.
             </p>
           )}
+        </div>
+      )}
         </div>
       )}
     </div>
