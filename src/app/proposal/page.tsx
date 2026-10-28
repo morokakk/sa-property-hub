@@ -60,6 +60,13 @@ import {
   calculateEvictionCarryingCost,
   DAYS_PER_MONTH,
 } from '@/lib/calculations/occupantRisk';
+import {
+  recommendOptimalFundingStructure,
+  calculateCapitalStackSplit,
+  calculateProposalStressScenarios,
+  synthesizeStrengthsAndMitigants,
+  FundingPresetOption,
+} from '@/lib/calculations/proposalIntelligence';
 
 function getSafeLogoUri(uri?: string): string {
   if (!uri) return '';
@@ -877,6 +884,138 @@ function ProposalGeneratorContent() {
     (deal?.ancillaryIncomes?.reduce((acc: number, curr: any) => acc + curr.monthlyRentZAR, 0) || 0) -
     monthlyBurnRate;
 
+  // Intelligent Funding Recommendation, Capital Stack Split, Stress Scenarios & Narrative Synthesizer
+  const fundingRecommendation = useMemo(() => {
+    if (!deal) return null;
+    return recommendOptimalFundingStructure({
+      strategy: pitchStrategy,
+      totalProjectCostZAR: totalProjectCost,
+      targetExitPriceZAR: deal.targetExitPrice || 0,
+      projectedNetProfitZAR: projectedNetProfit,
+      holdingDurationMonths: totalHoldingDurationMonths,
+      monthlyRentZAR:
+        (deal.monthlyRent || 0) +
+        (deal.ancillaryIncomes?.reduce((acc: number, curr: any) => acc + curr.monthlyRentZAR, 0) || 0),
+      monthlyBurnRateZAR: monthlyBurnRate,
+      seniorDebtZAR: 0,
+      isEviction,
+    });
+  }, [
+    deal,
+    pitchStrategy,
+    totalProjectCost,
+    projectedNetProfit,
+    totalHoldingDurationMonths,
+    monthlyBurnRate,
+    isEviction,
+  ]);
+
+  const capitalStackSplit = useMemo(() => {
+    if (!deal) return null;
+    return calculateCapitalStackSplit({
+      strategy: pitchStrategy,
+      capitalRequestedZAR: capitalRequested,
+      fundingOfferType,
+      offeredRatePercent: offeredRate,
+      totalProjectCostZAR: totalProjectCost,
+      targetExitPriceZAR: deal.targetExitPrice || 0,
+      projectedNetProfitZAR: projectedNetProfit,
+      holdingDurationMonths: totalHoldingDurationMonths,
+      netMonthlyCashflowBeforeLenderZAR: netMonthlyCashflow,
+      seniorDebtZAR: 0,
+    });
+  }, [
+    deal,
+    pitchStrategy,
+    capitalRequested,
+    fundingOfferType,
+    offeredRate,
+    totalProjectCost,
+    projectedNetProfit,
+    totalHoldingDurationMonths,
+    netMonthlyCashflow,
+  ]);
+
+  const stressMatrix = useMemo(() => {
+    if (!deal || !capitalStackSplit) return null;
+    return calculateProposalStressScenarios({
+      targetExitPriceZAR: deal.targetExitPrice || 0,
+      totalProjectCostZAR: totalProjectCost,
+      capitalRequestedZAR: capitalRequested,
+      lenderReturnZAR: capitalStackSplit.lenderReturnZAR,
+      exitCommissionPercent,
+      exitLegalCostZAR: exitLegalCost,
+      monthlyBurnRateZAR: monthlyBurnRate,
+      seniorDebtZAR: 0,
+      fundingOfferType,
+      offeredRatePercent: offeredRate,
+    });
+  }, [
+    deal,
+    capitalStackSplit,
+    totalProjectCost,
+    capitalRequested,
+    exitCommissionPercent,
+    exitLegalCost,
+    monthlyBurnRate,
+    fundingOfferType,
+    offeredRate,
+  ]);
+
+  const strengthsAndMitigants = useMemo(() => {
+    if (!deal || !capitalStackSplit || !stressMatrix) return null;
+    return synthesizeStrengthsAndMitigants({
+      deal: {
+        type: deal.type,
+        city: deal.city || '',
+        province: (deal as any).province,
+        source: deal.source,
+        purchasePrice: deal.purchasePrice || 0,
+        openMarketValue: deal.openMarketValue || 0,
+        builtInEquity: deal.builtInEquity || 0,
+        builtInEquityPercent: deal.builtInEquityPercent || 0,
+        renovationBudget: deal.renovationBudget || 0,
+        targetExitPrice: deal.targetExitPrice || 0,
+        monthlyRent: deal.monthlyRent || 0,
+        isSection13Eligible: deal.isSection13Eligible,
+        section13Allowance: (deal as any).section13Allowance,
+        isVatInclusiveDeveloperSale: (deal as any).isVatInclusiveDeveloperSale,
+        auctioneerCommission,
+        municipalArrears,
+        collectionRate: deal.collectionRate,
+        tenantArrears: deal.tenantArrears,
+        occupantRisk: deal.occupantRisk,
+        refinanceLtvPercent: (deal as any).refinanceLtvPercent ?? 75,
+      },
+      strategy: pitchStrategy,
+      capitalStack: capitalStackSplit,
+      stressMatrix,
+      rateShockScenarios: proposalRateShockScenarios,
+      investorProfile,
+    });
+  }, [
+    deal,
+    capitalStackSplit,
+    stressMatrix,
+    pitchStrategy,
+    auctioneerCommission,
+    municipalArrears,
+    proposalRateShockScenarios,
+    investorProfile,
+  ]);
+
+  const handleApplyFundingPreset = (preset: {
+    capitalRequestedZAR: number;
+    returnStructure: ReturnTermType;
+    offeredRatePercent: number;
+    securityOffered: string;
+  }) => {
+    setCapitalRequested(preset.capitalRequestedZAR);
+    setFundingOfferType(preset.returnStructure);
+    setOfferedRate(preset.offeredRatePercent);
+    setSecurityType(preset.securityOffered);
+  };
+
   const [copiedPitchWhatsApp, setCopiedPitchWhatsApp] = useState(false);
 
   const pitchWhatsAppText = useMemo(() => {
@@ -1075,6 +1214,134 @@ function ProposalGeneratorContent() {
               />
             </div>
           </div>
+
+          {/* Intelligent Auto-Structurer & Lender vs. Sponsor Economics Strip */}
+          {fundingRecommendation && capitalStackSplit && (
+            <div className="pt-3 border-t border-slate-100 space-y-3">
+              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-2.5 bg-slate-50/90 border border-slate-200/80 rounded-lg p-3">
+                <div className="space-y-1 min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="inline-flex items-center gap-1 text-[11px] font-extrabold uppercase tracking-wider text-emerald-800">
+                      <Zap className="w-3.5 h-3.5 text-emerald-600" />
+                      Intelligent Facility Structurer
+                    </span>
+                    <button
+                      type="button"
+                      data-testid="auto-structure-terms-btn"
+                      onClick={() => handleApplyFundingPreset(fundingRecommendation.recommended)}
+                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold shadow-2xs transition-colors cursor-pointer"
+                    >
+                      <Zap className="w-3 h-3" />
+                      Auto-Structure Optimal Terms
+                    </button>
+                    <div className="flex flex-wrap items-center gap-1">
+                      {fundingRecommendation.presets.map((preset: FundingPresetOption) => {
+                        const isActivePreset =
+                          fundingOfferType === preset.returnStructure &&
+                          Math.abs(capitalRequested - preset.capitalRequestedZAR) < 1000 &&
+                          offeredRate === preset.offeredRatePercent;
+                        return (
+                          <button
+                            key={preset.id}
+                            type="button"
+                            data-testid={`funding-preset-${preset.id}`}
+                            onClick={() => handleApplyFundingPreset(preset)}
+                            title={preset.rationale}
+                            className={`px-2 py-0.5 rounded border text-[10px] font-bold transition-colors cursor-pointer ${
+                              isActivePreset
+                                ? 'bg-slate-900 text-white border-slate-900'
+                                : 'bg-white hover:bg-slate-100 text-slate-700 border-slate-300'
+                            }`}
+                          >
+                            {preset.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                  <p className="text-[11px] text-slate-600 leading-snug">
+                    <strong className="text-slate-800">Underwriting Recommendation:</strong> {fundingRecommendation.recommended.rationale}
+                  </p>
+                </div>
+              </div>
+
+              {/* Live Lender vs. Sponsor Economics & Coverage Strip */}
+              <div
+                data-testid="lender-sponsor-split-strip"
+                className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-xs"
+              >
+                <div className="p-2.5 rounded-lg bg-emerald-50/70 border border-emerald-200">
+                  <span className="text-[10px] font-bold uppercase text-emerald-800 block">Lender Total Payout</span>
+                  <span className="text-sm font-extrabold text-emerald-950 font-mono block mt-0.5">
+                    {formatZAR(capitalStackSplit.lenderTotalPayoutZAR)}
+                  </span>
+                  <span className="text-[10px] text-emerald-700">
+                    +{formatZAR(capitalStackSplit.lenderReturnZAR)} return ({capitalStackSplit.lenderCoverageRatio}x coverage)
+                  </span>
+                </div>
+
+                <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-200">
+                  <span className="text-[10px] font-bold uppercase text-slate-600 block">
+                    {pitchStrategy === 'Flip' ? 'Sponsor Net Take-Home' : 'Sponsor Monthly Cashflow'}
+                  </span>
+                  <span
+                    className={`text-sm font-extrabold font-mono block mt-0.5 ${
+                      (pitchStrategy === 'Flip'
+                        ? capitalStackSplit.sponsorNetProfitFlipZAR
+                        : capitalStackSplit.sponsorNetMonthlyCashflowZAR) >= 0
+                        ? 'text-slate-900'
+                        : 'text-rose-700'
+                    }`}
+                  >
+                    {pitchStrategy === 'Flip'
+                      ? formatZAR(capitalStackSplit.sponsorNetProfitFlipZAR)
+                      : `${formatZAR(capitalStackSplit.sponsorNetMonthlyCashflowZAR)}/mo`}
+                  </span>
+                  <span className="text-[10px] text-slate-500">
+                    {pitchStrategy === 'Flip'
+                      ? `After ${formatZAR(capitalStackSplit.lenderReturnZAR)} lender return`
+                      : `After ${formatZAR(capitalStackSplit.monthlyLenderServiceZAR)}/mo facility service`}
+                  </span>
+                </div>
+
+                <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-200">
+                  <span className="text-[10px] font-bold uppercase text-slate-600 block">Sponsor Co-Investment</span>
+                  <span className="text-sm font-extrabold text-slate-900 font-mono block mt-0.5">
+                    {formatZAR(capitalStackSplit.sponsorCoInvestmentZAR)}
+                  </span>
+                  <span className="text-[10px] text-slate-500">
+                    Facility LTC: {formatPercent(capitalStackSplit.loanToCostPercent)} • Exit LTV: {formatPercent(capitalStackSplit.loanToExitValuePercent)}
+                  </span>
+                </div>
+
+                <div className="p-2.5 rounded-lg bg-indigo-50/60 border border-indigo-200">
+                  <span className="text-[10px] font-bold uppercase text-indigo-800 block">Principal Break-Even Exit</span>
+                  <span className="text-sm font-extrabold text-indigo-950 font-mono block mt-0.5">
+                    {stressMatrix ? formatZAR(stressMatrix.principalBreakEvenExitZAR) : '—'}
+                  </span>
+                  <span className="text-[10px] text-indigo-700">
+                    {stressMatrix && stressMatrix.principalSafetyMarginPercent > 0
+                      ? `${formatPercent(stressMatrix.principalSafetyMarginPercent)} below target ARV`
+                      : 'Requires upside exit to clear'}
+                  </span>
+                </div>
+              </div>
+
+              {capitalStackSplit.warnings.length > 0 && (
+                <div
+                  data-testid="capital-stack-warnings"
+                  className="p-2.5 rounded-lg bg-amber-50 border border-amber-300 text-amber-950 text-[11px] space-y-1"
+                >
+                  {capitalStackSplit.warnings.map((w, idx) => (
+                    <div key={idx} className="flex items-start gap-1.5">
+                      <AlertTriangle className="w-3.5 h-3.5 text-amber-600 shrink-0 mt-0.5" />
+                      <span>{w}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
 
           <div className="pt-3 border-t border-slate-100 text-xs">
             <label htmlFor="pitch-notes-input" className="block text-[11px] font-semibold text-slate-600 mb-1">
@@ -1536,6 +1803,90 @@ function ProposalGeneratorContent() {
                     Sponsor Background & Investment Mandate ({investorProfile.entityName})
                   </div>
                   <p className="text-slate-600">{investorProfile.bioSummary}</p>
+                </div>
+              )}
+
+              {/* Section 1B: Key Underwriting Strengths vs. Risk Mitigants Matrix (Print-Safe) */}
+              {strengthsAndMitigants && (
+                <div
+                  data-testid="proposal-strengths-mitigants-matrix"
+                  className="print:break-inside-avoid rounded-xl border border-slate-300 bg-white p-3.5 space-y-2.5"
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-300 pb-2">
+                    <div className="flex items-center gap-1.5 font-extrabold text-xs text-slate-900 uppercase tracking-wider">
+                      <ShieldCheck className="w-4 h-4 text-emerald-700" />
+                      1B. Key Underwriting Strengths &amp; Sponsor Risk Mitigants
+                    </div>
+                    <span className="px-2 py-0.5 rounded border border-slate-300 bg-slate-50 text-[10px] font-bold text-slate-800">
+                      Rule-Based Underwriting Audit
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+                    {/* Left Column: Key Underwriting Strengths */}
+                    <div className="rounded-lg border border-slate-300 bg-slate-50/60 p-3 space-y-2">
+                      <div className="flex items-center justify-between border-b border-slate-200 pb-1.5">
+                        <span className="text-[10px] font-extrabold uppercase tracking-wider text-emerald-900">
+                          Key Deal Strengths ({strengthsAndMitigants.strengths.length})
+                        </span>
+                        <span className="px-1.5 py-0.5 rounded border border-emerald-300 bg-emerald-50 text-[9px] font-bold text-emerald-900">
+                          Upside &amp; Coverage
+                        </span>
+                      </div>
+                      <ul className="space-y-2">
+                        {strengthsAndMitigants.strengths.map((item) => (
+                          <li key={item.id} className="space-y-0.5">
+                            <div className="flex items-center justify-between gap-1.5">
+                              <span className="font-bold text-slate-900 text-[11px] flex items-center gap-1">
+                                <Check className="w-3.5 h-3.5 text-emerald-700 shrink-0" />
+                                {item.title}
+                              </span>
+                              {item.metricBadge && (
+                                <span className="shrink-0 px-1.5 py-0.5 rounded border border-slate-300 bg-white text-[10px] font-bold font-mono text-emerald-900">
+                                  {item.metricBadge}
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-[11px] text-slate-600 leading-snug pl-4">
+                              {item.detail}
+                            </p>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+
+                    {/* Right Column: Identified Risks & Sponsor Mitigants */}
+                    <div className="rounded-lg border border-slate-300 bg-slate-50/60 p-3 space-y-2">
+                      <div className="flex items-center justify-between border-b border-slate-200 pb-1.5">
+                        <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-900">
+                          Identified Risks &amp; Active Mitigants ({strengthsAndMitigants.riskMitigants.length})
+                        </span>
+                        <span className="px-1.5 py-0.5 rounded border border-amber-300 bg-amber-50 text-[9px] font-bold text-amber-900">
+                          Downside Protection
+                        </span>
+                      </div>
+                      <ul className="space-y-2">
+                        {strengthsAndMitigants.riskMitigants.map((item) => (
+                          <li key={item.id} className="space-y-0.5">
+                            <div className="flex items-center justify-between gap-1.5">
+                              <span className="font-bold text-slate-900 text-[11px] flex items-center gap-1">
+                                <ShieldAlert className="w-3.5 h-3.5 text-amber-700 shrink-0" />
+                                {item.riskTitle}
+                              </span>
+                              {item.exposureBadge && (
+                                <span className="shrink-0 px-1.5 py-0.5 rounded border border-slate-300 bg-white text-[10px] font-bold font-mono text-slate-900">
+                                  {item.exposureBadge}
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-[11px] text-slate-600 leading-snug pl-4">
+                              {item.mitigationDetail}
+                            </p>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
                 </div>
               )}
             </div>
@@ -2495,45 +2846,136 @@ function ProposalGeneratorContent() {
             {/* Sensitivity / Scenario Analysis Table */}
             <div className="space-y-3 print:break-inside-avoid">
               <h2 className="text-sm uppercase tracking-wider font-extrabold text-slate-900 border-b border-slate-200 pb-1">
-                5. Sensitivity & Scenario Analysis
+                5. Sensitivity &amp; Scenario Analysis
               </h2>
-              <div className="overflow-x-auto">
-                <table className="w-full text-xs text-left border border-slate-200 rounded-lg overflow-hidden">
-                  <thead className="bg-slate-100 text-slate-700 font-bold uppercase text-[10px]">
+
+              {/* Mathematical Break-Even Callout Strip (Print-Safe) */}
+              {stressMatrix && (
+                <div
+                  data-testid="proposal-breakeven-strip"
+                  className="print:break-inside-avoid grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs"
+                >
+                  <div className="p-2.5 rounded-lg bg-white border border-slate-300">
+                    <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-700 block">
+                      Lender Principal Break-Even Exit
+                    </span>
+                    <div className="flex items-baseline justify-between gap-1 mt-0.5">
+                      <span className="text-sm font-extrabold font-mono text-slate-900">
+                        {formatZAR(stressMatrix.principalBreakEvenExitZAR)}
+                      </span>
+                      <span
+                        className={`px-1.5 py-0.5 rounded border text-[10px] font-bold ${
+                          stressMatrix.principalSafetyMarginPercent >= 15
+                            ? 'bg-emerald-50 text-emerald-900 border-emerald-300'
+                            : stressMatrix.principalSafetyMarginPercent > 0
+                            ? 'bg-amber-50 text-amber-900 border-amber-300'
+                            : 'bg-rose-50 text-rose-900 border-rose-300'
+                        }`}
+                      >
+                        {stressMatrix.principalSafetyMarginPercent > 0
+                          ? `-${formatPercent(stressMatrix.principalSafetyMarginPercent)} Buffer`
+                          : 'Zero Buffer'}
+                      </span>
+                    </div>
+                    <span className="text-[10px] text-slate-600 block mt-0.5">
+                      Gross sale price required to clear 100% of facility principal + exit friction
+                    </span>
+                  </div>
+
+                  <div className="p-2.5 rounded-lg bg-white border border-slate-300">
+                    <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-700 block">
+                      Full Payout Break-Even Exit
+                    </span>
+                    <div className="flex items-baseline justify-between gap-1 mt-0.5">
+                      <span className="text-sm font-extrabold font-mono text-slate-900">
+                        {formatZAR(stressMatrix.fullPayoutBreakEvenExitZAR)}
+                      </span>
+                      <span className="px-1.5 py-0.5 rounded border border-slate-300 bg-slate-50 text-[10px] font-bold text-slate-800">
+                        Principal + Return
+                      </span>
+                    </div>
+                    <span className="text-[10px] text-slate-600 block mt-0.5">
+                      Gross sale price required to settle principal plus full promised return
+                    </span>
+                  </div>
+
+                  <div className="p-2.5 rounded-lg bg-white border border-slate-300">
+                    <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-700 block">
+                      3-Month Delay Burn Impact
+                    </span>
+                    <div className="flex items-baseline justify-between gap-1 mt-0.5">
+                      <span className="text-sm font-extrabold font-mono text-slate-900">
+                        {formatZAR(stressMatrix.threeMonthDelayBurnZAR)}
+                      </span>
+                      <span className="px-1.5 py-0.5 rounded border border-slate-300 bg-slate-50 text-[10px] font-bold text-slate-800">
+                        +90d Deeds / Transfer
+                      </span>
+                    </div>
+                    <span className="text-[10px] text-slate-600 block mt-0.5">
+                      Incremental holding burn if transfer extends by 3 months (Net profit after delay: {formatZAR(stressMatrix.profitAfterThreeMonthDelayZAR)})
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              <div
+                tabIndex={0}
+                role="region"
+                aria-label="Sensitivity and Scenario Analysis Table"
+                className="overflow-x-auto focus:outline-2 focus:outline-emerald-600 rounded-lg"
+              >
+                <table className="w-full text-xs text-left border border-slate-300 rounded-lg overflow-hidden">
+                  <thead className="bg-slate-100 text-slate-800 font-bold uppercase text-[10px] border-b border-slate-300">
                     <tr>
                       <th className="p-2.5">Scenario</th>
                       <th className="p-2.5">Exit Valuation (ZAR)</th>
-                      <th className="p-2.5">Projected Net Profit</th>
+                      <th className="p-2.5">Net Deal Profit</th>
                       <th className="p-2.5">Sponsor ROI</th>
                       <th className="p-2.5">Lender Security Cushion</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-200 text-slate-800">
-                    <tr className="bg-rose-50/40">
-                      <td className="p-2.5 font-bold text-rose-800">Conservative (-10%)</td>
-                      <td className="p-2.5">{formatZAR(deal.targetExitPrice * 0.9)}</td>
-                      <td className="p-2.5 font-semibold text-slate-800">
-                        {formatZAR(deal.targetExitPrice * 0.9 - totalProjectCost)}
-                      </td>
-                      <td className="p-2.5">{formatPercent(((deal.targetExitPrice * 0.9 - totalProjectCost) / totalProjectCost) * 100)}</td>
-                      <td className="p-2.5 text-emerald-700 font-bold">100% Principal Covered</td>
-                    </tr>
-                    <tr className="bg-emerald-50/40">
-                      <td className="p-2.5 font-bold text-emerald-800">Base Case (Target)</td>
-                      <td className="p-2.5 font-bold">{formatZAR(deal.targetExitPrice)}</td>
-                      <td className="p-2.5 font-bold text-emerald-800">{formatZAR(projectedNetProfit)}</td>
-                      <td className="p-2.5 font-bold text-emerald-800">{formatPercent(netProjectROI)}</td>
-                      <td className="p-2.5 text-emerald-700 font-bold">100% Principal Covered</td>
-                    </tr>
-                    <tr className="bg-teal-50/40">
-                      <td className="p-2.5 font-bold text-teal-800">Optimistic (+10%)</td>
-                      <td className="p-2.5">{formatZAR(deal.targetExitPrice * 1.1)}</td>
-                      <td className="p-2.5 font-semibold text-slate-800">
-                        {formatZAR(deal.targetExitPrice * 1.1 - totalProjectCost)}
-                      </td>
-                      <td className="p-2.5">{formatPercent(((deal.targetExitPrice * 1.1 - totalProjectCost) / totalProjectCost) * 100)}</td>
-                      <td className="p-2.5 text-emerald-700 font-bold">100% Principal Covered</td>
-                    </tr>
+                    {stressMatrix
+                      ? stressMatrix.scenarios.map((row) => {
+                          const rowBg =
+                            row.id === 'base'
+                              ? 'bg-emerald-50/40'
+                              : row.id === 'optimistic'
+                              ? 'bg-teal-50/40'
+                              : row.id === 'severe_downside'
+                              ? 'bg-rose-50/50'
+                              : 'bg-amber-50/30';
+                          const labelTone =
+                            row.id === 'base'
+                              ? 'font-bold text-emerald-900'
+                              : row.id === 'optimistic'
+                              ? 'font-bold text-teal-900'
+                              : row.id === 'severe_downside'
+                              ? 'font-bold text-rose-900'
+                              : 'font-bold text-amber-900';
+                          const badgeTone =
+                            row.coverageStatus === 'full'
+                              ? 'text-emerald-800 font-bold'
+                              : row.coverageStatus === 'principal_only'
+                              ? 'text-amber-800 font-bold'
+                              : 'text-rose-800 font-bold';
+                          return (
+                            <tr key={row.id} className={rowBg}>
+                              <td className={`p-2.5 ${labelTone}`}>{row.label}</td>
+                              <td className="p-2.5 font-mono font-semibold">{formatZAR(row.exitValuationZAR)}</td>
+                              <td
+                                className={`p-2.5 font-mono font-semibold ${
+                                  row.projectedNetProfitZAR >= 0 ? 'text-slate-900' : 'text-rose-800'
+                                }`}
+                              >
+                                {formatZAR(row.projectedNetProfitZAR)}
+                              </td>
+                              <td className="p-2.5 font-mono font-semibold">{formatPercent(row.sponsorRoiPercent)}</td>
+                              <td className={`p-2.5 ${badgeTone}`}>{row.securityBadgeLabel}</td>
+                            </tr>
+                          );
+                        })
+                      : null}
                   </tbody>
                 </table>
               </div>

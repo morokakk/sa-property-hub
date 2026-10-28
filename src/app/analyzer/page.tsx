@@ -25,7 +25,13 @@ import LongTermProjectionChart from '@/components/analytics/LongTermProjectionCh
 import { OccupancyRiskCard } from '@/components/analyzer/OccupancyRiskCard';
 import { getOccupantRiskDefaults, isEvictionActive } from '@/lib/calculations/occupantRisk';
 import InvestmentNodeSelect, { InvestmentNodeBanner } from '@/components/common/InvestmentNodeSelect';
-import { findInvestmentNode, getNodeComplianceProfile, INVESTMENT_REGION_GROUPS } from '@/lib/constants/investmentNodes';
+import { findInvestmentNode, getNodeComplianceProfile, INVESTMENT_REGION_GROUPS, NodeMarketBenchmarks } from '@/lib/constants/investmentNodes';
+import {
+  evaluateThreeStrategyMatrix,
+  solveDealRepairLevers,
+  DealRepairLever,
+} from '@/lib/calculations/dealIntelligence';
+import DealIntelligencePanel from '@/components/analyzer/DealIntelligencePanel';
 import {
   Calculator,
   Zap,
@@ -811,6 +817,152 @@ export default function OpportunityAnalyzerPage() {
     if (bidAmount <= 0) return;
     handlePurchasePriceChange(bidAmount);
     setShowMaoSolver(false);
+  };
+
+  // Deterministic 3-Strategy Verdict & Deal-Repair Prescription Engine
+  const dealMetricsParams = useMemo(() => ({
+    strategy,
+    purchasePrice,
+    openMarketValueZAR: openMarketValue,
+    numberOfUnits,
+    floorAreaSqm,
+    isVatInclusiveDeveloperSale,
+    customTransferDutyZAR: overrideTax ? customTransferDuty : undefined,
+    tenantPlacementFeePercent,
+    annualSpvAdminAuditFeeZAR,
+    refinanceLtvPercent,
+    estimatedRehabCost: rehabCost,
+    monthlyRentalEstimate: monthlyRent,
+    monthlyLevies: propertyType === 'Freehold House' ? 0 : monthlyLevies,
+    monthlyRatesTaxes: monthlyRates,
+    annualInsurance: propertyType === 'Freehold House' ? annualInsurance : 0,
+    managementFeePercent: managementFee,
+    agencyVatApplicable,
+    vacancyRatePercent: vacancyRate,
+    targetExitPrice,
+    explicitFiveYearExitPriceZAR: strategy === 'Rental' && isFiveYearExitOverridden && targetExitPrice > 0 ? targetExitPrice : undefined,
+    holdingPeriodMonths,
+    loanToValuePercent: loanToValue,
+    depositZAR,
+    bondLTV: loanToValue,
+    interestRatePercent: interestRate,
+    interestRateMargin,
+    vatExemptAgent,
+    defaultAgentCommissionPercent: defaultAgentCommission,
+    loanTermYears,
+    annualCapitalGrowthPercent: annualCapitalGrowth,
+    annualRentalEscalationPercent: annualRentalEscalation,
+    annualExpenseInflationPercent: annualExpenseInflation,
+    extraMonthlyPaymentZAR: extraMonthlyPayment,
+    costs: calculatedCosts,
+    recomputeBondRegFromDeposit: true,
+    auctioneerCommissionZAR: auctioneerCommission,
+    municipalArrearsZAR: municipalArrears,
+    exitCommissionPercent: effectiveExitCommissionPercent,
+    bondCancellationFeeZAR: bondCancellationFee,
+    defaultBondCancellationFeeZAR: investorProfile?.defaultBondCancellationFeeZAR ?? 5200,
+    earlyTerminationNoticeGiven,
+    earlyTerminationPenaltyZAR: earlyTerminationPenalty,
+    monthlyMaintenanceReserveZAR: monthlyMaintenanceReserve,
+    monthlyPrepaidVendingFeeZAR: monthlyPrepaidVendingFee,
+    monthlyCommunalServicesZAR: monthlyCommunalServices,
+    occupantRisk,
+  }), [
+    strategy,
+    purchasePrice,
+    openMarketValue,
+    numberOfUnits,
+    floorAreaSqm,
+    isVatInclusiveDeveloperSale,
+    overrideTax,
+    customTransferDuty,
+    tenantPlacementFeePercent,
+    annualSpvAdminAuditFeeZAR,
+    refinanceLtvPercent,
+    rehabCost,
+    monthlyRent,
+    propertyType,
+    monthlyLevies,
+    monthlyRates,
+    annualInsurance,
+    managementFee,
+    agencyVatApplicable,
+    vacancyRate,
+    targetExitPrice,
+    isFiveYearExitOverridden,
+    holdingPeriodMonths,
+    loanToValue,
+    depositZAR,
+    interestRate,
+    interestRateMargin,
+    vatExemptAgent,
+    defaultAgentCommission,
+    loanTermYears,
+    annualCapitalGrowth,
+    annualRentalEscalation,
+    annualExpenseInflation,
+    extraMonthlyPayment,
+    calculatedCosts,
+    auctioneerCommission,
+    municipalArrears,
+    effectiveExitCommissionPercent,
+    bondCancellationFee,
+    investorProfile?.defaultBondCancellationFeeZAR,
+    earlyTerminationNoticeGiven,
+    earlyTerminationPenalty,
+    monthlyMaintenanceReserve,
+    monthlyPrepaidVendingFee,
+    monthlyCommunalServices,
+    occupantRisk,
+  ]);
+
+  const strategyMatrix = useMemo(
+    () => evaluateThreeStrategyMatrix(dealMetricsParams, investorProfile, city),
+    [dealMetricsParams, investorProfile, city]
+  );
+
+  const repairPrescription = useMemo(
+    () => solveDealRepairLevers(dealMetricsParams, investorProfile, strategy, city),
+    [dealMetricsParams, investorProfile, strategy, city]
+  );
+
+  const handleApplyNodeBenchmarks = useCallback((benchmarks: NodeMarketBenchmarks) => {
+    const valBasis = openMarketValue > 0 ? openMarketValue : purchasePrice;
+    const estRates = valBasis > 0
+      ? Math.max(100, Math.round((valBasis * (benchmarks.typicalMonthlyRatesPercentOfVal / 100)) / 50) * 50)
+      : monthlyRates;
+    setVacancyRate(benchmarks.typicalVacancyPercent);
+    setAnnualCapitalGrowth(benchmarks.typicalCapitalGrowthPercent);
+    setMonthlyRates(estRates);
+    updateAnalyzerDraft({
+      vacancyRatePercent: benchmarks.typicalVacancyPercent,
+      annualCapitalGrowthPercent: benchmarks.typicalCapitalGrowthPercent,
+      monthlyRates: estRates,
+    });
+    setFeeResetToast(
+      `Applied ${city} benchmarks: ${benchmarks.typicalVacancyPercent}% Vacancy, ${benchmarks.typicalCapitalGrowthPercent}% Capital Growth, and R${estRates.toLocaleString('en-ZA')}/m Rates.`
+    );
+  }, [openMarketValue, purchasePrice, monthlyRates, city, updateAnalyzerDraft]);
+
+  const handleApplyRepairLever = (lever: DealRepairLever) => {
+    if (lever.id === 'price' && lever.targetPriceZAR !== undefined) {
+      handlePurchasePriceChange(lever.targetPriceZAR);
+      setFeeResetToast(`Applied Max Bid: ${formatZAR(lever.targetPriceZAR)}`);
+    } else if (lever.id === 'rent' && lever.targetMonthlyRentZAR !== undefined) {
+      setMonthlyRent(lever.targetMonthlyRentZAR);
+      updateAnalyzerDraft({ monthlyRent: lever.targetMonthlyRentZAR });
+      setFeeResetToast(`Applied Target Monthly Rent: ${formatZAR(lever.targetMonthlyRentZAR)}/m`);
+    } else if (lever.id === 'ltv' && lever.targetLtvPercent !== undefined) {
+      handleLTVChange(lever.targetLtvPercent);
+      setFeeResetToast(`Applied Optimal Financing: ${lever.targetLtvPercent}% LTV`);
+    } else if (lever.id === 'exitPrice' && lever.targetExitPriceZAR !== undefined) {
+      setTargetExitPrice(lever.targetExitPriceZAR);
+      updateAnalyzerDraft({ targetExitPrice: lever.targetExitPriceZAR });
+      setFeeResetToast(`Applied Target Exit Valuation: ${formatZAR(lever.targetExitPriceZAR)}`);
+    } else if (lever.id === 'strategySwitch' && lever.targetStrategy) {
+      handleStrategyChange(lever.targetStrategy);
+      setFeeResetToast(`Switched Strategy to ${lever.targetStrategy}`);
+    }
   };
 
   const activeOverrides = useMemo<Partial<Record<AnalyzerSectionId, { active: boolean; label?: string }>>>(() => {
@@ -3275,7 +3427,21 @@ export default function OpportunityAnalyzerPage() {
             </div>
 
             {/* Selected Investment Node Profile & Regional Compliance Strip */}
-            <InvestmentNodeBanner city={city} province={province} />
+            <InvestmentNodeBanner
+              city={city}
+              province={province}
+              liveInputs={{
+                strategy,
+                purchasePrice,
+                openMarketValue,
+                grossYield: calculatedMetrics.grossYield,
+                vacancyRatePercent: vacancyRate,
+                annualCapitalGrowthPercent: annualCapitalGrowth,
+                monthlyRatesZAR: monthlyRates,
+                purchasePricePerSqm: calculatedMetrics.purchasePricePerSqm,
+              }}
+              onApplyNodeBenchmarks={handleApplyNodeBenchmarks}
+            />
 
             {/* Investment Strategy & Property Title Type 2-Column Row */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -3990,6 +4156,15 @@ export default function OpportunityAnalyzerPage() {
                 brrrrEquityExtractedZAR={calculatedMetrics.brrrrEquityExtractedZAR}
                 brrrrCashLeftInDealZAR={calculatedMetrics.brrrrCashLeftInDealZAR}
                 brrrrRefinanceLoanZAR={calculatedMetrics.brrrrRefinanceLoanZAR}
+              />
+
+              {/* Deterministic 3-Strategy Verdict & Actionable Deal-Repair Levers */}
+              <DealIntelligencePanel
+                activeStrategy={strategy}
+                strategyMatrix={strategyMatrix}
+                repairPrescription={repairPrescription}
+                onSelectStrategy={handleStrategyChange}
+                onApplyRepairLever={handleApplyRepairLever}
               />
 
               {/* Interest Rate Stress-Test Strip (Rental & BRRRR) */}
