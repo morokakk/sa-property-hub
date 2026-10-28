@@ -352,11 +352,6 @@ export default function Sidebar() {
             </span>
           </div>
         </Link>
-
-        <div className="flex items-center gap-1.5 text-[11px] bg-slate-800/80 text-emerald-400 font-semibold px-2.5 py-1 rounded-full border border-slate-700/60">
-          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-          <span>ZAR</span>
-        </div>
       </header>
 
       {/* ========================================================================= */}
