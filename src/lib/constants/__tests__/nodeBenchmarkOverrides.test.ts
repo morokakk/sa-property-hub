@@ -75,9 +75,10 @@ describe('Regional Node Market Benchmarks & Custom Overrides', () => {
     // When reading back or exporting, exact 0.85 is preserved rather than floating point artifact (0.849999...)
     expect(effective?.centsInRandAnnual).toBe(0.85);
 
-    // Default baseline derivation check: 0.065% * 12 = 0.78c
+    // Default baseline statutory rates check (CoJ official tariff = 0.9889c)
     const baselineEffective = getEffectiveNodeBenchmarks('jhb_cbd_maboneng');
-    expect(baselineEffective?.centsInRandAnnual).toBe(0.78);
+    expect(baselineEffective?.centsInRandAnnual).toBe(0.9889);
+    expect(baselineEffective?.source).toBe('CoJ 2026/27 Tariff + TPN/PayProp Inner-City Norm');
   });
 
   it('does not flip provenance to custom_verified if override entry is empty (Guardrail #3)', () => {
