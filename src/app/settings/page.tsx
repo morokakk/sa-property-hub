@@ -60,6 +60,8 @@ import {
   normalizeAiModel,
 } from '@/lib/ai/modelConfig';
 import { formatZAR, formatPercent } from '@/lib/formatters';
+import NodeBenchmarkEditor from '@/components/settings/NodeBenchmarkEditor';
+import { CustomNodeBenchmarkOverride } from '@/types';
 
 type SettingsTab = 'entity' | 'underwriting' | 'ai';
 
@@ -136,6 +138,9 @@ function SettingsContent() {
   );
   const [marginalTaxRate, setMarginalTaxRate] = useState<number>(
     investorProfile.marginalTaxRatePercent ?? 31.0
+  );
+  const [customNodeBenchmarks, setCustomNodeBenchmarks] = useState<Record<string, CustomNodeBenchmarkOverride>>(
+    investorProfile.customNodeBenchmarks || {}
   );
 
   // Client-Side BYOK AI Settings
@@ -319,6 +324,7 @@ function SettingsContent() {
       maxDay1Cash !== (investorProfile.maxDay1CashZAR ?? 500000) ||
       minDscr !== (investorProfile.minDscr ?? 1.20) ||
       marginalTaxRate !== (investorProfile.marginalTaxRatePercent ?? 31.0) ||
+      JSON.stringify(customNodeBenchmarks) !== JSON.stringify(investorProfile.customNodeBenchmarks || {}) ||
       aiProvider !== (aiSettings?.provider || 'anthropic') ||
       aiApiKey !== (aiSettings?.apiKey || '') ||
       aiModel !== normalizeAiModel(aiSettings?.model)
@@ -355,6 +361,7 @@ function SettingsContent() {
     maxDay1Cash,
     minDscr,
     marginalTaxRate,
+    customNodeBenchmarks,
     aiProvider,
     aiApiKey,
     aiModel,
@@ -390,6 +397,7 @@ function SettingsContent() {
     setMaxDay1Cash(investorProfile.maxDay1CashZAR ?? 500000);
     setMinDscr(investorProfile.minDscr ?? 1.20);
     setMarginalTaxRate(investorProfile.marginalTaxRatePercent ?? 31.0);
+    setCustomNodeBenchmarks(investorProfile.customNodeBenchmarks || {});
     setAiProvider(aiSettings?.provider || 'anthropic');
     setAiApiKey(aiSettings?.apiKey || '');
     setAiModel(normalizeAiModel(aiSettings?.model));
@@ -662,6 +670,7 @@ function SettingsContent() {
       maxDay1CashZAR: maxDay1Cash,
       minDscr: minDscr,
       marginalTaxRatePercent: marginalTaxRate,
+      customNodeBenchmarks,
       settingsSavedAt: nowIso,
     });
 
@@ -705,6 +714,7 @@ function SettingsContent() {
           baseline_hurdle_yield_percent: baselineHurdleYield,
           default_agent_commission_percent: defaultCommission,
           default_tax_entity_type: defaultTaxEntity,
+          custom_node_benchmarks: (customNodeBenchmarks as any) || null,
           updated_at: nowIso,
         })
         .eq('user_id', currentUser.id)
@@ -2146,6 +2156,12 @@ function SettingsContent() {
                   </div>
                 </div>
               </div>
+
+              {/* Section 7: Regional Node Market Benchmarks (35 SA Corridors) */}
+              <NodeBenchmarkEditor
+                customNodeBenchmarks={customNodeBenchmarks}
+                onChange={setCustomNodeBenchmarks}
+              />
             </div>
           )}
 

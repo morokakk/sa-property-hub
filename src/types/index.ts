@@ -968,6 +968,19 @@ export interface PortfolioSummary {
   equityAlerts: EquityExtractionAlert[];
 }
 
+// Regional Investment Node Custom Benchmark Overrides
+export interface CustomNodeBenchmarkOverride {
+  grossYieldRangePercent?: [number, number];
+  typicalVacancyPercent?: number;
+  typicalCapitalGrowthPercent?: number;
+  pricePerSqmRangeZAR?: [number, number];
+  typicalMonthlyRatesPercentOfVal?: number;
+  centsInRandAnnual?: number;
+  source?: string;
+  asOfDate?: string;
+  updatedAt?: string;
+}
+
 // Investor Profile & Platform Settings
 export interface InvestorProfile {
   entityName: string;
@@ -994,6 +1007,8 @@ export interface InvestorProfile {
   minDscr?: number; // default 1.20
   vatExemptAgent?: boolean; // default false
   marginalTaxRatePercent?: number; // default 31.0%
+  // Regional Node Market Benchmarks (35 Corridors Overrides)
+  customNodeBenchmarks?: Record<string, CustomNodeBenchmarkOverride>;
   // Remittance & Banking Details for Statements
   bankName?: string;
   accountHolder?: string;

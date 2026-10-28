@@ -1,5 +1,5 @@
 import { DealSource, DealStrategy, InvestorProfile, OccupantRiskProfile, ReturnTermType } from '@/types';
-import { findInvestmentNode, evaluateNodeBenchmarks } from '@/lib/constants/investmentNodes';
+import { findInvestmentNode, evaluateNodeBenchmarks, getEffectiveNodeBenchmarks } from '@/lib/constants/investmentNodes';
 import { isEvictionActive } from './occupantRisk';
 import { RateShockScenario } from './propertyMetrics';
 
@@ -542,12 +542,18 @@ export function synthesizeStrengthsAndMitigants(params: {
   if (node) {
     const isStrategyAligned = node.recommendedStrategies.includes(strategy);
     const grossYield = deal.openMarketValue > 0 ? ((deal.monthlyRent * 12) / deal.openMarketValue) * 100 : 0;
-    const nodeAudit = evaluateNodeBenchmarks(node, { strategy, grossYield });
+    const nodeAudit = evaluateNodeBenchmarks(node, { strategy, grossYield }, investorProfile?.customNodeBenchmarks);
+    const effective = nodeAudit?.effectiveBenchmarks ?? getEffectiveNodeBenchmarks(node, investorProfile?.customNodeBenchmarks) ?? {
+      ...node.benchmarks,
+      centsInRandAnnual: Number((node.benchmarks.typicalMonthlyRatesPercentOfVal * 12).toFixed(4)),
+      provenance: 'indicative_unverified' as const,
+      isOverridden: false,
+    };
     strengths.push({
       id: 'node-fundamentals',
       title: `${node.name} Corridor Fundamentals`,
-      metricBadge: isStrategyAligned ? `Verified ${strategy} Node` : `${node.benchmarks.grossYieldRangePercent[0]}–${node.benchmarks.grossYieldRangePercent[1]}% Node Yield`,
-      detail: `${node.primaryInvestmentProfile} Typical node vacancy stands at ${node.benchmarks.typicalVacancyPercent}% with ${node.benchmarks.typicalCapitalGrowthPercent}% p.a. historical capital growth${nodeAudit ? '' : '.'}`,
+      metricBadge: isStrategyAligned ? `Verified ${strategy} Node` : `${effective.grossYieldRangePercent[0]}–${effective.grossYieldRangePercent[1]}% Node Yield`,
+      detail: `${node.primaryInvestmentProfile} Typical node vacancy stands at ${effective.typicalVacancyPercent}% with ${effective.typicalCapitalGrowthPercent}% p.a. historical capital growth${effective.isOverridden ? ` (Custom Verified${effective.source ? ` · ${effective.source}` : ''})` : ''}.`,
     });
   }
 

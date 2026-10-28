@@ -2713,6 +2713,7 @@ export const INITIAL_INVESTOR_PROFILE: InvestorProfile = {
   minDscr: 1.20,
   vatExemptAgent: false,
   marginalTaxRatePercent: 31.0,
+  customNodeBenchmarks: {},
   bankName: 'First National Bank (FNB)',
   accountHolder: 'L&M Property Investments (Pty) Ltd',
   accountNumber: '62891044321',

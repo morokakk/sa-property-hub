@@ -264,6 +264,7 @@ export function mapProfile(
     min_dscr: toNumeric(profile.minDscr, 1.20),
     vat_exempt_agent: profile.vatExemptAgent ?? false,
     marginal_tax_rate_percent: toNumeric(profile.marginalTaxRatePercent, 31.0),
+    custom_node_benchmarks: (profile.customNodeBenchmarks as any) || null,
     liquid_capital_reserve_zar: toNumeric(extra.liquidCapitalReserve, 0),
     rental_forecast_view: extra.rentalForecastView || 'wealth-only',
     ai_settings: extra.aiSettings

@@ -630,6 +630,7 @@ export type Database = {
           min_dscr?: number | null
           vat_exempt_agent?: boolean | null
           marginal_tax_rate_percent?: number | null
+          custom_node_benchmarks?: Json | null
         }
         Insert: {
           account_holder?: string | null
@@ -668,6 +669,7 @@ export type Database = {
           min_dscr?: number | null
           vat_exempt_agent?: boolean | null
           marginal_tax_rate_percent?: number | null
+          custom_node_benchmarks?: Json | null
         }
         Update: {
           account_holder?: string | null
@@ -706,6 +708,7 @@ export type Database = {
           min_dscr?: number | null
           vat_exempt_agent?: boolean | null
           marginal_tax_rate_percent?: number | null
+          custom_node_benchmarks?: Json | null
         }
         Relationships: []
       }
@@ -1059,6 +1062,7 @@ export type Database = {
           updated_at: string | null
           user_id: string | null
           website: string | null
+          custom_node_benchmarks?: Json | null
         }
         Insert: {
           account_holder?: string | null

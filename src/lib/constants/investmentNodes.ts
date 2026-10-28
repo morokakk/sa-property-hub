@@ -1,4 +1,4 @@
-import { Province, DealStrategy, ComplianceCertificates } from '@/types';
+import { Province, DealStrategy, ComplianceCertificates, CustomNodeBenchmarkOverride } from '@/types';
 
 export interface NodeMarketBenchmarks {
   grossYieldRangePercent: [number, number];
@@ -6,6 +6,17 @@ export interface NodeMarketBenchmarks {
   typicalCapitalGrowthPercent: number;
   pricePerSqmRangeZAR: [number, number];
   typicalMonthlyRatesPercentOfVal: number;
+}
+
+export interface EffectiveNodeBenchmarks extends NodeMarketBenchmarks {
+  nodeId: string;
+  nodeName: string;
+  centsInRandAnnual: number;
+  provenance: 'custom_verified' | 'indicative_unverified';
+  source?: string;
+  asOfDate?: string;
+  updatedAt?: string;
+  isOverridden: boolean;
 }
 
 export interface NodeBenchmarkAuditItem {
@@ -18,6 +29,7 @@ export interface NodeBenchmarkAuditItem {
 
 export interface NodeBenchmarkAuditResult {
   node: InvestmentNode;
+  effectiveBenchmarks: EffectiveNodeBenchmarks;
   items: NodeBenchmarkAuditItem[];
   optimisticCount: number;
   alignedStrategy: boolean;
@@ -758,6 +770,92 @@ export function findInvestmentNode(nameOrCity?: string): InvestmentNode | undefi
 }
 
 /**
+ * Resolves effective market benchmarks for a given node, seamlessly merging
+ * user-customized overrides (from /settings or CSV/JSON import) with industry baselines.
+ * 
+ * Enforces Guardrail 2 (Round-Trip Precision):
+ * - Stores & reads exact centsInRandAnnual with fallback to Number((typicalMonthlyRatesPercentOfVal * 12).toFixed(4)).
+ * 
+ * Enforces Guardrail 3 (Canonical Node ID Keying):
+ * - Keys must match canonical node.id.
+ * - Only flips provenance to 'custom_verified' when an actual non-empty override exists.
+ */
+export function getEffectiveNodeBenchmarks(
+  nodeOrCity: InvestmentNode | string | undefined,
+  customOverrides?: Record<string, CustomNodeBenchmarkOverride>
+): EffectiveNodeBenchmarks | null {
+  const node = typeof nodeOrCity === 'string' ? findInvestmentNode(nodeOrCity) : nodeOrCity;
+  if (!node || !node.benchmarks) return null;
+
+  // Canonical node.id lookup, with fallback to node.name if legacy data exists
+  const override = customOverrides ? (customOverrides[node.id] ?? customOverrides[node.name]) : undefined;
+
+  const isOverridden = Boolean(
+    override && (
+      (override.grossYieldRangePercent && override.grossYieldRangePercent.length === 2) ||
+      typeof override.typicalVacancyPercent === 'number' ||
+      typeof override.typicalCapitalGrowthPercent === 'number' ||
+      (override.pricePerSqmRangeZAR && override.pricePerSqmRangeZAR.length === 2) ||
+      typeof override.typicalMonthlyRatesPercentOfVal === 'number' ||
+      typeof override.centsInRandAnnual === 'number' ||
+      (typeof override.source === 'string' && override.source.trim().length > 0) ||
+      (typeof override.asOfDate === 'string' && override.asOfDate.trim().length > 0)
+    )
+  );
+
+  const grossYieldRangePercent: [number, number] = override?.grossYieldRangePercent
+    ? [override.grossYieldRangePercent[0], override.grossYieldRangePercent[1]]
+    : [node.benchmarks.grossYieldRangePercent[0], node.benchmarks.grossYieldRangePercent[1]];
+
+  const typicalVacancyPercent: number =
+    typeof override?.typicalVacancyPercent === 'number'
+      ? override.typicalVacancyPercent
+      : node.benchmarks.typicalVacancyPercent;
+
+  const typicalCapitalGrowthPercent: number =
+    typeof override?.typicalCapitalGrowthPercent === 'number'
+      ? override.typicalCapitalGrowthPercent
+      : node.benchmarks.typicalCapitalGrowthPercent;
+
+  const pricePerSqmRangeZAR: [number, number] = override?.pricePerSqmRangeZAR
+    ? [override.pricePerSqmRangeZAR[0], override.pricePerSqmRangeZAR[1]]
+    : [node.benchmarks.pricePerSqmRangeZAR[0], node.benchmarks.pricePerSqmRangeZAR[1]];
+
+  // Municipal rates & cents in the Rand round-trip precision
+  let typicalMonthlyRatesPercentOfVal = node.benchmarks.typicalMonthlyRatesPercentOfVal;
+  if (typeof override?.typicalMonthlyRatesPercentOfVal === 'number') {
+    typicalMonthlyRatesPercentOfVal = override.typicalMonthlyRatesPercentOfVal;
+  } else if (typeof override?.centsInRandAnnual === 'number') {
+    typicalMonthlyRatesPercentOfVal = Number((override.centsInRandAnnual / 12).toFixed(6));
+  }
+
+  const centsInRandAnnual =
+    typeof override?.centsInRandAnnual === 'number'
+      ? override.centsInRandAnnual
+      : Number((typicalMonthlyRatesPercentOfVal * 12).toFixed(4));
+
+  const provenance: 'custom_verified' | 'indicative_unverified' = isOverridden
+    ? 'custom_verified'
+    : 'indicative_unverified';
+
+  return {
+    nodeId: node.id,
+    nodeName: node.name,
+    grossYieldRangePercent,
+    typicalVacancyPercent,
+    typicalCapitalGrowthPercent,
+    pricePerSqmRangeZAR,
+    typicalMonthlyRatesPercentOfVal,
+    centsInRandAnnual,
+    provenance,
+    source: override?.source,
+    asOfDate: override?.asOfDate,
+    updatedAt: override?.updatedAt,
+    isOverridden,
+  };
+}
+
+/**
  * Evaluates user underwriting inputs against the selected SA Investment Node's quantitative benchmarks.
  * Enforces Guardrail: evaluates grossYield, vacancyRate, annualCapitalGrowth, and monthlyRates unconditionally,
  * and ONLY triggers the pricePerSqmRangeZAR outlier badge when purchasePricePerSqm > 0.
@@ -773,10 +871,20 @@ export function evaluateNodeBenchmarks(
     annualCapitalGrowthPercent?: number;
     monthlyRatesZAR?: number;
     purchasePricePerSqm?: number;
-  }
+  },
+  customOverrides?: Record<string, CustomNodeBenchmarkOverride>
 ): NodeBenchmarkAuditResult | null {
   const node = typeof nodeOrCity === 'string' ? findInvestmentNode(nodeOrCity) : nodeOrCity;
   if (!node || !node.benchmarks) return null;
+
+  const effective = getEffectiveNodeBenchmarks(node, customOverrides) ?? {
+    nodeId: node.id,
+    nodeName: node.name,
+    ...node.benchmarks,
+    centsInRandAnnual: Number((node.benchmarks.typicalMonthlyRatesPercentOfVal * 12).toFixed(4)),
+    provenance: 'indicative_unverified' as const,
+    isOverridden: false,
+  };
 
   const {
     grossYieldRangePercent: [minYield, maxYield],
@@ -784,7 +892,7 @@ export function evaluateNodeBenchmarks(
     typicalCapitalGrowthPercent,
     pricePerSqmRangeZAR: [minSqm, maxSqm],
     typicalMonthlyRatesPercentOfVal,
-  } = node.benchmarks;
+  } = effective;
 
   const items: NodeBenchmarkAuditItem[] = [];
 
@@ -942,6 +1050,7 @@ export function evaluateNodeBenchmarks(
 
   return {
     node,
+    effectiveBenchmarks: effective,
     items,
     optimisticCount,
     alignedStrategy,

@@ -7,9 +7,12 @@ import {
   findInvestmentNode,
   getNodeComplianceProfile,
   evaluateNodeBenchmarks,
+  getEffectiveNodeBenchmarks,
   NodeMarketBenchmarks,
+  EffectiveNodeBenchmarks,
 } from '@/lib/constants/investmentNodes';
-import { Province, SouthAfricanProvince, DealStrategy } from '@/types';
+import { Province, SouthAfricanProvince, DealStrategy, CustomNodeBenchmarkOverride } from '@/types';
+import { usePortfolioStore } from '@/lib/store/usePortfolioStore';
 import { ShieldCheck, MapPin, Target, Sparkles, Building2, AlertTriangle, CheckCircle2, Sliders } from 'lucide-react';
 
 const SA_PROVINCES: SouthAfricanProvince[] = [
@@ -189,6 +192,7 @@ export interface InvestmentNodeBannerProps {
     purchasePricePerSqm?: number;
   };
   onApplyNodeBenchmarks?: (benchmarks: NodeMarketBenchmarks) => void;
+  customOverrides?: Record<string, CustomNodeBenchmarkOverride>;
 }
 
 export function InvestmentNodeBanner({
@@ -197,8 +201,17 @@ export function InvestmentNodeBanner({
   className = '',
   liveInputs,
   onApplyNodeBenchmarks,
+  customOverrides,
 }: InvestmentNodeBannerProps) {
+  const storeOverrides = usePortfolioStore((state) => state.investorProfile?.customNodeBenchmarks);
+  const overrides = customOverrides ?? storeOverrides;
+
   const matchedNode = useMemo(() => findInvestmentNode(city), [city]);
+  const effectiveBenchmarks = useMemo(
+    () => (matchedNode ? getEffectiveNodeBenchmarks(matchedNode, overrides) : null),
+    [matchedNode, overrides]
+  );
+
   const compliance = useMemo(
     () => getNodeComplianceProfile(city, province || matchedNode?.province),
     [city, province, matchedNode]
@@ -206,8 +219,8 @@ export function InvestmentNodeBanner({
 
   const benchmarkAudit = useMemo(() => {
     if (!matchedNode || !liveInputs) return null;
-    return evaluateNodeBenchmarks(matchedNode, liveInputs);
-  }, [matchedNode, liveInputs]);
+    return evaluateNodeBenchmarks(matchedNode, liveInputs, overrides);
+  }, [matchedNode, liveInputs, overrides]);
 
   return (
     <div className={`rounded-xl border border-slate-200 bg-slate-50/90 p-3 space-y-2 text-xs text-slate-700 ${className}`}>
@@ -219,6 +232,28 @@ export function InvestmentNodeBanner({
             <span className="text-[10px] font-normal text-slate-500">
               • {matchedNode.province}
             </span>
+          )}
+          {effectiveBenchmarks && (
+            effectiveBenchmarks.isOverridden ? (
+              <span
+                data-testid="node-provenance-badge"
+                className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-800 bg-emerald-100/90 px-2 py-0.5 rounded-full border border-emerald-300 ml-1"
+              >
+                <ShieldCheck className="w-3 h-3 text-emerald-700" />
+                <span>
+                  Custom / Verified
+                  {effectiveBenchmarks.source ? ` · ${effectiveBenchmarks.source}` : ''}
+                  {effectiveBenchmarks.asOfDate ? ` · ${effectiveBenchmarks.asOfDate}` : ''}
+                </span>
+              </span>
+            ) : (
+              <span
+                data-testid="node-provenance-badge"
+                className="inline-flex items-center gap-1 text-[10px] font-medium text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full border border-slate-200 ml-1"
+              >
+                <span>Indicative estimate — unverified</span>
+              </span>
+            )
           )}
         </div>
 
@@ -242,13 +277,13 @@ export function InvestmentNodeBanner({
           </span>
 
           {/* 1-Click Apply Node Benchmarks CTA */}
-          {matchedNode?.benchmarks && onApplyNodeBenchmarks && (
+          {effectiveBenchmarks && onApplyNodeBenchmarks && (
             <button
               type="button"
               data-testid="apply-node-benchmarks-btn"
-              onClick={() => onApplyNodeBenchmarks(matchedNode.benchmarks)}
+              onClick={() => onApplyNodeBenchmarks(effectiveBenchmarks)}
               className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-indigo-50 hover:bg-indigo-100 text-indigo-800 border border-indigo-300 transition-colors cursor-pointer shadow-2xs"
-              title={`Apply ${matchedNode.name} market norms: ${matchedNode.benchmarks.typicalVacancyPercent}% Vacancy, ${matchedNode.benchmarks.typicalCapitalGrowthPercent}% Capital Growth, and ~${matchedNode.benchmarks.typicalMonthlyRatesPercentOfVal}% Municipal Rates`}
+              title={`Apply ${matchedNode?.name} norms: ${effectiveBenchmarks.typicalVacancyPercent}% Vacancy, ${effectiveBenchmarks.typicalCapitalGrowthPercent}% Capital Growth, and ~${effectiveBenchmarks.typicalMonthlyRatesPercentOfVal}% Municipal Rates`}
             >
               <Sliders className="w-3 h-3 text-indigo-600" />
               <span>Use Node Defaults</span>
@@ -287,20 +322,20 @@ export function InvestmentNodeBanner({
             </div>
           )}
 
-          {matchedNode.benchmarks && (
+          {effectiveBenchmarks && (
             <div
               data-testid="node-benchmark-reference-strip"
               className="flex flex-wrap items-center gap-1.5 text-[10px] text-slate-600 font-mono bg-white/80 px-2.5 py-1 rounded-lg border border-slate-200"
             >
               <span className="font-sans font-bold text-slate-700">Node Norms:</span>
-              <span>Yield {matchedNode.benchmarks.grossYieldRangePercent[0]}–{matchedNode.benchmarks.grossYieldRangePercent[1]}%</span>
+              <span>Yield {effectiveBenchmarks.grossYieldRangePercent[0]}–{effectiveBenchmarks.grossYieldRangePercent[1]}%</span>
               <span>•</span>
-              <span>Vacancy {matchedNode.benchmarks.typicalVacancyPercent}%</span>
+              <span>Vacancy {effectiveBenchmarks.typicalVacancyPercent}%</span>
               <span>•</span>
-              <span>Growth {matchedNode.benchmarks.typicalCapitalGrowthPercent}%</span>
+              <span>Growth {effectiveBenchmarks.typicalCapitalGrowthPercent}%</span>
               <span>•</span>
               <span>
-                R{matchedNode.benchmarks.pricePerSqmRangeZAR[0].toLocaleString('en-ZA')}–R{matchedNode.benchmarks.pricePerSqmRangeZAR[1].toLocaleString('en-ZA')}/m²
+                R{effectiveBenchmarks.pricePerSqmRangeZAR[0].toLocaleString('en-ZA')}–R{effectiveBenchmarks.pricePerSqmRangeZAR[1].toLocaleString('en-ZA')}/m²
               </span>
             </div>
           )}
