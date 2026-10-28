@@ -684,7 +684,7 @@ function SettingsContent() {
     const store = usePortfolioStore.getState();
     const completedGuideSteps = store.completedGuideSteps;
     const toggleGuideStep = store.toggleGuideStep;
-    ['settings-entity-branding', 'settings-finance-defaults', 'settings-buy-box'].forEach((stepId) => {
+    ['settings-entity-branding', 'settings-finance-defaults', 'settings-buy-box', 'settings-node-benchmarks'].forEach((stepId) => {
       if (!completedGuideSteps.includes(stepId)) {
         toggleGuideStep(stepId);
       }
@@ -2158,10 +2158,12 @@ function SettingsContent() {
               </div>
 
               {/* Section 7: Regional Node Market Benchmarks (35 SA Corridors) */}
-              <NodeBenchmarkEditor
-                customNodeBenchmarks={customNodeBenchmarks}
-                onChange={setCustomNodeBenchmarks}
-              />
+              <div id="settings-node-benchmarks" className="scroll-mt-20">
+                <NodeBenchmarkEditor
+                  customNodeBenchmarks={customNodeBenchmarks}
+                  onChange={setCustomNodeBenchmarks}
+                />
+              </div>
             </div>
           )}
 

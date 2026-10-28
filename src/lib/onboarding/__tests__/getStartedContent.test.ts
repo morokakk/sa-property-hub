@@ -31,12 +31,13 @@ describe('Get Started content integrity', () => {
     expect(GET_STARTED_STAGES[5].modules.map((m) => m.route)).toEqual(['/', '/tasks']);
   });
 
-  it('splits Settings into Entity & Branding, Finance Defaults and Buy Box, each stating what it powers', () => {
+  it('splits Settings into Entity & Branding, Finance Defaults, Buy Box and Regional Benchmarks, each stating what it powers', () => {
     const settings = GET_STARTED_STAGES[0].modules[0];
     expect(settings.features.map((f) => f.title)).toEqual([
       '0a · Entity & Branding',
       '0b · Finance Defaults',
       '0c · Buy Box Hurdles',
+      '0d · Regional Node Benchmarks',
     ]);
     settings.features.forEach((f) => expect(f.powers && f.powers.length).toBeTruthy());
     const finance = settings.features[1];
