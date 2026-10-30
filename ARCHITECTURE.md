@@ -19,6 +19,7 @@ flowchart TD
     P3["src/app/flips/page.tsx (Buy & Flip)"]
     P4["src/app/rentals/page.tsx (Rentals)"]
     P5["src/app/funding/page.tsx (Facilities)"]
+    P6["src/app/tasks/page.tsx (Task Ledger & Calendar)"]
   end
 
   subgraph Tier2["Tier 2: Headless Domain UI Hooks"]
@@ -32,6 +33,8 @@ flowchart TD
     C2["src/components/flips/ (BOQTable, DelayMatrix, FlipExitModal)"]
     C3["src/components/rentals/ (RentalCard, TenantStatement, LeaseInspectionDrawer, TenantNoticeModal, ExitSaleModal)"]
     C4["src/components/rentals/UnifiedPdfVerificationModal.tsx"]
+    C5["src/components/analyzer/DealIntelligencePanel.tsx"]
+    C6["src/components/settings/NodeBenchmarkEditor.tsx"]
   end
 
   subgraph Tier4["Tier 4: Pure Calculation Engines"]
@@ -42,6 +45,8 @@ flowchart TD
     CALC5["src/lib/calculations/sarsTax.ts"]
     CALC6["src/lib/calculations/holdingSensitivity.ts"]
     CALC7["src/lib/calculations/inspections.ts"]
+    CALC8["src/lib/calculations/dealIntelligence.ts & proposalIntelligence.ts"]
+    CALC9["src/lib/calculations/recurrence.ts & taskCalendar.ts"]
   end
 
   subgraph Tier5["Tier 5: Modular Zustand State Store"]
@@ -90,6 +95,8 @@ flowchart TD
   - [`TenantNoticeModal.tsx`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/components/rentals/modals/TenantNoticeModal.tsx): Tenant vacation modal providing side-by-side Ingoing vs. Exit condition diffing, automated degraded-item detection, contractor repair deductions, and live deposit refund auto-sync.
   - [`ExitSaleModal.tsx`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/components/rentals/modals/ExitSaleModal.tsx): Rental disposal modal with itemized estate agent commission, conveyancer bond cancellation fee (`R5,200`), NCA Section 125 90-day early settlement penalty, and negative-equity shortfall warnings (`shortfallToSettleZAR`).
   - [`FlipExitModal.tsx`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/components/flips/modals/FlipExitModal.tsx): Buy-and-flip exit modal reconciling sales commission, bond cancellation fees, and early settlement penalties against realized profit and capital recycling.
+  - [`DealIntelligencePanel.tsx`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/components/analyzer/DealIntelligencePanel.tsx): Collapsible multi-strategy verdict and automated deal-repair engine panel comparing underwriting metrics against 35 SA regional investment node baselines.
+  - [`NodeBenchmarkEditor.tsx`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/components/settings/NodeBenchmarkEditor.tsx): Regional node benchmark override manager with CSV/JSON import/export and remote Supabase synchronization.
 
 ### 1.4 Tier 4: Pure Calculation Engines (`src/lib/calculations/`)
 - **Role:** 100% deterministic, side-effect-free financial, tax, and engineering mathematics.
@@ -101,9 +108,11 @@ flowchart TD
 - **Key Calculation Engines:**
   - [`inspections.ts`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/lib/calculations/inspections.ts) (Tested in [`__tests__/inspections.test.ts`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/lib/calculations/__tests__/inspections.test.ts)): Pure 8-point RHA Section 5 inspection engine, `calculateInspectionDepositSummary`, `ensureInspectionItems`, and phone number normalization.
   - [`propertyMetrics.ts`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/lib/calculations/propertyMetrics.ts): Cap rates, cashflow, IRR, DSCR, and Year-5 terminal exit disposal modeling.
+  - [`dealIntelligence.ts`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/lib/calculations/dealIntelligence.ts) & [`proposalIntelligence.ts`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/lib/calculations/proposalIntelligence.ts): Deterministic multi-strategy deal scoring, automated deal-repair levers, and capital-stack funding structurer calibrated against [`investmentNodes.ts`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/lib/constants/investmentNodes.ts).
   - [`flips.ts`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/lib/calculations/flips.ts): Renovation milestone draws, sponsor sweat-equity savings, and holding/exit friction (`calculateFlipFinancials`, `calculateArchivedFlipFinancials`).
   - [`rentals.ts`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/lib/calculations/rentals.ts): `calculateDisposalMetrics`, Section 11(a) tax provisions, and time-weighted occupancy YTD.
   - [`maoSolver.ts`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/lib/calculations/maoSolver.ts): Maximum Allowable Offer closed-form inverse solver with $O(1)$ bid-dependent 90-day early settlement penalty factor $k_{\text{penalty}}$.
+  - [`recurrence.ts`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/lib/calculations/recurrence.ts) & [`taskCalendar.ts`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/lib/calculations/taskCalendar.ts): Recurring task cadence engine (`Weekly`, `Monthly`, `Quarterly`, `Annually`), strict chronological sorting, overdue triage (`isTaskOverdue`), Monday-first 7-column calendar grid builder (`buildCalendarMonthGrid`), and future recurring ghost projections (`projectRecurringGhostTasks`).
 
 ### 1.5 Tier 5: Modular Zustand State Store (`src/lib/store/`)
 - **Role:** Single source of truth for local-first reactive state, persistence, and cross-domain events.

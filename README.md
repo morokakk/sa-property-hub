@@ -7,7 +7,7 @@
 [![React](https://img.shields.io/badge/React-19.3-blue.svg)](https://react.dev/)
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind-v4.3-38bdf8.svg)](https://tailwindcss.com/)
 [![Zustand](https://img.shields.io/badge/Zustand-v5.0-orange.svg)](https://github.com/pmndrs/zustand)
-[![Tests](https://img.shields.io/badge/Vitest-771%20Passed-brightgreen.svg)](https://vitest.dev/)
+[![Tests](https://img.shields.io/badge/Vitest-811%20Passed-brightgreen.svg)](https://vitest.dev/)
 [![E2E](https://img.shields.io/badge/Playwright-Multi--Device-purple.svg)](https://playwright.dev/)
 [![Compliance](https://img.shields.io/badge/SARS%20%2F%20LPC%20%2F%20RHA-2026%20Compliant-emerald.svg)]()
 
@@ -39,6 +39,7 @@ The **Moremela Property Investment Hub** addresses the structural complexities u
 * **Statutory Cost Engines:** Pure calculation engines computing 2026 progressive SARS Transfer Duty ([`calculateSarsTransferDuty`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/lib/calculations/sarsTax.ts)), Deeds Office registration tiers, LPC conveyancing legal fees, and bond registration costs.
 * **Bond Cancellation & Exit Legal Friction:** Models statutory conveyancing cancellation fees (default `R5,200` incl. 15% VAT based on the 1 July 2026 LSSA base cancellation tariff + Deeds Office cancellation levy + bank instruction fee) and the **National Credit Act (NCA) Section 125 90-Day Early Settlement Penalty** toggle (`Notice Given = R0` penalty vs. `No 90-Day Notice = 90 days' bond interest` or custom bank settlement quote override).
 * **Closed-Form MAO Inverse Solver:** Maximum Allowable Offer solver ([`maoSolver.ts`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/lib/calculations/maoSolver.ts)) determining maximum strike bids based on hurdle internal rates of return (IRR), desired flip ROI, target net cap rates, and PIE Act eviction risk reserves. When early termination notice is not given on a geared flip, the engine incorporates the bid-dependent 90-day penalty factor $k_{\text{penalty}} = (\text{LTV}/100) \times (\text{Rate}/100) \times (90/365)$ into the closed-form denominator in $O(1)$ without circular iteration.
+* **Deterministic Deal Intelligence & Strategy Verdict ([`dealIntelligence.ts`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/lib/calculations/dealIntelligence.ts) & [`DealIntelligencePanel.tsx`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/components/analyzer/DealIntelligencePanel.tsx)):** Evaluates Rental, Flip, and BRRRR viability against empirical benchmarks across **35 South African investment corridors** ([`investmentNodes.ts`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/lib/constants/investmentNodes.ts)) calibrated with 2026/27 statutory municipal tariffs, surfacing automated deal-repair levers (bid strike discounts, rent uplift targets, rehab trims, or strategy pivots).
 * **Location Scorecard:** 4-node spatial amenity evaluation measuring accessibility to transport corridors, employment nodes, educational institutions, and retail hubs.
 * **One-Click Promotion Pipeline:** Seamlessly promotes screened deals to active execution:
   - `promoteOpportunityToFlip`: Automatically transfers purchase basis, rehabilitation budgets, and initializes regional Certificate of Compliance (CoC) trackers.
@@ -76,6 +77,7 @@ The **Moremela Property Investment Hub** addresses the structural complexities u
 
 ### 2.5 Proposal Generator & Universal Financial Exports (`/proposal`)
 * **Live Route:** [`src/app/proposal/page.tsx`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/app/proposal/page.tsx)
+* **Deterministic Funding Structurer ([`proposalIntelligence.ts`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/lib/calculations/proposalIntelligence.ts)):** Recommends optimal capital stack structures (Private Lender Fixed Coupon, Syndicate JV Profit Split, Bullet Maturity, or Hybrid Bank + Mezzanine) calibrated to the deal's cashflow coverage, holding duration, and sponsor equity margin.
 * **Institutional PDF Tear-Sheets:** Dynamic, client-side PDF generation producing institutional investor memorandums with executive summaries, photo vaults, return waterfalls, and capital repayment tranches. Reconciles 100.0% of exit legal friction and bond cancellation costs within the "Use of Funds" and net return schedules.
 * **1-Click WhatsApp Syndication:** Generates concise, pre-formatted deal pitch copy and mobile WhatsApp URLs for rapid syndicate outreach, incorporating itemized acquisition and exit legal friction.
 * **Universal Accountant GL Journal CSV:** Exports general ledger journal entries pre-configured with debit/credit double-entry rows and South African VAT tags (Standard 15% vs. Exempt Residential Rent) for direct ingestion into Xero, Sage South Africa, and QuickBooks.
@@ -83,8 +85,16 @@ The **Moremela Property Investment Hub** addresses the structural complexities u
 
 ### 2.6 Global Settings & Investor Profile (`/settings`)
 * **Live Route:** [`src/app/settings/page.tsx`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/app/settings/page.tsx)
-* **Investor Profile & Corporate Tax Routing:** Configures tax entity (`Company (27%)`, `Individual (45%)`, or `Pre-Tax`), VAT-exempt managing agency toggle, buy-box investment hurdle thresholds, and LLM provider API credentials.
+* **Investor Profile & Corporate Tax Routing:** Configures tax entity (`Company (27%)`, `Individual (45%)`, or `Pre-Tax`), VAT-exempt managing agency toggle, buy-box investment hurdle thresholds, Google OAuth cloud authentication, and LLM provider API credentials.
+* **Regional Node Market Benchmark Editor ([`NodeBenchmarkEditor.tsx`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/components/settings/NodeBenchmarkEditor.tsx)):** Interactive editor for customizing gross yield, cap rate, price-per-$m^2$, and statutory municipal tariff baselines across all 35 South African investment nodes with CSV/JSON import/export and Supabase cloud sync.
 * **Conveyancing & Transfer Legal Settings:** Configures `defaultBondCancellationFeeZAR` (defaulting to `R5,200` incl. 15% VAT per 1 July 2026 LSSA tariffs + Deeds Office cancellation levy + bank instruction fee), synchronizing baseline exit legal cost assumptions across `/analyzer`, `/flips`, `/rentals`, and `/proposal`.
+
+### 2.7 Task & Compliance Calendar Engine (`/tasks`)
+* **Live Route:** [`src/app/tasks/page.tsx`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/app/tasks/page.tsx)
+* **Segmented Task Ledger vs. Calendar View:** High-ergonomics view switcher toggling between the chronological operational ledger (`📋 Task Ledger`) and a zero-dependency responsive monthly compliance calendar (`📅 Calendar View`) with shared multi-criteria filtering.
+* **Strict Chronological Sorting & Overdue Triage ([`taskCalendar.ts`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/lib/calculations/taskCalendar.ts)):** Sorts active tasks by `dueDate` ascending (breaking same-day ties by `Urgent` → `High` → `Medium` → `Low` priority and pinning `Completed` items to the bottom), badging overdue items (`dueDate < todayISO`) with rose border accents and updating the `Pending Tasks` KPI overdue counter.
+* **Interactive Calendar Grid & Recurring Ghost Previews ([`recurrence.ts`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/lib/calculations/recurrence.ts) & [`taskCalendar.ts`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/lib/calculations/taskCalendar.ts)):** Monday-first 7-column monthly grid projecting read-only dashed preview pills (`Scheduled {Recurrence} Preview`) for active `Weekly`, `Monthly`, `Quarterly`, and `Annually` recurring commitments (respecting `recurrenceEndDate`), paired with a Selected Date Inspector sidebar for 1-click completion and date-prefilled task creation.
+* **Automated Cross-Domain Reminders ([`taskSync.ts`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/lib/store/utils/taskSync.ts)):** Automatically schedules and synchronizes 60-day lease expiry renewal notices and 14-day Body Corporate AGM budget review tasks across rentals, flips, and pipeline opportunities.
 
 ---
 
@@ -99,8 +109,9 @@ The **Moremela Property Investment Hub** addresses the structural complexities u
 | **Client State** | Zustand | `5.0.15` (10 domain slices, `persist` middleware, atomic selectors) |
 | **Schema Validation** | Zod | `4.6.5` (Utility ingestion, JSON schema assertions) |
 | **Document Processing** | PDF-Lib / PDF.js | `pdf-lib 1.17.1`, `pdfjs-dist 6.3.289`, `html2pdf.js 0.14.0` |
-| **Database & Cloud** | Supabase | `@supabase/supabase-js 2.117.2` (Row-Level Security, multi-tenant cloud sync) |
-| **Unit & Integration** | Vitest | `5.0.1` (64 test files, 718 passing tests) |
+| **Database & Cloud** | Supabase | `@supabase/supabase-js 2.117.2` (Row-Level Security, Google OAuth, cloud sync) |
+| **Product Telemetry** | PostHog | `posthog-js` (POPIA-compliant input masking & client analytics) |
+| **Unit & Integration** | Vitest | `5.0.1` (77 test files, 811 passing tests) |
 | **End-to-End (E2E)** | Playwright | `1.63.0` (Mobile, Tablet, Desktop responsive regression suite) |
 | **Mutation Testing** | Stryker | `@stryker-mutator/core 10.0.0` |
 
@@ -179,6 +190,8 @@ npm run build
 │   ├── lib/
 │   │   ├── calculations/         # Tier 4: Pure 100% Deterministic ZAR Engines
 │   │   │   ├── propertyMetrics.ts# Cap rates, cashflow, IRR, DSCR formulas
+│   │   │   ├── dealIntelligence.ts   # Multi-strategy verdict & automated deal-repair engine
+│   │   │   ├── proposalIntelligence.ts # Deterministic capital stack & funding structurer
 │   │   │   ├── flips.ts          # Renovation milestone draws, sponsor savings, holding & exit costs
 │   │   │   ├── arrears.ts        # Dynamic monthly tenant ledger, allocation engine
 │   │   │   ├── inspections.ts    # RHA Section 5 8-point checklist & deposit deduction engine
@@ -186,7 +199,10 @@ npm run build
 │   │   │   ├── sarsTax.ts        # SARS Transfer Duty, Deeds Office, Section 13sex
 │   │   │   ├── holdingSensitivity.ts # Delay holding burn matrix (+30/60/90/120d)
 │   │   │   ├── municipalTariffs.ts   # Water/power sliding municipal tariff scales
+│   │   │   ├── recurrence.ts     # Recurring task cadence & deduplication engine
+│   │   │   ├── taskCalendar.ts   # Chronological sorting, overdue triage & calendar ghost projections
 │   │   │   └── vettingEngine.ts  # Pre-lease tenant scoring & deposit calculator
+│   │   ├── constants/            # Regional SA investment node baselines (35 corridors)
 │   │   ├── store/                # Tier 5: Modular Zustand Slices & Facade
 │   │   │   ├── slices/           # 10 domain slices (rental, flip, opp, funding, etc.)
 │   │   │   ├── selectors/        # Memoized selectors (usePortfolioSummary, equityAlerts)

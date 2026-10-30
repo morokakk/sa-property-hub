@@ -19,6 +19,13 @@ All notable changes to this project will be documented in this file.
 ### Fixed
 - **Safe Memory Storage Fallback in Persistence**: Added in-memory fallback storage in `portfolioMigrations.ts` to prevent Node 22+ environments without `--localstorage-file` from crashing during test runs.
 
+## [Regional Node Benchmarks, Deal Intelligence & POPIA Telemetry] - 2026-10-28
+
+### Added
+- **Deterministic Deal Intelligence & Strategy Verdict (`dealIntelligence.ts`, `DealIntelligencePanel.tsx`)**: Multi-strategy evaluation (Rental, Flip, BRRRR) with collapsible verdict panel and automated deal-repair levers (strike bid adjustments, rent uplift targets, rehab trims) benchmarked against 35 South African investment corridors (`investmentNodes.ts`) updated with official 2026/27 statutory municipal tariffs.
+- **Deterministic Funding Structurer (`proposalIntelligence.ts`)**: Automated capital-stack structuring recommendations in `/proposal` tailored to deal cashflow coverage, holding duration, and sponsor equity margin.
+- **Regional Node Market Benchmark Editor (`NodeBenchmarkEditor.tsx`)**: Settings module for customizing regional yield, cap rate, price-per-$m^2$, and municipal tariff baselines across all 35 SA nodes with CSV/JSON import/export and Supabase cloud sync.
+- **Google OAuth & POPIA-Compliant PostHog Telemetry**: Integrated Google OAuth cloud sign-in with query parameter preservation and PostHog client telemetry (`PostHogProvider.tsx`) with statutory POPIA input masking.
 
 ## [E2E Test Suite Stabilization & Root Cause Analysis] - 2026-10-23
 
