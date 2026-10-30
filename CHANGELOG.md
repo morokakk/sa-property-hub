@@ -19,6 +19,14 @@ All notable changes to this project will be documented in this file.
 ### Fixed
 - **Safe Memory Storage Fallback in Persistence**: Added in-memory fallback storage in `portfolioMigrations.ts` to prevent Node 22+ environments without `--localstorage-file` from crashing during test runs.
 
+### Updated
+- Ran `npm update` upgrading runtime and build dependencies to their latest compatible semver releases:
+  - **`html2canvas-pro`** (`2.5.2` &rarr; `2.6.0`): Canvas rendering engine minor upgrade.
+  - **`lucide-react`** (`1.63.0` &rarr; `1.65.0`): Icon component library update.
+  - **`posthog-js`** (`1.441.2` &rarr; `1.444.0`): Product analytics client update (`@posthog/core` `1.62.0`).
+  - **`resend`** (`6.35.0` &rarr; `6.36.0`): Transactional email SDK update.
+  - **Build & Transitive Tooling**: `@babel/*` (`8.0.10`), `rolldown` (`1.2.16`), `node-releases` (`2.0.62`).
+
 ## [Regional Node Benchmarks, Deal Intelligence & POPIA Telemetry] - 2026-10-28
 
 ### Added
