@@ -214,12 +214,50 @@ export function mergePortfolioPersistedState<T extends {
   };
 }
 
+const memoryStorageMap = new Map<string, string>();
+const fallbackMemoryStorage: Storage = {
+  get length() {
+    return memoryStorageMap.size;
+  },
+  clear() {
+    memoryStorageMap.clear();
+  },
+  getItem(key: string) {
+    return memoryStorageMap.has(key) ? memoryStorageMap.get(key)! : null;
+  },
+  key(index: number) {
+    return Array.from(memoryStorageMap.keys())[index] ?? null;
+  },
+  removeItem(key: string) {
+    memoryStorageMap.delete(key);
+  },
+  setItem(key: string, value: string) {
+    memoryStorageMap.set(key, String(value));
+  },
+};
+
+function getSafeStorage(): Storage {
+  try {
+    if (
+      typeof globalThis !== 'undefined' &&
+      globalThis.localStorage &&
+      typeof globalThis.localStorage.getItem === 'function' &&
+      typeof globalThis.localStorage.setItem === 'function'
+    ) {
+      return globalThis.localStorage;
+    }
+  } catch {
+    // Node 22+ without --localstorage-file or SSR environment
+  }
+  return fallbackMemoryStorage;
+}
+
 /**
  * Zustand Persist Middleware Configuration Object
  */
 export const portfolioPersistConfig: PersistOptions<PortfolioState, PortfolioState> = {
   name: PORTFOLIO_STORAGE_KEY,
-  storage: createJSONStorage<PortfolioState>(() => localStorage),
+  storage: createJSONStorage<PortfolioState>(() => getSafeStorage()),
   partialize: (state: PortfolioState) => {
     // Strip heavy raw OCR/PDF text from utility statements to shield localStorage quota (PERF-10)
     const sanitizedRentals = (state.rentals || []).map((r) => {
