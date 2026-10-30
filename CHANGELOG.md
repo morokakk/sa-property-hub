@@ -2,6 +2,24 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Task Engine Upgrade: Calendar View, Chronological Sorting & Overdue Triage] - 2026-10-30
+
+### Added
+- **Segmented View Switcher**: High-ergonomics toggle on the toolbar allowing one-click switching between `[ 📋 Task Ledger ]` (default) and `[ 📅 Calendar View ]`, with active cross-view filter dropdowns.
+- **Interactive Monthly Calendar Grid (`📅 Calendar View`)**: Zero-dependency 7-column Monday-first responsive calendar grid with month navigation (`[◀ Prev]`, `[Today]`, `[Next ▶]`), color-coded priority pills (`Urgent`/`Overdue` in rose, `High` in amber, `Medium`/`Low` in slate, `Completed` in emerald), and overflow counter.
+- **Recurring Ghost Projections**: Projection engine (`projectRecurringGhostTasks`) mapping active recurring commitments (Weekly, Monthly, Quarterly, Annually) onto future calendar dates with dashed styling (`border-dashed border-indigo-300`) and dedicated scheduled preview cards, respecting `recurrenceEndDate`.
+- **Selected Date Inspector & In-Place Actions**: Interactive right-hand agenda panel displaying full task cards with checkbox toggle, status select, linked entity chip, delete button, quick `[+ Add Task on Selected Date]` modal launcher, and monthly agenda list.
+- **Mobile Calendar Adaptations**: Compact priority dot indicators and automatic smooth-scroll to the day inspector upon tapping any calendar cell on mobile viewports (`< md`).
+
+### Changed
+- **Strict Chronological Sorting**: Sorted active tasks strictly by `dueDate` ascending (`new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime()`), breaking same-day ties by priority weight (`Urgent` → `High` → `Medium` → `Low`), and pinning `Completed` tasks to the bottom of the ledger.
+- **Overdue Visual Triage**: Active overdue tasks (`task.status !== 'Completed' && task.dueDate < todayISO`) receive prominent rose left border accents (`border-l-4 border-l-rose-500`) and rose badges (`⚠️ Overdue: DD MMM YYYY`).
+- **KPI Card Overdue Counter**: Added a `{overdueCount} overdue` rose sub-badge inside the `Pending Tasks` KPI card when overdue tasks exist.
+
+### Fixed
+- **Safe Memory Storage Fallback in Persistence**: Added in-memory fallback storage in `portfolioMigrations.ts` to prevent Node 22+ environments without `--localstorage-file` from crashing during test runs.
+
+
 ## [E2E Test Suite Stabilization & Root Cause Analysis] - 2026-10-23
 
 ### Fixed
