@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import TopHeader from '@/components/navigation/TopHeader';
 import { usePortfolioStore } from '@/lib/store/usePortfolioStore';
 import { formatDate } from '@/lib/formatters';
@@ -14,9 +14,17 @@ import {
 } from '@/lib/calculations/taskCalendar';
 import { formatDateParts } from '@/lib/calculations/recurrence';
 import {
+  exportTasksToICS,
+  buildGoogleCalendarUrl,
+  buildOutlookWebUrl,
+} from '@/lib/export/calendarExport';
+import {
   CheckSquare,
   PlusCircle,
   Calendar,
+  CalendarPlus,
+  Download,
+  ExternalLink,
   AlertTriangle,
   Clock,
   Trash2,
@@ -78,6 +86,33 @@ export default function TaskEnginePage() {
   const [filterStatus, setFilterStatus] = useState<string>('ALL');
   const [filterEntityType, setFilterEntityType] = useState<string>('ALL');
   const [filterRecurrence, setFilterRecurrence] = useState<string>('ALL');
+
+  // Per-task Calendar Quick Action Menu State
+  const [openCalendarMenuTaskId, setOpenCalendarMenuTaskId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!openCalendarMenuTaskId) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setOpenCalendarMenuTaskId(null);
+      }
+    };
+
+    const handleMouseDown = (e: MouseEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (target && !target.closest('[data-calendar-menu-container]')) {
+        setOpenCalendarMenuTaskId(null);
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    document.addEventListener('mousedown', handleMouseDown);
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+      document.removeEventListener('mousedown', handleMouseDown);
+    };
+  }, [openCalendarMenuTaskId]);
 
   // Modal State
   const [showAddModal, setShowAddModal] = useState(false);
@@ -154,6 +189,12 @@ export default function TaskEnginePage() {
     });
     return sortTasksChronologically(matching);
   }, [tasks, filterPriority, filterStatus, filterEntityType, filterRecurrence]);
+
+  // Active (non-completed) filtered tasks for bulk .ics export
+  const filteredActiveTasks = useMemo(
+    () => filteredTasks.filter((t) => t.status !== 'Completed'),
+    [filteredTasks]
+  );
 
   // KPI Counts
   const urgentCount = tasks.filter((t) => t.priority === 'Urgent' && t.status !== 'Completed').length;
@@ -374,6 +415,80 @@ export default function TaskEnginePage() {
             compact ? 'justify-end pt-2 border-t border-slate-100' : 'self-end sm:self-center shrink-0'
           }`}
         >
+          {/* Per-Task "Add to Calendar" Quick Action Popover */}
+          <div className="relative" data-calendar-menu-container>
+            <button
+              type="button"
+              data-testid={`task-calendar-menu-btn-${task.id}`}
+              onClick={() =>
+                setOpenCalendarMenuTaskId((prev) => (prev === task.id ? null : task.id))
+              }
+              aria-expanded={openCalendarMenuTaskId === task.id}
+              aria-haspopup="menu"
+              title="Add to External Calendar (.ics / Google / Outlook)"
+              className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg border text-xs font-semibold transition-colors ${
+                openCalendarMenuTaskId === task.id
+                  ? 'bg-emerald-50 border-emerald-300 text-emerald-800'
+                  : 'border-slate-300 bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+              }`}
+            >
+              <CalendarPlus className="w-3.5 h-3.5 text-emerald-600" />
+              <span className="hidden xl:inline">Sync</span>
+            </button>
+
+            {openCalendarMenuTaskId === task.id && (
+              <div
+                role="menu"
+                data-testid={`task-calendar-menu-${task.id}`}
+                className="absolute right-0 mt-1.5 w-64 rounded-xl bg-white border border-slate-200 shadow-lg py-1.5 z-30 text-xs"
+              >
+                <div className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 border-b border-slate-100">
+                  Add Task to Calendar
+                </div>
+
+                <button
+                  type="button"
+                  role="menuitem"
+                  data-testid={`task-download-ics-${task.id}`}
+                  onClick={() => {
+                    exportTasksToICS([task]);
+                    setOpenCalendarMenuTaskId(null);
+                  }}
+                  className="w-full text-left px-3 py-2 hover:bg-slate-50 text-slate-700 font-medium flex items-center justify-between gap-2 transition-colors"
+                >
+                  <span>📥 Download .ics (Outlook Desktop / Apple / Mobile)</span>
+                  <Download className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                </button>
+
+                <a
+                  role="menuitem"
+                  data-testid={`task-google-cal-${task.id}`}
+                  href={buildGoogleCalendarUrl(task)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={() => setOpenCalendarMenuTaskId(null)}
+                  className="w-full text-left px-3 py-2 hover:bg-slate-50 text-slate-700 font-medium flex items-center justify-between gap-2 transition-colors"
+                >
+                  <span>🌐 Add to Google Calendar</span>
+                  <ExternalLink className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                </a>
+
+                <a
+                  role="menuitem"
+                  data-testid={`task-outlook-cal-${task.id}`}
+                  href={buildOutlookWebUrl(task)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={() => setOpenCalendarMenuTaskId(null)}
+                  className="w-full text-left px-3 py-2 hover:bg-slate-50 text-slate-700 font-medium flex items-center justify-between gap-2 transition-colors"
+                >
+                  <span>📧 Add to Outlook 365 / Web</span>
+                  <ExternalLink className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                </a>
+              </div>
+            )}
+          </div>
+
           <select
             value={task.status}
             onChange={(e) => updateTask(task.id, { status: e.target.value as TaskStatus })}
@@ -525,6 +640,19 @@ export default function TaskEnginePage() {
             <span className="text-slate-400 font-medium">
               Showing {filteredTasks.length} of {tasks.length} tasks
             </span>
+
+            {/* Bulk RFC 5545 .ics Export Button */}
+            <button
+              type="button"
+              data-testid="export-bulk-ics-btn"
+              disabled={filteredActiveTasks.length === 0}
+              onClick={() => exportTasksToICS(filteredActiveTasks)}
+              title="Export filtered active tasks to an RFC 5545 .ics calendar file (Outlook, Apple Calendar, Google Calendar)"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-2xs"
+            >
+              <span aria-hidden="true">📅</span>
+              <span>Export .ics ({filteredActiveTasks.length})</span>
+            </button>
 
             {/* High-Ergonomics Segmented View Switcher */}
             <div
