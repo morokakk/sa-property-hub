@@ -24,9 +24,11 @@ import {
   CheckCircle2,
   Compass,
   BookOpen,
+  MessageSquarePlus,
 } from 'lucide-react';
 import { usePortfolioStore } from '@/lib/store/usePortfolioStore';
 import { exportAccountantJournalCSV } from '@/lib/export/csvExport';
+import FeedbackModal from '@/components/common/FeedbackModal';
 
 export default function Sidebar() {
   const pathname = usePathname();
@@ -47,6 +49,7 @@ export default function Sidebar() {
 
   // Mobile Drawer State
   const [isMobileDrawerOpen, setIsMobileDrawerOpen] = useState(false);
+  const [isFeedbackModalOpen, setIsFeedbackModalOpen] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
   const [drawerNotice, setDrawerNotice] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -306,6 +309,15 @@ export default function Sidebar() {
               </Link>
             );
           })}
+          <button
+            type="button"
+            onClick={() => setIsFeedbackModalOpen(true)}
+            data-testid="sidebar-feedback-trigger"
+            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-300 hover:bg-slate-800/80 hover:text-white transition-all cursor-pointer text-left"
+          >
+            <MessageSquarePlus className="w-4 h-4 text-emerald-400 shrink-0" />
+            <span>Feedback &amp; Ideas</span>
+          </button>
         </nav>
 
         {/* System Status / Regional Badge */}
@@ -449,6 +461,18 @@ export default function Sidebar() {
                     </Link>
                   );
                 })}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsMobileDrawerOpen(false);
+                    setIsFeedbackModalOpen(true);
+                  }}
+                  data-testid="sidebar-mobile-feedback-trigger"
+                  className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-xs font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition-all cursor-pointer text-left"
+                >
+                  <MessageSquarePlus className="w-4 h-4 text-emerald-400 shrink-0" />
+                  <span>Feedback &amp; Ideas</span>
+                </button>
               </nav>
 
               {/* Portfolio Data & Backup Section */}
@@ -590,6 +614,12 @@ export default function Sidebar() {
           <span className="font-medium">{drawerNotice}</span>
         </div>
       )}
+
+      {/* Permanent In-App Feedback Engine Modal */}
+      <FeedbackModal
+        isOpen={isFeedbackModalOpen}
+        onClose={() => setIsFeedbackModalOpen(false)}
+      />
     </>
   );
 }

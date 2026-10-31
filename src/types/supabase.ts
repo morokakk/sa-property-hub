@@ -14,6 +14,39 @@ export type Database = {
   }
   public: {
     Tables: {
+      user_feedback: {
+        Row: {
+          category: string
+          contact_optional: string | null
+          created_at: string
+          diagnostics: Json
+          id: string
+          message: string
+          module_route: string
+          user_id: string | null
+        }
+        Insert: {
+          category: string
+          contact_optional?: string | null
+          created_at?: string
+          diagnostics?: Json
+          id?: string
+          message: string
+          module_route: string
+          user_id?: string | null
+        }
+        Update: {
+          category?: string
+          contact_optional?: string | null
+          created_at?: string
+          diagnostics?: Json
+          id?: string
+          message?: string
+          module_route?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       boq_items: {
         Row: {
           actual_cash_outflow_zar: number | null
