@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Client-Side iCalendar (.ics) Export & Deep Links] - 2026-10-31
+
+### Added
+- **RFC 5545 Calendar Export Engine (`calendarExport.ts`)**: Zero-dependency utility generating compliant iCalendar `.ics` files with CRLF line endings, exclusive all-day `DTEND` dates (`dueDate + 1 day`), priority mappings (`Urgent`=1, `High`=3, `Medium`=5, `Low`=9), RFC 5545 special character escaping, native recurrence rules (`RRULE:FREQ=WEEKLY|MONTHLY|YEARLY` with `INTERVAL=3` quarterly and `UNTIL` bounds), and 9:00 AM `VALARM` reminders.
+- **Bulk `.ics` Export (`[ 📅 Export .ics (N) ]`)**: Added an export action in the `/tasks` toolbar that bulk-downloads all currently filtered active tasks into a structured `.ics` file.
+- **Per-Task Calendar Quick Actions**: Added a `CalendarPlus` (`Sync`) popover menu to all task cards (in both the Task Ledger and Calendar View's Selected Date Inspector) offering one-click `.ics` download, direct Google Calendar event templates, and Microsoft Outlook 365 / Web compose deep links.
+- **Get Started Guide Expansion**: Added feature `05d · Calendar View & .ics Sync` in `getStartedContent.ts` guiding users on monthly view switching, recurring ghost previews, and external calendar synchronization.
+
 ## [Task Engine Upgrade: Calendar View, Chronological Sorting & Overdue Triage] - 2026-10-30
 
 ### Added

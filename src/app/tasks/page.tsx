@@ -576,7 +576,10 @@ export default function TaskEnginePage() {
         </div>
 
         {/* Filter Controls Bar & Segmented View Switcher */}
-        <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-xs flex flex-wrap items-center justify-between gap-3 text-xs">
+        <div
+          id="tasks-toolbar"
+          className="scroll-mt-20 bg-white rounded-xl p-4 border border-slate-200 shadow-xs flex flex-wrap items-center justify-between gap-3 text-xs"
+        >
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-slate-500 font-semibold flex items-center gap-1">
               <Filter className="w-3.5 h-3.5" /> Filters:

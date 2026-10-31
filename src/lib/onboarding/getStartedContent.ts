@@ -614,6 +614,20 @@ export const GET_STARTED_STAGES: readonly JourneyStage[] = [
             href: '/tasks#tasks-list',
             ctaLabel: 'View AGM tasks',
           },
+          {
+            id: 'tasks-calendar-sync',
+            title: 'Calendar View & .ics Sync',
+            summary: 'Monthly grid with recurring ghost previews, bulk RFC 5545 .ics export, and per-task Google/Outlook calendar links.',
+            howTo: [
+              'Toggle [ 📅 Calendar View ] in the toolbar to inspect monthly to-dos and projected recurring ghost commitments.',
+              'Click [ 📅 Export .ics ] to bulk-download active to-dos with RFC 5545 recurrence rules and 9:00 AM reminders.',
+              'Click Sync on any task card to download a single .ics or open direct Google Calendar and Outlook 365 compose links.',
+            ],
+            proTip:
+              'RFC 5545 .ics files seamlessly import into Apple Calendar, Microsoft Outlook, and Google Calendar on mobile or desktop. Recurring series preserve frequency and until-dates so operational reminders trigger on time without manual entry.',
+            href: '/tasks#tasks-toolbar',
+            ctaLabel: 'Open Calendar & Sync',
+          },
         ],
       },
     ],

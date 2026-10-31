@@ -7,7 +7,7 @@
 [![React](https://img.shields.io/badge/React-19.3-blue.svg)](https://react.dev/)
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind-v4.3-38bdf8.svg)](https://tailwindcss.com/)
 [![Zustand](https://img.shields.io/badge/Zustand-v5.0-orange.svg)](https://github.com/pmndrs/zustand)
-[![Tests](https://img.shields.io/badge/Vitest-811%20Passed-brightgreen.svg)](https://vitest.dev/)
+[![Tests](https://img.shields.io/badge/Vitest-823%20Passed-brightgreen.svg)](https://vitest.dev/)
 [![E2E](https://img.shields.io/badge/Playwright-Multi--Device-purple.svg)](https://playwright.dev/)
 [![Compliance](https://img.shields.io/badge/SARS%20%2F%20LPC%20%2F%20RHA-2026%20Compliant-emerald.svg)]()
 
@@ -94,6 +94,7 @@ The **Moremela Property Investment Hub** addresses the structural complexities u
 * **Segmented Task Ledger vs. Calendar View:** High-ergonomics view switcher toggling between the chronological operational ledger (`📋 Task Ledger`) and a zero-dependency responsive monthly compliance calendar (`📅 Calendar View`) with shared multi-criteria filtering.
 * **Strict Chronological Sorting & Overdue Triage ([`taskCalendar.ts`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/lib/calculations/taskCalendar.ts)):** Sorts active tasks by `dueDate` ascending (breaking same-day ties by `Urgent` → `High` → `Medium` → `Low` priority and pinning `Completed` items to the bottom), badging overdue items (`dueDate < todayISO`) with rose border accents and updating the `Pending Tasks` KPI overdue counter.
 * **Interactive Calendar Grid & Recurring Ghost Previews ([`recurrence.ts`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/lib/calculations/recurrence.ts) & [`taskCalendar.ts`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/lib/calculations/taskCalendar.ts)):** Monday-first 7-column monthly grid projecting read-only dashed preview pills (`Scheduled {Recurrence} Preview`) for active `Weekly`, `Monthly`, `Quarterly`, and `Annually` recurring commitments (respecting `recurrenceEndDate`), paired with a Selected Date Inspector sidebar for 1-click completion and date-prefilled task creation.
+* **RFC 5545 iCalendar (.ics) Export & External Calendar Deep Links ([`calendarExport.ts`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/lib/export/calendarExport.ts)):** Pure client-side export generating RFC 5545 `.ics` calendar payloads with CRLF line endings, exclusive all-day `DTEND` dates (`dueDate + 1 day`), native recurrence rules (`RRULE:FREQ=WEEKLY|MONTHLY|YEARLY` with `INTERVAL=3` quarterly and `UNTIL` bounds), and 9:00 AM `VALARM` display reminders. Includes bulk filtered active export (`[ 📅 Export .ics (N) ]`) and per-task quick actions for direct Google Calendar and Outlook 365 compose deep links.
 * **Automated Cross-Domain Reminders ([`taskSync.ts`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/lib/store/utils/taskSync.ts)):** Automatically schedules and synchronizes 60-day lease expiry renewal notices and 14-day Body Corporate AGM budget review tasks across rentals, flips, and pipeline opportunities.
 
 ---
@@ -111,7 +112,7 @@ The **Moremela Property Investment Hub** addresses the structural complexities u
 | **Document Processing** | PDF-Lib / PDF.js | `pdf-lib 1.17.1`, `pdfjs-dist 6.3.289`, `html2pdf.js 0.14.0` |
 | **Database & Cloud** | Supabase | `@supabase/supabase-js 2.117.2` (Row-Level Security, Google OAuth, cloud sync) |
 | **Product Telemetry** | PostHog | `posthog-js` (POPIA-compliant input masking & client analytics) |
-| **Unit & Integration** | Vitest | `5.0.1` (77 test files, 811 passing tests) |
+| **Unit & Integration** | Vitest | `5.0.1` (78 test files, 823 passing tests) |
 | **End-to-End (E2E)** | Playwright | `1.63.0` (Mobile, Tablet, Desktop responsive regression suite) |
 | **Mutation Testing** | Stryker | `@stryker-mutator/core 10.0.0` |
 
@@ -209,7 +210,7 @@ npm run build
 │   │   │   ├── persistence/      # Auto-healing local-storage migrations & schema repair
 │   │   │   ├── utils/            # taskSync.ts (Acyclic leaf synchronization utility)
 │   │   │   └── usePortfolioStore.ts # Central store facade
-│   │   ├── export/               # CSV, Excel, GL Journal & SARS ITR12 exporters
+│   │   ├── export/               # CSV, Excel, GL Journal, SARS ITR12 & RFC 5545 .ics exporters
 │   │   ├── pdf/                  # PDF generators (Dispute letters, Tenant Statements)
 │   │   └── utilities/            # Client-side CoJ, Eskom, Cape Town regex parser
 │   └── types/                    # Canonical TypeScript interfaces & domain models

@@ -358,6 +358,7 @@ flowchart LR
   subgraph ExportEngine["Offline File Exports"]
     CSV_EXP["csvExport.ts (Universal Accountant GL Journal CSV)"]
     EXCEL_EXP["excelExport.ts (ITR12 Schedules & Portfolio Workbook)"]
+    ICS_EXP["calendarExport.ts (RFC 5545 .ics & Calendar Deep Links)"]
     JSON_SNAP["portfolioSnapshot.json (Full Backup)"]
   end
 
