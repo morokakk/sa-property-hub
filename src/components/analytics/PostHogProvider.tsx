@@ -23,12 +23,11 @@ export function initializePostHogClient(): void {
   const posthogKey =
     process.env.NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN ||
     process.env.NEXT_PUBLIC_POSTHOG_KEY;
-  const posthogHost =
-    process.env.NEXT_PUBLIC_POSTHOG_HOST || 'https://eu.i.posthog.com';
 
   if (posthogKey && typeof window !== 'undefined') {
     posthog.init(posthogKey, {
-      api_host: posthogHost,
+      api_host: '/ingest',
+      ui_host: 'https://eu.posthog.com',
       respect_dnt: true,
       capture_pageview: 'history_change',
       capture_pageleave: true,

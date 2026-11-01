@@ -45,15 +45,16 @@ describe('PostHogProvider Client-Side Telemetry & POPIA Privacy Masking', () => 
     expect(html).toContain('Moremela Analytics Child');
   });
 
-  it('enforces POPIA compliant maskAllInputs, DNT, SPA pageviews, exceptions, and EU Cloud ingestion host configuration', () => {
+  it('enforces POPIA compliant maskAllInputs, DNT, SPA pageviews, exceptions, and first-party /ingest reverse proxy configuration', () => {
     const providerSource = fs.readFileSync(
       path.resolve(__dirname, '../PostHogProvider.tsx'),
       'utf-8'
     );
 
-    // Verify key references
+    // Verify key & first-party EU Cloud proxy references
     expect(providerSource).toContain('NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN');
-    expect(providerSource).toContain('https://eu.i.posthog.com');
+    expect(providerSource).toContain("api_host: '/ingest'");
+    expect(providerSource).toContain("ui_host: 'https://eu.posthog.com'");
 
     // Verify POPIA statutory masking & telemetry alignment flags
     expect(providerSource).toContain('respect_dnt: true');
@@ -69,7 +70,24 @@ describe('PostHogProvider Client-Side Telemetry & POPIA Privacy Masking', () => 
     expect(providerSource).toContain('before_send: posthogBeforeSend');
   });
 
-  it('calls posthog.init with respect_dnt, capture_pageview: history_change, capture_exceptions, and before_send', () => {
+  it('configures next.config.mjs with skipTrailingSlashRedirect and /ingest rewrites to PostHog EU Cloud', () => {
+    const nextConfigSource = fs.readFileSync(
+      path.resolve(__dirname, '../../../../next.config.mjs'),
+      'utf-8'
+    );
+
+    expect(nextConfigSource).toContain('skipTrailingSlashRedirect: true');
+    expect(nextConfigSource).toContain("source: '/ingest/static/:path*'");
+    expect(nextConfigSource).toContain(
+      "destination: 'https://eu-assets.i.posthog.com/static/:path*'"
+    );
+    expect(nextConfigSource).toContain("source: '/ingest/:path*'");
+    expect(nextConfigSource).toContain(
+      "destination: 'https://eu.i.posthog.com/:path*'"
+    );
+  });
+
+  it('calls posthog.init with api_host: /ingest, ui_host: https://eu.posthog.com, respect_dnt, capture_pageview: history_change, capture_exceptions, and before_send', () => {
     const originalToken = process.env.NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN;
     const originalWindow = (globalThis as any).window;
     process.env.NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN = 'phc_test_token_123';
@@ -82,7 +100,8 @@ describe('PostHogProvider Client-Side Telemetry & POPIA Privacy Masking', () => 
       expect(posthog.init).toHaveBeenCalledWith(
         'phc_test_token_123',
         expect.objectContaining({
-          api_host: 'https://eu.i.posthog.com',
+          api_host: '/ingest',
+          ui_host: 'https://eu.posthog.com',
           respect_dnt: true,
           capture_pageview: 'history_change',
           capture_pageleave: true,
