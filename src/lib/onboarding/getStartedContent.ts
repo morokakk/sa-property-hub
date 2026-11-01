@@ -375,7 +375,7 @@ export const GET_STARTED_STAGES: readonly JourneyStage[] = [
             howTo: [
               'On a rental card, open Lease & Costs to score credit with Pre-Lease Vetting and record an 8-Point Ingoing Inspection (RHA Sec 5).',
               'When a tenant vacates, use Notice & Move-Out to run a joint Exit Inspection, log repair deductions, and settle the net deposit refund.',
-              'Switch to Payments & Arrears to log monthly rent, track utility cost recoveries, and record bad-debt write-offs.',
+              'Click Maintenance (N) to track work orders with status badges (Open/In Progress/Resolved), dispatch contractors via WhatsApp, and record final invoice amounts.',
             ],
             proTip:
               'Under Section 5 of the SA Rental Housing Act, landlords who fail to conduct a joint ingoing inspection forfeit the statutory right to deduct damage repairs from a tenant\'s deposit. Adding extra monthly bond payments accelerates debt-free cashflow without altering your SARS Section 11(a) tax reserve.',
@@ -417,7 +417,7 @@ export const GET_STARTED_STAGES: readonly JourneyStage[] = [
             howTo: [
               'On a rental card, click Utilities & Statement to inspect the current period ledger, utility recoveries and arrears.',
               'Click Share Statement to email PDF statements via Resend or copy the public tenant portal link (/statement/[token]).',
-              'Tenants can review their billing ledger or switch to the Inspection & Condition Report tab for 1-click WhatsApp statutory sign-off.',
+              'Tenants can review their billing ledger, sign off on joint inspections, or click "Report Maintenance" to submit tickets that sync directly to your dashboard.',
             ],
             proTip:
               'Public tenant portal links allow tenants to inspect their itemized 8-point condition audit and agree to move-in/exit deductions via WhatsApp with zero paperwork. Generated PDFs automatically preserve a clean print layout.',
@@ -636,15 +636,15 @@ export const GET_STARTED_STAGES: readonly JourneyStage[] = [
 
 export const GO_LIVE_STEP: GoLiveStep = {
   id: 'go-live-clear-demo',
-  title: 'Go Live: Clear Demo',
-  summary: 'Finished practising on the demo deals? Clear them and start entering your own portfolio.',
+  title: 'Go Live: Clear Demo & Cloud Sync',
+  summary: 'Finished practising on the demo deals? Sign in to enable cross-device cloud sync, clear sample data, and start entering your portfolio.',
   howTo: [
-    'If you changed any demo data you want to keep, download a JSON backup first (Export in the top bar, or More → Download JSON Backup on mobile).',
-    'Click Clear Demo in the top bar (on mobile: More → Clear All Portfolio Data). Your Settings and supplier directory are kept.',
+    'Under Settings → Cloud Sync & Multi-Device Access, sign in with Google or Email magic link to automatically sync your portfolio across all devices.',
+    'Click Clear Demo in the top bar (on mobile: More → Clear All Portfolio Data). Your Settings, credentials and supplier directory are kept.',
     'Back on the Dashboard, follow the Clean Slate card: analyze your first real deal, add rentals or flips, and set your liquid reserve.',
   ],
   proTip:
-    'You can bring the sample data back at any time with Reset Demo, so clearing is safe. Your Get Started checklist progress is also kept.',
+    'Signing in enables real-time background cloud synchronization to Supabase, keeping your portfolio backed up and synced between desktop and mobile. You can bring the sample data back at any time with Reset Demo.',
 };
 
 /** All checkbox IDs, in journey order (features first, then Go Live). */
