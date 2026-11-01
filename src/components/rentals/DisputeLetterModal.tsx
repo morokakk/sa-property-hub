@@ -33,6 +33,7 @@ import { generateDisputeLetterPdf, downloadDisputePdf } from '@/lib/pdf/generate
 import { buildConciseMailtoUrl, buildFullDisputeLetterText } from '@/lib/utils/disputeEmailHelper';
 import MunicipalDirectoryModal from './MunicipalDirectoryModal';
 import PropertyMeterRegistryModal from './PropertyMeterRegistryModal';
+import { trackPrivacySafeEvent } from '@/lib/analytics/posthogClient';
 
 interface DisputeLetterModalProps {
   property: RentalProperty;
@@ -281,6 +282,7 @@ export default function DisputeLetterModal({
       const pdfBytes = await generateDisputeLetterPdf(disputeData);
       const filename = `Dispute_Letter_${(property.title || 'Property').replace(/[^a-zA-Z0-9]/g, '_')}_${utilityType}_${accountNumber || 'Acc'}.pdf`;
       downloadDisputePdf(pdfBytes, filename);
+      trackPrivacySafeEvent('dispute_letter_exported', { disputeType: utilityType });
     } catch (err: any) {
       console.error('PDF generation error:', err);
       alert(`Failed to generate dispute PDF: ${err.message || 'Unknown error'}`);
@@ -293,6 +295,7 @@ export default function DisputeLetterModal({
   const handleCopyFullText = () => {
     const text = buildFullDisputeLetterText(disputeData);
     navigator.clipboard.writeText(text);
+    trackPrivacySafeEvent('dispute_letter_exported', { disputeType: utilityType });
     setCopyToast('Full formal dispute letter copied to clipboard!');
     setTimeout(() => setCopyToast(null), 3500);
   };
@@ -303,6 +306,7 @@ export default function DisputeLetterModal({
     const bodyMatch = mailtoUrl.match(/body=([^&]+)/);
     const bodyText = bodyMatch ? decodeURIComponent(bodyMatch[1]) : '';
     navigator.clipboard.writeText(bodyText);
+    trackPrivacySafeEvent('dispute_letter_exported', { disputeType: utilityType });
     setCopyToast('Concise email body copied to clipboard!');
     setTimeout(() => setCopyToast(null), 3500);
   };

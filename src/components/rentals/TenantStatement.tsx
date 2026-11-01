@@ -57,6 +57,7 @@ import {
 import { sendStatementEmail } from '@/app/actions/sendStatementEmail';
 import { generateTenantStatementPdf } from '@/lib/pdf/generateTenantStatementPdf';
 import CloudPublishModal from './CloudPublishModal';
+import { trackPrivacySafeEvent } from '@/lib/analytics/posthogClient';
 
 interface TenantStatementProps {
   propertyId: string | null;
@@ -505,6 +506,9 @@ export default function TenantStatement({
   };
 
   const handlePrint = () => {
+    trackPrivacySafeEvent('statement_pdf_generated', {
+      hasUtilitySplit: currentTenantUtilities > 0,
+    });
     window.print();
   };
 
@@ -694,6 +698,9 @@ export default function TenantStatement({
     // 2. Generate PDF silently in background & send via Resend
     try {
       const { base64 } = await generateTenantStatementPdf('tenant-statement-print-root');
+      trackPrivacySafeEvent('statement_pdf_generated', {
+        hasUtilitySplit: currentTenantUtilities > 0,
+      });
 
       const periodLabel = formatMonthLabel(activePeriodMonth);
       const finalAmountDue = !isNaN(periodNetOutstanding) ? periodNetOutstanding : currentGrandTotal;
@@ -848,6 +855,7 @@ export default function TenantStatement({
       >
         <div
           id="tenant-statement-print-root"
+          data-sensitive="true"
           className="bg-white rounded-t-3xl sm:rounded-2xl shadow-2xl border border-slate-200 w-full max-w-4xl max-h-[92vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200"
           role="dialog"
           aria-modal="true"

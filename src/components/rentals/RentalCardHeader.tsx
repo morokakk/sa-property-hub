@@ -199,7 +199,10 @@ export function RentalCardHeader({
 
       {/* Tenant Default Risk Alert Banner */}
       {arrearsInfo.totalArrearsZAR > 0 && (
-        <div className="bg-rose-50 border-y border-rose-200 px-4 py-2 flex items-center justify-between text-xs">
+        <div
+          data-sensitive="true"
+          className="bg-rose-50 border-y border-rose-200 px-4 py-2 flex items-center justify-between text-xs"
+        >
           <span className="flex items-center gap-1.5 font-bold text-rose-700">
             <AlertCircle className="w-3.5 h-3.5 text-rose-600 animate-pulse" />
             Tenant Default Risk: Arrears Accruing
@@ -211,7 +214,10 @@ export function RentalCardHeader({
       )}
 
       {/* Property Financial Highlights */}
-      <div className="p-4 bg-slate-50/60 grid grid-cols-3 gap-2 text-center border-b border-slate-100 text-xs">
+      <div
+        data-sensitive="true"
+        className="p-4 bg-slate-50/60 grid grid-cols-3 gap-2 text-center border-b border-slate-100 text-xs"
+      >
         <div>
           <span className="text-[10px] text-slate-400 block">Market Value</span>
           <strong className="text-slate-900 tabular-nums tracking-tight">{formatZAR(property.marketValueZAR, { compact: true })}</strong>

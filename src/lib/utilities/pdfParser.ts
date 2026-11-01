@@ -11,6 +11,7 @@ import { z } from 'zod';
 import { UtilityStatement, AiSettings, ExtractedRentalUnit, RentalProperty } from '@/types';
 import { parseStatementWithAnthropic } from '@/lib/ai/anthropicParser';
 import { normalizeAiModel } from '@/lib/ai/modelConfig';
+import { trackPrivacySafeEvent, captureSanitizedError } from '@/lib/analytics/posthogClient';
 
 // ============================================================================
 // 1. Zod Validation Schema with Mathematical Cross-Check
@@ -1438,6 +1439,12 @@ export async function parseUtilityPdf(
         createdAt: new Date().toISOString(),
       };
 
+      trackPrivacySafeEvent('ai_statement_parsed', {
+        provider: aiSettings.provider || 'anthropic',
+        documentType: 'municipal_utility',
+        success: true,
+      });
+
       return {
         success: true,
         statement,
@@ -1445,6 +1452,10 @@ export async function parseUtilityPdf(
       };
     } catch (aiError: any) {
       console.warn('BYOK AI parsing failed, attempting Regex fallback:', aiError?.message);
+      captureSanitizedError('PDF_BYOK_PARSE_FAILED', {
+        provider: aiSettings.provider || 'anthropic',
+        documentType: 'municipal_utility',
+      });
       // Fall through to regex pipeline
     }
   }
@@ -1462,6 +1473,12 @@ export async function parseUtilityPdf(
       createdAt: new Date().toISOString(),
     };
 
+    trackPrivacySafeEvent('ai_statement_parsed', {
+      provider: validated.provider || 'regex_fallback',
+      documentType: 'municipal_utility',
+      success: true,
+    });
+
     return {
       success: true,
       statement,
@@ -1469,6 +1486,15 @@ export async function parseUtilityPdf(
       rawText,
     };
   } catch (regexError: any) {
+    trackPrivacySafeEvent('ai_statement_parsed', {
+      provider: 'regex_fallback',
+      documentType: 'municipal_utility',
+      success: false,
+    });
+    captureSanitizedError('PDF_REGEX_PARSE_FAILED', {
+      provider: 'regex_fallback',
+      documentType: 'municipal_utility',
+    });
     return {
       success: false,
       parsedVia: 'regex-fallback',
@@ -1520,6 +1546,12 @@ export async function parseRentalPdfStatement(
         createdAt: new Date().toISOString(),
       };
 
+      trackPrivacySafeEvent('ai_statement_parsed', {
+        provider: 'City of Cape Town',
+        documentType: 'municipal_utility',
+        success: true,
+      });
+
       return {
         success: true,
         docType: 'municipal_utility',
@@ -1566,6 +1598,12 @@ export async function parseRentalPdfStatement(
         statementDate: stmt.statementDate,
       };
 
+      trackPrivacySafeEvent('ai_statement_parsed', {
+        provider: 'iGrow Rentals',
+        documentType: 'agent_payout',
+        success: true,
+      });
+
       return {
         success: true,
         docType: 'agent_payout',
@@ -1587,6 +1625,12 @@ export async function parseRentalPdfStatement(
         createdAt: new Date().toISOString(),
       };
 
+      trackPrivacySafeEvent('ai_statement_parsed', {
+        provider: 'City of Johannesburg',
+        documentType: 'municipal_utility',
+        success: true,
+      });
+
       return {
         success: true,
         docType: 'municipal_utility',
@@ -1607,6 +1651,12 @@ export async function parseRentalPdfStatement(
         createdAt: new Date().toISOString(),
       };
 
+      trackPrivacySafeEvent('ai_statement_parsed', {
+        provider: 'Eskom',
+        documentType: 'municipal_utility',
+        success: true,
+      });
+
       return {
         success: true,
         docType: 'municipal_utility',
@@ -1626,6 +1676,11 @@ export async function parseRentalPdfStatement(
           aiSettings.model
         );
         if (aiResult.success && aiResult.units.length > 0) {
+          trackPrivacySafeEvent('ai_statement_parsed', {
+            provider: aiSettings.provider || 'anthropic',
+            documentType: 'agent_payout',
+            success: true,
+          });
           return {
             success: true,
             docType: 'agent_payout',
@@ -1641,6 +1696,11 @@ export async function parseRentalPdfStatement(
       // Try AI utility parser
       try {
         const validated = await parseUtilityWithAi(fileOrText, aiSettings);
+        trackPrivacySafeEvent('ai_statement_parsed', {
+          provider: aiSettings.provider || 'anthropic',
+          documentType: 'municipal_utility',
+          success: true,
+        });
         return {
           success: true,
           docType: 'municipal_utility',
@@ -1658,6 +1718,16 @@ export async function parseRentalPdfStatement(
       }
     }
 
+    trackPrivacySafeEvent('ai_statement_parsed', {
+      provider: 'Unknown',
+      documentType: 'agent_payout',
+      success: false,
+    });
+    captureSanitizedError('PDF_STATEMENT_UNRECOGNIZED', {
+      provider: 'Unknown',
+      documentType: 'agent_payout',
+    });
+
     return {
       success: false,
       docType: 'agent_payout',
@@ -1666,6 +1736,15 @@ export async function parseRentalPdfStatement(
         'Could not automatically match statement with local zero-token parsers (iGrow, City of Johannesburg, City of Cape Town, Eskom). For other managing agent formats, please configure your BYOK AI API Key in Settings.',
     };
   } catch (err: any) {
+    trackPrivacySafeEvent('ai_statement_parsed', {
+      provider: 'Unknown',
+      documentType: 'agent_payout',
+      success: false,
+    });
+    captureSanitizedError('PDF_EXTRACT_FAILED', {
+      provider: 'Unknown',
+      documentType: 'agent_payout',
+    });
     return {
       success: false,
       docType: 'agent_payout',

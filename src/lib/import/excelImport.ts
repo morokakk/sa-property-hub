@@ -9,6 +9,7 @@ import {
 } from '@/types';
 import { computeAcquisitionCosts } from '@/lib/calculations/sarsTax';
 import { calculateDealMetrics, calculateMonthlyBondRepayment } from '@/lib/calculations/propertyMetrics';
+import { captureSanitizedError } from '@/lib/analytics/posthogClient';
 
 export interface ValidationErrorItem {
   row: number;
@@ -1257,14 +1258,25 @@ export async function parseImportFile<T>(
   templateType: 'pipeline' | 'rentals' | 'flips'
 ): Promise<ParseResult<T>> {
   const rawRows = await extractRawSheetRows(file);
+  let result: ParseResult<T>;
   switch (templateType) {
     case 'pipeline':
-      return parsePipelineRows(rawRows) as unknown as ParseResult<T>;
+      result = parsePipelineRows(rawRows) as unknown as ParseResult<T>;
+      break;
     case 'rentals':
-      return parseRentalsRows(rawRows) as unknown as ParseResult<T>;
+      result = parseRentalsRows(rawRows) as unknown as ParseResult<T>;
+      break;
     case 'flips':
-      return parseFlipsRows(rawRows) as unknown as ParseResult<T>;
+      result = parseFlipsRows(rawRows) as unknown as ParseResult<T>;
+      break;
     default:
       throw new Error(`Unsupported template type: ${templateType}`);
   }
+  if (result.errors.length > 0) {
+    captureSanitizedError('EXCEL_IMPORT_VALIDATION_FAILED', {
+      templateType,
+      errorCount: result.errors.length,
+    });
+  }
+  return result;
 }

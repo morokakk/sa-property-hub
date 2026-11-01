@@ -7,6 +7,12 @@ import { hydrateFromCloud } from '@/lib/db/hydrateFromCloud';
 import { migrateToCloud } from '@/lib/db/migrateToCloud';
 import { usePortfolioStore } from '@/lib/store/usePortfolioStore';
 import type { RootStoreState } from '@/lib/store/types';
+import {
+  resetAnalyticsSession,
+  syncAnalyticsStorageMode,
+  trackPrivacySafeEvent,
+  captureSanitizedError,
+} from '@/lib/analytics/posthogClient';
 
 export type CloudSyncStatus = 'local_only' | 'syncing' | 'synced' | 'error';
 
@@ -75,16 +81,23 @@ export async function hydrateNow(): Promise<void> {
     if (res.success) {
       hasHydratedThisSession = true;
       recordSyncedNow();
+      syncAnalyticsStorageMode('cloud_synced');
+      trackPrivacySafeEvent('cloud_sync_triggered', { status: 'synced' });
     } else if (res.error === 'NO_AUTH') {
       hasHydratedThisSession = false;
       setSync({ isAuthenticated: false, status: 'local_only', error: null });
+      syncAnalyticsStorageMode('local_only');
     } else {
       lastFailedOp = 'hydrate';
       setSync({ status: 'error', error: res.error || 'Cloud hydration failed' });
+      trackPrivacySafeEvent('cloud_sync_triggered', { status: 'error' });
+      captureSanitizedError('CLOUD_HYDRATE_FAILED', { operation: 'hydrate' });
     }
   } catch (err: any) {
     lastFailedOp = 'hydrate';
     setSync({ status: 'error', error: err?.message || 'Cloud hydration failed' });
+    trackPrivacySafeEvent('cloud_sync_triggered', { status: 'error' });
+    captureSanitizedError('CLOUD_HYDRATE_EXCEPTION', { operation: 'hydrate' });
   } finally {
     isHydratingFromCloud.current = false;
   }
@@ -100,15 +113,22 @@ export async function pushNow(): Promise<void> {
     const res = await migrateToCloud({ state: usePortfolioStore.getState() });
     if (res.success) {
       recordSyncedNow();
+      syncAnalyticsStorageMode('cloud_synced');
+      trackPrivacySafeEvent('cloud_sync_triggered', { status: 'synced' });
     } else if (res.error === 'NO_AUTH') {
       setSync({ isAuthenticated: false, status: 'local_only', error: null });
+      syncAnalyticsStorageMode('local_only');
     } else {
       lastFailedOp = 'push';
       setSync({ status: 'error', error: res.error || 'Cloud sync failed' });
+      trackPrivacySafeEvent('cloud_sync_triggered', { status: 'error' });
+      captureSanitizedError('CLOUD_SYNC_FAILED', { operation: 'push' });
     }
   } catch (err: any) {
     lastFailedOp = 'push';
     setSync({ status: 'error', error: err?.message || 'Cloud sync failed' });
+    trackPrivacySafeEvent('cloud_sync_triggered', { status: 'error' });
+    captureSanitizedError('CLOUD_SYNC_EXCEPTION', { operation: 'push' });
   }
 }
 
@@ -180,6 +200,8 @@ export function useAutoCloudSync() {
     } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (event === 'SIGNED_OUT') {
         markSignedOut();
+        resetAnalyticsSession();
+        syncAnalyticsStorageMode('local_only');
         try {
           usePortfolioStore.getState().resetToDemoData();
           if (typeof localStorage !== 'undefined') {
@@ -201,6 +223,7 @@ export function useAutoCloudSync() {
       }
 
       if (session?.user && (event === 'SIGNED_IN' || event === 'INITIAL_SESSION')) {
+        syncAnalyticsStorageMode('cloud_synced');
         if (isHydratingFromCloud.current) return;
         await hydrateNow();
         return;
@@ -208,6 +231,7 @@ export function useAutoCloudSync() {
 
       if (event === 'INITIAL_SESSION' && !session?.user) {
         markSignedOut();
+        syncAnalyticsStorageMode('local_only');
       }
     });
 

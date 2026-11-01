@@ -50,6 +50,7 @@ import {
   ensureInspectionItems,
   normalizeWhatsAppPhone,
 } from '@/lib/calculations/inspections';
+import { trackPrivacySafeEvent } from '@/lib/analytics/posthogClient';
 
 interface TenantStatementViewerProps {
   statementData: PublicTenantStatementPayload;
@@ -484,6 +485,9 @@ export default function TenantStatementViewer({
   };
 
   const handlePrint = () => {
+    trackPrivacySafeEvent('statement_pdf_generated', {
+      hasUtilitySplit: totalUtilities > 0,
+    });
     if (typeof window !== 'undefined') {
       window.print();
     }
@@ -833,6 +837,7 @@ export default function TenantStatementViewer({
         <div
           id="tenant-statement-print-root"
           data-testid="statement-document"
+          data-sensitive="true"
           className="bg-white border border-slate-200/90 rounded-2xl p-6 sm:p-8 shadow-sm space-y-6"
         >
           {activeTab === 'inspection' && lease.inspectionRecord ? (

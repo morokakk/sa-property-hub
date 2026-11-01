@@ -29,6 +29,7 @@ import {
 import { usePortfolioStore } from '@/lib/store/usePortfolioStore';
 import { exportAccountantJournalCSV } from '@/lib/export/csvExport';
 import FeedbackModal from '@/components/common/FeedbackModal';
+import { trackPrivacySafeEvent } from '@/lib/analytics/posthogClient';
 
 export default function Sidebar() {
   const pathname = usePathname();
@@ -82,6 +83,7 @@ export default function Sidebar() {
   };
 
   const handleExportExcel = async () => {
+    trackPrivacySafeEvent('portfolio_exported', { format: 'xlsx' });
     const { exportPortfolioToExcel } = await import('@/lib/export/excelExport');
     const currentState = usePortfolioStore.getState();
     await exportPortfolioToExcel({
@@ -96,6 +98,7 @@ export default function Sidebar() {
   };
 
   const handleExportJournal = () => {
+    trackPrivacySafeEvent('portfolio_exported', { format: 'csv' });
     const lineCount = exportAccountantJournalCSV(usePortfolioStore.getState().rentals);
     showDrawerNotice(
       lineCount > 0 ? `Accountant GL journal exported (${lineCount} lines).` : 'Journal exported, but no rental lines found.'
@@ -103,6 +106,7 @@ export default function Sidebar() {
   };
 
   const handleExportJSON = () => {
+    trackPrivacySafeEvent('portfolio_exported', { format: 'json' });
     const currentState = usePortfolioStore.getState();
     const dataStr = JSON.stringify(
       {

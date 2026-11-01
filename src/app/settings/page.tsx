@@ -62,6 +62,12 @@ import {
 import { formatZAR, formatPercent } from '@/lib/formatters';
 import NodeBenchmarkEditor from '@/components/settings/NodeBenchmarkEditor';
 import { CustomNodeBenchmarkOverride } from '@/types';
+import {
+  resetAnalyticsSession,
+  syncAnalyticsStorageMode,
+  trackPrivacySafeEvent,
+  captureSanitizedError,
+} from '@/lib/analytics/posthogClient';
 
 type SettingsTab = 'entity' | 'underwriting' | 'ai';
 
@@ -518,6 +524,8 @@ function SettingsContent() {
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
+    resetAnalyticsSession();
+    syncAnalyticsStorageMode('local_only');
     resetToDemoData();
     setCurrentUser(null);
     setLastSyncTime(null);
@@ -567,15 +575,20 @@ function SettingsContent() {
       });
       if (result.success) {
         setSyncResult(result);
+        trackPrivacySafeEvent('cloud_sync_triggered', { status: 'synced' });
         if (typeof localStorage !== 'undefined') {
           const ts = localStorage.getItem('cloud_sync_timestamp');
           if (ts) setLastSyncTime(ts);
         }
       } else {
         setSyncError(result.error || 'Failed to sync data to cloud');
+        trackPrivacySafeEvent('cloud_sync_triggered', { status: 'error' });
+        captureSanitizedError('CLOUD_SYNC_FAILED', { operation: 'manual_push' });
       }
     } catch (err: any) {
       setSyncError(err.message || 'An unexpected error occurred during sync');
+      trackPrivacySafeEvent('cloud_sync_triggered', { status: 'error' });
+      captureSanitizedError('CLOUD_SYNC_EXCEPTION', { operation: 'manual_push' });
     } finally {
       setIsSyncing(false);
     }
@@ -1460,7 +1473,11 @@ function SettingsContent() {
           {(showAllSections || activeTab === 'entity') && (
             <div className="space-y-6 animate-in fade-in duration-150">
               {/* Section 1: Entity & Legal Representation */}
-              <div id="settings-entity" className="scroll-mt-20 bg-white rounded-xl border border-slate-200 p-4 sm:p-6 shadow-xs space-y-4">
+              <div
+                id="settings-entity"
+                data-sensitive="true"
+                className="scroll-mt-20 bg-white rounded-xl border border-slate-200 p-4 sm:p-6 shadow-xs space-y-4"
+              >
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-100">
                   <div className="flex items-center gap-2.5">
                     <div className="p-2 bg-emerald-50 rounded-lg text-emerald-700">
@@ -1692,7 +1709,11 @@ function SettingsContent() {
               </div>
 
               {/* Section 3: Banking & Remittance Details */}
-              <div id="settings-banking" className="scroll-mt-20 bg-white rounded-xl border border-slate-200 p-4 sm:p-6 shadow-xs space-y-4">
+              <div
+                id="settings-banking"
+                data-sensitive="true"
+                className="scroll-mt-20 bg-white rounded-xl border border-slate-200 p-4 sm:p-6 shadow-xs space-y-4"
+              >
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-100">
                   <div className="flex items-center gap-2.5">
                     <div className="p-2 bg-emerald-50 rounded-lg text-emerald-700">
@@ -2171,7 +2192,11 @@ function SettingsContent() {
           {(showAllSections || activeTab === 'ai') && (
             <div className="space-y-6 animate-in fade-in duration-150">
               {/* Section 6: AI Integration & Statement Extraction (BYOK) */}
-              <div id="settings-ai" className="scroll-mt-20 bg-white rounded-xl border border-slate-200 p-4 sm:p-6 shadow-xs space-y-5">
+              <div
+                id="settings-ai"
+                data-sensitive="true"
+                className="scroll-mt-20 bg-white rounded-xl border border-slate-200 p-4 sm:p-6 shadow-xs space-y-5"
+              >
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
                   <div className="flex items-center gap-2">
                     <div className="p-1.5 rounded-lg bg-indigo-50 text-indigo-700">

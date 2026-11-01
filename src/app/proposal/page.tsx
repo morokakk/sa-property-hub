@@ -1268,6 +1268,7 @@ function ProposalGeneratorContent() {
               {/* Live Lender vs. Sponsor Economics & Coverage Strip */}
               <div
                 data-testid="lender-sponsor-split-strip"
+                data-sensitive="true"
                 className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-xs"
               >
                 <div className="p-2.5 rounded-lg bg-emerald-50/70 border border-emerald-200">
@@ -1462,6 +1463,7 @@ function ProposalGeneratorContent() {
         {deal && (
           <div
             id="proposal-document"
+            data-sensitive="true"
             className="bg-white rounded-xl border border-slate-200 shadow-md p-4 sm:p-8 md:p-12 text-slate-900 space-y-8 print:border-none print:shadow-none print:p-0"
           >
             {/* Document Header */}

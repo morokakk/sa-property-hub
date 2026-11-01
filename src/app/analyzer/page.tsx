@@ -83,6 +83,7 @@ import AnalyzerResultsGrid from '@/components/analyzer/AnalyzerResultsGrid';
 import RateShockStrip from '@/components/analytics/RateShockStrip';
 import PipelineDealCard from '@/components/analyzer/PipelineDealCard';
 import AnalyzerLayoutCustomizer from '@/components/analyzer/AnalyzerLayoutCustomizer';
+import { trackPrivacySafeEvent } from '@/lib/analytics/posthogClient';
 
 export default function OpportunityAnalyzerPage() {
   const opportunities = usePortfolioStore((state) => state.opportunities);
@@ -815,6 +816,7 @@ export default function OpportunityAnalyzerPage() {
 
   const handleApplyMaoBid = (bidAmount: number) => {
     if (bidAmount <= 0) return;
+    trackPrivacySafeEvent('mao_solver_applied', { strategy: maoSolverMode });
     handlePurchasePriceChange(bidAmount);
     setShowMaoSolver(false);
   };
@@ -1331,6 +1333,10 @@ export default function OpportunityAnalyzerPage() {
         projectedFlipNetProfit: calculatedMetrics.projectedFlipNetProfit,
         projectedFlipRoi: calculatedMetrics.projectedFlipRoi,
       });
+      trackPrivacySafeEvent('deal_saved_to_pipeline', {
+        strategy,
+        meetsBuyBox: Boolean(repairPrescription.meetsBuyBox),
+      });
       alert(`Deal "${title}" updated with new metrics!`);
       setEditingDealId(null);
       setTitle('');
@@ -1447,6 +1453,10 @@ export default function OpportunityAnalyzerPage() {
     };
 
     addOpportunity(newDeal);
+    trackPrivacySafeEvent('deal_saved_to_pipeline', {
+      strategy,
+      meetsBuyBox: Boolean(repairPrescription.meetsBuyBox),
+    });
     setExtraMonthlyPayment(0);
     setTitle('');
     setAddress('');
@@ -2626,7 +2636,13 @@ export default function OpportunityAnalyzerPage() {
           <div key="longTermProjections" data-section-id="longTermProjections" className="rounded-xl border border-slate-200 bg-white overflow-hidden shadow-2xs">
             <button
               type="button"
-              onClick={() => setShowAdvancedAssumptions(!showAdvancedAssumptions)}
+              onClick={() => {
+                const nextState = !showAdvancedAssumptions;
+                setShowAdvancedAssumptions(nextState);
+                trackPrivacySafeEvent('analyzer_mode_switched', {
+                  mode: nextState ? 'deep_dive' : 'napkin',
+                });
+              }}
               className="w-full p-4 flex items-center justify-between text-left hover:bg-slate-50 transition-colors cursor-pointer"
             >
               <div className="flex items-center gap-2.5">
@@ -3338,7 +3354,12 @@ export default function OpportunityAnalyzerPage() {
                 hiddenSections={hiddenAnalyzerSections}
                 onToggleVisibility={toggleAnalyzerSectionVisibility}
                 onMoveSection={moveAnalyzerSection}
-                onApplyPreset={applyAnalyzerLayoutPreset}
+                onApplyPreset={(preset) => {
+                  applyAnalyzerLayoutPreset(preset);
+                  trackPrivacySafeEvent('analyzer_mode_switched', {
+                    mode: preset === 'napkin' ? 'napkin' : 'deep_dive',
+                  });
+                }}
                 activeOverrides={activeOverrides}
                 isDistressedSource={isDistressedSource}
                 strategy={strategy}

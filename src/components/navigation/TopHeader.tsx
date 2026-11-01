@@ -23,6 +23,7 @@ import {
 import Link from 'next/link';
 import { exportAccountantJournalCSV } from '@/lib/export/csvExport';
 import { useCloudSyncStore, retrySync } from '@/hooks/useAutoCloudSync';
+import { trackPrivacySafeEvent } from '@/lib/analytics/posthogClient';
 
 function CloudSyncStatusPill() {
   const status = useCloudSyncStore((s) => s.status);
@@ -131,6 +132,7 @@ export default function TopHeader({ title, subtitle, actionButton }: TopHeaderPr
 
   const handleExportExcel = async () => {
     setShowExportMenu(false);
+    trackPrivacySafeEvent('portfolio_exported', { format: 'xlsx' });
     const { exportPortfolioToExcel } = await import('@/lib/export/excelExport');
     const currentState = usePortfolioStore.getState();
     await exportPortfolioToExcel({
@@ -146,6 +148,7 @@ export default function TopHeader({ title, subtitle, actionButton }: TopHeaderPr
 
   const handleExportJournal = () => {
     setShowExportMenu(false);
+    trackPrivacySafeEvent('portfolio_exported', { format: 'csv' });
     const lineCount = exportAccountantJournalCSV(usePortfolioStore.getState().rentals);
     showNotification(
       lineCount > 0
@@ -156,6 +159,7 @@ export default function TopHeader({ title, subtitle, actionButton }: TopHeaderPr
 
   const handleExportJSON = () => {
     setShowExportMenu(false);
+    trackPrivacySafeEvent('portfolio_exported', { format: 'json' });
     const currentState = usePortfolioStore.getState();
     const dataStr = JSON.stringify(
       {

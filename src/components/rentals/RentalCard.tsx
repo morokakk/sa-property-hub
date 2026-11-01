@@ -125,6 +125,7 @@ function RentalCard({
   return (
     <div
       data-testid={`rental-card-${property.id}`}
+      data-sensitive="true"
       className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-xs flex flex-col justify-between"
     >
       <div>
@@ -144,7 +145,10 @@ function RentalCard({
 
         {/* Tenant Notice Alert Banner */}
         {noticeLease && (
-          <div className="bg-amber-50 border-b border-amber-200 px-4 py-2 flex items-center justify-between text-xs gap-2">
+          <div
+            data-sensitive="true"
+            className="bg-amber-50 border-b border-amber-200 px-4 py-2 flex items-center justify-between text-xs gap-2"
+          >
             <span className="flex items-center gap-1.5 font-bold text-amber-900 truncate">
               <Clock className="w-3.5 h-3.5 text-amber-600 shrink-0" />
               <span className="truncate">

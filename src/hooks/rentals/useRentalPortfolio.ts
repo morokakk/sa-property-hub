@@ -5,6 +5,7 @@ import { calculateAggregateRentalKPIs } from '@/lib/calculations/rentals';
 import { calculatePropertyArrears } from '@/lib/calculations/arrears';
 import { exportRentalsCSV, exportAccountantJournalCSV } from '@/lib/export/csvExport';
 import { formatZAR } from '@/lib/formatters';
+import { trackPrivacySafeEvent } from '@/lib/analytics/posthogClient';
 
 export interface UseRentalPortfolioReturn {
   rentals: RentalProperty[];
@@ -66,11 +67,13 @@ export function useRentalPortfolio(): UseRentalPortfolioReturn {
   }, [feedbackToast]);
 
   const handleExportCsv = useCallback(() => {
+    trackPrivacySafeEvent('portfolio_exported', { format: 'csv' });
     exportRentalsCSV(activeRentals);
     showToast('Exported active rentals register as CSV');
   }, [activeRentals, showToast]);
 
   const handleExportAccountantJournal = useCallback(() => {
+    trackPrivacySafeEvent('portfolio_exported', { format: 'csv' });
     const count = exportAccountantJournalCSV(rentals);
     showToast(
       count > 0
@@ -81,6 +84,7 @@ export function useRentalPortfolio(): UseRentalPortfolioReturn {
 
   const handleExportItr12 = useCallback(
     async (taxYear: number = 2026) => {
+      trackPrivacySafeEvent('portfolio_exported', { format: 'itr12' });
       const { exportITR12TaxReport } = await import('@/lib/export/excelExport');
       await exportITR12TaxReport(rentals, taxYear);
       showToast(`Exported SARS ITR12 tax schedule (${taxYear})`);
