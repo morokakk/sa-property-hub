@@ -25,7 +25,14 @@ import {
   ExternalLink,
   ShieldCheck,
   AlertTriangle,
+  Wrench,
+  X,
+  Send,
+  Clock,
 } from 'lucide-react';
+import { formatTenantMaintenanceRequestForWhatsApp } from '@/lib/whatsappFormatter';
+import { submitTenantMaintenanceTicket } from '@/app/actions/submitTenantMaintenanceTicket';
+import { usePortfolioStore } from '@/lib/store/usePortfolioStore';
 import { PublicTenantStatementPayload } from '@/types/tenantStatement';
 import { RentalProperty, TenantPaymentRecord, ArrearsWriteOff, InspectionCondition } from '@/types';
 import { formatZAR, formatDate } from '@/lib/formatters';
@@ -169,6 +176,109 @@ export default function TenantStatementViewer({
     if (typeof window !== 'undefined') {
       window.open(waUrl, '_blank', 'noopener,noreferrer');
     }
+  };
+
+  const [isMaintenanceModalOpen, setIsMaintenanceModalOpen] = useState<boolean>(false);
+  const [maintenanceCategory, setMaintenanceCategory] = useState<string>('Plumbing');
+  const [maintenanceDescription, setMaintenanceDescription] = useState<string>('');
+  const [maintenanceUrgency, setMaintenanceUrgency] = useState<'Routine' | 'Urgent' | 'Emergency'>('Routine');
+  const [maintenancePreferredAccess, setMaintenancePreferredAccess] = useState<string>('');
+  const [maintenanceCopiedFeedback, setMaintenanceCopiedFeedback] = useState<boolean>(false);
+  const [isSubmittingMaintenance, setIsSubmittingMaintenance] = useState<boolean>(false);
+  const [maintenanceFeedbackMessage, setMaintenanceFeedbackMessage] = useState<string | null>(null);
+
+  const handleOpenMaintenanceModal = () => {
+    setIsMaintenanceModalOpen(true);
+  };
+
+  const handleCloseMaintenanceModal = () => {
+    setIsMaintenanceModalOpen(false);
+  };
+
+  const handleSubmitMaintenanceWhatsApp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!maintenanceDescription.trim() || isSubmittingMaintenance) return;
+
+    setIsSubmittingMaintenance(true);
+    let assignedTicketRef: string | undefined;
+
+    try {
+      const res = await submitTenantMaintenanceTicket({
+        leaseId: lease.id,
+        category: maintenanceCategory as any,
+        description: maintenanceDescription.trim(),
+        urgency: maintenanceUrgency,
+        preferredAccess: maintenancePreferredAccess.trim() || undefined,
+      });
+
+      if (res.success && res.ticketRef) {
+        assignedTicketRef = res.ticketRef;
+        setMaintenanceFeedbackMessage(`Ticket #${res.ticketRef} logged to landlord dashboard!`);
+      }
+    } catch {
+      // Gracefully continue to WhatsApp dispatch even if network/offline
+    } finally {
+      setIsSubmittingMaintenance(false);
+    }
+
+    // Immediately update landlord's client portfolio store so it displays in landlord maintenance history
+    try {
+      const store = usePortfolioStore.getState();
+      if (store && typeof store.addMaintenanceLog === 'function') {
+        const validCategory = (maintenanceCategory === 'Other' || !maintenanceCategory ? 'General Wear' : maintenanceCategory) as any;
+        const refPrefix = assignedTicketRef ? `[#${assignedTicketRef.replace(/^#/, '')}]` : `[#WO-${Math.floor(1000 + Math.random() * 9000)}]`;
+        const targetRental = (store.rentals || []).find(
+          (r) => r.id === property.id || (r.leases && r.leases.some((l) => l.id === lease.id))
+        );
+        const targetRentalId = targetRental ? targetRental.id : property.id;
+        store.addMaintenanceLog(targetRentalId, {
+          dateLogged: new Date().toISOString().slice(0, 10),
+          category: validCategory,
+          issueDescription: `${refPrefix} [${maintenanceUrgency.toUpperCase()}] ${maintenanceDescription.trim()}${maintenancePreferredAccess.trim() ? ` (Access: ${maintenancePreferredAccess.trim()})` : ''}`,
+          costZAR: 0,
+          status: 'Open',
+          reportedByTenant: true,
+          contractorName: 'Unassigned',
+        });
+      }
+    } catch {
+      // Safe fallback if store is not accessible in SSR/mock context
+    }
+
+    const landlordPhone = normalizeWhatsAppPhone(landlord.contact_number || undefined);
+    const text = formatTenantMaintenanceRequestForWhatsApp({
+      propertyTitle: property.title,
+      unitName: lease.unitName,
+      tenantName: lease.tenantName,
+      category: maintenanceCategory,
+      description: maintenanceDescription.trim(),
+      urgency: maintenanceUrgency,
+      preferredAccess: maintenancePreferredAccess.trim() || undefined,
+      ticketRef: assignedTicketRef,
+    });
+
+    if (typeof navigator !== 'undefined' && navigator.clipboard) {
+      navigator.clipboard.writeText(text);
+      setMaintenanceCopiedFeedback(true);
+      setTimeout(() => {
+        setMaintenanceCopiedFeedback(false);
+        setMaintenanceFeedbackMessage(null);
+      }, 4500);
+    }
+
+    const waUrl = landlordPhone
+      ? `https://wa.me/${landlordPhone}?text=${encodeURIComponent(text)}`
+      : `https://wa.me/?text=${encodeURIComponent(text)}`;
+
+    if (typeof window !== 'undefined') {
+      window.open(waUrl, '_blank', 'noopener,noreferrer');
+    }
+
+    setIsMaintenanceModalOpen(false);
+  };
+
+  const handleReportMaintenanceWhatsApp = () => {
+    setIsMaintenanceModalOpen(true);
   };
 
   const handleCopyAccount = (text: string) => {
@@ -434,33 +544,34 @@ export default function TenantStatementViewer({
 
       <div className="max-w-4xl mx-auto space-y-4">
         {/* Interactive Screen Controls (Print-Hidden) */}
-        <div className="bg-white border border-slate-200/80 rounded-2xl p-4 sm:p-5 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 print-hidden-element">
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="p-1.5 rounded-lg bg-emerald-100 text-emerald-800">
+        <div className="bg-white border border-slate-200/80 rounded-2xl p-4 sm:p-5 shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-3.5 print-hidden-element">
+          <div className="min-w-0 shrink">
+            <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+              <span className="p-1.5 rounded-lg bg-emerald-100 text-emerald-800 shrink-0">
                 <FileText className="w-5 h-5" />
               </span>
-              <h1 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight">
+              <h1 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight whitespace-nowrap">
                 Official Tenant Statement
               </h1>
-              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 shrink-0">
                 Verified Portal
               </span>
             </div>
-            <p className="text-xs text-slate-500 mt-1">
+            <p className="text-xs text-slate-500 mt-1 truncate">
               {property.title} • {lease.unitName}{lease.roomType ? ` — ${lease.roomType}` : ''}
             </p>
           </div>
 
-          <div className="flex items-center gap-2.5 w-full sm:w-auto flex-wrap sm:flex-nowrap">
+          <div className="flex items-center gap-2 w-full md:w-auto flex-wrap sm:flex-nowrap justify-start md:justify-end shrink-0">
             {/* Historical Month Selector */}
             {periodOptions.length > 0 && (
-              <div className="relative shrink-0 flex-1 sm:flex-none">
+              <div className="relative shrink min-w-[140px] max-w-[210px] sm:max-w-[220px]">
                 <select
                   data-testid="month-selector-dropdown"
                   value={activeMonth}
                   onChange={(e) => setSelectedPeriodMonth(e.target.value)}
-                  className="w-full sm:w-auto appearance-none bg-slate-50 border border-slate-300 hover:border-slate-400 text-slate-800 text-xs font-semibold py-2 pl-3 pr-8 rounded-xl focus:outline-hidden focus:ring-2 focus:ring-emerald-500 transition-colors cursor-pointer"
+                  className="w-full appearance-none bg-slate-50 border border-slate-300 hover:border-slate-400 text-slate-800 text-xs font-semibold py-2 pl-3 pr-8 rounded-xl focus:outline-hidden focus:ring-2 focus:ring-emerald-500 transition-colors cursor-pointer truncate"
+                  title="Select billing period"
                 >
                   {periodOptions.map((opt) => (
                     <option key={opt.month} value={opt.month}>
@@ -479,13 +590,200 @@ export default function TenantStatementViewer({
               type="button"
               data-testid="download-pdf-btn"
               onClick={handlePrint}
-              className="inline-flex items-center justify-center gap-1.5 bg-emerald-700 hover:bg-emerald-800 active:bg-emerald-900 text-white text-xs font-semibold px-4 py-2 rounded-xl shadow-xs transition-colors cursor-pointer shrink-0 w-full sm:w-auto"
+              className="inline-flex items-center justify-center gap-1.5 bg-emerald-700 hover:bg-emerald-800 active:bg-emerald-900 text-white text-xs font-semibold px-3 sm:px-3.5 py-2 rounded-xl shadow-xs transition-colors cursor-pointer shrink-0 whitespace-nowrap"
+              title="Download statement PDF"
             >
-              <Download className="w-4 h-4" />
-              <span>Download Statement (PDF)</span>
+              <Download className="w-4 h-4 shrink-0" />
+              <span>Download (PDF)</span>
             </button>
+
+            {/* Tenant Maintenance Request via WhatsApp */}
+            <div className="relative inline-block shrink-0">
+              <button
+                type="button"
+                data-testid="report-maintenance-whatsapp-btn"
+                onClick={handleReportMaintenanceWhatsApp}
+                className="inline-flex items-center justify-center gap-1.5 bg-white hover:bg-emerald-50 text-emerald-800 border border-emerald-300 text-xs font-semibold px-3 sm:px-3.5 py-2 rounded-xl shadow-xs transition-colors cursor-pointer shrink-0 whitespace-nowrap"
+                title="Report Maintenance Issue via WhatsApp"
+                aria-label="Report Maintenance Issue via WhatsApp"
+              >
+                <Wrench className="w-4 h-4 text-emerald-600 shrink-0" />
+                <span>Report Maintenance</span>
+              </button>
+              {maintenanceCopiedFeedback && (
+                <div className="absolute top-full mt-1.5 right-0 z-20 bg-emerald-900 text-white text-[11px] font-medium px-3 py-1.5 rounded-lg shadow-lg flex items-center gap-1.5 animate-in fade-in slide-in-from-top-1 whitespace-nowrap">
+                  <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                  <span>{maintenanceFeedbackMessage || 'Request copied & opened in WhatsApp'}</span>
+                </div>
+              )}
+            </div>
           </div>
         </div>
+
+        {/* Tenant Maintenance Request Interactive Intake Modal */}
+        {isMaintenanceModalOpen && (
+          <div
+            data-testid="tenant-maintenance-modal"
+            className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in duration-150 print:hidden print-hidden-element"
+          >
+            <div
+              className="bg-white rounded-2xl max-w-lg w-full p-5 sm:p-6 shadow-2xl border border-slate-200 space-y-4 max-h-[90vh] overflow-y-auto"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="tenant-maintenance-modal-title"
+            >
+              <div className="flex items-start justify-between gap-3 pb-3 border-b border-slate-100">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-600 shrink-0">
+                    <Wrench className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 id="tenant-maintenance-modal-title" className="text-sm sm:text-base font-bold text-slate-900">
+                      Report Maintenance Issue
+                    </h3>
+                    <p className="text-xs text-slate-500">
+                      {lease.unitName} • {property.title}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  data-testid="close-tenant-maintenance-modal"
+                  onClick={handleCloseMaintenanceModal}
+                  className="text-slate-400 hover:text-slate-700 p-1.5 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
+                  aria-label="Close maintenance report modal"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <form onSubmit={handleSubmitMaintenanceWhatsApp} className="space-y-4 text-xs">
+                {/* Category Selection */}
+                <div>
+                  <label htmlFor="tenant-maint-category" className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                    Category
+                  </label>
+                  <select
+                    id="tenant-maint-category"
+                    data-testid="tenant-maint-category"
+                    value={maintenanceCategory}
+                    onChange={(e) => setMaintenanceCategory(e.target.value)}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-xl bg-white text-slate-900 text-xs focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all cursor-pointer"
+                  >
+                    <option value="Plumbing">Plumbing (Leaks, Geysers, Drains, Mixers)</option>
+                    <option value="Electrical">Electrical (Power, Lights, Plugs, DB Board)</option>
+                    <option value="Appliance">Appliance (Oven, Stove, Extractor)</option>
+                    <option value="Structural">Structural (Roof, Ceiling, Doors, Locks)</option>
+                    <option value="General Wear">General Wear &amp; Tear / Fittings</option>
+                    <option value="Other">Other Maintenance</option>
+                  </select>
+                </div>
+
+                {/* Urgency Selection */}
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                    Urgency Level
+                  </label>
+                  <div className="grid grid-cols-3 gap-2">
+                    {(['Routine', 'Urgent', 'Emergency'] as const).map((urg) => {
+                      const isSelected = maintenanceUrgency === urg;
+                      const badgeColors =
+                        urg === 'Emergency'
+                          ? isSelected
+                            ? 'bg-rose-600 text-white border-rose-600 shadow-xs'
+                            : 'bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100'
+                          : urg === 'Urgent'
+                          ? isSelected
+                            ? 'bg-amber-600 text-white border-amber-600 shadow-xs'
+                            : 'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100'
+                          : isSelected
+                          ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs'
+                          : 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100';
+
+                      return (
+                        <button
+                          key={urg}
+                          type="button"
+                          data-testid={`urgency-btn-${urg.toLowerCase()}`}
+                          onClick={() => setMaintenanceUrgency(urg)}
+                          className={`py-2 px-2 text-center rounded-xl border text-xs font-semibold transition-all cursor-pointer ${badgeColors}`}
+                        >
+                          {urg}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <p className="text-[10px] text-slate-500 mt-1">
+                    {maintenanceUrgency === 'Emergency' && 'Active floods, electrical danger, burst geysers.'}
+                    {maintenanceUrgency === 'Urgent' && 'Loss of hot water, security lock failure, broken stove.'}
+                    {maintenanceUrgency === 'Routine' && 'Dripping tap, door handle loose, aesthetic snag.'}
+                  </p>
+                </div>
+
+                {/* Issue Description */}
+                <div>
+                  <label htmlFor="tenant-maint-description" className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                    Description of Issue <span className="text-rose-500">*</span>
+                  </label>
+                  <textarea
+                    id="tenant-maint-description"
+                    data-testid="tenant-maint-description"
+                    rows={3}
+                    required
+                    value={maintenanceDescription}
+                    onChange={(e) => setMaintenanceDescription(e.target.value)}
+                    placeholder="Describe what is broken, where it is located, and when it started (e.g. Geyser leaking water into ceiling above main bathroom)..."
+                    className="w-full px-3 py-2 border border-slate-300 rounded-xl bg-white text-slate-900 text-xs placeholder:text-slate-400 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all resize-y"
+                  />
+                </div>
+
+                {/* Preferred Access Window */}
+                <div>
+                  <label htmlFor="tenant-maint-access" className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                    Preferred Access Date &amp; Time (Optional)
+                  </label>
+                  <input
+                    id="tenant-maint-access"
+                    data-testid="tenant-maint-access"
+                    type="text"
+                    value={maintenancePreferredAccess}
+                    onChange={(e) => setMaintenancePreferredAccess(e.target.value)}
+                    placeholder="e.g. Weekdays after 17:00, or Saturday 09:00 - 12:00"
+                    className="w-full px-3 py-2 border border-slate-300 rounded-xl bg-white text-slate-900 text-xs placeholder:text-slate-400 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all"
+                  />
+                </div>
+
+                {/* Helper Callout for Photos */}
+                <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl flex items-start gap-2.5 text-[11px] text-slate-600">
+                  <Camera className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                  <p>
+                    <strong>Photo &amp; Video Note:</strong> Once WhatsApp opens with your formatted request, please take or attach photos of the issue in the WhatsApp chat to help the landlord dispatch the right contractor.
+                  </p>
+                </div>
+
+                {/* Buttons */}
+                <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-slate-100">
+                  <button
+                    type="button"
+                    onClick={handleCloseMaintenanceModal}
+                    className="px-4 py-2 border border-slate-300 text-slate-700 hover:bg-slate-50 rounded-xl text-xs font-semibold transition-colors cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    data-testid="submit-tenant-maintenance-whatsapp-btn"
+                    disabled={!maintenanceDescription.trim() || isSubmittingMaintenance}
+                    className="inline-flex items-center gap-1.5 px-5 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl text-xs font-semibold shadow-xs transition-colors cursor-pointer"
+                  >
+                    <Send className="w-3.5 h-3.5" />
+                    <span>{isSubmittingMaintenance ? 'Logging & Opening WhatsApp...' : 'Submit & Open in WhatsApp'}</span>
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
 
         {/* Tab Navigation (When Inspection Record exists) */}
         {lease.inspectionRecord && (

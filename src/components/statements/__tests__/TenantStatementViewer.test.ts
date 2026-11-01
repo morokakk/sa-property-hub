@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { PublicTenantStatementPayload } from '@/types/tenantStatement';
 import { formatZAR, formatDate } from '@/lib/formatters';
 
@@ -169,6 +169,15 @@ describe('Tenant Statement Ledger & Calculation Engine', () => {
   });
 
   describe('Sandhurst Executive Suite Statement Parity & Period Selection', () => {
+    beforeEach(() => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date('2026-10-15T12:00:00Z'));
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
     it('defaults to October 2026 with R0 brought forward, R18,500 current charges, and R18,500 total due', async () => {
       const { INITIAL_RENTALS } = await import('@/lib/store/initialData');
       const { calculateTenantStatementTiers, getStatementLedgerOptions } = await import('@/lib/calculations/arrears');

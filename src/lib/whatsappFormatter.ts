@@ -1311,3 +1311,100 @@ export function formatInspectionForWhatsApp(params: {
   return text;
 }
 
+
+export interface ContractorDispatchParams {
+  propertyTitle: string;
+  propertyAddress?: string;
+  propertyCity?: string;
+  unitName?: string;
+  tenantName?: string;
+  tenantPhone?: string;
+  category: string;
+  issueDescription: string;
+  status: 'Open' | 'In Progress' | 'Resolved';
+  dateLogged?: string;
+  costZAR?: number;
+  invoiceRef?: string;
+  contractorName?: string;
+  landlordEntityName?: string;
+  landlordContact?: string;
+}
+
+/**
+ * Formats a clean, emoji-free contractor work order dispatch for WhatsApp.
+ */
+export function formatContractorDispatchForWhatsApp(params: ContractorDispatchParams): string {
+  const location = [params.propertyAddress, params.propertyCity].filter(Boolean).join(', ');
+  let text = `*MAINTENANCE WORK ORDER DISPATCH*\n`;
+  text += `---\n`;
+  if (params.contractorName) text += `• Contractor: ${params.contractorName}\n`;
+  text += `• Property: ${params.propertyTitle}${params.unitName ? ` - ${params.unitName}` : ''}\n`;
+  if (location) text += `• Address: ${location}\n`;
+  if (params.tenantName && params.tenantName !== 'Vacant') {
+    text += `• Site Access Contact: ${params.tenantName}${params.tenantPhone ? ` (${params.tenantPhone})` : ''}\n`;
+  } else {
+    text += `• Site Access: Unit vacant - coordinate access with landlord\n`;
+  }
+  text += `\n*JOB DETAILS*\n`;
+  text += `• Category: ${params.category}\n`;
+  text += `• Issue: ${params.issueDescription}\n`;
+  text += `• Ticket Status: ${params.status}\n`;
+  if (params.dateLogged) text += `• Date Logged: ${formatDate(params.dateLogged)}\n`;
+  if (params.invoiceRef) text += `• Reference: ${params.invoiceRef}\n`;
+  if (params.costZAR && params.costZAR > 0) {
+    text += `• Approved Budget: ${formatZAR(params.costZAR)}\n`;
+  } else {
+    text += `• Budget: Please provide a written quote before commencing work\n`;
+  }
+  text += `---\n`;
+  if (params.landlordEntityName || params.landlordContact) {
+    text += `Issued by: ${params.landlordEntityName || 'Landlord'}${params.landlordContact ? ` | ${params.landlordContact}` : ''}\n`;
+  }
+  text += `Please reply to confirm your availability and ETA.`;
+  return text;
+}
+
+export interface TenantMaintenanceRequestParams {
+  propertyTitle: string;
+  unitName: string;
+  tenantName: string;
+  category?: string;
+  description?: string;
+  urgency?: string;
+  preferredAccess?: string;
+  ticketRef?: string;
+}
+
+/**
+ * Formats an emoji-free structured maintenance request prompt for tenants.
+ */
+export function formatTenantMaintenanceRequestForWhatsApp(params: TenantMaintenanceRequestParams): string {
+  const refHeader = params.ticketRef ? ` [#${params.ticketRef.replace(/^#/, '')}]` : '';
+  let text = `*MAINTENANCE REQUEST${refHeader}*\n`;
+  text += `---\n`;
+  text += `• Property: ${params.propertyTitle}\n`;
+  text += `• Unit: ${params.unitName}\n`;
+  text += `• Tenant: ${params.tenantName}\n\n`;
+
+  if (params.category || params.description) {
+    text += `*ISSUE DETAILS*\n`;
+    if (params.ticketRef) {
+      text += `• Ticket Reference: #${params.ticketRef.replace(/^#/, '')} (Logged in System)\n`;
+    }
+    if (params.category) text += `• Category: ${params.category}\n`;
+    if (params.urgency) text += `• Urgency: ${params.urgency}\n`;
+    if (params.description) text += `• Description: ${params.description}\n`;
+    if (params.preferredAccess) text += `• Preferred Access Window: ${params.preferredAccess}\n`;
+    text += `---\n`;
+    text += `Photos of the issue can be attached to this chat.`;
+  } else {
+    text += `*ISSUE DETAILS (please complete)*\n`;
+    text += `• Category (Plumbing / Electrical / Appliance / Structural / General Wear): \n`;
+    text += `• Description of the issue: \n`;
+    text += `• Urgency (Emergency / Urgent / Routine): \n`;
+    text += `• Preferred access date and time: \n`;
+    text += `---\n`;
+    text += `Photos of the issue can be attached to this chat.`;
+  }
+  return text;
+}

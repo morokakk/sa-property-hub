@@ -418,8 +418,9 @@ export interface MaintenanceLog {
   issueDescription: string;
   category: 'Plumbing' | 'Electrical' | 'Appliance' | 'Structural' | 'General Wear';
   contractorName: string;
-  costZAR: number;
+  costZAR: number; // May be 0 while status is 'Open' or 'In Progress' (awaiting quote / final invoice)
   status: 'Open' | 'In Progress' | 'Resolved';
+  reportedByTenant?: boolean;
   invoiceRef?: string;
 }
 

@@ -68,16 +68,20 @@ flowchart TD
   SELECT --> CALC5
 ```
 
-### 1.1 Tier 1: Thin View Controllers (`src/app/*/page.tsx`)
-- **Role:** Pure layout orchestration and client boundary mounting.
+### 1.1 Tier 1: Thin View Controllers & Server Actions (`src/app/*/page.tsx`, `src/app/actions/`)
+- **Role:** Pure layout orchestration, client boundary mounting, and secure server actions.
 - **Constraints:**
   - Strictly declarative. No inline calculations (no raw tax math, yield division, or compound interest formulas).
   - Maximum file size target: `< 250 LOC`.
   - Responsible only for connecting Tier 2 domain hooks to Tier 3 visual components and passing action callbacks to the store facade.
+- **Key Server Actions:**
+  - [`submitTenantMaintenanceTicket.ts`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/app/actions/submitTenantMaintenanceTicket.ts): Secure unauthenticated public intake for tenant work orders with sliding-window rate limiting (max 3/lease/hr), short tracking reference generation (e.g. `WO-4921`), and Supabase service-role persistence into `properties.maintenance_history`.
+  - [`sendStatementEmail.ts`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/app/actions/sendStatementEmail.ts): Resend-powered tenant statement delivery with attached PDF and payment reminders.
 
 ### 1.2 Tier 2: Headless Domain UI Hooks (`src/hooks/`)
 - **Role:** Coordinates form state, UI filter machines, modal visibility orchestration, and asynchronous client events.
 - **Key Modules:**
+  - [`useAutoCloudSync.ts`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/hooks/useAutoCloudSync.ts): Continuous multi-tenant Supabase synchronization engine with 1500ms debounced outbound mutations, auto-hydration on session load/sign-in, hydration loop suppression (`isHydratingFromCloud`), and reactive sync status store (`useCloudSyncStore`).
   - [`useRentalPortfolio.ts`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/hooks/rentals/useRentalPortfolio.ts): Assembles active vs. archived rental portfolios, executes CSV/Excel exports, handles optimistic write-offs and monthly rent marks.
   - [`useRentalModalState.ts`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/hooks/rentals/useRentalModalState.ts): Centralized modal open/close state machine for 9 rental dialogs.
   - [`useFlipCalculations.ts`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/hooks/flips/useFlipCalculations.ts): Bridges active flip project state into pure calculation results (`financials`, `fundingSummary`).
@@ -91,6 +95,7 @@ flowchart TD
   - Modals must be dynamically imported with `next/dynamic` (`{ ssr: false }`) in parent pages to eliminate code-bloat on initial SSR paint.
   - Must preserve standard `data-testid` attributes to support Playwright regression testing.
 - **Key Modules & Isolated Modals:**
+  - [`MaintenanceModal.tsx`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/components/rentals/modals/MaintenanceModal.tsx): Lean maintenance work order lifecycle modal tracking 3 distinct ticket states (`Open`, `In Progress`, `Resolved`), inline final invoice resolution, contractor WhatsApp dispatch, and automated cloud sync checking on dialog open.
   - [`LeaseInspectionDrawer.tsx`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/components/rentals/modals/LeaseInspectionDrawer.tsx): 15-second mobile "Tap-Only-What's-Broken" 8-category joint inspection drawer with Cloud Photo Vault integration and 1-click WhatsApp electronic delivery.
   - [`TenantNoticeModal.tsx`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/components/rentals/modals/TenantNoticeModal.tsx): Tenant vacation modal providing side-by-side Ingoing vs. Exit condition diffing, automated degraded-item detection, contractor repair deductions, and live deposit refund auto-sync.
   - [`ExitSaleModal.tsx`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/components/rentals/modals/ExitSaleModal.tsx): Rental disposal modal with itemized estate agent commission, conveyancer bond cancellation fee (`R5,200`), NCA Section 125 90-day early settlement penalty, and negative-equity shortfall warnings (`shortfallToSettleZAR`).
@@ -131,7 +136,7 @@ The application's reactive state is segmented across 10 modular slices assembled
 
 | Slice File | Managed State Fields | Key Actions & Business Handlers | Cross-Domain Side Effects |
 | :--- | :--- | :--- | :--- |
-| [`rentalSlice.ts`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/lib/store/slices/rentalSlice.ts) | `rentals: RentalProperty[]` | `addRental`, `bulkAddRentals`, `reconcileImportedRentals`, `updateRental`, `deleteRental`, `markRentalAsSold`, `reopenRental`, `refinanceRental`, `markTenantNotice`, `cancelTenantNotice`, `finalizeTenantMoveOut` | - Modifies `liquidCapitalReserve` on property sale<br>- Invokes `syncLeaseExpiryTasks` (60-day lease reminders)<br>- Invokes `syncAgmReminderTask` for Body Corporate AGMs<br>- `finalizeTenantMoveOut`: Persists `inspectionRecord` and `depositRefundedZAR` onto `ArchivedLease` (5-year statutory audit trail per RHA Section 5) while scrubbing departing tenant inspection state when a unit transitions to vacant/replacement |
+| [`rentalSlice.ts`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/lib/store/slices/rentalSlice.ts) | `rentals: RentalProperty[]` | `addRental`, `bulkAddRentals`, `reconcileImportedRentals`, `updateRental`, `deleteRental`, `markRentalAsSold`, `reopenRental`, `refinanceRental`, `markTenantNotice`, `cancelTenantNotice`, `finalizeTenantMoveOut`, `addMaintenanceLog`, `updateMaintenanceLog`, `deleteMaintenanceLog` | - Modifies `liquidCapitalReserve` on property sale<br>- Invokes `syncLeaseExpiryTasks` (60-day lease reminders)<br>- Invokes `syncAgmReminderTask` for Body Corporate AGMs<br>- `finalizeTenantMoveOut`: Persists `inspectionRecord` and `depositRefundedZAR` onto `ArchivedLease` (5-year statutory audit trail per RHA Section 5) while scrubbing departing tenant inspection state when a unit transitions to vacant/replacement<br>- Maintenance log mutations preserve work order lifecycle (`Open` -> `In Progress` -> `Resolved`) and sync with cloud storage |
 | [`flipSlice.ts`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/lib/store/slices/flipSlice.ts) | `flips: FlipProject[]` | `addFlip`, `bulkAddFlips`, `updateFlip`, `deleteFlip`, `addBOQItem`, `updateBOQItem`, `deleteBOQItem`, `markFlipAsCompleted`, `reopenFlip`, `convertFlipToRental` | - `markFlipAsCompleted`: Injects `netCashProceeds` into `liquidCapitalReserve`<br>- `reopenFlip`: Deducts previous proceeds from `liquidCapitalReserve` and deletes converted rental<br>- `convertFlipToRental`: Constructs `RentalProperty`, transfers cost basis, repoints `funding[]` debt facilities, syncs AGM tasks |
 | [`opportunitySlice.ts`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/lib/store/slices/opportunitySlice.ts) | `opportunities: OpportunityDeal[]` | `addOpportunity`, `bulkAddOpportunities`, `updateOpportunity`, `deleteOpportunity`, `duplicateOpportunity`, `passOpportunity`, `reactivateOpportunity`, `advanceOpportunityStage`, `promoteOpportunityToFlip`, `promoteOpportunityToRental` | - `promoteOpportunityToFlip`: Creates new `FlipProject`, calculates transfer duty & legal costs, applies regional CoC defaults, spawns AGM reminder<br>- `promoteOpportunityToRental`: Creates new `RentalProperty`, synthesizes unit `leases[]`, calculates bond repayments |
 | [`fundingSlice.ts`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/lib/store/slices/fundingSlice.ts) | `funding: FundingSource[]` | `addFunding`, `updateFunding`, `deleteFunding`, `syncFundingWithDealDelay` | - Modifies total private funding liabilities and drawn liquidity in portfolio summary |
@@ -343,16 +348,18 @@ flowchart TD
 
 ---
 
-### 3.4 Local-First Persistence & Cloud Sync Architecture
+### 3.4 Local-First Persistence & Automatic Cross-Device Cloud Sync Architecture (Flow 4)
 
-Illustrates the local-first storage hierarchy, client-side exports, and secure Supabase cloud sync with zero-leakage security boundaries.
+Illustrates the local-first storage hierarchy, client-side exports, and continuous multi-device Supabase cloud sync powered by `useAutoCloudSync.ts`.
 
 ```mermaid
-flowchart LR
+flowchart TD
   subgraph ClientRuntime["Browser Client Runtime"]
     ZUSTAND["Zustand Store Engine"]
     LOCAL["localStorage ('sa_property_portfolio_hub_v1')"]
     AUTO_HEAL["hydrationHelpers.ts (migratePersistedRental)"]
+    SYNC_HOOK["useAutoCloudSync.ts (Debounce 1500ms + Loop Guard)"]
+    PILL["TopHeader.tsx (CloudSyncStatusPill: Synced / Syncing / Local Only)"]
   end
 
   subgraph ExportEngine["Offline File Exports"]
@@ -375,12 +382,19 @@ flowchart LR
 
   ZUSTAND --> ExportEngine
 
-  ZUSTAND -->|"User Initiates Sync"| SANITIZE
+  ZUSTAND -->|"Mutations Subscribe"| SYNC_HOOK
+  SYNC_HOOK -->|"Debounced Push (1500ms)"| SANITIZE
+  SYNC_HOOK -.->|"Sync Status Reactive State"| PILL
   SANITIZE -->|"Sanitized JSON Payload"| AUTH
   AUTH --> RLS
   RLS --> TABLES
-  TABLES -->|"hydrateFromCloud.ts"| ZUSTAND
+  TABLES -->|"hydrateFromCloud.ts (On Load / Sign In)"| ZUSTAND
 ```
+
+**Key Cloud Sync Guarantees:**
+1. **Loop Suppression:** Outbound debounce listener checks `isHydratingFromCloud.current`. Inbound hydration from Supabase into Zustand never triggers an unintended echo push.
+2. **Session Teardown (`DBSYNC-02`):** On `SIGNED_OUT`, local sync identifiers (`last_sync_user_id`, `cloud_sync_completed`) are purged alongside restoring demo state, preventing cross-user data leakage on shared terminals.
+3. **Reactive UI Header Pill:** [`CloudSyncStatusPill`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/components/navigation/TopHeader.tsx) observes `useCloudSyncStore` to render immediate visual feedback (`Synced`, `Syncing...`, `Local Only`, or `Sync Error`).
 
 ---
 
@@ -418,6 +432,40 @@ flowchart TD
 3. **Statutory Deduction Gate (RHA Section 5(3)(g)):** `isRhaCompliantForDeductions` requires both `ingoingDate` and `ingoingTenantAgreed === true`. If the landlord neglects the joint ingoing inspection, Section 5(3)(g) of Act 50 of 1999 legally deems the property received in good order and bars repair deductions upon vacation.
 4. **Exit Inspection & Degraded-Item Diffing:** Upon notice, [`TenantNoticeModal.tsx`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/components/rentals/modals/TenantNoticeModal.tsx) performs side-by-side comparison against the ingoing baseline. Items that were `Good` or `Fair` but degraded to `Defective` are surfaced for itemized contractor repair costing (`repairDeductionZAR`).
 5. **Deposit Settlement Auto-Sync & Archival:** [`calculateInspectionDepositSummary`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/lib/calculations/inspections.ts) dynamically computes `netDepositRefundableZAR` and flags `excessDamageShortfallZAR`. Calling `finalizeTenantMoveOut` commits the full audit trail to `ArchivedLease` (statutorily preserved for 5 years per Section 5(3)(h)) and scrubs `inspectionRecord` from active unit state.
+
+---
+
+### 3.6 Lean Maintenance Ticketing & Tenant Intake Lifecycle (Flow 6)
+
+Illustrates the end-to-end work order lifecycle spanning public tenant reporting, secure server action intake, automated landlord store hydration, contractor dispatch, and final invoice reconciliation.
+
+```mermaid
+flowchart TD
+  T_VIEW["Tenant Views Statement (/statement/[lease_id])"] --> T_BTN["Clicks 'Report Maintenance'"]
+  T_BTN --> T_MODAL["Intake Modal: Category, Description, Urgency, Access Window"]
+  T_MODAL --> SA_ACTION["Server Action: submitTenantMaintenanceTicket(payload)"]
+  SA_ACTION --> RATE_LIMIT{"Rate Limit Check (Max 3/hr)"}
+  RATE_LIMIT -->|"Exceeded"| RATE_ERR["Return Friendly Rate Limit Notice"]
+  RATE_LIMIT -->|"Permitted"| WO_GEN["Generate Ref: WO-XXXX + costZAR: 0 + status: Open + reportedByTenant: true"]
+  WO_GEN --> DB_WRITE["Supabase properties.maintenance_history & Server Session Cache"]
+  DB_WRITE --> WA_OUT["Bridge to WhatsApp: Pre-filled with Ticket Ref (Strictly Emoji-Free)"]
+
+  LL_DASH["Landlord Visits /rentals Dashboard"] --> LL_MODAL["Opens MaintenanceModal.tsx"]
+  LL_MODAL --> AUTO_CHECK["Auto-triggers checkCloudAndTenantTickets()"]
+  AUTO_CHECK --> GET_TICKETS["getTenantReportedMaintenance(propertyId, leaseIds) + hydrateNow()"]
+  GET_TICKETS --> MERGE_STORE["Zustand store: addMaintenanceLog with 'Tenant Reported' Badge"]
+
+  MERGE_STORE --> DISPATCH["1-Click Contractor WhatsApp Dispatch (Local Suppliers Directory)"]
+  DISPATCH --> ADVANCE["Advance Status: Open -> In Progress"]
+  ADVANCE --> RESOLVE_CLICK["Click 'Mark Resolved'"]
+  RESOLVE_CLICK --> RESOLVE_STRIP["Inline Input: Final Invoice Amount (R) & Invoice #"]
+  RESOLVE_STRIP --> CONFIRM["Confirm: status = 'Resolved' & costZAR = Final Incurred Cost"]
+```
+
+**Work Order Domain Invariants:**
+1. **Zero Cash-Flow Deduction on Open Tickets:** Open or in-progress tickets start with `costZAR: 0` (or estimated quotes) and do not reduce realized cash flow or net operating income until transitioned to `Resolved`.
+2. **Elevated Server-Action Ingestion:** Unauthenticated tenants submit tickets through [`submitTenantMaintenanceTicket.ts`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/app/actions/submitTenantMaintenanceTicket.ts), which uses Supabase service-role credentials server-side, shielding the database from open anonymous write permissions.
+3. **Interactive Final Resolution Flow:** Clicking **"Mark Resolved"** in [`MaintenanceModal.tsx`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/components/rentals/modals/MaintenanceModal.tsx) presents the landlord with a dedicated final invoice input strip, capturing the true contractor cost before closing.
 
 ---
 
@@ -496,3 +544,4 @@ An automated Equity Extraction Alert is triggered if and only if two simultaneou
    $$\text{MAO} = \frac{\text{Net Allowable Outlay}}{1 + \text{acqRate} + k_{\text{eviction}} + k_{\text{penalty}}}$$
    This guarantees exact $O(1)$ evaluation without circular numerical loops or iterative convergence drift.
 7. **Strict ASCII / Emoji-Free WhatsApp Formatting:** All `whatsappFormatter.ts` templates (including `formatInspectionForWhatsApp`, syndicate pitch copy, and payment receipts) must remain strictly free of Unicode emojis, utilizing clean ASCII brackets (e.g. `[Good]`, `[Defective]`, `[Tenant Agreed]`), bullets (`•`), and standard typography to ensure complete test compliance with `whatsappFormatter.test.ts` and cross-platform compatibility across all mobile SMS/WhatsApp gateways.
+8. **Realized Cash Flow & Maintenance Incurred Cost Guard:** Open or in-progress work orders (`status !== 'Resolved'`) carry `costZAR: 0` or estimated contractor quotes and must NEVER be deducted from realized cash flow or net operating income. Only work orders marked `status: 'Resolved'` with a verified final invoice amount represent incurred deductible expenses.

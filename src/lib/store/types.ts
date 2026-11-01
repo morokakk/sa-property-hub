@@ -45,6 +45,12 @@ export interface RentalSliceActions {
   updateRental: (id: string, updates: Partial<RentalProperty>) => void;
   deleteRental: (id: string) => void;
   addMaintenanceLog: (rentalId: string, log: Omit<RentalProperty['maintenanceHistory'][0], 'id'>) => void;
+  updateMaintenanceLog: (
+    rentalId: string,
+    logId: string,
+    updates: Partial<Omit<RentalProperty['maintenanceHistory'][0], 'id'>>
+  ) => void;
+  deleteMaintenanceLog: (rentalId: string, logId: string) => void;
   markRentalAsSold: (rentalId: string, actualSalePrice: number, netCashProceeds: number, soldDate: string, exitNotes?: string) => void;
   reopenRental: (rentalId: string) => void;
   refinanceRental: (params: RentalRefinanceParams) => void;

@@ -15,8 +15,63 @@ import {
   FileCode2,
   ChevronDown,
   BookOpen,
+  Cloud,
+  CloudOff,
+  Loader2,
+  AlertCircle,
 } from 'lucide-react';
+import Link from 'next/link';
 import { exportAccountantJournalCSV } from '@/lib/export/csvExport';
+import { useCloudSyncStore, retrySync } from '@/hooks/useAutoCloudSync';
+
+function CloudSyncStatusPill() {
+  const status = useCloudSyncStore((s) => s.status);
+  const lastSyncedAt = useCloudSyncStore((s) => s.lastSyncedAt);
+  const error = useCloudSyncStore((s) => s.error);
+  const base =
+    'inline-flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1 rounded-full border shrink-0 transition-colors cursor-pointer';
+
+  if (status === 'error') {
+    return (
+      <button
+        type="button"
+        data-testid="cloud-sync-status-pill"
+        onClick={() => void retrySync()}
+        title={error || 'Cloud sync failed - click to retry'}
+        className={`${base} bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100`}
+      >
+        <AlertCircle className="w-3.5 h-3.5" />
+        <span>Sync Error (Retry)</span>
+      </button>
+    );
+  }
+
+  const config =
+    status === 'syncing'
+      ? { href: '/settings', cls: 'bg-indigo-50 text-indigo-700 border-indigo-200', icon: <Loader2 className="w-3.5 h-3.5 animate-spin" />, label: 'Syncing...', title: 'Saving changes to the cloud' }
+      : status === 'synced'
+      ? {
+          href: '/settings',
+          cls: 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100',
+          icon: <Cloud className="w-3.5 h-3.5" />,
+          label: 'Synced',
+          title: lastSyncedAt ? `Last synced ${new Date(lastSyncedAt).toLocaleString('en-ZA')}` : 'Synced to cloud',
+        }
+      : {
+          href: '/settings?action=signin',
+          cls: 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100',
+          icon: <CloudOff className="w-3.5 h-3.5" />,
+          label: 'Local Only (Sign In)',
+          title: 'Data is stored on this device only. Sign in to sync across devices.',
+        };
+
+  return (
+    <Link href={config.href} data-testid="cloud-sync-status-pill" title={config.title} className={`${base} ${config.cls}`}>
+      {config.icon}
+      <span>{config.label}</span>
+    </Link>
+  );
+}
 
 interface TopHeaderProps {
   title: string;
@@ -169,6 +224,7 @@ export default function TopHeader({ title, subtitle, actionButton }: TopHeaderPr
 
         {/* Row 2 on mobile / Right on desktop */}
         <div className="flex flex-wrap items-center justify-between md:justify-end gap-2 sm:gap-2.5 w-full md:w-auto min-w-0">
+          <CloudSyncStatusPill />
           {/* Net Equity Quick Pill (Visible on large desktop) */}
           <div className="hidden xl:flex bg-slate-50 border border-slate-200/90 px-3.5 py-1.5 rounded-lg items-center gap-2.5 shrink-0 shadow-2xs">
             <div className="w-6 h-6 rounded-md bg-white border border-slate-200/80 flex items-center justify-center text-slate-700 shrink-0">

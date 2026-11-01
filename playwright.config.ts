@@ -9,7 +9,7 @@ export default defineConfig({
   retries: 0,
   reporter: [['list'], ['html', { open: 'never', outputFolder: 'e2e/report' }]],
   webServer: {
-    command: process.platform === 'win32' ? 'npm.cmd run dev' : 'npm run dev',
+    command: process.platform === 'win32' ? 'npm.cmd run start' : 'npm run start',
     port: 3000,
     reuseExistingServer: true,
     timeout: 120_000,

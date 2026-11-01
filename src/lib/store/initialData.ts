@@ -636,6 +636,16 @@ export const INITIAL_RENTALS: RentalProperty[] = [
         status: 'Resolved',
         invoiceRef: 'KZN-4412',
       },
+      {
+        id: 'maint-3b',
+        dateLogged: '2026-10-18',
+        issueDescription: '[#WO-3190] Aircon condensate pipe leaking on balcony',
+        category: 'General Wear',
+        contractorName: 'KZN Aluminium Works',
+        costZAR: 0,
+        status: 'In Progress',
+        reportedByTenant: true,
+      },
     ],
     utilityStatements: [
       {

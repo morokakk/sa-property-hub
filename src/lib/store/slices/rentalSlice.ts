@@ -319,6 +319,32 @@ export const createRentalSlice: StateCreator<
       }),
     })),
 
+  updateMaintenanceLog: (rentalId, logId, updates) =>
+    set((state) => ({
+      rentals: state.rentals.map((r) =>
+        r.id !== rentalId
+          ? r
+          : {
+              ...r,
+              maintenanceHistory: (r.maintenanceHistory || []).map((m) =>
+                m.id === logId ? { ...m, ...updates } : m
+              ),
+            }
+      ),
+    })),
+
+  deleteMaintenanceLog: (rentalId, logId) =>
+    set((state) => ({
+      rentals: state.rentals.map((r) =>
+        r.id !== rentalId
+          ? r
+          : {
+              ...r,
+              maintenanceHistory: (r.maintenanceHistory || []).filter((m) => m.id !== logId),
+            }
+      ),
+    })),
+
   markRentalAsSold: (rentalId, actualSalePrice, netCashProceeds, soldDate, exitNotes) =>
     set((state) => {
       const rental = state.rentals.find((r) => r.id === rentalId);

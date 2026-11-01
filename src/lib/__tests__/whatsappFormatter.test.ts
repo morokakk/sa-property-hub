@@ -10,6 +10,8 @@ import {
   formatCommercialInvoiceForWhatsApp,
   formatConsolidatedOverviewForWhatsApp,
   getStatementDueDate,
+  formatContractorDispatchForWhatsApp,
+  formatTenantMaintenanceRequestForWhatsApp,
 } from '../whatsappFormatter';
 import { formatZAR, formatDate } from '../formatters';
 import { OpportunityDeal, FlipProject, InvestorProfile, OccupantRiskProfile, RentalProperty, AncillaryIncome, UtilityStatement } from '@/types';
@@ -1142,6 +1144,73 @@ describe('whatsappFormatter - Strategy Adaptive Formatting', () => {
       expect(getStatementDueDate('2026-12')).toBe('1st January 2027');
       expect(getStatementDueDate('April 2026')).toBe('1st May 2026');
       expect(getStatementDueDate(undefined)).toBe('1st of the month');
+    });
+  });
+
+  describe('Contractor Work Order Dispatch & Tenant Maintenance WhatsApp Formatting', () => {
+    const emojiRegex = /[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{1F600}-\u{1F64F}\u{1F680}-\u{1F6FF}\u{1F1E6}-\u{1F1FF}]/u;
+
+    it('formats contractor dispatch correctly and enforces zero emojis', () => {
+      const dispatch = formatContractorDispatchForWhatsApp({
+        propertyTitle: 'The Oval 204',
+        propertyAddress: '15 West Road South',
+        propertyCity: 'Morningside',
+        unitName: 'Unit 204',
+        tenantName: 'Thabo Khumalo',
+        tenantPhone: '+27 82 555 1234',
+        category: 'Plumbing',
+        issueDescription: 'Geyser pressure valve leaking continuously',
+        status: 'Open',
+        dateLogged: '2026-11-01',
+        costZAR: 0,
+        invoiceRef: 'WO-8891',
+        contractorName: 'Rapid Response Plumbing',
+        landlordEntityName: 'Moremela Properties',
+        landlordContact: '+27 82 000 9999',
+      });
+
+      expect(dispatch).toContain('*MAINTENANCE WORK ORDER DISPATCH*');
+      expect(dispatch).toContain('• Contractor: Rapid Response Plumbing');
+      expect(dispatch).toContain('• Property: The Oval 204 - Unit 204');
+      expect(dispatch).toContain('• Address: 15 West Road South, Morningside');
+      expect(dispatch).toContain('• Site Access Contact: Thabo Khumalo (+27 82 555 1234)');
+      expect(dispatch).toContain('• Category: Plumbing');
+      expect(dispatch).toContain('• Issue: Geyser pressure valve leaking continuously');
+      expect(dispatch).toContain('• Ticket Status: Open');
+      expect(dispatch).toContain('• Reference: WO-8891');
+      expect(dispatch).toContain('• Budget: Please provide a written quote before commencing work');
+      expect(dispatch).toContain('Issued by: Moremela Properties | +27 82 000 9999');
+      expect(dispatch).not.toMatch(emojiRegex);
+    });
+
+    it('formats contractor dispatch with approved budget when costZAR > 0', () => {
+      const dispatch = formatContractorDispatchForWhatsApp({
+        propertyTitle: 'Sunset Heights 12',
+        category: 'Electrical',
+        issueDescription: 'Main breaker trip test',
+        status: 'Resolved',
+        costZAR: 1850,
+      });
+
+      expect(dispatch).toContain(`• Approved Budget: ${formatZAR(1850)}`);
+      expect(dispatch).not.toContain('Please provide a written quote');
+      expect(dispatch).not.toMatch(emojiRegex);
+    });
+
+    it('formats tenant maintenance request prompt correctly and enforces zero emojis', () => {
+      const prompt = formatTenantMaintenanceRequestForWhatsApp({
+        propertyTitle: 'Sunset Heights 12',
+        unitName: 'Unit 3',
+        tenantName: 'Lerato Ndlovu',
+      });
+
+      expect(prompt).toContain('*MAINTENANCE REQUEST*');
+      expect(prompt).toContain('• Property: Sunset Heights 12');
+      expect(prompt).toContain('• Unit: Unit 3');
+      expect(prompt).toContain('• Tenant: Lerato Ndlovu');
+      expect(prompt).toContain('*ISSUE DETAILS (please complete)*');
+      expect(prompt).toContain('• Category (Plumbing / Electrical / Appliance / Structural / General Wear):');
+      expect(prompt).not.toMatch(emojiRegex);
     });
   });
 });

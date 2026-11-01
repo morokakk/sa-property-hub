@@ -7,7 +7,7 @@
 [![React](https://img.shields.io/badge/React-19.3-blue.svg)](https://react.dev/)
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind-v4.3-38bdf8.svg)](https://tailwindcss.com/)
 [![Zustand](https://img.shields.io/badge/Zustand-v5.0-orange.svg)](https://github.com/pmndrs/zustand)
-[![Tests](https://img.shields.io/badge/Vitest-823%20Passed-brightgreen.svg)](https://vitest.dev/)
+[![Tests](https://img.shields.io/badge/Vitest-885%20Passed-brightgreen.svg)](https://vitest.dev/)
 [![E2E](https://img.shields.io/badge/Playwright-Multi--Device-purple.svg)](https://playwright.dev/)
 [![Compliance](https://img.shields.io/badge/SARS%20%2F%20LPC%20%2F%20RHA-2026%20Compliant-emerald.svg)]()
 
@@ -68,6 +68,15 @@ The **Moremela Property Investment Hub** addresses the structural complexities u
   - **Onboarding ([`LeaseInspectionDrawer.tsx`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/components/rentals/modals/LeaseInspectionDrawer.tsx)):** 15-second mobile "Tap-Only-What's-Broken" 8-category checklist (`Walls, Paint & Ceilings`, `Floors, Tiles & Skirting`, `Doors, Locks, Keys & Remotes`, `Windows, Glass & Blinds`, `Plumbing, Taps & Geyser`, `Electrical, Lights & Plugs`, `Kitchen Stove, Oven & Cupboards`, `Meters, Exterior & Parking`), Cloud Photo Vault URL attachment, and 1-click WhatsApp inspection delivery for electronic tenant acknowledgement.
   - **Move-Out & Settlement ([`TenantNoticeModal.tsx`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/components/rentals/modals/TenantNoticeModal.tsx)):** Side-by-side Ingoing vs. Exit condition diffing, automated degraded-item detection (`Good`/`Fair` ingoing degraded to `Defective` exit), itemized contractor repair deductions, live `netDepositRefundableZAR` auto-sync, excess damage shortfall alerts (`excessDamageShortfallZAR`), and 5-year statutory audit trail retention on `ArchivedLease`.
   - **Public Tenant Portal ([`TenantStatementViewer.tsx`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/components/statements/TenantStatementViewer.tsx)):** Secure tokenized viewer with a dual-tab switcher (`Monthly Statement Ledger` | `Inspection & Condition Report` via `?tab=inspection`) featuring itemized defect photos and a 1-click **"Confirm & Agree via WhatsApp"** digital handshake for statutory compliance.
+* **Lean Maintenance Ticketing & Work Order Lifecycle ([`MaintenanceModal.tsx`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/components/rentals/modals/MaintenanceModal.tsx)):**
+  - **3-Stage Lifecycle:** Color-coded status badges (**Amber** `Open`, **Blue** `In Progress`, **Emerald** `Resolved`) with 1-click status cycling and inline cost updates via `InlineEditableAmount`.
+  - **Supplier Directory Dispatch:** 1-click **"Dispatch to Contractor (WhatsApp)"** action linking to local service suppliers with clean, emoji-free work order dispatch templates.
+  - **Interactive Final Resolution Flow:** Clicking **"Mark Resolved"** opens an inline input strip for **Final Invoice Amount (R)** and optional **Invoice #**, ensuring realized cash-flow only deducts actual incurred expenses.
+  - **Automated Cloud & Server Check:** Opening the modal triggers `checkCloudAndTenantTickets()`, automatically syncing new tenant reports from Supabase or server memory into the landlord's Zustand store.
+* **Tenant Maintenance Intake Portal & Direct Database Persistence:**
+  - **Interactive Public Intake:** Public tenant statements feature a responsive **"Report Maintenance"** action opening a structured intake dialog (Category, Urgency level, Issue Description, and Preferred Access Window).
+  - **Secure Server Action ([`submitTenantMaintenanceTicket.ts`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/app/actions/submitTenantMaintenanceTicket.ts)):** Runs with elevated service-role privileges, enforces sliding-window rate limiting (max 3 tickets/lease/hour), generates tracking references (e.g. `WO-4921`), and appends the work order directly to the landlord's `properties.maintenance_history` in Supabase.
+  - **Instant WhatsApp Bridge:** Automatically copies pre-formatted request copy to clipboard and opens WhatsApp pre-populated with the generated ticket reference.
 * **Disposal & Exit Settlement Engine ([`ExitSaleModal.tsx`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/components/rentals/modals/ExitSaleModal.tsx) & [`calculateDisposalMetrics`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/lib/calculations/rentals.ts)):** Reconciles gross capital gains, estate agent commission (private treaty vs. agent), bond cancellation fees (`R5,200`), NCA 90-day early termination penalties, and negative-equity settlement shortfall warnings (`shortfallToSettleZAR`) when debt and legal friction exceed realized sale value.
 * **Ancillary Income Matrix:** Commercial non-lease revenue aggregation (MNO cellular towers, rooftop advertising billboards, dedicated parking bays, storage units).
 * **Prepaid Sub-Metering vs. Post-Paid Ledger:** Transparent reconciliation of vending platform fees (8–15% deductions from Net Operating Income) against direct municipal utility statements.
@@ -86,6 +95,7 @@ The **Moremela Property Investment Hub** addresses the structural complexities u
 ### 2.6 Global Settings & Investor Profile (`/settings`)
 * **Live Route:** [`src/app/settings/page.tsx`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/app/settings/page.tsx)
 * **Investor Profile & Corporate Tax Routing:** Configures tax entity (`Company (27%)`, `Individual (45%)`, or `Pre-Tax`), VAT-exempt managing agency toggle, buy-box investment hurdle thresholds, Google OAuth cloud authentication, and LLM provider API credentials.
+* **Automatic Cross-Device Supabase Sync ([`useAutoCloudSync.ts`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/hooks/useAutoCloudSync.ts)):** Continuous multi-device synchronization engine with live navigation header status pill ([`CloudSyncStatusPill`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/components/navigation/TopHeader.tsx)), 1500ms debounced push on portfolio mutations, automatic cloud hydration on session load or sign-in, loop suppression guard (`isHydratingFromCloud`), and `DBSYNC-02` cross-user contamination prevention.
 * **Regional Node Market Benchmark Editor ([`NodeBenchmarkEditor.tsx`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/components/settings/NodeBenchmarkEditor.tsx)):** Interactive editor for customizing gross yield, cap rate, price-per-$m^2$, and statutory municipal tariff baselines across all 35 South African investment nodes with CSV/JSON import/export and Supabase cloud sync.
 * **Conveyancing & Transfer Legal Settings:** Configures `defaultBondCancellationFeeZAR` (defaulting to `R5,200` incl. 15% VAT per 1 July 2026 LSSA tariffs + Deeds Office cancellation levy + bank instruction fee), synchronizing baseline exit legal cost assumptions across `/analyzer`, `/flips`, `/rentals`, and `/proposal`.
 
@@ -112,7 +122,7 @@ The **Moremela Property Investment Hub** addresses the structural complexities u
 | **Document Processing** | PDF-Lib / PDF.js | `pdf-lib 1.17.1`, `pdfjs-dist 6.3.289`, `html2pdf.js 0.14.0` |
 | **Database & Cloud** | Supabase | `@supabase/supabase-js 2.117.2` (Row-Level Security, Google OAuth, cloud sync) |
 | **Product Telemetry** | PostHog | `posthog-js` (POPIA-compliant input masking & client analytics) |
-| **Unit & Integration** | Vitest | `5.0.1` (78 test files, 823 passing tests) |
+| **Unit & Integration** | Vitest | `5.0.1` (86 test files, 885 passing tests) |
 | **End-to-End (E2E)** | Playwright | `1.63.0` (Mobile, Tablet, Desktop responsive regression suite) |
 | **Mutation Testing** | Stryker | `@stryker-mutator/core 10.0.0` |
 
@@ -170,6 +180,7 @@ npm run build
 ```text
 ├── src/
 │   ├── app/                      # Tier 1: Thin Next.js App Router Page Controllers
+│   │   ├── actions/              # Next.js Server Actions (submitTenantMaintenanceTicket, sendStatementEmail)
 │   │   ├── page.tsx              # Executive Dashboard
 │   │   ├── analyzer/page.tsx     # Opportunity Deal Sourcing & Underwriting
 │   │   ├── flips/page.tsx        # Buy-and-Flip Renovation Command Center
@@ -183,9 +194,10 @@ npm run build
 │   │   ├── dashboard/            # KPI strips, allocation graphs, tax widgets
 │   │   ├── analyzer/             # Underwriting cards, scorecards, input forms
 │   │   ├── flips/                # BOQ tables, phase checklists, delay matrix, exit modal
-│   │   ├── rentals/              # Rental cards, meter modals, inspection drawer, move-out & exit modals
+│   │   ├── rentals/              # Rental cards, meter modals, inspection drawer, maintenance modal, exit modals
 │   │   └── common/               # Shared modals, badges, inputs, buttons
 │   ├── hooks/                    # Tier 2: Headless Domain UI State Hooks
+│   │   ├── useAutoCloudSync.ts   # Continuous Cross-Device Cloud Sync Engine & Reactive Sync Store
 │   │   ├── flips/                # useFlipCalculations, useFlipModalManager, useBoqForm
 │   │   └── rentals/              # useRentalPortfolio, useRentalModalState, useDirectPdfUpload
 │   ├── lib/
