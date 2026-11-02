@@ -206,7 +206,7 @@ export default function WelcomePage() {
               <div className="space-y-3 text-xs sm:text-sm">
                 <div>
                   <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 block mb-0.5">
-                    Human Goal
+                    Goal
                   </span>
                   <p className="text-slate-800 font-medium leading-relaxed">{activeGoal.humanGoal}</p>
                 </div>
