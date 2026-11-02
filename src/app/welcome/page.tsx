@@ -27,7 +27,7 @@ interface LifeGoalOption {
 const LIFE_GOALS: LifeGoalOption[] = [
   {
     id: 'cashflow',
-    title: 'Monthly Family Cash Flow',
+    title: 'Monthly Cash Flow',
     icon: Building2,
     humanGoal: 'Cover school or varsity fees, supplement household income, or replace your salary.',
     howClearsWay:
@@ -57,7 +57,7 @@ const LIFE_GOALS: LifeGoalOption[] = [
   },
   {
     id: 'wealth',
-    title: 'Long-Term Family Wealth & Partners',
+    title: 'Long-Term Wealth & Partners',
     icon: FileText,
     humanGoal: 'Compound debt-free equity over 20 years, recycle capital via BRRRR, and raise private funding professionally.',
     howClearsWay:

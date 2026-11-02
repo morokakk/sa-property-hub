@@ -34,12 +34,12 @@ describe('Welcome Landing Page (/welcome)', () => {
     // Interactive Life Goal Switcher
     expect(html).toContain('data-testid="life-goal-switcher"');
     expect(html).toContain('“What is your next property meant to do for your life?”');
-    expect(html).toContain('Monthly Family Cash Flow');
+    expect(html).toContain('Monthly Cash Flow');
     expect(html).toContain('Build a Lump-Sum Cash War Chest');
     expect(html).toContain('Vet a Deal Before You Sign');
-    expect(html).toContain('Long-Term Family Wealth &amp; Partners');
+    expect(html).toContain('Long-Term Wealth &amp; Partners');
 
-    // Default active goal (Monthly Family Cash Flow)
+    // Default active goal (Monthly Cash Flow)
     expect(html).toContain('Cover school or varsity fees, supplement household income, or replace your salary.');
     expect(html).toContain('Explore Rental Portfolio ➔');
     expect(html).toContain('href="/rentals"');
