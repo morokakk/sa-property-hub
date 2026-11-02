@@ -20,6 +20,8 @@ flowchart TD
     P4["src/app/rentals/page.tsx (Rentals)"]
     P5["src/app/funding/page.tsx (Facilities)"]
     P6["src/app/tasks/page.tsx (Task Ledger & Calendar)"]
+    P7["src/app/welcome/page.tsx (Landing Page)"]
+    P8["src/app/about/page.tsx (Founder Story)"]
   end
 
   subgraph Tier2["Tier 2: Headless Domain UI Hooks"]
@@ -74,9 +76,11 @@ flowchart TD
   - Strictly declarative. No inline calculations (no raw tax math, yield division, or compound interest formulas).
   - Maximum file size target: `< 250 LOC`.
   - Responsible only for connecting Tier 2 domain hooks to Tier 3 visual components and passing action callbacks to the store facade.
-- **Key Server Actions:**
+- **Key Server Actions & Standalone Controllers:**
   - [`submitTenantMaintenanceTicket.ts`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/app/actions/submitTenantMaintenanceTicket.ts): Secure unauthenticated public intake for tenant work orders with sliding-window rate limiting (max 3/lease/hr), short tracking reference generation (e.g. `WO-4921`), and Supabase service-role persistence into `properties.maintenance_history`.
   - [`sendStatementEmail.ts`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/app/actions/sendStatementEmail.ts): Resend-powered tenant statement delivery with attached PDF and payment reminders.
+  - **Standalone Layout & Chrome Isolation:** Standard operational routes render within the shared desktop navigation sidebar and mobile bottom tab bar (`Sidebar.tsx`). Standalone public routes ([`/welcome`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/app/welcome/page.tsx), [`/about`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/app/about/page.tsx), `/privacy`, and `/statement/*`) are explicitly bypassed in `Sidebar.tsx` to render full-width institutional headers and clean reading canvases without sidebar shell interference.
+  - **Server Component Stealth Invariant ([`/about`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/app/about/page.tsx)):** Pages requiring deterministic search engine exclusion (such as the private GTM founder story) must be implemented strictly as React Server Components (omitting `'use client'`) to guarantee that `export const metadata: Metadata` with `robots: { index: false, follow: false, nocache: true }` evaluates natively during static page prerendering, using pure `<Link>` tags for client transitions.
 
 ### 1.2 Tier 2: Headless Domain UI Hooks (`src/hooks/`)
 - **Role:** Coordinates form state, UI filter machines, modal visibility orchestration, and asynchronous client events.
@@ -545,3 +549,4 @@ An automated Equity Extraction Alert is triggered if and only if two simultaneou
    This guarantees exact $O(1)$ evaluation without circular numerical loops or iterative convergence drift.
 7. **Strict ASCII / Emoji-Free WhatsApp Formatting:** All `whatsappFormatter.ts` templates (including `formatInspectionForWhatsApp`, syndicate pitch copy, and payment receipts) must remain strictly free of Unicode emojis, utilizing clean ASCII brackets (e.g. `[Good]`, `[Defective]`, `[Tenant Agreed]`), bullets (`•`), and standard typography to ensure complete test compliance with `whatsappFormatter.test.ts` and cross-platform compatibility across all mobile SMS/WhatsApp gateways.
 8. **Realized Cash Flow & Maintenance Incurred Cost Guard:** Open or in-progress work orders (`status !== 'Resolved'`) carry `costZAR: 0` or estimated contractor quotes and must NEVER be deducted from realized cash flow or net operating income. Only work orders marked `status: 'Resolved'` with a verified final invoice amount represent incurred deductible expenses.
+9. **GTM Stealth & Standalone Route Isolation:** New unlaunched marketing or founder narrative routes must be protected with both search-engine directives (`robots: { index: false, follow: false, nocache: true }`) and navigation feature flags (e.g., `SHOW_ABOUT_PAGE_IN_NAV = false` in `Sidebar.tsx`). Standalone routes that bypass app Chrome must be registered in the route guard `if (pathname.startsWith('/welcome') || ...)` to ensure pure full-width rendering.

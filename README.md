@@ -7,7 +7,7 @@
 [![React](https://img.shields.io/badge/React-19.3-blue.svg)](https://react.dev/)
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind-v4.3-38bdf8.svg)](https://tailwindcss.com/)
 [![Zustand](https://img.shields.io/badge/Zustand-v5.0-orange.svg)](https://github.com/pmndrs/zustand)
-[![Tests](https://img.shields.io/badge/Vitest-885%20Passed-brightgreen.svg)](https://vitest.dev/)
+[![Tests](https://img.shields.io/badge/Vitest-896%20Passed-brightgreen.svg)](https://vitest.dev/)
 [![E2E](https://img.shields.io/badge/Playwright-Multi--Device-purple.svg)](https://playwright.dev/)
 [![Compliance](https://img.shields.io/badge/SARS%20%2F%20LPC%20%2F%20RHA-2026%20Compliant-emerald.svg)]()
 
@@ -107,6 +107,21 @@ The **Moremela Property Investment Hub** addresses the structural complexities u
 * **RFC 5545 iCalendar (.ics) Export & External Calendar Deep Links ([`calendarExport.ts`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/lib/export/calendarExport.ts)):** Pure client-side export generating RFC 5545 `.ics` calendar payloads with CRLF line endings, exclusive all-day `DTEND` dates (`dueDate + 1 day`), native recurrence rules (`RRULE:FREQ=WEEKLY|MONTHLY|YEARLY` with `INTERVAL=3` quarterly and `UNTIL` bounds), and 9:00 AM `VALARM` display reminders. Includes bulk filtered active export (`[ 📅 Export .ics (N) ]`) and per-task quick actions for direct Google Calendar and Outlook 365 compose deep links.
 * **Automated Cross-Domain Reminders ([`taskSync.ts`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/lib/store/utils/taskSync.ts)):** Automatically schedules and synchronizes 60-day lease expiry renewal notices and 14-day Body Corporate AGM budget review tasks across rentals, flips, and pipeline opportunities.
 
+### 2.8 Standalone Human-First Landing Page (`/welcome`)
+* **Live Route:** [`src/app/welcome/page.tsx`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/app/welcome/page.tsx)
+* **Human-Centric Deal Alignment:** A low-word-count institutional landing page linking an entrepreneur's core life goals directly to live underwriting and management modules:
+  - **Monthly Cash Flow:** Feeds single-let/multi-let tracking, utility recovery, and 1-click statements ([`/rentals`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/app/rentals/page.tsx)).
+  - **Build a Lump-Sum Cash War Chest:** Drives 10-trade BOQ management, stage draws, and Section 118 clearance timelines ([`/flips`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/app/flips/page.tsx)).
+  - **Vet a Deal Before You Sign:** Instant SARS transfer duty, conveyancing tariffs, and MAO calculation ([`/analyzer`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/app/analyzer/page.tsx)).
+  - **Long-Term Wealth & Partners:** BRRRR refinance readiness, tax reserves, and 1-page PDF/WhatsApp pitch memos ([`/proposal`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/app/proposal/page.tsx)).
+* **Architecture Grid ("Guard the Kraal. Grow the Baobab."):** 3-column value matrix emphasizing Day-1 cash protection against South African transaction traps, mobile building-site operations, and instant lender syndication.
+* **Workspace Integration:** Directly accessible from any view via the **"Welcome & Overview"** link in the navigation sidebar under *Help & Reference*.
+
+### 2.9 Hidden Founder Story & Cultural Vision (`/about`)
+* **Live Route:** [`src/app/about/page.tsx`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/app/about/page.tsx)
+* **Cultural Roots & Tribute:** Documents the founding purpose and cultural heritage behind *Moremela* (from Setswana, Sesotho, and Sepedi *go remela* — *"the one who clears the way"* to build the homestead / *kraal*), paying tribute to **Sally Motlana**, recipient of the National **Order of the Baobab**.
+* **Stealth GTM Protection:** Strict Next.js Server Component configured with `robots: { index: false, follow: false, nocache: true }` metadata, private draft notice badge, and gated navigation behind `SHOW_ABOUT_PAGE_IN_NAV = false` in `Sidebar.tsx`.
+
 ---
 
 ## 3. Tech Stack Architecture
@@ -182,6 +197,8 @@ npm run build
 │   ├── app/                      # Tier 1: Thin Next.js App Router Page Controllers
 │   │   ├── actions/              # Next.js Server Actions (submitTenantMaintenanceTicket, sendStatementEmail)
 │   │   ├── page.tsx              # Executive Dashboard
+│   │   ├── welcome/page.tsx      # Human-First Landing Page & Goal Switcher
+│   │   ├── about/page.tsx        # Stealth Founder Story & Cultural Vision (GTM Private Draft)
 │   │   ├── analyzer/page.tsx     # Opportunity Deal Sourcing & Underwriting
 │   │   ├── flips/page.tsx        # Buy-and-Flip Renovation Command Center
 │   │   ├── rentals/page.tsx      # Multi-Let Rental Portfolio & Operations
