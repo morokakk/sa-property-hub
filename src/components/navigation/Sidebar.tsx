@@ -25,17 +25,26 @@ import {
   Compass,
   BookOpen,
   MessageSquarePlus,
+  Sparkles,
 } from 'lucide-react';
 import { usePortfolioStore } from '@/lib/store/usePortfolioStore';
 import { exportAccountantJournalCSV } from '@/lib/export/csvExport';
 import FeedbackModal from '@/components/common/FeedbackModal';
 import { trackPrivacySafeEvent } from '@/lib/analytics/posthogClient';
 
+// Top-level GTM feature flag: keep /about hidden from public navigation until official launch
+export const SHOW_ABOUT_PAGE_IN_NAV = false;
+
 export default function Sidebar() {
   const pathname = usePathname();
 
-  // Hide sidebar completely on tenant statement portal and standalone privacy/legal page
-  if (pathname.startsWith('/statement') || pathname.startsWith('/privacy')) {
+  // Hide sidebar completely on tenant statement portal, legal privacy page, and standalone landing/about pages
+  if (
+    pathname.startsWith('/statement') ||
+    pathname.startsWith('/privacy') ||
+    pathname.startsWith('/welcome') ||
+    pathname.startsWith('/about')
+  ) {
     return null;
   }
 
@@ -223,10 +232,24 @@ export default function Sidebar() {
   // Permanent secondary utility links (static: never reordered or hidden based on guide progress)
   const utilityNavItems = [
     {
+      name: 'Welcome & Overview',
+      href: '/welcome',
+      icon: Sparkles,
+    },
+    {
       name: 'Get Started Guide',
       href: '/get-started',
       icon: Compass,
     },
+    ...(SHOW_ABOUT_PAGE_IN_NAV
+      ? [
+          {
+            name: 'About & Founder Story',
+            href: '/about',
+            icon: BookOpen,
+          },
+        ]
+      : []),
   ];
 
   // Mobile Bottom Quick Navigation Tabs (4 Core Modules + More Drawer Trigger)
