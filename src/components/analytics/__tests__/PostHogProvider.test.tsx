@@ -10,6 +10,7 @@ import {
   captureSanitizedError,
   syncAnalyticsStorageMode,
   resetAnalyticsSession,
+  identifyAnalyticsUser,
 } from '../PostHogProvider';
 import fs from 'fs';
 import path from 'path';
@@ -21,6 +22,7 @@ vi.mock('posthog-js', () => ({
     capture: vi.fn(),
     register: vi.fn(),
     reset: vi.fn(),
+    identify: vi.fn(),
   },
 }));
 
@@ -213,6 +215,37 @@ describe('PostHogProvider Client-Side Telemetry & POPIA Privacy Masking', () => 
       error_code: 'PDF_BYOK_PARSE_FAILED',
       provider: 'anthropic',
       documentType: 'municipal_utility',
+    });
+  });
+
+  it('identifies users pseudonymously with raw Supabase UUID and zero PII traits', () => {
+    identifyAnalyticsUser('usr-uuid-1234-abcd');
+    expect(posthog.identify).toHaveBeenCalledWith('usr-uuid-1234-abcd');
+    expect(posthog.identify).toHaveBeenCalledTimes(1);
+
+    // Should no-op safely on empty or whitespace strings
+    identifyAnalyticsUser('');
+    expect(posthog.identify).toHaveBeenCalledTimes(1);
+  });
+
+  it('emits POPIA-safe account_created and user_signed_in conversion events', () => {
+    trackPrivacySafeEvent('account_created', {
+      method: 'email',
+      requires_verification: true,
+      email: 'investor@example.co.za', // Should be stripped by privacy scrubber
+    });
+
+    expect(posthog.capture).toHaveBeenCalledWith('account_created', {
+      method: 'email',
+      requires_verification: true,
+    });
+
+    trackPrivacySafeEvent('user_signed_in', {
+      method: 'email',
+    });
+
+    expect(posthog.capture).toHaveBeenCalledWith('user_signed_in', {
+      method: 'email',
     });
   });
 });

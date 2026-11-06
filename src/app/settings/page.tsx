@@ -67,6 +67,7 @@ import {
   syncAnalyticsStorageMode,
   trackPrivacySafeEvent,
   captureSanitizedError,
+  identifyAnalyticsUser,
 } from '@/lib/analytics/posthogClient';
 
 type SettingsTab = 'entity' | 'underwriting' | 'ai';
@@ -425,6 +426,10 @@ function SettingsContent() {
           password: authPassword,
         });
         if (error) throw error;
+        trackPrivacySafeEvent('user_signed_in', { method: 'email' });
+        if (data.user?.id) {
+          identifyAnalyticsUser(data.user.id);
+        }
         setCurrentUser(data.user ? { id: data.user.id, email: data.user.email } : null);
         setAuthEmail('');
         setAuthPassword('');
@@ -437,6 +442,18 @@ function SettingsContent() {
           password: authPassword,
         });
         if (error) throw error;
+        if (data.user) {
+          trackPrivacySafeEvent('account_created', {
+            method: 'email',
+            requires_verification: !data.session,
+          });
+          if (typeof localStorage !== 'undefined' && data.user.id) {
+            localStorage.setItem(`ph_signup_tracked_${data.user.id}`, 'true');
+          }
+          if (data.user.id) {
+            identifyAnalyticsUser(data.user.id);
+          }
+        }
         if (data.user && !data.session) {
           setAuthInfo('Account created! If confirmation is enabled, please verify your email before syncing.');
           setCurrentUser(null);

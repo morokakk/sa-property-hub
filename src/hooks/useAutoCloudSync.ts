@@ -12,6 +12,7 @@ import {
   syncAnalyticsStorageMode,
   trackPrivacySafeEvent,
   captureSanitizedError,
+  identifyAnalyticsUser,
 } from '@/lib/analytics/posthogClient';
 
 export type CloudSyncStatus = 'local_only' | 'syncing' | 'synced' | 'error';
@@ -223,7 +224,31 @@ export function useAutoCloudSync() {
       }
 
       if (session?.user && (event === 'SIGNED_IN' || event === 'INITIAL_SESSION')) {
+        identifyAnalyticsUser(session.user.id);
         syncAnalyticsStorageMode('cloud_synced');
+
+        if (typeof localStorage !== 'undefined') {
+          const signupKey = `ph_signup_tracked_${session.user.id}`;
+          const isAlreadyTracked = localStorage.getItem(signupKey);
+          const userCreatedAtMs = session.user.created_at
+            ? new Date(session.user.created_at).getTime()
+            : 0;
+          const isRecentCreation =
+            userCreatedAtMs > 0 && Date.now() - userCreatedAtMs < 60000;
+
+          if (!isAlreadyTracked && isRecentCreation) {
+            const provider =
+              session.user.app_metadata?.provider ||
+              session.user.app_metadata?.providers?.[0] ||
+              'google';
+            trackPrivacySafeEvent('account_created', {
+              method: provider,
+              requires_verification: false,
+            });
+            localStorage.setItem(signupKey, 'true');
+          }
+        }
+
         if (isHydratingFromCloud.current) return;
         await hydrateNow();
         return;

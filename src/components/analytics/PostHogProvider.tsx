@@ -9,6 +9,7 @@ import {
   captureSanitizedError,
   syncAnalyticsStorageMode,
   resetAnalyticsSession,
+  identifyAnalyticsUser,
 } from '@/lib/analytics/posthogClient';
 
 export {
@@ -17,6 +18,7 @@ export {
   captureSanitizedError,
   syncAnalyticsStorageMode,
   resetAnalyticsSession,
+  identifyAnalyticsUser,
 };
 
 export function initializePostHogClient(): void {

@@ -201,6 +201,20 @@ export function syncAnalyticsStorageMode(mode: 'local_only' | 'cloud_synced'): v
 }
 
 /**
+ * Associates telemetry with an anonymous Supabase UUID for retention and funnel analytics.
+ * Strictly transmits the raw UUID string with zero PII traits (no email, name, or phone)
+ * in accordance with POPIA statutory minimisation.
+ */
+export function identifyAnalyticsUser(userId: string): void {
+  try {
+    if (!isPostHogReady() || !userId) return;
+    posthog.identify(userId);
+  } catch {
+    // Telemetry must never disrupt application execution
+  }
+}
+
+/**
  * Resets the PostHog session and rotates the anonymous device_id immediately on sign-out,
  * fulfilling `/privacy` Section 4.
  */
