@@ -117,6 +117,13 @@ export function DevelopmentUnitInventoryTab({
     return acc;
   }, {} as Record<DevUnitStatus, number>);
 
+  const soldCount = statusCounts['Sold & Transferred'] || 0;
+  const contractedCount =
+    (statusCounts['Reserved (OTP Signed)'] || 0) +
+    (statusCounts['Bond Approved / Guarantees Issued'] || 0);
+  const retainedCount = statusCounts['Retained for Rental'] || 0;
+  const availableCount = statusCounts['Available'] || 0;
+
   // Totals for sticky footer
   const totalFloorArea = financials.totalFloorAreaSqm;
   const totalCostBasis = financials.totalAllocatedCostBasisZAR;
@@ -351,7 +358,7 @@ export function DevelopmentUnitInventoryTab({
                   <td className="py-2.5 px-3 text-right font-mono text-emerald-800">{formatZAR(totalListGdv)}</td>
                   <td className="py-2.5 px-3 text-right font-mono text-purple-800">{formatZAR(totalEstRent)}/mo</td>
                   <td colSpan={3} className="py-2.5 px-3 text-right text-xs text-slate-500 font-normal">
-                    {`${financials.unitsSoldAndTransferredCount} Sold • ${financials.unitsRetainedCount} Retained • ${financials.unitsForSaleCount} Available`}
+                    {`${soldCount} Sold • ${contractedCount > 0 ? `${contractedCount} Contracted • ` : ''}${retainedCount} Retained • ${availableCount} Available`}
                   </td>
                 </tr>
               </tfoot>

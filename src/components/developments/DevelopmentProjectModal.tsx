@@ -8,6 +8,7 @@ import {
   DevelopmentTaxEntityType,
   Province,
 } from '@/types';
+import { generateInitialDevelopmentUnits } from '@/lib/calculations/developments';
 import {
   Building2,
   Calendar,
@@ -97,6 +98,12 @@ export function DevelopmentProjectModal({
   const [preSalesHurdlePercent, setPreSalesHurdlePercent] = useState(60);
   const [notes, setNotes] = useState('');
 
+  // Initial Unit Schedule Generator (new projects)
+  const [initialUnitCount, setInitialUnitCount] = useState(6);
+  const [defaultUnitConfiguration, setDefaultUnitConfiguration] = useState('2 Bed 1 Bath Cluster');
+  const [targetListPricePerUnitZAR, setTargetListPricePerUnitZAR] = useState(1350000);
+  const [estMonthlyRentPerUnitZAR, setEstMonthlyRentPerUnitZAR] = useState(11500);
+
   useEffect(() => {
     if (editingDevelopment) {
       setTitle(editingDevelopment.title || '');
@@ -144,6 +151,10 @@ export function DevelopmentProjectModal({
       setDevelopmentFacilityLimitZAR(4500000);
       setPreSalesHurdlePercent(60);
       setNotes('');
+      setInitialUnitCount(6);
+      setDefaultUnitConfiguration('2 Bed 1 Bath Cluster');
+      setTargetListPricePerUnitZAR(1350000);
+      setEstMonthlyRentPerUnitZAR(11500);
     }
   }, [editingDevelopment, isOpen]);
 
@@ -178,7 +189,8 @@ export function DevelopmentProjectModal({
     };
 
     if (isNew) {
-      projectData.id = `dev-${Date.now()}`;
+      const newProjectId = `dev-${Date.now()}`;
+      projectData.id = newProjectId;
       projectData.createdAt = new Date().toISOString().split('T')[0];
       projectData.developmentFacilityDrawnZAR = 0;
       projectData.developmentFacilityRepaidZAR = 0;
@@ -201,7 +213,16 @@ export function DevelopmentProjectModal({
         occupancyCertificate: { status: 'Not Started' },
       };
       projectData.boqItems = [];
-      projectData.units = [];
+      projectData.units = generateInitialDevelopmentUnits({
+        projectId: newProjectId,
+        unitCount: Number(initialUnitCount),
+        unitConfiguration: defaultUnitConfiguration,
+        totalBuildableAreaSqm: Number(totalBuildableAreaSqm),
+        landPurchasePriceZAR: Number(landPurchasePriceZAR),
+        budgetedHardCostPerSqmZAR: Number(budgetedHardCostPerSqmZAR),
+        listPriceVatInclZAR: Number(targetListPricePerUnitZAR),
+        estimatedMonthlyRentZAR: Number(estMonthlyRentPerUnitZAR),
+      });
     }
 
     onSave(projectData, isNew);
@@ -540,7 +561,68 @@ export function DevelopmentProjectModal({
             </div>
           </div>
 
-          {/* Section 6: Notes */}
+          {/* Section 6: Initial Unit Schedule Generator */}
+          {isNew && (
+            <div className="space-y-3 bg-emerald-50/40 border border-emerald-200 rounded-xl p-3.5">
+              <h4 className="font-bold text-slate-900 flex items-center gap-1.5 text-xs border-b border-emerald-100 pb-1">
+                <span>6. Initial Unit Schedule Generator</span>
+              </h4>
+              <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 text-xs">
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">
+                    Initial Unit Count
+                  </label>
+                  <input
+                    type="number"
+                    min={0}
+                    max={100}
+                    value={initialUnitCount}
+                    onChange={(e) => setInitialUnitCount(Number(e.target.value))}
+                    className="w-full rounded border border-slate-300 bg-white px-3 py-1.5"
+                  />
+                </div>
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">
+                    Default Unit Configuration
+                  </label>
+                  <input
+                    type="text"
+                    value={defaultUnitConfiguration}
+                    onChange={(e) => setDefaultUnitConfiguration(e.target.value)}
+                    className="w-full rounded border border-slate-300 bg-white px-3 py-1.5"
+                  />
+                </div>
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">
+                    Target List Price / Unit (ZAR)
+                  </label>
+                  <input
+                    type="number"
+                    min={0}
+                    step={10000}
+                    value={targetListPricePerUnitZAR}
+                    onChange={(e) => setTargetListPricePerUnitZAR(Number(e.target.value))}
+                    className="w-full rounded border border-slate-300 bg-white px-3 py-1.5"
+                  />
+                </div>
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">
+                    Est. Monthly Rent / Unit (ZAR)
+                  </label>
+                  <input
+                    type="number"
+                    min={0}
+                    step={500}
+                    value={estMonthlyRentPerUnitZAR}
+                    onChange={(e) => setEstMonthlyRentPerUnitZAR(Number(e.target.value))}
+                    className="w-full rounded border border-slate-300 bg-white px-3 py-1.5"
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Section 7: Notes */}
           <div>
             <label className="block font-semibold text-slate-700 mb-1">Project Notes & Feasibility Assumptions</label>
             <textarea

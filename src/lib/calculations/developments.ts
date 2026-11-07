@@ -9,6 +9,7 @@ import {
   ApprovalStatus,
   DevelopmentProject,
   DevelopmentSoftCosts,
+  DevelopmentUnit,
   DevUnitStatus,
   DevelopmentTaxEntityType,
   PreConstructionApprovals,
@@ -1155,4 +1156,37 @@ export function calculateDevelopmentDebtWipeoutMatrix(
     unitsNeededForSection13Sex: fin.unitsNeededForSection13Sex,
   };
 }
+
+export interface InitialUnitGeneratorInput {
+  projectId: string;
+  unitCount: number;
+  unitConfiguration: string;
+  totalBuildableAreaSqm: number;
+  landPurchasePriceZAR: number;
+  budgetedHardCostPerSqmZAR: number;
+  listPriceVatInclZAR: number;
+  estimatedMonthlyRentZAR: number;
+}
+
+export function generateInitialDevelopmentUnits(input: InitialUnitGeneratorInput): DevelopmentUnit[] {
+  const count = Math.max(0, Math.round(Number(input.unitCount) || 0));
+  if (count <= 0) return [];
+  const areaSqm = Math.max(10, Math.round((Number(input.totalBuildableAreaSqm) || 0) / count));
+  const estTdc =
+    (Number(input.landPurchasePriceZAR) || 0) +
+    (Number(input.totalBuildableAreaSqm) || 0) * (Number(input.budgetedHardCostPerSqmZAR) || 0);
+  const allocatedCostBasisZAR = Math.round(estTdc / count);
+
+  return Array.from({ length: count }, (_, idx) => ({
+    id: `${input.projectId}-unit-${idx + 1}`,
+    unitNumber: `Unit ${idx + 1}`,
+    configuration: input.unitConfiguration || '2 Bed 1 Bath Cluster',
+    floorAreaSqm: areaSqm,
+    allocatedCostBasisZAR,
+    listPriceVatInclZAR: Number(input.listPriceVatInclZAR) || 0,
+    estimatedMonthlyRentZAR: Number(input.estimatedMonthlyRentZAR) || 0,
+    status: 'Available' as const,
+  }));
+}
+
 

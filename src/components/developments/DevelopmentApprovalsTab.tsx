@@ -242,7 +242,7 @@ export function DevelopmentApprovalsTab({
           return (
             <div
               key={def.key}
-              className={`bg-white rounded-xl border p-4 shadow-2xs hover:shadow-xs transition-shadow flex flex-col justify-between space-y-3 ${
+              className={`bg-white rounded-xl border p-4 shadow-2xs hover:shadow-xs transition-shadow flex flex-col justify-between space-y-3 h-auto ${
                 status === 'Approved'
                   ? 'border-emerald-200'
                   : status === 'Objection / Query'
@@ -287,7 +287,7 @@ export function DevelopmentApprovalsTab({
               <div className="pt-3 border-t border-slate-100 space-y-2 text-xs">
                 {/* Reference Number */}
                 <div>
-                  <label className="block text-[11px] font-semibold text-slate-600 mb-0.5">
+                  <label className="block text-[11px] font-semibold text-slate-600 mb-1 leading-normal">
                     Authority Reference No.
                   </label>
                   <input
@@ -302,7 +302,7 @@ export function DevelopmentApprovalsTab({
                 {/* Date Inputs */}
                 <div className="grid grid-cols-2 gap-2">
                   <div>
-                    <label className="block text-[10px] font-semibold text-slate-500 mb-0.5">
+                    <label className="block text-[11px] font-semibold text-slate-600 mb-1 leading-normal">
                       Submitted Date
                     </label>
                     <input
@@ -313,7 +313,7 @@ export function DevelopmentApprovalsTab({
                     />
                   </div>
                   <div>
-                    <label className="block text-[10px] font-semibold text-slate-500 mb-0.5">
+                    <label className="block text-[11px] font-semibold text-slate-600 mb-1 leading-normal">
                       Target Approval
                     </label>
                     <input

@@ -74,29 +74,29 @@ export function FlipBOQTable({
         </div>
       </div>
 
-      <div className="overflow-x-auto relative">
+      <div className="overflow-x-auto relative w-full">
         <table className="w-full min-w-[850px] text-left text-xs border-collapse">
           <thead className="sticky top-0 z-10 bg-slate-50/95 backdrop-blur-xs">
             <tr className="border-b border-slate-200 text-slate-500 uppercase font-semibold text-[10px] tracking-wider">
-              <th className="py-3 px-3.5 pl-5">Trade Category</th>
-              <th className="py-3 px-3.5">Draw Phase</th>
-              <th className="py-3 px-3.5">Scope / Item Description</th>
-              <th className="py-3 px-3.5">Unit / Qty</th>
-              <th className="py-3 px-3.5">Baseline (ZAR)</th>
-              <th className="py-3 px-3.5">Actual (ZAR)</th>
-              <th className="py-3 px-3.5">Variance</th>
-              <th className="py-3 px-3.5">Supplier / Contractor</th>
-              <th className="py-3 px-3.5">Status</th>
-              <th className="py-3 px-3.5 pr-5 text-right">Actions</th>
+              <th className="py-2.5 px-3 pl-4">Trade Category</th>
+              <th className="py-2.5 px-3">Draw Phase</th>
+              <th className="py-2.5 px-3">Scope / Item Description</th>
+              <th className="py-2.5 px-3">Unit / Qty</th>
+              <th className="py-2.5 px-3">Baseline (ZAR)</th>
+              <th className="py-2.5 px-3">Actual (ZAR)</th>
+              <th className="py-2.5 px-3">Variance</th>
+              <th className="py-2.5 px-3">Supplier / Contractor</th>
+              <th className="py-2.5 px-3">Status</th>
+              <th className="py-2.5 px-3 pr-4 text-right whitespace-nowrap">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100 text-slate-700">
             {boqItems.map((item) => (
               <tr key={item.id} className="hover:bg-slate-50/70 transition-colors">
-                <td className="py-3.5 px-3.5 pl-5 font-semibold text-slate-900 whitespace-nowrap">
+                <td className="py-2.5 px-3 pl-4 font-semibold text-slate-900 whitespace-nowrap">
                   {item.category}
                 </td>
-                <td className="py-3.5 px-3.5">
+                <td className="py-2.5 px-3">
                   <select
                     value={item.milestonePhase || 'First Fix / Wet Works'}
                     onChange={(e) =>
@@ -118,7 +118,7 @@ export function FlipBOQTable({
                     </span>
                   ) : null}
                 </td>
-                <td className="py-3.5 px-3.5 max-w-xs">
+                <td className="py-2.5 px-3 max-w-xs">
                   <div className="font-medium text-slate-800 leading-snug">{item.itemDescription}</div>
                   <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
                     {item.invoiceRef && (
@@ -134,13 +134,13 @@ export function FlipBOQTable({
                     )}
                   </div>
                 </td>
-                <td className="py-3.5 px-3.5 text-slate-500 whitespace-nowrap">
+                <td className="py-2.5 px-3 text-slate-500 whitespace-nowrap">
                   {item.quantity} {item.unit}
                 </td>
-                <td className="py-3.5 px-3.5 font-medium text-slate-700 whitespace-nowrap">
+                <td className="py-2.5 px-3 font-medium text-slate-700 whitespace-nowrap">
                   {formatZAR(item.baselineTotalZAR)}
                 </td>
-                <td className="py-3.5 px-3.5 font-bold text-slate-900 whitespace-nowrap">
+                <td className="py-2.5 px-3 font-bold text-slate-900 whitespace-nowrap">
                   <div className="leading-snug">{formatZAR(item.actualCostZAR)}</div>
                   {item.isSponsoredOrBarter && (
                     <div className="text-[9px] text-purple-700 font-normal">
@@ -148,7 +148,7 @@ export function FlipBOQTable({
                     </div>
                   )}
                 </td>
-                <td className="py-3.5 px-3.5 whitespace-nowrap">
+                <td className="py-2.5 px-3 whitespace-nowrap">
                   <span
                     className={`font-bold leading-snug ${
                       item.varianceZAR <= 0 ? 'text-emerald-700' : 'text-rose-600'
@@ -157,10 +157,10 @@ export function FlipBOQTable({
                     {item.varianceZAR > 0 ? `+${formatZAR(item.varianceZAR)}` : formatZAR(item.varianceZAR)}
                   </span>
                 </td>
-                <td className="py-3.5 px-3.5 text-slate-600 font-medium max-w-[180px] truncate" title={item.supplierOrContractor}>
+                <td className="py-2.5 px-3 text-slate-600 font-medium max-w-[180px] truncate" title={item.supplierOrContractor}>
                   {item.supplierOrContractor}
                 </td>
-                <td className="py-3.5 px-3.5">
+                <td className="py-2.5 px-3">
                   <select
                     value={item.status}
                     onChange={(e) =>
@@ -182,7 +182,7 @@ export function FlipBOQTable({
                     <option value="Completed">Completed</option>
                   </select>
                 </td>
-                <td className="py-3.5 px-3.5 pr-5 text-right whitespace-nowrap">
+                <td className="py-2.5 px-3 pr-4 text-right whitespace-nowrap">
                   <button
                     type="button"
                     onClick={() => {
@@ -202,23 +202,23 @@ export function FlipBOQTable({
           {/* Sticky Totals Summary Footer */}
           <tfoot className="sticky bottom-0 z-10 bg-slate-100/95 backdrop-blur-xs border-t-2 border-slate-300 font-bold text-slate-900 text-xs shadow-xs">
             <tr>
-              <td className="py-3.5 px-3.5 pl-5 text-slate-900 whitespace-nowrap">
+              <td className="py-2.5 px-3 pl-4 text-slate-900 whitespace-nowrap">
                 Total BOQ ({boqItems.length} Items)
               </td>
-              <td className="py-3.5 px-3.5 text-[11px] text-slate-600 whitespace-nowrap">
+              <td className="py-2.5 px-3 text-[11px] text-slate-600 whitespace-nowrap">
                 4 Draw Phases
               </td>
-              <td className="py-3.5 px-3.5 text-[11px] text-slate-600 whitespace-nowrap" title={`Master Budget: ${formatZAR(flip.baselineRenovationBudgetZAR)}`}>
+              <td className="py-2.5 px-3 text-[11px] text-slate-600 whitespace-nowrap" title={`Master Budget: ${formatZAR(flip.baselineRenovationBudgetZAR)}`}>
                 Master: {formatZAR(flip.baselineRenovationBudgetZAR, { compact: true })}{' '}
                 <span className="text-emerald-700 font-semibold">({formatZAR(contingencyBufferZAR, { compact: true })} Reserve)</span>
               </td>
-              <td className="py-3.5 px-3.5 text-slate-400 text-center">
+              <td className="py-2.5 px-3 text-slate-400 text-center">
                 —
               </td>
-              <td className="py-3.5 px-3.5 font-bold text-slate-900 whitespace-nowrap">
+              <td className="py-2.5 px-3 font-bold text-slate-900 whitespace-nowrap">
                 {formatZAR(totalBaselineZAR)}
               </td>
-              <td className="py-3.5 px-3.5 font-bold text-indigo-900 whitespace-nowrap">
+              <td className="py-2.5 px-3 font-bold text-indigo-900 whitespace-nowrap">
                 <div>{formatZAR(totalActualCostZAR)}</div>
                 {(flip.numberOfUnits || 1) > 1 && (
                   <div className="text-[10px] font-semibold text-indigo-600">
@@ -226,12 +226,12 @@ export function FlipBOQTable({
                   </div>
                 )}
               </td>
-              <td className="py-3.5 px-3.5 whitespace-nowrap">
+              <td className="py-2.5 px-3 whitespace-nowrap">
                 <span className={`font-black ${totalVarianceZAR <= 0 ? 'text-emerald-700' : 'text-rose-600'}`}>
                   {totalVarianceZAR > 0 ? `+${formatZAR(totalVarianceZAR)}` : formatZAR(totalVarianceZAR)}
                 </span>
               </td>
-              <td className="py-3.5 px-3.5 text-[11px] whitespace-nowrap">
+              <td className="py-2.5 px-3 text-[11px] whitespace-nowrap">
                 {totalSponsorSavingsZAR > 0 ? (
                   <span className="inline-flex items-center gap-1 text-[10px] font-bold text-purple-800 bg-purple-100 border border-purple-200 px-2 py-0.5 rounded-full">
                     <Gift className="w-3 h-3 text-purple-600" />
@@ -241,13 +241,13 @@ export function FlipBOQTable({
                   <span className="text-slate-400">—</span>
                 )}
               </td>
-              <td className="py-3.5 px-3.5 text-[10px] text-slate-600 whitespace-nowrap">
+              <td className="py-2.5 px-3 text-[10px] text-slate-600 whitespace-nowrap">
                 <span className="inline-flex items-center gap-1 font-semibold text-emerald-800">
                   <CheckCircle2 className="w-3 h-3 text-emerald-600" />
                   <span>{completedCount} Done • {inProgressCount} Active</span>
                 </span>
               </td>
-              <td className="py-3.5 px-3.5 pr-5 text-right text-slate-400">
+              <td className="py-2.5 px-3 pr-4 text-right text-slate-400">
                 —
               </td>
             </tr>
