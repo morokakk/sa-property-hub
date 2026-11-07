@@ -183,14 +183,14 @@ export const GET_STARTED_STAGES: readonly JourneyStage[] = [
           {
             id: 'analyzer-deal-screening',
             title: 'Deal Screening & Node Defaults',
-            summary: 'Model purchase price, deposit, regional node benchmarks, LSSA conveyancing and Day-1 capital with 1-click market defaults.',
+            summary: 'Model purchase price, deposit, regional node benchmarks, municipal zoning envelope, LSSA conveyancing and Day-1 capital with 1-click market defaults.',
             howTo: [
               'Click Edit on a demo deal (or start fresh) to load it into the South African Acquisition & Yield Calculator.',
               'Select a city or regional corridor, click "Use Node Defaults" to auto-populate market vacancy, capital growth and municipal rates, and choose your bond preset.',
-              'When Units / Rooms > 1, inspect the Build / Unit and All-In / Unit benchmarks, or open the MAO Quick Solver to back-solve your Max Allowable Bid (MAO) before saving.',
+              'When modeling multi-let or development stands, expand Municipal Zoning & Bulk Envelope to apply SA presets (Res 1, Res 3, Res 4, Township Infill) and check live FAR bulk utilization, height limits, and As-of-Right vs. SPLUMA rezoning triggers.',
             ],
             proTip:
-              'The 1-click "Use Node Defaults" button populates empirical norms from the property\'s regional corridor (or your custom /settings overrides), calibrating municipal rates and vacancy buffers to local market reality alongside July 2026 LSSA legal fees and SARS Transfer Duty.',
+              'The 1-click "Use Node Defaults" button calibrates regional norms, while the Municipal Zoning & Bulk Envelope calculates maximum stand bulk (FAR) and alerts you immediately if statutory SPLUMA Section 42 rezoning tribunal delays require a ≥6 month Stage 1 holding buffer.',
             href: '/analyzer#analyzer-calculator',
             ctaLabel: 'Open the calculator',
           },
@@ -387,14 +387,14 @@ export const GET_STARTED_STAGES: readonly JourneyStage[] = [
           {
             id: 'developments-approvals-tracker',
             title: 'Statutory Approvals & Paper Rights',
-            summary: 'Track municipal planning, SPLUMA rezoning, SG diagrams, building plans, NHBRC enrolment, and occupancy certificates.',
+            summary: 'Track municipal planning, zoning envelopes, SPLUMA rezoning, SG diagrams, building plans, and NHBRC enrolment.',
             howTo: [
-              'Open the Paper Rights & Approvals tab to view the 6 statutory pre-construction and handover milestones.',
+              'Open the Paper Rights & Approvals tab to inspect the statutory zoning envelope (FAR bulk, coverage, height, and density cap) alongside the 6 pre-construction milestones.',
               'Update each approval stage status from Not Started to Submitted, Objection or Query, or Approved with council reference numbers.',
-              'Set target approval dates to automatically generate calendar reminders and holding burn warning tasks 14 days in advance.',
+              'For As-of-Right infill developments, verify SPLUMA rezoning automatically defaults to N/A, eliminating 6–18 month tribunal delays.',
             ],
             proTip:
-              'Never break ground without an approved Surveyor-General diagram and NHBRC enrolment certificate. Municipal stop orders carry severe statutory penalties and escalate holding burn.',
+              'As-of-Right infill developments automatically mark SPLUMA Section 42 rezoning as N/A, derisking holding timelines. Never break ground without an approved SG diagram and NHBRC enrolment certificate to prevent municipal stop orders.',
             href: '/developments#developments-approvals',
             ctaLabel: 'Track statutory approvals',
           },
@@ -516,12 +516,12 @@ export const GET_STARTED_STAGES: readonly JourneyStage[] = [
             title: 'Select a Deal',
             summary: 'Pick any pipeline opportunity, flip, development scheme, or rental to pitch.',
             howTo: [
-              'Open Proposal Generator, or click Pitch Deck on an Analyzer card.',
-              'Choose the deal in Select Deal & Tailor Pitch Terms.',
-              'Check that the tear-sheet below picks up the deal\'s numbers.',
+              'Open Proposal Generator, or click Pitch Deck on any Analyzer, Flip, Rental, or Development card.',
+              'Choose your candidate from pipeline opportunities, flips, rentals, or ground-up developments in Select Deal & Tailor Pitch Terms.',
+              'Verify the tear-sheet populates project economics, featuring Section 2 development feasibility and statutory paper rights for ground-up schemes.',
             ],
             proTip:
-              'Pitch deals that already pass your Buy Box. Funders judge you on the first deal you bring them.',
+              'Pitch deals that already satisfy your Buy Box. For ground-up developments, the pitch deck automatically synthesizes statutory paper rights and As-of-Right town planning status, giving private lenders institutional confidence.',
             href: '/proposal#proposal-deal-selector',
             ctaLabel: 'Choose a deal',
           },
