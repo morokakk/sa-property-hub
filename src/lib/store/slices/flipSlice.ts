@@ -293,6 +293,7 @@ export const createFlipSlice: StateCreator<
         : 'Vacant',
       cocChecklist: flip.cocChecklist ? { ...flip.cocChecklist } : undefined,
       driveVault: flip.driveVault ? { ...flip.driveVault } : undefined,
+      zoningProfile: flip.zoningProfile ? structuredClone(flip.zoningProfile) : undefined,
       convertedFromFlipId: flip.id,
       isBrrrrProperty: true,
       totalEquityExtractedZAR: 0,

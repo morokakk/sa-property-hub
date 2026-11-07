@@ -2322,6 +2322,22 @@ export const INITIAL_DEVELOPMENTS: DevelopmentProject[] = [
     developmentFacilityRepaidZAR: 2_750_000,
     preSalesHurdlePercent: 60,
     linkedFundingSourceId: 'fund-dev-ferndale',
+    zoningProfile: {
+      requiresRezoning: true,
+      currentZoning: 'Residential 1',
+      targetZoning: 'Residential 3',
+      erfSizeSqm: 1200,
+      farRatio: 0.6,
+      coveragePercent: 50,
+      maxHeightStoreys: 2,
+      maxDensityDuPerHa: 50,
+      consentUses: {
+        secondDwellingPermitted: true,
+        studentCommuneConsent: false,
+        backyardMicroUnitsPermitted: false,
+        homeEnterprisePermitted: true,
+      },
+    },
     approvals: {
       splumaRezoningSubdivision: {
         status: 'Approved',
@@ -2503,12 +2519,26 @@ export const INITIAL_DEVELOPMENTS: DevelopmentProject[] = [
     developmentFacilityRepaidZAR: 0,
     preSalesHurdlePercent: 0,
     linkedFundingSourceId: 'fund-tuhf-kempton',
+    zoningProfile: {
+      requiresRezoning: false,
+      currentZoning: 'Unzoned / Township Scheme',
+      targetZoning: 'Unzoned / Township Scheme',
+      erfSizeSqm: 500,
+      farRatio: 1.2,
+      coveragePercent: 60,
+      maxHeightStoreys: 3,
+      maxDensityDuPerHa: 200,
+      consentUses: {
+        secondDwellingPermitted: true,
+        studentCommuneConsent: false,
+        backyardMicroUnitsPermitted: true,
+        homeEnterprisePermitted: false,
+      },
+    },
     approvals: {
       splumaRezoningSubdivision: {
-        status: 'Approved',
-        submittedDate: '2025-01-15',
-        targetApprovalDate: '2025-05-30',
-        referenceNo: 'EKU/ZON/2025/112',
+        status: 'N/A',
+        notes: 'As-of-Right Township Scheme development - no SPLUMA rezoning tribunal required',
       },
       sgDiagramApproval: {
         status: 'Approved',

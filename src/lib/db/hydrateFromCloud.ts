@@ -130,7 +130,10 @@ export function unmapProfile(row?: Database['public']['Tables']['profiles']['Row
 }
 
 export function unmapRentals(rows: Database['public']['Tables']['properties']['Row'][] = []): RentalProperty[] {
-  return rows.map((r) => migrateNegativeArrearsToRental({
+  return rows.map((r) => {
+    const rawCoc = r.coc_checklist ? (parseJson(r.coc_checklist, undefined) as any) : undefined;
+    const { _zoningProfile: rentalZoning, ...cleanCoc } = rawCoc || {};
+    return migrateNegativeArrearsToRental({
     id: r.id,
     title: r.title,
     address: r.address,
@@ -177,8 +180,9 @@ export function unmapRentals(rows: Database['public']['Tables']['properties']['R
       undefined,
     maintenanceHistory: parseJson(r.maintenance_history, []),
     status: (r.status as any) || 'Occupied',
-    cocChecklist: r.coc_checklist ? (parseJson(r.coc_checklist, undefined) as any) : undefined,
+    cocChecklist: Object.keys(cleanCoc).length > 0 ? cleanCoc : undefined,
     driveVault: r.drive_vault ? (parseJson(r.drive_vault, undefined) as any) : undefined,
+    zoningProfile: rentalZoning || undefined,
     notes: r.notes || undefined,
     actualSalePriceZAR: toNullableNum(r.actual_sale_price_zar),
     netCashProceedsZAR: toNullableNum(r.net_cash_proceeds_zar),
@@ -209,7 +213,8 @@ export function unmapRentals(rows: Database['public']['Tables']['properties']['R
     promisedReturnRatePercent: toNullableNum(r.promised_return_rate_percent),
     promisedPayoutSchedule: (r.promised_payout_schedule as any) || undefined,
     securityOffered: r.security_offered || undefined,
-  }));
+  });
+});
 }
 
 export function unmapFlips(
@@ -243,7 +248,10 @@ export function unmapFlips(
     boqByFlipId.get(b.flip_id)!.push(boqItem);
   }
 
-  return flipRows.map((f) => ({
+  return flipRows.map((f) => {
+    const rawCoc = f.coc_checklist ? (parseJson(f.coc_checklist, undefined) as any) : undefined;
+    const { _zoningProfile: flipZoning, ...cleanCoc } = rawCoc || {};
+    return {
     id: f.id,
     title: f.title,
     address: f.address,
@@ -275,8 +283,9 @@ export function unmapFlips(
     linkedFundingIds: f.linked_funding_ids || [],
     status: (f.status as any) || 'Active',
     notes: f.notes || undefined,
-    cocChecklist: f.coc_checklist ? (parseJson(f.coc_checklist, undefined) as any) : undefined,
+    cocChecklist: Object.keys(cleanCoc).length > 0 ? cleanCoc : undefined,
     driveVault: f.drive_vault ? (parseJson(f.drive_vault, undefined) as any) : undefined,
+    zoningProfile: flipZoning || undefined,
     fundingRequiredZAR: toNullableNum(f.funding_required_zar),
     capitalRaisedZAR: toNullableNum(f.capital_raised_zar),
     primaryFunderName: f.primary_funder_name || undefined,
@@ -298,13 +307,25 @@ export function unmapFlips(
     drawSchedule: f.draw_schedule ? (parseJson(f.draw_schedule, undefined) as any) : undefined,
     occupantRisk: f.occupant_risk ? (parseJson(f.occupant_risk, undefined) as any) : undefined,
     boq: boqByFlipId.get(f.id) || [],
-  }));
+  };
+});
 }
 
 export function unmapDevelopments(
   rows: Database['public']['Tables']['developments']['Row'][] = []
 ): DevelopmentProject[] {
-  return rows.map((d) => ({
+  return rows.map((d) => {
+    const rawApprovals = d.approvals ? (parseJson(d.approvals, undefined) as any) : undefined;
+    const { _zoningProfile: devZoning, ...cleanApprovals } = rawApprovals || {};
+    const fallbackApprovals = {
+      splumaRezoningSubdivision: { status: 'Not Started' },
+      sgDiagramApproval: { status: 'Not Started' },
+      municipalBuildingPlans: { status: 'Not Started' },
+      nhbrcEnrolment: { status: 'Not Started' },
+      sectionalTitleRegister: { status: 'Not Started' },
+      occupancyCertificate: { status: 'Not Started' },
+    };
+    return {
     id: d.id,
     title: d.title,
     address: d.address,
@@ -342,20 +363,15 @@ export function unmapDevelopments(
     developmentFacilityRepaidZAR: toNum(d.development_facility_repaid_zar, 0),
     preSalesHurdlePercent: toNum(d.pre_sales_hurdle_percent, 0),
     linkedFundingSourceId: d.linked_funding_source_id || undefined,
-    approvals: parseJson(d.approvals, {
-      splumaRezoningSubdivision: { status: 'Not Started' },
-      sgDiagramApproval: { status: 'Not Started' },
-      municipalBuildingPlans: { status: 'Not Started' },
-      nhbrcEnrolment: { status: 'Not Started' },
-      sectionalTitleRegister: { status: 'Not Started' },
-      occupancyCertificate: { status: 'Not Started' },
-    }),
+    approvals: Object.keys(cleanApprovals).length > 0 ? cleanApprovals : fallbackApprovals,
     units: parseJson(d.units, []),
     compliance: d.compliance ? (parseJson(d.compliance, undefined) as any) : undefined,
     driveVault: d.drive_vault ? (parseJson(d.drive_vault, undefined) as any) : undefined,
+    zoningProfile: devZoning || undefined,
     notes: d.notes || undefined,
     createdAt: d.created_at || undefined,
-  }));
+  };
+  });
 }
 
 export function unmapFundingSources(
@@ -425,6 +441,7 @@ export function unmapOpportunities(
         projectedDevGdvZAR: _pdg,
         projectedDevNetProfitZAR: _pdnp,
         projectedDevPocPercent: _pdp,
+        zoningProfile: _zp,
         ...restCosts
       } = rawCosts;
       cleanCosts = Object.keys(restCosts).length > 0 ? (restCosts as any) : undefined;
@@ -502,6 +519,7 @@ export function unmapOpportunities(
       projectedDevGdvZAR: toNullableNum(rawCosts?.projectedDevGdvZAR),
       projectedDevNetProfitZAR: toNullableNum(rawCosts?.projectedDevNetProfitZAR),
       projectedDevPocPercent: toNullableNum(rawCosts?.projectedDevPocPercent),
+      zoningProfile: rawCosts?.zoningProfile || undefined,
       annualInsurance: toNum(opp.annual_insurance_zar, 0),
       managementFeePercent: toNum(opp.management_fee_percent, 8.0),
       agencyVatApplicable: opp.agency_vat_applicable ?? true,

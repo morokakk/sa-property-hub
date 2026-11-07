@@ -110,6 +110,39 @@ export type PropertyTitleType =
   | 'Townhouse / Cluster'
   | 'Multi-unit Commercial';
 
+// Municipal Land Use Schemes & Town Planning Zoning
+export type MunicipalZoningCode =
+  | 'Residential 1'
+  | 'Residential 2'
+  | 'Residential 3'
+  | 'Residential 4'
+  | 'Business 1'
+  | 'Business 2'
+  | 'Mixed Use'
+  | 'Industrial 1'
+  | 'Special'
+  | 'Agricultural'
+  | 'Unzoned / Township Scheme';
+
+export interface ConsentUseFlags {
+  secondDwellingPermitted: boolean;
+  studentCommuneConsent: boolean;
+  backyardMicroUnitsPermitted: boolean;
+  homeEnterprisePermitted: boolean;
+}
+
+export interface ZoningProfile {
+  currentZoning: MunicipalZoningCode;
+  targetZoning?: MunicipalZoningCode;
+  erfSizeSqm: number;
+  farRatio: number; // e.g. 0.5, 1.2
+  coveragePercent: number; // e.g. 50, 60
+  maxHeightStoreys: number; // e.g. 2, 3, 4
+  maxDensityDuPerHa?: number; // e.g. 20, 60, 80
+  requiresRezoning: boolean;
+  consentUses: ConsentUseFlags;
+}
+
 export type PassReason =
   | 'Yield Too Low'
   | 'High Arrears / Municipal Risk'
@@ -253,6 +286,8 @@ export interface OpportunityDeal {
   section13sex?: Section13sexCalculation;
   // Cloud Drive Link Vault
   driveVault?: CloudDriveVault;
+  // Municipal Zoning & Town Planning Envelope
+  zoningProfile?: ZoningProfile;
   // P4: Ancillary Income Array
   ancillaryIncomes?: AncillaryIncome[];
   // Calculated outputs
@@ -397,6 +432,7 @@ export interface FlipProject {
   notes?: string;
   cocChecklist?: ComplianceCertificates;
   driveVault?: CloudDriveVault;
+  zoningProfile?: ZoningProfile;
   // Funding Campaign & Investor Terms
   fundingRequiredZAR?: number;
   capitalRaisedZAR?: number;
@@ -720,6 +756,7 @@ export interface RentalProperty {
   archivedLeases?: ArchivedLease[];
   cocChecklist?: ComplianceCertificates;
   driveVault?: CloudDriveVault;
+  zoningProfile?: ZoningProfile;
   notes?: string;
   // Realized Sale / Exit Fields
   actualSalePriceZAR?: number;
@@ -1147,6 +1184,7 @@ export interface AnalyzerDraft {
   seniorDebtLtcPercent?: number;
   sCurveUtilizationPercent?: number;
   preSalesHurdlePercent?: number;
+  zoningProfile?: ZoningProfile;
 }
 
 // Client-side BYOK AI Integration Settings
@@ -1192,6 +1230,8 @@ export type ApprovalStatus =
   | 'Objection / Query'
   | 'Approved'
   | 'N/A';
+
+export type DevelopmentApprovalStatus = ApprovalStatus;
 
 export interface PreConstructionApprovalItem {
   status: ApprovalStatus;
@@ -1308,6 +1348,7 @@ export interface DevelopmentProject {
   units: DevelopmentUnit[];
   compliance?: ComplianceCertificates;
   driveVault?: DriveVaultLinks;
+  zoningProfile?: ZoningProfile;
 
   // General Metadata
   notes?: string;

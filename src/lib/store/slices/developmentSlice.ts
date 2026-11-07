@@ -6,6 +6,7 @@ import {
   RentalProperty,
   Lease,
   TaskItem,
+  DevelopmentApprovalStatus,
 } from '@/types';
 import { RootStoreState, DevelopmentSlice } from '../types';
 import { INITIAL_DEVELOPMENTS } from '../initialData';
@@ -14,6 +15,7 @@ import {
   calculateMonthlyBondRepayment,
   buildDefaultSoftCostsFromAllowance,
 } from '@/lib/calculations/propertyMetrics';
+import { calculateZoningEnvelope } from '@/lib/calculations/zoning';
 import { trackPrivacySafeEvent } from '@/lib/analytics/posthogClient';
 
 export const createDevelopmentSlice: StateCreator<
@@ -260,6 +262,7 @@ export const createDevelopmentSlice: StateCreator<
       }`,
       convertedFromDevelopmentId: dev.id,
       section13SexEligible: isSection13Sex,
+      zoningProfile: dev.zoningProfile ? structuredClone(dev.zoningProfile) : undefined,
     };
 
     const updatedDevelopments = get().developments.map((d) =>
@@ -368,6 +371,17 @@ export const createDevelopmentSlice: StateCreator<
     const existingLinkedFunding = get().funding.find((f) => f.linkedDealId === opp.id);
     const newDevTitle = opp.title.includes('(Development)') ? opp.title : `${opp.title} (Development)`;
 
+    const zoningProfile = opp.zoningProfile ? structuredClone(opp.zoningProfile) : undefined;
+    let splumaStatus: DevelopmentApprovalStatus = 'Not Started';
+    let splumaNotes: string | undefined = undefined;
+    if (zoningProfile) {
+      const zoningResult = calculateZoningEnvelope(zoningProfile, totalArea, unitCount);
+      if (!zoningResult.isSplumaRezoningTriggered) {
+        splumaStatus = 'N/A';
+        splumaNotes = 'As-of-Right municipal zoning rights confirmed. No SPLUMA Section 42 rezoning tribunal required.';
+      }
+    }
+
     const newDev: DevelopmentProject = {
       id: newDevId,
       title: newDevTitle,
@@ -397,8 +411,12 @@ export const createDevelopmentSlice: StateCreator<
       developmentFacilityRepaidZAR: 0,
       preSalesHurdlePercent: opp.preSalesHurdlePercent ?? 60,
       linkedFundingSourceId: existingLinkedFunding?.id,
+      zoningProfile,
       approvals: {
-        splumaRezoningSubdivision: { status: 'Not Started' },
+        splumaRezoningSubdivision: {
+          status: splumaStatus,
+          notes: splumaNotes,
+        },
         sgDiagramApproval: { status: 'Not Started' },
         municipalBuildingPlans: { status: 'Not Started' },
         nhbrcEnrolment: { status: 'Not Started' },
@@ -411,7 +429,10 @@ export const createDevelopmentSlice: StateCreator<
     const onboardingTask: TaskItem = {
       id: `task-${Date.now()}-dev-conveyance`,
       title: `Instruct conveyancer & town planner for ${newDev.title}`,
-      description: `Promoted from Deal Analyzer. Begin SPLUMA rezoning and title deed search. Land purchase price: R ${landPrice.toLocaleString('en-ZA')}`,
+      description:
+        splumaStatus === 'N/A'
+          ? `Promoted from Deal Analyzer. As-of-Right development (no SPLUMA rezoning required). Begin building plan submissions. Land purchase price: R ${landPrice.toLocaleString('en-ZA')}`
+          : `Promoted from Deal Analyzer. Begin SPLUMA rezoning and title deed search. Land purchase price: R ${landPrice.toLocaleString('en-ZA')}`,
       dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
       priority: 'Urgent',
       status: 'Pending',

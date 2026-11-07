@@ -7,8 +7,12 @@ import {
   DevelopmentPhase,
   DevelopmentTaxEntityType,
   Province,
+  MunicipalZoningCode,
+  ZoningProfile,
+  ConsentUseFlags,
 } from '@/types';
 import { generateInitialDevelopmentUnits } from '@/lib/calculations/developments';
+import { calculateZoningEnvelope, ZONING_PRESETS } from '@/lib/calculations/zoning';
 import { usePortfolioStore } from '@/lib/store/usePortfolioStore';
 import {
   Building2,
@@ -62,6 +66,20 @@ const SA_PROVINCES: Province[] = [
   'Northern Cape',
 ];
 
+const MUNICIPAL_ZONING_CODES: MunicipalZoningCode[] = [
+  'Residential 1',
+  'Residential 2',
+  'Residential 3',
+  'Residential 4',
+  'Business 1',
+  'Business 2',
+  'Mixed Use',
+  'Industrial 1',
+  'Special',
+  'Agricultural',
+  'Unzoned / Township Scheme',
+];
+
 export function DevelopmentProjectModal({
   isOpen,
   editingDevelopment,
@@ -108,6 +126,38 @@ export function DevelopmentProjectModal({
   const [targetListPricePerUnitZAR, setTargetListPricePerUnitZAR] = useState(1350000);
   const [estMonthlyRentPerUnitZAR, setEstMonthlyRentPerUnitZAR] = useState(11500);
 
+  // Statutory Municipal Zoning & Rights Profile
+  const [currentZoning, setCurrentZoning] = useState<MunicipalZoningCode>('Residential 3');
+  const [targetZoning, setTargetZoning] = useState<MunicipalZoningCode | ''>('');
+  const [erfSizeSqm, setErfSizeSqm] = useState<number>(1200);
+  const [farRatio, setFarRatio] = useState<number>(0.8);
+  const [coveragePercent, setCoveragePercent] = useState<number>(50);
+  const [maxHeightStoreys, setMaxHeightStoreys] = useState<number>(3);
+  const [maxDensityDuPerHa, setMaxDensityDuPerHa] = useState<number | ''>(40);
+  const [requiresRezoning, setRequiresRezoning] = useState<boolean>(false);
+  const [consentUses, setConsentUses] = useState<ConsentUseFlags>({
+    secondDwellingPermitted: true,
+    studentCommuneConsent: false,
+    backyardMicroUnitsPermitted: false,
+    homeEnterprisePermitted: true,
+  });
+
+  const applyZoningPreset = (presetId: string) => {
+    const preset = ZONING_PRESETS.find((p) => p.id === presetId);
+    if (!preset) return;
+    setCurrentZoning(preset.profile.currentZoning);
+    setTargetZoning(preset.profile.targetZoning || '');
+    setFarRatio(preset.profile.farRatio);
+    setCoveragePercent(preset.profile.coveragePercent);
+    setMaxHeightStoreys(preset.profile.maxHeightStoreys);
+    setMaxDensityDuPerHa(preset.profile.maxDensityDuPerHa ?? '');
+    setRequiresRezoning(preset.profile.requiresRezoning);
+    setConsentUses({ ...preset.profile.consentUses });
+    if (!erfSizeSqm || erfSizeSqm === 1200) {
+      setErfSizeSqm(preset.profile.defaultErfSizeSqm);
+    }
+  };
+
   useEffect(() => {
     if (editingDevelopment) {
       setTitle(editingDevelopment.title || '');
@@ -132,6 +182,32 @@ export function DevelopmentProjectModal({
       setDevelopmentFacilityLimitZAR(editingDevelopment.developmentFacilityLimitZAR ?? 4500000);
       setPreSalesHurdlePercent(editingDevelopment.preSalesHurdlePercent ?? 60);
       setNotes(editingDevelopment.notes || '');
+      if (editingDevelopment.zoningProfile) {
+        setCurrentZoning(editingDevelopment.zoningProfile.currentZoning);
+        setTargetZoning(editingDevelopment.zoningProfile.targetZoning || '');
+        setErfSizeSqm(editingDevelopment.zoningProfile.erfSizeSqm || 1200);
+        setFarRatio(editingDevelopment.zoningProfile.farRatio ?? 0.8);
+        setCoveragePercent(editingDevelopment.zoningProfile.coveragePercent ?? 50);
+        setMaxHeightStoreys(editingDevelopment.zoningProfile.maxHeightStoreys ?? 3);
+        setMaxDensityDuPerHa(editingDevelopment.zoningProfile.maxDensityDuPerHa ?? 40);
+        setRequiresRezoning(editingDevelopment.zoningProfile.requiresRezoning ?? false);
+        setConsentUses({ ...editingDevelopment.zoningProfile.consentUses });
+      } else {
+        setCurrentZoning('Residential 3');
+        setTargetZoning('');
+        setErfSizeSqm(1200);
+        setFarRatio(0.8);
+        setCoveragePercent(50);
+        setMaxHeightStoreys(3);
+        setMaxDensityDuPerHa(40);
+        setRequiresRezoning(false);
+        setConsentUses({
+          secondDwellingPermitted: true,
+          studentCommuneConsent: false,
+          backyardMicroUnitsPermitted: false,
+          homeEnterprisePermitted: true,
+        });
+      }
     } else {
       setTitle('');
       setAddress('');
@@ -159,6 +235,20 @@ export function DevelopmentProjectModal({
       setDefaultUnitConfiguration('2 Bed 1 Bath Cluster');
       setTargetListPricePerUnitZAR(1350000);
       setEstMonthlyRentPerUnitZAR(11500);
+      setCurrentZoning('Residential 3');
+      setTargetZoning('');
+      setErfSizeSqm(1200);
+      setFarRatio(0.8);
+      setCoveragePercent(50);
+      setMaxHeightStoreys(3);
+      setMaxDensityDuPerHa(40);
+      setRequiresRezoning(false);
+      setConsentUses({
+        secondDwellingPermitted: true,
+        studentCommuneConsent: false,
+        backyardMicroUnitsPermitted: false,
+        homeEnterprisePermitted: true,
+      });
     }
   }, [editingDevelopment, isOpen, defaultVatReg, defaultHardRate]);
 
@@ -192,6 +282,19 @@ export function DevelopmentProjectModal({
       notes,
     };
 
+    const zoningProfile: ZoningProfile = {
+      currentZoning,
+      targetZoning: targetZoning ? targetZoning : undefined,
+      erfSizeSqm: Number(erfSizeSqm),
+      farRatio: Number(farRatio),
+      coveragePercent: Number(coveragePercent),
+      maxHeightStoreys: Number(maxHeightStoreys),
+      maxDensityDuPerHa: maxDensityDuPerHa !== '' ? Number(maxDensityDuPerHa) : undefined,
+      requiresRezoning,
+      consentUses,
+    };
+    projectData.zoningProfile = zoningProfile;
+
     if (isNew) {
       const newProjectId = `dev-${Date.now()}`;
       projectData.id = newProjectId;
@@ -208,8 +311,21 @@ export function DevelopmentProjectModal({
         planScrutinyAndSubdivisionFeesZAR: 25000,
         marketingAndShowUnitZAR: 30000,
       };
+
+      const envelope = calculateZoningEnvelope(
+        zoningProfile,
+        Number(totalBuildableAreaSqm),
+        Number(initialUnitCount)
+      );
+      const splumaStatus = envelope.isSplumaRezoningTriggered ? 'Not Started' : 'N/A';
       projectData.approvals = {
-        splumaRezoningSubdivision: { status: 'Not Started' },
+        splumaRezoningSubdivision: {
+          status: splumaStatus,
+          notes:
+            splumaStatus === 'N/A'
+              ? 'As-of-Right municipal zoning rights confirmed. No SPLUMA Section 42 rezoning tribunal required.'
+              : undefined,
+        },
         sgDiagramApproval: { status: 'Not Started' },
         municipalBuildingPlans: { status: 'Not Started' },
         nhbrcEnrolment: { status: 'Not Started' },
@@ -378,6 +494,185 @@ export function DevelopmentProjectModal({
                   <span>VAT Registered (15% Output / Input VAT)</span>
                 </label>
               </div>
+            </div>
+          </div>
+
+          {/* Section: Municipal Zoning Rights & Town Planning Envelope */}
+          <div className="space-y-3 p-3.5 rounded-xl bg-slate-50 border border-slate-200">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-200/80 pb-2">
+              <div>
+                <h4 className="font-bold text-slate-900 flex items-center gap-1.5 text-xs">
+                  <span>Municipal Zoning Rights &amp; Statutory Envelope</span>
+                </h4>
+                <p className="text-[11px] text-slate-500">
+                  Defines maximum permitted bulk floor area (FAR), ground coverage, height, and density.
+                </p>
+              </div>
+              {/* Presets */}
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <span className="text-[10px] uppercase font-bold text-slate-500">Presets:</span>
+                {ZONING_PRESETS.map((preset) => (
+                  <button
+                    key={preset.id}
+                    type="button"
+                    onClick={() => applyZoningPreset(preset.id)}
+                    className="px-2 py-0.5 rounded text-[11px] font-semibold bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 cursor-pointer shadow-2xs transition-colors"
+                  >
+                    {preset.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1 text-[11px]">Current Zoning</label>
+                <select
+                  value={currentZoning}
+                  onChange={(e) => setCurrentZoning(e.target.value as MunicipalZoningCode)}
+                  className="w-full rounded border border-slate-300 px-2.5 py-1.5 bg-white text-xs font-medium"
+                >
+                  {MUNICIPAL_ZONING_CODES.map((code) => (
+                    <option key={code} value={code}>
+                      {code}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1 text-[11px]">Target Zoning (Optional)</label>
+                <select
+                  value={targetZoning}
+                  onChange={(e) => setTargetZoning((e.target.value as MunicipalZoningCode) || '')}
+                  className="w-full rounded border border-slate-300 px-2.5 py-1.5 bg-white text-xs font-medium"
+                >
+                  <option value="">Same as Current (As-of-Right)</option>
+                  {MUNICIPAL_ZONING_CODES.map((code) => (
+                    <option key={code} value={code}>
+                      {code}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1 text-[11px]">Erf Stand Size (m²)</label>
+                <input
+                  type="number"
+                  min={1}
+                  step={50}
+                  value={erfSizeSqm}
+                  onChange={(e) => setErfSizeSqm(Number(e.target.value))}
+                  className="w-full rounded border border-slate-300 px-2.5 py-1.5 text-xs bg-white"
+                />
+              </div>
+
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1 text-[11px]">Floor Area Ratio (FAR)</label>
+                <input
+                  type="number"
+                  min={0.1}
+                  max={10}
+                  step={0.1}
+                  value={farRatio}
+                  onChange={(e) => setFarRatio(Number(e.target.value))}
+                  className="w-full rounded border border-slate-300 px-2.5 py-1.5 text-xs bg-white"
+                />
+              </div>
+
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1 text-[11px]">Max Coverage (%)</label>
+                <input
+                  type="number"
+                  min={10}
+                  max={100}
+                  step={5}
+                  value={coveragePercent}
+                  onChange={(e) => setCoveragePercent(Number(e.target.value))}
+                  className="w-full rounded border border-slate-300 px-2.5 py-1.5 text-xs bg-white"
+                />
+              </div>
+
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1 text-[11px]">Max Height (Storeys)</label>
+                <input
+                  type="number"
+                  min={1}
+                  max={20}
+                  step={1}
+                  value={maxHeightStoreys}
+                  onChange={(e) => setMaxHeightStoreys(Number(e.target.value))}
+                  className="w-full rounded border border-slate-300 px-2.5 py-1.5 text-xs bg-white"
+                />
+              </div>
+
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1 text-[11px]">Max Density (du / ha)</label>
+                <input
+                  type="number"
+                  min={1}
+                  max={1000}
+                  step={10}
+                  value={maxDensityDuPerHa}
+                  placeholder="Unrestricted"
+                  onChange={(e) => setMaxDensityDuPerHa(e.target.value === '' ? '' : Number(e.target.value))}
+                  className="w-full rounded border border-slate-300 px-2.5 py-1.5 text-xs bg-white"
+                />
+              </div>
+
+              <div className="flex items-center pt-3">
+                <label className="flex items-center gap-2 cursor-pointer font-medium text-slate-800 text-[11px]">
+                  <input
+                    type="checkbox"
+                    checked={requiresRezoning}
+                    onChange={(e) => setRequiresRezoning(e.target.checked)}
+                    className="rounded border-slate-300 text-amber-600 focus:ring-amber-500 w-4 h-4"
+                  />
+                  <span>SPLUMA Rezoning Required</span>
+                </label>
+              </div>
+            </div>
+
+            {/* Consent Uses */}
+            <div className="pt-2 border-t border-slate-200 flex flex-wrap items-center gap-4 text-[11px]">
+              <span className="font-semibold text-slate-600">Consent Uses:</span>
+              <label className="flex items-center gap-1.5 cursor-pointer text-slate-700">
+                <input
+                  type="checkbox"
+                  checked={consentUses.secondDwellingPermitted}
+                  onChange={(e) => setConsentUses((prev) => ({ ...prev, secondDwellingPermitted: e.target.checked }))}
+                  className="rounded border-slate-300 text-emerald-600 w-3.5 h-3.5"
+                />
+                <span>2nd Dwelling</span>
+              </label>
+              <label className="flex items-center gap-1.5 cursor-pointer text-slate-700">
+                <input
+                  type="checkbox"
+                  checked={consentUses.backyardMicroUnitsPermitted}
+                  onChange={(e) => setConsentUses((prev) => ({ ...prev, backyardMicroUnitsPermitted: e.target.checked }))}
+                  className="rounded border-slate-300 text-emerald-600 w-3.5 h-3.5"
+                />
+                <span>Backyard Micro-Units</span>
+              </label>
+              <label className="flex items-center gap-1.5 cursor-pointer text-slate-700">
+                <input
+                  type="checkbox"
+                  checked={consentUses.studentCommuneConsent}
+                  onChange={(e) => setConsentUses((prev) => ({ ...prev, studentCommuneConsent: e.target.checked }))}
+                  className="rounded border-slate-300 text-emerald-600 w-3.5 h-3.5"
+                />
+                <span>Student Commune</span>
+              </label>
+              <label className="flex items-center gap-1.5 cursor-pointer text-slate-700">
+                <input
+                  type="checkbox"
+                  checked={consentUses.homeEnterprisePermitted}
+                  onChange={(e) => setConsentUses((prev) => ({ ...prev, homeEnterprisePermitted: e.target.checked }))}
+                  className="rounded border-slate-300 text-emerald-600 w-3.5 h-3.5"
+                />
+                <span>Home Enterprise</span>
+              </label>
             </div>
           </div>
 

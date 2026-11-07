@@ -14,6 +14,10 @@ import {
   DevelopmentFinancialSummary,
 } from '@/lib/calculations/developments';
 import {
+  calculateZoningEnvelope,
+  formatZoningTransitionLabel,
+} from '@/lib/calculations/zoning';
+import {
   FileText,
   CheckCircle2,
   AlertTriangle,
@@ -144,6 +148,16 @@ export function DevelopmentApprovalsTab({
     return calculateDevelopmentHoldingSensitivity(development, financials);
   }, [development, financials]);
 
+  // Pure Town Planning statutory bulk envelope calculation
+  const zoningEnvelope = useMemo(() => {
+    if (!development.zoningProfile) return null;
+    return calculateZoningEnvelope(
+      development.zoningProfile,
+      development.totalBuildableAreaSqm,
+      development.units?.length || 0
+    );
+  }, [development.zoningProfile, development.totalBuildableAreaSqm, development.units]);
+
   const handleTriggerDelayMatrix = () => {
     if (onOpenDelayMatrix) {
       onOpenDelayMatrix();
@@ -154,6 +168,105 @@ export function DevelopmentApprovalsTab({
 
   return (
     <div data-testid="development-approvals-tab" className="space-y-6">
+      {/* Statutory Zoning & Bulk Envelope Strip */}
+      {development.zoningProfile && zoningEnvelope && (
+        <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-2xs space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
+            <div className="space-y-0.5">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                  Town Planning &amp; Statutory Zoning Envelope
+                </span>
+                <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-slate-900 text-white">
+                  {formatZoningTransitionLabel(
+                    development.zoningProfile.currentZoning,
+                    development.zoningProfile.targetZoning
+                  )}
+                </span>
+              </div>
+              <p className="text-xs text-slate-500">
+                Statutory FAR, ground coverage, and bulk utilization envelope governing construction rights
+              </p>
+            </div>
+            <div>
+              {zoningEnvelope.isSplumaRezoningTriggered ? (
+                <span className="inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full bg-amber-50 text-amber-800 border border-amber-300">
+                  <AlertTriangle className="w-3.5 h-3.5 text-amber-600" />
+                  <span>SPLUMA Rezoning Tribunal Triggered</span>
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-300">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>As-of-Right Rights (No Rezoning Tribunal Delay)</span>
+                </span>
+              )}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+            <div className="p-3 rounded-lg bg-slate-50 border border-slate-200">
+              <span className="text-[10px] text-slate-500 block uppercase font-semibold">Stand &amp; FAR Rights</span>
+              <span className="text-sm font-bold text-slate-900 block mt-0.5">
+                {development.zoningProfile.erfSizeSqm.toLocaleString('en-ZA')} m²
+              </span>
+              <span className="text-[11px] text-slate-600">
+                FAR {development.zoningProfile.farRatio} &bull; Max {zoningEnvelope.maxPermittedBulkSqm.toLocaleString('en-ZA')} m² bulk
+              </span>
+            </div>
+
+            <div className="p-3 rounded-lg bg-slate-50 border border-slate-200">
+              <span className="text-[10px] text-slate-500 block uppercase font-semibold">Bulk Utilization</span>
+              <span className={`text-sm font-bold block mt-0.5 ${zoningEnvelope.isBulkExceeded ? 'text-rose-600' : 'text-slate-900'}`}>
+                {development.totalBuildableAreaSqm.toLocaleString('en-ZA')} m² ({zoningEnvelope.bulkUtilizationPercent}%)
+              </span>
+              <span className="text-[11px] text-slate-600">
+                {zoningEnvelope.isBulkExceeded
+                  ? `Exceeds max bulk by ${(development.totalBuildableAreaSqm - zoningEnvelope.maxPermittedBulkSqm).toLocaleString('en-ZA')} m²`
+                  : `${(zoningEnvelope.maxPermittedBulkSqm - development.totalBuildableAreaSqm).toLocaleString('en-ZA')} m² headroom`}
+              </span>
+            </div>
+
+            <div className="p-3 rounded-lg bg-slate-50 border border-slate-200">
+              <span className="text-[10px] text-slate-500 block uppercase font-semibold">Coverage &amp; Height</span>
+              <span className="text-sm font-bold text-slate-900 block mt-0.5">
+                {development.zoningProfile.coveragePercent}% ({zoningEnvelope.maxGroundFootprintSqm.toLocaleString('en-ZA')} m² footprint)
+              </span>
+              <span className={`text-[11px] ${zoningEnvelope.isHeightExceeded ? 'text-rose-600 font-semibold' : 'text-slate-600'}`}>
+                Max {development.zoningProfile.maxHeightStoreys} storeys ({zoningEnvelope.minStoreysRequired} req.)
+              </span>
+            </div>
+
+            <div className="p-3 rounded-lg bg-slate-50 border border-slate-200">
+              <span className="text-[10px] text-slate-500 block uppercase font-semibold">Density &amp; Unit Cap</span>
+              <span className={`text-sm font-bold block mt-0.5 ${zoningEnvelope.isDensityExceeded ? 'text-rose-600' : 'text-slate-900'}`}>
+                {development.units?.length || 0} Units Planned
+              </span>
+              <span className="text-[11px] text-slate-600">
+                {zoningEnvelope.maxPermittedUnitsByDensity !== undefined
+                  ? `Max cap: ${zoningEnvelope.maxPermittedUnitsByDensity} units (${development.zoningProfile.maxDensityDuPerHa} du/ha)`
+                  : 'Unrestricted density'}
+              </span>
+            </div>
+          </div>
+
+          <div className="pt-2 border-t border-slate-100 flex flex-wrap items-center gap-2 text-[11px]">
+            <span className="font-semibold text-slate-500">Consent Uses:</span>
+            <span className={`px-2 py-0.5 rounded border ${development.zoningProfile.consentUses.secondDwellingPermitted ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-slate-50 text-slate-400 border-slate-200'}`}>
+              2nd Dwelling: {development.zoningProfile.consentUses.secondDwellingPermitted ? 'Permitted' : 'No'}
+            </span>
+            <span className={`px-2 py-0.5 rounded border ${development.zoningProfile.consentUses.backyardMicroUnitsPermitted ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-slate-50 text-slate-400 border-slate-200'}`}>
+              Backyard Units: {development.zoningProfile.consentUses.backyardMicroUnitsPermitted ? 'Permitted' : 'No'}
+            </span>
+            <span className={`px-2 py-0.5 rounded border ${development.zoningProfile.consentUses.studentCommuneConsent ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-slate-50 text-slate-400 border-slate-200'}`}>
+              Student Commune: {development.zoningProfile.consentUses.studentCommuneConsent ? 'Consent Approved' : 'No'}
+            </span>
+            <span className={`px-2 py-0.5 rounded border ${development.zoningProfile.consentUses.homeEnterprisePermitted ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-slate-50 text-slate-400 border-slate-200'}`}>
+              Home Enterprise: {development.zoningProfile.consentUses.homeEnterprisePermitted ? 'Permitted' : 'No'}
+            </span>
+          </div>
+        </div>
+      )}
+
       {/* Stage-Gate Callout Banner */}
       <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-2xs space-y-4">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">

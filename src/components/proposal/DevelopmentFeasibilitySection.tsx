@@ -15,6 +15,7 @@ import {
   calculateDevelopmentRiskGate,
   calculateDevelopmentDebtWipeoutMatrix,
 } from '@/lib/calculations/developments';
+import { formatZoningTransitionLabel } from '@/lib/calculations/zoning';
 import { formatZAR, formatPercent } from '@/lib/formatters';
 import {
   Coins,
@@ -210,6 +211,35 @@ export function DevelopmentFeasibilitySection({
             </span>
           </div>
         </div>
+
+        {/* 1-Line Zoning & Town Planning Rights Summary */}
+        {development.zoningProfile && (
+          <div className="mt-4 pt-3 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2 text-xs">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="font-semibold text-slate-700">Town Planning &amp; Zoning Rights:</span>
+              <span className="font-bold text-slate-900">
+                {formatZoningTransitionLabel(development.zoningProfile.currentZoning, development.zoningProfile.targetZoning)}
+              </span>
+              <span className="text-slate-400">&bull;</span>
+              <span className="text-slate-600">
+                Erf: {development.zoningProfile.erfSizeSqm.toLocaleString('en-ZA')} m² &bull; FAR {development.zoningProfile.farRatio} ({development.totalBuildableAreaSqm} m² planned / {Math.round(development.zoningProfile.erfSizeSqm * development.zoningProfile.farRatio)} m² max bulk)
+              </span>
+            </div>
+            <div>
+              {development.zoningProfile.requiresRezoning ||
+              (development.zoningProfile.targetZoning &&
+                development.zoningProfile.targetZoning !== development.zoningProfile.currentZoning) ? (
+                <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-amber-50 text-amber-800 border border-amber-200 print:bg-amber-100 print:text-amber-900">
+                  Subject to SPLUMA Section 42 Rezoning
+                </span>
+              ) : (
+                <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200 print:bg-emerald-100 print:text-emerald-900">
+                  As-of-Right Statutory Zoning (No Rezoning Required)
+                </span>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* PART 1: INSTITUTIONAL TDC VS GDV CAPITAL STACK */}

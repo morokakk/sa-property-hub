@@ -5,6 +5,7 @@ import Link from 'next/link';
 import TopHeader from '@/components/navigation/TopHeader';
 import { usePortfolioStore } from '@/lib/store/usePortfolioStore';
 import { calculateDevelopmentFinancials } from '@/lib/calculations/developments';
+import { calculateZoningEnvelope, formatZoningTransitionLabel } from '@/lib/calculations/zoning';
 import { formatZAR, formatPercent } from '@/lib/formatters';
 import { DevelopmentKpiBanner } from '@/components/developments/DevelopmentKpiBanner';
 import { DevelopmentUnitInventoryTab } from '@/components/developments/DevelopmentUnitInventoryTab';
@@ -62,6 +63,14 @@ export default function DevelopmentsPage() {
     () => (activeDev ? calculateDevelopmentFinancials(activeDev) : null),
     [activeDev]
   );
+  const activeDevEnvelope = useMemo(() => {
+    if (!activeDev?.zoningProfile) return null;
+    return calculateZoningEnvelope(
+      activeDev.zoningProfile,
+      activeDev.totalBuildableAreaSqm,
+      activeDev.units?.length || 0
+    );
+  }, [activeDev]);
 
   const handleDeleteProject = () => {
     if (!activeDev || !confirm(`Delete development "${activeDev.title}"?`)) return;
@@ -225,7 +234,35 @@ export default function DevelopmentsPage() {
         )}
 
         {activeDev && financials && (
-          <div className="space-y-6">
+          <div className="space-y-4">
+            {activeDev.zoningProfile && activeDevEnvelope && (
+              <div className="flex flex-wrap items-center justify-between gap-2 px-3.5 py-2 rounded-xl bg-slate-900 text-white text-xs shadow-xs">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="font-bold text-amber-400">
+                    {formatZoningTransitionLabel(
+                      activeDev.zoningProfile.currentZoning,
+                      activeDev.zoningProfile.targetZoning
+                    )}
+                  </span>
+                  <span className="text-slate-500">&bull;</span>
+                  <span className="text-slate-300">
+                    Erf: {activeDev.zoningProfile.erfSizeSqm.toLocaleString('en-ZA')} m² &bull; FAR {activeDev.zoningProfile.farRatio} ({activeDev.totalBuildableAreaSqm} / {activeDevEnvelope.maxPermittedBulkSqm} m² Bulk &bull; {activeDevEnvelope.bulkUtilizationPercent}%)
+                  </span>
+                </div>
+                <div>
+                  {activeDevEnvelope.isSplumaRezoningTriggered ? (
+                    <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-400/20 text-amber-300 border border-amber-400/40">
+                      SPLUMA Rezoning Tribunal Triggered
+                    </span>
+                  ) : (
+                    <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-400/20 text-emerald-300 border border-emerald-400/40">
+                      As-of-Right Statutory Rights
+                    </span>
+                  )}
+                </div>
+              </div>
+            )}
+
             <DevelopmentKpiBanner
               development={activeDev}
               financials={financials}

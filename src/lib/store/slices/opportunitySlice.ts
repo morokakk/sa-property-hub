@@ -213,6 +213,7 @@ export const createOpportunitySlice: StateCreator<
       status: 'Active',
       notes: fullFlipNote,
       driveVault: opp.driveVault ? { ...opp.driveVault } : undefined,
+      zoningProfile: opp.zoningProfile ? structuredClone(opp.zoningProfile) : undefined,
       boq: [
         {
           id: `boq-${Date.now()}-1`,
@@ -418,6 +419,7 @@ export const createOpportunitySlice: StateCreator<
         : undefined,
       isBrrrrProperty: opp.strategy === 'BRRRR' ? true : undefined,
       ancillaryIncomes: opp.ancillaryIncomes ? structuredClone(opp.ancillaryIncomes) : undefined,
+      zoningProfile: opp.zoningProfile ? structuredClone(opp.zoningProfile) : undefined,
       notes: rentalNoteParts.length > 0 ? rentalNoteParts.join(' • ') : undefined,
       driveVault: opp.driveVault ? { ...opp.driveVault } : undefined,
       maintenanceHistory: [],

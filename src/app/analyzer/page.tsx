@@ -35,7 +35,14 @@ import {
   OccupantRiskProfile,
   Province,
   AnalyzerSectionId,
+  ZoningProfile,
+  MunicipalZoningCode,
 } from '@/types';
+import {
+  calculateZoningEnvelope,
+  ZONING_PRESETS,
+  formatZoningTransitionLabel,
+} from '@/lib/calculations/zoning';
 import { PropertyTypeBadge, AgmDateChip } from '@/components/common/PropertyTypeBadge';
 import LongTermProjectionChart from '@/components/analytics/LongTermProjectionChart';
 import { OccupancyRiskCard } from '@/components/analyzer/OccupancyRiskCard';
@@ -101,7 +108,22 @@ import AnalyzerResultsGrid from '@/components/analyzer/AnalyzerResultsGrid';
 import RateShockStrip from '@/components/analytics/RateShockStrip';
 import PipelineDealCard from '@/components/analyzer/PipelineDealCard';
 import AnalyzerLayoutCustomizer from '@/components/analyzer/AnalyzerLayoutCustomizer';
+import { ZoningEnvelopeSubPanel } from '@/components/analyzer/ZoningEnvelopeSubPanel';
 import { trackPrivacySafeEvent } from '@/lib/analytics/posthogClient';
+
+const MUNICIPAL_ZONING_CODES: MunicipalZoningCode[] = [
+  'Residential 1',
+  'Residential 2',
+  'Residential 3',
+  'Residential 4',
+  'Business 1',
+  'Business 2',
+  'Mixed Use',
+  'Industrial 1',
+  'Special',
+  'Agricultural',
+  'Unzoned / Township Scheme',
+];
 
 export default function OpportunityAnalyzerPage() {
   const opportunities = usePortfolioStore((state) => state.opportunities);
@@ -325,6 +347,61 @@ export default function OpportunityAnalyzerPage() {
     analyzerDraft?.preSalesHurdlePercent ?? 60
   );
 
+  // Municipal Zoning Rights & Town Planning Bulk Envelope
+  const [zoningProfile, setZoningProfile] = useState<ZoningProfile | undefined>(
+    analyzerDraft?.zoningProfile
+  );
+  const [isZoningPanelOpen, setIsZoningPanelOpen] = useState<boolean>(
+    Boolean(analyzerDraft?.zoningProfile)
+  );
+
+  const zoningEnvelopeResult = useMemo(() => {
+    if (!zoningProfile) return null;
+    const plannedBulk = floorAreaSqm || (strategy === 'Development' ? 320 : 150);
+    const plannedUnits = numberOfUnits || 1;
+    return calculateZoningEnvelope(zoningProfile, plannedBulk, plannedUnits);
+  }, [zoningProfile, floorAreaSqm, strategy, numberOfUnits]);
+
+  const handleUpdateZoning = (updates: Partial<ZoningProfile>) => {
+    const current: ZoningProfile = zoningProfile || {
+      currentZoning: 'Residential 1',
+      erfSizeSqm: 1000,
+      farRatio: 0.5,
+      coveragePercent: 50,
+      maxHeightStoreys: 2,
+      maxDensityDuPerHa: 10,
+      requiresRezoning: false,
+      consentUses: {
+        secondDwellingPermitted: true,
+        studentCommuneConsent: false,
+        backyardMicroUnitsPermitted: false,
+        homeEnterprisePermitted: true,
+      },
+    };
+    const updated: ZoningProfile = {
+      ...current,
+      ...updates,
+      consentUses: {
+        ...current.consentUses,
+        ...(updates.consentUses || {}),
+      },
+    };
+    setZoningProfile(updated);
+    updateAnalyzerDraft({ zoningProfile: updated });
+  };
+
+  const handleApplyZoningPreset = (presetId: string) => {
+    const preset = ZONING_PRESETS.find((p) => p.id === presetId);
+    if (!preset) return;
+    const currentErf = zoningProfile?.erfSizeSqm || preset.profile.defaultErfSizeSqm;
+    const updated: ZoningProfile = {
+      ...preset.profile,
+      erfSizeSqm: currentErf,
+    };
+    setZoningProfile(updated);
+    updateAnalyzerDraft({ zoningProfile: updated });
+  };
+
   // Long-Term Projections & Escalation Assumptions
   const [annualCapitalGrowth, setAnnualCapitalGrowth] = useState<number>(analyzerDraft?.annualCapitalGrowthPercent ?? 5.0);
   const [annualRentalEscalation, setAnnualRentalEscalation] = useState<number>(analyzerDraft?.annualRentalEscalationPercent ?? 6.0);
@@ -415,6 +492,7 @@ export default function OpportunityAnalyzerPage() {
       if (analyzerDraft.seniorDebtLtcPercent !== undefined) setSeniorDebtLtcPercent(analyzerDraft.seniorDebtLtcPercent);
       if (analyzerDraft.sCurveUtilizationPercent !== undefined) setSCurveUtilizationPercent(analyzerDraft.sCurveUtilizationPercent);
       if (analyzerDraft.preSalesHurdlePercent !== undefined) setPreSalesHurdlePercent(analyzerDraft.preSalesHurdlePercent);
+      if (analyzerDraft.zoningProfile !== undefined) setZoningProfile(analyzerDraft.zoningProfile);
     }
   }, [
     analyzerDraft,
@@ -1467,6 +1545,7 @@ export default function OpportunityAnalyzerPage() {
     setSeniorDebtLtcPercent(deal.seniorDebtLtcPercent ?? 65);
     setSCurveUtilizationPercent(deal.sCurveUtilizationPercent ?? 60);
     setPreSalesHurdlePercent(deal.preSalesHurdlePercent ?? 60);
+    setZoningProfile(deal.zoningProfile ? structuredClone(deal.zoningProfile) : undefined);
     setActiveWorkspaceTab('calculator');
     if (deal.strategy === 'Flip' || deal.strategy === 'BRRRR' || deal.strategy === 'Development') {
       setIsHoldingOpen(true);
@@ -1526,6 +1605,7 @@ export default function OpportunityAnalyzerPage() {
     setManagementFee(analyzerDraft?.managementFeePercent ?? 8.0);
     setAgencyVatApplicable(analyzerDraft?.agencyVatApplicable ?? true);
     setOccupantRisk(analyzerDraft?.occupantRisk ?? getOccupantRiskDefaults('vacant'));
+    setZoningProfile(analyzerDraft?.zoningProfile);
   };
 
   const handleSaveOpportunity = (e: React.FormEvent) => {
@@ -1637,6 +1717,7 @@ export default function OpportunityAnalyzerPage() {
         projectedDevGdvZAR: strategy === 'Development' ? calculatedMetrics.devGdvInclVatZAR : undefined,
         projectedDevNetProfitZAR: strategy === 'Development' ? calculatedMetrics.devNetProfitBeforeTaxZAR : undefined,
         projectedDevPocPercent: strategy === 'Development' ? calculatedMetrics.devPocPercent : undefined,
+        zoningProfile: zoningProfile ? structuredClone(zoningProfile) : undefined,
       });
       trackPrivacySafeEvent('deal_saved_to_pipeline', {
         strategy,
@@ -1782,6 +1863,7 @@ export default function OpportunityAnalyzerPage() {
       projectedDevGdvZAR: strategy === 'Development' ? calculatedMetrics.devGdvInclVatZAR : undefined,
       projectedDevNetProfitZAR: strategy === 'Development' ? calculatedMetrics.devNetProfitBeforeTaxZAR : undefined,
       projectedDevPocPercent: strategy === 'Development' ? calculatedMetrics.devPocPercent : undefined,
+      zoningProfile: zoningProfile ? structuredClone(zoningProfile) : undefined,
       status: 'Screening',
       createdAt: new Date().toISOString().split('T')[0],
     };
@@ -4802,6 +4884,18 @@ export default function OpportunityAnalyzerPage() {
                   </div>
                 )}
 
+                {/* Sub-Panel: Municipal Zoning Rights & Town Planning Bulk Envelope */}
+                <ZoningEnvelopeSubPanel
+                  zoningProfile={zoningProfile}
+                  onUpdateZoning={handleUpdateZoning}
+                  onApplyPreset={handleApplyZoningPreset}
+                  plannedBuildableSqm={floorAreaSqm || 320}
+                  plannedUnits={numberOfUnits || 4}
+                  preApprovalMonths={preApprovalMonths}
+                  isCollapsible={true}
+                  defaultOpen={false}
+                />
+
                 {/* Row 2: 2-Stage Development Timeline & Holding Burn (Stage 1 Pre-Approval vs Stage 2 Construction) */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-2 border-t border-amber-200/70">
                   <div>
@@ -5212,6 +5306,20 @@ export default function OpportunityAnalyzerPage() {
                 </div>
               </div>
             </div>
+            )}
+
+            {/* Optional Zoning & Rights Envelope for Freehold/Commercial/Infill deals */}
+            {strategy !== 'Development' && (
+              <ZoningEnvelopeSubPanel
+                zoningProfile={zoningProfile}
+                onUpdateZoning={handleUpdateZoning}
+                onApplyPreset={handleApplyZoningPreset}
+                plannedBuildableSqm={floorAreaSqm || 150}
+                plannedUnits={numberOfUnits || 1}
+                preApprovalMonths={holdingPeriodMonths || 6}
+                isCollapsible={true}
+                defaultOpen={Boolean(zoningProfile)}
+              />
             )}
 
             {/* Hybrid BRRRR Post-Rehab Refinance Modeling Panel */}

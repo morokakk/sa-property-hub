@@ -354,7 +354,11 @@ export function mapRentals(rentals: RentalProperty[] = [], userId: string): Prop
     transactions: (r.transactions ? JSON.parse(JSON.stringify(r.transactions)) : []) as any,
     maintenance_history: (r.maintenanceHistory ? JSON.parse(JSON.stringify(r.maintenanceHistory)) : []) as any,
     status: r.status || 'Occupied',
-    coc_checklist: (r.cocChecklist ? JSON.parse(JSON.stringify(r.cocChecklist)) : {}) as any,
+    coc_checklist: (() => {
+      const baseCoc = r.cocChecklist ? JSON.parse(JSON.stringify(r.cocChecklist)) : {};
+      if (r.zoningProfile !== undefined) baseCoc._zoningProfile = r.zoningProfile;
+      return baseCoc;
+    })() as any,
     drive_vault: (r.driveVault ? JSON.parse(JSON.stringify(r.driveVault)) : {}) as any,
     notes: r.notes || null,
     actual_sale_price_zar: toNullableNumeric(r.actualSalePriceZAR),
@@ -423,7 +427,11 @@ export function mapFlips(flips: FlipProject[] = [], userId: string): FlipInsert[
     linked_funding_ids: f.linkedFundingIds || [],
     status: f.status || 'Active',
     notes: f.notes || null,
-    coc_checklist: (f.cocChecklist ? JSON.parse(JSON.stringify(f.cocChecklist)) : {}) as any,
+    coc_checklist: (() => {
+      const baseCoc = f.cocChecklist ? JSON.parse(JSON.stringify(f.cocChecklist)) : {};
+      if (f.zoningProfile !== undefined) baseCoc._zoningProfile = f.zoningProfile;
+      return baseCoc;
+    })() as any,
     drive_vault: (f.driveVault ? JSON.parse(JSON.stringify(f.driveVault)) : {}) as any,
     funding_required_zar: toNullableNumeric(f.fundingRequiredZAR),
     capital_raised_zar: toNullableNumeric(f.capitalRaisedZAR),
@@ -480,7 +488,11 @@ export function mapDevelopments(developments: DevelopmentProject[] = [], userId:
     development_facility_repaid_zar: toNumeric(d.developmentFacilityRepaidZAR, 0),
     pre_sales_hurdle_percent: toNumeric(d.preSalesHurdlePercent, 0),
     linked_funding_source_id: d.linkedFundingSourceId || null,
-    approvals: (d.approvals ? JSON.parse(JSON.stringify(d.approvals)) : {}) as any,
+    approvals: (() => {
+      const baseApprovals = d.approvals ? JSON.parse(JSON.stringify(d.approvals)) : {};
+      if (d.zoningProfile !== undefined) baseApprovals._zoningProfile = d.zoningProfile;
+      return baseApprovals;
+    })() as any,
     units: (Array.isArray(d.units) ? JSON.parse(JSON.stringify(d.units)) : []) as any,
     compliance: (d.compliance ? JSON.parse(JSON.stringify(d.compliance)) : null) as any,
     drive_vault: (d.driveVault ? JSON.parse(JSON.stringify(d.driveVault)) : null) as any,
@@ -711,6 +723,9 @@ export function mapOpportunities(opportunities: OpportunityDeal[] = [], userId: 
       }
       if (opp.projectedDevPocPercent !== undefined) {
         baseCosts.projectedDevPocPercent = opp.projectedDevPocPercent;
+      }
+      if (opp.zoningProfile !== undefined) {
+        baseCosts.zoningProfile = opp.zoningProfile;
       }
       return baseCosts;
     })() as any,
