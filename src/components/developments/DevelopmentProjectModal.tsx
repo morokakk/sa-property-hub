@@ -569,7 +569,7 @@ export function DevelopmentProjectModal({
               </h4>
               <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 text-xs">
                 <div>
-                  <label className="block font-semibold text-slate-700 mb-1">
+                  <label className="block font-semibold text-slate-700 mb-1 whitespace-nowrap">
                     Initial Unit Count
                   </label>
                   <input
@@ -582,7 +582,7 @@ export function DevelopmentProjectModal({
                   />
                 </div>
                 <div>
-                  <label className="block font-semibold text-slate-700 mb-1">
+                  <label className="block font-semibold text-slate-700 mb-1 whitespace-nowrap">
                     Default Unit Configuration
                   </label>
                   <input
@@ -593,7 +593,7 @@ export function DevelopmentProjectModal({
                   />
                 </div>
                 <div>
-                  <label className="block font-semibold text-slate-700 mb-1">
+                  <label className="block font-semibold text-slate-700 mb-1 whitespace-nowrap">
                     Target List Price / Unit (ZAR)
                   </label>
                   <input
@@ -606,8 +606,8 @@ export function DevelopmentProjectModal({
                   />
                 </div>
                 <div>
-                  <label className="block font-semibold text-slate-700 mb-1">
-                    Est. Monthly Rent / Unit (ZAR)
+                  <label className="block font-semibold text-slate-700 mb-1 whitespace-nowrap">
+                    Est. Rent / Unit (ZAR)
                   </label>
                   <input
                     type="number"

@@ -834,7 +834,14 @@ function ProposalGeneratorContent() {
   };
 
   // Financial calculations
-  const holdingDuration = deal?.holdingDurationMonths || 6;
+  const isDevelopment = deal?.type === 'development';
+  const activeDevelopment = isDevelopment ? (deal as any).rawDevelopment : undefined;
+  const devFin = isDevelopment ? (deal as any).developmentFinancials : undefined;
+
+  const holdingDuration =
+    isDevelopment && activeDevelopment
+      ? (activeDevelopment.preApprovalMonths || 0) + (activeDevelopment.constructionMonths || 0)
+      : deal?.holdingDurationMonths || 6;
   const monthlyBond = deal?.monthlyBondHolding ?? 0;
   const monthlyLevies = deal?.monthlyLeviesHolding ?? 0;
   const monthlyRates = deal?.monthlyRatesHolding ?? 0;
@@ -854,8 +861,16 @@ function ProposalGeneratorContent() {
   const evictionDelayBurn = isFlip && isEviction ? evictionCosts.evictionDelayBurnZAR : 0;
   const legalEvictionReserve = isEviction ? Math.max(0, occupantRisk?.budgetedLegalEvictionCostZAR || 0) : 0;
   const worksHoldingReserve = isFlip ? monthlyBurnRate * holdingDuration : 0;
-  const totalHoldingReserve = worksHoldingReserve + evictionDelayBurn;
-  const totalHoldingDurationMonths = isFlip && isEviction ? Math.round((holdingDuration + evictionDelayMonths) * 10) / 10 : holdingDuration;
+  const totalHoldingReserve =
+    isDevelopment && devFin
+      ? devFin.totalCarryingCostZAR
+      : worksHoldingReserve + evictionDelayBurn;
+  const totalHoldingDurationMonths =
+    isDevelopment
+      ? holdingDuration
+      : isFlip && isEviction
+      ? Math.round((holdingDuration + evictionDelayMonths) * 10) / 10
+      : holdingDuration;
 
   const auctioneerCommission = deal?.auctioneerCommission ?? 0;
   const municipalArrears = deal?.municipalArrears ?? 0;
@@ -877,18 +892,28 @@ function ProposalGeneratorContent() {
   const exitLegalCost = bondCancellationFee + earlyPenalty;
 
   const totalProjectCost =
-    (deal?.purchasePrice || 0) +
-    (deal?.acquisitionCosts || 0) +
-    (deal?.renovationBudget || 0) +
-    legalEvictionReserve +
-    totalHoldingReserve +
-    auctioneerCommission +
-    municipalArrears +
-    exitCommission +
-    exitLegalCost;
+    isDevelopment && devFin
+      ? devFin.tdcZAR
+      : (deal?.purchasePrice || 0) +
+        (deal?.acquisitionCosts || 0) +
+        (deal?.renovationBudget || 0) +
+        legalEvictionReserve +
+        totalHoldingReserve +
+        auctioneerCommission +
+        municipalArrears +
+        exitCommission +
+        exitLegalCost;
 
-  const projectedNetProfit = (deal?.targetExitPrice || 0) - totalProjectCost;
-  const netProjectROI = totalProjectCost > 0 ? (projectedNetProfit / totalProjectCost) * 100 : 0;
+  const projectedNetProfit =
+    isDevelopment && devFin
+      ? devFin.netProfitBeforeTaxZAR
+      : (deal?.targetExitPrice || 0) - totalProjectCost;
+  const netProjectROI =
+    isDevelopment && devFin
+      ? devFin.pocPercent
+      : totalProjectCost > 0
+      ? (projectedNetProfit / totalProjectCost) * 100
+      : 0;
   const loanToCost = totalProjectCost > 0 ? (capitalRequested / totalProjectCost) * 100 : 0;
   const netMonthlyCashflow =
     (deal?.monthlyRent || 0) +
@@ -997,6 +1022,7 @@ function ProposalGeneratorContent() {
         tenantArrears: deal.tenantArrears,
         occupantRisk: deal.occupantRisk,
         refinanceLtvPercent: (deal as any).refinanceLtvPercent ?? 75,
+        developmentFinancials: devFin,
       },
       strategy: pitchStrategy,
       capitalStack: capitalStackSplit,
@@ -1006,6 +1032,7 @@ function ProposalGeneratorContent() {
     });
   }, [
     deal,
+    devFin,
     capitalStackSplit,
     stressMatrix,
     pitchStrategy,
@@ -1491,13 +1518,20 @@ function ProposalGeneratorContent() {
                     South Africa (ZAR)
                   </span>
                   <span className={`text-[10px] font-semibold px-2 py-0.5 rounded border flex items-center gap-1 ${
-                    isFlip 
+                    isDevelopment
+                      ? 'bg-amber-50 text-amber-900 border-amber-300'
+                      : isFlip 
                       ? 'bg-slate-100 text-slate-800 border-slate-200' 
                       : pitchStrategy === 'BRRRR'
                       ? 'bg-slate-100 text-slate-800 border-slate-200'
                       : 'bg-slate-100 text-slate-800 border-slate-200'
                   }`}>
-                    {isFlip ? (
+                    {isDevelopment && activeDevelopment ? (
+                      <>
+                        <Building2 className="w-3 h-3 text-amber-700" />
+                        <span>Development Mandate • {activeDevelopment.developmentType}</span>
+                      </>
+                    ) : isFlip ? (
                       <>
                         <Hammer className="w-3 h-3 text-emerald-700" />
                         <span>Buy &amp; Flip Mandate</span>
@@ -1577,77 +1611,139 @@ function ProposalGeneratorContent() {
             </div>
 
             {/* Executive Key Highlights Grid */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3">
-              <div className="p-3 rounded-lg bg-slate-50 border border-slate-200">
-                <span className="text-[10px] uppercase font-bold text-slate-400 block">Purchase Price</span>
-                <span className="text-sm font-extrabold text-slate-900 block mt-0.5">
-                  {formatZAR(deal.purchasePrice)}
-                </span>
-                <span className="text-[9px] text-slate-500">Agreed contract</span>
-              </div>
+            {isDevelopment && activeDevelopment && devFin ? (
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+                <div className="p-3 rounded-lg bg-slate-50 border border-slate-200 min-h-[6.5rem] h-auto">
+                  <span className="text-[10px] uppercase font-bold text-slate-400 block whitespace-nowrap">LAND &amp; ACQUISITION</span>
+                  <span className="text-sm font-extrabold text-slate-900 block mt-0.5 font-mono">
+                    {formatZAR(devFin.totalLandAndAcquisitionZAR)}
+                  </span>
+                  <span className="text-[9px] text-slate-500">
+                    Land: {formatZAR(activeDevelopment.landPurchasePriceZAR, { compact: true })} + Legal/Arrears
+                  </span>
+                </div>
 
-              <div className="p-3 rounded-lg bg-emerald-50/80 border border-emerald-300">
-                <span className="text-[10px] uppercase font-bold text-emerald-800 block">Built-in Equity</span>
-                <span className="text-sm font-extrabold text-emerald-900 block mt-0.5">
-                  {formatZAR(deal.builtInEquity || 0)}
-                </span>
-                <span className="text-[9px] text-emerald-700 font-semibold">
-                  {deal.builtInEquityPercent != null && deal.builtInEquityPercent > 0
-                    ? `+${formatPercent(deal.builtInEquityPercent)} Below Valuation`
-                    : 'Capital Upside'}
-                </span>
-              </div>
+                <div className="p-3 rounded-lg bg-slate-50 border border-slate-200 min-h-[6.5rem] h-auto">
+                  <span className="text-[10px] uppercase font-bold text-slate-400 block whitespace-nowrap">SOFT &amp; BULK COSTS</span>
+                  <span className="text-sm font-extrabold text-slate-900 block mt-0.5 font-mono">
+                    {formatZAR(devFin.totalSoftCostsZAR)}
+                  </span>
+                  <span className="text-[9px] text-slate-500">Pro Team + Sec 42 Bulk</span>
+                </div>
 
-              <div className="p-3 rounded-lg bg-slate-50 border border-slate-200">
-                <span className="text-[10px] uppercase font-bold text-slate-400 block">Acquisition Costs</span>
-                <span className="text-sm font-extrabold text-slate-900 block mt-0.5">
-                  {formatZAR(deal.acquisitionCosts)}
-                </span>
-                <span className="text-[9px] text-slate-500">SARS duty & legal</span>
-              </div>
+                <div className="p-3 rounded-lg bg-slate-50 border border-slate-200 min-h-[6.5rem] h-auto">
+                  <span className="text-[10px] uppercase font-bold text-slate-400 block whitespace-nowrap">HARD BUILD WORKS</span>
+                  <span className="text-sm font-extrabold text-slate-900 block mt-0.5 font-mono">
+                    {formatZAR(devFin.activeHardBuildCostZAR)}
+                  </span>
+                  <span className="text-[9px] text-slate-500">
+                    {formatZAR(activeDevelopment.budgetedHardCostPerSqmZAR)}/m² • {activeDevelopment.totalBuildableAreaSqm} m²
+                  </span>
+                </div>
 
-              <div className="p-3 rounded-lg bg-slate-50 border border-slate-200">
-                <span className="text-[10px] uppercase font-bold text-slate-400 block">BOQ Renovation</span>
-                <span className="text-sm font-extrabold text-slate-900 block mt-0.5">
-                  {formatZAR(deal.renovationBudget)}
-                </span>
-                <span className="text-[9px] text-slate-500">Fixed quote basis</span>
-              </div>
+                <div className="p-3 rounded-lg bg-amber-50/70 border border-amber-200 min-h-[6.5rem] h-auto">
+                  <span className="text-[10px] uppercase font-bold text-amber-800 block whitespace-nowrap">TOTAL DEV COST (TDC)</span>
+                  <span className="text-sm font-extrabold text-slate-900 block mt-0.5 font-mono">
+                    {formatZAR(devFin.tdcZAR)}
+                  </span>
+                  <span className="text-[9px] text-amber-700 font-semibold">
+                    {formatZAR(devFin.tdcPerUnitZAR)} / unit
+                  </span>
+                </div>
 
-              <div className="p-3 rounded-lg bg-slate-50 border border-slate-200">
-                <span className="text-[10px] uppercase font-bold text-slate-400 block">Target Exit Price</span>
-                <span className="text-sm font-extrabold text-slate-900 block mt-0.5">
-                  {formatZAR(deal.targetExitPrice)}
-                </span>
-                <span className="text-[9px] text-slate-500">Comparable CMA</span>
-              </div>
+                <div className="p-3 rounded-lg bg-emerald-50/80 border border-emerald-200 min-h-[6.5rem] h-auto">
+                  <span className="text-[10px] uppercase font-bold text-emerald-800 block whitespace-nowrap">COMPLETED GDV</span>
+                  <span className="text-sm font-extrabold text-emerald-900 block mt-0.5 font-mono">
+                    {formatZAR(devFin.gdvInclVatZAR)}
+                  </span>
+                  <span className="text-[9px] text-emerald-700 font-semibold">
+                    {devFin.totalUnitsCount} Units • {activeDevelopment.isVatRegisteredDeveloper ? '15% VAT Incl.' : 'Direct / Non-VAT'}
+                  </span>
+                </div>
 
-              <div className="p-3 rounded-lg bg-emerald-50 border border-emerald-200">
-                <span className="text-[10px] uppercase font-bold text-emerald-800 block">
-                  {isFlip ? 'Projected Net Profit' : 'Net Monthly Cashflow'}
-                </span>
-                <span className={`text-sm font-extrabold block mt-0.5 ${!isFlip && netMonthlyCashflow < 0 ? 'text-rose-600' : 'text-emerald-900'}`}>
-                  {isFlip ? formatZAR(projectedNetProfit) : `${formatZAR(netMonthlyCashflow)}/m`}
-                </span>
-                <span className="text-[9px] text-emerald-700 font-semibold">
-                  {isFlip ? 'After all capex' : 'After all debt & opex'}
-                </span>
+                <div className="p-3 rounded-lg bg-emerald-900 text-white border border-emerald-950 min-h-[6.5rem] h-auto">
+                  <span className="text-[10px] uppercase font-bold text-emerald-200 block whitespace-nowrap">PROFIT ON COST (POC)</span>
+                  <span className="text-sm font-extrabold text-white block mt-0.5 font-mono">
+                    {formatPercent(devFin.pocPercent)}
+                  </span>
+                  <span className="text-[9px] text-emerald-200">
+                    {formatZAR(devFin.netProfitBeforeTaxZAR)} Pre-Tax Margin
+                  </span>
+                </div>
               </div>
+            ) : (
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3">
+                <div className="p-3 rounded-lg bg-slate-50 border border-slate-200">
+                  <span className="text-[10px] uppercase font-bold text-slate-400 block">Purchase Price</span>
+                  <span className="text-sm font-extrabold text-slate-900 block mt-0.5">
+                    {formatZAR(deal.purchasePrice)}
+                  </span>
+                  <span className="text-[9px] text-slate-500">Agreed contract</span>
+                </div>
 
-              <div className="p-3 rounded-lg bg-emerald-900 text-white border border-emerald-950">
-                <span className="text-[10px] uppercase font-bold text-emerald-200 block">
-                  {isFlip ? 'Project ROI' : 'Contracted Gross Yield'}
-                </span>
-                <span className="text-sm font-extrabold text-white block mt-0.5">
-                  {isFlip
-                    ? formatPercent(netProjectROI)
-                    : formatPercent(deal?.openMarketValue > 0 ? (((deal?.monthlyRent || 0) * 12) / deal.openMarketValue) * 100 : 0)}
-                </span>
-                <span className="text-[9px] text-emerald-200">
-                  {isFlip ? 'On total capital' : 'Contracted baseline'}
-                </span>
+                <div className="p-3 rounded-lg bg-emerald-50/80 border border-emerald-300">
+                  <span className="text-[10px] uppercase font-bold text-emerald-800 block">Built-in Equity</span>
+                  <span className="text-sm font-extrabold text-emerald-900 block mt-0.5">
+                    {formatZAR(deal.builtInEquity || 0)}
+                  </span>
+                  <span className="text-[9px] text-emerald-700 font-semibold">
+                    {deal.builtInEquityPercent != null && deal.builtInEquityPercent > 0
+                      ? `+${formatPercent(deal.builtInEquityPercent)} Below Valuation`
+                      : 'Capital Upside'}
+                  </span>
+                </div>
+
+                <div className="p-3 rounded-lg bg-slate-50 border border-slate-200">
+                  <span className="text-[10px] uppercase font-bold text-slate-400 block">Acquisition Costs</span>
+                  <span className="text-sm font-extrabold text-slate-900 block mt-0.5">
+                    {formatZAR(deal.acquisitionCosts)}
+                  </span>
+                  <span className="text-[9px] text-slate-500">SARS duty & legal</span>
+                </div>
+
+                <div className="p-3 rounded-lg bg-slate-50 border border-slate-200">
+                  <span className="text-[10px] uppercase font-bold text-slate-400 block">BOQ Renovation</span>
+                  <span className="text-sm font-extrabold text-slate-900 block mt-0.5">
+                    {formatZAR(deal.renovationBudget)}
+                  </span>
+                  <span className="text-[9px] text-slate-500">Fixed quote basis</span>
+                </div>
+
+                <div className="p-3 rounded-lg bg-slate-50 border border-slate-200">
+                  <span className="text-[10px] uppercase font-bold text-slate-400 block">Target Exit Price</span>
+                  <span className="text-sm font-extrabold text-slate-900 block mt-0.5">
+                    {formatZAR(deal.targetExitPrice)}
+                  </span>
+                  <span className="text-[9px] text-slate-500">Comparable CMA</span>
+                </div>
+
+                <div className="p-3 rounded-lg bg-emerald-50 border border-emerald-200">
+                  <span className="text-[10px] uppercase font-bold text-emerald-800 block">
+                    {isFlip ? 'Projected Net Profit' : 'Net Monthly Cashflow'}
+                  </span>
+                  <span className={`text-sm font-extrabold block mt-0.5 ${!isFlip && netMonthlyCashflow < 0 ? 'text-rose-600' : 'text-emerald-900'}`}>
+                    {isFlip ? formatZAR(projectedNetProfit) : `${formatZAR(netMonthlyCashflow)}/m`}
+                  </span>
+                  <span className="text-[9px] text-emerald-700 font-semibold">
+                    {isFlip ? 'After all capex' : 'After all debt & opex'}
+                  </span>
+                </div>
+
+                <div className="p-3 rounded-lg bg-emerald-900 text-white border border-emerald-950">
+                  <span className="text-[10px] uppercase font-bold text-emerald-200 block">
+                    {isFlip ? 'Project ROI' : 'Contracted Gross Yield'}
+                  </span>
+                  <span className="text-sm font-extrabold text-white block mt-0.5">
+                    {isFlip
+                      ? formatPercent(netProjectROI)
+                      : formatPercent(deal?.openMarketValue > 0 ? (((deal?.monthlyRent || 0) * 12) / deal.openMarketValue) * 100 : 0)}
+                  </span>
+                  <span className="text-[9px] text-emerald-200">
+                    {isFlip ? 'On total capital' : 'Contracted baseline'}
+                  </span>
+                </div>
               </div>
-            </div>
+            )}
 
             {/* Investment Opportunity & Business Case */}
             <div className="space-y-3">
@@ -2096,10 +2192,11 @@ function ProposalGeneratorContent() {
             )}
 
             {/* Capital Requirement & Use of Funds */}
-            <div className="space-y-3">
-              <h2 className="text-sm uppercase tracking-wider font-extrabold text-slate-900 border-b border-slate-200 pb-1">
-                2. Capital Requirements & Use of Funds
-              </h2>
+            {!isDevelopment && (
+              <div className="space-y-3">
+                <h2 className="text-sm uppercase tracking-wider font-extrabold text-slate-900 border-b border-slate-200 pb-1">
+                  2. Capital Requirements & Use of Funds
+                </h2>
               <div className="overflow-x-auto">
                 <table className="w-full text-xs text-left border border-slate-200 rounded-lg overflow-hidden">
                   <thead className="bg-slate-100 text-slate-700 font-bold uppercase text-[10px]">
@@ -2334,6 +2431,7 @@ function ProposalGeneratorContent() {
                 )}
               </div>
             </div>
+            )}
 
             {/* Statutory Risk & Security Module (PIE Act Compliance) */}
             {isEviction && (
@@ -2432,7 +2530,7 @@ function ProposalGeneratorContent() {
             {/* Proposed Lender / JV Partner Financing Terms */}
             <div className="space-y-3">
               <h2 className="text-sm uppercase tracking-wider font-extrabold text-slate-900 border-b border-slate-200 pb-1">
-                3. Proposed Lender / Partner Return Structure
+                {isDevelopment ? '2.' : '3.'} Proposed Lender / Partner Return Structure
               </h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
                 <div className="p-4 rounded-xl border border-emerald-300 bg-emerald-50/50 space-y-2">
@@ -2530,23 +2628,31 @@ function ProposalGeneratorContent() {
             {isFlip ? (
               <div className="space-y-4 print:break-inside-avoid">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 border-b border-slate-200 pb-1">
-                    <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2">
                     <h2 className="text-sm uppercase tracking-wider font-extrabold text-slate-900">
-                      4. Holding Period Carrying Costs &amp; Renovation Burn Rate ({isEviction ? `${totalHoldingDurationMonths}-Month Compounded Horizon` : `${holdingDuration}-Month Horizon`})
+                      {isDevelopment
+                        ? `3. Two-Stage Holding & Carrying Burn Schedule (${totalHoldingDurationMonths}-Month Horizon)`
+                        : `4. Holding Period Carrying Costs & Renovation Burn Rate (${isEviction ? `${totalHoldingDurationMonths}-Month Compounded Horizon` : `${holdingDuration}-Month Horizon`})`}
                     </h2>
                     <span className="text-[10px] bg-amber-100 text-amber-800 font-bold px-2 py-0.5 rounded border border-amber-300">
-                      Flip Liquidity Reserve
+                      {isDevelopment ? '2-Stage Development Burn Reserve' : 'Flip Liquidity Reserve'}
                     </span>
                   </div>
                   <span className="text-[10px] font-semibold text-slate-500">
-                    {isEviction
+                    {isDevelopment && activeDevelopment
+                      ? `Stage 1 Pre-Approval (${activeDevelopment.preApprovalMonths} mo) + Stage 2 Construction (${activeDevelopment.constructionMonths} mo) • Total Reserve: ${formatZAR(totalHoldingReserve)}`
+                      : isEviction
                       ? `Compounded Horizon: Stage 1 Eviction (${evictionDelayMonths} mo) + Stage 2 Works (${holdingDuration} mo) • Total Reserve: ${formatZAR(totalHoldingReserve)}`
                       : `Monthly Burn: ${formatZAR(monthlyBurnRate)}/mo • ${holdingDuration} Months Holding`}
                   </span>
                 </div>
 
                 <p className="text-xs text-slate-600 leading-relaxed">
-                  {isEviction ? (
+                  {isDevelopment && activeDevelopment && devFin ? (
+                    <>
+                      During municipal rezoning, SPLUMA approvals, and wet works construction, the site generates zero revenue. To eliminate insolvency and completion risk, the project capitalizes a two-stage carrying cost escrow of <strong>{formatZAR(devFin.totalCarryingCostZAR)}</strong> across <strong>{totalHoldingDurationMonths} months</strong>: <strong>Stage 1 (Pre-Approval &amp; Rezoning: {activeDevelopment.preApprovalMonths} Months @ {formatZAR(activeDevelopment.monthlyPreApprovalHoldingBurnZAR)}/mo)</strong> carrying burn of <strong>{formatZAR(devFin.totalPreApprovalCarryingCostZAR)}</strong>, followed by <strong>Stage 2 (Wet Works Construction: {activeDevelopment.constructionMonths} Months @ {formatZAR(activeDevelopment.monthlyConstructionHoldingBurnZAR)}/mo)</strong> carrying burn of <strong>{formatZAR(devFin.totalConstructionCarryingCostZAR)}</strong>.
+                    </>
+                  ) : isEviction ? (
                     <>
                       During legal eviction and construction cycles, the property generates zero revenue. To eliminate insolvency and completion risk, the project capitalizes an itemized carrying cost escrow of <strong>{formatZAR(totalHoldingReserve)}</strong> spanning a compounded <strong>{totalHoldingDurationMonths}-month horizon</strong>: <strong>Stage 1 (Legal Eviction Delay: ~{evictionDelayDays} days / {evictionDelayMonths} mos)</strong> carrying burn of <strong>{formatZAR(evictionDelayBurn)}</strong> (including {formatZAR(deal.occupantRisk?.monthlySiteSecurityZAR || 0)}/mo armed site security), followed by <strong>Stage 2 (Renovation &amp; Fit-Out: {holdingDuration} mos)</strong> carrying burn of <strong>{formatZAR(worksHoldingReserve)}</strong>.
                     </>
@@ -2560,12 +2666,20 @@ function ProposalGeneratorContent() {
                 {/* 4 Summary Highlight Cards */}
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                   <div className="p-3 rounded-lg bg-slate-50 border border-slate-200">
-                    <span className="text-[10px] uppercase font-bold text-slate-500 block">Monthly Operational Burn</span>
+                    <span className="text-[10px] uppercase font-bold text-slate-500 block">
+                      {isDevelopment ? 'Stage 1 & 2 Monthly Burn' : 'Monthly Operational Burn'}
+                    </span>
                     <span className="text-sm font-extrabold text-slate-900 block mt-0.5 font-mono">
-                      {formatZAR(monthlyBurnRate)}/mo
+                      {isDevelopment && activeDevelopment
+                        ? `${formatZAR(activeDevelopment.monthlyPreApprovalHoldingBurnZAR)} → ${formatZAR(activeDevelopment.monthlyConstructionHoldingBurnZAR)}/mo`
+                        : `${formatZAR(monthlyBurnRate)}/mo`}
                     </span>
                     <span className="text-[9px] text-slate-400">
-                      {isEviction ? `Works burn (excl. R${Math.round(deal.occupantRisk?.monthlySiteSecurityZAR || 0).toLocaleString('en-ZA')}/mo sec)` : 'All standing carrying lines'}
+                      {isDevelopment
+                        ? 'Pre-approval burn → Wet works burn'
+                        : isEviction
+                        ? `Works burn (excl. R${Math.round(deal.occupantRisk?.monthlySiteSecurityZAR || 0).toLocaleString('en-ZA')}/mo sec)`
+                        : 'All standing carrying lines'}
                     </span>
                   </div>
                   <div className="p-3 rounded-lg bg-amber-50/80 border border-amber-300">
@@ -2574,16 +2688,24 @@ function ProposalGeneratorContent() {
                       {formatZAR(totalHoldingReserve)}
                     </span>
                     <span className="text-[9px] text-amber-700 font-semibold">
-                      {isEviction ? `${totalHoldingDurationMonths}-month compounded buffer` : `${holdingDuration}-month pre-funded buffer`}
+                      {isDevelopment || isEviction
+                        ? `${totalHoldingDurationMonths}-month compounded buffer`
+                        : `${holdingDuration}-month pre-funded buffer`}
                     </span>
                   </div>
                   <div className="p-3 rounded-lg bg-slate-50 border border-slate-200">
-                    <span className="text-[10px] uppercase font-bold text-slate-500 block">Flip Horizon</span>
+                    <span className="text-[10px] uppercase font-bold text-slate-500 block">
+                      {isDevelopment ? 'Development Horizon' : 'Flip Horizon'}
+                    </span>
                     <span className="text-sm font-extrabold text-slate-900 block mt-0.5">
                       {totalHoldingDurationMonths} Months
                     </span>
                     <span className="text-[9px] text-slate-400">
-                      {isEviction ? `Stage 1: ${evictionDelayMonths}mo | Stage 2: ${holdingDuration}mo` : `Target exit: ${formatDate(deal.completionDate)}`}
+                      {isDevelopment && activeDevelopment
+                        ? `Stage 1: ${activeDevelopment.preApprovalMonths}mo | Stage 2: ${activeDevelopment.constructionMonths}mo`
+                        : isEviction
+                        ? `Stage 1: ${evictionDelayMonths}mo | Stage 2: ${holdingDuration}mo`
+                        : `Target exit: ${formatDate(deal.completionDate)}`}
                     </span>
                   </div>
                   <div className="p-3 rounded-lg bg-emerald-50 border border-emerald-300">
@@ -2602,69 +2724,125 @@ function ProposalGeneratorContent() {
                       <tr>
                         <th className="p-2.5">Carrying Cost Component</th>
                         <th className="p-2.5">Monthly Outlay (ZAR)</th>
-                        <th className="p-2.5">{isEviction ? 'Horizon Reserve (ZAR)' : `${holdingDuration}-Month Reserve (ZAR)`}</th>
+                        <th className="p-2.5">
+                          {isDevelopment || isEviction
+                            ? `${totalHoldingDurationMonths}-Month Reserve (ZAR)`
+                            : `${holdingDuration}-Month Reserve (ZAR)`}
+                        </th>
                         <th className="p-2.5">% of Burn</th>
                         <th className="p-2.5">Obligation &amp; Statutory Mandate</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-200 text-slate-800">
-                      {isEviction && evictionDelayBurn > 0 && (
-                        <tr className="bg-rose-50/50" data-testid="eviction-delay-burn-row">
-                          <td className="p-2.5 font-medium flex items-center gap-1.5 flex-wrap">
-                            <span className="text-rose-950 font-bold">Stage 1: Eviction Delay Interim Holding Burn</span>
-                            <span className="text-[10px] bg-rose-100 text-rose-900 font-bold px-1.5 py-0.2 rounded border border-rose-300">
-                              ~{evictionDelayDays} Days ({evictionDelayMonths.toFixed(1)} Mos)
-                            </span>
-                          </td>
-                          <td className="p-2.5 font-bold font-mono text-rose-900">
-                            {formatZAR(evictionCosts?.monthlyFixedBurnZAR || 0)}/mo
-                          </td>
-                          <td className="p-2.5 font-bold font-mono text-rose-950">{formatZAR(evictionDelayBurn)}</td>
-                          <td className="p-2.5 text-rose-900">{totalHoldingReserve > 0 ? formatPercent((evictionDelayBurn / totalHoldingReserve) * 100) : '0%'}</td>
-                          <td className="p-2.5 text-slate-600 font-medium">Interim bond interest, municipal rates, levies &amp; armed security during litigation</td>
-                        </tr>
+                      {isDevelopment && activeDevelopment && devFin ? (
+                        <>
+                          <tr>
+                            <td className="p-2.5 font-medium flex items-center gap-1.5 flex-wrap">
+                              <span className="font-bold text-slate-900">Stage 1: Pre-Approval &amp; Rezoning Carrying Burn</span>
+                              <span className="text-[10px] bg-amber-100 text-amber-900 font-bold px-1.5 py-0.2 rounded border border-amber-200">
+                                {activeDevelopment.preApprovalMonths} Months @ {formatZAR(activeDevelopment.monthlyPreApprovalHoldingBurnZAR)}/mo
+                              </span>
+                            </td>
+                            <td className="p-2.5 font-bold font-mono">{formatZAR(activeDevelopment.monthlyPreApprovalHoldingBurnZAR)}/mo</td>
+                            <td className="p-2.5 font-bold font-mono text-slate-900">{formatZAR(devFin.totalPreApprovalCarryingCostZAR)}</td>
+                            <td className="p-2.5">
+                              {devFin.totalCarryingCostZAR > 0
+                                ? formatPercent((devFin.totalPreApprovalCarryingCostZAR / devFin.totalCarryingCostZAR) * 100)
+                                : '0%'}
+                            </td>
+                            <td className="p-2.5 text-slate-500">
+                              Land holding rates, municipal charges &amp; security during SPLUMA / SDP paper rights phase
+                            </td>
+                          </tr>
+                          <tr>
+                            <td className="p-2.5 font-medium flex items-center gap-1.5 flex-wrap">
+                              <span className="font-bold text-slate-900">Stage 2: Wet Works Construction Carrying Burn</span>
+                              <span className="text-[10px] bg-emerald-100 text-emerald-900 font-bold px-1.5 py-0.2 rounded border border-emerald-200">
+                                {activeDevelopment.constructionMonths} Months @ {formatZAR(activeDevelopment.monthlyConstructionHoldingBurnZAR)}/mo
+                              </span>
+                            </td>
+                            <td className="p-2.5 font-bold font-mono">{formatZAR(activeDevelopment.monthlyConstructionHoldingBurnZAR)}/mo</td>
+                            <td className="p-2.5 font-bold font-mono text-slate-900">{formatZAR(devFin.totalConstructionCarryingCostZAR)}</td>
+                            <td className="p-2.5">
+                              {devFin.totalCarryingCostZAR > 0
+                                ? formatPercent((devFin.totalConstructionCarryingCostZAR / devFin.totalCarryingCostZAR) * 100)
+                                : '0%'}
+                            </td>
+                            <td className="p-2.5 text-slate-500">
+                              Capitalized construction facility interest, builder&apos;s risk insurance &amp; site security
+                            </td>
+                          </tr>
+                          <tr className="bg-amber-50/70 font-bold">
+                            <td className="p-2.5 text-amber-950">Total Carrying Cost Reserve (Escrow Tranche)</td>
+                            <td className="p-2.5 text-amber-950 font-mono">{totalHoldingDurationMonths} Months (Stages 1 &amp; 2)</td>
+                            <td className="p-2.5 text-amber-950 font-mono">{formatZAR(devFin.totalCarryingCostZAR)}</td>
+                            <td className="p-2.5 text-amber-950">100.0%</td>
+                            <td className="p-2.5 text-amber-900 font-semibold">
+                              Pre-funded and capitalized into Total Development Cost (TDC)
+                            </td>
+                          </tr>
+                        </>
+                      ) : (
+                        <>
+                          {isEviction && evictionDelayBurn > 0 && (
+                            <tr className="bg-rose-50/50" data-testid="eviction-delay-burn-row">
+                              <td className="p-2.5 font-medium flex items-center gap-1.5 flex-wrap">
+                                <span className="text-rose-950 font-bold">Stage 1: Eviction Delay Interim Holding Burn</span>
+                                <span className="text-[10px] bg-rose-100 text-rose-900 font-bold px-1.5 py-0.2 rounded border border-rose-300">
+                                  ~{evictionDelayDays} Days ({evictionDelayMonths.toFixed(1)} Mos)
+                                </span>
+                              </td>
+                              <td className="p-2.5 font-bold font-mono text-rose-900">
+                                {formatZAR(evictionCosts?.monthlyFixedBurnZAR || 0)}/mo
+                              </td>
+                              <td className="p-2.5 font-bold font-mono text-rose-950">{formatZAR(evictionDelayBurn)}</td>
+                              <td className="p-2.5 text-rose-900">{totalHoldingReserve > 0 ? formatPercent((evictionDelayBurn / totalHoldingReserve) * 100) : '0%'}</td>
+                              <td className="p-2.5 text-slate-600 font-medium">Interim bond interest, municipal rates, levies &amp; armed security during litigation</td>
+                            </tr>
+                          )}
+                          <tr>
+                            <td className="p-2.5 font-medium">Interim Bond / Debt Facility Interest Service</td>
+                            <td className="p-2.5 font-bold font-mono">{formatZAR(monthlyBond)}</td>
+                            <td className="p-2.5 font-bold font-mono text-slate-900">{formatZAR(monthlyBond * holdingDuration)}</td>
+                            <td className="p-2.5">{totalHoldingReserve > 0 ? formatPercent(((monthlyBond * holdingDuration) / totalHoldingReserve) * 100) : '0%'}</td>
+                            <td className="p-2.5 text-slate-500">Senior mortgage or bridge facility interest during works</td>
+                          </tr>
+                          <tr>
+                            <td className="p-2.5 font-medium">Body Corporate / HOA Levies</td>
+                            <td className="p-2.5 font-bold font-mono">{formatZAR(monthlyLevies)}</td>
+                            <td className="p-2.5 font-bold font-mono text-slate-900">{formatZAR(monthlyLevies * holdingDuration)}</td>
+                            <td className="p-2.5">{totalHoldingReserve > 0 ? formatPercent(((monthlyLevies * holdingDuration) / totalHoldingReserve) * 100) : '0%'}</td>
+                            <td className="p-2.5 text-slate-500">
+                              {monthlyLevies === 0 ? 'Freehold standalone title (R0 levies)' : 'Sectional title scheme statutory levies'}
+                            </td>
+                          </tr>
+                          <tr>
+                            <td className="p-2.5 font-medium">Municipal Rates &amp; Taxes (City Council)</td>
+                            <td className="p-2.5 font-bold font-mono">{formatZAR(monthlyRates)}</td>
+                            <td className="p-2.5 font-bold font-mono text-slate-900">{formatZAR(monthlyRates * holdingDuration)}</td>
+                            <td className="p-2.5">{totalHoldingReserve > 0 ? formatPercent(((monthlyRates * holdingDuration) / totalHoldingReserve) * 100) : '0%'}</td>
+                            <td className="p-2.5 text-slate-500">Statutory municipal property rates &amp; refuse service</td>
+                          </tr>
+                          <tr>
+                            <td className="p-2.5 font-medium">Site Operational Burn &amp; Builder&apos;s Risk Insurance</td>
+                            <td className="p-2.5 font-bold font-mono">{formatZAR(monthlyOther)}</td>
+                            <td className="p-2.5 font-bold font-mono text-slate-900">{formatZAR(monthlyOther * holdingDuration)}</td>
+                            <td className="p-2.5">{totalHoldingReserve > 0 ? formatPercent(((monthlyOther * holdingDuration) / totalHoldingReserve) * 100) : '0%'}</td>
+                            <td className="p-2.5 text-slate-500">Active perimeter security, contractor insurance, and utilities</td>
+                          </tr>
+                          <tr className="bg-amber-50/70 font-bold">
+                            <td className="p-2.5 text-amber-950">Total Carrying Cost Reserve (Escrow Tranche)</td>
+                            <td className="p-2.5 text-amber-950 font-mono">
+                              {isEviction ? `${formatZAR(monthlyBurnRate)}/mo (Stage 2)` : `${formatZAR(monthlyBurnRate)}/mo`}
+                            </td>
+                            <td className="p-2.5 text-amber-950 font-mono">{formatZAR(totalHoldingReserve)}</td>
+                            <td className="p-2.5 text-amber-950">100.0%</td>
+                            <td className="p-2.5 text-amber-900 font-semibold">
+                              {isEviction ? 'Pre-funded and capitalized into Total Project Outlay (Stages 1 & 2)' : 'Pre-funded and capitalized into Total Project Outlay'}
+                            </td>
+                          </tr>
+                        </>
                       )}
-                      <tr>
-                        <td className="p-2.5 font-medium">Interim Bond / Debt Facility Interest Service</td>
-                        <td className="p-2.5 font-bold font-mono">{formatZAR(monthlyBond)}</td>
-                        <td className="p-2.5 font-bold font-mono text-slate-900">{formatZAR(monthlyBond * holdingDuration)}</td>
-                        <td className="p-2.5">{totalHoldingReserve > 0 ? formatPercent(((monthlyBond * holdingDuration) / totalHoldingReserve) * 100) : '0%'}</td>
-                        <td className="p-2.5 text-slate-500">Senior mortgage or bridge facility interest during works</td>
-                      </tr>
-                      <tr>
-                        <td className="p-2.5 font-medium">Body Corporate / HOA Levies</td>
-                        <td className="p-2.5 font-bold font-mono">{formatZAR(monthlyLevies)}</td>
-                        <td className="p-2.5 font-bold font-mono text-slate-900">{formatZAR(monthlyLevies * holdingDuration)}</td>
-                        <td className="p-2.5">{totalHoldingReserve > 0 ? formatPercent(((monthlyLevies * holdingDuration) / totalHoldingReserve) * 100) : '0%'}</td>
-                        <td className="p-2.5 text-slate-500">
-                          {monthlyLevies === 0 ? 'Freehold standalone title (R0 levies)' : 'Sectional title scheme statutory levies'}
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="p-2.5 font-medium">Municipal Rates &amp; Taxes (City Council)</td>
-                        <td className="p-2.5 font-bold font-mono">{formatZAR(monthlyRates)}</td>
-                        <td className="p-2.5 font-bold font-mono text-slate-900">{formatZAR(monthlyRates * holdingDuration)}</td>
-                        <td className="p-2.5">{totalHoldingReserve > 0 ? formatPercent(((monthlyRates * holdingDuration) / totalHoldingReserve) * 100) : '0%'}</td>
-                        <td className="p-2.5 text-slate-500">Statutory municipal property rates &amp; refuse service</td>
-                      </tr>
-                      <tr>
-                        <td className="p-2.5 font-medium">Site Operational Burn &amp; Builder&apos;s Risk Insurance</td>
-                        <td className="p-2.5 font-bold font-mono">{formatZAR(monthlyOther)}</td>
-                        <td className="p-2.5 font-bold font-mono text-slate-900">{formatZAR(monthlyOther * holdingDuration)}</td>
-                        <td className="p-2.5">{totalHoldingReserve > 0 ? formatPercent(((monthlyOther * holdingDuration) / totalHoldingReserve) * 100) : '0%'}</td>
-                        <td className="p-2.5 text-slate-500">Active perimeter security, contractor insurance, and utilities</td>
-                      </tr>
-                      <tr className="bg-amber-50/70 font-bold">
-                        <td className="p-2.5 text-amber-950">Total Carrying Cost Reserve (Escrow Tranche)</td>
-                        <td className="p-2.5 text-amber-950 font-mono">
-                          {isEviction ? `${formatZAR(monthlyBurnRate)}/mo (Stage 2)` : `${formatZAR(monthlyBurnRate)}/mo`}
-                        </td>
-                        <td className="p-2.5 text-amber-950 font-mono">{formatZAR(totalHoldingReserve)}</td>
-                        <td className="p-2.5 text-amber-950">100.0%</td>
-                        <td className="p-2.5 text-amber-900 font-semibold">
-                          {isEviction ? 'Pre-funded and capitalized into Total Project Outlay (Stages 1 & 2)' : 'Pre-funded and capitalized into Total Project Outlay'}
-                        </td>
-                      </tr>
                     </tbody>
                   </table>
                 </div>
@@ -2674,7 +2852,7 @@ function ProposalGeneratorContent() {
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 border-b border-slate-200 pb-1">
                   <div className="flex items-center gap-2">
                     <h2 className="text-sm uppercase tracking-wider font-extrabold text-slate-900">
-                      4. Hybrid BRRRR Strategy: 2-Phase Refinance & Capital Recycling Model
+                      {isDevelopment ? '3.' : '4.'} Hybrid BRRRR Strategy: 2-Phase Refinance & Capital Recycling Model
                     </h2>
                     <span className="text-[10px] bg-purple-100 text-purple-800 font-bold px-2 py-0.5 rounded border border-purple-300 inline-flex items-center gap-1">
                       <Zap className="w-3 h-3 text-purple-700" />
@@ -2816,7 +2994,7 @@ function ProposalGeneratorContent() {
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 border-b border-slate-200 pb-1">
                   <div className="flex items-center gap-2">
                     <h2 className="text-sm uppercase tracking-wider font-extrabold text-slate-900">
-                      4. Long-Term Wealth & Equity Projections ({projectionData.length}-Year Horizon)
+                      {isDevelopment ? '3.' : '4.'} Long-Term Wealth & Equity Projections ({projectionData.length}-Year Horizon)
                     </h2>
                     <span className="text-[10px] bg-indigo-100 text-indigo-800 font-bold px-2 py-0.5 rounded border border-indigo-200 inline-flex items-center gap-1">
                       <Building2 className="w-3 h-3 text-indigo-700" />
@@ -2866,7 +3044,7 @@ function ProposalGeneratorContent() {
             {/* Sensitivity / Scenario Analysis Table */}
             <div className="space-y-3 print:break-inside-avoid">
               <h2 className="text-sm uppercase tracking-wider font-extrabold text-slate-900 border-b border-slate-200 pb-1">
-                5. Sensitivity &amp; Scenario Analysis
+                {isDevelopment ? '4.' : '5.'} Sensitivity &amp; Scenario Analysis
               </h2>
 
               {/* Mathematical Break-Even Callout Strip (Print-Safe) */}

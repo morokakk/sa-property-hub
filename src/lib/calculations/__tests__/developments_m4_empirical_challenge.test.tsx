@@ -704,7 +704,7 @@ describe('Milestone 4 Empirical Challenge: Financial Math & Presentation Consist
       expect(html).toContain(`${wipeout.unitsRequiredForDebtWipeout} of ${wipeout.totalUnitsCount} Units`);
       expect(html).toContain(formatZAR(wipeout.outstandingDebtZAR));
       expect(html).toContain(`${wipeout.unencumberedUnitsCount} Units`);
-      expect(html).toContain(`${wipeout.preSoldGdvPercent}% Pre-Sold`);
+      expect(html).toContain(`${wipeout.preSoldGdvPercent.toFixed(1)}% Pre-Sold`);
       expect(html).toContain(`${wipeout.preSalesHurdlePercent}% Required`);
       expect(html).toContain(formatZAR(wipeout.netCashProceedsAfterDebtZAR));
       expect(html).toContain(formatZAR(wipeout.remainingDebtOnRetainedUnitsZAR));

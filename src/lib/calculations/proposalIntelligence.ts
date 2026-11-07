@@ -481,7 +481,7 @@ export function calculateProposalStressScenarios(params: {
  */
 export function synthesizeStrengthsAndMitigants(params: {
   deal: {
-    type: 'flip' | 'opportunity' | 'rental';
+    type: 'flip' | 'opportunity' | 'rental' | 'development';
     city: string;
     province?: string;
     source?: DealSource;
@@ -501,6 +501,14 @@ export function synthesizeStrengthsAndMitigants(params: {
     tenantArrears?: number;
     occupantRisk?: OccupantRiskProfile;
     refinanceLtvPercent?: number;
+    developmentFinancials?: {
+      tdcZAR: number;
+      tdcPerSqmZAR: number;
+      gdvInclVatZAR: number;
+      totalUnitsCount: number;
+      pocPercent: number;
+      netProfitBeforeTaxZAR: number;
+    };
   };
   strategy: DealStrategy;
   capitalStack: CapitalStackSplitResult;
@@ -518,8 +526,17 @@ export function synthesizeStrengthsAndMitigants(params: {
   // 1. SYNTHESIZE UNDERWRITING STRENGTHS
   // ============================================================================
 
-  // Strength A: Built-in Equity / Below-Market Acquisition
-  if (deal.builtInEquity > 0) {
+  // Strength A: Development Bulk & Value Creation OR Built-in Equity / Below-Market Acquisition
+  if (deal.type === 'development' && deal.developmentFinancials) {
+    const devFin = deal.developmentFinancials;
+    const grossSpreadZAR = Math.max(0, devFin.gdvInclVatZAR - devFin.tdcZAR);
+    strengths.push({
+      id: 'development-bulk-value-creation',
+      title: 'Development Bulk & Value Creation',
+      metricBadge: `+${devFin.pocPercent.toFixed(1)}% Pre-Tax POC (${formatCompactZAR(grossSpreadZAR)})`,
+      detail: `Total Development Cost of ${formatCompactZAR(devFin.tdcZAR)} (${formatCompactZAR(devFin.tdcPerSqmZAR)}/m²) against a completed ${devFin.totalUnitsCount}-unit GDV of ${formatCompactZAR(devFin.gdvInclVatZAR)}, creating ${formatCompactZAR(grossSpreadZAR)} in gross development spread (+${devFin.pocPercent.toFixed(1)}% Pre-Tax POC)`,
+    });
+  } else if (deal.builtInEquity > 0) {
     strengths.push({
       id: 'built-in-equity',
       title: 'Day-1 Equity Cushion Below Valuation',
