@@ -26,6 +26,7 @@ import {
   BookOpen,
   MessageSquarePlus,
   Sparkles,
+  HardHat,
 } from 'lucide-react';
 import { usePortfolioStore } from '@/lib/store/usePortfolioStore';
 import { exportAccountantJournalCSV } from '@/lib/export/csvExport';
@@ -51,6 +52,7 @@ export default function Sidebar() {
   const pendingOpportunitiesCount = usePortfolioStore((state) => state.opportunities.length);
   const activeFlipsCount = usePortfolioStore((state) => state.flips.filter((f) => f.status === 'Active').length);
   const activeRentalsCount = usePortfolioStore((state) => state.rentals.length);
+  const activeDevelopmentsCount = usePortfolioStore((state) => (state.developments || []).length);
   const tasks = usePortfolioStore((state) => state.tasks);
   const pendingTasksCount = tasks.filter((t) => t.status !== 'Completed').length;
   const resetToDemoData = usePortfolioStore((state) => state.resetToDemoData);
@@ -200,6 +202,12 @@ export default function Sidebar() {
       href: '/flips',
       icon: Hammer,
       badge: isMounted && activeFlipsCount > 0 ? `${activeFlipsCount} Active` : null,
+    },
+    {
+      name: 'Developments',
+      href: '/developments',
+      icon: HardHat,
+      badge: isMounted && activeDevelopmentsCount > 0 ? `${activeDevelopmentsCount} Active` : null,
     },
     {
       name: 'Rental Portfolio',

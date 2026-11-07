@@ -97,6 +97,7 @@ describe('useAutoCloudSync & useCloudSyncStore', () => {
         profile: 1,
         properties: 1,
         flips: 0,
+        developments: 0,
         boqItems: 0,
         fundingSources: 0,
         opportunities: 0,

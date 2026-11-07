@@ -5,6 +5,7 @@ import { createRentalSlice } from './slices/rentalSlice';
 import { createFlipSlice } from './slices/flipSlice';
 import { createOpportunitySlice } from './slices/opportunitySlice';
 import { createFundingSlice } from './slices/fundingSlice';
+import { createDevelopmentSlice } from './slices/developmentSlice';
 import { createUtilitiesSlice } from './slices/utilitiesSlice';
 import { createTenantAccountingSlice } from './slices/tenantAccountingSlice';
 import { createTaskSlice } from './slices/taskSlice';
@@ -23,6 +24,7 @@ export const usePortfolioStore = create<RootStoreState>()(
       ...createFlipSlice(...a),
       ...createOpportunitySlice(...a),
       ...createFundingSlice(...a),
+      ...createDevelopmentSlice(...a),
       ...createUtilitiesSlice(...a),
       ...createTenantAccountingSlice(...a),
       ...createTaskSlice(...a),
@@ -42,10 +44,15 @@ export {
   usePortfolioSummary,
   computeEquityAlerts,
 } from './selectors/portfolioSummarySelector';
-export { syncLeaseExpiryTasks, syncAgmReminderTask } from './utils/taskSync';
+export {
+  syncLeaseExpiryTasks,
+  syncAgmReminderTask,
+  syncDevelopmentApprovalTasks,
+} from './utils/taskSync';
 export {
   sanitizeCompletedGuideSteps,
   sanitizeAnalyzerSectionOrder,
   sanitizeHiddenAnalyzerSections,
-} from './persistence/hydrationHelpers';
+  sanitizePersistedDevelopments,
+} from './hydrationHelpers';
 export type { RootStoreState, PortfolioState };

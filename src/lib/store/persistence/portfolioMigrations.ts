@@ -5,6 +5,7 @@ import {
   MunicipalContact,
   AiSettings,
   AnalyzerSectionId,
+  DevelopmentProject,
 } from '@/types';
 import { normalizeAiModel } from '@/lib/ai/modelConfig';
 import { DEFAULT_AI_SETTINGS } from '../initialData';
@@ -15,6 +16,7 @@ import {
   sanitizeAnalyzerSectionOrder,
   sanitizeHiddenAnalyzerSections,
 } from './hydrationHelpers';
+import { sanitizePersistedDevelopments } from '../hydrationHelpers';
 import type { PortfolioState } from '../types';
 
 export const PORTFOLIO_STORAGE_KEY = 'sa_property_portfolio_hub_v1';
@@ -170,6 +172,7 @@ export function mergePortfolioPersistedState<T extends {
   completedGuideSteps?: string[];
   analyzerSectionOrder?: AnalyzerSectionId[];
   hiddenAnalyzerSections?: AnalyzerSectionId[];
+  developments?: DevelopmentProject[];
 }>(
   persistedState: unknown,
   currentState: T
@@ -195,6 +198,13 @@ export function mergePortfolioPersistedState<T extends {
     ...pState,
     rentals: migratedRentals,
     opportunities: migratedOpportunities,
+    ...((pState as any).developments !== undefined || currentState?.developments !== undefined
+      ? {
+          developments: sanitizePersistedDevelopments(
+            (pState as any).developments || currentState?.developments || []
+          ),
+        }
+      : {}),
     municipalDirectory:
       pState.municipalDirectory && pState.municipalDirectory.length > 0
         ? pState.municipalDirectory

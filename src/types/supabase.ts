@@ -127,6 +127,123 @@ export type Database = {
           },
         ]
       }
+      developments: {
+        Row: {
+          acquisition_costs_zar: number
+          address: string
+          approvals: Json
+          boq_items: Json
+          budgeted_hard_cost_per_sqm_zar: number
+          city: string
+          compliance: Json | null
+          construction_months: number
+          contingency_percent: number
+          created_at: string
+          current_phase: string
+          development_facility_drawn_zar: number
+          development_facility_limit_zar: number
+          development_facility_repaid_zar: number
+          development_type: string
+          drive_vault: Json | null
+          id: string
+          investment_node_id: string | null
+          is_vat_registered_developer: boolean
+          land_purchase_price_zar: number
+          linked_funding_source_id: string | null
+          monthly_construction_holding_burn_zar: number
+          monthly_pre_approval_holding_burn_zar: number
+          notes: string | null
+          pre_approval_months: number
+          pre_sales_hurdle_percent: number
+          province: string | null
+          sec118_arrears_zar: number
+          sell_down_months: number
+          soft_costs: Json
+          tax_entity_type: string | null
+          title: string
+          total_buildable_area_sqm: number
+          units: Json
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          acquisition_costs_zar?: number
+          address?: string
+          approvals?: Json
+          boq_items?: Json
+          budgeted_hard_cost_per_sqm_zar?: number
+          city?: string
+          compliance?: Json | null
+          construction_months?: number
+          contingency_percent?: number
+          created_at?: string
+          current_phase?: string
+          development_facility_drawn_zar?: number
+          development_facility_limit_zar?: number
+          development_facility_repaid_zar?: number
+          development_type?: string
+          drive_vault?: Json | null
+          id?: string
+          investment_node_id?: string | null
+          is_vat_registered_developer?: boolean
+          land_purchase_price_zar?: number
+          linked_funding_source_id?: string | null
+          monthly_construction_holding_burn_zar?: number
+          monthly_pre_approval_holding_burn_zar?: number
+          notes?: string | null
+          pre_approval_months?: number
+          pre_sales_hurdle_percent?: number
+          province?: string | null
+          sec118_arrears_zar?: number
+          sell_down_months?: number
+          soft_costs?: Json
+          tax_entity_type?: string | null
+          title: string
+          total_buildable_area_sqm?: number
+          units?: Json
+          updated_at?: string
+          user_id?: string
+        }
+        Update: {
+          acquisition_costs_zar?: number
+          address?: string
+          approvals?: Json
+          boq_items?: Json
+          budgeted_hard_cost_per_sqm_zar?: number
+          city?: string
+          compliance?: Json | null
+          construction_months?: number
+          contingency_percent?: number
+          created_at?: string
+          current_phase?: string
+          development_facility_drawn_zar?: number
+          development_facility_limit_zar?: number
+          development_facility_repaid_zar?: number
+          development_type?: string
+          drive_vault?: Json | null
+          id?: string
+          investment_node_id?: string | null
+          is_vat_registered_developer?: boolean
+          land_purchase_price_zar?: number
+          linked_funding_source_id?: string | null
+          monthly_construction_holding_burn_zar?: number
+          monthly_pre_approval_holding_burn_zar?: number
+          notes?: string | null
+          pre_approval_months?: number
+          pre_sales_hurdle_percent?: number
+          province?: string | null
+          sec118_arrears_zar?: number
+          sell_down_months?: number
+          soft_costs?: Json
+          tax_entity_type?: string | null
+          title?: string
+          total_buildable_area_sqm?: number
+          units?: Json
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       flips: {
         Row: {
           acquisition_costs_zar: number | null

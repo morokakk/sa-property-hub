@@ -3,6 +3,7 @@ import type { Database } from '@/types/supabase';
 import type {
   RentalProperty,
   FlipProject,
+  DevelopmentProject,
   OpportunityDeal,
   FundingSource,
   LocalSupplier,
@@ -295,6 +296,63 @@ export function unmapFlips(
   }));
 }
 
+export function unmapDevelopments(
+  rows: Database['public']['Tables']['developments']['Row'][] = []
+): DevelopmentProject[] {
+  return rows.map((d) => ({
+    id: d.id,
+    title: d.title,
+    address: d.address,
+    city: d.city,
+    province: (d.province as any) || undefined,
+    investmentNodeId: d.investment_node_id || undefined,
+    developmentType: (d.development_type as any) || 'Subdivision & Cluster',
+    isVatRegisteredDeveloper: Boolean(d.is_vat_registered_developer),
+    taxEntityType: (d.tax_entity_type as any) || undefined,
+    currentPhase: (d.current_phase as any) || 'Feasibility',
+    preApprovalMonths: toNum(d.pre_approval_months, 0),
+    constructionMonths: toNum(d.construction_months, 0),
+    sellDownMonths: toNum(d.sell_down_months, 0),
+    landPurchasePriceZAR: toNum(d.land_purchase_price_zar, 0),
+    acquisitionCostsZAR: toNum(d.acquisition_costs_zar, 0),
+    sec118ArrearsZAR: toNum(d.sec118_arrears_zar, 0),
+    softCosts: parseJson(d.soft_costs, {
+      townPlannerZAR: 0,
+      architectZAR: 0,
+      structuralCivilEngineerZAR: 0,
+      quantitySurveyorZAR: 0,
+      nhbrcEnrolmentFeeZAR: 0,
+      councilBulkContributionsZAR: 0,
+      planScrutinyAndSubdivisionFeesZAR: 0,
+      marketingAndShowUnitZAR: 0,
+    }),
+    totalBuildableAreaSqm: toNum(d.total_buildable_area_sqm, 0),
+    budgetedHardCostPerSqmZAR: toNum(d.budgeted_hard_cost_per_sqm_zar, 0),
+    contingencyPercent: toNum(d.contingency_percent, 0),
+    boqItems: parseJson(d.boq_items, []),
+    monthlyPreApprovalHoldingBurnZAR: toNum(d.monthly_pre_approval_holding_burn_zar, 0),
+    monthlyConstructionHoldingBurnZAR: toNum(d.monthly_construction_holding_burn_zar, 0),
+    developmentFacilityLimitZAR: toNum(d.development_facility_limit_zar, 0),
+    developmentFacilityDrawnZAR: toNum(d.development_facility_drawn_zar, 0),
+    developmentFacilityRepaidZAR: toNum(d.development_facility_repaid_zar, 0),
+    preSalesHurdlePercent: toNum(d.pre_sales_hurdle_percent, 0),
+    linkedFundingSourceId: d.linked_funding_source_id || undefined,
+    approvals: parseJson(d.approvals, {
+      splumaRezoningSubdivision: { status: 'Not Started' },
+      sgDiagramApproval: { status: 'Not Started' },
+      municipalBuildingPlans: { status: 'Not Started' },
+      nhbrcEnrolment: { status: 'Not Started' },
+      sectionalTitleRegister: { status: 'Not Started' },
+      occupancyCertificate: { status: 'Not Started' },
+    }),
+    units: parseJson(d.units, []),
+    compliance: d.compliance ? (parseJson(d.compliance, undefined) as any) : undefined,
+    driveVault: d.drive_vault ? (parseJson(d.drive_vault, undefined) as any) : undefined,
+    notes: d.notes || undefined,
+    createdAt: d.created_at || undefined,
+  }));
+}
+
 export function unmapFundingSources(
   rows: Database['public']['Tables']['funding_sources']['Row'][] = []
 ): FundingSource[] {
@@ -517,11 +575,12 @@ export async function hydrateFromCloud(): Promise<HydrationResult> {
     const userId = user.id;
 
     try {
-      // 1. Fetch data from all 8 tables for this user in parallel
+      // 1. Fetch data from tables for this user in parallel
       const [
         profilesRes,
         propertiesRes,
         flipsRes,
+        devsRes,
         boqRes,
         fundingRes,
         oppsRes,
@@ -531,6 +590,7 @@ export async function hydrateFromCloud(): Promise<HydrationResult> {
         supabase.from('profiles').select('*').eq('user_id', userId),
         supabase.from('properties').select('*').eq('user_id', userId),
         supabase.from('flips').select('*').eq('user_id', userId),
+        supabase.from('developments').select('*').eq('user_id', userId),
         supabase.from('boq_items').select('*').eq('user_id', userId),
         supabase.from('funding_sources').select('*').eq('user_id', userId),
         supabase.from('opportunities').select('*').eq('user_id', userId),
@@ -547,9 +607,14 @@ export async function hydrateFromCloud(): Promise<HydrationResult> {
       if (tasksRes.error) throw new Error(`Tasks fetch failed: ${tasksRes.error.message}`);
       if (suppliersRes.error) throw new Error(`Suppliers fetch failed: ${suppliersRes.error.message}`);
 
+      if (devsRes.error) {
+        console.warn('Developments fetch warning (table may be pending migration):', devsRes.error.message);
+      }
+
       const profileRow = profilesRes.data?.[0];
       const propertyRows = propertiesRes.data || [];
       const flipRows = flipsRes.data || [];
+      const devRows = devsRes.data || [];
       const boqRows = boqRes.data || [];
       const fundingRows = fundingRes.data || [];
       const oppRows = oppsRes.data || [];
@@ -560,6 +625,7 @@ export async function hydrateFromCloud(): Promise<HydrationResult> {
         Boolean(profileRow) ||
         propertyRows.length > 0 ||
         flipRows.length > 0 ||
+        devRows.length > 0 ||
         fundingRows.length > 0 ||
         oppRows.length > 0 ||
         taskRows.length > 0 ||
@@ -581,6 +647,7 @@ export async function hydrateFromCloud(): Promise<HydrationResult> {
       const cloudSnapshot: PortfolioStateSnapshot = {
         rentals: unmapRentals(propertyRows),
         flips: unmapFlips(flipRows, boqRows),
+        developments: unmapDevelopments(devRows),
         funding: unmapFundingSources(fundingRows),
         opportunities: unmapOpportunities(oppRows),
         tasks: unmapTasks(taskRows),

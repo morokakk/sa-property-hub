@@ -26,7 +26,7 @@ describe('Get Started content integrity', () => {
     expect(GET_STARTED_STAGES[0].modules.map((m) => m.route)).toEqual(['/settings']);
     expect(GET_STARTED_STAGES[1].modules.map((m) => m.route)).toEqual(['/analyzer']);
     expect(GET_STARTED_STAGES[2].modules.map((m) => m.route)).toEqual(['/funding']);
-    expect(GET_STARTED_STAGES[3].modules.map((m) => m.route)).toEqual(['/flips', '/rentals']);
+    expect(GET_STARTED_STAGES[3].modules.map((m) => m.route)).toEqual(['/flips', '/developments', '/rentals']);
     expect(GET_STARTED_STAGES[4].modules.map((m) => m.route)).toEqual(['/proposal']);
     expect(GET_STARTED_STAGES[5].modules.map((m) => m.route)).toEqual(['/', '/tasks']);
   });

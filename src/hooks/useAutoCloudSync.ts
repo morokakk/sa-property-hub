@@ -30,6 +30,7 @@ export const SYNC_DEBOUNCE_MS = 1500;
 export const SYNCED_SLICE_KEYS = [
   'rentals',
   'flips',
+  'developments',
   'opportunities',
   'funding',
   'suppliers',

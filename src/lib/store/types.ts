@@ -26,6 +26,8 @@ import {
   PortfolioSummary,
   AnalyzerSectionId,
   AnalyzerLayoutPreset,
+  DevelopmentProject,
+  DevelopmentUnit,
 } from '@/types';
 import type { PortfolioStateSnapshot } from '@/lib/db/mergePortfolioState';
 
@@ -230,11 +232,37 @@ export interface SystemSliceActions {
 }
 export type SystemSlice = SystemSliceActions;
 
+// 4b. Development Slice
+export interface DevelopmentSliceState {
+  developments: DevelopmentProject[];
+}
+export interface DevelopmentSliceActions {
+  addDevelopment: (dev: DevelopmentProject) => void;
+  updateDevelopment: (id: string, updates: Partial<DevelopmentProject>) => void;
+  deleteDevelopment: (id: string) => void;
+  sellDevelopmentUnit: (
+    devId: string,
+    unitId: string,
+    buyerName?: string,
+    salePriceZAR?: number
+  ) => void;
+  graduateRetainedUnitsToRental: (devId: string) => RentalProperty;
+  promoteOpportunityToDevelopment: (oppId: string) => string;
+  addDevelopmentBOQItem: (
+    devId: string,
+    item: Omit<BOQItem, 'id' | 'varianceZAR'> & { varianceZAR?: number }
+  ) => void;
+  updateDevelopmentBOQItem: (devId: string, boqId: string, updates: Partial<BOQItem>) => void;
+  deleteDevelopmentBOQItem: (devId: string, boqId: string) => void;
+}
+export type DevelopmentSlice = DevelopmentSliceState & DevelopmentSliceActions;
+
 // Root Store Combined Type
 export type RootStoreState = RentalSlice &
   FlipSlice &
   OpportunitySlice &
   FundingSlice &
+  DevelopmentSlice &
   UtilitiesSlice &
   TenantAccountingSlice &
   TaskSlice &

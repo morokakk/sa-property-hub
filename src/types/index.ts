@@ -1,4 +1,4 @@
-export type PropertyType = 'rental' | 'flip' | 'opportunity';
+export type PropertyType = 'rental' | 'flip' | 'opportunity' | 'development';
 export type DealStrategy = 'Flip' | 'Rental' | 'BRRRR';
 
 export type DealSource = 'iGrow Rentals' | 'High-Street Auction' | 'Distressed Sale / Repo' | 'Private Agent' | 'Direct Owner';
@@ -20,7 +20,7 @@ export type TaskStatus = 'Pending' | 'In Progress' | 'Completed';
 export type TaskRecurrence = 'None' | 'Weekly' | 'Monthly' | 'Quarterly' | 'Annually';
 
 export interface LinkedEntity {
-  type: 'rental' | 'flip' | 'opportunity' | 'funding' | 'general';
+  type: 'rental' | 'flip' | 'opportunity' | 'development' | 'funding' | 'general';
   id?: string;
   name: string;
 }
@@ -253,7 +253,7 @@ export interface OpportunityDeal {
   promisedReturnRatePercent?: number;
   promisedPayoutSchedule?: 'Monthly Interest' | 'Quarterly' | 'At Exit (Maturity)' | 'Bi-Annual';
   securityOffered?: string;
-  status: 'Screening' | 'Offer Submitted' | 'Due Diligence' | 'Promoted to Flip' | 'Promoted to Rental' | 'Passed';
+  status: 'Screening' | 'Offer Submitted' | 'Due Diligence' | 'Promoted to Flip' | 'Promoted to Rental' | 'Promoted to Development' | 'Passed';
   passReason?: PassReason;
   passNotes?: string;
   passedAt?: string;
@@ -704,8 +704,10 @@ export interface RentalProperty {
   netCashProceedsZAR?: number;
   soldDate?: string;
   exitNotes?: string;
-  // BRRRR Lifecycle Fields
+  // BRRRR & Development Lifecycle Fields
   convertedFromFlipId?: string;
+  convertedFromDevelopmentId?: string;
+  section13SexEligible?: boolean;
   isBrrrrProperty?: boolean;
   totalEquityExtractedZAR?: number;
   refinanceHistory?: RentalRefinanceRecord[];
@@ -967,6 +969,9 @@ export interface PortfolioSummary {
   annualRentalTaxReserve: number;
   monthlyRentalTaxReserve: number;
   equityAlerts: EquityExtractionAlert[];
+  totalDevelopmentValue?: number;
+  activeDevelopmentsCount?: number;
+  totalDevelopmentLiabilities?: number;
 }
 
 // Regional Investment Node Custom Benchmark Overrides
@@ -1130,4 +1135,134 @@ export interface ExtractedRentalUnit {
   propertyType?: PropertyTitleType;
 }
 
+// ==========================================
+// Phase 1A: Development Module Domain Contracts
+// ==========================================
 
+export type ApprovalStatus =
+  | 'Not Started'
+  | 'Submitted'
+  | 'Objection / Query'
+  | 'Approved'
+  | 'N/A';
+
+export interface PreConstructionApprovalItem {
+  status: ApprovalStatus;
+  submittedDate?: string;
+  targetApprovalDate?: string;
+  referenceNo?: string;
+  approvedDate?: string;
+  notes?: string;
+}
+
+export type ApprovalItem = PreConstructionApprovalItem;
+
+export interface PreConstructionApprovals {
+  splumaRezoningSubdivision: PreConstructionApprovalItem;
+  sgDiagramApproval: PreConstructionApprovalItem;
+  municipalBuildingPlans: PreConstructionApprovalItem;
+  nhbrcEnrolment: PreConstructionApprovalItem;
+  sectionalTitleRegister: PreConstructionApprovalItem;
+  occupancyCertificate: PreConstructionApprovalItem;
+}
+
+export interface DevelopmentSoftCosts {
+  townPlannerZAR: number;
+  architectZAR: number;
+  structuralCivilEngineerZAR: number;
+  quantitySurveyorZAR: number;
+  nhbrcEnrolmentFeeZAR: number;
+  councilBulkContributionsZAR: number; // SPLUMA Sec 42
+  planScrutinyAndSubdivisionFeesZAR: number;
+  marketingAndShowUnitZAR: number;
+}
+
+export type DevUnitStatus =
+  | 'Available'
+  | 'Reserved (OTP Signed)'
+  | 'Bond Approved / Guarantees Issued'
+  | 'Sold & Transferred'
+  | 'Retained for Rental';
+
+export interface DevelopmentUnit {
+  id: string;
+  unitNumber: string;
+  configuration: string; // e.g. '2 Bed 1 Bath' or 'Studio'
+  floorAreaSqm: number;
+  allocatedCostBasisZAR: number;
+  listPriceVatInclZAR: number;
+  estimatedMonthlyRentZAR: number;
+  status: DevUnitStatus;
+  buyerName?: string;
+  depositHeldZAR?: number;
+  conveyancerRef?: string;
+  soldDate?: string;
+  graduatedRentalId?: string;
+}
+
+export type DevelopmentType =
+  | 'Subdivision & Cluster'
+  | 'Sectional Title Apartments'
+  | 'Township Micro-Units (Infill)'
+  | 'Commercial-to-Residential Conversion';
+
+export type DevelopmentPhase =
+  | 'Feasibility'
+  | 'Land & Paper Rights'
+  | 'Earthworks & Services'
+  | 'Superstructure'
+  | 'Finishes & Practical Completion'
+  | 'Sell-Down / Handover'
+  | 'Completed';
+
+export type DevelopmentTaxEntityType = 'Company (27%)' | 'Individual' | 'Trust';
+
+export type DriveVaultLinks = CloudDriveVault;
+
+export interface DevelopmentProject {
+  // Identity & Node
+  id: string;
+  title: string;
+  address: string;
+  city: string;
+  province?: Province;
+  investmentNodeId?: string;
+  developmentType: DevelopmentType;
+  isVatRegisteredDeveloper: boolean;
+  taxEntityType?: DevelopmentTaxEntityType;
+
+  // Timeline
+  currentPhase: DevelopmentPhase;
+  preApprovalMonths: number;
+  constructionMonths: number;
+  sellDownMonths: number;
+
+  // Cost Stack
+  landPurchasePriceZAR: number;
+  acquisitionCostsZAR: number;
+  sec118ArrearsZAR: number;
+  softCosts: DevelopmentSoftCosts;
+  totalBuildableAreaSqm: number;
+  budgetedHardCostPerSqmZAR: number;
+  contingencyPercent: number;
+  boqItems: BOQItem[];
+
+  // Carrying & Finance
+  monthlyPreApprovalHoldingBurnZAR: number;
+  monthlyConstructionHoldingBurnZAR: number;
+  developmentFacilityLimitZAR: number;
+  developmentFacilityDrawnZAR: number;
+  developmentFacilityRepaidZAR: number;
+  preSalesHurdlePercent: number;
+  linkedFundingSourceId?: string;
+
+  // Inventory & Compliance
+  approvals: PreConstructionApprovals;
+  units: DevelopmentUnit[];
+  compliance?: ComplianceCertificates;
+  driveVault?: DriveVaultLinks;
+
+  // General Metadata
+  notes?: string;
+  createdAt?: string;
+}

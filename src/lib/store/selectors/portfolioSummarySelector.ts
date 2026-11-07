@@ -7,6 +7,7 @@ import {
   InvestorProfile,
   PortfolioSummary,
   EquityExtractionAlert,
+  DevelopmentProject,
 } from '@/types';
 import {
   calculateFlipFinancials,
@@ -26,6 +27,7 @@ export interface PortfolioSummaryInput {
   rentals: RentalProperty[];
   flips: FlipProject[];
   funding: FundingSource[];
+  developments?: DevelopmentProject[];
   liquidCapitalReserve: number;
   investorProfile?: InvestorProfile;
   opportunities?: OpportunityDeal[];
@@ -85,8 +87,21 @@ export function computePortfolioSummary(state: PortfolioSummaryInput): Portfolio
       return sum + Math.max(0, drawn - (f.totalRepaidZAR || 0));
     }, 0);
 
+  const developments = state?.developments || [];
+  const activeDevelopments = developments.filter((d) => d && d.currentPhase !== 'Completed');
+  const totalDevelopmentValue = activeDevelopments.reduce((sum, d) => {
+    // Valuation is sum of units' list price or allocated cost basis
+    const unitVal = (d.units || []).reduce((s, u) => s + (u.listPriceVatInclZAR || u.allocatedCostBasisZAR || 0), 0);
+    return sum + (unitVal > 0 ? unitVal : (d.landPurchasePriceZAR || 0));
+  }, 0);
+
+  // Development loan liability (avoid double-counting if linked funding source is present in funding)
+  const totalDevelopmentLiabilities = activeDevelopments
+    .filter((d) => !d.linkedFundingSourceId || !funding.some((f) => f.id === d.linkedFundingSourceId || f.linkedDealId === d.id))
+    .reduce((sum, d) => sum + Math.max(0, (d.developmentFacilityDrawnZAR || 0) - (d.developmentFacilityRepaidZAR || 0)), 0);
+
   const liquidCapitalReserve = (state?.liquidCapitalReserve || 0) + newlyDrawnCapital;
-  const totalGrossAssetValue = totalRentalValue + totalFlipValue + liquidCapitalReserve;
+  const totalGrossAssetValue = totalRentalValue + totalFlipValue + totalDevelopmentValue + liquidCapitalReserve;
 
   // Standby & unallocated private funding facilities for next acquisitions (Standby facilities across the portfolio + undrawn tranches)
   const unallocatedFundingReserve = funding
@@ -127,7 +142,7 @@ export function computePortfolioSummary(state: PortfolioSummaryInput): Portfolio
       return sum + Math.max(0, drawn - (f.totalRepaidZAR || 0));
     }, 0);
 
-  const totalFundingLiabilities = totalPrivateFundingLiability + totalBondLiabilities;
+  const totalFundingLiabilities = totalPrivateFundingLiability + totalBondLiabilities + totalDevelopmentLiabilities;
   const netEquity = totalGrossAssetValue - totalFundingLiabilities;
 
   // Monthly rental cash flow and property-by-property SARS provisional tax reserve
@@ -249,6 +264,9 @@ export function computePortfolioSummary(state: PortfolioSummaryInput): Portfolio
     annualRentalTaxReserve,
     monthlyRentalTaxReserve: Math.round(annualRentalTaxReserve / 12),
     equityAlerts,
+    totalDevelopmentValue,
+    activeDevelopmentsCount: activeDevelopments.length,
+    totalDevelopmentLiabilities,
   };
 }
 
@@ -259,6 +277,7 @@ export function usePortfolioSummary(): PortfolioSummary {
   const rentals = usePortfolioStore((s) => s.rentals);
   const flips = usePortfolioStore((s) => s.flips);
   const funding = usePortfolioStore((s) => s.funding);
+  const developments = usePortfolioStore((s) => s.developments);
   const liquidCapitalReserve = usePortfolioStore((s) => s.liquidCapitalReserve);
   const investorProfile = usePortfolioStore((s) => s.investorProfile);
   const opportunities = usePortfolioStore((s) => s.opportunities);
@@ -269,10 +288,11 @@ export function usePortfolioSummary(): PortfolioSummary {
         rentals,
         flips,
         funding,
+        developments,
         liquidCapitalReserve,
         investorProfile,
         opportunities,
       }),
-    [rentals, flips, funding, liquidCapitalReserve, investorProfile, opportunities]
+    [rentals, flips, funding, developments, liquidCapitalReserve, investorProfile, opportunities]
   );
 }

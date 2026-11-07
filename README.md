@@ -7,7 +7,7 @@
 [![React](https://img.shields.io/badge/React-19.3-blue.svg)](https://react.dev/)
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind-v4.3-38bdf8.svg)](https://tailwindcss.com/)
 [![Zustand](https://img.shields.io/badge/Zustand-v5.0-orange.svg)](https://github.com/pmndrs/zustand)
-[![Tests](https://img.shields.io/badge/Vitest-896%20Passed-brightgreen.svg)](https://vitest.dev/)
+[![Tests](https://img.shields.io/badge/Vitest-1268%20Passed-brightgreen.svg)](https://vitest.dev/)
 [![E2E](https://img.shields.io/badge/Playwright-Multi--Device-purple.svg)](https://playwright.dev/)
 [![Compliance](https://img.shields.io/badge/SARS%20%2F%20LPC%20%2F%20RHA-2026%20Compliant-emerald.svg)]()
 
@@ -21,6 +21,7 @@ The **Moremela Property Investment Hub** addresses the structural complexities u
 - **Operational Archetypes:** Grounded in proven South African execution models:
   - **Steve Baron Archetype (Flipping Johannesburg):** 10-trade Bill of Quantities (BOQ), retail vs. net cash sponsor tracking, contractor milestone draw schedules (20/30/30/20 retention), time-decay holding burn sensitivity matrices (+30/60/90/120 days), and dual exit paths (Market Disposition vs. BRRRR Equity Extraction).
   - **PropertyBull Archetype (Multi-Let Scale):** Dynamic multi-unit lease arrays (`leases[]`), cellular tower and rooftop billboard ancillary cashflow routing, prepaid sub-meter vending commission reconciliations (8–15%), and tokenized POPIA-compliant tenant statement ledgers.
+  - **Ground-Up & Subdivision Developer Archetype (Sectional Title Clusters & Township Infill):** Pre-construction statutory paper rights tracking (SPLUMA rezoning, Surveyor-General diagram approval, municipal building plans, NHBRC enrolment, sectional title register, occupancy certificates), soft cost stacks (professional team, SPLUMA Sec 42 bulk contributions), bank pre-sales hurdles, debt wipeout breakeven math, and the **Hybrid Split-Exit Strategy** (selling units to extinguish development loans and retaining units for rental cashflow with automated SARS Section 13sex 55% tax deductions).
 
 ---
 
@@ -61,7 +62,27 @@ The **Moremela Property Investment Hub** addresses the structural complexities u
   - `markFlipAsCompleted`: Records net proceeds, settles linked facilities, and credits capital to `liquidCapitalReserve`.
   - `convertFlipToRental`: Transitions flip to rental portfolio, carrying forward cumulative renovation costs into purchase price basis, re-pointing syndicate funding debt, and initializing Section 13sex tax shield tracking.
 
-### 2.4 Rental Portfolio Manager (`/rentals`)
+### 2.4 Developments Manager (`/developments`)
+* **Live Route:** [`src/app/developments/page.tsx`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/app/developments/page.tsx)
+* **Ground-Up & Subdivision Underwriting:** Designed for sectional title clusters, residential subdivisions, township infill micro-units, and commercial-to-residential conversions.
+* **Top 6-Card KPI Scoreboard ([`DevelopmentKpiBanner.tsx`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/components/developments/DevelopmentKpiBanner.tsx)):**
+  1. *Total Development Cost (TDC):* Aggregates land acquisition, Section 118 municipal arrears, soft costs, active hard build BOQ, contingency reserves, and holding carrying burns (with R/m² and R/unit metrics).
+  2. *Gross Development Value (GDV):* Total list prices across all units, accounting for VAT-registered developer output/input VAT claims (`gdv / 1.15`) or R0 transfer duty for private purchasers.
+  3. *Profit on Cost (POC %):* Return on TDC before tax and after 27% corporate tax provision.
+  4. *Hard Build Rate:* Budgeted build rate per m² vs. actual active BOQ spend pacing.
+  5. *Pre-Sales Hurdle & Debt Wipeout:* Commercial bank pre-sales threshold tracking (`preSalesHurdlePercent`) and closed-form unit sales required to extinguish senior development debt.
+  6. *Hybrid Split-Exit Summary:* Split between units sold to extinguish senior debt and units retained for long-term rental cashflow.
+* **4 Operational Workstream Tabs:**
+  - **Tab 1: Unit Inventory & Split-Exit Table ([`DevelopmentUnitInventoryTab.tsx`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/components/developments/DevelopmentUnitInventoryTab.tsx)):** Unit-by-unit inventory (`Available`, `Reserved`, `Bond Approved`, `Sold & Transferred`, `Retained for Rental`), 1-click **"Mark Sold & Pay Down Debt"** action applying net sales proceeds directly to senior bank facilities, and 1-click **"Graduate Retained Units to Rentals"** CTA.
+  - **Tab 2: Cost Stack & Hard Build BOQ ([`DevelopmentCostStackTab.tsx`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/components/developments/DevelopmentCostStackTab.tsx)):** Professional team fees (Town Planner, Architect, Engineer, QS, NHBRC), SPLUMA Section 42 municipal bulk services contributions, and 10-trade construction BOQ.
+  - **Tab 3: Statutory Approvals & Paper Rights ([`DevelopmentApprovalsTab.tsx`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/components/developments/DevelopmentApprovalsTab.tsx)):** Visual status gatekeeper for 6 statutory milestones (SPLUMA Rezoning/Subdivision, SG Diagram Approval, Municipal Building Plans, NHBRC Enrolment, Sectional Title Register, Occupancy Certificate) with target dates and automated calendar tasks.
+  - **Tab 4: Finance & Pre-Sales Gate ([`DevelopmentFinanceTab.tsx`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/components/developments/DevelopmentFinanceTab.tsx)):** Land tranche vs. construction drawdown tracking, pre-sales coverage hurdles, and debt wipeout progress.
+* **Cross-Module Bridges:**
+  - `promoteOpportunityToDevelopment`: Promotes screened deals from `/analyzer` directly into developments with land price, zoning rights, and build costs carried over.
+  - `graduateRetainedUnitsToRental`: Auto-scaffolds a multi-unit property in `/rentals` with prepaid sub-meter leases, transfers residual debt balance, and activates SARS Section 13sex 55% tax deductions when retaining $\ge 5$ new residential units.
+  - **Institutional Feasibility in `/proposal` ([`DevelopmentFeasibilitySection.tsx`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/components/proposal/DevelopmentFeasibilitySection.tsx)):** Dynamic development feasibility tear-sheets with capital stack visualizations, pre-sales sensitivity matrices, and statutory approval gatekeeper badges.
+
+### 2.5 Rental Portfolio Manager (`/rentals`)
 * **Live Route:** [`src/app/rentals/page.tsx`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/app/rentals/page.tsx)
 * **Multi-Let Lease Architecture:** Canonical `leases[]` array supporting single residential units, dual-living configurations, block-of-flats, and student communes without flat-field anti-patterns.
 * **8-Point Property Inspection & Deposit Deduction Engine (`inspections.ts`):** Fully compliant with **Section 5(3)(e)–(k) of the South African Rental Housing Act (Act 50 of 1999)**:
@@ -84,7 +105,7 @@ The **Moremela Property Investment Hub** addresses the structural complexities u
 * **SARB PMT Bond Calculator:** South African Reserve Bank amortization calculations accounting for prime lending rate movements, capital repayments, and tax-deductible interest portions.
 * **Tenant Vetting & Public Statements:** Credit check risk grading (Grades A through D), statutory deposit multiplier recommendations (1.0x to 2.0x), and secure tokenized tenant statement portals (`/statement/[lease_id]`) with POPIA-compliant privacy redaction.
 
-### 2.5 Proposal Generator & Universal Financial Exports (`/proposal`)
+### 2.6 Proposal Generator & Universal Financial Exports (`/proposal`)
 * **Live Route:** [`src/app/proposal/page.tsx`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/app/proposal/page.tsx)
 * **Deterministic Funding Structurer ([`proposalIntelligence.ts`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/lib/calculations/proposalIntelligence.ts)):** Recommends optimal capital stack structures (Private Lender Fixed Coupon, Syndicate JV Profit Split, Bullet Maturity, or Hybrid Bank + Mezzanine) calibrated to the deal's cashflow coverage, holding duration, and sponsor equity margin.
 * **Institutional PDF Tear-Sheets:** Dynamic, client-side PDF generation producing institutional investor memorandums with executive summaries, photo vaults, return waterfalls, and capital repayment tranches. Reconciles 100.0% of exit legal friction and bond cancellation costs within the "Use of Funds" and net return schedules.
@@ -92,32 +113,33 @@ The **Moremela Property Investment Hub** addresses the structural complexities u
 * **Universal Accountant GL Journal CSV:** Exports general ledger journal entries pre-configured with debit/credit double-entry rows and South African VAT tags (Standard 15% vs. Exempt Residential Rent) for direct ingestion into Xero, Sage South Africa, and QuickBooks.
 * **SARS ITR12 Tax Schedules:** Pre-formatted annual income tax schedules grouping rental gross revenue, Section 11(a) deductible operational costs, bond interest, and Section 13sex capital allowances.
 
-### 2.6 Global Settings & Investor Profile (`/settings`)
+### 2.7 Global Settings & Investor Profile (`/settings`)
 * **Live Route:** [`src/app/settings/page.tsx`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/app/settings/page.tsx)
 * **Investor Profile & Corporate Tax Routing:** Configures tax entity (`Company (27%)`, `Individual (45%)`, or `Pre-Tax`), VAT-exempt managing agency toggle, buy-box investment hurdle thresholds, Google OAuth cloud authentication, and LLM provider API credentials.
 * **Automatic Cross-Device Supabase Sync ([`useAutoCloudSync.ts`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/hooks/useAutoCloudSync.ts)):** Continuous multi-device synchronization engine with live navigation header status pill ([`CloudSyncStatusPill`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/components/navigation/TopHeader.tsx)), 1500ms debounced push on portfolio mutations, automatic cloud hydration on session load or sign-in, loop suppression guard (`isHydratingFromCloud`), and `DBSYNC-02` cross-user contamination prevention.
 * **Regional Node Market Benchmark Editor ([`NodeBenchmarkEditor.tsx`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/components/settings/NodeBenchmarkEditor.tsx)):** Interactive editor for customizing gross yield, cap rate, price-per-$m^2$, and statutory municipal tariff baselines across all 35 South African investment nodes with CSV/JSON import/export and Supabase cloud sync.
 * **Conveyancing & Transfer Legal Settings:** Configures `defaultBondCancellationFeeZAR` (defaulting to `R5,200` incl. 15% VAT per 1 July 2026 LSSA tariffs + Deeds Office cancellation levy + bank instruction fee), synchronizing baseline exit legal cost assumptions across `/analyzer`, `/flips`, `/rentals`, and `/proposal`.
 
-### 2.7 Task & Compliance Calendar Engine (`/tasks`)
+### 2.8 Task & Compliance Calendar Engine (`/tasks`)
 * **Live Route:** [`src/app/tasks/page.tsx`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/app/tasks/page.tsx)
 * **Segmented Task Ledger vs. Calendar View:** High-ergonomics view switcher toggling between the chronological operational ledger (`📋 Task Ledger`) and a zero-dependency responsive monthly compliance calendar (`📅 Calendar View`) with shared multi-criteria filtering.
 * **Strict Chronological Sorting & Overdue Triage ([`taskCalendar.ts`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/lib/calculations/taskCalendar.ts)):** Sorts active tasks by `dueDate` ascending (breaking same-day ties by `Urgent` → `High` → `Medium` → `Low` priority and pinning `Completed` items to the bottom), badging overdue items (`dueDate < todayISO`) with rose border accents and updating the `Pending Tasks` KPI overdue counter.
 * **Interactive Calendar Grid & Recurring Ghost Previews ([`recurrence.ts`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/lib/calculations/recurrence.ts) & [`taskCalendar.ts`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/lib/calculations/taskCalendar.ts)):** Monday-first 7-column monthly grid projecting read-only dashed preview pills (`Scheduled {Recurrence} Preview`) for active `Weekly`, `Monthly`, `Quarterly`, and `Annually` recurring commitments (respecting `recurrenceEndDate`), paired with a Selected Date Inspector sidebar for 1-click completion and date-prefilled task creation.
 * **RFC 5545 iCalendar (.ics) Export & External Calendar Deep Links ([`calendarExport.ts`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/lib/export/calendarExport.ts)):** Pure client-side export generating RFC 5545 `.ics` calendar payloads with CRLF line endings, exclusive all-day `DTEND` dates (`dueDate + 1 day`), native recurrence rules (`RRULE:FREQ=WEEKLY|MONTHLY|YEARLY` with `INTERVAL=3` quarterly and `UNTIL` bounds), and 9:00 AM `VALARM` display reminders. Includes bulk filtered active export (`[ 📅 Export .ics (N) ]`) and per-task quick actions for direct Google Calendar and Outlook 365 compose deep links.
-* **Automated Cross-Domain Reminders ([`taskSync.ts`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/lib/store/utils/taskSync.ts)):** Automatically schedules and synchronizes 60-day lease expiry renewal notices and 14-day Body Corporate AGM budget review tasks across rentals, flips, and pipeline opportunities.
+* **Automated Cross-Domain Reminders ([`taskSync.ts`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/lib/store/utils/taskSync.ts)):** Automatically schedules and synchronizes 60-day lease expiry renewal notices, 14-day Body Corporate AGM budget reviews, and pre-construction statutory approval warning tasks across rentals, flips, developments, and pipeline opportunities.
 
-### 2.8 Standalone Human-First Landing Page (`/welcome`)
+### 2.9 Standalone Human-First Landing Page (`/welcome`)
 * **Live Route:** [`src/app/welcome/page.tsx`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/app/welcome/page.tsx)
 * **Human-Centric Deal Alignment:** A low-word-count institutional landing page linking an entrepreneur's core life goals directly to live underwriting and management modules:
   - **Monthly Cash Flow:** Feeds single-let/multi-let tracking, utility recovery, and 1-click statements ([`/rentals`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/app/rentals/page.tsx)).
   - **Build a Lump-Sum Cash War Chest:** Drives 10-trade BOQ management, stage draws, and Section 118 clearance timelines ([`/flips`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/app/flips/page.tsx)).
   - **Vet a Deal Before You Sign:** Instant SARS transfer duty, conveyancing tariffs, and MAO calculation ([`/analyzer`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/app/analyzer/page.tsx)).
+  - **Ground-Up Subdivision & Clusters:** Plan statutory approvals, pre-sales debt wipeout, and hybrid exit models ([`/developments`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/app/developments/page.tsx)).
   - **Long-Term Wealth & Partners:** BRRRR refinance readiness, tax reserves, and 1-page PDF/WhatsApp pitch memos ([`/proposal`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/app/proposal/page.tsx)).
 * **Architecture Grid ("Guard the Kraal. Grow the Baobab."):** 3-column value matrix emphasizing Day-1 cash protection against South African transaction traps, mobile building-site operations, and instant lender syndication.
 * **Workspace Integration:** Directly accessible from any view via the **"Welcome & Overview"** link in the navigation sidebar under *Help & Reference*.
 
-### 2.9 Hidden Founder Story & Cultural Vision (`/about`)
+### 2.10 Hidden Founder Story & Cultural Vision (`/about`)
 * **Live Route:** [`src/app/about/page.tsx`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/app/about/page.tsx)
 * **Cultural Roots & Tribute:** Documents the founding purpose and cultural heritage behind *Moremela* (from Setswana, Sesotho, and Sepedi *go remela* — *"the one who clears the way"* to build the homestead / *kraal*), paying tribute to **Sally Motlana**, recipient of the National **Order of the Baobab**.
 * **Stealth GTM Protection:** Strict Next.js Server Component configured with `robots: { index: false, follow: false, nocache: true }` metadata, private draft notice badge, and gated navigation behind `SHOW_ABOUT_PAGE_IN_NAV = false` in `Sidebar.tsx`.
@@ -200,6 +222,7 @@ npm run build
 │   │   ├── welcome/page.tsx      # Human-First Landing Page & Goal Switcher
 │   │   ├── about/page.tsx        # Stealth Founder Story & Cultural Vision (GTM Private Draft)
 │   │   ├── analyzer/page.tsx     # Opportunity Deal Sourcing & Underwriting
+│   │   ├── developments/page.tsx # Ground-Up Clusters, Infill & Subdivision Command Center
 │   │   ├── flips/page.tsx        # Buy-and-Flip Renovation Command Center
 │   │   ├── rentals/page.tsx      # Multi-Let Rental Portfolio & Operations
 │   │   ├── funding/page.tsx      # Private Investor & Bond Syndicate Facility Manager
@@ -210,6 +233,7 @@ npm run build
 │   ├── components/               # Tier 3: Modular Component Trees & Modals
 │   │   ├── dashboard/            # KPI strips, allocation graphs, tax widgets
 │   │   ├── analyzer/             # Underwriting cards, scorecards, input forms
+│   │   ├── developments/         # KpiBanner, Inventory tab, Cost stack tab, Approvals tab, Finance tab
 │   │   ├── flips/                # BOQ tables, phase checklists, delay matrix, exit modal
 │   │   ├── rentals/              # Rental cards, meter modals, inspection drawer, maintenance modal, exit modals
 │   │   └── common/               # Shared modals, badges, inputs, buttons
@@ -220,6 +244,7 @@ npm run build
 │   ├── lib/
 │   │   ├── calculations/         # Tier 4: Pure 100% Deterministic ZAR Engines
 │   │   │   ├── propertyMetrics.ts# Cap rates, cashflow, IRR, DSCR formulas
+│   │   │   ├── developments.ts   # TDC, GDV, POC%, VAT claims, debt wipeout & hybrid split-exit math
 │   │   │   ├── dealIntelligence.ts   # Multi-strategy verdict & automated deal-repair engine
 │   │   │   ├── proposalIntelligence.ts # Deterministic capital stack & funding structurer
 │   │   │   ├── flips.ts          # Renovation milestone draws, sponsor savings, holding & exit costs
@@ -234,7 +259,7 @@ npm run build
 │   │   │   └── vettingEngine.ts  # Pre-lease tenant scoring & deposit calculator
 │   │   ├── constants/            # Regional SA investment node baselines (35 corridors)
 │   │   ├── store/                # Tier 5: Modular Zustand Slices & Facade
-│   │   │   ├── slices/           # 10 domain slices (rental, flip, opp, funding, etc.)
+│   │   │   ├── slices/           # 11 domain slices (rental, flip, development, opp, funding, etc.)
 │   │   │   ├── selectors/        # Memoized selectors (usePortfolioSummary, equityAlerts)
 │   │   │   ├── persistence/      # Auto-healing local-storage migrations & schema repair
 │   │   │   ├── utils/            # taskSync.ts (Acyclic leaf synchronization utility)

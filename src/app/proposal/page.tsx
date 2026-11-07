@@ -17,6 +17,7 @@ import LongTermProjectionChart from '@/components/analytics/LongTermProjectionCh
 import RateShockStrip from '@/components/analytics/RateShockStrip';
 import AddFundingModal from '@/components/funding/AddFundingModal';
 import { DealStrategy, DealSource, OccupantRiskProfile, ReturnTermType, FundingSource } from '@/types';
+import { DevelopmentFeasibilitySection, mapDevelopmentToProposalDeal } from '@/components/proposal/DevelopmentFeasibilitySection';
 import {
   PlusCircle,
   Printer,
@@ -209,6 +210,8 @@ function ProposalGeneratorContent() {
   const updateRental = usePortfolioStore((state) => state.updateRental);
   const updateFlip = usePortfolioStore((state) => state.updateFlip);
   const updateOpportunity = usePortfolioStore((state) => state.updateOpportunity);
+  const developments = usePortfolioStore((state) => state.developments);
+  const updateDevelopment = usePortfolioStore((state) => state.updateDevelopment);
 
   const [showTenantNames, setShowTenantNames] = useState<boolean>(false);
 
@@ -560,7 +563,8 @@ function ProposalGeneratorContent() {
         occupantRisk: undefined,
       };
     }),
-  ], [flips, opportunities, rentals, funding, showTenantNames]);
+    ...developments.map((d) => mapDevelopmentToProposalDeal(d, funding)),
+  ], [flips, opportunities, rentals, developments, funding, showTenantNames]);
 
   const [selectedDealId, setSelectedDealId] = useState<string>(
     queryDealId || allDeals[0]?.id || ''
@@ -575,7 +579,7 @@ function ProposalGeneratorContent() {
   const deal = allDeals.find((d) => d.id === selectedDealId) || allDeals[0];
 
   const [pitchStrategy, setPitchStrategy] = useState<DealStrategy>(
-    deal?.strategy ?? (deal?.type === 'flip' ? 'Flip' : 'Rental')
+    deal?.strategy ?? ((deal as any)?.type === 'flip' ? 'Flip' : 'Rental')
   );
 
   const isFlip = pitchStrategy === 'Flip';
@@ -706,7 +710,7 @@ function ProposalGeneratorContent() {
   // Sync state when deal selection changes
   useEffect(() => {
     if (deal) {
-      const initialStrategy = deal.strategy ?? (deal.type === 'flip' ? 'Flip' : 'Rental');
+      const initialStrategy = deal.strategy ?? ((deal as any).type === 'flip' ? 'Flip' : 'Rental');
       setPitchStrategy(initialStrategy);
 
       const isDealFlip = initialStrategy === 'Flip';
@@ -770,6 +774,11 @@ function ProposalGeneratorContent() {
         promisedReturnRatePercent: offeredRate,
         securityOffered: securityType,
       });
+    } else if (deal.type === 'development') {
+      updateDevelopment(deal.id, {
+        notes: pitchNotes,
+        developmentFacilityLimitZAR: capitalRequested,
+      });
     }
     setIsSavedFeedback(true);
     setTimeout(() => setIsSavedFeedback(false), 3000);
@@ -817,6 +826,8 @@ function ProposalGeneratorContent() {
         updateOpportunity(deal.id, updates);
       } else if (deal.type === 'rental') {
         updateRental(deal.id, updates);
+      } else if (deal.type === 'development') {
+        updateDevelopment(deal.id, updates);
       }
     }
     setToastMessage('Facility successfully recorded in Funding & Capital Ledger');
@@ -966,7 +977,7 @@ function ProposalGeneratorContent() {
     if (!deal || !capitalStackSplit || !stressMatrix) return null;
     return synthesizeStrengthsAndMitigants({
       deal: {
-        type: deal.type,
+        type: deal.type as any,
         city: deal.city || '',
         province: (deal as any).province,
         source: deal.source,
@@ -1023,6 +1034,7 @@ function ProposalGeneratorContent() {
     return formatProposalPitchForWhatsApp({
       deal: {
         ...deal,
+        type: deal.type as any,
         auctioneerCommission,
         municipalArrears: deal.type === 'rental' ? 0 : municipalArrears,
         exitCommissionPercent,
@@ -1137,6 +1149,8 @@ function ProposalGeneratorContent() {
                   let badge = '';
                   if (d.type === 'rental') {
                     badge = '[STABILIZED RENTAL]';
+                  } else if (d.type === 'development') {
+                    badge = '[DEVELOPMENT FEASIBILITY]';
                   } else {
                     const stratTag = d.strategy?.toUpperCase() || (d.type === 'flip' ? 'FLIP' : 'RENTAL');
                     const srcTag = d.source ? ` • ${d.source}` : '';
@@ -2075,6 +2089,10 @@ function ProposalGeneratorContent() {
                   </table>
                 </div>
               </div>
+            )}
+
+            {deal.type === 'development' && (deal as any).rawDevelopment && (
+              <DevelopmentFeasibilitySection development={(deal as any).rawDevelopment} />
             )}
 
             {/* Capital Requirement & Use of Funds */}

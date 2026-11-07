@@ -1,6 +1,7 @@
 import type {
   RentalProperty,
   FlipProject,
+  DevelopmentProject,
   OpportunityDeal,
   FundingSource,
   LocalSupplier,
@@ -24,12 +25,20 @@ export function isDemoRentalProperty(propertyId?: string | null): boolean {
   return DEMO_RENTAL_IDS.has(propertyId) || propertyId.startsWith('demo-rental-');
 }
 export const DEMO_FLIP_IDS = new Set(['flip-1', 'flip-2', 'flip-3']);
+export const DEMO_DEV_IDS = new Set(['dev-1', 'dev-2']);
+
+export function isDemoDevelopment(devId?: string | null): boolean {
+  if (!devId || typeof devId !== 'string') return false;
+  return DEMO_DEV_IDS.has(devId) || devId.startsWith('demo-dev-');
+}
 export const DEMO_BOQ_IDS = new Set([
   'boq-1', 'boq-2', 'boq-3', 'boq-4', 'boq-5', 'boq-6', 'boq-7', 'boq-8',
   'boq-9', 'boq-10', 'boq-11', 'boq-12', 'boq-13', 'boq-14', 'boq-15', 'boq-16',
 ]);
 export const DEMO_OPP_IDS = new Set(['opp-1', 'opp-2', 'opp-3', 'opp-4']);
-export const DEMO_FUNDING_IDS = new Set(['fund-1', 'fund-2', 'fund-3']);
+export const DEMO_FUNDING_IDS = new Set([
+  'fund-1', 'fund-2', 'fund-3', 'fund-dev-ferndale', 'fund-tuhf-kempton',
+]);
 export const DEMO_TASK_IDS = new Set([
   'task-1', 'task-2', 'task-3', 'task-4', 'task-5', 'task-6', 'task-7',
   'task-agm-rental-1', 'task-agm-rental-2',
@@ -39,6 +48,7 @@ export const DEMO_SUPPLIER_IDS = new Set(['sup-1', 'sup-2', 'sup-3', 'sup-4', 's
 export interface PortfolioStateSnapshot {
   rentals: RentalProperty[];
   flips: FlipProject[];
+  developments?: DevelopmentProject[];
   funding: FundingSource[];
   opportunities: OpportunityDeal[];
   suppliers: LocalSupplier[];
@@ -130,6 +140,34 @@ export function mergePortfolioState(
 
     if (!conflicts) {
       mergedFlips.push(localF);
+      hasNewLocalItems = true;
+    }
+  }
+
+  // 2b. Merge Developments
+  const cloudDevelopments = cloudState.developments || [];
+  const localDevelopments = localState.developments || [];
+  const mergedDevelopments: DevelopmentProject[] = [...cloudDevelopments];
+
+  const cloudDevIds = new Set(cloudDevelopments.map((d) => d.id));
+  const cloudDevTitles = new Set(
+    cloudDevelopments.map((d) => normalizeStr(d.title)).filter(Boolean)
+  );
+  const cloudDevAddresses = new Set(
+    cloudDevelopments.map((d) => normalizeStr(d.address)).filter(Boolean)
+  );
+
+  for (const localD of localDevelopments) {
+    if (DEMO_DEV_IDS.has(localD.id)) {
+      continue;
+    }
+    const conflicts =
+      cloudDevIds.has(localD.id) ||
+      (localD.title && cloudDevTitles.has(normalizeStr(localD.title))) ||
+      (localD.address && cloudDevAddresses.has(normalizeStr(localD.address)));
+
+    if (!conflicts) {
+      mergedDevelopments.push(localD);
       hasNewLocalItems = true;
     }
   }
@@ -269,6 +307,7 @@ export function mergePortfolioState(
     mergedState: {
       rentals: mergedRentals.map(migrateNegativeArrearsToRental),
       flips: mergedFlips,
+      developments: mergedDevelopments,
       funding: mergedFunding,
       opportunities: mergedOpps,
       suppliers: mergedSuppliers,

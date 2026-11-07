@@ -17,7 +17,9 @@ import {
   EMPTY_ANALYZER_DRAFT,
   DEFAULT_AI_SETTINGS,
   DEFAULT_ANALYZER_SECTION_ORDER,
+  INITIAL_DEVELOPMENTS,
 } from '../initialData';
+import { sanitizePersistedDevelopments } from '../hydrationHelpers';
 
 export const createSystemSlice: StateCreator<
   RootStoreState,
@@ -35,6 +37,7 @@ export const createSystemSlice: StateCreator<
       flips: snapshot.flips ?? state.flips,
       funding: snapshot.funding ?? state.funding,
       opportunities: snapshot.opportunities ?? state.opportunities,
+      developments: (snapshot as any).developments ?? state.developments,
       suppliers: snapshot.suppliers ?? state.suppliers,
       tasks: snapshot.tasks ?? state.tasks,
       municipalDirectory: (snapshot as any).municipalDirectory ?? state.municipalDirectory,
@@ -71,6 +74,7 @@ export const createSystemSlice: StateCreator<
       flips: INITIAL_FLIPS,
       funding: INITIAL_FUNDING,
       opportunities: INITIAL_OPPORTUNITIES,
+      developments: INITIAL_DEVELOPMENTS,
       suppliers: INITIAL_SUPPLIERS,
       tasks: INITIAL_TASKS,
       municipalDirectory: INITIAL_MUNICIPAL_DIRECTORY,
@@ -90,6 +94,7 @@ export const createSystemSlice: StateCreator<
       flips: [],
       funding: [],
       opportunities: [],
+      developments: [],
       tasks: [],
       municipalDirectory: INITIAL_MUNICIPAL_DIRECTORY,
       liquidCapitalReserve: 0,
@@ -107,6 +112,7 @@ export const createSystemSlice: StateCreator<
           flips: parsed.flips || [],
           funding: parsed.funding || [],
           opportunities: parsed.opportunities || [],
+          developments: sanitizePersistedDevelopments(parsed.developments),
           suppliers: parsed.suppliers || [],
           tasks: parsed.tasks || [],
           municipalDirectory: parsed.municipalDirectory || INITIAL_MUNICIPAL_DIRECTORY,

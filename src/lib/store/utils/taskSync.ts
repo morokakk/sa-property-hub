@@ -1,9 +1,9 @@
-import { TaskItem, Lease } from '@/types';
+import { TaskItem, Lease, PreConstructionApprovals, ApprovalItem } from '@/types';
 import { parseDateParts } from '@/lib/calculations/arrears';
 
 export function syncAgmReminderTask(
   tasks: TaskItem[],
-  entityType: 'rental' | 'flip' | 'opportunity',
+  entityType: 'rental' | 'flip' | 'opportunity' | 'development',
   entityId: string,
   entityTitle: string,
   agmDate?: string
@@ -146,3 +146,96 @@ export function syncLeaseExpiryTasks(
 
   return nextTasks;
 }
+
+export const STATUTORY_GATE_NAMES: Record<keyof PreConstructionApprovals, string> = {
+  splumaRezoningSubdivision: 'SPLUMA Rezoning & Subdivision',
+  sgDiagramApproval: 'Surveyor-General (SG) Diagram Approval',
+  municipalBuildingPlans: 'Municipal Building Plans Approval',
+  nhbrcEnrolment: 'NHBRC Project Enrolment',
+  sectionalTitleRegister: 'Sectional Title Register Opening',
+  occupancyCertificate: 'Municipal Certificate of Occupancy',
+};
+
+export function syncDevelopmentApprovalTasks(
+  tasks: TaskItem[],
+  devId: string,
+  devTitle: string,
+  approvals?: PreConstructionApprovals
+): TaskItem[] {
+  let nextTasks = [...tasks];
+  const today = new Date().toISOString().split('T')[0];
+
+  if (!approvals) {
+    return nextTasks.filter(
+      (t) => !(t.linkedEntity?.id === devId && t.id.startsWith('task-dev-approval-'))
+    );
+  }
+
+  const gateKeys = Object.keys(STATUTORY_GATE_NAMES) as (keyof PreConstructionApprovals)[];
+
+  for (const gateKey of gateKeys) {
+    const item: ApprovalItem | undefined = approvals[gateKey];
+    const taskId = `task-dev-approval-${devId}-${gateKey}`;
+    const gateName = STATUTORY_GATE_NAMES[gateKey];
+
+    const existingIdx = nextTasks.findIndex((t) => t.id === taskId);
+
+    // If gate is Approved, N/A, or has no targetApprovalDate, remove any pending reminder
+    if (!item || !item.targetApprovalDate || item.status === 'Approved' || item.status === 'N/A') {
+      if (existingIdx >= 0 && nextTasks[existingIdx].status === 'Pending') {
+        nextTasks.splice(existingIdx, 1);
+      }
+      continue;
+    }
+
+    // 14 days prior warning calculation
+    const targetTime = new Date(item.targetApprovalDate).getTime();
+    const reminderDate = isNaN(targetTime)
+      ? item.targetApprovalDate
+      : new Date(targetTime - 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+    const dueDate = reminderDate > today ? reminderDate : today;
+
+    const title = `Statutory Gate: ${gateName} - ${devTitle}`;
+    const description = `Follow up on statutory submission for ${gateName} (Ref: ${
+      item.referenceNo || 'Pending'
+    }). Target approval date: ${item.targetApprovalDate}. Status: ${item.status}.`;
+
+    if (existingIdx >= 0) {
+      const existing = nextTasks[existingIdx];
+      const dateChanged = existing.dueDate !== dueDate;
+      nextTasks[existingIdx] = {
+        ...existing,
+        id: taskId,
+        title,
+        description,
+        dueDate,
+        priority: 'Urgent',
+        status: dateChanged ? 'Pending' : existing.status,
+        linkedEntity: {
+          type: 'development',
+          id: devId,
+          name: devTitle,
+        },
+      };
+    } else {
+      const newTask: TaskItem = {
+        id: taskId,
+        title,
+        description,
+        dueDate,
+        priority: 'Urgent',
+        status: 'Pending',
+        linkedEntity: {
+          type: 'development',
+          id: devId,
+          name: devTitle,
+        },
+        createdAt: today,
+      };
+      nextTasks = [newTask, ...nextTasks];
+    }
+  }
+
+  return nextTasks;
+}
+

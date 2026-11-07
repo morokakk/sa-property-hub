@@ -1,0 +1,235 @@
+import { describe, it, expect } from 'vitest';
+import {
+  mapDevelopments,
+  isStockDemoState,
+} from '../migrateToCloud';
+import {
+  unmapDevelopments,
+} from '../hydrateFromCloud';
+import {
+  mergePortfolioState,
+  isDemoDevelopment,
+  DEMO_DEV_IDS,
+} from '../mergePortfolioState';
+import {
+  INITIAL_DEVELOPMENTS,
+  INITIAL_RENTALS,
+  INITIAL_FLIPS,
+  INITIAL_FUNDING,
+  INITIAL_OPPORTUNITIES,
+  INITIAL_TASKS,
+  INITIAL_SUPPLIERS,
+  INITIAL_INVESTOR_PROFILE,
+} from '@/lib/store/initialData';
+import type { DevelopmentProject } from '@/types';
+
+describe('Developments Cloud Sync Suite', () => {
+  const mockUserId = 'usr-test-dev-sync-123';
+
+  it('identifies demo development IDs and prefix helpers', () => {
+    expect(DEMO_DEV_IDS.has('dev-1')).toBe(true);
+    expect(DEMO_DEV_IDS.has('dev-2')).toBe(true);
+    expect(isDemoDevelopment('dev-1')).toBe(true);
+    expect(isDemoDevelopment('dev-2')).toBe(true);
+    expect(isDemoDevelopment('demo-dev-custom')).toBe(true);
+    expect(isDemoDevelopment('custom-dev-999')).toBe(false);
+    expect(isDemoDevelopment(null)).toBe(false);
+  });
+
+  it('correctly maps DevelopmentProject domain models to DB rows via mapDevelopments', () => {
+    const mapped = mapDevelopments(INITIAL_DEVELOPMENTS, mockUserId);
+    expect(mapped.length).toBe(INITIAL_DEVELOPMENTS.length);
+
+    const dev1 = mapped[0];
+    expect(dev1.user_id).toBe(mockUserId);
+    expect(dev1.id).toBe('dev-1');
+    expect(dev1.title).toBe('Ferndale 6-Unit Cluster Subdivision');
+    expect(dev1.is_vat_registered_developer).toBe(true);
+    expect(dev1.development_type).toBe('Subdivision & Cluster');
+    expect(dev1.current_phase).toBe('Finishes & Practical Completion');
+    expect(dev1.land_purchase_price_zar).toBe(1850000);
+    expect(dev1.total_buildable_area_sqm).toBe(390);
+
+    // JSONB columns should be properly structured
+    expect(typeof dev1.soft_costs).toBe('object');
+    expect(Array.isArray(dev1.units)).toBe(true);
+    expect((dev1.units as any[]).length).toBe(6);
+    expect(typeof dev1.approvals).toBe('object');
+  });
+
+  it('correctly unmaps database rows back into domain models via unmapDevelopments', () => {
+    const mapped = mapDevelopments(INITIAL_DEVELOPMENTS, mockUserId);
+    const unmapped = unmapDevelopments(mapped as any);
+
+    expect(unmapped.length).toBe(INITIAL_DEVELOPMENTS.length);
+    const unmappedDev1 = unmapped[0];
+    expect(unmappedDev1.id).toBe('dev-1');
+    expect(unmappedDev1.title).toBe('Ferndale 6-Unit Cluster Subdivision');
+    expect(unmappedDev1.isVatRegisteredDeveloper).toBe(true);
+    expect(unmappedDev1.units.length).toBe(6);
+    expect(unmappedDev1.softCosts.townPlannerZAR).toBe(65000);
+    expect(unmappedDev1.approvals.splumaRezoningSubdivision.status).toBe('Approved');
+  });
+
+  it('handles stock demo state detection accurately with developments', () => {
+    const stockPayload = {
+      rentals: INITIAL_RENTALS,
+      flips: INITIAL_FLIPS,
+      developments: INITIAL_DEVELOPMENTS,
+      opportunities: INITIAL_OPPORTUNITIES,
+      funding: INITIAL_FUNDING,
+      tasks: INITIAL_TASKS,
+      suppliers: INITIAL_SUPPLIERS,
+      investorProfile: INITIAL_INVESTOR_PROFILE,
+    };
+
+    expect(isStockDemoState(stockPayload)).toBe(true);
+
+    // Modifying a development should make isStockDemoState return false
+    const modifiedPayload = {
+      ...stockPayload,
+      developments: [
+        {
+          ...INITIAL_DEVELOPMENTS[0],
+          landPurchasePriceZAR: 9999999,
+        },
+        INITIAL_DEVELOPMENTS[1],
+      ],
+    };
+    expect(isStockDemoState(modifiedPayload)).toBe(false);
+
+    // Adding an extra development should make isStockDemoState return false
+    const addedPayload = {
+      ...stockPayload,
+      developments: [
+        ...INITIAL_DEVELOPMENTS,
+        {
+          id: 'dev-custom-3',
+          title: 'Custom Infill',
+          address: '10 Main Rd',
+          city: 'Pretoria',
+          developmentType: 'Township Micro-Units (Infill)',
+          isVatRegisteredDeveloper: false,
+          currentPhase: 'Feasibility',
+          preApprovalMonths: 3,
+          constructionMonths: 6,
+          sellDownMonths: 2,
+          landPurchasePriceZAR: 500000,
+          acquisitionCostsZAR: 20000,
+          sec118ArrearsZAR: 0,
+          softCosts: {} as any,
+          totalBuildableAreaSqm: 200,
+          budgetedHardCostPerSqmZAR: 8000,
+          contingencyPercent: 10,
+          boqItems: [],
+          monthlyPreApprovalHoldingBurnZAR: 5000,
+          monthlyConstructionHoldingBurnZAR: 10000,
+          developmentFacilityLimitZAR: 0,
+          developmentFacilityDrawnZAR: 0,
+          developmentFacilityRepaidZAR: 0,
+          preSalesHurdlePercent: 0,
+          approvals: {} as any,
+          units: [],
+        } as DevelopmentProject,
+      ],
+    };
+    expect(isStockDemoState(addedPayload)).toBe(false);
+  });
+
+  it('merges developments state smoothly in mergePortfolioState without duplicates', () => {
+    const cloudSnapshot = {
+      rentals: [],
+      flips: [],
+      funding: [],
+      opportunities: [],
+      suppliers: [],
+      tasks: [],
+      developments: [
+        {
+          id: 'dev-cloud-1',
+          title: 'Cloud Development Project',
+          address: '45 Ridge Rd',
+          city: 'Sandton',
+          developmentType: 'Sectional Title Apartments',
+          isVatRegisteredDeveloper: true,
+          currentPhase: 'Feasibility',
+          preApprovalMonths: 6,
+          constructionMonths: 12,
+          sellDownMonths: 6,
+          landPurchasePriceZAR: 4000000,
+          acquisitionCostsZAR: 150000,
+          sec118ArrearsZAR: 0,
+          softCosts: {} as any,
+          totalBuildableAreaSqm: 1200,
+          budgetedHardCostPerSqmZAR: 14000,
+          contingencyPercent: 10,
+          boqItems: [],
+          monthlyPreApprovalHoldingBurnZAR: 20000,
+          monthlyConstructionHoldingBurnZAR: 40000,
+          developmentFacilityLimitZAR: 10000000,
+          developmentFacilityDrawnZAR: 0,
+          developmentFacilityRepaidZAR: 0,
+          preSalesHurdlePercent: 60,
+          approvals: {} as any,
+          units: [],
+        } as DevelopmentProject,
+      ],
+    };
+
+    const localSnapshot = {
+      rentals: [],
+      flips: [],
+      funding: [],
+      opportunities: [],
+      suppliers: [],
+      tasks: [],
+      developments: [
+        // Demo item should be ignored when cloud has items
+        ...INITIAL_DEVELOPMENTS,
+        // Conflicting item matching cloud ID
+        {
+          ...cloudSnapshot.developments[0],
+          title: 'Modified Local Version',
+        },
+        // Brand new local item
+        {
+          id: 'dev-local-unique',
+          title: 'Unique Local Development',
+          address: '88 West St',
+          city: 'Durban',
+          developmentType: 'Subdivision & Cluster',
+          isVatRegisteredDeveloper: false,
+          currentPhase: 'Feasibility',
+          preApprovalMonths: 3,
+          constructionMonths: 8,
+          sellDownMonths: 4,
+          landPurchasePriceZAR: 1200000,
+          acquisitionCostsZAR: 50000,
+          sec118ArrearsZAR: 0,
+          softCosts: {} as any,
+          totalBuildableAreaSqm: 350,
+          budgetedHardCostPerSqmZAR: 9500,
+          contingencyPercent: 7.5,
+          boqItems: [],
+          monthlyPreApprovalHoldingBurnZAR: 8000,
+          monthlyConstructionHoldingBurnZAR: 15000,
+          developmentFacilityLimitZAR: 2000000,
+          developmentFacilityDrawnZAR: 0,
+          developmentFacilityRepaidZAR: 0,
+          preSalesHurdlePercent: 50,
+          approvals: {} as any,
+          units: [],
+        } as DevelopmentProject,
+      ],
+    };
+
+    const { mergedState, hasNewLocalItems } = mergePortfolioState(cloudSnapshot as any, localSnapshot as any);
+
+    expect(hasNewLocalItems).toBe(true);
+    expect(mergedState.developments?.length).toBe(2);
+    expect(mergedState.developments?.find((d) => d.id === 'dev-cloud-1')?.title).toBe('Cloud Development Project');
+    expect(mergedState.developments?.find((d) => d.id === 'dev-local-unique')).toBeDefined();
+    // Demo developments should have been discarded
+    expect(mergedState.developments?.find((d) => d.id === 'dev-1')).toBeUndefined();
+  });
+});

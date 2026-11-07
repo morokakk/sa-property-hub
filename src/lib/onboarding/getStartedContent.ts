@@ -13,6 +13,7 @@ export type GuideRoute =
   | '/'
   | '/analyzer'
   | '/funding'
+  | '/developments'
   | '/flips'
   | '/rentals'
   | '/proposal'
@@ -24,6 +25,7 @@ export const GUIDE_ROUTES: readonly GuideRoute[] = [
   '/',
   '/analyzer',
   '/funding',
+  '/developments',
   '/flips',
   '/rentals',
   '/proposal',
@@ -77,7 +79,7 @@ export interface GoLiveStep {
 }
 
 export const DEMO_DATA_TIP =
-  'Try every step on the demo deals first. The app ships with realistic South African sample rentals, flips, funding and pipeline deals, so you can experiment safely. When you are ready, use Clear Demo to go live (final step below).';
+  'Try every step on the demo deals first. The app ships with realistic South African sample rentals, flips, developments, funding and pipeline deals, so you can experiment safely. When you are ready, use Clear Demo to go live (final step below).';
 
 export const GET_STARTED_STAGES: readonly JourneyStage[] = [
   // ---------------------------------------------------------------------------
@@ -309,8 +311,8 @@ export const GET_STARTED_STAGES: readonly JourneyStage[] = [
     id: 'stage-3',
     stepNumber: 3,
     phase: 'Execute',
-    title: 'Execute: run it as a Flip or a Rental',
-    summary: 'Promote a winning deal, then manage it day to day in the matching module.',
+    title: 'Execute: Flips, Developments & Rentals',
+    summary: 'Promote a winning deal, then manage renovations, ground-up developments or rental portfolios day to day.',
     modules: [
       {
         id: 'flips',
@@ -359,6 +361,70 @@ export const GET_STARTED_STAGES: readonly JourneyStage[] = [
               'Transfers in SA typically take 2–3 months after a sale is agreed, and the Section 118 rates clearance can add weeks. Budget your holding burn to the registration date, not the day the buyer signs.',
             href: '/flips#flips-holding-cost',
             ctaLabel: 'View holding cost',
+          },
+        ],
+      },
+      {
+        id: 'developments',
+        moduleName: 'Developments Manager',
+        route: '/developments',
+        purpose: 'Run ground-up clusters, infill schemes, statutory approvals, pre-sales debt wipeout, and hybrid split-exit portfolios.',
+        features: [
+          {
+            id: 'developments-promote-deal',
+            title: 'Promote Deal & Feasibility Setup',
+            summary: 'Promote an analyzed pipeline deal into Developments with land price, zoning rights, and build costs carried over.',
+            howTo: [
+              'In the Analyzer pipeline, open any deal, complete feasibility modeling, and click Promote to Development.',
+              'Review the auto-populated land purchase price, total buildable area in square meters, and target unit count.',
+              'Configure the developer VAT registration status to automatically model 15% input VAT claims on professional fees and construction costs.',
+            ],
+            proTip:
+              'VAT-registered developers in South Africa can claim back 15% input VAT on professional fees and hard construction costs, boosting project cashflow during early ground-works.',
+            href: '/developments',
+            ctaLabel: 'Open Developments',
+          },
+          {
+            id: 'developments-approvals-tracker',
+            title: 'Statutory Approvals & Paper Rights',
+            summary: 'Track municipal planning, SPLUMA rezoning, SG diagrams, building plans, NHBRC enrolment, and occupancy certificates.',
+            howTo: [
+              'Open the Paper Rights & Approvals tab to view the 6 statutory pre-construction and handover milestones.',
+              'Update each approval stage status from Not Started to Submitted, Objection or Query, or Approved with council reference numbers.',
+              'Set target approval dates to automatically generate calendar reminders and holding burn warning tasks 14 days in advance.',
+            ],
+            proTip:
+              'Never break ground without an approved Surveyor-General diagram and NHBRC enrolment certificate. Municipal stop orders carry severe statutory penalties and escalate holding burn.',
+            href: '/developments#developments-approvals',
+            ctaLabel: 'Track statutory approvals',
+          },
+          {
+            id: 'developments-presales-debt-wipeout',
+            title: 'Pre-Sales Hurdle & Debt Wipeout',
+            summary: 'Monitor commercial bank pre-sales thresholds and calculate the exact unit sales required to extinguish development debt.',
+            howTo: [
+              'Open the Finance & Pre-Sales Gate tab to view the development facility limit, drawn capital, and pre-sales hurdle.',
+              'Check the debt wipeout calculation to see how many unit sales at average list price reduce outstanding debt to zero.',
+              'Record sales milestones as OTPs are signed, bank guarantees issued, and conveyancers confirm transfer registrations.',
+            ],
+            proTip:
+              'South African commercial lenders typically require 50% to 70% pre-sales cover before releasing senior construction finance tranches to derisk capital exposure.',
+            href: '/developments#developments-finance',
+            ctaLabel: 'View finance and debt wipeout',
+          },
+          {
+            id: 'developments-hybrid-split-exit',
+            title: 'Hybrid Split-Exit & Rental Graduation',
+            summary: 'Sell a portion of units to repay the development loan and graduate retained units to the rental portfolio debt-free.',
+            howTo: [
+              'In Unit Inventory, assign each unit as Available, Reserved, Bond Approved, Sold, or Retained for Rental.',
+              'Use Mark Sold & Pay Down Debt on completed sales to apply net proceeds directly against the senior development facility.',
+              'Click Graduate Retained Units to Rentals to create a multi-unit rental property with Section 13sex 55% tax deductions enabled if holding 5 or more units.',
+            ],
+            proTip:
+              'Retaining five or more newly constructed residential units in South Africa unlocks SARS Section 13sex allowances, providing a 55% tax write-off on the unit cost basis over twenty years.',
+            href: '/developments#developments-inventory',
+            ctaLabel: 'Manage unit inventory',
           },
         ],
       },
@@ -641,7 +707,7 @@ export const GO_LIVE_STEP: GoLiveStep = {
   howTo: [
     'Under Settings → Cloud Sync & Multi-Device Access, sign in with Google or Email magic link to automatically sync your portfolio across all devices.',
     'Click Clear Demo in the top bar (on mobile: More → Clear All Portfolio Data). Your Settings, credentials and supplier directory are kept.',
-    'Back on the Dashboard, follow the Clean Slate card: analyze your first real deal, add rentals or flips, and set your liquid reserve.',
+    'Back on the Dashboard, follow the Clean Slate card: analyze your first real deal, add rentals, flips or developments, and set your liquid reserve.',
   ],
   proTip:
     'Signing in enables real-time background cloud synchronization to Supabase, keeping your portfolio backed up and synced between desktop and mobile. You can bring the sample data back at any time with Reset Demo.',

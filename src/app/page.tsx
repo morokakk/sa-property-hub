@@ -17,6 +17,7 @@ import {
   ShieldCheck,
   Building,
   Hammer,
+  Layers,
   Coins,
   ArrowUpRight,
   PlusCircle,
@@ -38,8 +39,11 @@ export default function GlobalDashboardPage() {
   const summary = usePortfolioSummary();
   const rentals = usePortfolioStore((state) => state.rentals);
   const flips = usePortfolioStore((state) => state.flips);
+  const developments = usePortfolioStore((state) => state.developments) ?? [];
   const funding = usePortfolioStore((state) => state.funding);
   const updateLiquidReserve = usePortfolioStore((state) => state.updateLiquidReserve);
+
+  const activeDevelopments = developments.filter((d) => d && d.currentPhase !== 'Completed');
 
   const [showEditSeedModal, setShowEditSeedModal] = React.useState(false);
   const [seedAmount, setSeedAmount] = React.useState(summary.liquidCapitalReserve);
@@ -175,7 +179,7 @@ export default function GlobalDashboardPage() {
         </div>
 
         {/* Clean Slate Onboarding Guide (Shown when portfolio is empty) */}
-        {rentals.length === 0 && flips.length === 0 && (
+        {rentals.length === 0 && flips.length === 0 && activeDevelopments.length === 0 && (
           <div className="bg-white rounded-2xl p-6 border-2 border-dashed border-emerald-300 shadow-xs">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-slate-100">
               <div className="flex items-start gap-3">
@@ -469,6 +473,74 @@ export default function GlobalDashboardPage() {
                     </div>
                   );
                 })}
+              </div>
+            )}
+          </div>
+
+          {/* Active Developments & Subdivisions Quick Look */}
+          <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-xs">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <Layers className="w-4 h-4 text-amber-600" />
+                <h3 className="font-semibold text-slate-900 text-sm">Active Developments</h3>
+              </div>
+              <Link
+                href="/developments"
+                className="text-xs text-amber-600 hover:text-amber-700 font-medium flex items-center gap-1"
+              >
+                View Developments <ArrowUpRight className="w-3.5 h-3.5" />
+              </Link>
+            </div>
+
+            {activeDevelopments.length === 0 ? (
+              <div className="p-6 rounded-lg border border-dashed border-slate-200 text-center bg-slate-50/50">
+                <Layers className="w-6 h-6 text-slate-400 mx-auto mb-1.5" />
+                <p className="text-xs font-semibold text-slate-700">No active developments in pipeline</p>
+                <p className="text-[11px] text-slate-400 mt-0.5 mb-3">Model ground-up clusters, statutory approvals, and split-exit units.</p>
+                <Link
+                  href="/developments"
+                  className="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-700 bg-amber-50 hover:bg-amber-100 px-2.5 py-1 rounded-md border border-amber-200 transition-colors"
+                >
+                  <PlusCircle className="w-3 h-3" /> New Development Project
+                </Link>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {activeDevelopments.map((dev) => (
+                  <div
+                    key={dev.id}
+                    className="p-3 rounded-lg border border-slate-100 bg-slate-50/70 hover:bg-slate-100/80 transition-colors"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <h4 className="text-xs font-bold text-slate-900">{dev.title}</h4>
+                        <p className="text-[11px] text-slate-500">{dev.address}, {dev.city}</p>
+                      </div>
+                      <span className="text-[10px] font-semibold bg-amber-50 text-amber-700 border border-amber-200 px-2 py-0.5 rounded-full">
+                        {dev.currentPhase}
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs mt-3 pt-2 border-t border-slate-200/60">
+                      <div>
+                        <span className="text-[10px] text-slate-400 block">Land Price</span>
+                        <span className="font-semibold text-slate-800">{formatZAR(dev.landPurchasePriceZAR)}</span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-slate-400 block">Inventory</span>
+                        <span className="font-semibold text-slate-800">{dev.units?.length || 0} Units</span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-slate-400 block">Buildable Area</span>
+                        <span className="font-semibold text-slate-800">{dev.totalBuildableAreaSqm} m²</span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-slate-400 block">Pre-Sales Hurdle</span>
+                        <span className="font-semibold text-emerald-700">{dev.preSalesHurdlePercent}%</span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
               </div>
             )}
           </div>

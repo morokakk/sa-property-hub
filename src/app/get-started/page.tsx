@@ -249,7 +249,7 @@ export default function GetStartedPage() {
                 />
               </div>
               <p className="text-[11px] text-slate-500 mt-2">
-                On-demand guides for pipeline analysis, flips, funding &amp; monitoring.
+                On-demand guides for pipeline analysis, flips, developments, funding &amp; monitoring.
               </p>
             </div>
           </div>

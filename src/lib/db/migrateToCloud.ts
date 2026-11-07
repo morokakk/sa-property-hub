@@ -3,6 +3,7 @@ import type { Database } from '@/types/supabase';
 import type {
   RentalProperty,
   FlipProject,
+  DevelopmentProject,
   OpportunityDeal,
   FundingSource,
   LocalSupplier,
@@ -14,6 +15,7 @@ import type {
 import {
   DEMO_RENTAL_IDS,
   DEMO_FLIP_IDS,
+  DEMO_DEV_IDS,
   DEMO_OPP_IDS,
   DEMO_FUNDING_IDS,
   DEMO_TASK_IDS,
@@ -22,6 +24,7 @@ import {
 import {
   INITIAL_RENTALS,
   INITIAL_FLIPS,
+  INITIAL_DEVELOPMENTS,
   INITIAL_OPPORTUNITIES,
   INITIAL_FUNDING,
   INITIAL_TASKS,
@@ -34,6 +37,7 @@ export function isStockDemoState(state?: PortfolioMigrationPayload | null): bool
 
   const rentals = state.rentals || [];
   const flips = state.flips || [];
+  const developments = state.developments || [];
   const opps = state.opportunities || [];
   const funding = state.funding || [];
   const tasks = state.tasks || [];
@@ -42,6 +46,7 @@ export function isStockDemoState(state?: PortfolioMigrationPayload | null): bool
   if (
     rentals.length === 0 &&
     flips.length === 0 &&
+    developments.length === 0 &&
     opps.length === 0 &&
     funding.length === 0 &&
     tasks.length === 0 &&
@@ -53,6 +58,7 @@ export function isStockDemoState(state?: PortfolioMigrationPayload | null): bool
   // If any provided collection count differs from initial demo data, the user has removed or added items
   if (state.rentals !== undefined && rentals.length !== INITIAL_RENTALS.length) return false;
   if (state.flips !== undefined && flips.length !== INITIAL_FLIPS.length) return false;
+  if (state.developments !== undefined && developments.length !== INITIAL_DEVELOPMENTS.length) return false;
   if (state.opportunities !== undefined && opps.length !== INITIAL_OPPORTUNITIES.length) return false;
   if (state.funding !== undefined && funding.length !== INITIAL_FUNDING.length) return false;
   if (state.tasks !== undefined && tasks.length !== INITIAL_TASKS.length) return false;
@@ -60,6 +66,7 @@ export function isStockDemoState(state?: PortfolioMigrationPayload | null): bool
 
   const hasCustomRentals = rentals.some((r) => !DEMO_RENTAL_IDS.has(r.id));
   const hasCustomFlips = flips.some((f) => !DEMO_FLIP_IDS.has(f.id));
+  const hasCustomDevelopments = developments.some((d) => !DEMO_DEV_IDS.has(d.id));
   const hasCustomOpps = opps.some((o) => !DEMO_OPP_IDS.has(o.id));
   const hasCustomFunding = funding.some((f) => !DEMO_FUNDING_IDS.has(f.id));
   const hasCustomTasks = tasks.some((t) => !DEMO_TASK_IDS.has(t.id));
@@ -68,6 +75,7 @@ export function isStockDemoState(state?: PortfolioMigrationPayload | null): bool
   if (
     hasCustomRentals ||
     hasCustomFlips ||
+    hasCustomDevelopments ||
     hasCustomOpps ||
     hasCustomFunding ||
     hasCustomTasks ||
@@ -113,6 +121,20 @@ export function isStockDemoState(state?: PortfolioMigrationPayload | null): bool
   });
   if (isAnyFlipModified) return false;
 
+  const initialDevsMap = new Map(INITIAL_DEVELOPMENTS.map((d) => [d.id, d]));
+  const isAnyDevModified = developments.some((d) => {
+    const orig = initialDevsMap.get(d.id);
+    if (!orig) return true;
+    return (
+      d.title !== orig.title ||
+      d.address !== orig.address ||
+      d.landPurchasePriceZAR !== orig.landPurchasePriceZAR ||
+      d.totalBuildableAreaSqm !== orig.totalBuildableAreaSqm ||
+      d.budgetedHardCostPerSqmZAR !== orig.budgetedHardCostPerSqmZAR
+    );
+  });
+  if (isAnyDevModified) return false;
+
   const initialOppsMap = new Map(INITIAL_OPPORTUNITIES.map((o) => [o.id, o]));
   const isAnyOppModified = opps.some((o) => {
     const orig = initialOppsMap.get(o.id);
@@ -139,6 +161,7 @@ export function isStockDemoState(state?: PortfolioMigrationPayload | null): bool
 export interface PortfolioMigrationPayload {
   rentals?: RentalProperty[];
   flips?: FlipProject[];
+  developments?: DevelopmentProject[];
   funding?: FundingSource[];
   opportunities?: OpportunityDeal[];
   suppliers?: LocalSupplier[];
@@ -154,6 +177,7 @@ export interface MigrationCounts {
   profile: number;
   properties: number;
   flips: number;
+  developments: number;
   boqItems: number;
   fundingSources: number;
   opportunities: number;
@@ -170,6 +194,7 @@ export interface MigrationResult {
 type ProfileInsert = Database['public']['Tables']['profiles']['Insert'];
 type PropertyInsert = Database['public']['Tables']['properties']['Insert'];
 type FlipInsert = Database['public']['Tables']['flips']['Insert'];
+type DevelopmentInsert = Database['public']['Tables']['developments']['Insert'];
 type BOQItemInsert = Database['public']['Tables']['boq_items']['Insert'];
 type FundingSourceInsert = Database['public']['Tables']['funding_sources']['Insert'];
 type OpportunityInsert = Database['public']['Tables']['opportunities']['Insert'];
@@ -420,6 +445,46 @@ export function mapFlips(flips: FlipProject[] = [], userId: string): FlipInsert[
   }));
 }
 
+export function mapDevelopments(developments: DevelopmentProject[] = [], userId: string): DevelopmentInsert[] {
+  return developments.map((d, index) => ({
+    id: d.id || `dev-${index + 1}-${Date.now()}`,
+    user_id: userId,
+    title: d.title || 'Untitled Development',
+    address: d.address || '',
+    city: d.city || 'Johannesburg',
+    province: d.province || null,
+    investment_node_id: d.investmentNodeId || null,
+    development_type: d.developmentType || 'Subdivision & Cluster',
+    is_vat_registered_developer: Boolean(d.isVatRegisteredDeveloper),
+    tax_entity_type: d.taxEntityType || null,
+    current_phase: d.currentPhase || 'Feasibility',
+    pre_approval_months: toInteger(d.preApprovalMonths, 0),
+    construction_months: toInteger(d.constructionMonths, 0),
+    sell_down_months: toInteger(d.sellDownMonths, 0),
+    land_purchase_price_zar: toNumeric(d.landPurchasePriceZAR, 0),
+    acquisition_costs_zar: toNumeric(d.acquisitionCostsZAR, 0),
+    sec118_arrears_zar: toNumeric(d.sec118ArrearsZAR, 0),
+    soft_costs: (d.softCosts ? JSON.parse(JSON.stringify(d.softCosts)) : {}) as any,
+    total_buildable_area_sqm: toNumeric(d.totalBuildableAreaSqm, 0),
+    budgeted_hard_cost_per_sqm_zar: toNumeric(d.budgetedHardCostPerSqmZAR, 0),
+    contingency_percent: toNumeric(d.contingencyPercent, 0),
+    boq_items: (Array.isArray(d.boqItems) ? JSON.parse(JSON.stringify(d.boqItems)) : []) as any,
+    monthly_pre_approval_holding_burn_zar: toNumeric(d.monthlyPreApprovalHoldingBurnZAR, 0),
+    monthly_construction_holding_burn_zar: toNumeric(d.monthlyConstructionHoldingBurnZAR, 0),
+    development_facility_limit_zar: toNumeric(d.developmentFacilityLimitZAR, 0),
+    development_facility_drawn_zar: toNumeric(d.developmentFacilityDrawnZAR, 0),
+    development_facility_repaid_zar: toNumeric(d.developmentFacilityRepaidZAR, 0),
+    pre_sales_hurdle_percent: toNumeric(d.preSalesHurdlePercent, 0),
+    linked_funding_source_id: d.linkedFundingSourceId || null,
+    approvals: (d.approvals ? JSON.parse(JSON.stringify(d.approvals)) : {}) as any,
+    units: (Array.isArray(d.units) ? JSON.parse(JSON.stringify(d.units)) : []) as any,
+    compliance: (d.compliance ? JSON.parse(JSON.stringify(d.compliance)) : null) as any,
+    drive_vault: (d.driveVault ? JSON.parse(JSON.stringify(d.driveVault)) : null) as any,
+    notes: d.notes || null,
+    updated_at: new Date().toISOString(),
+  }));
+}
+
 export function extractAndMapBOQItems(flips: FlipProject[] = [], userId: string): BOQItemInsert[] {
   const items: BOQItemInsert[] = [];
   const validFlipIds = new Set(flips.map((f) => f.id).filter(Boolean));
@@ -646,6 +711,7 @@ export async function migrateToCloud(options?: {
     profile: 0,
     properties: 0,
     flips: 0,
+    developments: 0,
     boqItems: 0,
     fundingSources: 0,
     opportunities: 0,
@@ -696,9 +762,10 @@ export async function migrateToCloud(options?: {
     try {
       const propQuery = supabase.from('properties');
       if (typeof propQuery?.select === 'function') {
-        const [pRes, fRes, oRes, fsRes, tRes, sRes] = await Promise.all([
+        const [pRes, fRes, dRes, oRes, fsRes, tRes, sRes] = await Promise.all([
           supabase.from('properties').select('id', { count: 'exact', head: true }).eq('user_id', userId),
           supabase.from('flips').select('id', { count: 'exact', head: true }).eq('user_id', userId),
+          supabase.from('developments').select('id', { count: 'exact', head: true }).eq('user_id', userId),
           supabase.from('opportunities').select('id', { count: 'exact', head: true }).eq('user_id', userId),
           supabase.from('funding_sources').select('id', { count: 'exact', head: true }).eq('user_id', userId),
           supabase.from('tasks').select('id', { count: 'exact', head: true }).eq('user_id', userId),
@@ -707,6 +774,7 @@ export async function migrateToCloud(options?: {
         const totalCloudRecords =
           (pRes.count || 0) +
           (fRes.count || 0) +
+          (dRes?.count || 0) +
           (oRes.count || 0) +
           (fsRes.count || 0) +
           (tRes.count || 0) +
@@ -741,6 +809,7 @@ export async function migrateToCloud(options?: {
 
     const propertyRows = mapRentals(state.rentals, userId);
     const flipRows = mapFlips(state.flips, userId);
+    const developmentRows = mapDevelopments(state.developments, userId);
     const boqRows = extractAndMapBOQItems(state.flips, userId);
     const fundingRows = mapFundingSources(state.funding, userId);
     const opportunityRows = mapOpportunities(state.opportunities, userId);
@@ -781,6 +850,20 @@ export async function migrateToCloud(options?: {
       counts.boqItems = boqRows.length;
     }
 
+    // Step 4.5b: Developments
+    if (developmentRows.length > 0) {
+      try {
+        const { error: devError } = await supabase.from('developments').upsert(developmentRows);
+        if (devError) {
+          console.warn('Developments sync warning:', devError.message);
+        } else {
+          counts.developments = developmentRows.length;
+        }
+      } catch (devCatch) {
+        console.warn('Developments sync skipped or table pending migration:', devCatch);
+      }
+    }
+
     // Step 4.6: Opportunities
     if (opportunityRows.length > 0) {
       const { error: oppError } = await supabase.from('opportunities').upsert(opportunityRows);
@@ -805,7 +888,7 @@ export async function migrateToCloud(options?: {
     // Step 4.9: Deletion Reconciliation (DBSYNC-01, DBSYNC-05)
     // Reconcile deleted records in cloud that are no longer present in local payload
     const deleteRecordsNotInPayload = async (
-      table: 'properties' | 'flips' | 'boq_items' | 'funding_sources' | 'opportunities' | 'tasks' | 'suppliers',
+      table: 'properties' | 'flips' | 'developments' | 'boq_items' | 'funding_sources' | 'opportunities' | 'tasks' | 'suppliers',
       localIds: string[]
     ) => {
       try {
@@ -864,6 +947,11 @@ export async function migrateToCloud(options?: {
       await deleteRecordsNotInPayload('boq_items', localBoqIds as string[]);
       const localFlipIds = flipRows.map((f) => f.id).filter(Boolean);
       await deleteRecordsNotInPayload('flips', localFlipIds as string[]);
+    }
+
+    if (Array.isArray(state.developments)) {
+      const localDevIds = developmentRows.map((d) => d.id).filter(Boolean);
+      await deleteRecordsNotInPayload('developments', localDevIds as string[]);
     }
 
     if (Array.isArray(state.rentals)) {

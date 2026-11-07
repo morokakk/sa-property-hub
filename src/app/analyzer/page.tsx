@@ -75,6 +75,7 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { exportOpportunitiesCSV } from '@/lib/export/csvExport';
 import ImportDropdown from '@/components/common/ImportDropdown';
 import AnalyzerModeSwitcher from '@/components/analyzer/AnalyzerModeSwitcher';
@@ -96,6 +97,8 @@ export default function OpportunityAnalyzerPage() {
   const advanceOpportunityStage = usePortfolioStore((state) => state.advanceOpportunityStage);
   const promoteOpportunityToFlip = usePortfolioStore((state) => state.promoteOpportunityToFlip);
   const promoteOpportunityToRental = usePortfolioStore((state) => state.promoteOpportunityToRental);
+  const promoteOpportunityToDevelopment = usePortfolioStore((state) => state.promoteOpportunityToDevelopment);
+  const router = useRouter();
   const investorProfile = usePortfolioStore((state) => state.investorProfile);
   const liquidCapitalReserve = usePortfolioStore((state) => state.liquidCapitalReserve);
   const analyzerDraft = usePortfolioStore((state) => state.analyzerDraft);
@@ -1498,7 +1501,7 @@ export default function OpportunityAnalyzerPage() {
   );
   const passedDeals = useMemo(() => opportunities.filter((d) => d.status === 'Passed'), [opportunities]);
   const promotedDeals = useMemo(
-    () => opportunities.filter((d) => d.status === 'Promoted to Flip' || d.status === 'Promoted to Rental'),
+    () => opportunities.filter((d) => d.status === 'Promoted to Flip' || d.status === 'Promoted to Rental' || d.status === 'Promoted to Development'),
     [opportunities]
   );
   const displayedOpportunities = useMemo(() => {
@@ -4417,6 +4420,10 @@ export default function OpportunityAnalyzerPage() {
                     if (confirm(`Promote "${deal.title}" to Rental Portfolio?`)) {
                       promoteOpportunityToRental(dealId);
                     }
+                  }}
+                  onPromoteToDevelopment={(dealId) => {
+                    promoteOpportunityToDevelopment(dealId);
+                    router.push('/developments');
                   }}
                   investorProfile={investorProfile}
                   copiedDealId={copiedDealId}

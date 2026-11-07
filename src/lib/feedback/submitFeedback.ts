@@ -64,16 +64,17 @@ export function collectClientDiagnostics(): FeedbackDiagnostics {
 
   let demoStatus = 'Clean Slate';
   try {
-    const { rentals = [], flips = [] } = usePortfolioStore.getState() || {};
+    const { rentals = [], flips = [], developments = [] } = usePortfolioStore.getState() || {};
     const hasDemoRentals = rentals.some((r) => r.id === 'rental-1' || r.id?.startsWith('demo-'));
     const hasDemoFlips = flips.some((f) => f.id === 'flip-1' || f.id?.startsWith('demo-'));
+    const hasDemoDevs = developments.some((d) => d.id === 'dev-1' || d.id === 'dev-2');
 
-    if (hasDemoRentals || hasDemoFlips) {
+    if (hasDemoRentals || hasDemoFlips || hasDemoDevs) {
       demoStatus = 'Demo Dataset Loaded';
-    } else if (rentals.length === 0 && flips.length === 0) {
+    } else if (rentals.length === 0 && flips.length === 0 && developments.length === 0) {
       demoStatus = 'Clean Slate / Empty Portfolio';
     } else {
-      demoStatus = `Custom Portfolio (${rentals.length} rentals, ${flips.length} flips)`;
+      demoStatus = `Custom Portfolio (${rentals.length} rentals, ${flips.length} flips, ${developments.length} developments)`;
     }
   } catch {
     // Fallback if store is uninitialized

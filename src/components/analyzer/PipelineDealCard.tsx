@@ -25,6 +25,7 @@ import {
   RotateCcw,
   Hammer,
   Building,
+  HardHat,
   FileText,
   ShieldCheck,
   Sparkles,
@@ -45,6 +46,7 @@ export interface PipelineDealCardProps {
   onReactivate: (dealId: string) => void;
   onPromoteToFlip: (dealId: string) => void;
   onPromoteToRental: (dealId: string) => void;
+  onPromoteToDevelopment?: (dealId: string) => void;
   investorProfile: any;
   copiedDealId: string | null;
   onCopyWhatsApp: (deal: any) => void;
@@ -63,6 +65,7 @@ function PipelineDealCard({
   onReactivate,
   onPromoteToFlip,
   onPromoteToRental,
+  onPromoteToDevelopment,
   investorProfile,
   copiedDealId,
   onCopyWhatsApp,
@@ -153,6 +156,8 @@ function PipelineDealCard({
                   ? 'bg-rose-100 text-rose-800 border-rose-300'
                   : deal.status === 'Promoted to Flip'
                   ? 'bg-indigo-100 text-indigo-800 border-indigo-300'
+                  : deal.status === 'Promoted to Development'
+                  ? 'bg-amber-100 text-amber-800 border-amber-300'
                   : 'bg-teal-100 text-teal-800 border-teal-300'
               }`}
             >
@@ -327,6 +332,24 @@ function PipelineDealCard({
                   >
                     <Hammer className="w-3.5 h-3.5 text-indigo-600" />
                     <span>Promote to Flip</span>
+                  </button>
+                )}
+
+                {/* Promote to Development Option */}
+                {onPromoteToDevelopment && deal.status !== 'Passed' && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsMenuOpen(false);
+                      if (confirm(`Promote "${deal.title}" to Developments Project (/developments)?`)) {
+                        onPromoteToDevelopment(deal.id);
+                      }
+                    }}
+                    title="Promote to Development (/developments)"
+                    className="w-full px-3 py-2 text-left text-amber-800 hover:bg-amber-50 flex items-center gap-2 cursor-pointer font-medium border-t border-slate-100"
+                  >
+                    <HardHat className="w-3.5 h-3.5 text-amber-600" />
+                    <span>Promote to Development</span>
                   </button>
                 )}
 
