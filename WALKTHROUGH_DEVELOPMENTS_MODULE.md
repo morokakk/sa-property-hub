@@ -208,7 +208,3 @@ Privacy-safe analytics track user actions across the development lifecycle:
 | **Property Metrics** (`propertyMetrics.test.ts`) | **PASS** | 15/15 tests passing (Rate shock stress testing & DSCR) |
 | **PostHog Analytics** (`PostHogProvider.test.tsx`) | **PASS** | 10/10 tests passing (Privacy-safe events & mock boundaries) |
 | **Supabase Remote DB** | **PASS** | RLS active, `developments` table live, `profiles` columns synchronized |
-
----
-
-*Authored by Antigravity AI Coding Assistant for SA Property Hub.*
