@@ -109,7 +109,7 @@ export function evaluateThreeStrategyMatrix(
       : exactMetrics;
 
   const minFlipRoi = profile.minFlipRoiPercent ?? 18.0;
-  const minDevPoc = profile.minDevelopmentPocPercent ?? 20.0;
+  const minDevPoc = profile.minDevPocPercent ?? profile.minDevelopmentPocPercent ?? 20.0;
   const maxDay1Cash = profile.maxDay1CashZAR ?? 500_000;
   const includeDevelopment =
     params.strategy === 'Development' || (params.numberOfUnits ?? 1) >= 2;
@@ -325,7 +325,8 @@ export function solveDealRepairLevers(
   const minMonthlyCashflow = profile.minMonthlyCashflowZAR ?? 1500;
   const minNetRoi = profile.minNetRoiPercent ?? 8.0;
   const minFlipRoi = profile.minFlipRoiPercent ?? 18.0;
-  const minDevPoc = profile.minDevelopmentPocPercent ?? 20.0;
+  const minDevPoc = profile.minDevPocPercent ?? profile.minDevelopmentPocPercent ?? 20.0;
+  const minDevYoc = profile.minDevYocPercent ?? profile.minNetYieldPercent ?? 12.0;
   const maxDay1Cash = profile.maxDay1CashZAR ?? 500_000;
   const effectiveDevEquityCap =
     profile.liquidCapitalReserveZAR !== undefined && profile.liquidCapitalReserveZAR > 0
@@ -376,8 +377,8 @@ export function solveDealRepairLevers(
         key: 'minDevelopmentYoc',
         label: 'Yield on Cost (BTR YoC %)',
         actualLabel: `${devYoc.toFixed(1)}%`,
-        targetLabel: `≥ ${minNetYield.toFixed(1)}%`,
-        gapLabel: `${(devYoc - minNetYield).toFixed(1)}%`,
+        targetLabel: `≥ ${minDevYoc.toFixed(1)}%`,
+        gapLabel: `${(devYoc - minDevYoc).toFixed(1)}%`,
       });
     }
     if (!currentBuyBox.criteriaMap['maxDebtWipeoutUnits']) {

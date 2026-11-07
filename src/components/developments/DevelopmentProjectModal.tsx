@@ -9,6 +9,7 @@ import {
   Province,
 } from '@/types';
 import { generateInitialDevelopmentUnits } from '@/lib/calculations/developments';
+import { usePortfolioStore } from '@/lib/store/usePortfolioStore';
 import {
   Building2,
   Calendar,
@@ -68,6 +69,9 @@ export function DevelopmentProjectModal({
   onSave,
 }: DevelopmentProjectModalProps) {
   const isNew = !editingDevelopment;
+  const investorProfile = usePortfolioStore((state) => state.investorProfile);
+  const defaultVatReg = investorProfile?.defaultVatRegisteredDeveloper ?? true;
+  const defaultHardRate = investorProfile?.defaultHardBuildRatePerSqmZAR ?? 9800;
 
   const [title, setTitle] = useState('');
   const [address, setAddress] = useState('');
@@ -75,7 +79,7 @@ export function DevelopmentProjectModal({
   const [province, setProvince] = useState<Province>('Gauteng');
   const [developmentType, setDevelopmentType] = useState<DevelopmentType>('Sectional Title Apartments');
   const [currentPhase, setCurrentPhase] = useState<DevelopmentPhase>('Feasibility');
-  const [isVatRegisteredDeveloper, setIsVatRegisteredDeveloper] = useState(true);
+  const [isVatRegisteredDeveloper, setIsVatRegisteredDeveloper] = useState(defaultVatReg);
   const [taxEntityType, setTaxEntityType] = useState<DevelopmentTaxEntityType>('Company (27%)');
 
   // Timeline
@@ -88,7 +92,7 @@ export function DevelopmentProjectModal({
   const [acquisitionCostsZAR, setAcquisitionCostsZAR] = useState(85000);
   const [sec118ArrearsZAR, setSec118ArrearsZAR] = useState(0);
   const [totalBuildableAreaSqm, setTotalBuildableAreaSqm] = useState(480);
-  const [budgetedHardCostPerSqmZAR, setBudgetedHardCostPerSqmZAR] = useState(10500);
+  const [budgetedHardCostPerSqmZAR, setBudgetedHardCostPerSqmZAR] = useState(defaultHardRate);
   const [contingencyPercent, setContingencyPercent] = useState(7.5);
 
   // Holding & Facilities
@@ -135,7 +139,7 @@ export function DevelopmentProjectModal({
       setProvince('Gauteng');
       setDevelopmentType('Sectional Title Apartments');
       setCurrentPhase('Feasibility');
-      setIsVatRegisteredDeveloper(true);
+      setIsVatRegisteredDeveloper(defaultVatReg);
       setTaxEntityType('Company (27%)');
       setPreApprovalMonths(6);
       setConstructionMonths(10);
@@ -144,7 +148,7 @@ export function DevelopmentProjectModal({
       setAcquisitionCostsZAR(85000);
       setSec118ArrearsZAR(0);
       setTotalBuildableAreaSqm(480);
-      setBudgetedHardCostPerSqmZAR(10500);
+      setBudgetedHardCostPerSqmZAR(defaultHardRate);
       setContingencyPercent(7.5);
       setMonthlyPreApprovalHoldingBurnZAR(9500);
       setMonthlyConstructionHoldingBurnZAR(16500);
@@ -156,7 +160,7 @@ export function DevelopmentProjectModal({
       setTargetListPricePerUnitZAR(1350000);
       setEstMonthlyRentPerUnitZAR(11500);
     }
-  }, [editingDevelopment, isOpen]);
+  }, [editingDevelopment, isOpen, defaultVatReg, defaultHardRate]);
 
   if (!isOpen) return null;
 

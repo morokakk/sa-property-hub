@@ -1207,7 +1207,8 @@ export function evaluateDealCriteria(
   const minMonthlyCashflow = profile.minMonthlyCashflowZAR ?? 1500;
   const minNetRoi = profile.minNetRoiPercent ?? 8.0;
   const minFlipRoi = profile.minFlipRoiPercent ?? 18.0;
-  const minDevelopmentPoc = profile.minDevelopmentPocPercent ?? 20.0;
+  const minDevelopmentPoc = profile.minDevPocPercent ?? profile.minDevelopmentPocPercent ?? 20.0;
+  const minDevelopmentYoc = profile.minDevYocPercent ?? profile.minNetYieldPercent ?? 12.0;
   const maxDay1Cash = profile.maxDay1CashZAR ?? 500000;
   const minDscr = profile.minDscr ?? 1.20;
 
@@ -1236,7 +1237,7 @@ export function evaluateDealCriteria(
     criteriaMap['maxDay1Cash'] = day1Cash !== undefined ? day1Cash <= maxDay1Cash : false;
   } else if (strategy === 'Development') {
     const devPoc = metrics.devPocPercent ?? metrics.projectedFlipRoi ?? 0;
-    const devYoc = metrics.devYieldOnCostPercent ?? metrics.grossYield ?? metrics.capRate ?? minNetYield;
+    const devYoc = metrics.devYieldOnCostPercent ?? metrics.grossYield ?? metrics.capRate ?? minDevelopmentYoc;
     const devEq = metrics.devEquityRequiredZAR ?? day1Cash;
     const plannedUnits = Math.max(1, metrics.devUnitsTotalCount ?? 6);
     const maxWipeoutUnits = metrics.devMaxDebtWipeoutUnits ?? Math.ceil(plannedUnits * 0.65);
@@ -1247,7 +1248,7 @@ export function evaluateDealCriteria(
         : maxDay1Cash;
 
     criteriaMap['minDevelopmentPoc'] = devPoc >= minDevelopmentPoc;
-    criteriaMap['minDevelopmentYoc'] = devYoc >= minNetYield;
+    criteriaMap['minDevelopmentYoc'] = devYoc >= minDevelopmentYoc;
     criteriaMap['maxDebtWipeoutUnits'] = wipeoutUnits <= maxWipeoutUnits;
     criteriaMap['maxDay1Cash'] = devEq !== undefined ? devEq <= effectiveEquityCap : false;
   } else {

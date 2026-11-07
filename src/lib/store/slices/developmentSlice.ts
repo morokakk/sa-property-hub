@@ -14,6 +14,7 @@ import {
   calculateMonthlyBondRepayment,
   buildDefaultSoftCostsFromAllowance,
 } from '@/lib/calculations/propertyMetrics';
+import { trackPrivacySafeEvent } from '@/lib/analytics/posthogClient';
 
 export const createDevelopmentSlice: StateCreator<
   RootStoreState,
@@ -25,6 +26,11 @@ export const createDevelopmentSlice: StateCreator<
 
   addDevelopment: (dev) =>
     set((state) => {
+      trackPrivacySafeEvent('development_created', {
+        development_type: dev.developmentType,
+        units_count: dev.units?.length ?? 0,
+        is_vat_registered: dev.isVatRegisteredDeveloper,
+      });
       const updatedTasks = syncDevelopmentApprovalTasks(
         state.tasks,
         dev.id,
@@ -144,6 +150,11 @@ export const createDevelopmentSlice: StateCreator<
           };
         }
         return f;
+      });
+
+      trackPrivacySafeEvent('development_unit_sold', {
+        development_type: dev.developmentType,
+        debt_repaid_boolean: debtPayment > 0,
       });
 
       return {
@@ -289,6 +300,11 @@ export const createDevelopmentSlice: StateCreator<
       tasks: updatedTasks,
     });
 
+    trackPrivacySafeEvent('development_units_graduated_to_rental', {
+      retained_units_count: retainedUnits.length,
+      section_13sex_eligible: isSection13Sex,
+    });
+
     return newRental;
   },
 
@@ -423,6 +439,12 @@ export const createDevelopmentSlice: StateCreator<
       ),
       tasks: [onboardingTask, ...state.tasks],
     }));
+
+    trackPrivacySafeEvent('development_promoted_from_analyzer', {
+      development_type: newDev.developmentType,
+      units_count: unitCount,
+      exit_mode: exitMode,
+    });
 
     return newDev.id;
   },

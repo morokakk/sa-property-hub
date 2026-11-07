@@ -14,6 +14,7 @@ import { DevelopmentFinanceTab } from '@/components/developments/DevelopmentFina
 import { DevelopmentProjectModal } from '@/components/developments/DevelopmentProjectModal';
 import { PlusCircle, HardHat, FileSpreadsheet, FileCheck, Coins, Edit2, Trash2, Building, Copy, Check, FileText } from 'lucide-react';
 import { DevelopmentProject, DevelopmentUnit, DevelopmentPhase } from '@/types';
+import { trackPrivacySafeEvent } from '@/lib/analytics/posthogClient';
 
 type OperationalTab = 'units' | 'costs' | 'approvals' | 'finance';
 
@@ -112,6 +113,10 @@ export default function DevelopmentsPage() {
     if (typeof navigator !== 'undefined' && navigator.clipboard) {
       navigator.clipboard.writeText(lines.join('\n'));
     }
+    trackPrivacySafeEvent('development_whatsapp_copied', {
+      development_type: activeDev.developmentType,
+      units_count: financials.totalUnitsCount,
+    });
     setCopiedWhatsApp(true);
     setTimeout(() => setCopiedWhatsApp(false), 2500);
   };
@@ -238,7 +243,10 @@ export default function DevelopmentsPage() {
                 <button
                   key={id}
                   type="button"
-                  onClick={() => setActiveTab(id as OperationalTab)}
+                  onClick={() => {
+                    setActiveTab(id as OperationalTab);
+                    trackPrivacySafeEvent('development_tab_switched', { tab: id });
+                  }}
                   className={`inline-flex items-center gap-2 px-4 py-2.5 text-xs font-bold border-b-2 transition-all cursor-pointer whitespace-nowrap ${
                     activeTab === id
                       ? 'border-emerald-600 text-emerald-700 bg-emerald-50/40'

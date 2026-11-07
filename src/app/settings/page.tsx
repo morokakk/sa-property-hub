@@ -137,6 +137,18 @@ function SettingsContent() {
   const [minFlipRoi, setMinFlipRoi] = useState<number>(
     investorProfile.minFlipRoiPercent ?? 18.0
   );
+  const [minDevPoc, setMinDevPoc] = useState<number>(
+    investorProfile.minDevPocPercent ?? investorProfile.minDevelopmentPocPercent ?? 20.0
+  );
+  const [minDevYoc, setMinDevYoc] = useState<number>(
+    investorProfile.minDevYocPercent ?? 12.0
+  );
+  const [defaultHardBuildRatePerSqm, setDefaultHardBuildRatePerSqm] = useState<number>(
+    investorProfile.defaultHardBuildRatePerSqmZAR ?? 9800
+  );
+  const [defaultVatRegisteredDeveloper, setDefaultVatRegisteredDeveloper] = useState<boolean>(
+    investorProfile.defaultVatRegisteredDeveloper ?? true
+  );
   const [maxDay1Cash, setMaxDay1Cash] = useState<number>(
     investorProfile.maxDay1CashZAR ?? 500000
   );
@@ -328,6 +340,10 @@ function SettingsContent() {
       minMonthlyCashflow !== (investorProfile.minMonthlyCashflowZAR ?? 1500) ||
       minNetRoi !== (investorProfile.minNetRoiPercent ?? 8.0) ||
       minFlipRoi !== (investorProfile.minFlipRoiPercent ?? 18.0) ||
+      minDevPoc !== (investorProfile.minDevPocPercent ?? investorProfile.minDevelopmentPocPercent ?? 20.0) ||
+      minDevYoc !== (investorProfile.minDevYocPercent ?? 12.0) ||
+      defaultHardBuildRatePerSqm !== (investorProfile.defaultHardBuildRatePerSqmZAR ?? 9800) ||
+      defaultVatRegisteredDeveloper !== (investorProfile.defaultVatRegisteredDeveloper ?? true) ||
       maxDay1Cash !== (investorProfile.maxDay1CashZAR ?? 500000) ||
       minDscr !== (investorProfile.minDscr ?? 1.20) ||
       marginalTaxRate !== (investorProfile.marginalTaxRatePercent ?? 31.0) ||
@@ -365,6 +381,10 @@ function SettingsContent() {
     minMonthlyCashflow,
     minNetRoi,
     minFlipRoi,
+    minDevPoc,
+    minDevYoc,
+    defaultHardBuildRatePerSqm,
+    defaultVatRegisteredDeveloper,
     maxDay1Cash,
     minDscr,
     marginalTaxRate,
@@ -401,6 +421,10 @@ function SettingsContent() {
     setMinMonthlyCashflow(investorProfile.minMonthlyCashflowZAR ?? 1500);
     setMinNetRoi(investorProfile.minNetRoiPercent ?? 8.0);
     setMinFlipRoi(investorProfile.minFlipRoiPercent ?? 18.0);
+    setMinDevPoc(investorProfile.minDevPocPercent ?? investorProfile.minDevelopmentPocPercent ?? 20.0);
+    setMinDevYoc(investorProfile.minDevYocPercent ?? 12.0);
+    setDefaultHardBuildRatePerSqm(investorProfile.defaultHardBuildRatePerSqmZAR ?? 9800);
+    setDefaultVatRegisteredDeveloper(investorProfile.defaultVatRegisteredDeveloper ?? true);
     setMaxDay1Cash(investorProfile.maxDay1CashZAR ?? 500000);
     setMinDscr(investorProfile.minDscr ?? 1.20);
     setMarginalTaxRate(investorProfile.marginalTaxRatePercent ?? 31.0);
@@ -697,6 +721,11 @@ function SettingsContent() {
       minMonthlyCashflowZAR: minMonthlyCashflow,
       minNetRoiPercent: minNetRoi,
       minFlipRoiPercent: minFlipRoi,
+      minDevPocPercent: minDevPoc,
+      minDevelopmentPocPercent: minDevPoc,
+      minDevYocPercent: minDevYoc,
+      defaultHardBuildRatePerSqmZAR: defaultHardBuildRatePerSqm,
+      defaultVatRegisteredDeveloper,
       maxDay1CashZAR: maxDay1Cash,
       minDscr: minDscr,
       marginalTaxRatePercent: marginalTaxRate,
@@ -2062,6 +2091,23 @@ function SettingsContent() {
                       )}
                     </div>
                   </div>
+
+                  <div className="pt-2 border-t border-slate-200/80">
+                    <label className="flex items-center gap-2 text-xs text-slate-700 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={defaultVatRegisteredDeveloper}
+                        onChange={(e) => setDefaultVatRegisteredDeveloper(e.target.checked)}
+                        className="rounded text-indigo-600 focus:ring-indigo-500 h-3.5 w-3.5"
+                      />
+                      <span className="font-semibold text-slate-800">
+                        Default VAT-Registered Developer (15% Output / Input VAT)
+                      </span>
+                      <span className="text-[10px] text-slate-500 hidden sm:inline">
+                        — Seeds developer VAT registration status across Opportunity Analyzer &amp; Developments
+                      </span>
+                    </label>
+                  </div>
                 </div>
               </div>
 
@@ -2190,6 +2236,79 @@ function SettingsContent() {
                         className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg font-bold text-emerald-700 bg-white"
                       />
                       <span className="ml-1.5 font-bold text-slate-600">x</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Development Strategy Hurdles Sub-Row */}
+                <div className="pt-3 border-t border-slate-100 space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-amber-800">
+                      Development Strategy Hurdles
+                    </span>
+                    <span className="text-[10px] text-slate-400 font-medium">
+                      Ground-Up, Subdivision, Infill &amp; Build-to-Rent (BTR) Benchmarks
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 text-xs">
+                    <div className="p-3.5 rounded-lg bg-amber-50/40 border border-amber-200/80">
+                      <label className="block font-semibold text-slate-700 mb-1">
+                        Min Development POC Hurdle (%)
+                      </label>
+                      <p className="text-[10px] text-slate-500 mb-2">
+                        Minimum pre-tax Profit on Cost required for ground-up &amp; subdivision builds
+                      </p>
+                      <div className="flex items-center">
+                        <input
+                          type="number"
+                          step="any"
+                          value={minDevPoc}
+                          onChange={(e) => setMinDevPoc(Number(e.target.value))}
+                          className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg font-bold text-amber-800 bg-white"
+                        />
+                        <span className="ml-1.5 font-bold text-slate-600">%</span>
+                      </div>
+                    </div>
+
+                    <div className="p-3.5 rounded-lg bg-amber-50/40 border border-amber-200/80">
+                      <label className="block font-semibold text-slate-700 mb-1">
+                        Min Build-to-Rent YoC (%)
+                      </label>
+                      <p className="text-[10px] text-slate-500 mb-2">
+                        Minimum gross Yield on Total Development Cost for retained multi-units
+                      </p>
+                      <div className="flex items-center">
+                        <input
+                          type="number"
+                          step="any"
+                          value={minDevYoc}
+                          onChange={(e) => setMinDevYoc(Number(e.target.value))}
+                          className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg font-bold text-emerald-700 bg-white"
+                        />
+                        <span className="ml-1.5 font-bold text-slate-600">%</span>
+                      </div>
+                    </div>
+
+                    <div className="p-3.5 rounded-lg bg-amber-50/40 border border-amber-200/80">
+                      <label className="block font-semibold text-slate-700 mb-1">
+                        Default Hard Build Rate (R/m²)
+                      </label>
+                      <p className="text-[10px] text-slate-500 mb-2">
+                        Baseline SA top-structure construction cost per buildable m²
+                      </p>
+                      <div className="flex items-center mb-1.5">
+                        <span className="mr-1.5 font-bold text-slate-500">R</span>
+                        <input
+                          type="number"
+                          step="100"
+                          value={defaultHardBuildRatePerSqm}
+                          onChange={(e) => setDefaultHardBuildRatePerSqm(Number(e.target.value))}
+                          className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg font-bold text-slate-900 bg-white"
+                        />
+                      </div>
+                      <span className="text-[11px] text-amber-800 bg-amber-50 px-2 py-0.5 rounded border border-amber-200 font-semibold inline-block">
+                        {formatZAR(defaultHardBuildRatePerSqm)} / m² baseline
+                      </span>
                     </div>
                   </div>
                 </div>

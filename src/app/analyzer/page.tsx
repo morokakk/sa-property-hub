@@ -273,7 +273,7 @@ export default function OpportunityAnalyzerPage() {
     analyzerDraft?.developmentType ?? 'Subdivision & Cluster'
   );
   const [isVatRegisteredDeveloper, setIsVatRegisteredDeveloper] = useState<boolean>(
-    analyzerDraft?.isVatRegisteredDeveloper ?? true
+    analyzerDraft?.isVatRegisteredDeveloper ?? investorProfile?.defaultVatRegisteredDeveloper ?? true
   );
   const [developmentExitMode, setDevelopmentExitMode] = useState<DevelopmentExitMode>(
     analyzerDraft?.developmentExitMode ?? 'Build-to-Sell'
@@ -282,7 +282,7 @@ export default function OpportunityAnalyzerPage() {
     analyzerDraft?.unitsRetainedCount ?? 2
   );
   const [hardCostPerSqmZAR, setHardCostPerSqmZAR] = useState<number>(
-    analyzerDraft?.hardCostPerSqmZAR ?? 9_800
+    analyzerDraft?.hardCostPerSqmZAR ?? investorProfile?.defaultHardBuildRatePerSqmZAR ?? 9_800
   );
   const [contingencyPercent, setContingencyPercent] = useState<number>(
     analyzerDraft?.contingencyPercent ?? 7.5
@@ -294,7 +294,11 @@ export default function OpportunityAnalyzerPage() {
     analyzerDraft?.useCustomSoftCosts ?? false
   );
   const [softCosts, setSoftCosts] = useState<DevelopmentSoftCosts>(
-    analyzerDraft?.softCosts ?? buildDefaultSoftCostsFromAllowance(390 * 9_800, 15.0)
+    analyzerDraft?.softCosts ??
+      buildDefaultSoftCostsFromAllowance(
+        390 * (analyzerDraft?.hardCostPerSqmZAR ?? investorProfile?.defaultHardBuildRatePerSqmZAR ?? 9_800),
+        15.0
+      )
   );
   const [isSoftCostsDrawerOpen, setIsSoftCostsDrawerOpen] = useState<boolean>(
     Boolean(analyzerDraft?.useCustomSoftCosts)
@@ -388,10 +392,18 @@ export default function OpportunityAnalyzerPage() {
         setOccupantRisk(getOccupantRiskDefaults('vacant'));
       }
       if (analyzerDraft.developmentType !== undefined) setDevelopmentType(analyzerDraft.developmentType);
-      if (analyzerDraft.isVatRegisteredDeveloper !== undefined) setIsVatRegisteredDeveloper(analyzerDraft.isVatRegisteredDeveloper);
+      if (analyzerDraft.isVatRegisteredDeveloper !== undefined) {
+        setIsVatRegisteredDeveloper(analyzerDraft.isVatRegisteredDeveloper);
+      } else if (investorProfile?.defaultVatRegisteredDeveloper !== undefined) {
+        setIsVatRegisteredDeveloper(investorProfile.defaultVatRegisteredDeveloper);
+      }
       if (analyzerDraft.developmentExitMode !== undefined) setDevelopmentExitMode(analyzerDraft.developmentExitMode);
       if (analyzerDraft.unitsRetainedCount !== undefined) setUnitsRetainedCount(analyzerDraft.unitsRetainedCount);
-      if (analyzerDraft.hardCostPerSqmZAR !== undefined) setHardCostPerSqmZAR(analyzerDraft.hardCostPerSqmZAR);
+      if (analyzerDraft.hardCostPerSqmZAR !== undefined) {
+        setHardCostPerSqmZAR(analyzerDraft.hardCostPerSqmZAR);
+      } else if (investorProfile?.defaultHardBuildRatePerSqmZAR !== undefined) {
+        setHardCostPerSqmZAR(investorProfile.defaultHardBuildRatePerSqmZAR);
+      }
       if (analyzerDraft.contingencyPercent !== undefined) setContingencyPercent(analyzerDraft.contingencyPercent);
       if (analyzerDraft.softCostAllowancePercent !== undefined) setSoftCostAllowancePercent(analyzerDraft.softCostAllowancePercent);
       if (analyzerDraft.useCustomSoftCosts !== undefined) setUseCustomSoftCosts(analyzerDraft.useCustomSoftCosts);
@@ -404,7 +416,13 @@ export default function OpportunityAnalyzerPage() {
       if (analyzerDraft.sCurveUtilizationPercent !== undefined) setSCurveUtilizationPercent(analyzerDraft.sCurveUtilizationPercent);
       if (analyzerDraft.preSalesHurdlePercent !== undefined) setPreSalesHurdlePercent(analyzerDraft.preSalesHurdlePercent);
     }
-  }, [analyzerDraft, investorProfile?.defaultPrimeRatePercent, investorProfile?.vatExemptAgent]);
+  }, [
+    analyzerDraft,
+    investorProfile?.defaultPrimeRatePercent,
+    investorProfile?.vatExemptAgent,
+    investorProfile?.defaultVatRegisteredDeveloper,
+    investorProfile?.defaultHardBuildRatePerSqmZAR,
+  ]);
 
   // Sync MAO solver mode when deal strategy changes
   useEffect(() => {
@@ -5458,7 +5476,7 @@ export default function OpportunityAnalyzerPage() {
                 devUnitsRetainedCount={calculatedMetrics.devUnitsRetainedCount}
                 devIsSection13SexEligible={calculatedMetrics.devIsSection13SexEligible}
                 devSection13SexAnnualShieldZAR={calculatedMetrics.devSection13SexAnnualShieldZAR}
-                minDevPocHurdle={investorProfile?.minDevelopmentPocPercent ?? 20}
+                minDevPocHurdle={investorProfile?.minDevPocPercent ?? investorProfile?.minDevelopmentPocPercent ?? 20}
               />
 
               {/* Deterministic 3-Strategy Verdict & Actionable Deal-Repair Levers */}

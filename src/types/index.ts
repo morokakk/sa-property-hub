@@ -1034,7 +1034,11 @@ export interface InvestorProfile {
   minMonthlyCashflowZAR?: number; // default 1500 ZAR
   minNetRoiPercent?: number; // default 8.0%
   minFlipRoiPercent?: number; // default 18.0%
-  minDevelopmentPocPercent?: number; // default 20.0%
+  minDevPocPercent?: number; // default 20.0% — Minimum Profit on Cost % hurdle for developments
+  minDevelopmentPocPercent?: number; // backward-compatible alias for minDevPocPercent
+  minDevYocPercent?: number; // default 12.0% — Minimum Build-to-Rent Yield on Cost % hurdle
+  defaultHardBuildRatePerSqmZAR?: number; // default 9800 — Baseline SA hard construction cost R/m²
+  defaultVatRegisteredDeveloper?: boolean; // default true — Seeds isVatRegisteredDeveloper in /analyzer and /developments
   maxDay1CashZAR?: number; // default 500000 ZAR
   minDscr?: number; // default 1.20
   vatExemptAgent?: boolean; // default false
