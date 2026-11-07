@@ -10,10 +10,13 @@ interface AssetAllocationChartProps {
 
 export default function AssetAllocationChart({ summary }: AssetAllocationChartProps) {
   const { totalRentalValue, totalFlipValue, liquidCapitalReserve, totalGrossAssetValue } = summary;
+  const developmentsValueZAR = summary.developmentsValueZAR ?? summary.totalDevelopmentValue ?? 0;
 
   const total = totalGrossAssetValue || 1;
   const rentalPercent = (totalRentalValue / total) * 100;
   const flipPercent = (totalFlipValue / total) * 100;
+  const developmentsAllocationPercent =
+    summary.developmentsAllocationPercent ?? (developmentsValueZAR / total) * 100;
   const cashPercent = (liquidCapitalReserve / total) * 100;
 
   // SVG Donut calculation
@@ -22,11 +25,13 @@ export default function AssetAllocationChart({ summary }: AssetAllocationChartPr
 
   const rentalStroke = (rentalPercent / 100) * circumference;
   const flipStroke = (flipPercent / 100) * circumference;
+  const devStroke = (developmentsAllocationPercent / 100) * circumference;
   const cashStroke = (cashPercent / 100) * circumference;
 
   const rentalOffset = 0;
   const flipOffset = -rentalStroke;
-  const cashOffset = -(rentalStroke + flipStroke);
+  const devOffset = -(rentalStroke + flipStroke);
+  const cashOffset = -(rentalStroke + flipStroke + devStroke);
 
   return (
     <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-xs flex flex-col justify-between">
@@ -65,16 +70,31 @@ export default function AssetAllocationChart({ summary }: AssetAllocationChartPr
                   className="transition-all duration-500"
                 />
               )}
-              {/* Flips - Indigo / Blue */}
+              {/* Flips - Blue */}
               {flipPercent > 0 && (
                 <circle
                   cx="80"
                   cy="80"
                   r={radius}
-                  stroke="#6366f1"
+                  stroke="#3b82f6"
                   strokeWidth="18"
                   strokeDasharray={`${flipStroke} ${circumference}`}
                   strokeDashoffset={flipOffset}
+                  strokeLinecap="butt"
+                  fill="transparent"
+                  className="transition-all duration-500"
+                />
+              )}
+              {/* Active Developments - Violet / Purple */}
+              {developmentsAllocationPercent > 0 && (
+                <circle
+                  cx="80"
+                  cy="80"
+                  r={radius}
+                  stroke="#8b5cf6"
+                  strokeWidth="18"
+                  strokeDasharray={`${devStroke} ${circumference}`}
+                  strokeDashoffset={devOffset}
                   strokeLinecap="butt"
                   fill="transparent"
                   className="transition-all duration-500"
@@ -116,10 +136,20 @@ export default function AssetAllocationChart({ summary }: AssetAllocationChartPr
 
             <div className="flex items-center justify-between gap-3 text-xs">
               <div className="flex items-center gap-2 min-w-0">
-                <span className="w-3 h-3 rounded-sm bg-indigo-500 shrink-0"></span>
+                <span className="w-3 h-3 rounded-sm bg-blue-500 shrink-0"></span>
                 <span className="text-slate-700 font-medium truncate">Ongoing Flips ({formatPercent(flipPercent)})</span>
               </div>
               <span className="font-semibold text-slate-900 shrink-0 whitespace-nowrap">{formatZAR(totalFlipValue)}</span>
+            </div>
+
+            <div className="flex items-center justify-between gap-3 text-xs">
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="w-3 h-3 rounded-sm bg-violet-500 shrink-0"></span>
+                <span className="text-slate-700 font-medium truncate">
+                  Active Developments ({developmentsAllocationPercent.toFixed(1)}%)
+                </span>
+              </div>
+              <span className="font-semibold text-slate-900 shrink-0 whitespace-nowrap">{formatZAR(developmentsValueZAR)}</span>
             </div>
 
             <div className="flex items-center justify-between gap-3 text-xs">

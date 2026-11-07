@@ -169,5 +169,115 @@ describe('Portfolio Selectors: computeEquityAlerts & computePortfolioSummary', (
       expect(summary.activeFlipsCount).toBe(0);
       expect(summary.freeUnallocatedCash).toBe(100_000);
     });
+
+    it('excludes Sold & Transferred and graduated units from developmentsValueZAR and reconciles 100% asset allocation', () => {
+      const summary = computePortfolioSummary({
+        rentals: [baseRental], // 1,500,000
+        flips: [],
+        funding: [],
+        liquidCapitalReserve: 500_000,
+        developments: [
+          {
+            id: 'dev-test-1',
+            title: 'Test Dev',
+            address: '1 Dev St',
+            city: 'Johannesburg',
+            developmentType: 'Subdivision & Cluster',
+            isVatRegisteredDeveloper: true,
+            currentPhase: 'Superstructure',
+            preApprovalMonths: 6,
+            constructionMonths: 9,
+            sellDownMonths: 4,
+            landPurchasePriceZAR: 1_000_000,
+            acquisitionCostsZAR: 100_000,
+            sec118ArrearsZAR: 0,
+            softCosts: {
+              townPlannerZAR: 0,
+              architectZAR: 0,
+              structuralCivilEngineerZAR: 0,
+              quantitySurveyorZAR: 0,
+              nhbrcEnrolmentFeeZAR: 0,
+              councilBulkContributionsZAR: 0,
+              planScrutinyAndSubdivisionFeesZAR: 0,
+              marketingAndShowUnitZAR: 0,
+            },
+            totalBuildableAreaSqm: 200,
+            budgetedHardCostPerSqmZAR: 9_000,
+            contingencyPercent: 5,
+            boqItems: [],
+            monthlyPreApprovalHoldingBurnZAR: 5_000,
+            monthlyConstructionHoldingBurnZAR: 10_000,
+            developmentFacilityLimitZAR: 2_000_000,
+            developmentFacilityDrawnZAR: 1_500_000,
+            developmentFacilityRepaidZAR: 500_000,
+            preSalesHurdlePercent: 60,
+            approvals: {
+              splumaRezoningSubdivision: { status: 'Approved' },
+              sgDiagramApproval: { status: 'Approved' },
+              municipalBuildingPlans: { status: 'Approved' },
+              nhbrcEnrolment: { status: 'Approved' },
+              sectionalTitleRegister: { status: 'Submitted' },
+              occupancyCertificate: { status: 'Submitted' },
+            },
+            units: [
+              {
+                id: 'u-sold',
+                unitNumber: '1',
+                configuration: '2 Bed',
+                floorAreaSqm: 50,
+                allocatedCostBasisZAR: 600_000,
+                listPriceVatInclZAR: 1_000_000,
+                estimatedMonthlyRentZAR: 8_000,
+                status: 'Sold & Transferred',
+              },
+              {
+                id: 'u-graduated',
+                unitNumber: '2',
+                configuration: '2 Bed',
+                floorAreaSqm: 50,
+                allocatedCostBasisZAR: 600_000,
+                listPriceVatInclZAR: 1_000_000,
+                estimatedMonthlyRentZAR: 8_000,
+                status: 'Retained for Rental',
+                graduatedRentalId: 'base-prop-1',
+              },
+              {
+                id: 'u-retained-ungraduated',
+                unitNumber: '3',
+                configuration: '2 Bed',
+                floorAreaSqm: 50,
+                allocatedCostBasisZAR: 600_000,
+                listPriceVatInclZAR: 1_000_000,
+                estimatedMonthlyRentZAR: 8_000,
+                status: 'Retained for Rental',
+              },
+              {
+                id: 'u-available',
+                unitNumber: '4',
+                configuration: '2 Bed',
+                floorAreaSqm: 50,
+                allocatedCostBasisZAR: 600_000,
+                listPriceVatInclZAR: 1_000_000,
+                estimatedMonthlyRentZAR: 8_000,
+                status: 'Available',
+              },
+            ],
+          },
+        ],
+      });
+
+      // Only u-retained-ungraduated (1M) + u-available (1M) = 2,000,000
+      expect(summary.developmentsValueZAR).toBe(2_000_000);
+      expect(summary.totalDevelopmentValue).toBe(2_000_000);
+      // Gross assets = 1.5M rental + 2.0M dev + 0.5M cash = 4,000,000
+      expect(summary.totalGrossAssetValue).toBe(4_000_000);
+      expect(summary.developmentsAllocationPercent).toBe(50);
+
+      // Drawn (1.5M) - Repaid (0.5M) = 1,000,000
+      expect(summary.totalDevelopmentDebtLiability).toBe(1_000_000);
+      // Total liabilities = 900k bond + 1,000k dev = 1,900,000
+      expect(summary.totalFundingLiabilities).toBe(1_900_000);
+      expect(summary.netEquity).toBe(2_100_000);
+    });
   });
 });

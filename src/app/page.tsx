@@ -12,6 +12,7 @@ import { usePortfolioStore, usePortfolioSummary } from '@/lib/store/usePortfolio
 import { formatZAR, formatPercent, formatDate } from '@/lib/formatters';
 import { calculateRentalCashflow } from '@/lib/calculations/propertyMetrics';
 import { calculatePropertyArrears } from '@/lib/calculations/arrears';
+import { calculateDevelopmentFinancials } from '@/lib/calculations/developments';
 import {
   TrendingUp,
   ShieldCheck,
@@ -282,7 +283,9 @@ export default function GlobalDashboardPage() {
             </div>
             <div className="text-[11px] text-slate-500 mt-1 flex items-center justify-between">
               <span>Gross Assets</span>
-              <span className="font-medium text-slate-700">{summary.activeRentalsCount + summary.activeFlipsCount} properties</span>
+              <span className="font-medium text-slate-700">
+                {summary.activeRentalsCount + summary.activeFlipsCount + (summary.activeDevelopmentsCount ?? activeDevelopments.length)} assets
+              </span>
             </div>
           </div>
 
@@ -506,41 +509,55 @@ export default function GlobalDashboardPage() {
               </div>
             ) : (
               <div className="space-y-3">
-                {activeDevelopments.map((dev) => (
-                  <div
-                    key={dev.id}
-                    className="p-3 rounded-lg border border-slate-100 bg-slate-50/70 hover:bg-slate-100/80 transition-colors"
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <div>
-                        <h4 className="text-xs font-bold text-slate-900">{dev.title}</h4>
-                        <p className="text-[11px] text-slate-500">{dev.address}, {dev.city}</p>
-                      </div>
-                      <span className="text-[10px] font-semibold bg-amber-50 text-amber-700 border border-amber-200 px-2 py-0.5 rounded-full">
-                        {dev.currentPhase}
-                      </span>
-                    </div>
+                {activeDevelopments.map((dev) => {
+                  const financials = calculateDevelopmentFinancials(dev);
+                  const pocColor =
+                    financials.pocPercent >= 18
+                      ? 'text-emerald-700'
+                      : financials.pocPercent >= 12
+                      ? 'text-amber-700'
+                      : 'text-rose-600';
 
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs mt-3 pt-2 border-t border-slate-200/60">
-                      <div>
-                        <span className="text-[10px] text-slate-400 block">Land Price</span>
-                        <span className="font-semibold text-slate-800">{formatZAR(dev.landPurchasePriceZAR)}</span>
+                  return (
+                    <div
+                      key={dev.id}
+                      className="p-3 rounded-lg border border-slate-100 bg-slate-50/70 hover:bg-slate-100/80 transition-colors"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <h4 className="text-xs font-bold text-slate-900">{dev.title}</h4>
+                          <p className="text-[11px] text-slate-500">{dev.address}, {dev.city}</p>
+                        </div>
+                        <span className="text-[10px] font-semibold bg-amber-50 text-amber-700 border border-amber-200 px-2 py-0.5 rounded-full">
+                          {dev.currentPhase}
+                        </span>
                       </div>
-                      <div>
-                        <span className="text-[10px] text-slate-400 block">Inventory</span>
-                        <span className="font-semibold text-slate-800">{dev.units?.length || 0} Units</span>
-                      </div>
-                      <div>
-                        <span className="text-[10px] text-slate-400 block">Buildable Area</span>
-                        <span className="font-semibold text-slate-800">{dev.totalBuildableAreaSqm} m²</span>
-                      </div>
-                      <div>
-                        <span className="text-[10px] text-slate-400 block">Pre-Sales Hurdle</span>
-                        <span className="font-semibold text-emerald-700">{dev.preSalesHurdlePercent}%</span>
+
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs mt-3 pt-2 border-t border-slate-200/60">
+                        <div>
+                          <span className="text-[10px] text-slate-400 block">Total TDC</span>
+                          <span className="font-semibold text-slate-800">{formatZAR(financials.tdcZAR)}</span>
+                        </div>
+                        <div>
+                          <span className="text-[10px] text-slate-400 block">Target GDV</span>
+                          <span className="font-semibold text-emerald-700">{formatZAR(financials.gdvInclVatZAR)}</span>
+                        </div>
+                        <div>
+                          <span className="text-[10px] text-slate-400 block">Scale</span>
+                          <span className="font-semibold text-slate-800">
+                            {dev.units?.length || 0} Units ({dev.totalBuildableAreaSqm} m²)
+                          </span>
+                        </div>
+                        <div>
+                          <span className="text-[10px] text-slate-400 block">POC Margin</span>
+                          <span className={`font-semibold ${pocColor}`}>
+                            {financials.pocPercent >= 0 ? `+${financials.pocPercent.toFixed(1)}%` : `${financials.pocPercent.toFixed(1)}%`}
+                          </span>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>

@@ -970,8 +970,11 @@ export interface PortfolioSummary {
   monthlyRentalTaxReserve: number;
   equityAlerts: EquityExtractionAlert[];
   totalDevelopmentValue?: number;
+  developmentsValueZAR?: number;
+  developmentsAllocationPercent?: number;
   activeDevelopmentsCount?: number;
   totalDevelopmentLiabilities?: number;
+  totalDevelopmentDebtLiability?: number;
 }
 
 // Regional Investment Node Custom Benchmark Overrides

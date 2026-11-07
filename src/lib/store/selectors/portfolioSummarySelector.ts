@@ -89,19 +89,40 @@ export function computePortfolioSummary(state: PortfolioSummaryInput): Portfolio
 
   const developments = state?.developments || [];
   const activeDevelopments = developments.filter((d) => d && d.currentPhase !== 'Completed');
-  const totalDevelopmentValue = activeDevelopments.reduce((sum, d) => {
-    // Valuation is sum of units' list price or allocated cost basis
-    const unitVal = (d.units || []).reduce((s, u) => s + (u.listPriceVatInclZAR || u.allocatedCostBasisZAR || 0), 0);
-    return sum + (unitVal > 0 ? unitVal : (d.landPurchasePriceZAR || 0));
-  }, 0);
 
-  // Development loan liability (avoid double-counting if linked funding source is present in funding)
-  const totalDevelopmentLiabilities = activeDevelopments
-    .filter((d) => !d.linkedFundingSourceId || !funding.some((f) => f.id === d.linkedFundingSourceId || f.linkedDealId === d.id))
+  // Unsold/Retained Development Asset Valuation:
+  // Sum listPriceVatInclZAR strictly for units still owned by the developer
+  // (unit.status !== 'Sold & Transferred' and !unit.graduatedRentalId) so sold units
+  // or units already graduated into /rentals are never double-counted.
+  const developmentsValueZAR = activeDevelopments.reduce((sum, d) => {
+    const ownedUnits = (d.units || []).filter(
+      (u) => u && u.status !== 'Sold & Transferred' && !u.graduatedRentalId
+    );
+    const unitVal = ownedUnits.reduce(
+      (s, u) => s + (u.listPriceVatInclZAR || u.allocatedCostBasisZAR || 0),
+      0
+    );
+    return sum + unitVal;
+  }, 0);
+  const totalDevelopmentValue = developmentsValueZAR;
+
+  // Total drawn senior development debt liability across all developments
+  const totalDevelopmentDebtLiability = developments.reduce(
+    (sum, dev) =>
+      sum + Math.max(0, (dev?.developmentFacilityDrawnZAR || 0) - (dev?.developmentFacilityRepaidZAR || 0)),
+    0
+  );
+
+  // Development loan liability not already represented by a linked FundingSource in `funding`
+  const unlinkedDevelopmentLiabilities = activeDevelopments
+    .filter((d) => !d.linkedFundingSourceId || !funding.some((f) => f && (f.id === d.linkedFundingSourceId || f.linkedDealId === d.id)))
     .reduce((sum, d) => sum + Math.max(0, (d.developmentFacilityDrawnZAR || 0) - (d.developmentFacilityRepaidZAR || 0)), 0);
+  const totalDevelopmentLiabilities = totalDevelopmentDebtLiability;
 
   const liquidCapitalReserve = (state?.liquidCapitalReserve || 0) + newlyDrawnCapital;
-  const totalGrossAssetValue = totalRentalValue + totalFlipValue + totalDevelopmentValue + liquidCapitalReserve;
+  const totalGrossAssetValue = totalRentalValue + totalFlipValue + developmentsValueZAR + liquidCapitalReserve;
+  const developmentsAllocationPercent =
+    totalGrossAssetValue > 0 ? (developmentsValueZAR / totalGrossAssetValue) * 100 : 0;
 
   // Standby & unallocated private funding facilities for next acquisitions (Standby facilities across the portfolio + undrawn tranches)
   const unallocatedFundingReserve = funding
@@ -142,7 +163,7 @@ export function computePortfolioSummary(state: PortfolioSummaryInput): Portfolio
       return sum + Math.max(0, drawn - (f.totalRepaidZAR || 0));
     }, 0);
 
-  const totalFundingLiabilities = totalPrivateFundingLiability + totalBondLiabilities + totalDevelopmentLiabilities;
+  const totalFundingLiabilities = totalPrivateFundingLiability + totalBondLiabilities + unlinkedDevelopmentLiabilities;
   const netEquity = totalGrossAssetValue - totalFundingLiabilities;
 
   // Monthly rental cash flow and property-by-property SARS provisional tax reserve
@@ -265,8 +286,11 @@ export function computePortfolioSummary(state: PortfolioSummaryInput): Portfolio
     monthlyRentalTaxReserve: Math.round(annualRentalTaxReserve / 12),
     equityAlerts,
     totalDevelopmentValue,
+    developmentsValueZAR,
+    developmentsAllocationPercent,
     activeDevelopmentsCount: activeDevelopments.length,
     totalDevelopmentLiabilities,
+    totalDevelopmentDebtLiability,
   };
 }
 
