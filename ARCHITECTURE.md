@@ -2,7 +2,7 @@
 
 > **Status:** Institutional Reference & Definitive Architectural Standard  
 > **Target Audience:** Principal Systems Architects, Full-Stack Engineers, and Autonomous AI Coding Agents  
-> **System Baseline:** Next.js 16 (App Router), React 19, TypeScript 6, Tailwind CSS v4, Zustand v5  
+> **System Baseline:** v2.8.0 • Next.js 16 (App Router), React 19, TypeScript 6, Tailwind CSS v4, Zustand v5 (11 Slices)  
 > **Primary Jurisdiction:** Republic of South Africa (ZAR Institutional Real Estate Suite)
 
 ---
@@ -392,7 +392,7 @@ flowchart TD
     AUTH["Supabase Auth (user_id session)"]
     RLS["Row-Level Security: auth.uid() = user_id"]
     SANITIZE["migrateToCloud.ts: Strip BYOK Keys & Sensitive OCR"]
-    TABLES["PostgreSQL Schema: properties, flips, leases, funding_sources"]
+    TABLES["PostgreSQL Schema: properties, flips, developments, funding_sources, profiles"]
   end
 
   ZUSTAND <-->|"persist middleware"| LOCAL
@@ -414,6 +414,8 @@ flowchart TD
 1. **Loop Suppression:** Outbound debounce listener checks `isHydratingFromCloud.current`. Inbound hydration from Supabase into Zustand never triggers an unintended echo push.
 2. **Session Teardown (`DBSYNC-02`):** On `SIGNED_OUT`, local sync identifiers (`last_sync_user_id`, `cloud_sync_completed`) are purged alongside restoring demo state, preventing cross-user data leakage on shared terminals.
 3. **Reactive UI Header Pill:** [`CloudSyncStatusPill`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/components/navigation/TopHeader.tsx) observes `useCloudSyncStore` to render immediate visual feedback (`Synced`, `Syncing...`, `Local Only`, or `Sync Error`).
+4. **Developments Cloud Schema Parity:** Remote `public.developments` table (36 columns) isolates user records via Row-Level Security (`developments_select_own`, `developments_insert_own`, `developments_update_own`, `developments_delete_own`).
+5. **Investor Profile Settings Persistence:** User-configured development underwriting hurdles (`min_dev_poc_percent`, `min_dev_yoc_percent`, `default_hard_build_rate_per_sqm_zar`, `default_vat_registered_developer`) persist directly to `public.profiles` and hydrate seamlessly into local Zustand storage upon authentication.
 
 ---
 
@@ -548,6 +550,10 @@ An automated Equity Extraction Alert is triggered if and only if two simultaneou
    - **Closed-Form Debt Wipeout Breakeven:**
      $$\text{unitsRequired} = \left\lceil \frac{\max(0, \text{drawn} - \text{repaid})}{\text{avgUnitPrice}} \right\rceil$$
    - **Hybrid Split-Exit Free-Carry & Section 13sex:** Net proceeds from sold units extinguish 100% of the senior development loan first. Any remaining units retained for rental receive zero carrying debt ("free-carry") and automatically qualify for SARS Section 13sex 55% tax deductions (5% annually over 20 years) if holding $\ge 5$ new residential units.
+
+9. **Development Asset & Liability Parity Invariant ([`portfolioSummarySelector.ts`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/lib/store/selectors/portfolioSummarySelector.ts)):**
+   - **Asset Valuation Parity:** When computing the active portfolio asset value contribution of developments (`developmentsValueZAR`), sum `listPriceVatInclZAR` strictly for units still owned by the developer (`unit.status !== 'Sold & Transferred'` and `!unit.graduatedRentalId`). Units sold or already graduated into `/rentals` must NEVER be included to prevent balance-sheet double-counting.
+   - **Senior Debt Liability Parity:** Drawn senior development facilities (`totalDevelopmentDebtLiability = developments.reduce((sum, dev) => sum + Math.max(0, (dev.developmentFacilityDrawnZAR || 0) - (dev.developmentFacilityRepaidZAR || 0)), 0)`) must be strictly included in `totalLiabilities`. Consequently, net equity ($\text{GAV} - \text{totalLiabilities}$) and portfolio gearing ($\text{LTV} = \frac{\text{totalLiabilities}}{\text{totalGrossAssetValue}} \times 100$) accurately incorporate senior development facilities without distortion.
 
 ### 4.6 Architectural & AI Coding Agent Guardrails
 1. **Zero Inline Math in JSX:** Never embed mathematical calculations or business rules inside component render blocks. Delegate strictly to [`src/lib/calculations/`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/lib/calculations/).
