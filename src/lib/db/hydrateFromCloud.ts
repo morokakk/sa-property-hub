@@ -411,6 +411,7 @@ export function unmapOpportunities(
   return rows.map((opp) => {
     const rawCosts = opp.costs ? (parseJson(opp.costs, undefined) as any) : undefined;
     let cleanCosts: OpportunityDeal['costs'] | undefined = undefined;
+    let extractedZoning: any = undefined;
     if (rawCosts && typeof rawCosts === 'object') {
       const {
         numberOfUnits: _u,
@@ -442,8 +443,10 @@ export function unmapOpportunities(
         projectedDevNetProfitZAR: _pdnp,
         projectedDevPocPercent: _pdp,
         zoningProfile: _zp,
+        _zoningProfile: _zp2,
         ...restCosts
       } = rawCosts;
+      extractedZoning = _zp || _zp2 || (rawCosts as any).zoningProfile || (rawCosts as any)._zoningProfile;
       cleanCosts = Object.keys(restCosts).length > 0 ? (restCosts as any) : undefined;
     }
 
@@ -519,7 +522,7 @@ export function unmapOpportunities(
       projectedDevGdvZAR: toNullableNum(rawCosts?.projectedDevGdvZAR),
       projectedDevNetProfitZAR: toNullableNum(rawCosts?.projectedDevNetProfitZAR),
       projectedDevPocPercent: toNullableNum(rawCosts?.projectedDevPocPercent),
-      zoningProfile: rawCosts?.zoningProfile || undefined,
+      zoningProfile: extractedZoning || undefined,
       annualInsurance: toNum(opp.annual_insurance_zar, 0),
       managementFeePercent: toNum(opp.management_fee_percent, 8.0),
       agencyVatApplicable: opp.agency_vat_applicable ?? true,

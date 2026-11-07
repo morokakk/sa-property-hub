@@ -102,7 +102,8 @@ export function isStockDemoState(state?: PortfolioMigrationPayload | null): bool
       r.marketValueZAR !== orig.marketValueZAR ||
       r.purchasePriceZAR !== orig.purchasePriceZAR ||
       r.monthlyGrossRentZAR !== orig.monthlyGrossRentZAR ||
-      r.outstandingBondBalanceZAR !== orig.outstandingBondBalanceZAR
+      r.outstandingBondBalanceZAR !== orig.outstandingBondBalanceZAR ||
+      JSON.stringify(r.zoningProfile) !== JSON.stringify(orig.zoningProfile)
     );
   });
   if (isAnyRentalModified) return false;
@@ -116,7 +117,8 @@ export function isStockDemoState(state?: PortfolioMigrationPayload | null): bool
       f.address !== orig.address ||
       f.purchasePriceZAR !== orig.purchasePriceZAR ||
       f.baselineRenovationBudgetZAR !== orig.baselineRenovationBudgetZAR ||
-      f.targetExitPriceZAR !== orig.targetExitPriceZAR
+      f.targetExitPriceZAR !== orig.targetExitPriceZAR ||
+      JSON.stringify(f.zoningProfile) !== JSON.stringify(orig.zoningProfile)
     );
   });
   if (isAnyFlipModified) return false;
@@ -130,7 +132,8 @@ export function isStockDemoState(state?: PortfolioMigrationPayload | null): bool
       d.address !== orig.address ||
       d.landPurchasePriceZAR !== orig.landPurchasePriceZAR ||
       d.totalBuildableAreaSqm !== orig.totalBuildableAreaSqm ||
-      d.budgetedHardCostPerSqmZAR !== orig.budgetedHardCostPerSqmZAR
+      d.budgetedHardCostPerSqmZAR !== orig.budgetedHardCostPerSqmZAR ||
+      JSON.stringify(d.zoningProfile) !== JSON.stringify(orig.zoningProfile)
     );
   });
   if (isAnyDevModified) return false;
@@ -142,7 +145,8 @@ export function isStockDemoState(state?: PortfolioMigrationPayload | null): bool
     return (
       o.title !== orig.title ||
       o.purchasePrice !== orig.purchasePrice ||
-      o.openMarketValueZAR !== orig.openMarketValueZAR
+      o.openMarketValueZAR !== orig.openMarketValueZAR ||
+      JSON.stringify(o.zoningProfile) !== JSON.stringify(orig.zoningProfile)
     );
   });
   if (isAnyOppModified) return false;
