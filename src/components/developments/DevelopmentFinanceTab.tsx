@@ -308,6 +308,7 @@ export function DevelopmentFinanceTab({
 
                 <div className="pt-2 border-t border-slate-200/60">
                   <span
+                    title={unit.status}
                     className={`text-[10px] font-medium block truncate ${
                       isSold
                         ? 'text-emerald-700 font-bold'

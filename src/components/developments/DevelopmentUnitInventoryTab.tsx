@@ -222,15 +222,15 @@ export function DevelopmentUnitInventoryTab({
           <table className="w-full text-left text-xs border-collapse">
             <thead>
               <tr className="bg-slate-50/90 border-b border-slate-200 text-slate-700 font-semibold sticky top-0 z-10">
-                <th className="py-2.5 px-3">Unit #</th>
-                <th className="py-2.5 px-3">Configuration</th>
-                <th className="py-2.5 px-3 text-right">Floor (m²)</th>
-                <th className="py-2.5 px-3 text-right">Cost Basis</th>
-                <th className="py-2.5 px-3 text-right">List Price (incl. VAT)</th>
-                <th className="py-2.5 px-3 text-right">Est. Rent</th>
-                <th className="py-2.5 px-3">Status</th>
-                <th className="py-2.5 px-3">Buyer / Ref</th>
-                <th className="py-2.5 px-3 text-right">Actions</th>
+                <th className="py-2.5 px-3 whitespace-nowrap">Unit #</th>
+                <th className="py-2.5 px-3 whitespace-nowrap">Configuration</th>
+                <th className="py-2.5 px-3 text-right whitespace-nowrap">Floor (m²)</th>
+                <th className="py-2.5 px-3 text-right whitespace-nowrap">Cost Basis</th>
+                <th className="py-2.5 px-3 text-right whitespace-nowrap">List Price (incl. VAT)</th>
+                <th className="py-2.5 px-3 text-right whitespace-nowrap">Est. Rent</th>
+                <th className="py-2.5 px-3 whitespace-nowrap">Status</th>
+                <th className="py-2.5 px-3 whitespace-nowrap">Buyer / Ref</th>
+                <th className="py-2.5 px-3 text-right whitespace-nowrap">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-slate-700">
@@ -252,25 +252,25 @@ export function DevelopmentUnitInventoryTab({
                         isSold ? 'bg-emerald-50/20' : isRetained ? 'bg-purple-50/20' : ''
                       }`}
                     >
-                      <td className="py-2.5 px-3 font-semibold text-slate-900">
+                      <td className="py-2.5 px-3 font-semibold text-slate-900 whitespace-nowrap">
                         {unit.unitNumber}
                       </td>
-                      <td className="py-2.5 px-3 text-slate-600">
+                      <td className="py-2.5 px-3 text-slate-600 whitespace-nowrap">
                         {unit.configuration}
                       </td>
-                      <td className="py-2.5 px-3 text-right font-mono">
+                      <td className="py-2.5 px-3 text-right font-mono whitespace-nowrap">
                         {`${unit.floorAreaSqm} m²`}
                       </td>
-                      <td className="py-2.5 px-3 text-right font-mono text-slate-600">
+                      <td className="py-2.5 px-3 text-right font-mono text-slate-600 whitespace-nowrap">
                         {formatZAR(unit.allocatedCostBasisZAR)}
                       </td>
-                      <td className="py-2.5 px-3 text-right font-mono font-semibold text-slate-900">
+                      <td className="py-2.5 px-3 text-right font-mono font-semibold text-slate-900 whitespace-nowrap">
                         {formatZAR(unit.listPriceVatInclZAR)}
                       </td>
-                      <td className="py-2.5 px-3 text-right font-mono text-slate-600">
+                      <td className="py-2.5 px-3 text-right font-mono text-slate-600 whitespace-nowrap">
                         {formatZAR(unit.estimatedMonthlyRentZAR)}/mo
                       </td>
-                      <td className="py-2.5 px-3">
+                      <td className="py-2.5 px-3 whitespace-nowrap">
                         <select
                           value={unit.status}
                           onChange={(e) =>
@@ -294,7 +294,7 @@ export function DevelopmentUnitInventoryTab({
                           ))}
                         </select>
                       </td>
-                      <td className="py-2.5 px-3 text-slate-600">
+                      <td className="py-2.5 px-3 text-slate-600 whitespace-nowrap">
                         {isSold ? (
                           <div className="leading-tight">
                             <span className="font-semibold text-slate-900">{unit.buyerName || 'Private Buyer'}</span>
@@ -351,13 +351,13 @@ export function DevelopmentUnitInventoryTab({
             {units.length > 0 && (
               <tfoot className="bg-slate-100/95 font-semibold text-slate-900 border-t-2 border-slate-300 sticky bottom-0 z-10">
                 <tr>
-                  <td className="py-2.5 px-3">Total / Portfolio</td>
-                  <td className="py-2.5 px-3 text-slate-500 font-normal">{`${units.length} Units`}</td>
-                  <td className="py-2.5 px-3 text-right font-mono">{`${totalFloorArea} m²`}</td>
-                  <td className="py-2.5 px-3 text-right font-mono">{formatZAR(totalCostBasis)}</td>
-                  <td className="py-2.5 px-3 text-right font-mono text-emerald-800">{formatZAR(totalListGdv)}</td>
-                  <td className="py-2.5 px-3 text-right font-mono text-purple-800">{formatZAR(totalEstRent)}/mo</td>
-                  <td colSpan={3} className="py-2.5 px-3 text-right text-xs text-slate-500 font-normal">
+                  <td className="py-2.5 px-3 whitespace-nowrap">Total / Portfolio</td>
+                  <td className="py-2.5 px-3 text-slate-500 font-normal whitespace-nowrap">{`${units.length} Units`}</td>
+                  <td className="py-2.5 px-3 text-right font-mono whitespace-nowrap">{`${totalFloorArea} m²`}</td>
+                  <td className="py-2.5 px-3 text-right font-mono whitespace-nowrap">{formatZAR(totalCostBasis)}</td>
+                  <td className="py-2.5 px-3 text-right font-mono text-emerald-800 whitespace-nowrap">{formatZAR(totalListGdv)}</td>
+                  <td className="py-2.5 px-3 text-right font-mono text-purple-800 whitespace-nowrap">{formatZAR(totalEstRent)}/mo</td>
+                  <td colSpan={3} className="py-2.5 px-3 text-right text-xs text-slate-500 font-normal whitespace-nowrap">
                     {`${soldCount} Sold • ${contractedCount > 0 ? `${contractedCount} Contracted • ` : ''}${retainedCount} Retained • ${availableCount} Available`}
                   </td>
                 </tr>

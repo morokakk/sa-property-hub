@@ -191,7 +191,7 @@ describe('Milestone 5 Challenger: E2E Cross-Module Lifecycle & Adversarial Stres
 
       expect(dev.units.length).toBe(4); // Default 4 units
       expect(dev.totalBuildableAreaSqm).toBe(320); // Default 320 m²
-      expect(dev.budgetedHardCostPerSqmZAR).toBe(9500); // Default 9,500/m²
+      expect(dev.budgetedHardCostPerSqmZAR).toBe(9800); // Default 9,800/m² SA baseline
       expect(dev.acquisitionCostsZAR).toBe(75000); // Default 75,000
     });
   });

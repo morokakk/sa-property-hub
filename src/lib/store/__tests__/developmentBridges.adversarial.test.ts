@@ -497,6 +497,7 @@ describe('Adversarial Verification — Milestone 2 Cross-Module Bridges', () => 
         targetExitPrice: 10_800_000, // 10,800,000 / 6 = 1,800,000 list price / unit
         monthlyRentalEstimate: 72_000, // 72,000 / 6 = 12,000 rent / unit
         holdingPeriodMonths: 12,
+        seniorDebtLtcPercent: 75,
         monthlyLevies: 3_500,
         monthlyRatesTaxes: 4_500,
         costs: {
@@ -595,8 +596,8 @@ describe('Adversarial Verification — Milestone 2 Cross-Module Bridges', () => 
       // Default totalBuildableAreaSqm = 320 -> unit area = 80
       expect(promoted.totalBuildableAreaSqm).toBe(320);
       expect(promoted.units[0].floorAreaSqm).toBe(80);
-      // Default buildCostPerSqm = 9500
-      expect(promoted.budgetedHardCostPerSqmZAR).toBe(9500);
+      // Default buildCostPerSqm = 9800 (SA v2.8.0 baseline)
+      expect(promoted.budgetedHardCostPerSqmZAR).toBe(9800);
 
       // Verify no NaNs across all financial fields
       expect(Number.isFinite(promoted.landPurchasePriceZAR)).toBe(true);
