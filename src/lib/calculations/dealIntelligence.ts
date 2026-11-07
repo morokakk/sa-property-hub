@@ -24,7 +24,8 @@ export interface StrategyVerdictItem {
 }
 
 export interface ThreeStrategyMatrixResult {
-  strategies: Record<DealStrategy, StrategyVerdictItem>;
+  strategies: Partial<Record<DealStrategy, StrategyVerdictItem>> &
+    Record<'Rental' | 'Flip' | 'BRRRR', StrategyVerdictItem>;
   orderedStrategies: StrategyVerdictItem[];
   recommendedStrategy: DealStrategy;
   recommendationReason: string;
@@ -42,6 +43,7 @@ export interface DealRepairLever {
   targetPriceZAR?: number;
   targetMonthlyRentZAR?: number;
   targetLtvPercent?: number;
+  targetSeniorDebtLtcPercent?: number;
   targetDepositZAR?: number;
   targetExitPriceZAR?: number;
   targetStrategy?: DealStrategy;
@@ -77,12 +79,12 @@ function formatCompactZAR(amount: number): string {
  */
 export function evaluateThreeStrategyMatrix(
   params: DealMetricsInputParams,
-  profile: Partial<InvestorProfile> = {},
+  profile: Partial<InvestorProfile> & { liquidCapitalReserveZAR?: number } = {},
   nodeOrCity?: InvestmentNode | string
 ): ThreeStrategyMatrixResult {
   const node = typeof nodeOrCity === 'string' ? findInvestmentNode(nodeOrCity) : nodeOrCity;
 
-  // Compute full metrics once (calculateDealMetrics computes Rental, Flip, and BRRRR fields together)
+  // Compute full metrics once (calculateDealMetrics computes Rental, Flip, BRRRR, and Development fields together)
   const metrics = calculateDealMetrics({
     ...params,
     costs: undefined, // allow clean recomputation if needed, or use provided costs if not overridden
@@ -92,39 +94,56 @@ export function evaluateThreeStrategyMatrix(
   // If custom costs were explicitly passed, use params directly for exact parity with Analyzer page
   const exactMetrics = params.costs ? calculateDealMetrics(params) : metrics;
 
+  // When Development strategy is active, a traditional Rental/Flip/BRRRR on raw land cannot earn the
+  // multi-unit completed scheme rent or GDV without spending the full Hard + Soft + Contingency build cost.
+  const singleFacilityMetrics =
+    params.strategy === 'Development'
+      ? calculateDealMetrics({
+          ...params,
+          strategy: 'Rental',
+          estimatedRehabCost:
+            exactMetrics.devHardBuildCostZAR +
+            exactMetrics.devSoftCostsZAR +
+            exactMetrics.devContingencyZAR,
+        })
+      : exactMetrics;
+
   const minFlipRoi = profile.minFlipRoiPercent ?? 18.0;
+  const minDevPoc = profile.minDevelopmentPocPercent ?? 20.0;
   const maxDay1Cash = profile.maxDay1CashZAR ?? 500_000;
+  const includeDevelopment =
+    params.strategy === 'Development' || (params.numberOfUnits ?? 1) >= 2;
 
   // 1. Rental Evaluation
-  const rentalBuyBox = evaluateDealCriteria(exactMetrics, profile, 'Rental');
+  const rentalBuyBox = evaluateDealCriteria(singleFacilityMetrics, profile, 'Rental');
   const rentalNodeMatch = node ? node.recommendedStrategies.includes('Rental') : true;
   let rentalScore = Math.round((rentalBuyBox.passedCount / Math.max(1, rentalBuyBox.totalCount)) * 70);
   if (rentalNodeMatch) rentalScore += 15;
-  if (exactMetrics.monthlyCashFlow > 0) rentalScore += Math.min(10, Math.round(exactMetrics.netRoi / 2));
-  if ((exactMetrics.dscr ?? 1.5) >= (profile.minDscr ?? 1.2)) rentalScore += 5;
+  if (singleFacilityMetrics.monthlyCashFlow > 0) rentalScore += Math.min(10, Math.round(singleFacilityMetrics.netRoi / 2));
+  if ((singleFacilityMetrics.dscr ?? 1.5) >= (profile.minDscr ?? 1.2)) rentalScore += 5;
   rentalScore = Math.max(0, Math.min(100, rentalScore));
 
   // 2. Flip Evaluation
-  const flipBuyBox = evaluateDealCriteria(exactMetrics, profile, 'Flip');
+  const flipBuyBox = evaluateDealCriteria(singleFacilityMetrics, profile, 'Flip');
   const flipNodeMatch = node ? node.recommendedStrategies.includes('Flip') : true;
   let flipScore = Math.round((flipBuyBox.passedCount / Math.max(1, flipBuyBox.totalCount)) * 70);
   if (flipNodeMatch) flipScore += 15;
-  if (exactMetrics.projectedFlipNetProfit > 0) {
-    flipScore += Math.min(15, Math.round((exactMetrics.projectedFlipRoi / Math.max(1, minFlipRoi)) * 10));
+  if (singleFacilityMetrics.projectedFlipNetProfit > 0) {
+    flipScore += Math.min(15, Math.round((singleFacilityMetrics.projectedFlipRoi / Math.max(1, minFlipRoi)) * 10));
   }
   flipScore = Math.max(0, Math.min(100, flipScore));
 
   // 3. BRRRR Evaluation
   // Uses Rental/BRRRR base criteria + evaluates Post-Refi Cashflow & Capital Recycling efficiency
-  const baseBrrrrBuyBox = evaluateDealCriteria(exactMetrics, profile, 'BRRRR');
+  const baseBrrrrBuyBox = evaluateDealCriteria(singleFacilityMetrics, profile, 'BRRRR');
   const brrrrNodeMatch = node ? node.recommendedStrategies.includes('BRRRR') : true;
-  const postRefiCashflowPositive = exactMetrics.brrrrPostRefiCashflowZAR >= 0;
-  const capitalRecycledWell = exactMetrics.brrrrCashLeftInDealZAR <= maxDay1Cash;
+  const postRefiCashflowPositive = singleFacilityMetrics.brrrrPostRefiCashflowZAR >= 0;
+  const capitalRecycledWell = singleFacilityMetrics.brrrrCashLeftInDealZAR <= maxDay1Cash;
   let brrrrScore = Math.round((baseBrrrrBuyBox.passedCount / Math.max(1, baseBrrrrBuyBox.totalCount)) * 60);
   if (brrrrNodeMatch) brrrrScore += 15;
   if (postRefiCashflowPositive) brrrrScore += 12;
   if (capitalRecycledWell) brrrrScore += 8;
-  if (exactMetrics.brrrrCashLeftInDealZAR === 0) brrrrScore += 5;
+  if (singleFacilityMetrics.brrrrCashLeftInDealZAR === 0) brrrrScore += 5;
   brrrrScore = Math.max(0, Math.min(100, brrrrScore));
 
   const buildVerdictBadge = (meets: boolean, passed: number, total: number, isBest: boolean): StrategyVerdictItem['verdictBadge'] => {
@@ -141,14 +160,34 @@ export function evaluateThreeStrategyMatrix(
     { strategy: 'BRRRR', score: brrrrScore, meets: baseBrrrrBuyBox.meetsBuyBox },
   ];
 
+  // 4. Development Evaluation (included when strategy === 'Development' or numberOfUnits >= 2)
+  let devBuyBox: BuyBoxEvaluationResult | null = null;
+  let devScore = 0;
+  if (includeDevelopment) {
+    devBuyBox = evaluateDealCriteria(exactMetrics, profile, 'Development');
+    const devPoc = exactMetrics.devPocPercent ?? 0;
+    const devProfit = exactMetrics.devNetProfitBeforeTaxZAR ?? 0;
+    devScore = Math.round((devBuyBox.passedCount / Math.max(1, devBuyBox.totalCount)) * 70);
+    if (devProfit > 0) {
+      devScore += Math.min(20, Math.round((devPoc / Math.max(1, minDevPoc)) * 15));
+    }
+    if (exactMetrics.devIsSection13SexEligible) devScore += 10;
+    devScore = Math.max(0, Math.min(100, devScore));
+    rawScores.push({ strategy: 'Development', score: devScore, meets: devBuyBox.meetsBuyBox });
+  }
+
   rawScores.sort((a, b) => {
+    if (params.strategy === 'Development') {
+      if (a.strategy === 'Development') return -1;
+      if (b.strategy === 'Development') return 1;
+    }
     if (a.meets !== b.meets) return a.meets ? -1 : 1;
     return b.score - a.score;
   });
 
   const recommendedStrategy = rawScores[0].strategy;
 
-  const strategies: Record<DealStrategy, StrategyVerdictItem> = {
+  const strategies: ThreeStrategyMatrixResult['strategies'] = {
     Rental: {
       strategy: 'Rental',
       label: 'Buy & Hold Rental',
@@ -156,13 +195,13 @@ export function evaluateThreeStrategyMatrix(
       score: rentalScore,
       isNodeRecommended: rentalNodeMatch,
       primaryKpiLabel: 'Net Cashflow / CoC',
-      primaryKpiValue: `${formatCompactZAR(exactMetrics.monthlyCashFlow)}/m (${exactMetrics.netRoi.toFixed(1)}%)`,
+      primaryKpiValue: `${formatCompactZAR(singleFacilityMetrics.monthlyCashFlow)}/m (${singleFacilityMetrics.netRoi.toFixed(1)}%)`,
       secondaryKpiLabel: 'Net Yield / DSCR',
-      secondaryKpiValue: `${exactMetrics.capRate.toFixed(1)}% • ${exactMetrics.dscr === null ? 'Cash' : `${exactMetrics.dscr.toFixed(2)}x`}`,
+      secondaryKpiValue: `${singleFacilityMetrics.capRate.toFixed(1)}% • ${singleFacilityMetrics.dscr === null ? 'Cash' : `${singleFacilityMetrics.dscr.toFixed(2)}x`}`,
       verdictBadge: buildVerdictBadge(rentalBuyBox.meetsBuyBox, rentalBuyBox.passedCount, rentalBuyBox.totalCount, recommendedStrategy === 'Rental'),
       summary: rentalBuyBox.meetsBuyBox
-        ? `Passes all ${rentalBuyBox.totalCount} rental hurdles with ${formatCompactZAR(exactMetrics.monthlyCashFlow)}/m cashflow.`
-        : `Meets ${rentalBuyBox.passedCount}/${rentalBuyBox.totalCount} hurdles (${exactMetrics.capRate.toFixed(1)}% Cap Rate).`,
+        ? `Passes all ${rentalBuyBox.totalCount} rental hurdles with ${formatCompactZAR(singleFacilityMetrics.monthlyCashFlow)}/m cashflow.`
+        : `Meets ${rentalBuyBox.passedCount}/${rentalBuyBox.totalCount} hurdles (${singleFacilityMetrics.capRate.toFixed(1)}% Cap Rate).`,
     },
     Flip: {
       strategy: 'Flip',
@@ -171,13 +210,13 @@ export function evaluateThreeStrategyMatrix(
       score: flipScore,
       isNodeRecommended: flipNodeMatch,
       primaryKpiLabel: 'Net Flip Profit',
-      primaryKpiValue: formatCompactZAR(exactMetrics.projectedFlipNetProfit),
+      primaryKpiValue: formatCompactZAR(singleFacilityMetrics.projectedFlipNetProfit),
       secondaryKpiLabel: 'Flip ROI (Ann.)',
-      secondaryKpiValue: `${exactMetrics.projectedFlipRoi.toFixed(1)}% (${exactMetrics.annualizedFlipRoi.toFixed(1)}%/yr)`,
+      secondaryKpiValue: `${singleFacilityMetrics.projectedFlipRoi.toFixed(1)}% (${singleFacilityMetrics.annualizedFlipRoi.toFixed(1)}%/yr)`,
       verdictBadge: buildVerdictBadge(flipBuyBox.meetsBuyBox, flipBuyBox.passedCount, flipBuyBox.totalCount, recommendedStrategy === 'Flip'),
       summary: flipBuyBox.meetsBuyBox
-        ? `Exceeds ${minFlipRoi}% Flip ROI hurdle with ${formatCompactZAR(exactMetrics.projectedFlipNetProfit)} net profit.`
-        : `Projected Flip ROI of ${exactMetrics.projectedFlipRoi.toFixed(1)}% vs ${minFlipRoi}% target.`,
+        ? `Exceeds ${minFlipRoi}% Flip ROI hurdle with ${formatCompactZAR(singleFacilityMetrics.projectedFlipNetProfit)} net profit.`
+        : `Projected Flip ROI of ${singleFacilityMetrics.projectedFlipRoi.toFixed(1)}% vs ${minFlipRoi}% target.`,
     },
     BRRRR: {
       strategy: 'BRRRR',
@@ -186,27 +225,57 @@ export function evaluateThreeStrategyMatrix(
       score: brrrrScore,
       isNodeRecommended: brrrrNodeMatch,
       primaryKpiLabel: 'Post-Refi Cashflow',
-      primaryKpiValue: `${formatCompactZAR(exactMetrics.brrrrPostRefiCashflowZAR)}/m`,
+      primaryKpiValue: `${formatCompactZAR(singleFacilityMetrics.brrrrPostRefiCashflowZAR)}/m`,
       secondaryKpiLabel: 'Cash Left in Deal',
       secondaryKpiValue:
-        exactMetrics.brrrrCashLeftInDealZAR === 0
+        singleFacilityMetrics.brrrrCashLeftInDealZAR === 0
           ? 'R 0 (100% Recycled)'
-          : formatCompactZAR(exactMetrics.brrrrCashLeftInDealZAR),
+          : formatCompactZAR(singleFacilityMetrics.brrrrCashLeftInDealZAR),
       verdictBadge: buildVerdictBadge(baseBrrrrBuyBox.meetsBuyBox, baseBrrrrBuyBox.passedCount, baseBrrrrBuyBox.totalCount, recommendedStrategy === 'BRRRR'),
       summary:
-        exactMetrics.brrrrCashLeftInDealZAR === 0
-          ? `100% capital recycled on refi with ${formatCompactZAR(exactMetrics.brrrrPostRefiCashflowZAR)}/m post-refi flow.`
-          : `Leaves ${formatCompactZAR(exactMetrics.brrrrCashLeftInDealZAR)} in deal post-refi (${formatCompactZAR(exactMetrics.brrrrEquityExtractedZAR)} extracted).`,
+        singleFacilityMetrics.brrrrCashLeftInDealZAR === 0
+          ? `100% capital recycled on refi with ${formatCompactZAR(singleFacilityMetrics.brrrrPostRefiCashflowZAR)}/m post-refi flow.`
+          : `Leaves ${formatCompactZAR(singleFacilityMetrics.brrrrCashLeftInDealZAR)} in deal post-refi (${formatCompactZAR(singleFacilityMetrics.brrrrEquityExtractedZAR)} extracted).`,
     },
   };
 
-  const orderedStrategies = rawScores.map((r) => strategies[r.strategy]);
+  if (includeDevelopment && devBuyBox) {
+    const devProfit = exactMetrics.devNetProfitBeforeTaxZAR ?? 0;
+    const devPoc = exactMetrics.devPocPercent ?? 0;
+    const devTdc = exactMetrics.devTdcZAR ?? 0;
+    strategies.Development = {
+      strategy: 'Development',
+      label: 'Development',
+      buyBox: devBuyBox,
+      score: devScore,
+      isNodeRecommended: true,
+      primaryKpiLabel: 'Net Dev Profit / POC',
+      primaryKpiValue: `${formatCompactZAR(devProfit)} (${devPoc.toFixed(1)}%)`,
+      secondaryKpiLabel: 'Total TDC / Scale',
+      secondaryKpiValue: `${formatCompactZAR(devTdc)} • ${params.numberOfUnits ?? 1}u`,
+      verdictBadge: buildVerdictBadge(
+        devBuyBox.meetsBuyBox,
+        devBuyBox.passedCount,
+        devBuyBox.totalCount,
+        recommendedStrategy === 'Development'
+      ),
+      summary: devBuyBox.meetsBuyBox
+        ? `Exceeds ${minDevPoc}% POC hurdle with ${formatCompactZAR(devProfit)} pre-tax development profit.`
+        : `Projected POC of ${devPoc.toFixed(1)}% vs ${minDevPoc}% target (${formatCompactZAR(devTdc)} TDC).`,
+    };
+  }
+
+  const orderedStrategies = rawScores
+    .map((r) => strategies[r.strategy])
+    .filter((item): item is StrategyVerdictItem => Boolean(item));
 
   let recommendationReason = '';
   if (recommendedStrategy === 'Rental') {
     recommendationReason = `Buy & Hold Rental scores highest (${rentalScore}/100) with ${rentalBuyBox.passedCount}/${rentalBuyBox.totalCount} Buy-Box hurdles met and ${exactMetrics.fiveYearIrrPercent.toFixed(1)}% 5-Yr IRR.`;
   } else if (recommendedStrategy === 'Flip') {
     recommendationReason = `Buy & Flip scores highest (${flipScore}/100), unlocking ${formatCompactZAR(exactMetrics.projectedFlipNetProfit)} net profit (${exactMetrics.projectedFlipRoi.toFixed(1)}% ROI) over ${params.holdingPeriodMonths ?? 6} months.`;
+  } else if (recommendedStrategy === 'Development') {
+    recommendationReason = `Ground-Up / Subdivision Development scores highest (${devScore}/100), generating ${formatCompactZAR(exactMetrics.devNetProfitBeforeTaxZAR ?? 0)} net profit (${(exactMetrics.devPocPercent ?? 0).toFixed(1)}% POC) on ${formatCompactZAR(exactMetrics.devTdcZAR ?? 0)} TDC.`;
   } else {
     recommendationReason = `Hybrid BRRRR scores highest (${brrrrScore}/100), extracting ${formatCompactZAR(exactMetrics.brrrrEquityExtractedZAR)} on refinance and leaving ${formatCompactZAR(exactMetrics.brrrrCashLeftInDealZAR)} trapped.`;
   }
@@ -245,7 +314,7 @@ function simulateModifiedDeal(
  */
 export function solveDealRepairLevers(
   params: DealMetricsInputParams,
-  profile: Partial<InvestorProfile> = {},
+  profile: Partial<InvestorProfile> & { liquidCapitalReserveZAR?: number } = {},
   strategy: DealStrategy = params.strategy ?? 'Rental',
   nodeOrCity?: InvestmentNode | string
 ): DealRepairPrescription {
@@ -256,7 +325,12 @@ export function solveDealRepairLevers(
   const minMonthlyCashflow = profile.minMonthlyCashflowZAR ?? 1500;
   const minNetRoi = profile.minNetRoiPercent ?? 8.0;
   const minFlipRoi = profile.minFlipRoiPercent ?? 18.0;
+  const minDevPoc = profile.minDevelopmentPocPercent ?? 20.0;
   const maxDay1Cash = profile.maxDay1CashZAR ?? 500_000;
+  const effectiveDevEquityCap =
+    profile.liquidCapitalReserveZAR !== undefined && profile.liquidCapitalReserveZAR > 0
+      ? profile.liquidCapitalReserveZAR
+      : maxDay1Cash;
   const minDscr = profile.minDscr ?? 1.20;
 
   const failedHurdles: FailedHurdleDetail[] = [];
@@ -278,6 +352,50 @@ export function solveDealRepairLevers(
         actualLabel: formatCompactZAR(currentMetrics.initialCapitalRequired),
         targetLabel: `≤ ${formatCompactZAR(maxDay1Cash)}`,
         gapLabel: `+${formatCompactZAR(currentMetrics.initialCapitalRequired - maxDay1Cash)} over`,
+      });
+    }
+  } else if (strategy === 'Development') {
+    const devPoc = currentMetrics.devPocPercent ?? 0;
+    const devYoc = currentMetrics.devYieldOnCostPercent ?? 0;
+    const devEq = currentMetrics.devEquityRequiredZAR ?? currentMetrics.initialCapitalRequired;
+    const plannedUnits = Math.max(1, currentMetrics.devUnitsTotalCount ?? params.numberOfUnits ?? 6);
+    const maxWipeoutUnits = currentMetrics.devMaxDebtWipeoutUnits ?? Math.ceil(plannedUnits * 0.65);
+    const wipeoutUnits = currentMetrics.devUnitsRequiredForDebtWipeout ?? 0;
+
+    if (!currentBuyBox.criteriaMap['minDevelopmentPoc']) {
+      failedHurdles.push({
+        key: 'minDevelopmentPoc',
+        label: 'Profit on Cost (POC %)',
+        actualLabel: `${devPoc.toFixed(1)}%`,
+        targetLabel: `≥ ${minDevPoc.toFixed(1)}%`,
+        gapLabel: `${(devPoc - minDevPoc).toFixed(1)}%`,
+      });
+    }
+    if (!currentBuyBox.criteriaMap['minDevelopmentYoc']) {
+      failedHurdles.push({
+        key: 'minDevelopmentYoc',
+        label: 'Yield on Cost (BTR YoC %)',
+        actualLabel: `${devYoc.toFixed(1)}%`,
+        targetLabel: `≥ ${minNetYield.toFixed(1)}%`,
+        gapLabel: `${(devYoc - minNetYield).toFixed(1)}%`,
+      });
+    }
+    if (!currentBuyBox.criteriaMap['maxDebtWipeoutUnits']) {
+      failedHurdles.push({
+        key: 'maxDebtWipeoutUnits',
+        label: 'Debt Wipeout Breakeven',
+        actualLabel: `${wipeoutUnits}/${plannedUnits} units`,
+        targetLabel: `≤ ${maxWipeoutUnits} units (65%)`,
+        gapLabel: `+${wipeoutUnits - maxWipeoutUnits} units over`,
+      });
+    }
+    if (!currentBuyBox.criteriaMap['maxDay1Cash']) {
+      failedHurdles.push({
+        key: 'maxDay1Cash',
+        label: 'Developer Equity vs War Chest',
+        actualLabel: formatCompactZAR(devEq),
+        targetLabel: `≤ ${formatCompactZAR(effectiveDevEquityCap)}`,
+        gapLabel: `Reserve Shortfall: -${formatCompactZAR(devEq - effectiveDevEquityCap)}`,
       });
     }
   } else {
@@ -345,7 +463,7 @@ export function solveDealRepairLevers(
   // ============================================================================
   // LEVER 1: Exact Net-to-Gross Target Monthly Rent Solver (Rental & BRRRR)
   // ============================================================================
-  if (strategy !== 'Flip') {
+  if (strategy !== 'Flip' && strategy !== 'Development') {
     const incomeHurdleFailed =
       !currentBuyBox.criteriaMap['minNetYield'] ||
       !currentBuyBox.criteriaMap['minMonthlyCashflow'] ||
@@ -430,7 +548,7 @@ export function solveDealRepairLevers(
   }
 
   // ============================================================================
-  // LEVER 2: Max Allowable Purchase Price Solver (All Strategies)
+  // LEVER 2: Max Allowable Purchase Price / Land Bid Solver (All Strategies)
   // ============================================================================
   if (params.purchasePrice > 100_000) {
     // Binary search between R 50,000 and current purchasePrice preserving LTV %
@@ -456,7 +574,35 @@ export function solveDealRepairLevers(
       }
     }
 
-    // Fine-tune downward in R 1,000 steps if needed to ensure strict Buy-Box pass
+    // For Development, if build works alone require more equity than War Chest at current LTC,
+    // solve the Max Land Bid that satisfies the 20% POC, YoC & Debt Wipeout hurdles (or fits War Chest at 75% LTC).
+    if (bestPrice === null && strategy === 'Development') {
+      let devLow = 50_000;
+      let devHigh = params.purchasePrice;
+      for (let iter = 0; iter < 30; iter++) {
+        const mid = Math.floor((devLow + devHigh) / 2 / 1000) * 1000;
+        const midDeposit = Math.max(0, Math.round(mid * (1 - effectiveLtv / 100)));
+        const simMetrics = simulateModifiedDeal(params, {
+          purchasePrice: mid,
+          depositZAR: midDeposit,
+          loanToValuePercent: effectiveLtv,
+          bondLTV: effectiveLtv,
+        });
+        const simEval = evaluateDealCriteria(simMetrics, profile, 'Development');
+        const pocAndWipeoutPass =
+          simEval.criteriaMap['minDevelopmentPoc'] &&
+          simEval.criteriaMap['minDevelopmentYoc'] &&
+          simEval.criteriaMap['maxDebtWipeoutUnits'];
+        if (pocAndWipeoutPass) {
+          bestPrice = mid;
+          devLow = mid + 1000;
+        } else {
+          devHigh = mid - 1000;
+        }
+      }
+    }
+
+    // Fine-tune downward in R 1,000 steps if needed
     if (bestPrice !== null && bestPrice < params.purchasePrice) {
       const finalDeposit = Math.max(0, Math.round(bestPrice * (1 - effectiveLtv / 100)));
       const verifyMetrics = simulateModifiedDeal(params, {
@@ -466,17 +612,20 @@ export function solveDealRepairLevers(
         bondLTV: effectiveLtv,
       });
       const verifyEval = evaluateDealCriteria(verifyMetrics, profile, strategy);
-      if (verifyEval.meetsBuyBox) {
+      if (verifyEval.meetsBuyBox || (strategy === 'Development' && verifyEval.criteriaMap['minDevelopmentPoc'])) {
         const discountZAR = params.purchasePrice - bestPrice;
         const discountPct = Number(((discountZAR / params.purchasePrice) * 100).toFixed(1));
         levers.push({
           id: 'price',
-          label: 'Max Allowable Purchase Bid',
+          label: strategy === 'Development' ? 'Max Allowable Land Bid' : 'Max Allowable Purchase Bid',
           currentValueLabel: formatCompactZAR(params.purchasePrice),
           targetValueLabel: formatCompactZAR(bestPrice),
           deltaLabel: `-${formatCompactZAR(discountZAR)} (-${discountPct}%)`,
-          description: `Negotiating the bid down to ${formatCompactZAR(bestPrice)} (at ${effectiveLtv}% LTV) recalibrates SARS transfer duty, bond size, and Day-1 cash to pass all ${verifyEval.totalCount}/${verifyEval.totalCount} hurdles.`,
-          fixesAllHurdles: true,
+          description:
+            strategy === 'Development'
+              ? `Negotiating the raw land bid down to ${formatCompactZAR(bestPrice)} lowers TDC to ${formatCompactZAR(verifyMetrics.devTdcZAR)} (${verifyMetrics.devPocPercent.toFixed(1)}% POC) and reduces required developer equity to ${formatCompactZAR(verifyMetrics.devEquityRequiredZAR)}.`
+              : `Negotiating the bid down to ${formatCompactZAR(bestPrice)} (at ${effectiveLtv}% LTV) recalibrates SARS transfer duty, bond size, and Day-1 cash to pass all ${verifyEval.totalCount}/${verifyEval.totalCount} hurdles.`,
+          fixesAllHurdles: verifyEval.meetsBuyBox,
           targetPriceZAR: bestPrice,
         });
       }
@@ -484,9 +633,51 @@ export function solveDealRepairLevers(
   }
 
   // ============================================================================
-  // LEVER 3: Optimal LTV / Deposit Structure Solver
+  // LEVER 3: Optimal LTV / Senior LTC Structure Solver
   // ============================================================================
-  if (!currentBuyBox.criteriaMap['maxDay1Cash'] || !currentBuyBox.criteriaMap['minDscr'] || !currentBuyBox.criteriaMap['minMonthlyCashflow']) {
+  if (strategy === 'Development' && !currentBuyBox.criteriaMap['maxDay1Cash']) {
+    const currentLtc = params.seniorDebtLtcPercent ?? 65;
+    const candidateLtcs = [75, 80, 70];
+    let targetLtc: number | null = null;
+    for (const cand of candidateLtcs) {
+      if (cand <= currentLtc) continue;
+      const simMetrics = simulateModifiedDeal(params, { seniorDebtLtcPercent: cand });
+      const simEval = evaluateDealCriteria(simMetrics, profile, 'Development');
+      if (simEval.criteriaMap['maxDay1Cash']) {
+        targetLtc = cand;
+        break;
+      }
+    }
+    if (targetLtc === null && currentLtc < 75) {
+      targetLtc = 75;
+    } else if (targetLtc === null && currentLtc < 80) {
+      targetLtc = 80;
+    }
+
+    if (targetLtc !== null) {
+      const simMetrics = simulateModifiedDeal(params, { seniorDebtLtcPercent: targetLtc });
+      const simEval = evaluateDealCriteria(simMetrics, profile, 'Development');
+      const curEq = currentMetrics.devEquityRequiredZAR;
+      const nextEq = simMetrics.devEquityRequiredZAR;
+      const eqSaved = Math.max(0, curEq - nextEq);
+      levers.push({
+        id: 'ltv',
+        label: `Increase LTC to ${targetLtc}% (TUHF/DFI)`,
+        currentValueLabel: `${currentLtc}% LTC (${formatCompactZAR(curEq)})`,
+        targetValueLabel: `${targetLtc}% LTC (${formatCompactZAR(nextEq)})`,
+        deltaLabel: `-${formatCompactZAR(eqSaved)} Equity`,
+        description: `Securing a ${targetLtc}% LTC Senior Development Facility (TUHF / DFI inner-city or infill mandate) expands senior debt to ${formatCompactZAR(simMetrics.devSeniorFacilityLimitZAR)} and reduces Developer Equity required by ${formatCompactZAR(eqSaved)}.`,
+        fixesAllHurdles: simEval.meetsBuyBox,
+        targetLtvPercent: targetLtc,
+        targetSeniorDebtLtcPercent: targetLtc,
+      });
+    }
+  } else if (
+    strategy !== 'Development' &&
+    (!currentBuyBox.criteriaMap['maxDay1Cash'] ||
+      !currentBuyBox.criteriaMap['minDscr'] ||
+      !currentBuyBox.criteriaMap['minMonthlyCashflow'])
+  ) {
     let bestLtv: number | null = null;
     let bestLtvPassesAll = false;
     let bestPassedCount = currentBuyBox.passedCount;
@@ -533,7 +724,7 @@ export function solveDealRepairLevers(
   }
 
   // ============================================================================
-  // LEVER 4: Required Exit Valuation / Post-Rehab ARV (Flip & BRRRR)
+  // LEVER 4: Required Exit Valuation / Post-Rehab ARV / Scheme GDV
   // ============================================================================
   if (strategy === 'Flip' && !currentBuyBox.criteriaMap['minFlipRoi']) {
     let candExit = Math.max(params.targetExitPrice + 10_000, params.purchasePrice + params.estimatedRehabCost);
@@ -557,6 +748,30 @@ export function solveDealRepairLevers(
         break;
       }
       candExit += 25_000;
+    }
+  } else if (strategy === 'Development' && !currentBuyBox.criteriaMap['minDevelopmentPoc']) {
+    const baseGdv = currentMetrics.devGdvInclVatZAR ?? params.targetExitPrice;
+    let candGdv = Math.max(baseGdv + 50_000, currentMetrics.devTdcZAR ?? baseGdv);
+    for (let step = 0; step < 150; step++) {
+      const simMetrics = params.costs
+        ? calculateDealMetrics({ ...params, targetExitPrice: candGdv })
+        : simulateModifiedDeal(params, { targetExitPrice: candGdv });
+      const simEval = evaluateDealCriteria(simMetrics, profile, 'Development');
+      if (simEval.criteriaMap['minDevelopmentPoc']) {
+        const gdvDelta = candGdv - baseGdv;
+        levers.push({
+          id: 'exitPrice',
+          label: 'Required Completed Scheme GDV',
+          currentValueLabel: formatCompactZAR(baseGdv),
+          targetValueLabel: formatCompactZAR(candGdv),
+          deltaLabel: `+${formatCompactZAR(gdvDelta)}`,
+          description: `Pricing completed units for a total scheme GDV of ${formatCompactZAR(candGdv)} achieves the ${minDevPoc}% Profit on Cost (POC) hurdle.`,
+          fixesAllHurdles: simEval.meetsBuyBox,
+          targetExitPriceZAR: candGdv,
+        });
+        break;
+      }
+      candGdv += 50_000;
     }
   }
 

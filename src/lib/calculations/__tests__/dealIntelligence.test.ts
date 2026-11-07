@@ -12,6 +12,7 @@ import {
 import {
   calculateDealMetrics,
   evaluateDealCriteria,
+  calculateDevelopmentRateShockScenarios,
 } from '@/lib/calculations/propertyMetrics';
 import { InvestorProfile } from '@/types';
 
@@ -165,5 +166,95 @@ describe('dealIntelligence — 3-Strategy Matrix & Guardrail #1 (Exact Net-to-Gr
     const repairedMetrics = calculateDealMetrics(repairedInputs);
     const repairedEval = evaluateDealCriteria(repairedMetrics, mockInvestorProfile, 'Rental');
     expect(repairedEval.meetsBuyBox).toBe(true);
+  });
+
+  it('includes the 4th Development strategy in the matrix when strategy is Development or numberOfUnits >= 2, and solves Development POC & Equity hurdles', () => {
+    const devDeal: DealMetricsInputParams = {
+      ...baseFailingRentalDeal,
+      strategy: 'Development',
+      numberOfUnits: 6,
+      floorAreaSqm: 390,
+      purchasePrice: 1_850_000,
+      monthlyRentalEstimate: 57_000,
+      targetExitPrice: 7_200_000, // Low GDV so POC is below 20%
+      hardCostPerSqmZAR: 9_800,
+      contingencyPercent: 7.5,
+      softCostAllowancePercent: 15,
+      preApprovalMonths: 4,
+      constructionMonths: 8,
+      monthlyPreApprovalBurnZAR: 3_500,
+      monthlyConstructionBurnZAR: 12_500,
+      seniorDebtLtcPercent: 65,
+      sCurveUtilizationPercent: 60,
+      preSalesHurdlePercent: 60,
+      isVatRegisteredDeveloper: true,
+    };
+
+    const matrix = evaluateThreeStrategyMatrix(
+      devDeal,
+      { ...mockInvestorProfile, liquidCapitalReserveZAR: 450_000 },
+      'Sandton'
+    );
+    expect(matrix.orderedStrategies).toHaveLength(4);
+    expect(Object.keys(matrix.strategies)).toEqual(['Rental', 'Flip', 'BRRRR', 'Development']);
+    expect(matrix.strategies.Development).toBeDefined();
+    expect(matrix.strategies.Development?.primaryKpiLabel).toBe('Net Dev Profit / POC');
+    expect(matrix.recommendedStrategy).toBe('Development');
+    expect(matrix.strategies.Development?.buyBox.totalCount).toBe(4);
+
+    const devMetrics = calculateDealMetrics(devDeal);
+    expect(devMetrics.devTdcZAR).toBeGreaterThan(5_000_000);
+    expect(devMetrics.devUnitsRequiredForDebtWipeout).toBeGreaterThan(0);
+
+    const repairPlan = solveDealRepairLevers(
+      devDeal,
+      { ...mockInvestorProfile, liquidCapitalReserveZAR: 450_000 },
+      'Development',
+      'Sandton'
+    );
+    expect(repairPlan.totalCount).toBe(4);
+    expect(repairPlan.failedHurdles.map((h) => h.key)).toContain('minDevelopmentPoc');
+    expect(repairPlan.failedHurdles.map((h) => h.key)).toContain('maxDay1Cash');
+
+    const landBidLever = repairPlan.levers.find((l) => l.id === 'price');
+    expect(landBidLever).toBeDefined();
+    expect(landBidLever!.targetPriceZAR).toBeLessThan(devDeal.purchasePrice);
+
+    const ltcLever = repairPlan.levers.find((l) => l.id === 'ltv');
+    expect(ltcLever).toBeDefined();
+    expect(ltcLever!.targetSeniorDebtLtcPercent).toBe(75);
+    expect(ltcLever!.label).toContain('Increase LTC to 75% (TUHF/DFI)');
+
+    const gdvLever = repairPlan.levers.find((l) => l.id === 'exitPrice');
+    expect(gdvLever).toBeDefined();
+    expect(gdvLever!.targetExitPriceZAR).toBeGreaterThan(devDeal.targetExitPrice!);
+
+    // Verify SARB Shock Exposure bound to Senior Development Facility
+    const devRateShocks = calculateDevelopmentRateShockScenarios({
+      seniorDebtZAR: devMetrics.devSeniorFacilityLimitZAR,
+      sCurveUtilizationPercent: 60,
+      baseRatePercent: 10.75,
+      preApprovalMonths: 4,
+      constructionMonths: 8,
+      monthlyPreApprovalBurnZAR: 3_500,
+      monthlyConstructionBurnZAR: 12_500,
+      baseNonCarryingTdcZAR: devMetrics.devTdcZAR - devMetrics.devTotalCarryingCostZAR,
+      netRealizableGdvPlusInputVatZAR:
+        devMetrics.devNetRealizableGdvZAR + devMetrics.devClaimableInputVatZAR,
+      exitMode: 'Build-to-Sell',
+      monthlyNoi: devMetrics.monthlyNOI,
+      loanTermYears: 20,
+      minDscr: 1.25,
+    });
+    expect(devRateShocks).toHaveLength(3);
+    expect(devRateShocks[0].ratePercent).toBe(10.75);
+    expect(devRateShocks[1].ratePercent).toBe(11.75);
+    expect(devRateShocks[2].ratePercent).toBe(12.75);
+    expect(devRateShocks[2].avgMonthlySCurveInterestZAR).toBeGreaterThan(
+      devRateShocks[0].avgMonthlySCurveInterestZAR
+    );
+    expect(devRateShocks[2].totalCarryingBurnWithDelayZAR).toBeGreaterThan(
+      devRateShocks[0].totalCarryingBurnWithDelayZAR
+    );
   });
 });

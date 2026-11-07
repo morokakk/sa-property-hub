@@ -38,6 +38,26 @@ export interface AnalyzerResultsGridProps {
   isSection13Eligible?: boolean;
   section13AnnualSavings?: number;
   section13TwentyYearSavings?: number;
+  // Development Strategy Results Grid Props
+  devTdcZAR?: number;
+  devTdcPerSqmZAR?: number;
+  devTdcPerUnitZAR?: number;
+  devGdvInclVatZAR?: number;
+  devAvgUnitPriceZAR?: number;
+  devNetProfitBeforeTaxZAR?: number;
+  devPocPercent?: number;
+  devMarginPercent?: number;
+  devYieldOnCostPercent?: number;
+  devSoftCostsZAR?: number;
+  devHardBuildCostZAR?: number;
+  devTotalCarryingCostZAR?: number;
+  devContingencyZAR?: number;
+  devSeniorFacilityLimitZAR?: number;
+  devUnitsRequiredForDebtWipeout?: number;
+  devUnitsRetainedCount?: number;
+  devIsSection13SexEligible?: boolean;
+  devSection13SexAnnualShieldZAR?: number;
+  minDevPocHurdle?: number;
 }
 
 export function AnalyzerResultsGrid({
@@ -72,10 +92,149 @@ export function AnalyzerResultsGrid({
   isSection13Eligible = false,
   section13AnnualSavings = 0,
   section13TwentyYearSavings = 0,
+  devTdcZAR = 0,
+  devTdcPerSqmZAR = 0,
+  devTdcPerUnitZAR = 0,
+  devGdvInclVatZAR = 0,
+  devAvgUnitPriceZAR = 0,
+  devNetProfitBeforeTaxZAR = 0,
+  devPocPercent = 0,
+  devMarginPercent = 0,
+  devYieldOnCostPercent = 0,
+  devSoftCostsZAR = 0,
+  devHardBuildCostZAR = 0,
+  devTotalCarryingCostZAR = 0,
+  devContingencyZAR = 0,
+  devSeniorFacilityLimitZAR = 0,
+  devUnitsRequiredForDebtWipeout = 0,
+  devUnitsRetainedCount = 0,
+  devIsSection13SexEligible = false,
+  devSection13SexAnnualShieldZAR = 0,
+  minDevPocHurdle = 20.0,
 }: AnalyzerResultsGridProps) {
   const meetsRoiHurdle = netRoi >= minNetRoiHurdle;
   const isCashDeal = dscr === null;
   const meetsDscrHurdle = isCashDeal || dscr >= minDscrHurdle - 1e-4;
+  const meetsDevPocHurdle = devPocPercent >= minDevPocHurdle;
+
+  if (strategy === 'Development') {
+    return (
+      <div className="space-y-3 pt-1">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+          {/* Dev Metric 1: Net Development Profit */}
+          <div className="bg-emerald-950/70 p-3 rounded-xl border border-emerald-500/40 flex flex-col justify-between min-h-[76px]">
+            <span className="text-emerald-400 block text-[10px] font-semibold uppercase tracking-wide">
+              Net Dev Profit (Pre-Tax)
+            </span>
+            <div className={`text-sm sm:text-base font-extrabold font-mono ${devNetProfitBeforeTaxZAR >= 0 ? 'text-emerald-300' : 'text-rose-400'}`}>
+              {formatZAR(devNetProfitBeforeTaxZAR)}
+            </div>
+            <span className="text-[10px] text-emerald-400/80 block">
+              Dev Margin: {formatPercent(devMarginPercent)}
+            </span>
+          </div>
+
+          {/* Dev Metric 2: Total Development Cost (TDC) */}
+          <div className="bg-slate-900/80 p-3 rounded-xl border border-slate-700/80 flex flex-col justify-between min-h-[76px]">
+            <span className="text-slate-400 block text-[10px] font-semibold uppercase tracking-wide">
+              Total Dev Cost (TDC)
+            </span>
+            <div className="text-sm sm:text-base font-bold text-white font-mono">
+              {formatZAR(devTdcZAR)}
+            </div>
+            <span className="text-[10px] text-indigo-300 font-mono block truncate">
+              {formatZAR(devTdcPerSqmZAR)}/m² &bull; {formatZAR(devTdcPerUnitZAR)}/u
+            </span>
+          </div>
+
+          {/* Dev Metric 3: Completed Scheme GDV */}
+          <div className="bg-slate-900/80 p-3 rounded-xl border border-slate-700/80 flex flex-col justify-between min-h-[76px]">
+            <span className="text-slate-400 block text-[10px] font-semibold uppercase tracking-wide">
+              Completed Scheme GDV
+            </span>
+            <div className="text-sm sm:text-base font-bold text-emerald-400 font-mono">
+              {formatZAR(devGdvInclVatZAR)}
+            </div>
+            <span className="text-[10px] text-slate-400 font-mono block truncate">
+              {numberOfUnits} units &bull; Avg {formatZAR(devAvgUnitPriceZAR)}/u
+            </span>
+          </div>
+
+          {/* Dev Metric 4: Profit on Cost (POC %) */}
+          <div className="bg-slate-900/80 p-3 rounded-xl border border-slate-700/80 flex flex-col justify-between min-h-[76px]">
+            <div className="flex items-center justify-between gap-1">
+              <span className="text-slate-400 block text-[10px] font-semibold uppercase tracking-wide">
+                Profit on Cost (POC)
+              </span>
+              <span className={`text-[9px] font-bold px-1.5 py-0.2 rounded ${meetsDevPocHurdle ? 'bg-emerald-950 text-emerald-300 border border-emerald-700/60' : 'bg-amber-950 text-amber-300 border border-amber-700/60'}`}>
+                {meetsDevPocHurdle ? `≥${minDevPocHurdle}%` : `<${minDevPocHurdle}%`}
+              </span>
+            </div>
+            <div className={`text-sm sm:text-base font-bold font-mono ${meetsDevPocHurdle ? 'text-emerald-400' : devPocPercent >= 0 ? 'text-amber-300' : 'text-rose-400'}`}>
+              {formatPercent(devPocPercent)}
+            </div>
+            <span className="text-[10px] text-slate-400 block">
+              Net Profit &divide; Total TDC
+            </span>
+          </div>
+
+          {/* Dev Metric 5: Hard Build + Soft & Bulk */}
+          <div className="bg-slate-900/80 p-3 rounded-xl border border-slate-700/80 flex flex-col justify-between min-h-[76px]">
+            <span className="text-slate-400 block text-[10px] font-semibold uppercase tracking-wide">
+              Hard Build Works
+            </span>
+            <div className="text-sm sm:text-base font-bold text-white font-mono">
+              {formatZAR(devHardBuildCostZAR)}
+            </div>
+            <span className="text-[10px] text-slate-400 block truncate">
+              Soft &amp; Bulk: {formatZAR(devSoftCostsZAR)}
+            </span>
+          </div>
+
+          {/* Dev Metric 6: 2-Stage Carrying & Contingency */}
+          <div className="bg-slate-900/80 p-3 rounded-xl border border-slate-700/80 flex flex-col justify-between min-h-[76px]">
+            <span className="text-slate-400 block text-[10px] font-semibold uppercase tracking-wide">
+              Carrying &amp; Contingency
+            </span>
+            <div className="text-sm sm:text-base font-bold text-amber-300 font-mono">
+              {formatZAR(devTotalCarryingCostZAR + devContingencyZAR)}
+            </div>
+            <span className="text-[10px] text-slate-400 block truncate">
+              Burn: {formatZAR(devTotalCarryingCostZAR)} &bull; Cont: {formatZAR(devContingencyZAR)}
+            </span>
+          </div>
+
+          {/* Dev Metric 7: Senior Debt Wipeout Breakeven */}
+          <div className="bg-slate-900/80 p-3 rounded-xl border border-slate-700/80 flex flex-col justify-between min-h-[76px]">
+            <span className="text-slate-400 block text-[10px] font-semibold uppercase tracking-wide">
+              Debt Wipeout Breakeven
+            </span>
+            <div className="text-sm sm:text-base font-bold text-teal-300 font-mono">
+              {devUnitsRequiredForDebtWipeout} of {numberOfUnits} Units
+            </div>
+            <span className="text-[10px] text-slate-400 block truncate">
+              Senior Facility: {formatZAR(devSeniorFacilityLimitZAR)}
+            </span>
+          </div>
+
+          {/* Dev Metric 8: Yield on TDC & Section 13sex */}
+          <div className="bg-slate-900/80 p-3 rounded-xl border border-slate-700/80 flex flex-col justify-between min-h-[76px]">
+            <span className="text-teal-400 block text-[10px] font-semibold uppercase tracking-wide">
+              Dev Yield on Cost (BTR)
+            </span>
+            <div className="text-sm sm:text-base font-bold text-teal-300 font-mono">
+              {formatPercent(devYieldOnCostPercent)}
+            </div>
+            <span className="text-[10px] text-slate-400 block truncate">
+              {devIsSection13SexEligible
+                ? `Sec 13sex: +${formatZAR(devSection13SexAnnualShieldZAR)}/yr`
+                : `${devUnitsRetainedCount} retained (${Math.max(0, 5 - devUnitsRetainedCount)} more for 13sex)`}
+            </span>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-3 pt-1">

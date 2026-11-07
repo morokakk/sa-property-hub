@@ -400,6 +400,26 @@ export function unmapOpportunities(
         refinanceLtvPercent: _r,
         monthlyMaintenanceReserveZAR: _m,
         monthlyPrepaidVendingFeeZAR: _p,
+        developmentType: _dt,
+        isVatRegisteredDeveloper: _dv,
+        developmentExitMode: _dem,
+        unitsRetainedCount: _urc,
+        hardCostPerSqmZAR: _hc,
+        contingencyPercent: _cp,
+        softCostAllowancePercent: _sca,
+        useCustomSoftCosts: _ucsc,
+        softCosts: _sc,
+        preApprovalMonths: _pam,
+        constructionMonths: _cm,
+        monthlyPreApprovalBurnZAR: _mpab,
+        monthlyConstructionBurnZAR: _mcb,
+        seniorDebtLtcPercent: _sdl,
+        sCurveUtilizationPercent: _scu,
+        preSalesHurdlePercent: _psh,
+        projectedDevTdcZAR: _pdt,
+        projectedDevGdvZAR: _pdg,
+        projectedDevNetProfitZAR: _pdnp,
+        projectedDevPocPercent: _pdp,
         ...restCosts
       } = rawCosts;
       cleanCosts = Object.keys(restCosts).length > 0 ? (restCosts as any) : undefined;
@@ -451,6 +471,32 @@ export function unmapOpportunities(
       refinanceLtvPercent:
         toNullableNum((opp as any).refinance_ltv_percent) ??
         toNullableNum(rawCosts?.refinanceLtvPercent),
+      developmentType: rawCosts?.developmentType || undefined,
+      isVatRegisteredDeveloper:
+        rawCosts?.isVatRegisteredDeveloper !== undefined
+          ? Boolean(rawCosts.isVatRegisteredDeveloper)
+          : undefined,
+      developmentExitMode: rawCosts?.developmentExitMode || undefined,
+      unitsRetainedCount: toNullableNum(rawCosts?.unitsRetainedCount),
+      hardCostPerSqmZAR: toNullableNum(rawCosts?.hardCostPerSqmZAR),
+      contingencyPercent: toNullableNum(rawCosts?.contingencyPercent),
+      softCostAllowancePercent: toNullableNum(rawCosts?.softCostAllowancePercent),
+      useCustomSoftCosts:
+        rawCosts?.useCustomSoftCosts !== undefined
+          ? Boolean(rawCosts.useCustomSoftCosts)
+          : undefined,
+      softCosts: rawCosts?.softCosts || undefined,
+      preApprovalMonths: toNullableNum(rawCosts?.preApprovalMonths),
+      constructionMonths: toNullableNum(rawCosts?.constructionMonths),
+      monthlyPreApprovalBurnZAR: toNullableNum(rawCosts?.monthlyPreApprovalBurnZAR),
+      monthlyConstructionBurnZAR: toNullableNum(rawCosts?.monthlyConstructionBurnZAR),
+      seniorDebtLtcPercent: toNullableNum(rawCosts?.seniorDebtLtcPercent),
+      sCurveUtilizationPercent: toNullableNum(rawCosts?.sCurveUtilizationPercent),
+      preSalesHurdlePercent: toNullableNum(rawCosts?.preSalesHurdlePercent),
+      projectedDevTdcZAR: toNullableNum(rawCosts?.projectedDevTdcZAR),
+      projectedDevGdvZAR: toNullableNum(rawCosts?.projectedDevGdvZAR),
+      projectedDevNetProfitZAR: toNullableNum(rawCosts?.projectedDevNetProfitZAR),
+      projectedDevPocPercent: toNullableNum(rawCosts?.projectedDevPocPercent),
       annualInsurance: toNum(opp.annual_insurance_zar, 0),
       managementFeePercent: toNum(opp.management_fee_percent, 8.0),
       agencyVatApplicable: opp.agency_vat_applicable ?? true,

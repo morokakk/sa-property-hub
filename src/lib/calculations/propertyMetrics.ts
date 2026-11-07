@@ -1,6 +1,7 @@
-import { AcquisitionCostBreakdown, AmenityDistance, AmenityScorecard, AncillaryIncome, DealStrategy, InvestorProfile, Lease, LongTermProjectionYear, OccupantRiskProfile, OpportunityDeal, PropertyTitleType, RentalProperty } from '@/types';
+import { AcquisitionCostBreakdown, AmenityDistance, AmenityScorecard, AncillaryIncome, DealStrategy, DevelopmentExitMode, DevelopmentSoftCosts, DevelopmentType, InvestorProfile, Lease, LongTermProjectionYear, OccupantRiskProfile, OpportunityDeal, PropertyTitleType, RentalProperty } from '@/types';
 import { calculateEvictionCarryingCost } from './occupantRisk';
 import { computeAcquisitionCosts, calculateBondRegistrationFee } from './sarsTax';
+import { calculateDevelopmentSoftCostsTotal } from './developments';
 
 /**
  * Computes Built-in Equity and discount percentage
@@ -215,6 +216,19 @@ export interface RateShockScenario {
   band: DscrBand;
 }
 
+export interface DevelopmentRateShockScenario {
+  label: string; // 'Current' | '+100 bps' | '+200 bps'
+  shockBps: number;
+  ratePercent: number;
+  avgMonthlySCurveInterestZAR: number;
+  totalCarryingBurnWithDelayZAR: number;
+  stressedPocPercent: number;
+  btrDscr: number | null;
+  exitMode: DevelopmentExitMode;
+  band: DscrBand;
+  badgeLabel: string;
+}
+
 /**
  * Calculates interest rate stress-test scenarios (0 bps, +100 bps, +200 bps)
  * evaluating monthly bond debt service, net cashflow, and DSCR hurdle status.
@@ -262,6 +276,117 @@ export function calculateRateShockScenarios(params: {
       monthlyCashFlow,
       dscr,
       band,
+    };
+  });
+}
+
+/**
+ * Calculates SARB interest rate & +2 month construction delay stress-test scenarios
+ * (Current, +100 bps, +200 bps) bound to the Senior Development Facility (seniorDebtZAR).
+ */
+export function calculateDevelopmentRateShockScenarios(params: {
+  seniorDebtZAR: number;
+  sCurveUtilizationPercent: number;
+  baseRatePercent: number;
+  preApprovalMonths: number;
+  constructionMonths: number;
+  monthlyPreApprovalBurnZAR: number;
+  monthlyConstructionBurnZAR: number;
+  baseNonCarryingTdcZAR: number;
+  netRealizableGdvPlusInputVatZAR: number;
+  exitMode?: DevelopmentExitMode;
+  monthlyNoi?: number;
+  loanTermYears?: number;
+  minDscr?: number;
+  delayMonths?: number;
+  shocksBps?: number[];
+}): DevelopmentRateShockScenario[] {
+  const {
+    seniorDebtZAR,
+    sCurveUtilizationPercent,
+    baseRatePercent,
+    preApprovalMonths,
+    constructionMonths,
+    monthlyPreApprovalBurnZAR,
+    monthlyConstructionBurnZAR,
+    baseNonCarryingTdcZAR,
+    netRealizableGdvPlusInputVatZAR,
+    exitMode = 'Build-to-Sell',
+    monthlyNoi = 0,
+    loanTermYears = 20,
+    minDscr = 1.2,
+    delayMonths = 2,
+    shocksBps = [0, 100, 200],
+  } = params;
+
+  const utilFraction = Math.max(0, Math.min(100, sCurveUtilizationPercent)) / 100;
+  const preApprovalBurnTotal = Math.round(
+    Math.max(0, preApprovalMonths) * Math.max(0, monthlyPreApprovalBurnZAR)
+  );
+  const stressedBuildMonths = Math.max(1, constructionMonths) + Math.max(0, delayMonths);
+
+  return shocksBps.map((bps) => {
+    const ratePercent = Number((baseRatePercent + bps / 100).toFixed(2));
+    const avgMonthlySCurveInterestZAR = Math.round(
+      Math.max(0, seniorDebtZAR) * utilFraction * (Math.max(0, ratePercent) / 100 / 12)
+    );
+    const totalCarryingBurnWithDelayZAR = Math.round(
+      preApprovalBurnTotal +
+        stressedBuildMonths *
+          (Math.max(0, monthlyConstructionBurnZAR) + avgMonthlySCurveInterestZAR)
+    );
+    const stressedTdcZAR = Math.max(1, baseNonCarryingTdcZAR + totalCarryingBurnWithDelayZAR);
+    const stressedProfitZAR = netRealizableGdvPlusInputVatZAR - stressedTdcZAR;
+    const stressedPocPercent = Number(((stressedProfitZAR / stressedTdcZAR) * 100).toFixed(1));
+
+    const btrMonthlyBond =
+      seniorDebtZAR > 0
+        ? calculateMonthlyBondRepayment(seniorDebtZAR, ratePercent, loanTermYears)
+        : 0;
+    const rawBtrDscr = btrMonthlyBond > 0 ? monthlyNoi / btrMonthlyBond : null;
+    const btrDscr = rawBtrDscr !== null ? Number(rawBtrDscr.toFixed(2)) : null;
+
+    let band: DscrBand = 'pass';
+    let badgeLabel = 'PASS (≥ 15% POC)';
+
+    if (seniorDebtZAR <= 0) {
+      band = 'cash';
+      badgeLabel = '100% EQUITY (No Debt)';
+    } else if (exitMode === 'Build-to-Rent Hold') {
+      if ((btrDscr ?? 0) >= minDscr && stressedPocPercent >= 15.0) {
+        band = 'pass';
+        badgeLabel = 'PASS (≥ 15% POC & Bankable DSCR)';
+      } else if ((btrDscr ?? 0) >= 1.0 && stressedPocPercent >= 10.0) {
+        band = 'watch';
+        badgeLabel = 'WARN (Thin BTR Buffer)';
+      } else {
+        band = 'fail';
+        badgeLabel = 'FAIL (Sub-Hurdle Coverage)';
+      }
+    } else {
+      if (stressedPocPercent >= 15.0) {
+        band = 'pass';
+        badgeLabel = 'PASS (≥ 15% POC)';
+      } else if (stressedPocPercent >= 10.0) {
+        band = 'watch';
+        badgeLabel = 'WARN (Thin Margin < 15%)';
+      } else {
+        band = 'fail';
+        badgeLabel = 'FAIL (Margin Eroded < 10%)';
+      }
+    }
+
+    return {
+      label: bps === 0 ? 'Current' : `+${bps} bps`,
+      shockBps: bps,
+      ratePercent,
+      avgMonthlySCurveInterestZAR,
+      totalCarryingBurnWithDelayZAR,
+      stressedPocPercent,
+      btrDscr,
+      exitMode,
+      band,
+      badgeLabel,
     };
   });
 }
@@ -375,6 +500,78 @@ export interface OpportunityMetricsResult {
   bondCancellationFeeZAR?: number;
   earlyPenaltyZAR?: number;
   totalExitFrictionZAR?: number;
+  // Development Strategy Feasibility Outputs
+  devLandAndAcquisitionZAR: number;
+  devHardBuildCostZAR: number;
+  devContingencyZAR: number;
+  devSoftCostsZAR: number;
+  devSoftCostsBreakdown: DevelopmentSoftCosts;
+  devPreApprovalCarryingZAR: number;
+  devConstructionCarryingZAR: number;
+  devTotalCarryingCostZAR: number;
+  devTdcZAR: number;
+  devTdcPerSqmZAR: number;
+  devTdcPerUnitZAR: number;
+  devSeniorFacilityLimitZAR: number;
+  devMonthlySCurveInterestZAR: number;
+  devEquityRequiredZAR: number;
+  devGdvInclVatZAR: number;
+  devOutputVatZAR: number;
+  devClaimableInputVatZAR: number;
+  devNetRealizableGdvZAR: number;
+  devNetProfitBeforeTaxZAR: number;
+  devPocPercent: number;
+  devMarginPercent: number;
+  devYieldOnCostPercent: number;
+  devAvgUnitPriceZAR: number;
+  devUnitsTotalCount: number;
+  devUnitsForSaleCount: number;
+  devUnitsRetainedCount: number;
+  devUnitsRequiredForDebtWipeout: number;
+  devMaxDebtWipeoutUnits: number;
+  devRemainingDebtOnRetainedZAR: number;
+  devRetainedMonthlyRentZAR: number;
+  devIsSection13SexEligible: boolean;
+  devSection13SexAnnualShieldZAR: number;
+}
+
+/**
+ * Allocates a quick percentage Soft & Bulk allowance across the 8 standard South African
+ * development soft cost & SPLUMA Sec 42 bulk contribution items so that the sum equals
+ * the exact target allowance and maps 1:1 into /developments.
+ */
+export function buildDefaultSoftCostsFromAllowance(
+  hardBuildCostZAR: number,
+  allowancePercent: number = 15.0
+): DevelopmentSoftCosts {
+  const totalAllowance = Math.max(0, Math.round(Math.max(0, hardBuildCostZAR) * (Math.max(0, allowancePercent) / 100)));
+  const townPlannerZAR = Math.round(totalAllowance * 0.10);
+  const architectZAR = Math.round(totalAllowance * 0.22);
+  const structuralCivilEngineerZAR = Math.round(totalAllowance * 0.14);
+  const quantitySurveyorZAR = Math.round(totalAllowance * 0.08);
+  const nhbrcEnrolmentFeeZAR = Math.round(totalAllowance * 0.09);
+  const councilBulkContributionsZAR = Math.round(totalAllowance * 0.25);
+  const planScrutinyAndSubdivisionFeesZAR = Math.round(totalAllowance * 0.05);
+  const allocatedSoFar =
+    townPlannerZAR +
+    architectZAR +
+    structuralCivilEngineerZAR +
+    quantitySurveyorZAR +
+    nhbrcEnrolmentFeeZAR +
+    councilBulkContributionsZAR +
+    planScrutinyAndSubdivisionFeesZAR;
+  const marketingAndShowUnitZAR = Math.max(0, totalAllowance - allocatedSoFar);
+
+  return {
+    townPlannerZAR,
+    architectZAR,
+    structuralCivilEngineerZAR,
+    quantitySurveyorZAR,
+    nhbrcEnrolmentFeeZAR,
+    councilBulkContributionsZAR,
+    planScrutinyAndSubdivisionFeesZAR,
+    marketingAndShowUnitZAR,
+  };
 }
 
 /**
@@ -440,6 +637,23 @@ export function calculateDealMetrics(params: {
   earlyTerminationNoticeGiven?: boolean;
   earlyTerminationPenaltyZAR?: number;
   occupantRisk?: OccupantRiskProfile;
+  // Development Strategy Underwriting Parameters
+  developmentType?: DevelopmentType;
+  isVatRegisteredDeveloper?: boolean;
+  developmentExitMode?: DevelopmentExitMode;
+  unitsRetainedCount?: number;
+  hardCostPerSqmZAR?: number;
+  contingencyPercent?: number;
+  softCostAllowancePercent?: number;
+  useCustomSoftCosts?: boolean;
+  softCosts?: DevelopmentSoftCosts;
+  preApprovalMonths?: number;
+  constructionMonths?: number;
+  monthlyPreApprovalBurnZAR?: number;
+  monthlyConstructionBurnZAR?: number;
+  seniorDebtLtcPercent?: number;
+  sCurveUtilizationPercent?: number;
+  preSalesHurdlePercent?: number;
 }): OpportunityMetricsResult {
   const {
     purchasePrice,
@@ -750,6 +964,136 @@ export function calculateDealMetrics(params: {
   );
   const brrrrPostRefiCashflowZAR = Math.round(monthlyNetOperatingIncome - brrrrPostRefiBondPaymentZAR);
 
+  // 6. Development Strategy Feasibility & Split-Exit Calculations
+  const devUnitsCount = Math.max(1, safeUnits);
+  const devBuildableSqm = safeSqm > 0 ? safeSqm : devUnitsCount * 65;
+  const devHardRatePerSqm = params.hardCostPerSqmZAR !== undefined && params.hardCostPerSqmZAR > 0
+    ? params.hardCostPerSqmZAR
+    : (safeSqm > 0 && estimatedRehabCost > 0 ? Math.round(estimatedRehabCost / safeSqm) : 9_800);
+  const devHardBuildCostZAR =
+    params.strategy === 'Development' || (params.hardCostPerSqmZAR !== undefined && params.hardCostPerSqmZAR > 0)
+      ? Math.round(devBuildableSqm * devHardRatePerSqm)
+      : Math.round(estimatedRehabCost);
+
+  const devContingencyPct = params.contingencyPercent ?? 7.5;
+  const devContingencyZAR = Math.round(devHardBuildCostZAR * (Math.max(0, devContingencyPct) / 100));
+
+  const devSoftAllowancePct = params.softCostAllowancePercent ?? 15.0;
+  const devSoftCostsBreakdown: DevelopmentSoftCosts =
+    params.useCustomSoftCosts && params.softCosts
+      ? params.softCosts
+      : buildDefaultSoftCostsFromAllowance(devHardBuildCostZAR, devSoftAllowancePct);
+  const devSoftCostsZAR = Math.round(calculateDevelopmentSoftCostsTotal(devSoftCostsBreakdown));
+
+  const devLandAndAcquisitionZAR = Math.round(
+    effectiveTotalAcquisitionCost + auctionCosts + totalEvictionBurden
+  );
+
+  const devPreApprovalMos = params.preApprovalMonths ?? 4;
+  const devConstructionMos = params.constructionMonths ?? (holdingPeriodMonths > 0 ? holdingPeriodMonths : 8);
+  const devMonthlyPreApprovalBurn =
+    params.monthlyPreApprovalBurnZAR !== undefined
+      ? params.monthlyPreApprovalBurnZAR
+      : Math.max(1_500, monthlyRatesTaxes + monthlyLevies);
+  const devMonthlyConstructionBurn =
+    params.monthlyConstructionBurnZAR !== undefined
+      ? params.monthlyConstructionBurnZAR
+      : Math.max(4_500, devMonthlyPreApprovalBurn + 4_500);
+
+  const preFinanceTdcZAR =
+    devLandAndAcquisitionZAR +
+    devSoftCostsZAR +
+    devHardBuildCostZAR +
+    devContingencyZAR +
+    Math.round(devPreApprovalMos * devMonthlyPreApprovalBurn) +
+    Math.round(devConstructionMos * devMonthlyConstructionBurn);
+
+  const devSeniorLtcPct =
+    params.seniorDebtLtcPercent !== undefined ? params.seniorDebtLtcPercent : 65;
+  const devSCurveUtilPct =
+    params.sCurveUtilizationPercent !== undefined ? params.sCurveUtilizationPercent : 60;
+  const devSeniorFacilityLimitZAR = Math.round(
+    preFinanceTdcZAR * (Math.max(0, Math.min(100, devSeniorLtcPct)) / 100)
+  );
+  const devMonthlySCurveInterestZAR = Math.round(
+    devSeniorFacilityLimitZAR *
+      (Math.max(0, Math.min(100, devSCurveUtilPct)) / 100) *
+      (Math.max(0, interestRatePercent) / 100 / 12)
+  );
+
+  const devPreApprovalCarryingZAR = Math.round(Math.max(0, devPreApprovalMos) * Math.max(0, devMonthlyPreApprovalBurn));
+  const devConstructionCarryingZAR = Math.round(
+    Math.max(0, devConstructionMos) * (Math.max(0, devMonthlyConstructionBurn) + devMonthlySCurveInterestZAR)
+  );
+  const devTotalCarryingCostZAR = devPreApprovalCarryingZAR + devConstructionCarryingZAR;
+
+  const devTdcZAR =
+    devLandAndAcquisitionZAR +
+    devSoftCostsZAR +
+    devHardBuildCostZAR +
+    devContingencyZAR +
+    devTotalCarryingCostZAR;
+  const devTdcPerSqmZAR = devBuildableSqm > 0 ? Math.round(devTdcZAR / devBuildableSqm) : 0;
+  const devTdcPerUnitZAR = devUnitsCount > 0 ? Math.round(devTdcZAR / devUnitsCount) : devTdcZAR;
+  const devEquityRequiredZAR = Math.max(0, devTdcZAR - devSeniorFacilityLimitZAR);
+
+  const devGdvInclVatZAR =
+    targetExitPrice > 0
+      ? targetExitPrice
+      : effectiveMarketValue > purchasePrice
+      ? effectiveMarketValue
+      : Math.round(devTdcZAR * 1.25);
+  const devAvgUnitPriceZAR = devUnitsCount > 0 ? Math.round(devGdvInclVatZAR / devUnitsCount) : devGdvInclVatZAR;
+
+  const isVatRegDev = params.isVatRegisteredDeveloper !== false;
+  const devNetRealizableGdvZAR = isVatRegDev
+    ? Math.round(devGdvInclVatZAR / 1.15)
+    : devGdvInclVatZAR;
+  const devOutputVatZAR = isVatRegDev ? devGdvInclVatZAR - devNetRealizableGdvZAR : 0;
+  const devClaimableInputVatZAR = isVatRegDev
+    ? Math.round((devSoftCostsZAR + devHardBuildCostZAR) * 0.15)
+    : 0;
+  const devNetProfitBeforeTaxZAR =
+    (devNetRealizableGdvZAR + devClaimableInputVatZAR) - devTdcZAR;
+
+  const devPocPercent =
+    devTdcZAR > 0 ? Number(((devNetProfitBeforeTaxZAR / devTdcZAR) * 100).toFixed(2)) : 0;
+  const devMarginPercent =
+    devNetRealizableGdvZAR > 0
+      ? Number(((devNetProfitBeforeTaxZAR / devNetRealizableGdvZAR) * 100).toFixed(2))
+      : 0;
+  const devYieldOnCostPercent =
+    devTdcZAR > 0 ? Number((((grossMonthlyRent * 12) / devTdcZAR) * 100).toFixed(2)) : 0;
+
+  const exitMode: DevelopmentExitMode = params.developmentExitMode ?? 'Build-to-Sell';
+  const rawRetained =
+    exitMode === 'Build-to-Sell'
+      ? 0
+      : exitMode === 'Build-to-Rent Hold'
+      ? devUnitsCount
+      : Math.max(0, Math.min(devUnitsCount, params.unitsRetainedCount ?? Math.floor(devUnitsCount / 2)));
+  const devUnitsRetainedCount = rawRetained;
+  const devUnitsForSaleCount = Math.max(0, devUnitsCount - devUnitsRetainedCount);
+
+  const netProceedsPerUnitZAR = isVatRegDev
+    ? Math.round(devAvgUnitPriceZAR / 1.15)
+    : devAvgUnitPriceZAR;
+  const devUnitsRequiredForDebtWipeout =
+    devSeniorFacilityLimitZAR <= 0 || netProceedsPerUnitZAR <= 0
+      ? 0
+      : Math.ceil(devSeniorFacilityLimitZAR / netProceedsPerUnitZAR);
+  const devSoldProceedsNetVatZAR = devUnitsForSaleCount * netProceedsPerUnitZAR;
+  const devRemainingDebtOnRetainedZAR = Math.max(0, devSeniorFacilityLimitZAR - devSoldProceedsNetVatZAR);
+  const devRetainedMonthlyRentZAR =
+    devUnitsCount > 0 ? Math.round((grossMonthlyRent / devUnitsCount) * devUnitsRetainedCount) : 0;
+  const devIsSection13SexEligible = devUnitsRetainedCount >= 5;
+  const devSection13SexAnnualShieldZAR = devIsSection13SexEligible
+    ? Math.round((devTdcPerUnitZAR * devUnitsRetainedCount) * 0.55 * 0.05 * 0.27)
+    : 0;
+
+  const finalInitialCapitalRequired =
+    params.strategy === 'Development' ? devEquityRequiredZAR : Math.round(initialCapitalRequired);
+
   return {
     grossYield: Number(grossYield.toFixed(2)),
     capRate: Number(capRate.toFixed(2)),
@@ -757,8 +1101,8 @@ export function calculateDealMetrics(params: {
     monthlyCashFlow: Math.round(monthlyCashFlow),
     monthlyNOI: Math.round(monthlyNetOperatingIncome),
     annualNetOperatingIncome: Math.round(annualNetOperatingIncome),
-    totalCashRequired: Math.round(totalCashRequired),
-    initialCapitalRequired: Math.round(initialCapitalRequired),
+    totalCashRequired: finalInitialCapitalRequired,
+    initialCapitalRequired: finalInitialCapitalRequired,
     bondAmount: Math.round(bondAmount),
     cashDeposit: Math.round(cashDeposit),
     monthlyBondPayment: Math.round(monthlyBondPayment),
@@ -789,6 +1133,38 @@ export function calculateDealMetrics(params: {
     bondCancellationFeeZAR,
     earlyPenaltyZAR,
     totalExitFrictionZAR: Math.round(exitCommission + exitLegalCosts),
+    devLandAndAcquisitionZAR,
+    devHardBuildCostZAR,
+    devContingencyZAR,
+    devSoftCostsZAR,
+    devSoftCostsBreakdown,
+    devPreApprovalCarryingZAR,
+    devConstructionCarryingZAR,
+    devTotalCarryingCostZAR,
+    devTdcZAR,
+    devTdcPerSqmZAR,
+    devTdcPerUnitZAR,
+    devSeniorFacilityLimitZAR,
+    devMonthlySCurveInterestZAR,
+    devEquityRequiredZAR,
+    devGdvInclVatZAR,
+    devOutputVatZAR,
+    devClaimableInputVatZAR,
+    devNetRealizableGdvZAR,
+    devNetProfitBeforeTaxZAR,
+    devPocPercent,
+    devMarginPercent,
+    devYieldOnCostPercent,
+    devAvgUnitPriceZAR,
+    devUnitsTotalCount: devUnitsCount,
+    devUnitsForSaleCount,
+    devUnitsRetainedCount,
+    devUnitsRequiredForDebtWipeout,
+    devMaxDebtWipeoutUnits: Math.ceil(devUnitsCount * 0.65),
+    devRemainingDebtOnRetainedZAR,
+    devRetainedMonthlyRentZAR,
+    devIsSection13SexEligible,
+    devSection13SexAnnualShieldZAR,
   };
 }
 
@@ -801,7 +1177,7 @@ export interface BuyBoxEvaluationResult {
 
 /**
  * Strategy-aware evaluation of deal metrics against an InvestorProfile's Buy Box criteria.
- * Evaluates only relevant metrics based on deal.strategy ('Flip' | 'Rental' | 'BRRRR').
+ * Evaluates only relevant metrics based on deal.strategy ('Flip' | 'Rental' | 'BRRRR' | 'Development').
  */
 export function evaluateDealCriteria(
   metrics: {
@@ -816,14 +1192,22 @@ export function evaluateDealCriteria(
     dscr?: number | null;
     monthlyBondPayment?: number;
     annualNetOperatingIncome?: number;
+    devPocPercent?: number;
+    devYieldOnCostPercent?: number;
+    devUnitsRequiredForDebtWipeout?: number;
+    devMaxDebtWipeoutUnits?: number;
+    devUnitsTotalCount?: number;
+    devNetProfitBeforeTaxZAR?: number;
+    devEquityRequiredZAR?: number;
   },
-  profile: Partial<InvestorProfile>,
+  profile: Partial<InvestorProfile> & { liquidCapitalReserveZAR?: number },
   strategy: DealStrategy = 'Rental'
 ): BuyBoxEvaluationResult {
   const minNetYield = profile.minNetYieldPercent ?? 8.0;
   const minMonthlyCashflow = profile.minMonthlyCashflowZAR ?? 1500;
   const minNetRoi = profile.minNetRoiPercent ?? 8.0;
   const minFlipRoi = profile.minFlipRoiPercent ?? 18.0;
+  const minDevelopmentPoc = profile.minDevelopmentPocPercent ?? 20.0;
   const maxDay1Cash = profile.maxDay1CashZAR ?? 500000;
   const minDscr = profile.minDscr ?? 1.20;
 
@@ -850,6 +1234,22 @@ export function evaluateDealCriteria(
   if (strategy === 'Flip') {
     criteriaMap['minFlipRoi'] = (metrics.projectedFlipRoi ?? 0) >= minFlipRoi;
     criteriaMap['maxDay1Cash'] = day1Cash !== undefined ? day1Cash <= maxDay1Cash : false;
+  } else if (strategy === 'Development') {
+    const devPoc = metrics.devPocPercent ?? metrics.projectedFlipRoi ?? 0;
+    const devYoc = metrics.devYieldOnCostPercent ?? metrics.grossYield ?? metrics.capRate ?? minNetYield;
+    const devEq = metrics.devEquityRequiredZAR ?? day1Cash;
+    const plannedUnits = Math.max(1, metrics.devUnitsTotalCount ?? 6);
+    const maxWipeoutUnits = metrics.devMaxDebtWipeoutUnits ?? Math.ceil(plannedUnits * 0.65);
+    const wipeoutUnits = metrics.devUnitsRequiredForDebtWipeout ?? Math.ceil(plannedUnits * 0.5);
+    const effectiveEquityCap =
+      profile.liquidCapitalReserveZAR !== undefined && profile.liquidCapitalReserveZAR > 0
+        ? profile.liquidCapitalReserveZAR
+        : maxDay1Cash;
+
+    criteriaMap['minDevelopmentPoc'] = devPoc >= minDevelopmentPoc;
+    criteriaMap['minDevelopmentYoc'] = devYoc >= minNetYield;
+    criteriaMap['maxDebtWipeoutUnits'] = wipeoutUnits <= maxWipeoutUnits;
+    criteriaMap['maxDay1Cash'] = devEq !== undefined ? devEq <= effectiveEquityCap : false;
   } else {
     // 'Rental' and 'BRRRR'
     criteriaMap['minNetYield'] = (metrics.capRate ?? 0) >= minNetYield;

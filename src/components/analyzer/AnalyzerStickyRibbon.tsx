@@ -23,6 +23,13 @@ export interface AnalyzerStickyRibbonProps {
   brrrrPostRefiCashflowZAR?: number;
   brrrrEquityExtractedZAR?: number;
   brrrrCashLeftInDealZAR?: number;
+  // Development Strategy Ribbon Props
+  devTdcZAR?: number;
+  devGdvInclVatZAR?: number;
+  devNetProfitBeforeTaxZAR?: number;
+  devPocPercent?: number;
+  devUnitsRequiredForDebtWipeout?: number;
+  devIsSection13SexEligible?: boolean;
   isEditing?: boolean;
   onSaveDeal: () => void;
   onScrollToResults?: () => void;
@@ -53,6 +60,12 @@ export function AnalyzerStickyRibbon({
   brrrrPostRefiCashflowZAR = 0,
   brrrrEquityExtractedZAR = 0,
   brrrrCashLeftInDealZAR = 0,
+  devTdcZAR = 0,
+  devGdvInclVatZAR = 0,
+  devNetProfitBeforeTaxZAR = 0,
+  devPocPercent = 0,
+  devUnitsRequiredForDebtWipeout = 0,
+  devIsSection13SexEligible = false,
   isEditing = false,
   onSaveDeal,
   onScrollToResults,
@@ -89,30 +102,59 @@ export function AnalyzerStickyRibbon({
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-2.5">
         {/* Metric Pills Strip */}
         <div className="flex items-center gap-2 overflow-x-auto pb-1 lg:pb-0 text-xs flex-1 scrollbar-thin">
-          {/* Day-1 Cash */}
+          {/* Day-1 Cash / Developer Equity */}
           <div className="bg-slate-800/90 border border-slate-700 px-2.5 py-1 rounded-lg shrink-0">
-            <span className="text-[10px] text-slate-400 block uppercase font-medium">Day-1 Cash</span>
+            <span className="text-[10px] text-slate-400 block uppercase font-medium">
+              {strategy === 'Development' ? 'Dev Equity Req.' : 'Day-1 Cash'}
+            </span>
             <span className="font-bold text-white font-mono">{formatZAR(dayOneCapitalRequired)}</span>
           </div>
 
-          {/* Built-in Equity */}
-          <div className="bg-slate-800/90 border border-slate-700 px-2.5 py-1 rounded-lg shrink-0">
-            <span className="text-[10px] text-slate-400 block uppercase font-medium">Built-in Equity</span>
-            <span className={`font-bold font-mono ${builtInEquity >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-              {formatZAR(builtInEquity)}
-              <span className="text-[10px] font-normal ml-1">
-                ({builtInEquityPercent >= 0 ? '+' : ''}{formatPercent(builtInEquityPercent)})
-              </span>
-            </span>
-          </div>
+          {strategy === 'Development' ? (
+            <>
+              <div className="bg-slate-800/90 border border-slate-700 px-2.5 py-1 rounded-lg shrink-0">
+                <span className="text-[10px] text-slate-400 block uppercase font-medium">Total Dev Cost (TDC)</span>
+                <span className="font-bold text-white font-mono">{formatZAR(devTdcZAR)}</span>
+              </div>
+              <div className="bg-slate-800/90 border border-slate-700 px-2.5 py-1 rounded-lg shrink-0">
+                <span className="text-[10px] text-slate-400 block uppercase font-medium">Completed GDV</span>
+                <span className="font-bold text-emerald-400 font-mono">{formatZAR(devGdvInclVatZAR)}</span>
+              </div>
+              <div className="bg-slate-800/90 border border-slate-700 px-2.5 py-1 rounded-lg shrink-0">
+                <span className="text-[10px] text-slate-400 block uppercase font-medium">Net Dev Profit / POC</span>
+                <span className={`font-bold font-mono ${devNetProfitBeforeTaxZAR >= 0 ? 'text-amber-300' : 'text-rose-400'}`}>
+                  {formatZAR(devNetProfitBeforeTaxZAR)} ({formatPercent(devPocPercent)})
+                </span>
+              </div>
+              <div className="bg-slate-800/90 border border-slate-700 px-2.5 py-1 rounded-lg shrink-0">
+                <span className="text-[10px] text-slate-400 block uppercase font-medium">Debt Wipeout / Tax</span>
+                <span className="font-bold text-teal-300 font-mono">
+                  {devUnitsRequiredForDebtWipeout}u Breakeven{devIsSection13SexEligible ? ' • Sec 13sex ✓' : ''}
+                </span>
+              </div>
+            </>
+          ) : (
+            <>
+              {/* Built-in Equity */}
+              <div className="bg-slate-800/90 border border-slate-700 px-2.5 py-1 rounded-lg shrink-0">
+                <span className="text-[10px] text-slate-400 block uppercase font-medium">Built-in Equity</span>
+                <span className={`font-bold font-mono ${builtInEquity >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                  {formatZAR(builtInEquity)}
+                  <span className="text-[10px] font-normal ml-1">
+                    ({builtInEquityPercent >= 0 ? '+' : ''}{formatPercent(builtInEquityPercent)})
+                  </span>
+                </span>
+              </div>
 
-          {/* Yields */}
-          <div className="bg-slate-800/90 border border-slate-700 px-2.5 py-1 rounded-lg shrink-0">
-            <span className="text-[10px] text-slate-400 block uppercase font-medium">Gross / Net Yield</span>
-            <span className="font-bold text-emerald-400 font-mono">
-              {formatPercent(grossYield)} / {formatPercent(netCapRate)}
-            </span>
-          </div>
+              {/* Yields */}
+              <div className="bg-slate-800/90 border border-slate-700 px-2.5 py-1 rounded-lg shrink-0">
+                <span className="text-[10px] text-slate-400 block uppercase font-medium">Gross / Net Yield</span>
+                <span className="font-bold text-emerald-400 font-mono">
+                  {formatPercent(grossYield)} / {formatPercent(netCapRate)}
+                </span>
+              </div>
+            </>
+          )}
 
           {/* Strategy-Matched Primary KPIs */}
           {strategy === 'Rental' && (

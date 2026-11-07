@@ -10,7 +10,10 @@ import {
 import { RootStoreState, DevelopmentSlice } from '../types';
 import { INITIAL_DEVELOPMENTS } from '../initialData';
 import { syncDevelopmentApprovalTasks, syncLeaseExpiryTasks } from '../utils/taskSync';
-import { calculateMonthlyBondRepayment } from '@/lib/calculations/propertyMetrics';
+import {
+  calculateMonthlyBondRepayment,
+  buildDefaultSoftCostsFromAllowance,
+} from '@/lib/calculations/propertyMetrics';
 
 export const createDevelopmentSlice: StateCreator<
   RootStoreState,
@@ -43,9 +46,39 @@ export const createDevelopmentSlice: StateCreator<
       const tasks = target
         ? syncDevelopmentApprovalTasks(state.tasks, id, target.title, target.approvals)
         : state.tasks;
+
+      let updatedFunding = state.funding;
+      if (
+        target &&
+        (updates.developmentFacilityRepaidZAR !== undefined ||
+          updates.developmentFacilityLimitZAR !== undefined)
+      ) {
+        updatedFunding = state.funding.map((f) => {
+          if (f.id === target.linkedFundingSourceId || f.linkedDealId === target.id) {
+            const nextRepaid =
+              updates.developmentFacilityRepaidZAR !== undefined
+                ? updates.developmentFacilityRepaidZAR
+                : f.totalRepaidZAR;
+            const nextLimit =
+              updates.developmentFacilityLimitZAR !== undefined && updates.developmentFacilityLimitZAR > 0
+                ? updates.developmentFacilityLimitZAR
+                : f.capitalAmountZAR;
+            const isSettled = nextRepaid >= nextLimit && nextLimit > 0;
+            return {
+              ...f,
+              capitalAmountZAR: nextLimit,
+              totalRepaidZAR: nextRepaid,
+              status: isSettled ? ('Settled' as const) : f.status,
+            };
+          }
+          return f;
+        });
+      }
+
       return {
         developments: updatedDevelopments,
         tasks,
+        funding: updatedFunding,
       };
     }),
 
@@ -268,9 +301,19 @@ export const createDevelopmentSlice: StateCreator<
     const unitArea = Math.round(totalArea / unitCount);
     const landPrice = opp.purchasePrice;
     const buildCostPerSqm =
-      opp.floorAreaSqm && opp.estimatedRehabCost
+      opp.hardCostPerSqmZAR && opp.hardCostPerSqmZAR > 0
+        ? opp.hardCostPerSqmZAR
+        : opp.floorAreaSqm && opp.estimatedRehabCost
         ? Math.round(opp.estimatedRehabCost / opp.floorAreaSqm)
-        : 9500;
+        : 9800;
+    const hardBuildCostZAR = totalArea * buildCostPerSqm;
+    const softCosts =
+      opp.useCustomSoftCosts && opp.softCosts
+        ? { ...opp.softCosts }
+        : buildDefaultSoftCostsFromAllowance(
+            hardBuildCostZAR,
+            opp.softCostAllowancePercent ?? 15
+          );
     const estimatedUnitListPrice = Math.round(
       (opp.targetExitPrice || landPrice * 1.5) / unitCount
     );
@@ -278,56 +321,66 @@ export const createDevelopmentSlice: StateCreator<
       (opp.monthlyRentalEstimate || 36000) / unitCount
     );
 
+    const exitMode = opp.developmentExitMode ?? 'Build-to-Sell';
+    const retainedUnitsCount =
+      exitMode === 'Build-to-Rent Hold'
+        ? unitCount
+        : exitMode === 'Split-Exit Hybrid'
+        ? Math.min(unitCount, Math.max(0, Math.round(opp.unitsRetainedCount ?? Math.floor(unitCount / 2))))
+        : 0;
+    const soldUnitsCount = Math.max(0, unitCount - retainedUnitsCount);
+
     const newDevId = `dev-${Date.now()}`;
     const units: DevelopmentUnit[] = Array.from({ length: unitCount }, (_, idx) => ({
       id: `dev-unit-${Date.now()}-${idx + 1}`,
       unitNumber: `${idx + 1}`,
       configuration: '2 Bed 1 Bath',
       floorAreaSqm: unitArea,
-      allocatedCostBasisZAR: Math.round((landPrice + buildCostPerSqm * totalArea) / unitCount),
+      allocatedCostBasisZAR: Math.round((landPrice + hardBuildCostZAR) / unitCount),
       listPriceVatInclZAR: estimatedUnitListPrice,
       estimatedMonthlyRentZAR: estimatedUnitRent,
-      status: 'Available',
+      status: idx < soldUnitsCount ? 'Available' : 'Retained for Rental',
     }));
+
+    const preApprovalMonths = opp.preApprovalMonths ?? 4;
+    const constructionMonths = opp.constructionMonths ?? (opp.holdingPeriodMonths || 8);
+    const baseRatesAndLevies = (opp.monthlyLevies || 0) + (opp.monthlyRatesTaxes || 0);
+    const preApprovalBurn = opp.monthlyPreApprovalBurnZAR ?? baseRatesAndLevies;
+    const constructionBurn = opp.monthlyConstructionBurnZAR ?? (baseRatesAndLevies + 8000);
+    const seniorLtcFraction = (opp.seniorDebtLtcPercent ?? 65) / 100;
+
+    const existingLinkedFunding = get().funding.find((f) => f.linkedDealId === opp.id);
+    const newDevTitle = opp.title.includes('(Development)') ? opp.title : `${opp.title} (Development)`;
 
     const newDev: DevelopmentProject = {
       id: newDevId,
-      title: `${opp.title} (Development)`,
+      title: newDevTitle,
       address: opp.address,
       city: opp.city,
       province: opp.province,
       investmentNodeId: (opp as any).investmentNodeId,
-      developmentType: 'Subdivision & Cluster',
-      isVatRegisteredDeveloper: true,
+      developmentType: opp.developmentType ?? 'Subdivision & Cluster',
+      isVatRegisteredDeveloper: opp.isVatRegisteredDeveloper ?? true,
       taxEntityType: 'Company (27%)',
       currentPhase: 'Feasibility',
-      preApprovalMonths: 4,
-      constructionMonths: opp.holdingPeriodMonths || 8,
+      preApprovalMonths,
+      constructionMonths,
       sellDownMonths: 3,
       landPurchasePriceZAR: landPrice,
       acquisitionCostsZAR: opp.costs ? opp.costs.totalAcquisitionCost - landPrice : 75000,
-      sec118ArrearsZAR: 0,
-      softCosts: {
-        townPlannerZAR: 45000,
-        architectZAR: 85000,
-        structuralCivilEngineerZAR: 55000,
-        quantitySurveyorZAR: 35000,
-        nhbrcEnrolmentFeeZAR: 40000,
-        councilBulkContributionsZAR: 120000,
-        planScrutinyAndSubdivisionFeesZAR: 25000,
-        marketingAndShowUnitZAR: 30000,
-      },
+      sec118ArrearsZAR: opp.municipalArrearsZAR || 0,
+      softCosts,
       totalBuildableAreaSqm: totalArea,
       budgetedHardCostPerSqmZAR: buildCostPerSqm,
-      contingencyPercent: 7.5,
+      contingencyPercent: opp.contingencyPercent ?? 7.5,
       boqItems: [],
-      monthlyPreApprovalHoldingBurnZAR: (opp.monthlyLevies || 0) + (opp.monthlyRatesTaxes || 0),
-      monthlyConstructionHoldingBurnZAR:
-        (opp.monthlyLevies || 0) + (opp.monthlyRatesTaxes || 0) + 8000,
-      developmentFacilityLimitZAR: Math.round((landPrice + totalArea * buildCostPerSqm) * 0.75),
+      monthlyPreApprovalHoldingBurnZAR: preApprovalBurn,
+      monthlyConstructionHoldingBurnZAR: constructionBurn,
+      developmentFacilityLimitZAR: Math.round((landPrice + hardBuildCostZAR) * seniorLtcFraction),
       developmentFacilityDrawnZAR: 0,
       developmentFacilityRepaidZAR: 0,
-      preSalesHurdlePercent: 60,
+      preSalesHurdlePercent: opp.preSalesHurdlePercent ?? 60,
+      linkedFundingSourceId: existingLinkedFunding?.id,
       approvals: {
         splumaRezoningSubdivision: { status: 'Not Started' },
         sgDiagramApproval: { status: 'Not Started' },
@@ -358,6 +411,15 @@ export const createDevelopmentSlice: StateCreator<
       developments: [newDev, ...state.developments],
       opportunities: state.opportunities.map((o) =>
         o.id === oppId ? { ...o, status: 'Promoted to Development' as any } : o
+      ),
+      funding: state.funding.map((f) =>
+        f.linkedDealId === oppId
+          ? {
+              ...f,
+              linkedDealId: newDev.id,
+              linkedDealName: newDev.title,
+            }
+          : f
       ),
       tasks: [onboardingTask, ...state.tasks],
     }));

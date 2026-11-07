@@ -121,6 +121,8 @@ function PipelineDealCard({
           initialCapitalRequired: deal.initialCapitalRequired,
           projectedFlipRoi: deal.projectedFlipRoi,
           projectedFlipNetProfit: deal.projectedFlipNetProfit,
+          devPocPercent: deal.projectedDevPocPercent ?? deal.projectedFlipRoi,
+          devEquityRequiredZAR: deal.initialCapitalRequired,
           dscr: dscrInfo.rawDscr,
           monthlyBondPayment: dscrInfo.monthlyBondPayment,
         },
@@ -131,6 +133,7 @@ function PipelineDealCard({
   );
 
   const isFlipStrategy = deal.strategy === 'Flip';
+  const isDevelopmentStrategy = deal.strategy === 'Development';
 
   return (
     <div className="p-4 sm:p-5 rounded-xl border border-slate-200 hover:border-slate-300 bg-white transition-all shadow-2xs space-y-3">
@@ -169,10 +172,18 @@ function PipelineDealCard({
                   ? 'bg-amber-100 text-amber-900 border-amber-300'
                   : deal.strategy === 'BRRRR'
                   ? 'bg-purple-100 text-purple-900 border-purple-300'
+                  : deal.strategy === 'Development'
+                  ? 'bg-orange-100 text-orange-900 border-orange-300'
                   : 'bg-indigo-100 text-indigo-900 border-indigo-300'
               }`}
             >
-              {deal.strategy === 'Flip' ? '🔄 Flip' : deal.strategy === 'BRRRR' ? '⚡ BRRRR' : '🏠 Rental'}
+              {deal.strategy === 'Flip'
+                ? '🔄 Flip'
+                : deal.strategy === 'BRRRR'
+                ? '⚡ BRRRR'
+                : deal.strategy === 'Development'
+                ? '🏗️ Development'
+                : '🏠 Rental'}
             </span>
             {deal.occupantRisk && isEvictionActive(deal.occupantRisk) && (
               <span className="text-[10px] font-bold px-2 py-0.5 rounded border bg-rose-100 text-rose-800 border-rose-300 flex items-center gap-1">
@@ -505,9 +516,13 @@ function PipelineDealCard({
           </span>
         </div>
         <div>
-          <span className="text-[10px] text-slate-400 block font-medium">Flip Profit / ROI</span>
+          <span className="text-[10px] text-slate-400 block font-medium">
+            {isDevelopmentStrategy ? 'Dev Profit / POC' : 'Flip Profit / ROI'}
+          </span>
           <span className="font-bold text-indigo-700">
-            {formatZAR(deal.projectedFlipNetProfit)} ({formatPercent(deal.projectedFlipRoi)})
+            {isDevelopmentStrategy
+              ? `${formatZAR(deal.projectedDevNetProfitZAR ?? deal.projectedFlipNetProfit)} (${formatPercent(deal.projectedDevPocPercent ?? deal.projectedFlipRoi)} POC)`
+              : `${formatZAR(deal.projectedFlipNetProfit)} (${formatPercent(deal.projectedFlipRoi)})`}
           </span>
         </div>
       </div>
@@ -541,7 +556,11 @@ function PipelineDealCard({
       <div className="pt-2.5 border-t border-slate-200/60 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
         <div className="text-[11px] text-slate-500">
           <span className="font-semibold text-slate-700">Strategy Target:</span>{' '}
-          {isFlipStrategy ? 'Short-term flip liquidation' : 'Long-term rental compounding'}
+          {isDevelopmentStrategy
+            ? `Development Feasibility (${deal.developmentExitMode ?? 'Build-to-Sell'})`
+            : isFlipStrategy
+            ? 'Short-term flip liquidation'
+            : 'Long-term rental compounding'}
         </div>
 
         <div className="flex flex-wrap items-center gap-2 shrink-0 self-start sm:self-center">
@@ -560,7 +579,25 @@ function PipelineDealCard({
 
           {/* Primary Strategy-Matched Promotion CTA */}
           {deal.status !== 'Passed' && (
-            isFlipStrategy ? (
+            isDevelopmentStrategy && onPromoteToDevelopment ? (
+              <button
+                type="button"
+                onClick={() => {
+                  if (confirm(`Promote "${deal.title}" to Developments Manager (/developments)?`)) {
+                    onPromoteToDevelopment(deal.id);
+                  }
+                }}
+                title="Promote to Developments Manager"
+                className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-colors flex items-center gap-1.5 shadow-2xs cursor-pointer ${
+                  deal.status === 'Due Diligence'
+                    ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs'
+                    : 'bg-amber-50 text-amber-800 hover:bg-amber-100 border border-amber-300'
+                }`}
+              >
+                <HardHat className="w-3.5 h-3.5" />
+                <span>Promote to Development</span>
+              </button>
+            ) : isFlipStrategy ? (
               <button
                 type="button"
                 onClick={() => {

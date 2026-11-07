@@ -649,6 +649,65 @@ export function mapOpportunities(opportunities: OpportunityDeal[] = [], userId: 
       if (opp.monthlyPrepaidVendingFeeZAR !== undefined) {
         baseCosts.monthlyPrepaidVendingFeeZAR = opp.monthlyPrepaidVendingFeeZAR;
       }
+      // Persist Development Strategy underwriting parameters in costs JSONB
+      if (opp.developmentType !== undefined) baseCosts.developmentType = opp.developmentType;
+      if (opp.isVatRegisteredDeveloper !== undefined) {
+        baseCosts.isVatRegisteredDeveloper = opp.isVatRegisteredDeveloper;
+      }
+      if (opp.developmentExitMode !== undefined) {
+        baseCosts.developmentExitMode = opp.developmentExitMode;
+      }
+      if (opp.unitsRetainedCount !== undefined) {
+        baseCosts.unitsRetainedCount = opp.unitsRetainedCount;
+      }
+      if (opp.hardCostPerSqmZAR !== undefined) {
+        baseCosts.hardCostPerSqmZAR = opp.hardCostPerSqmZAR;
+      }
+      if (opp.contingencyPercent !== undefined) {
+        baseCosts.contingencyPercent = opp.contingencyPercent;
+      }
+      if (opp.softCostAllowancePercent !== undefined) {
+        baseCosts.softCostAllowancePercent = opp.softCostAllowancePercent;
+      }
+      if (opp.useCustomSoftCosts !== undefined) {
+        baseCosts.useCustomSoftCosts = opp.useCustomSoftCosts;
+      }
+      if (opp.softCosts !== undefined) {
+        baseCosts.softCosts = opp.softCosts;
+      }
+      if (opp.preApprovalMonths !== undefined) {
+        baseCosts.preApprovalMonths = opp.preApprovalMonths;
+      }
+      if (opp.constructionMonths !== undefined) {
+        baseCosts.constructionMonths = opp.constructionMonths;
+      }
+      if (opp.monthlyPreApprovalBurnZAR !== undefined) {
+        baseCosts.monthlyPreApprovalBurnZAR = opp.monthlyPreApprovalBurnZAR;
+      }
+      if (opp.monthlyConstructionBurnZAR !== undefined) {
+        baseCosts.monthlyConstructionBurnZAR = opp.monthlyConstructionBurnZAR;
+      }
+      if (opp.seniorDebtLtcPercent !== undefined) {
+        baseCosts.seniorDebtLtcPercent = opp.seniorDebtLtcPercent;
+      }
+      if (opp.sCurveUtilizationPercent !== undefined) {
+        baseCosts.sCurveUtilizationPercent = opp.sCurveUtilizationPercent;
+      }
+      if (opp.preSalesHurdlePercent !== undefined) {
+        baseCosts.preSalesHurdlePercent = opp.preSalesHurdlePercent;
+      }
+      if (opp.projectedDevTdcZAR !== undefined) {
+        baseCosts.projectedDevTdcZAR = opp.projectedDevTdcZAR;
+      }
+      if (opp.projectedDevGdvZAR !== undefined) {
+        baseCosts.projectedDevGdvZAR = opp.projectedDevGdvZAR;
+      }
+      if (opp.projectedDevNetProfitZAR !== undefined) {
+        baseCosts.projectedDevNetProfitZAR = opp.projectedDevNetProfitZAR;
+      }
+      if (opp.projectedDevPocPercent !== undefined) {
+        baseCosts.projectedDevPocPercent = opp.projectedDevPocPercent;
+      }
       return baseCosts;
     })() as any,
     section_13sex: (opp.section13sex ? JSON.parse(JSON.stringify(opp.section13sex)) : {}) as any,

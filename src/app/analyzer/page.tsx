@@ -14,12 +14,28 @@ import {
   evaluateDealCriteria,
   calculateEffectiveExitCommission,
   calculateRateShockScenarios,
+  calculateDevelopmentRateShockScenarios,
   calculatePaydownImpact,
+  buildDefaultSoftCostsFromAllowance,
 } from '@/lib/calculations/propertyMetrics';
 import { calculateFlipMao, calculateRentalMao } from '@/lib/calculations/maoSolver';
 import { formatOpportunityForWhatsApp } from '@/lib/whatsappFormatter';
 import { formatZAR, formatPercent } from '@/lib/formatters';
-import { OpportunityDeal, DealSource, AmenityDistance, AmenityScorecard, PropertyTitleType, DealStrategy, PassReason, OccupantRiskProfile, Province, AnalyzerSectionId } from '@/types';
+import {
+  OpportunityDeal,
+  DealSource,
+  AmenityDistance,
+  AmenityScorecard,
+  PropertyTitleType,
+  DealStrategy,
+  DevelopmentType,
+  DevelopmentExitMode,
+  DevelopmentSoftCosts,
+  PassReason,
+  OccupantRiskProfile,
+  Province,
+  AnalyzerSectionId,
+} from '@/types';
 import { PropertyTypeBadge, AgmDateChip } from '@/components/common/PropertyTypeBadge';
 import LongTermProjectionChart from '@/components/analytics/LongTermProjectionChart';
 import { OccupancyRiskCard } from '@/components/analyzer/OccupancyRiskCard';
@@ -73,6 +89,7 @@ import {
   Briefcase,
   Calendar,
   RefreshCw,
+  HardHat,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -251,6 +268,59 @@ export default function OpportunityAnalyzerPage() {
   // Strategy Selection
   const [strategy, setStrategy] = useState<DealStrategy>(analyzerDraft?.strategy ?? 'Rental');
 
+  // Development Feasibility Underwriting State
+  const [developmentType, setDevelopmentType] = useState<DevelopmentType>(
+    analyzerDraft?.developmentType ?? 'Subdivision & Cluster'
+  );
+  const [isVatRegisteredDeveloper, setIsVatRegisteredDeveloper] = useState<boolean>(
+    analyzerDraft?.isVatRegisteredDeveloper ?? true
+  );
+  const [developmentExitMode, setDevelopmentExitMode] = useState<DevelopmentExitMode>(
+    analyzerDraft?.developmentExitMode ?? 'Build-to-Sell'
+  );
+  const [unitsRetainedCount, setUnitsRetainedCount] = useState<number>(
+    analyzerDraft?.unitsRetainedCount ?? 2
+  );
+  const [hardCostPerSqmZAR, setHardCostPerSqmZAR] = useState<number>(
+    analyzerDraft?.hardCostPerSqmZAR ?? 9_800
+  );
+  const [contingencyPercent, setContingencyPercent] = useState<number>(
+    analyzerDraft?.contingencyPercent ?? 7.5
+  );
+  const [softCostAllowancePercent, setSoftCostAllowancePercent] = useState<number>(
+    analyzerDraft?.softCostAllowancePercent ?? 15.0
+  );
+  const [useCustomSoftCosts, setUseCustomSoftCosts] = useState<boolean>(
+    analyzerDraft?.useCustomSoftCosts ?? false
+  );
+  const [softCosts, setSoftCosts] = useState<DevelopmentSoftCosts>(
+    analyzerDraft?.softCosts ?? buildDefaultSoftCostsFromAllowance(390 * 9_800, 15.0)
+  );
+  const [isSoftCostsDrawerOpen, setIsSoftCostsDrawerOpen] = useState<boolean>(
+    Boolean(analyzerDraft?.useCustomSoftCosts)
+  );
+  const [preApprovalMonths, setPreApprovalMonths] = useState<number>(
+    analyzerDraft?.preApprovalMonths ?? 4
+  );
+  const [constructionMonths, setConstructionMonths] = useState<number>(
+    analyzerDraft?.constructionMonths ?? 8
+  );
+  const [monthlyPreApprovalBurnZAR, setMonthlyPreApprovalBurnZAR] = useState<number>(
+    analyzerDraft?.monthlyPreApprovalBurnZAR ?? 3_500
+  );
+  const [monthlyConstructionBurnZAR, setMonthlyConstructionBurnZAR] = useState<number>(
+    analyzerDraft?.monthlyConstructionBurnZAR ?? 12_500
+  );
+  const [seniorDebtLtcPercent, setSeniorDebtLtcPercent] = useState<number>(
+    analyzerDraft?.seniorDebtLtcPercent ?? 65
+  );
+  const [sCurveUtilizationPercent, setSCurveUtilizationPercent] = useState<number>(
+    analyzerDraft?.sCurveUtilizationPercent ?? 60
+  );
+  const [preSalesHurdlePercent, setPreSalesHurdlePercent] = useState<number>(
+    analyzerDraft?.preSalesHurdlePercent ?? 60
+  );
+
   // Long-Term Projections & Escalation Assumptions
   const [annualCapitalGrowth, setAnnualCapitalGrowth] = useState<number>(analyzerDraft?.annualCapitalGrowthPercent ?? 5.0);
   const [annualRentalEscalation, setAnnualRentalEscalation] = useState<number>(analyzerDraft?.annualRentalEscalationPercent ?? 6.0);
@@ -317,6 +387,22 @@ export default function OpportunityAnalyzerPage() {
       } else {
         setOccupantRisk(getOccupantRiskDefaults('vacant'));
       }
+      if (analyzerDraft.developmentType !== undefined) setDevelopmentType(analyzerDraft.developmentType);
+      if (analyzerDraft.isVatRegisteredDeveloper !== undefined) setIsVatRegisteredDeveloper(analyzerDraft.isVatRegisteredDeveloper);
+      if (analyzerDraft.developmentExitMode !== undefined) setDevelopmentExitMode(analyzerDraft.developmentExitMode);
+      if (analyzerDraft.unitsRetainedCount !== undefined) setUnitsRetainedCount(analyzerDraft.unitsRetainedCount);
+      if (analyzerDraft.hardCostPerSqmZAR !== undefined) setHardCostPerSqmZAR(analyzerDraft.hardCostPerSqmZAR);
+      if (analyzerDraft.contingencyPercent !== undefined) setContingencyPercent(analyzerDraft.contingencyPercent);
+      if (analyzerDraft.softCostAllowancePercent !== undefined) setSoftCostAllowancePercent(analyzerDraft.softCostAllowancePercent);
+      if (analyzerDraft.useCustomSoftCosts !== undefined) setUseCustomSoftCosts(analyzerDraft.useCustomSoftCosts);
+      if (analyzerDraft.softCosts !== undefined) setSoftCosts(analyzerDraft.softCosts);
+      if (analyzerDraft.preApprovalMonths !== undefined) setPreApprovalMonths(analyzerDraft.preApprovalMonths);
+      if (analyzerDraft.constructionMonths !== undefined) setConstructionMonths(analyzerDraft.constructionMonths);
+      if (analyzerDraft.monthlyPreApprovalBurnZAR !== undefined) setMonthlyPreApprovalBurnZAR(analyzerDraft.monthlyPreApprovalBurnZAR);
+      if (analyzerDraft.monthlyConstructionBurnZAR !== undefined) setMonthlyConstructionBurnZAR(analyzerDraft.monthlyConstructionBurnZAR);
+      if (analyzerDraft.seniorDebtLtcPercent !== undefined) setSeniorDebtLtcPercent(analyzerDraft.seniorDebtLtcPercent);
+      if (analyzerDraft.sCurveUtilizationPercent !== undefined) setSCurveUtilizationPercent(analyzerDraft.sCurveUtilizationPercent);
+      if (analyzerDraft.preSalesHurdlePercent !== undefined) setPreSalesHurdlePercent(analyzerDraft.preSalesHurdlePercent);
     }
   }, [analyzerDraft, investorProfile?.defaultPrimeRatePercent, investorProfile?.vatExemptAgent]);
 
@@ -416,10 +502,32 @@ export default function OpportunityAnalyzerPage() {
 
   const handleStrategyChange = (newStrategy: DealStrategy) => {
     setStrategy(newStrategy);
-    if (newStrategy === 'Flip' || newStrategy === 'BRRRR') {
+    if (newStrategy === 'Flip' || newStrategy === 'BRRRR' || newStrategy === 'Development') {
       setIsHoldingOpen(true);
     } else {
       setIsHoldingOpen(false);
+    }
+    if (newStrategy === 'Development') {
+      const nextUnits = numberOfUnits < 2 ? 6 : numberOfUnits;
+      const nextArea = floorAreaSqm / nextUnits < 24 ? nextUnits * 65 : floorAreaSqm;
+      const nextExit =
+        targetExitPrice <= purchasePrice * 1.4
+          ? Math.max(targetExitPrice, nextUnits * 1_395_000)
+          : targetExitPrice;
+      const nextRent =
+        monthlyRent < nextUnits * 6_500 ? nextUnits * 9_500 : monthlyRent;
+      setNumberOfUnits(nextUnits);
+      setFloorAreaSqm(nextArea);
+      setTargetExitPrice(nextExit);
+      setMonthlyRent(nextRent);
+      updateAnalyzerDraft({
+        strategy: newStrategy,
+        numberOfUnits: nextUnits,
+        floorAreaSqm: nextArea,
+        targetExitPrice: nextExit,
+        monthlyRent: nextRent,
+      });
+      return;
     }
     updateAnalyzerDraft({ strategy: newStrategy });
   };
@@ -582,6 +690,22 @@ export default function OpportunityAnalyzerPage() {
       monthlyPrepaidVendingFeeZAR: monthlyPrepaidVendingFee,
       monthlyCommunalServicesZAR: monthlyCommunalServices,
       occupantRisk,
+      developmentType,
+      isVatRegisteredDeveloper,
+      developmentExitMode,
+      unitsRetainedCount,
+      hardCostPerSqmZAR,
+      contingencyPercent,
+      softCostAllowancePercent,
+      useCustomSoftCosts,
+      softCosts,
+      preApprovalMonths,
+      constructionMonths,
+      monthlyPreApprovalBurnZAR,
+      monthlyConstructionBurnZAR,
+      seniorDebtLtcPercent,
+      sCurveUtilizationPercent,
+      preSalesHurdlePercent,
     });
   }, [
     purchasePrice,
@@ -630,15 +754,35 @@ export default function OpportunityAnalyzerPage() {
     earlyTerminationNoticeGiven,
     earlyTerminationPenalty,
     investorProfile?.defaultBondCancellationFeeZAR,
+    developmentType,
+    isVatRegisteredDeveloper,
+    developmentExitMode,
+    unitsRetainedCount,
+    hardCostPerSqmZAR,
+    contingencyPercent,
+    softCostAllowancePercent,
+    useCustomSoftCosts,
+    softCosts,
+    preApprovalMonths,
+    constructionMonths,
+    monthlyPreApprovalBurnZAR,
+    monthlyConstructionBurnZAR,
+    seniorDebtLtcPercent,
+    sCurveUtilizationPercent,
+    preSalesHurdlePercent,
   ]);
 
   // Day-1 Capital Required vs Liquid Capital Reserve comparison
-  const reserveDelta = liquidCapitalReserve - calculatedMetrics.initialCapitalRequired;
+  const activeCapitalRequired =
+    strategy === 'Development'
+      ? calculatedMetrics.devEquityRequiredZAR
+      : calculatedMetrics.initialCapitalRequired;
+  const reserveDelta = liquidCapitalReserve - activeCapitalRequired;
   const isReserveSufficient = reserveDelta >= 0;
 
   // Rate-Shock Sensitivity Scenarios (Rental & BRRRR)
   const rateShockScenarios = useMemo(() => {
-    if (strategy === 'Flip' || calculatedMetrics.bondAmount <= 0) return [];
+    if (strategy === 'Flip' || strategy === 'Development' || calculatedMetrics.bondAmount <= 0) return [];
     return calculateRateShockScenarios({
       monthlyNoi: calculatedMetrics.monthlyNOI,
       bondAmount: calculatedMetrics.bondAmount,
@@ -647,6 +791,45 @@ export default function OpportunityAnalyzerPage() {
       minDscr: investorProfile?.minDscr ?? 1.2,
     });
   }, [strategy, calculatedMetrics.monthlyNOI, calculatedMetrics.bondAmount, interestRate, bondTermYears, investorProfile?.minDscr]);
+
+  // Development Senior Facility SARB Rate-Shock & +2 Month Delay Scenarios
+  const developmentRateShockScenarios = useMemo(() => {
+    if (strategy !== 'Development' || calculatedMetrics.devSeniorFacilityLimitZAR <= 0) return [];
+    return calculateDevelopmentRateShockScenarios({
+      seniorDebtZAR: calculatedMetrics.devSeniorFacilityLimitZAR,
+      sCurveUtilizationPercent,
+      baseRatePercent: interestRate,
+      preApprovalMonths,
+      constructionMonths,
+      monthlyPreApprovalBurnZAR,
+      monthlyConstructionBurnZAR,
+      baseNonCarryingTdcZAR:
+        calculatedMetrics.devTdcZAR - calculatedMetrics.devTotalCarryingCostZAR,
+      netRealizableGdvPlusInputVatZAR:
+        calculatedMetrics.devNetRealizableGdvZAR + calculatedMetrics.devClaimableInputVatZAR,
+      exitMode: developmentExitMode,
+      monthlyNoi: calculatedMetrics.monthlyNOI,
+      loanTermYears: bondTermYears,
+      minDscr: investorProfile?.minDscr ?? 1.2,
+    });
+  }, [
+    strategy,
+    calculatedMetrics.devSeniorFacilityLimitZAR,
+    calculatedMetrics.devTdcZAR,
+    calculatedMetrics.devTotalCarryingCostZAR,
+    calculatedMetrics.devNetRealizableGdvZAR,
+    calculatedMetrics.devClaimableInputVatZAR,
+    calculatedMetrics.monthlyNOI,
+    sCurveUtilizationPercent,
+    interestRate,
+    preApprovalMonths,
+    constructionMonths,
+    monthlyPreApprovalBurnZAR,
+    monthlyConstructionBurnZAR,
+    developmentExitMode,
+    bondTermYears,
+    investorProfile?.minDscr,
+  ]);
 
   // Section 13sex Tax Incentive Engine
   const calculatedSection13 = useMemo(() => {
@@ -872,6 +1055,22 @@ export default function OpportunityAnalyzerPage() {
     monthlyPrepaidVendingFeeZAR: monthlyPrepaidVendingFee,
     monthlyCommunalServicesZAR: monthlyCommunalServices,
     occupantRisk,
+    developmentType,
+    isVatRegisteredDeveloper,
+    developmentExitMode,
+    unitsRetainedCount,
+    hardCostPerSqmZAR,
+    contingencyPercent,
+    softCostAllowancePercent,
+    useCustomSoftCosts,
+    softCosts,
+    preApprovalMonths,
+    constructionMonths,
+    monthlyPreApprovalBurnZAR,
+    monthlyConstructionBurnZAR,
+    seniorDebtLtcPercent,
+    sCurveUtilizationPercent,
+    preSalesHurdlePercent,
   }), [
     strategy,
     purchasePrice,
@@ -919,16 +1118,40 @@ export default function OpportunityAnalyzerPage() {
     monthlyPrepaidVendingFee,
     monthlyCommunalServices,
     occupantRisk,
+    developmentType,
+    isVatRegisteredDeveloper,
+    developmentExitMode,
+    unitsRetainedCount,
+    hardCostPerSqmZAR,
+    contingencyPercent,
+    softCostAllowancePercent,
+    useCustomSoftCosts,
+    softCosts,
+    preApprovalMonths,
+    constructionMonths,
+    monthlyPreApprovalBurnZAR,
+    monthlyConstructionBurnZAR,
+    seniorDebtLtcPercent,
+    sCurveUtilizationPercent,
+    preSalesHurdlePercent,
   ]);
 
+  const profileWithWarChest = useMemo(
+    () => ({
+      ...investorProfile,
+      liquidCapitalReserveZAR: liquidCapitalReserve,
+    }),
+    [investorProfile, liquidCapitalReserve]
+  );
+
   const strategyMatrix = useMemo(
-    () => evaluateThreeStrategyMatrix(dealMetricsParams, investorProfile, city),
-    [dealMetricsParams, investorProfile, city]
+    () => evaluateThreeStrategyMatrix(dealMetricsParams, profileWithWarChest, city),
+    [dealMetricsParams, profileWithWarChest, city]
   );
 
   const repairPrescription = useMemo(
-    () => solveDealRepairLevers(dealMetricsParams, investorProfile, strategy, city),
-    [dealMetricsParams, investorProfile, strategy, city]
+    () => solveDealRepairLevers(dealMetricsParams, profileWithWarChest, strategy, city),
+    [dealMetricsParams, profileWithWarChest, strategy, city]
   );
 
   const handleApplyNodeBenchmarks = useCallback((benchmarks: NodeMarketBenchmarks) => {
@@ -952,14 +1175,24 @@ export default function OpportunityAnalyzerPage() {
   const handleApplyRepairLever = (lever: DealRepairLever) => {
     if (lever.id === 'price' && lever.targetPriceZAR !== undefined) {
       handlePurchasePriceChange(lever.targetPriceZAR);
-      setFeeResetToast(`Applied Max Bid: ${formatZAR(lever.targetPriceZAR)}`);
+      setFeeResetToast(
+        `Applied ${strategy === 'Development' ? 'Max Land Bid' : 'Max Bid'}: ${formatZAR(lever.targetPriceZAR)}`
+      );
     } else if (lever.id === 'rent' && lever.targetMonthlyRentZAR !== undefined) {
       setMonthlyRent(lever.targetMonthlyRentZAR);
       updateAnalyzerDraft({ monthlyRent: lever.targetMonthlyRentZAR });
       setFeeResetToast(`Applied Target Monthly Rent: ${formatZAR(lever.targetMonthlyRentZAR)}/m`);
-    } else if (lever.id === 'ltv' && lever.targetLtvPercent !== undefined) {
-      handleLTVChange(lever.targetLtvPercent);
-      setFeeResetToast(`Applied Optimal Financing: ${lever.targetLtvPercent}% LTV`);
+    } else if (lever.id === 'ltv') {
+      if (lever.targetSeniorDebtLtcPercent !== undefined) {
+        setSeniorDebtLtcPercent(lever.targetSeniorDebtLtcPercent);
+        updateAnalyzerDraft({ seniorDebtLtcPercent: lever.targetSeniorDebtLtcPercent });
+        setFeeResetToast(
+          `Applied Senior Development Facility: ${lever.targetSeniorDebtLtcPercent}% LTC (TUHF/DFI)`
+        );
+      } else if (lever.targetLtvPercent !== undefined) {
+        handleLTVChange(lever.targetLtvPercent);
+        setFeeResetToast(`Applied Optimal Financing: ${lever.targetLtvPercent}% LTV`);
+      }
     } else if (lever.id === 'exitPrice' && lever.targetExitPriceZAR !== undefined) {
       setTargetExitPrice(lever.targetExitPriceZAR);
       updateAnalyzerDraft({ targetExitPrice: lever.targetExitPriceZAR });
@@ -1194,8 +1427,30 @@ export default function OpportunityAnalyzerPage() {
       setMallDistance(deal.amenityScorecard.shoppingMall);
     }
     setOccupantRisk(deal.occupantRisk ?? getOccupantRiskDefaults('vacant'));
+    setDevelopmentType(deal.developmentType ?? 'Subdivision & Cluster');
+    setIsVatRegisteredDeveloper(deal.isVatRegisteredDeveloper ?? true);
+    setDevelopmentExitMode(deal.developmentExitMode ?? 'Build-to-Sell');
+    setUnitsRetainedCount(deal.unitsRetainedCount ?? 2);
+    setHardCostPerSqmZAR(deal.hardCostPerSqmZAR ?? 9_800);
+    setContingencyPercent(deal.contingencyPercent ?? 7.5);
+    setSoftCostAllowancePercent(deal.softCostAllowancePercent ?? 15.0);
+    setUseCustomSoftCosts(Boolean(deal.useCustomSoftCosts));
+    setSoftCosts(
+      deal.softCosts ??
+        buildDefaultSoftCostsFromAllowance(
+          (deal.floorAreaSqm || 390) * (deal.hardCostPerSqmZAR ?? 9_800),
+          deal.softCostAllowancePercent ?? 15.0
+        )
+    );
+    setPreApprovalMonths(deal.preApprovalMonths ?? 4);
+    setConstructionMonths(deal.constructionMonths ?? (deal.holdingPeriodMonths || 8));
+    setMonthlyPreApprovalBurnZAR(deal.monthlyPreApprovalBurnZAR ?? 3_500);
+    setMonthlyConstructionBurnZAR(deal.monthlyConstructionBurnZAR ?? 12_500);
+    setSeniorDebtLtcPercent(deal.seniorDebtLtcPercent ?? 65);
+    setSCurveUtilizationPercent(deal.sCurveUtilizationPercent ?? 60);
+    setPreSalesHurdlePercent(deal.preSalesHurdlePercent ?? 60);
     setActiveWorkspaceTab('calculator');
-    if (deal.strategy === 'Flip' || deal.strategy === 'BRRRR') {
+    if (deal.strategy === 'Flip' || deal.strategy === 'BRRRR' || deal.strategy === 'Development') {
       setIsHoldingOpen(true);
     } else {
       setIsHoldingOpen(false);
@@ -1332,9 +1587,38 @@ export default function OpportunityAnalyzerPage() {
         capRate: calculatedMetrics.capRate,
         netRoi: calculatedMetrics.netRoi,
         monthlyCashFlow: calculatedMetrics.monthlyCashFlow,
-        initialCapitalRequired: calculatedMetrics.initialCapitalRequired,
-        projectedFlipNetProfit: calculatedMetrics.projectedFlipNetProfit,
-        projectedFlipRoi: calculatedMetrics.projectedFlipRoi,
+        initialCapitalRequired:
+          strategy === 'Development'
+            ? calculatedMetrics.devEquityRequiredZAR
+            : calculatedMetrics.initialCapitalRequired,
+        projectedFlipNetProfit:
+          strategy === 'Development'
+            ? calculatedMetrics.devNetProfitBeforeTaxZAR
+            : calculatedMetrics.projectedFlipNetProfit,
+        projectedFlipRoi:
+          strategy === 'Development'
+            ? calculatedMetrics.devPocPercent
+            : calculatedMetrics.projectedFlipRoi,
+        developmentType: strategy === 'Development' ? developmentType : undefined,
+        isVatRegisteredDeveloper: strategy === 'Development' ? isVatRegisteredDeveloper : undefined,
+        developmentExitMode: strategy === 'Development' ? developmentExitMode : undefined,
+        unitsRetainedCount: strategy === 'Development' ? unitsRetainedCount : undefined,
+        hardCostPerSqmZAR: strategy === 'Development' ? hardCostPerSqmZAR : undefined,
+        contingencyPercent: strategy === 'Development' ? contingencyPercent : undefined,
+        softCostAllowancePercent: strategy === 'Development' ? softCostAllowancePercent : undefined,
+        useCustomSoftCosts: strategy === 'Development' ? useCustomSoftCosts : undefined,
+        softCosts: strategy === 'Development' ? calculatedMetrics.devSoftCostsBreakdown : undefined,
+        preApprovalMonths: strategy === 'Development' ? preApprovalMonths : undefined,
+        constructionMonths: strategy === 'Development' ? constructionMonths : undefined,
+        monthlyPreApprovalBurnZAR: strategy === 'Development' ? monthlyPreApprovalBurnZAR : undefined,
+        monthlyConstructionBurnZAR: strategy === 'Development' ? monthlyConstructionBurnZAR : undefined,
+        seniorDebtLtcPercent: strategy === 'Development' ? seniorDebtLtcPercent : undefined,
+        sCurveUtilizationPercent: strategy === 'Development' ? sCurveUtilizationPercent : undefined,
+        preSalesHurdlePercent: strategy === 'Development' ? preSalesHurdlePercent : undefined,
+        projectedDevTdcZAR: strategy === 'Development' ? calculatedMetrics.devTdcZAR : undefined,
+        projectedDevGdvZAR: strategy === 'Development' ? calculatedMetrics.devGdvInclVatZAR : undefined,
+        projectedDevNetProfitZAR: strategy === 'Development' ? calculatedMetrics.devNetProfitBeforeTaxZAR : undefined,
+        projectedDevPocPercent: strategy === 'Development' ? calculatedMetrics.devPocPercent : undefined,
       });
       trackPrivacySafeEvent('deal_saved_to_pipeline', {
         strategy,
@@ -1448,9 +1732,38 @@ export default function OpportunityAnalyzerPage() {
       capRate: calculatedMetrics.capRate,
       netRoi: calculatedMetrics.netRoi,
       monthlyCashFlow: calculatedMetrics.monthlyCashFlow,
-      initialCapitalRequired: calculatedMetrics.initialCapitalRequired,
-      projectedFlipNetProfit: calculatedMetrics.projectedFlipNetProfit,
-      projectedFlipRoi: calculatedMetrics.projectedFlipRoi,
+      initialCapitalRequired:
+        strategy === 'Development'
+          ? calculatedMetrics.devEquityRequiredZAR
+          : calculatedMetrics.initialCapitalRequired,
+      projectedFlipNetProfit:
+        strategy === 'Development'
+          ? calculatedMetrics.devNetProfitBeforeTaxZAR
+          : calculatedMetrics.projectedFlipNetProfit,
+      projectedFlipRoi:
+        strategy === 'Development'
+          ? calculatedMetrics.devPocPercent
+          : calculatedMetrics.projectedFlipRoi,
+      developmentType: strategy === 'Development' ? developmentType : undefined,
+      isVatRegisteredDeveloper: strategy === 'Development' ? isVatRegisteredDeveloper : undefined,
+      developmentExitMode: strategy === 'Development' ? developmentExitMode : undefined,
+      unitsRetainedCount: strategy === 'Development' ? unitsRetainedCount : undefined,
+      hardCostPerSqmZAR: strategy === 'Development' ? hardCostPerSqmZAR : undefined,
+      contingencyPercent: strategy === 'Development' ? contingencyPercent : undefined,
+      softCostAllowancePercent: strategy === 'Development' ? softCostAllowancePercent : undefined,
+      useCustomSoftCosts: strategy === 'Development' ? useCustomSoftCosts : undefined,
+      softCosts: strategy === 'Development' ? calculatedMetrics.devSoftCostsBreakdown : undefined,
+      preApprovalMonths: strategy === 'Development' ? preApprovalMonths : undefined,
+      constructionMonths: strategy === 'Development' ? constructionMonths : undefined,
+      monthlyPreApprovalBurnZAR: strategy === 'Development' ? monthlyPreApprovalBurnZAR : undefined,
+      monthlyConstructionBurnZAR: strategy === 'Development' ? monthlyConstructionBurnZAR : undefined,
+      seniorDebtLtcPercent: strategy === 'Development' ? seniorDebtLtcPercent : undefined,
+      sCurveUtilizationPercent: strategy === 'Development' ? sCurveUtilizationPercent : undefined,
+      preSalesHurdlePercent: strategy === 'Development' ? preSalesHurdlePercent : undefined,
+      projectedDevTdcZAR: strategy === 'Development' ? calculatedMetrics.devTdcZAR : undefined,
+      projectedDevGdvZAR: strategy === 'Development' ? calculatedMetrics.devGdvInclVatZAR : undefined,
+      projectedDevNetProfitZAR: strategy === 'Development' ? calculatedMetrics.devNetProfitBeforeTaxZAR : undefined,
+      projectedDevPocPercent: strategy === 'Development' ? calculatedMetrics.devPocPercent : undefined,
       status: 'Screening',
       createdAt: new Date().toISOString().split('T')[0],
     };
@@ -1662,6 +1975,7 @@ export default function OpportunityAnalyzerPage() {
         );
 
       case 'holdingExit':
+        if (strategy === 'Development') return null;
         return (
           <div key="holdingExit" data-section-id="holdingExit" id="analyzer-sensitivity" className="scroll-mt-20 rounded-xl bg-slate-50 border border-slate-200 overflow-hidden shadow-2xs">
             {strategy === 'Rental' ? (
@@ -1931,6 +2245,7 @@ export default function OpportunityAnalyzerPage() {
         );
 
       case 'vacancyAgent':
+        if (strategy === 'Development' && developmentExitMode === 'Build-to-Sell') return null;
         return (
           <div key="vacancyAgent" data-section-id="vacancyAgent" className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 rounded-xl bg-slate-50 border border-slate-200 shadow-2xs">
             <div>
@@ -2052,7 +2367,7 @@ export default function OpportunityAnalyzerPage() {
         );
 
       case 'opexReserves':
-        if (strategy === 'Flip') return null;
+        if (strategy === 'Flip' || (strategy === 'Development' && developmentExitMode === 'Build-to-Sell')) return null;
         return (
           <div key="opexReserves" data-section-id="opexReserves" className="rounded-xl border border-slate-200 bg-slate-50/70 overflow-hidden shadow-2xs">
             <button
@@ -2371,6 +2686,196 @@ export default function OpportunityAnalyzerPage() {
         );
 
       case 'mortgageEngine':
+        if (strategy === 'Development') {
+          return (
+            <div key="mortgageEngine" data-section-id="mortgageEngine" className="p-4 sm:p-5 rounded-xl border border-amber-200 bg-white shadow-2xs space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-100">
+                <div className="flex items-center gap-2">
+                  <div className="p-1.5 bg-amber-50 rounded-lg text-amber-700 border border-amber-200">
+                    <HardHat className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
+                      Senior Development Facility &amp; S-Curve Drawdown Engine
+                    </h4>
+                    <p className="text-[11px] text-slate-500">
+                      Loan-to-Cost (LTC %) senior construction facility, S-Curve progressive interest &amp; pre-sales bank hurdle
+                    </p>
+                  </div>
+                </div>
+
+                {/* Live Senior Facility & Equity Required Badges */}
+                <div className="flex flex-wrap items-center gap-2">
+                  <div className="flex items-center gap-1.5 bg-slate-50 px-2.5 py-1 rounded-lg border border-slate-200">
+                    <span className="text-[11px] text-slate-500 font-medium">Senior Facility ({seniorDebtLtcPercent}% LTC):</span>
+                    <span className="text-xs font-black text-slate-900 font-mono">
+                      {formatZAR(calculatedMetrics.devSeniorFacilityLimitZAR)}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1.5 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200">
+                    <span className="text-[11px] text-emerald-700 font-medium">Developer Equity Req:</span>
+                    <span className="text-xs font-black text-emerald-900 font-mono">
+                      {formatZAR(calculatedMetrics.devEquityRequiredZAR)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-4">
+                {/* Column 1: Senior Debt LTC (%) Slider & Presets */}
+                <div className="lg:col-span-5 bg-slate-50/70 p-3.5 rounded-xl border border-slate-200 space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-bold text-slate-800">
+                      Senior Debt Loan-to-Cost (LTC %)
+                    </label>
+                    <span className="text-xs font-extrabold text-amber-900 font-mono bg-amber-100/80 px-2 py-0.5 rounded border border-amber-300">
+                      {seniorDebtLtcPercent}% LTC
+                    </span>
+                  </div>
+
+                  <input
+                    type="range"
+                    min="0"
+                    max="85"
+                    step="5"
+                    value={seniorDebtLtcPercent}
+                    onChange={(e) => {
+                      const val = Number(e.target.value);
+                      setSeniorDebtLtcPercent(val);
+                      updateAnalyzerDraft({ seniorDebtLtcPercent: val });
+                    }}
+                    className="w-full accent-amber-600 cursor-pointer h-2 bg-slate-200 rounded-lg"
+                  />
+                  <div className="flex justify-between text-[10px] text-slate-400 font-medium px-0.5">
+                    <span>0% (All Equity)</span>
+                    <span>50%</span>
+                    <span>65% (Bank Std)</span>
+                    <span>75% (TUHF/DFI)</span>
+                    <span>85%</span>
+                  </div>
+
+                  <div className="flex items-center gap-1.5 pt-1">
+                    {[
+                      { ltc: 75, label: '75% (TUHF/DFI)' },
+                      { ltc: 65, label: '65% (Bank Std)' },
+                      { ltc: 50, label: '50% (Low Gear)' },
+                      { ltc: 0, label: '0% (All Cash)' },
+                    ].map((preset) => (
+                      <button
+                        key={preset.ltc}
+                        type="button"
+                        onClick={() => {
+                          setSeniorDebtLtcPercent(preset.ltc);
+                          updateAnalyzerDraft({ seniorDebtLtcPercent: preset.ltc });
+                        }}
+                        className={`flex-1 text-[10px] py-1 px-1.5 rounded-md font-semibold border transition-all cursor-pointer ${
+                          seniorDebtLtcPercent === preset.ltc
+                            ? 'bg-amber-600 text-white border-amber-600 shadow-2xs'
+                            : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-100'
+                        }`}
+                      >
+                        {preset.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Column 2: S-Curve Utilization Factor & Pre-Sales Bank Hurdle */}
+                <div className="lg:col-span-4 bg-slate-50/70 p-3.5 rounded-xl border border-slate-200 space-y-3">
+                  <div>
+                    <div className="flex items-center justify-between text-xs mb-1">
+                      <label className="font-bold text-slate-800">
+                        Avg S-Curve Drawdown Factor (%)
+                      </label>
+                      <span className="font-mono font-bold text-indigo-800 bg-white px-2 py-0.5 rounded border border-slate-200">
+                        {sCurveUtilizationPercent}% Drawn Avg
+                      </span>
+                    </div>
+                    <input
+                      type="range"
+                      min="30"
+                      max="100"
+                      step="5"
+                      value={sCurveUtilizationPercent}
+                      onChange={(e) => {
+                        const val = Number(e.target.value);
+                        setSCurveUtilizationPercent(val);
+                        updateAnalyzerDraft({ sCurveUtilizationPercent: val });
+                      }}
+                      className="w-full accent-indigo-600 cursor-pointer h-1.5 bg-slate-200 rounded-lg"
+                    />
+                    <span className="text-[10px] text-slate-500 block mt-0.5">
+                      Progressive QS certification drawdown (Standard S-Curve: 55%–65%).
+                    </span>
+                  </div>
+
+                  <div className="pt-2 border-t border-slate-200">
+                    <div className="flex items-center justify-between text-xs mb-1">
+                      <label className="font-bold text-slate-800">
+                        Bank Pre-Sales Hurdle (% GDV)
+                      </label>
+                      <span className="font-mono font-bold text-emerald-800 bg-white px-2 py-0.5 rounded border border-slate-200">
+                        {preSalesHurdlePercent}% Pre-Sold
+                      </span>
+                    </div>
+                    <input
+                      type="range"
+                      min="0"
+                      max="100"
+                      step="5"
+                      value={preSalesHurdlePercent}
+                      onChange={(e) => {
+                        const val = Number(e.target.value);
+                        setPreSalesHurdlePercent(val);
+                        updateAnalyzerDraft({ preSalesHurdlePercent: val });
+                      }}
+                      className="w-full accent-emerald-600 cursor-pointer h-1.5 bg-slate-200 rounded-lg"
+                    />
+                    <span className="text-[10px] text-slate-500 block mt-0.5">
+                      Required OTPs/guarantees before first construction draw: <strong>{formatZAR(Math.round(calculatedMetrics.devGdvInclVatZAR * (preSalesHurdlePercent / 100)))}</strong>
+                    </span>
+                  </div>
+                </div>
+
+                {/* Column 3: Interest Rate & S-Curve Monthly Finance Cost */}
+                <div className="lg:col-span-3 bg-slate-50/70 p-3.5 rounded-xl border border-slate-200 flex flex-col justify-between space-y-2">
+                  <div>
+                    <label className="block text-[10px] font-semibold text-slate-600 mb-1">
+                      Facility Interest Rate (% p.a.)
+                    </label>
+                    <div className="flex items-center">
+                      <input
+                        type="number"
+                        name="interestRatePercent"
+                        autoComplete="off"
+                        min="0"
+                        step="0.25"
+                        value={interestRate}
+                        onChange={(e) => setInterestRate(Number(e.target.value))}
+                        className="w-full text-xs px-2.5 py-1.5 border border-slate-300 rounded-lg font-semibold bg-white"
+                      />
+                      <span className="ml-1.5 text-xs text-slate-500 font-bold">%</span>
+                    </div>
+                  </div>
+
+                  <div className="p-2.5 rounded-lg bg-white border border-slate-200 space-y-1">
+                    <span className="text-[10px] text-slate-500 block">
+                      Avg Monthly S-Curve Interest:
+                    </span>
+                    <span className="text-xs font-black text-amber-800 font-mono block">
+                      {seniorDebtLtcPercent > 0
+                        ? `${formatZAR(calculatedMetrics.devMonthlySCurveInterestZAR)}/mo`
+                        : 'R 0 (All-Equity Build)'}
+                    </span>
+                    <span className="text-[10px] text-slate-400 block">
+                      Total {preApprovalMonths + constructionMonths}-Mo Carrying: {formatZAR(calculatedMetrics.devTotalCarryingCostZAR)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        }
         return (
           <div key="mortgageEngine" data-section-id="mortgageEngine" className="p-4 sm:p-5 rounded-xl border border-slate-200 bg-white shadow-2xs space-y-4">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-100">
@@ -3100,7 +3605,11 @@ export default function OpportunityAnalyzerPage() {
         {(activeWorkspaceTab === 'calculator' || isStackedView) && (
           <AnalyzerStickyRibbon
             strategy={strategy}
-            dayOneCapitalRequired={calculatedMetrics.initialCapitalRequired}
+            dayOneCapitalRequired={
+              strategy === 'Development'
+                ? calculatedMetrics.devEquityRequiredZAR
+                : calculatedMetrics.initialCapitalRequired
+            }
             builtInEquity={calculatedBuiltInEquity.builtInEquityZAR}
             builtInEquityPercent={calculatedBuiltInEquity.builtInEquityPercent}
             grossYield={calculatedMetrics.grossYield}
@@ -3116,6 +3625,12 @@ export default function OpportunityAnalyzerPage() {
             brrrrPostRefiCashflowZAR={calculatedMetrics.brrrrPostRefiCashflowZAR}
             brrrrEquityExtractedZAR={calculatedMetrics.brrrrEquityExtractedZAR}
             brrrrCashLeftInDealZAR={calculatedMetrics.brrrrCashLeftInDealZAR}
+            devTdcZAR={calculatedMetrics.devTdcZAR}
+            devGdvInclVatZAR={calculatedMetrics.devGdvInclVatZAR}
+            devNetProfitBeforeTaxZAR={calculatedMetrics.devNetProfitBeforeTaxZAR}
+            devPocPercent={calculatedMetrics.devPocPercent}
+            devUnitsRequiredForDebtWipeout={calculatedMetrics.devUnitsRequiredForDebtWipeout}
+            devIsSection13SexEligible={calculatedMetrics.devIsSection13SexEligible}
             isEditing={Boolean(editingDealId)}
             onSaveDeal={() => formRef.current?.requestSubmit()}
             onScrollToResults={() => {
@@ -3458,11 +3973,17 @@ export default function OpportunityAnalyzerPage() {
                 strategy,
                 purchasePrice,
                 openMarketValue,
-                grossYield: calculatedMetrics.grossYield,
+                grossYield:
+                  strategy === 'Development'
+                    ? calculatedMetrics.devYieldOnCostPercent
+                    : calculatedMetrics.grossYield,
                 vacancyRatePercent: vacancyRate,
                 annualCapitalGrowthPercent: annualCapitalGrowth,
                 monthlyRatesZAR: monthlyRates,
-                purchasePricePerSqm: calculatedMetrics.purchasePricePerSqm,
+                purchasePricePerSqm:
+                  strategy === 'Development'
+                    ? calculatedMetrics.devTdcPerSqmZAR
+                    : calculatedMetrics.purchasePricePerSqm,
               }}
               onApplyNodeBenchmarks={handleApplyNodeBenchmarks}
             />
@@ -3480,12 +4001,13 @@ export default function OpportunityAnalyzerPage() {
                   </div>
                   <span className="text-[10px] text-slate-500">Tailors carrying burn rate vs 20/30-yr projection models</span>
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   {(
                     [
                       { id: 'Rental' as const, label: 'Buy & Hold Rental', icon: Building2, desc: 'Long-term cash flow & equity compounding' },
                       { id: 'Flip' as const, label: 'Buy & Flip', icon: Hammer, desc: 'Short-term renovation & capital liquidation' },
                       { id: 'BRRRR' as const, label: 'Hybrid BRRRR', icon: RefreshCw, desc: 'Rehab, refinance & compound hold' },
+                      { id: 'Development' as const, label: 'Development', icon: HardHat, desc: 'Subdivision, cluster, infill & bulk conversion' },
                     ] as const
                   ).map((st) => {
                     const StrategyIcon = st.icon;
@@ -3516,64 +4038,120 @@ export default function OpportunityAnalyzerPage() {
                 </div>
               </div>
 
-              {/* Property Title Type & Body Corporate AGM Schedule */}
+              {/* Property Title Type & Governance OR Development Scheme & Tax Structure */}
               <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/70 space-y-3">
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-1.5">
-                      <Building className="w-4 h-4 text-emerald-600" />
-                      <label className="text-xs font-bold text-slate-900 uppercase tracking-wider">
-                        Property Title Type & Governance
+                {strategy === 'Development' ? (
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-1.5">
+                        <HardHat className="w-4 h-4 text-amber-600" />
+                        <label className="text-xs font-bold text-slate-900 uppercase tracking-wider">
+                          Development Scheme &amp; Tax Structure
+                        </label>
+                      </div>
+                      <label className="inline-flex items-center gap-1.5 text-[10px] font-bold text-amber-900 bg-amber-100/80 border border-amber-300 px-2 py-0.5 rounded-md cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          checked={isVatRegisteredDeveloper}
+                          onChange={(e) => {
+                            const checked = e.target.checked;
+                            setIsVatRegisteredDeveloper(checked);
+                            updateAnalyzerDraft({ isVatRegisteredDeveloper: checked });
+                          }}
+                          className="w-3 h-3 rounded text-amber-600 focus:ring-amber-500 cursor-pointer"
+                        />
+                        <span>VAT-Registered Developer (15% Output VAT)</span>
                       </label>
                     </div>
-                    <span className="text-[10px] text-slate-500">STSMA Schemes vs Freehold Standalone</span>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                      {(
+                        [
+                          { id: 'Subdivision & Cluster' as const, label: 'Subdivision Cluster', icon: Home },
+                          { id: 'Sectional Title Apartments' as const, label: 'Sectional Title', icon: Building2 },
+                          { id: 'Township Micro-Units (Infill)' as const, label: 'Township Infill', icon: Building },
+                          { id: 'Commercial-to-Residential Conversion' as const, label: 'Comm-to-Resi', icon: Warehouse },
+                        ] as const
+                      ).map((dt) => {
+                        const DevIcon = dt.icon;
+                        return (
+                          <button
+                            key={dt.id}
+                            type="button"
+                            onClick={() => {
+                              setDevelopmentType(dt.id);
+                              updateAnalyzerDraft({ developmentType: dt.id });
+                            }}
+                            className={`px-2.5 py-2 rounded-lg text-xs font-semibold transition-all text-center border flex items-center justify-center gap-1.5 cursor-pointer ${
+                              developmentType === dt.id
+                                ? 'bg-slate-900 text-white border-slate-900 shadow-2xs font-bold'
+                                : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
+                            }`}
+                          >
+                            <DevIcon className="w-3.5 h-3.5 shrink-0" />
+                            <span className="whitespace-nowrap">{dt.label}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                    {(
-                      [
-                        { id: 'Sectional Title Apartment', label: 'Sectional Title', icon: Building2 },
-                        { id: 'Freehold House', label: 'Freehold House', icon: Home },
-                        { id: 'Townhouse / Cluster', label: 'Townhouse / Cluster', icon: Warehouse },
-                        { id: 'Multi-unit Commercial', label: 'Commercial', icon: Briefcase },
-                      ] as const
-                    ).map((pt) => {
-                      const TypeIcon = pt.icon;
-                      return (
-                        <button
-                          key={pt.id}
-                          type="button"
-                          onClick={() => {
-                            setPropertyType(pt.id);
-                            if (pt.id === 'Freehold House') {
-                              setMonthlyLevies(0);
-                              const newIns = annualInsurance > 0 ? annualInsurance : 7_200;
-                              setAnnualInsurance(newIns);
-                              updateAnalyzerDraft({ monthlyLevies: 0, annualInsurance: newIns });
-                            } else {
-                              setAnnualInsurance(0);
-                              updateAnalyzerDraft({ annualInsurance: 0 });
-                            }
-                          }}
-                          className={`py-2 px-3 rounded-lg text-xs font-semibold transition-all text-center border flex items-center justify-center gap-1.5 cursor-pointer ${
-                            propertyType === pt.id
-                              ? 'bg-slate-900 text-white border-slate-900 shadow-2xs font-bold'
-                              : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
-                          }`}
-                        >
-                          <TypeIcon className="w-3.5 h-3.5" />
-                          <span>{pt.label}</span>
-                        </button>
-                      );
-                    })}
+                ) : (
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-1.5">
+                        <Building className="w-4 h-4 text-emerald-600" />
+                        <label className="text-xs font-bold text-slate-900 uppercase tracking-wider">
+                          Property Title Type &amp; Governance
+                        </label>
+                      </div>
+                      <span className="text-[10px] text-slate-500">STSMA Schemes vs Freehold Standalone</span>
+                    </div>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                      {(
+                        [
+                          { id: 'Sectional Title Apartment', label: 'Sectional Title', icon: Building2 },
+                          { id: 'Freehold House', label: 'Freehold House', icon: Home },
+                          { id: 'Townhouse / Cluster', label: 'Townhouse / Cluster', icon: Warehouse },
+                          { id: 'Multi-unit Commercial', label: 'Commercial', icon: Briefcase },
+                        ] as const
+                      ).map((pt) => {
+                        const TypeIcon = pt.icon;
+                        return (
+                          <button
+                            key={pt.id}
+                            type="button"
+                            onClick={() => {
+                              setPropertyType(pt.id);
+                              if (pt.id === 'Freehold House') {
+                                setMonthlyLevies(0);
+                                const newIns = annualInsurance > 0 ? annualInsurance : 7_200;
+                                setAnnualInsurance(newIns);
+                                updateAnalyzerDraft({ monthlyLevies: 0, annualInsurance: newIns });
+                              } else {
+                                setAnnualInsurance(0);
+                                updateAnalyzerDraft({ annualInsurance: 0 });
+                              }
+                            }}
+                            className={`py-2 px-3 rounded-lg text-xs font-semibold transition-all text-center border flex items-center justify-center gap-1.5 cursor-pointer ${
+                              propertyType === pt.id
+                                ? 'bg-slate-900 text-white border-slate-900 shadow-2xs font-bold'
+                                : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
+                            }`}
+                          >
+                            <TypeIcon className="w-3.5 h-3.5" />
+                            <span>{pt.label}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
-                </div>
+                )}
 
                 {/* Unit Count & Total Floor Area (m²) Inputs for Multi-Unit / Bulk SPVs */}
                 <div className="pt-2 border-t border-slate-200/80 grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <div className="flex items-center justify-between mb-1">
                       <label className="text-[11px] font-semibold text-slate-700">
-                        Units (Qty)
+                        {strategy === 'Development' ? 'Planned Units (Qty) *' : 'Units (Qty)'}
                       </label>
                       {numberOfUnits >= 5 && (
                         <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100 px-1.5 py-0.5 rounded">
@@ -3591,7 +4169,13 @@ export default function OpportunityAnalyzerPage() {
                       onChange={(e) => {
                         const val = Math.max(1, Math.round(Number(e.target.value) || 1));
                         setNumberOfUnits(val);
-                        updateAnalyzerDraft({ numberOfUnits: val });
+                        if (strategy === 'Development' && floorAreaSqm / val < 24) {
+                          const nextArea = val * 65;
+                          setFloorAreaSqm(nextArea);
+                          updateAnalyzerDraft({ numberOfUnits: val, floorAreaSqm: nextArea });
+                        } else {
+                          updateAnalyzerDraft({ numberOfUnits: val });
+                        }
                       }}
                       className="w-full text-xs px-3 py-2 border border-slate-300 rounded-lg bg-white focus:ring-1 focus:ring-emerald-500 font-semibold text-slate-900"
                     />
@@ -3599,9 +4183,13 @@ export default function OpportunityAnalyzerPage() {
                   <div>
                     <div className="flex items-center justify-between mb-1">
                       <label className="text-[11px] font-semibold text-slate-700">
-                        Total Size (m²)
+                        {strategy === 'Development' ? 'Total Buildable Bulk (m²) *' : 'Total Size (m²)'}
                       </label>
-                      <span className="text-[10px] text-slate-400">Optional (e.g. 420)</span>
+                      <span className="text-[10px] text-slate-400">
+                        {strategy === 'Development' && numberOfUnits > 0 && floorAreaSqm > 0
+                          ? `Avg ${Math.round(floorAreaSqm / numberOfUnits)} m²/unit`
+                          : 'Optional (e.g. 420)'}
+                      </span>
                     </div>
                     <div className="relative">
                       <input
@@ -3621,165 +4209,802 @@ export default function OpportunityAnalyzerPage() {
                       />
                       <span className="absolute right-2.5 top-2 text-[11px] text-slate-400 font-bold">m²</span>
                     </div>
+                    {strategy === 'Development' && numberOfUnits > 0 && floorAreaSqm / numberOfUnits < 24 && (
+                      <div className="mt-1.5 px-2.5 py-1.5 rounded-lg bg-amber-50 border border-amber-300 text-[11px] text-amber-900 flex flex-wrap items-center justify-between gap-1.5">
+                        <span>
+                          ⚠️ Avg {Math.round(floorAreaSqm / numberOfUnits)} m²/unit is below SA 24 m² micro-unit minimum —{' '}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const nextArea = numberOfUnits * 65;
+                              setFloorAreaSqm(nextArea);
+                              updateAnalyzerDraft({ floorAreaSqm: nextArea });
+                            }}
+                            className="font-bold text-amber-800 hover:text-amber-950 underline cursor-pointer"
+                          >
+                            [Set to {numberOfUnits * 65} m² (65 m²/unit)]
+                          </button>
+                        </span>
+                      </div>
+                    )}
                   </div>
                 </div>
 
-                {(propertyType === 'Sectional Title Apartment' || propertyType === 'Townhouse / Cluster') && (
-                  <div className="pt-2 border-t border-slate-200/80">
-                    <div className="flex items-center justify-between mb-1">
-                      <label className="block text-xs font-semibold text-slate-800 flex items-center gap-1.5">
-                        <Calendar className="w-3.5 h-3.5 text-indigo-600" />
-                        <span>Scheduled Body Corporate AGM Date</span>
-                      </label>
-                      <span className="text-[10px] text-indigo-600 font-medium">
-                        Auto-schedules reminder task 14 days prior to AGM
-                      </span>
+                {strategy !== 'Development' &&
+                  (propertyType === 'Sectional Title Apartment' || propertyType === 'Townhouse / Cluster') && (
+                    <div className="pt-2 border-t border-slate-200/80">
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="block text-xs font-semibold text-slate-800 flex items-center gap-1.5">
+                          <Calendar className="w-3.5 h-3.5 text-indigo-600" />
+                          <span>Scheduled Body Corporate AGM Date</span>
+                        </label>
+                        <span className="text-[10px] text-indigo-600 font-medium">
+                          Auto-schedules reminder task 14 days prior to AGM
+                        </span>
+                      </div>
+                      <input
+                        type="date"
+                        name="agmDate"
+                        autoComplete="off"
+                        value={agmDate}
+                        onChange={(e) => setAgmDate(e.target.value)}
+                        className="w-full text-xs px-3 py-2 border border-slate-300 rounded-lg bg-white focus:ring-1 focus:ring-emerald-500"
+                      />
                     </div>
-                    <input
-                      type="date"
-                      name="agmDate"
-                      autoComplete="off"
-                      value={agmDate}
-                      onChange={(e) => setAgmDate(e.target.value)}
-                      className="w-full text-xs px-3 py-2 border border-slate-300 rounded-lg bg-white focus:ring-1 focus:ring-emerald-500"
-                    />
-                  </div>
-                )}
+                  )}
               </div>
             </div>
 
-            {/* Valuation vs. Purchase Price & Built-in Equity */}
+            {/* Valuation vs. Purchase Price & Built-in Equity OR Land Acquisition vs. Completed Scheme GDV */}
             <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
               <div className="flex items-center justify-between border-b border-slate-200 pb-2">
                 <div className="flex items-center gap-2">
                   <TrendingUp className="w-4 h-4 text-emerald-600" />
                   <span className="text-xs font-bold text-slate-900 uppercase tracking-wider">
-                    Valuation vs. Acquisition Bid
+                    {strategy === 'Development'
+                      ? 'Land / Site Acquisition vs. Completed Scheme GDV'
+                      : 'Valuation vs. Acquisition Bid'}
                   </span>
                 </div>
-                <span className="text-[10px] text-slate-500">Lightstone CMA / Bank Valuation Baseline</span>
+                <span className="text-[10px] text-slate-500">
+                  {strategy === 'Development'
+                    ? 'Raw Land / Erf Bid vs. Completed Scheme Gross Development Value'
+                    : 'Lightstone CMA / Bank Valuation Baseline'}
+                </span>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {/* Open Market Value (ZAR) */}
-                <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <label className="text-[11px] font-semibold text-slate-700">Open Market Value (ZAR) *</label>
-                    <span className="text-[10px] text-slate-400">Professional Valuation</span>
-                  </div>
-                  <div className="relative">
-                    <span className="absolute left-2.5 top-2 text-xs text-slate-400 font-bold">R</span>
-                    <input
-                      type="number"
-                      name="openMarketValueZAR"
-                      autoComplete="off"
-                      min="0"
-                      step="any"
-                      value={openMarketValue}
-                      onChange={(e) => {
-                        const val = Number(e.target.value);
-                        setOpenMarketValue(val);
-                        updateAnalyzerDraft({ openMarketValue: val });
-                      }}
-                      className="w-full text-xs pl-7 pr-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-emerald-500 font-semibold text-slate-900 bg-white"
-                    />
-                  </div>
-                </div>
-
-                {/* Target Purchase Price / Max Bid (ZAR) */}
-                <div>
-                  <div className="flex items-center justify-between gap-1 mb-1 flex-wrap">
-                    <label className="text-[11px] font-semibold text-slate-700">Target Purchase Price / Max Bid (ZAR) *</label>
-                    <label
-                      className={`inline-flex items-center gap-1 cursor-pointer text-[10px] font-semibold px-1.5 py-0.5 rounded border transition-colors select-none ${
-                        isVatInclusiveDeveloperSale
-                          ? 'bg-emerald-100 text-emerald-900 border-emerald-300'
-                          : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-100'
-                      }`}
-                      title="VAT-registered developer / off-plan sale — SARS Transfer Duty is R 0"
-                    >
-                      <input
-                        type="checkbox"
-                        checked={isVatInclusiveDeveloperSale}
-                        onChange={(e) => {
-                          const checked = e.target.checked;
-                          setIsVatInclusiveDeveloperSale(checked);
-                          updateAnalyzerDraft({ isVatInclusiveDeveloperSale: checked });
-                        }}
-                        className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 w-3 h-3 cursor-pointer"
-                      />
-                      <span>Developer / VAT-Incl. (R0 Transfer Duty)</span>
-                    </label>
-                  </div>
-                  <div className="relative">
-                    <span className="absolute left-2.5 top-2 text-xs text-slate-400 font-bold">R</span>
-                    <input
-                      type="number"
-                      name="purchasePriceZAR"
-                      autoComplete="off"
-                      min="0"
-                      step="any"
-                      value={purchasePrice}
-                      onChange={(e) => handlePurchasePriceChange(Number(e.target.value))}
-                      className="w-full text-xs pl-7 pr-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-emerald-500 font-semibold text-slate-900 bg-white"
-                    />
-                  </div>
-                </div>
-
-                {/* Calculated Built-in Equity Highlight Callout */}
-                <div
-                  className={`p-3 rounded-xl border flex flex-col justify-between transition-colors ${
-                    calculatedBuiltInEquity.builtInEquityZAR > 0
-                      ? 'bg-emerald-50/90 border-emerald-300 text-emerald-950 shadow-2xs'
-                      : calculatedBuiltInEquity.builtInEquityZAR === 0
-                      ? 'bg-slate-100 border-slate-300 text-slate-800'
-                      : 'bg-rose-50 border-rose-300 text-rose-950'
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-extrabold uppercase tracking-wider">
-                      Built-in Equity (Capital Upside)
-                    </span>
-                    <span
-                      className={`text-[10px] font-bold px-1.5 py-0.2 rounded-full ${
-                        calculatedBuiltInEquity.builtInEquityZAR > 0
-                          ? 'bg-emerald-200/80 text-emerald-900'
-                          : 'bg-rose-200 text-rose-900'
-                      }`}
-                    >
-                      {calculatedBuiltInEquity.builtInEquityPercent >= 0 ? '+' : ''}
-                      {formatPercent(calculatedBuiltInEquity.builtInEquityPercent)} Below Valuation
-                    </span>
-                  </div>
-                  <div className="text-lg font-black mt-1">
-                    {formatZAR(calculatedBuiltInEquity.builtInEquityZAR)}
-                  </div>
-                  {(floorAreaSqm > 0 || numberOfUnits > 1) ? (
-                    <div className="text-[10px] font-semibold opacity-90 flex flex-wrap items-center gap-1.5 mt-0.5">
-                      {floorAreaSqm > 0 && (
-                        <span>
-                          Bid: {formatZAR(calculatedMetrics.purchasePricePerSqm)}/m² vs Val: {formatZAR(calculatedMetrics.valuationPerSqm)}/m²
-                        </span>
-                      )}
-                      {floorAreaSqm > 0 && numberOfUnits > 1 && <span>&bull;</span>}
-                      {numberOfUnits > 1 && (
-                        <span>
-                          Avg {formatZAR(calculatedMetrics.averagePricePerUnit)} / unit ({numberOfUnits} units)
-                        </span>
-                      )}
+              {strategy === 'Development' ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {/* 1. Raw Land / Site Acquisition Price (ZAR) */}
+                  <div>
+                    <div className="flex items-center justify-between gap-1 mb-1 flex-wrap">
+                      <label className="text-[11px] font-semibold text-slate-700">
+                        Raw Land / Site Acquisition Price (ZAR) *
+                      </label>
+                      <label
+                        className={`inline-flex items-center gap-1 cursor-pointer text-[10px] font-semibold px-1.5 py-0.5 rounded border transition-colors select-none ${
+                          isVatInclusiveDeveloperSale
+                            ? 'bg-emerald-100 text-emerald-900 border-emerald-300'
+                            : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-100'
+                        }`}
+                        title="VAT-registered seller — SARS Transfer Duty is R 0"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isVatInclusiveDeveloperSale}
+                          onChange={(e) => {
+                            const checked = e.target.checked;
+                            setIsVatInclusiveDeveloperSale(checked);
+                            updateAnalyzerDraft({ isVatInclusiveDeveloperSale: checked });
+                          }}
+                          className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 w-3 h-3 cursor-pointer"
+                        />
+                        <span>VAT-Incl. Land (R0 Duty)</span>
+                      </label>
                     </div>
-                  ) : (
-                    <span className="text-[10px] opacity-80 block">
-                      {calculatedBuiltInEquity.builtInEquityZAR > 0
-                        ? 'Immediate equity cushion upon transfer'
-                        : 'Target bid equals or exceeds market valuation'}
+                    <div className="relative">
+                      <span className="absolute left-2.5 top-2 text-xs text-slate-400 font-bold">R</span>
+                      <input
+                        type="number"
+                        name="purchasePriceZAR"
+                        autoComplete="off"
+                        min="0"
+                        step="any"
+                        value={purchasePrice}
+                        onChange={(e) => handlePurchasePriceChange(Number(e.target.value))}
+                        className="w-full text-xs pl-7 pr-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-emerald-500 font-semibold text-slate-900 bg-white"
+                      />
+                    </div>
+                    <span className="text-[10px] text-slate-500 mt-1 block">
+                      Land + Legal/Duty: <strong>{formatZAR(calculatedMetrics.devLandAndAcquisitionZAR)}</strong> ({formatZAR(Math.round(purchasePrice / Math.max(1, numberOfUnits)))} / unit stand cost)
                     </span>
-                  )}
+                  </div>
+
+                  {/* 2. Completed Scheme GDV (Incl. VAT) */}
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="text-[11px] font-semibold text-slate-700">
+                        Completed Scheme GDV (ZAR, {isVatRegisteredDeveloper ? '15% VAT Incl.' : 'Exempt'}) *
+                      </label>
+                      <span className="text-[10px] text-amber-700 font-semibold">
+                        Avg {formatZAR(calculatedMetrics.devAvgUnitPriceZAR)}/unit
+                      </span>
+                    </div>
+                    <div className="relative">
+                      <span className="absolute left-2.5 top-2 text-xs text-slate-400 font-bold">R</span>
+                      <input
+                        type="number"
+                        name="targetExitPriceZAR"
+                        autoComplete="off"
+                        min="0"
+                        step="any"
+                        value={targetExitPrice}
+                        onChange={(e) => {
+                          const val = Number(e.target.value);
+                          setTargetExitPrice(val);
+                          setOpenMarketValue(val);
+                          updateAnalyzerDraft({ targetExitPrice: val, openMarketValue: val });
+                        }}
+                        className="w-full text-xs pl-7 pr-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-emerald-500 font-semibold text-slate-900 bg-white"
+                      />
+                    </div>
+                    <span className="text-[10px] text-slate-500 mt-1 block">
+                      Net Realizable GDV (after VAT &amp; comm): <strong>{formatZAR(calculatedMetrics.devNetRealizableGdvZAR)}</strong>
+                    </span>
+                  </div>
+
+                  {/* 3. Gross Development Spread & POC % Callout */}
+                  <div
+                    className={`p-3 rounded-xl border flex flex-col justify-between transition-colors ${
+                      calculatedMetrics.devPocPercent >= (investorProfile?.minDevelopmentPocPercent ?? 20)
+                        ? 'bg-emerald-50/90 border-emerald-300 text-emerald-950 shadow-2xs'
+                        : calculatedMetrics.devNetProfitBeforeTaxZAR > 0
+                        ? 'bg-amber-50 border-amber-300 text-amber-950'
+                        : 'bg-rose-50 border-rose-300 text-rose-950'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-extrabold uppercase tracking-wider">
+                        Development Spread (GDV vs. TDC)
+                      </span>
+                      <span
+                        className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
+                          calculatedMetrics.devPocPercent >= (investorProfile?.minDevelopmentPocPercent ?? 20)
+                            ? 'bg-emerald-200/80 text-emerald-900'
+                            : calculatedMetrics.devNetProfitBeforeTaxZAR > 0
+                            ? 'bg-amber-200/80 text-amber-900'
+                            : 'bg-rose-200 text-rose-900'
+                        }`}
+                      >
+                        {calculatedMetrics.devPocPercent >= 0 ? '+' : ''}
+                        {formatPercent(calculatedMetrics.devPocPercent)} POC (Hurdle {investorProfile?.minDevelopmentPocPercent ?? 20}%)
+                      </span>
+                    </div>
+                    <div className="text-lg font-black mt-1 tabular-nums">
+                      {formatZAR(calculatedMetrics.devNetProfitBeforeTaxZAR)}{' '}
+                      <span className="text-xs font-bold opacity-80">Pre-Tax Profit</span>
+                    </div>
+                    <div className="text-[10px] font-semibold opacity-90 flex flex-wrap items-center gap-1.5 mt-0.5">
+                      <span>TDC: {formatZAR(calculatedMetrics.devTdcZAR)}</span>
+                      <span>&bull;</span>
+                      <span>{formatZAR(calculatedMetrics.devTdcPerSqmZAR)}/m² TDC</span>
+                      <span>&bull;</span>
+                      <span>Margin: {formatPercent(calculatedMetrics.devMarginPercent)}</span>
+                    </div>
+                  </div>
                 </div>
-              </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {/* Open Market Value (ZAR) */}
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="text-[11px] font-semibold text-slate-700">Open Market Value (ZAR) *</label>
+                      <span className="text-[10px] text-slate-400">Professional Valuation</span>
+                    </div>
+                    <div className="relative">
+                      <span className="absolute left-2.5 top-2 text-xs text-slate-400 font-bold">R</span>
+                      <input
+                        type="number"
+                        name="openMarketValueZAR"
+                        autoComplete="off"
+                        min="0"
+                        step="any"
+                        value={openMarketValue}
+                        onChange={(e) => {
+                          const val = Number(e.target.value);
+                          setOpenMarketValue(val);
+                          updateAnalyzerDraft({ openMarketValue: val });
+                        }}
+                        className="w-full text-xs pl-7 pr-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-emerald-500 font-semibold text-slate-900 bg-white"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Target Purchase Price / Max Bid (ZAR) */}
+                  <div>
+                    <div className="flex items-center justify-between gap-1 mb-1 flex-wrap">
+                      <label className="text-[11px] font-semibold text-slate-700">Target Purchase Price / Max Bid (ZAR) *</label>
+                      <label
+                        className={`inline-flex items-center gap-1 cursor-pointer text-[10px] font-semibold px-1.5 py-0.5 rounded border transition-colors select-none ${
+                          isVatInclusiveDeveloperSale
+                            ? 'bg-emerald-100 text-emerald-900 border-emerald-300'
+                            : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-100'
+                        }`}
+                        title="VAT-registered developer / off-plan sale — SARS Transfer Duty is R 0"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isVatInclusiveDeveloperSale}
+                          onChange={(e) => {
+                            const checked = e.target.checked;
+                            setIsVatInclusiveDeveloperSale(checked);
+                            updateAnalyzerDraft({ isVatInclusiveDeveloperSale: checked });
+                          }}
+                          className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 w-3 h-3 cursor-pointer"
+                        />
+                        <span>Developer / VAT-Incl. (R0 Transfer Duty)</span>
+                      </label>
+                    </div>
+                    <div className="relative">
+                      <span className="absolute left-2.5 top-2 text-xs text-slate-400 font-bold">R</span>
+                      <input
+                        type="number"
+                        name="purchasePriceZAR"
+                        autoComplete="off"
+                        min="0"
+                        step="any"
+                        value={purchasePrice}
+                        onChange={(e) => handlePurchasePriceChange(Number(e.target.value))}
+                        className="w-full text-xs pl-7 pr-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-emerald-500 font-semibold text-slate-900 bg-white"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Calculated Built-in Equity Highlight Callout */}
+                  <div
+                    className={`p-3 rounded-xl border flex flex-col justify-between transition-colors ${
+                      calculatedBuiltInEquity.builtInEquityZAR > 0
+                        ? 'bg-emerald-50/90 border-emerald-300 text-emerald-950 shadow-2xs'
+                        : calculatedBuiltInEquity.builtInEquityZAR === 0
+                        ? 'bg-slate-100 border-slate-300 text-slate-800'
+                        : 'bg-rose-50 border-rose-300 text-rose-950'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-extrabold uppercase tracking-wider">
+                        Built-in Equity (Capital Upside)
+                      </span>
+                      <span
+                        className={`text-[10px] font-bold px-1.5 py-0.2 rounded-full ${
+                          calculatedBuiltInEquity.builtInEquityZAR > 0
+                            ? 'bg-emerald-200/80 text-emerald-900'
+                            : 'bg-rose-200 text-rose-900'
+                        }`}
+                      >
+                        {calculatedBuiltInEquity.builtInEquityPercent >= 0 ? '+' : ''}
+                        {formatPercent(calculatedBuiltInEquity.builtInEquityPercent)} Below Valuation
+                      </span>
+                    </div>
+                    <div className="text-lg font-black mt-1">
+                      {formatZAR(calculatedBuiltInEquity.builtInEquityZAR)}
+                    </div>
+                    {(floorAreaSqm > 0 || numberOfUnits > 1) ? (
+                      <div className="text-[10px] font-semibold opacity-90 flex flex-wrap items-center gap-1.5 mt-0.5">
+                        {floorAreaSqm > 0 && (
+                          <span>
+                            Bid: {formatZAR(calculatedMetrics.purchasePricePerSqm)}/m² vs Val: {formatZAR(calculatedMetrics.valuationPerSqm)}/m²
+                          </span>
+                        )}
+                        {floorAreaSqm > 0 && numberOfUnits > 1 && <span>&bull;</span>}
+                        {numberOfUnits > 1 && (
+                          <span>
+                            Avg {formatZAR(calculatedMetrics.averagePricePerUnit)} / unit ({numberOfUnits} units)
+                          </span>
+                        )}
+                      </div>
+                    ) : (
+                      <span className="text-[10px] opacity-80 block">
+                        {calculatedBuiltInEquity.builtInEquityZAR > 0
+                          ? 'Immediate equity cushion upon transfer'
+                          : 'Target bid equals or exceeds market valuation'}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
 
-            {/* Operational Capex, Rental & Flip Exit Projections */}
+            {/* Operational Capex, Rental & Flip Exit Projections OR Development Cost Stack & Exit Mode */}
+            {strategy === 'Development' ? (
+              <div className="p-4 sm:p-5 rounded-xl bg-amber-50/40 border border-amber-200/80 space-y-4 shadow-2xs">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2.5 border-b border-amber-200/80">
+                  <div className="flex items-center gap-2">
+                    <div className="p-1.5 bg-amber-100 text-amber-800 rounded-lg">
+                      <HardHat className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
+                        Development Cost Stack, 2-Stage Burn &amp; Exit Mode
+                      </h4>
+                      <span className="text-[10px] text-slate-500">
+                        Hard build rate/m², SPLUMA Sec 42 bulk &amp; pro fees, 2-stage timeline burn, and unit exit allocation
+                      </span>
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
+                    <span className="font-bold text-slate-900 bg-white px-2.5 py-0.5 rounded border border-amber-200 tabular-nums">
+                      Hard Build: {formatZAR(calculatedMetrics.devHardBuildCostZAR)}
+                    </span>
+                    <span className="font-bold text-indigo-900 bg-indigo-50 px-2.5 py-0.5 rounded border border-indigo-200 tabular-nums">
+                      Soft &amp; Bulk: {formatZAR(calculatedMetrics.devSoftCostsZAR)}
+                    </span>
+                    <span className="font-bold text-amber-900 bg-amber-100/80 px-2.5 py-0.5 rounded border border-amber-300 tabular-nums">
+                      Total TDC: {formatZAR(calculatedMetrics.devTdcZAR)}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Row 1: Hard Cost/m², Contingency %, Soft & Bulk %, Est. Monthly Rent */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                  {/* 1. Hard Construction Cost per m² */}
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="text-[11px] font-semibold text-slate-700">
+                        Hard Build Rate (ZAR / m²) *
+                      </label>
+                      <span className="text-[10px] font-bold text-amber-800 bg-amber-100/70 px-1.5 py-0.5 rounded tabular-nums">
+                        {formatZAR(calculatedMetrics.devHardBuildCostZAR)}
+                      </span>
+                    </div>
+                    <div className="relative">
+                      <span className="absolute left-2.5 top-2 text-xs text-slate-400 font-bold">R</span>
+                      <input
+                        type="number"
+                        name="hardCostPerSqmZAR"
+                        autoComplete="off"
+                        min="0"
+                        step="100"
+                        value={hardCostPerSqmZAR}
+                        onChange={(e) => {
+                          const val = Math.max(0, Number(e.target.value) || 0);
+                          setHardCostPerSqmZAR(val);
+                          updateAnalyzerDraft({ hardCostPerSqmZAR: val });
+                        }}
+                        className="w-full text-xs pl-7 pr-10 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-amber-500 font-semibold text-slate-900 bg-white"
+                      />
+                      <span className="absolute right-2.5 top-2 text-[10px] text-slate-400 font-bold">/m²</span>
+                    </div>
+                    <p className="text-[10px] text-slate-500 mt-1">
+                      SA benchmark: R 8 500–R 12 500/m² ({floorAreaSqm || 320} m² bulk).
+                    </p>
+                  </div>
+
+                  {/* 2. Construction Contingency (%) */}
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="text-[11px] font-semibold text-slate-700">
+                        Build Contingency (%)
+                      </label>
+                      <span className="text-[10px] font-bold text-slate-700 bg-white border border-slate-200 px-1.5 py-0.5 rounded tabular-nums">
+                        +{formatZAR(calculatedMetrics.devContingencyZAR)}
+                      </span>
+                    </div>
+                    <div className="relative">
+                      <input
+                        type="number"
+                        name="contingencyPercent"
+                        autoComplete="off"
+                        min="0"
+                        max="25"
+                        step="0.5"
+                        value={contingencyPercent}
+                        onChange={(e) => {
+                          const val = Math.max(0, Number(e.target.value) || 0);
+                          setContingencyPercent(val);
+                          updateAnalyzerDraft({ contingencyPercent: val });
+                        }}
+                        className="w-full text-xs px-3 pr-7 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-amber-500 font-semibold text-slate-900 bg-white"
+                      />
+                      <span className="absolute right-3 top-2 text-xs text-slate-400 font-bold">%</span>
+                    </div>
+                    <p className="text-[10px] text-slate-500 mt-1">
+                      Buffer for geotechnical / BOQ overruns (Default: 7.5%).
+                    </p>
+                  </div>
+
+                  {/* 3. Soft Costs & SPLUMA Sec 42 Bulk Allowance (%) + 8-Item Override Drawer Toggle */}
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="text-[11px] font-semibold text-slate-700">
+                        Soft &amp; SPLUMA Bulk (%)
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => setIsSoftCostsDrawerOpen(!isSoftCostsDrawerOpen)}
+                        className="text-[10px] font-bold text-indigo-700 hover:text-indigo-900 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 px-1.5 py-0.5 rounded cursor-pointer transition-colors"
+                      >
+                        {isSoftCostsDrawerOpen ? 'Hide 8-Item Breakdown' : '8-Item Override ▾'}
+                      </button>
+                    </div>
+                    <div className="relative">
+                      <input
+                        type="number"
+                        name="softCostAllowancePercent"
+                        autoComplete="off"
+                        min="0"
+                        max="40"
+                        step="0.5"
+                        disabled={useCustomSoftCosts}
+                        value={softCostAllowancePercent}
+                        onChange={(e) => {
+                          const val = Math.max(0, Number(e.target.value) || 0);
+                          setSoftCostAllowancePercent(val);
+                          const updatedBreakdown = buildDefaultSoftCostsFromAllowance(
+                            calculatedMetrics.devHardBuildCostZAR,
+                            val
+                          );
+                          setSoftCosts(updatedBreakdown);
+                          updateAnalyzerDraft({
+                            softCostAllowancePercent: val,
+                            softCosts: updatedBreakdown,
+                          });
+                        }}
+                        className="w-full text-xs px-3 pr-7 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-indigo-500 font-semibold text-slate-900 bg-white disabled:bg-slate-100 disabled:text-slate-500"
+                      />
+                      <span className="absolute right-3 top-2 text-xs text-slate-400 font-bold">%</span>
+                    </div>
+                    <p className="text-[10px] text-slate-500 mt-1">
+                      {useCustomSoftCosts
+                        ? `Custom 8-item sum: ${formatZAR(calculatedMetrics.devSoftCostsZAR)}`
+                        : `${softCostAllowancePercent}% of Hard Build = ${formatZAR(calculatedMetrics.devSoftCostsZAR)}`}
+                    </p>
+                  </div>
+
+                  {/* 4. Est. Completed Scheme Gross Monthly Rent */}
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="text-[11px] font-semibold text-slate-700">
+                        Est. Scheme Gross Rent (ZAR/m)
+                      </label>
+                      <span className="text-[10px] font-bold text-emerald-800 bg-emerald-100/80 px-1.5 py-0.5 rounded tabular-nums">
+                        YoC: {formatPercent(calculatedMetrics.devYieldOnCostPercent)}
+                      </span>
+                    </div>
+                    <div className="relative">
+                      <span className="absolute left-2.5 top-2 text-xs text-slate-400 font-bold">R</span>
+                      <input
+                        type="number"
+                        name="monthlyRentZAR"
+                        autoComplete="off"
+                        min="0"
+                        step="500"
+                        value={monthlyRent}
+                        onChange={(e) => {
+                          const val = Number(e.target.value);
+                          setMonthlyRent(val);
+                          updateAnalyzerDraft({ monthlyRent: val });
+                        }}
+                        className="w-full text-xs pl-7 pr-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-emerald-500 font-semibold text-slate-900 bg-white"
+                      />
+                    </div>
+                    <p className="text-[10px] text-slate-500 mt-1">
+                      Avg {formatZAR(Math.round(monthlyRent / Math.max(1, numberOfUnits)))}/m per unit ({numberOfUnits} units).
+                    </p>
+                  </div>
+                </div>
+
+                {/* Expandable 8-Item Soft Costs & SPLUMA Sec 42 Bulk Override Drawer */}
+                {isSoftCostsDrawerOpen && (
+                  <div className="p-3.5 rounded-xl bg-white border border-indigo-200 space-y-3 animate-in fade-in duration-150">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-slate-100">
+                      <div className="flex items-center gap-2">
+                        <label className="inline-flex items-center gap-2 text-xs font-bold text-slate-900 cursor-pointer select-none">
+                          <input
+                            type="checkbox"
+                            checked={useCustomSoftCosts}
+                            onChange={(e) => {
+                              const checked = e.target.checked;
+                              setUseCustomSoftCosts(checked);
+                              if (!checked) {
+                                const resetSoft = buildDefaultSoftCostsFromAllowance(
+                                  calculatedMetrics.devHardBuildCostZAR,
+                                  softCostAllowancePercent
+                                );
+                                setSoftCosts(resetSoft);
+                                updateAnalyzerDraft({
+                                  useCustomSoftCosts: false,
+                                  softCosts: resetSoft,
+                                });
+                              } else {
+                                setSoftCosts(calculatedMetrics.devSoftCostsBreakdown);
+                                updateAnalyzerDraft({
+                                  useCustomSoftCosts: true,
+                                  softCosts: calculatedMetrics.devSoftCostsBreakdown,
+                                });
+                              }
+                            }}
+                            className="w-3.5 h-3.5 rounded text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                          />
+                          <span>Override with Itemized 8-Line Professional Team &amp; SPLUMA Sec 42 Schedule</span>
+                        </label>
+                      </div>
+                      <span className="text-xs font-bold text-indigo-900 bg-indigo-50 px-2.5 py-0.5 rounded border border-indigo-200 tabular-nums">
+                        Total Soft &amp; Bulk: {formatZAR(calculatedMetrics.devSoftCostsZAR)}
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                      {(
+                        [
+                          { key: 'townPlannerZAR' as const, label: 'Town Planner (SPLUMA)' },
+                          { key: 'architectZAR' as const, label: 'Architect & SDP Plans' },
+                          { key: 'structuralCivilEngineerZAR' as const, label: 'Structural & Civil Eng.' },
+                          { key: 'quantitySurveyorZAR' as const, label: 'Quantity Surveyor (QS)' },
+                          { key: 'nhbrcEnrolmentFeeZAR' as const, label: 'NHBRC Enrolment Fee' },
+                          { key: 'councilBulkContributionsZAR' as const, label: 'SPLUMA Sec 42 Bulk Cont.' },
+                          { key: 'planScrutinyAndSubdivisionFeesZAR' as const, label: 'Council Plan & Subdiv. Fees' },
+                          { key: 'marketingAndShowUnitZAR' as const, label: 'Marketing & Show Unit' },
+                        ] as const
+                      ).map((item) => {
+                        const activeBreakdown = useCustomSoftCosts
+                          ? softCosts
+                          : calculatedMetrics.devSoftCostsBreakdown;
+                        return (
+                          <div key={item.key}>
+                            <label className="block text-[10px] font-semibold text-slate-600 mb-1">
+                              {item.label}
+                            </label>
+                            <div className="relative">
+                              <span className="absolute left-2.5 top-1.5 text-xs text-slate-400 font-bold">R</span>
+                              <input
+                                type="number"
+                                min="0"
+                                step="1000"
+                                value={activeBreakdown[item.key]}
+                                onChange={(e) => {
+                                  const val = Math.max(0, Number(e.target.value) || 0);
+                                  const nextSoft: DevelopmentSoftCosts = {
+                                    ...activeBreakdown,
+                                    [item.key]: val,
+                                  };
+                                  setUseCustomSoftCosts(true);
+                                  setSoftCosts(nextSoft);
+                                  updateAnalyzerDraft({
+                                    useCustomSoftCosts: true,
+                                    softCosts: nextSoft,
+                                  });
+                                }}
+                                className="w-full text-xs pl-7 pr-2.5 py-1.5 border border-slate-300 rounded-lg font-semibold text-slate-900 bg-white"
+                              />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Row 2: 2-Stage Development Timeline & Holding Burn (Stage 1 Pre-Approval vs Stage 2 Construction) */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-2 border-t border-amber-200/70">
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="text-[11px] font-semibold text-slate-700">
+                        Stage 1: Pre-Approval (Mos)
+                      </label>
+                      <span className="text-[10px] text-slate-500">SPLUMA / Plans</span>
+                    </div>
+                    <input
+                      type="number"
+                      min="0"
+                      max="36"
+                      value={preApprovalMonths}
+                      onChange={(e) => {
+                        const val = Math.max(0, Number(e.target.value) || 0);
+                        setPreApprovalMonths(val);
+                        updateAnalyzerDraft({ preApprovalMonths: val });
+                      }}
+                      className="w-full text-xs px-3 py-1.5 border border-slate-300 rounded-lg font-semibold text-slate-900 bg-white"
+                    />
+                  </div>
+
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="text-[11px] font-semibold text-slate-700">
+                        Stage 1 Burn (ZAR / mo)
+                      </label>
+                      <span className="text-[10px] font-semibold text-slate-600 tabular-nums">
+                        {formatZAR(calculatedMetrics.devPreApprovalCarryingZAR)} total
+                      </span>
+                    </div>
+                    <div className="relative">
+                      <span className="absolute left-2.5 top-1.5 text-xs text-slate-400 font-bold">R</span>
+                      <input
+                        type="number"
+                        min="0"
+                        step="500"
+                        value={monthlyPreApprovalBurnZAR}
+                        onChange={(e) => {
+                          const val = Math.max(0, Number(e.target.value) || 0);
+                          setMonthlyPreApprovalBurnZAR(val);
+                          updateAnalyzerDraft({ monthlyPreApprovalBurnZAR: val });
+                        }}
+                        className="w-full text-xs pl-7 pr-2.5 py-1.5 border border-slate-300 rounded-lg font-semibold text-slate-900 bg-white"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="text-[11px] font-semibold text-slate-700">
+                        Stage 2: Construction (Mos)
+                      </label>
+                      <span className="text-[10px] text-slate-500">Civil &amp; Top-Structure</span>
+                    </div>
+                    <input
+                      type="number"
+                      min="1"
+                      max="48"
+                      value={constructionMonths}
+                      onChange={(e) => {
+                        const val = Math.max(1, Number(e.target.value) || 1);
+                        setConstructionMonths(val);
+                        setHoldingPeriodMonths(val);
+                        updateAnalyzerDraft({ constructionMonths: val, holdingPeriodMonths: val });
+                      }}
+                      className="w-full text-xs px-3 py-1.5 border border-slate-300 rounded-lg font-semibold text-slate-900 bg-white"
+                    />
+                  </div>
+
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="text-[11px] font-semibold text-slate-700">
+                        Stage 2 Burn (ZAR / mo)
+                      </label>
+                      <span className="text-[10px] font-semibold text-amber-800 tabular-nums">
+                        +{formatZAR(calculatedMetrics.devMonthlySCurveInterestZAR)}/m S-Curve Int.
+                      </span>
+                    </div>
+                    <div className="relative">
+                      <span className="absolute left-2.5 top-1.5 text-xs text-slate-400 font-bold">R</span>
+                      <input
+                        type="number"
+                        min="0"
+                        step="500"
+                        value={monthlyConstructionBurnZAR}
+                        onChange={(e) => {
+                          const val = Math.max(0, Number(e.target.value) || 0);
+                          setMonthlyConstructionBurnZAR(val);
+                          updateAnalyzerDraft({ monthlyConstructionBurnZAR: val });
+                        }}
+                        className="w-full text-xs pl-7 pr-2.5 py-1.5 border border-slate-300 rounded-lg font-semibold text-slate-900 bg-white"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Row 3: 3-Mode Development Exit Selector (Build-to-Sell, Split-Exit Hybrid, Build-to-Rent Hold) */}
+                <div className="p-3.5 rounded-xl bg-white border border-amber-200 space-y-3">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <div>
+                      <span className="text-xs font-bold text-slate-900 uppercase tracking-wider block">
+                        Development Exit Mode &amp; Debt Wipeout Matrix
+                      </span>
+                      <span className="text-[10px] text-slate-500">
+                        Pre-populates unit inventory statuses (`Available` vs `Retained for Rental`) when promoted to `/developments`
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      {(
+                        [
+                          { id: 'Build-to-Sell' as const, label: '100% Build-to-Sell' },
+                          { id: 'Split-Exit Hybrid' as const, label: 'Split-Exit (Sell + Hold)' },
+                          { id: 'Build-to-Rent Hold' as const, label: '100% Build-to-Rent (BTR)' },
+                        ] as const
+                      ).map((mode) => (
+                        <button
+                          key={mode.id}
+                          type="button"
+                          onClick={() => {
+                            setDevelopmentExitMode(mode.id);
+                            const nextRetained =
+                              mode.id === 'Build-to-Rent Hold'
+                                ? numberOfUnits
+                                : mode.id === 'Build-to-Sell'
+                                ? 0
+                                : Math.min(numberOfUnits, Math.max(1, Math.floor(numberOfUnits / 2)));
+                            setUnitsRetainedCount(nextRetained);
+                            updateAnalyzerDraft({
+                              developmentExitMode: mode.id,
+                              unitsRetainedCount: nextRetained,
+                            });
+                          }}
+                          className={`px-2.5 py-1 rounded-lg text-xs font-bold border transition-all cursor-pointer ${
+                            developmentExitMode === mode.id
+                              ? 'bg-slate-900 text-white border-slate-900 shadow-2xs'
+                              : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                          }`}
+                        >
+                          {mode.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {developmentExitMode === 'Split-Exit Hybrid' && (
+                    <div className="pt-2 border-t border-slate-100 grid grid-cols-1 md:grid-cols-12 gap-4 items-center">
+                      <div className="md:col-span-7 space-y-1">
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="font-semibold text-slate-700">
+                            Units Sold vs. Retained for Rental Portfolio
+                          </span>
+                          <span className="font-bold text-indigo-900 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-200">
+                            Sell {calculatedMetrics.devUnitsForSaleCount} Units &bull; Retain {calculatedMetrics.devUnitsRetainedCount} Units
+                          </span>
+                        </div>
+                        <input
+                          type="range"
+                          min="1"
+                          max={Math.max(1, numberOfUnits - 1)}
+                          step="1"
+                          value={Math.min(Math.max(1, unitsRetainedCount), Math.max(1, numberOfUnits - 1))}
+                          onChange={(e) => {
+                            const val = Number(e.target.value);
+                            setUnitsRetainedCount(val);
+                            updateAnalyzerDraft({ unitsRetainedCount: val });
+                          }}
+                          className="w-full accent-indigo-600 cursor-pointer h-1.5 bg-slate-200 rounded-lg"
+                        />
+                      </div>
+                      <div className="md:col-span-5 grid grid-cols-2 gap-2 text-xs">
+                        <div className="p-2 rounded-lg bg-slate-50 border border-slate-200">
+                          <span className="text-[10px] text-slate-500 block">Residual Debt on Held Units</span>
+                          <span className={`font-bold font-mono ${calculatedMetrics.devRemainingDebtOnRetainedZAR === 0 ? 'text-emerald-700' : 'text-amber-800'}`}>
+                            {calculatedMetrics.devRemainingDebtOnRetainedZAR === 0
+                              ? 'R 0 (100% Debt-Free!)'
+                              : formatZAR(calculatedMetrics.devRemainingDebtOnRetainedZAR)}
+                          </span>
+                        </div>
+                        <div className="p-2 rounded-lg bg-slate-50 border border-slate-200">
+                          <span className="text-[10px] text-slate-500 block">Retained Rental Income</span>
+                          <span className="font-bold text-emerald-700 font-mono">
+                            {formatZAR(calculatedMetrics.devRetainedMonthlyRentZAR)}/m
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1 text-[11px]">
+                    <div className="p-2 rounded-lg bg-slate-50 border border-slate-200">
+                      <span className="text-[10px] text-slate-500 block">Senior Debt Wipeout</span>
+                      <span className="font-bold text-slate-900">
+                        {calculatedMetrics.devUnitsRequiredForDebtWipeout} of {numberOfUnits} Units Sold
+                      </span>
+                    </div>
+                    <div className="p-2 rounded-lg bg-slate-50 border border-slate-200">
+                      <span className="text-[10px] text-slate-500 block">TDC Cost / Unit</span>
+                      <span className="font-bold text-slate-900 tabular-nums">
+                        {formatZAR(calculatedMetrics.devTdcPerUnitZAR)}
+                      </span>
+                    </div>
+                    <div className="p-2 rounded-lg bg-slate-50 border border-slate-200">
+                      <span className="text-[10px] text-slate-500 block">Target List Price / Unit</span>
+                      <span className="font-bold text-emerald-700 tabular-nums">
+                        {formatZAR(calculatedMetrics.devAvgUnitPriceZAR)}
+                      </span>
+                    </div>
+                    <div className="p-2 rounded-lg bg-slate-50 border border-slate-200">
+                      <span className="text-[10px] text-slate-500 block">SARS Sec 13sex Shield</span>
+                      <span className="font-bold text-emerald-800 tabular-nums">
+                        {calculatedMetrics.devIsSection13SexEligible
+                          ? `+${formatZAR(calculatedMetrics.devSection13SexAnnualShieldZAR)}/yr`
+                          : 'Requires ≥5 Retained'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 p-4 rounded-xl bg-slate-50 border border-slate-200">
               <div>
                 <label className="block text-[11px] font-semibold text-slate-700 mb-1">Renovation / Capex (ZAR)</label>
@@ -3969,6 +5194,7 @@ export default function OpportunityAnalyzerPage() {
                 </div>
               </div>
             </div>
+            )}
 
             {/* Hybrid BRRRR Post-Rehab Refinance Modeling Panel */}
             {strategy === 'BRRRR' && (
@@ -4086,7 +5312,9 @@ export default function OpportunityAnalyzerPage() {
                   <div>
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="text-xs font-semibold uppercase tracking-wider text-slate-300">
-                        Initial Capital Required (Day 1)
+                        {strategy === 'Development'
+                          ? 'Developer Equity Contribution Required'
+                          : 'Initial Capital Required (Day 1)'}
                       </span>
                       <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-md border tabular-nums ${
                         isReserveSufficient
@@ -4099,11 +5327,34 @@ export default function OpportunityAnalyzerPage() {
                       </span>
                     </div>
                     <div className="text-2xl font-bold text-white tabular-nums tracking-tight mt-0.5">
-                      {formatZAR(calculatedMetrics.initialCapitalRequired)}
+                      {formatZAR(
+                        strategy === 'Development'
+                          ? calculatedMetrics.devEquityRequiredZAR
+                          : calculatedMetrics.initialCapitalRequired
+                      )}
                     </div>
                   </div>
                 </div>
 
+                {strategy === 'Development' ? (
+                  <div className="lg:col-span-7 flex flex-wrap items-center gap-2 text-[11px] text-slate-300 bg-slate-950/70 p-2.5 rounded-lg border border-slate-800">
+                    <span className="font-semibold text-slate-400">Development Capital Stack:</span>
+                    <span className="bg-slate-800 px-2 py-0.5 rounded border border-slate-700 text-white tabular-nums">
+                      Total TDC: <strong className="text-amber-300 font-semibold">{formatZAR(calculatedMetrics.devTdcZAR)}</strong>
+                    </span>
+                    <span className="text-slate-500">-</span>
+                    <span className="bg-slate-800 px-2 py-0.5 rounded border border-slate-700 text-white tabular-nums">
+                      Senior Debt ({seniorDebtLtcPercent}% LTC): <strong className="text-emerald-400 font-semibold">{formatZAR(calculatedMetrics.devSeniorFacilityLimitZAR)}</strong>
+                    </span>
+                    <span className="text-slate-500">=</span>
+                    <span className="bg-slate-800 px-2 py-0.5 rounded border border-slate-700 text-white tabular-nums">
+                      Equity Req: <strong className="text-white font-semibold">{formatZAR(calculatedMetrics.devEquityRequiredZAR)}</strong>
+                    </span>
+                    <span className="text-slate-400 text-[10px] block w-full mt-1 border-t border-slate-800 pt-1">
+                      Land &amp; Legal: <strong className="text-white tabular-nums">{formatZAR(calculatedMetrics.devLandAndAcquisitionZAR)}</strong> &bull; Hard Build: <strong className="text-white tabular-nums">{formatZAR(calculatedMetrics.devHardBuildCostZAR)}</strong> &bull; Soft &amp; Bulk: <strong className="text-white tabular-nums">{formatZAR(calculatedMetrics.devSoftCostsZAR)}</strong>
+                    </span>
+                  </div>
+                ) : (
                 <div className="lg:col-span-7 flex flex-wrap items-center gap-2 text-[11px] text-slate-300 bg-slate-950/70 p-2.5 rounded-lg border border-slate-800">
                   <span className="font-semibold text-slate-400">Day-1 Outlay Breakdown:</span>
                   <span className="bg-slate-800 px-2 py-0.5 rounded border border-slate-700 text-white tabular-nums">
@@ -4144,6 +5395,7 @@ export default function OpportunityAnalyzerPage() {
                       : ' • Outlay exceeds current liquid reserve; external syndicate/funder needed.'}
                   </span>
                 </div>
+                )}
               </div>
 
               {/* Standard Performance & Returns Metric Badges */}
@@ -4159,9 +5411,17 @@ export default function OpportunityAnalyzerPage() {
                 projectedFlipRoi={calculatedMetrics.projectedFlipRoi}
                 bondTermYears={bondTermYears}
                 netEquityFinal={calculatedProjections[calculatedProjections.length - 1]?.netEquity || 0}
-                isSection13Eligible={isSection13Eligible}
-                section13AnnualSavings={calculatedSection13.annualTaxSavingsZAR}
-                section13TwentyYearSavings={calculatedSection13.twentyYearCumulativeSavingsZAR}
+                isSection13Eligible={isSection13Eligible || calculatedMetrics.devIsSection13SexEligible}
+                section13AnnualSavings={
+                  strategy === 'Development' && calculatedMetrics.devIsSection13SexEligible
+                    ? calculatedMetrics.devSection13SexAnnualShieldZAR
+                    : calculatedSection13.annualTaxSavingsZAR
+                }
+                section13TwentyYearSavings={
+                  strategy === 'Development' && calculatedMetrics.devIsSection13SexEligible
+                    ? calculatedMetrics.devSection13SexAnnualShieldZAR * 20
+                    : calculatedSection13.twentyYearCumulativeSavingsZAR
+                }
                 netRoi={calculatedMetrics.netRoi}
                 minNetRoiHurdle={investorProfile?.minNetRoiPercent ?? 8}
                 dscr={calculatedMetrics.dscr}
@@ -4180,6 +5440,25 @@ export default function OpportunityAnalyzerPage() {
                 brrrrEquityExtractedZAR={calculatedMetrics.brrrrEquityExtractedZAR}
                 brrrrCashLeftInDealZAR={calculatedMetrics.brrrrCashLeftInDealZAR}
                 brrrrRefinanceLoanZAR={calculatedMetrics.brrrrRefinanceLoanZAR}
+                devTdcZAR={calculatedMetrics.devTdcZAR}
+                devTdcPerSqmZAR={calculatedMetrics.devTdcPerSqmZAR}
+                devTdcPerUnitZAR={calculatedMetrics.devTdcPerUnitZAR}
+                devGdvInclVatZAR={calculatedMetrics.devGdvInclVatZAR}
+                devAvgUnitPriceZAR={calculatedMetrics.devAvgUnitPriceZAR}
+                devNetProfitBeforeTaxZAR={calculatedMetrics.devNetProfitBeforeTaxZAR}
+                devPocPercent={calculatedMetrics.devPocPercent}
+                devMarginPercent={calculatedMetrics.devMarginPercent}
+                devYieldOnCostPercent={calculatedMetrics.devYieldOnCostPercent}
+                devSoftCostsZAR={calculatedMetrics.devSoftCostsZAR}
+                devHardBuildCostZAR={calculatedMetrics.devHardBuildCostZAR}
+                devTotalCarryingCostZAR={calculatedMetrics.devTotalCarryingCostZAR}
+                devContingencyZAR={calculatedMetrics.devContingencyZAR}
+                devSeniorFacilityLimitZAR={calculatedMetrics.devSeniorFacilityLimitZAR}
+                devUnitsRequiredForDebtWipeout={calculatedMetrics.devUnitsRequiredForDebtWipeout}
+                devUnitsRetainedCount={calculatedMetrics.devUnitsRetainedCount}
+                devIsSection13SexEligible={calculatedMetrics.devIsSection13SexEligible}
+                devSection13SexAnnualShieldZAR={calculatedMetrics.devSection13SexAnnualShieldZAR}
+                minDevPocHurdle={investorProfile?.minDevelopmentPocPercent ?? 20}
               />
 
               {/* Deterministic 3-Strategy Verdict & Actionable Deal-Repair Levers */}
@@ -4191,10 +5470,24 @@ export default function OpportunityAnalyzerPage() {
                 onApplyRepairLever={handleApplyRepairLever}
               />
 
-              {/* Interest Rate Stress-Test Strip (Rental & BRRRR) */}
+              {/* Interest Rate Stress-Test Strip (Rental, BRRRR & Development) */}
               {strategy !== 'Flip' && (
                 <div className="mt-4">
-                  {calculatedMetrics.bondAmount > 0 && rateShockScenarios.length > 0 ? (
+                  {strategy === 'Development' ? (
+                    calculatedMetrics.devSeniorFacilityLimitZAR > 0 && developmentRateShockScenarios.length > 0 ? (
+                      <RateShockStrip
+                        scenarios={[]}
+                        developmentScenarios={developmentRateShockScenarios}
+                        seniorDebtZAR={calculatedMetrics.devSeniorFacilityLimitZAR}
+                        minDscr={investorProfile?.minDscr ?? 1.2}
+                      />
+                    ) : (
+                      <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-600 flex items-center justify-between">
+                        <span className="font-semibold text-slate-700">100% Equity Development:</span>
+                        <span className="text-slate-500">Zero senior development debt eliminates S-Curve construction interest-rate risk.</span>
+                      </div>
+                    )
+                  ) : calculatedMetrics.bondAmount > 0 && rateShockScenarios.length > 0 ? (
                     <RateShockStrip
                       scenarios={rateShockScenarios}
                       minDscr={investorProfile?.minDscr ?? 1.2}

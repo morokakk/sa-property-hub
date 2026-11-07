@@ -20,9 +20,11 @@ export default function AddFundingModal({
   onSuccess,
 }: AddFundingModalProps) {
   const flips = usePortfolioStore((s) => s.flips);
+  const developments = usePortfolioStore((s) => s.developments);
   const rentals = usePortfolioStore((s) => s.rentals);
   const opportunities = usePortfolioStore((s) => s.opportunities);
   const addFunding = usePortfolioStore((s) => s.addFunding);
+  const updateDevelopment = usePortfolioStore((s) => s.updateDevelopment);
 
   const [lenderName, setLenderName] = useState('');
   const [entityOrContact, setEntityOrContact] = useState('');
@@ -185,7 +187,9 @@ export default function AddFundingModal({
       return;
     }
 
+    const linkedDev = developments.find((d) => d.id === linkedDealId);
     const linkedDeal =
+      linkedDev ||
       flips.find((f) => f.id === linkedDealId) ||
       rentals.find((r) => r.id === linkedDealId) ||
       opportunities.find((o) => o.id === linkedDealId);
@@ -233,6 +237,19 @@ export default function AddFundingModal({
     };
 
     addFunding(newSource);
+    if (linkedDev) {
+      const drawnAmount =
+        newSource.status === 'Standby'
+          ? 0
+          : finalTranches && finalTranches.length > 0
+          ? finalTranches.filter((t) => t.isDisbursed).reduce((s, t) => s + t.amountZAR, 0)
+          : finalPrincipal;
+      updateDevelopment(linkedDev.id, {
+        linkedFundingSourceId: newSource.id,
+        developmentFacilityLimitZAR: finalPrincipal,
+        developmentFacilityDrawnZAR: drawnAmount,
+      });
+    }
     onSuccess?.(newSource);
     onClose();
   };
@@ -501,6 +518,15 @@ export default function AddFundingModal({
                 className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white"
               >
                 <option value="">-- General Operational Reserve --</option>
+                {developments.length > 0 && (
+                  <optgroup label="Active Developments">
+                    {developments.map((dev) => (
+                      <option key={dev.id} value={dev.id}>
+                        [DEVELOPMENT] {dev.title} ({dev.city})
+                      </option>
+                    ))}
+                  </optgroup>
+                )}
                 {flips.length > 0 && (
                   <optgroup label="Active Flips">
                     {flips.map((flip) => (

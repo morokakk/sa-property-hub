@@ -1,5 +1,6 @@
 export type PropertyType = 'rental' | 'flip' | 'opportunity' | 'development';
-export type DealStrategy = 'Flip' | 'Rental' | 'BRRRR';
+export type DealStrategy = 'Flip' | 'Rental' | 'BRRRR' | 'Development';
+export type DevelopmentExitMode = 'Build-to-Sell' | 'Split-Exit Hybrid' | 'Build-to-Rent Hold';
 
 export type DealSource = 'iGrow Rentals' | 'High-Street Auction' | 'Distressed Sale / Repo' | 'Private Agent' | 'Direct Owner';
 
@@ -191,7 +192,28 @@ export interface OpportunityDeal {
   earlyTerminationPenaltyZAR?: number; // Optional custom bank quote or auto-calculated 90-day interest
   vatExemptAgent?: boolean;
   holdingPeriodMonths: number;
-  strategy?: DealStrategy; // 'Flip' | 'Rental' | 'BRRRR'
+  strategy?: DealStrategy; // 'Flip' | 'Rental' | 'BRRRR' | 'Development'
+  // Development Strategy Underwriting Extensions
+  developmentType?: DevelopmentType;
+  isVatRegisteredDeveloper?: boolean;
+  developmentExitMode?: DevelopmentExitMode;
+  unitsRetainedCount?: number;
+  hardCostPerSqmZAR?: number;
+  contingencyPercent?: number;
+  softCostAllowancePercent?: number;
+  useCustomSoftCosts?: boolean;
+  softCosts?: DevelopmentSoftCosts;
+  preApprovalMonths?: number;
+  constructionMonths?: number;
+  monthlyPreApprovalBurnZAR?: number;
+  monthlyConstructionBurnZAR?: number;
+  seniorDebtLtcPercent?: number;
+  sCurveUtilizationPercent?: number;
+  preSalesHurdlePercent?: number;
+  projectedDevTdcZAR?: number;
+  projectedDevGdvZAR?: number;
+  projectedDevNetProfitZAR?: number;
+  projectedDevPocPercent?: number;
   interestRateMargin?: number; // deal interest rate margin / spread vs Prime (e.g. +0.50% or -0.50%)
   monthlyHoldingCostZAR?: number;
   monthlyBondPaymentZAR?: number;
@@ -1012,6 +1034,7 @@ export interface InvestorProfile {
   minMonthlyCashflowZAR?: number; // default 1500 ZAR
   minNetRoiPercent?: number; // default 8.0%
   minFlipRoiPercent?: number; // default 18.0%
+  minDevelopmentPocPercent?: number; // default 20.0%
   maxDay1CashZAR?: number; // default 500000 ZAR
   minDscr?: number; // default 1.20
   vatExemptAgent?: boolean; // default false
@@ -1103,6 +1126,23 @@ export interface AnalyzerDraft {
   tenantPlacementFeePercent?: number;
   annualSpvAdminAuditFeeZAR?: number;
   refinanceLtvPercent?: number;
+  // Development Strategy Draft State
+  developmentType?: DevelopmentType;
+  isVatRegisteredDeveloper?: boolean;
+  developmentExitMode?: DevelopmentExitMode;
+  unitsRetainedCount?: number;
+  hardCostPerSqmZAR?: number;
+  contingencyPercent?: number;
+  softCostAllowancePercent?: number;
+  useCustomSoftCosts?: boolean;
+  softCosts?: DevelopmentSoftCosts;
+  preApprovalMonths?: number;
+  constructionMonths?: number;
+  monthlyPreApprovalBurnZAR?: number;
+  monthlyConstructionBurnZAR?: number;
+  seniorDebtLtcPercent?: number;
+  sCurveUtilizationPercent?: number;
+  preSalesHurdlePercent?: number;
 }
 
 // Client-side BYOK AI Integration Settings

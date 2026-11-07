@@ -52,6 +52,8 @@ export default function FundingTrackerPage() {
   const syncFundingWithDealDelay = usePortfolioStore((state) => state.syncFundingWithDealDelay);
   const summary = usePortfolioSummary();
   const flips = usePortfolioStore((state) => state.flips);
+  const developments = usePortfolioStore((state) => state.developments);
+  const updateDevelopment = usePortfolioStore((state) => state.updateDevelopment);
   const rentals = usePortfolioStore((state) => state.rentals);
 
   // New Capital Source Form State
@@ -96,6 +98,15 @@ export default function FundingTrackerPage() {
     });
 
     updateFunding(sourceId, { tranches: updatedTranches });
+    const linkedDev = developments.find(
+      (d) => d.id === source.linkedDealId || d.linkedFundingSourceId === sourceId
+    );
+    if (linkedDev) {
+      const nextDrawn = updatedTranches
+        .filter((t) => t.isDisbursed)
+        .reduce((s, t) => s + t.amountZAR, 0);
+      updateDevelopment(linkedDev.id, { developmentFacilityDrawnZAR: nextDrawn });
+    }
     setToastMessage('Tranche disbursement status updated');
   };
 
@@ -116,6 +127,16 @@ export default function FundingTrackerPage() {
         status: isSettled ? 'Settled' : repaymentModalSource.status,
         ...(trimmedReference ? { lastPaymentReference: trimmedReference } : {}),
       });
+      const linkedDev = developments.find(
+        (d) =>
+          d.id === repaymentModalSource.linkedDealId ||
+          d.linkedFundingSourceId === repaymentModalSource.id
+      );
+      if (linkedDev) {
+        updateDevelopment(linkedDev.id, {
+          developmentFacilityRepaidZAR: newTotalRepaid,
+        });
+      }
     } else {
       // Monthly Coupon / Interest or Profit Share Distribution
       const currentInterest = repaymentModalSource.totalInterestPaidZAR || 0;
@@ -389,13 +410,26 @@ export default function FundingTrackerPage() {
                         ? Math.round(((activeDrawnBalance * (item.returnRatePercent / 100)) / 365) * item.delayExtensionDays)
                         : 0;
 
-                    const linkedDeal = flips.find((f) => f.id === item.linkedDealId) || rentals.find((r) => r.id === item.linkedDealId);
+                    const linkedDev = developments.find(
+                      (d) => d.id === item.linkedDealId || d.linkedFundingSourceId === item.id
+                    );
+                    const linkedDeal =
+                      linkedDev ||
+                      flips.find((f) => f.id === item.linkedDealId) ||
+                      rentals.find((r) => r.id === item.linkedDealId);
                     const isLinkedFlipDelayed =
                       linkedDeal &&
-                      ('municipalClearance' in linkedDeal ? 
-                        (linkedDeal.status === 'Delayed' ||
+                      ('municipalClearance' in linkedDeal
+                        ? linkedDeal.status === 'Delayed' ||
                           linkedDeal.municipalClearance?.rccStatus === 'Disputed' ||
-                          Boolean(linkedDeal.municipalClearance?.disputeNotes)) : false);
+                          Boolean(linkedDeal.municipalClearance?.disputeNotes)
+                        : false);
+                    const blockedDevApproval = linkedDev
+                      ? Object.entries(linkedDev.approvals || {}).find(
+                          ([, app]) => app?.status === 'Blocked / Queried'
+                        )
+                      : undefined;
+                    const isLinkedDealBlocked = Boolean(isLinkedFlipDelayed || blockedDevApproval);
                     const isExpanded = expandedTranchesId === item.id;
 
                   return (
@@ -495,10 +529,20 @@ export default function FundingTrackerPage() {
                         <span className="text-[11px] font-medium text-slate-700 bg-slate-100 px-2 py-0.5 rounded">
                           {item.linkedDealName || 'General'}
                         </span>
-                        {isLinkedFlipDelayed && (
+                        {linkedDev && (
+                          <div className="mt-1">
+                            <span className="inline-flex items-center gap-1 text-[9px] font-bold bg-purple-50 text-purple-700 border border-purple-200 px-1.5 py-0.5 rounded">
+                              🏗️ {linkedDev.currentPhase} ({linkedDev.units?.length || 0} Units)
+                            </span>
+                          </div>
+                        )}
+                        {isLinkedDealBlocked && (
                           <div className="mt-1">
                             <span className="inline-flex items-center gap-1 text-[9px] font-bold bg-rose-50 text-rose-700 border border-rose-200 px-1.5 py-0.5 rounded">
-                              <AlertTriangle className="w-2.5 h-2.5" /> Deal Blocked / Disputed
+                              <AlertTriangle className="w-2.5 h-2.5" />{' '}
+                              {blockedDevApproval
+                                ? 'Approval Blocked / Queried'
+                                : 'Deal Blocked / Disputed'}
                             </span>
                           </div>
                         )}
@@ -575,7 +619,11 @@ export default function FundingTrackerPage() {
                               setSyncModalSource(item);
                               setSelectedDelayDays(30);
                               setDelayReason(
-                                linkedDeal && 'municipalClearance' in linkedDeal && linkedDeal.municipalClearance?.rccStatus === 'Disputed'
+                                blockedDevApproval
+                                  ? `SPLUMA / Council approval query on ${linkedDev?.title}`
+                                  : linkedDev
+                                  ? `Development construction & municipal clearance queue: ${linkedDev.title}`
+                                  : linkedDeal && 'municipalClearance' in linkedDeal && linkedDeal.municipalClearance?.rccStatus === 'Disputed'
                                   ? `Section 118 municipal rates dispute: ${linkedDeal.title}`
                                   : 'Contractor snagging & conveyancing queue'
                               );

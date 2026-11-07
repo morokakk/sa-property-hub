@@ -1,12 +1,18 @@
 'use client';
 
 import React from 'react';
-import { RateShockScenario, DscrBand } from '@/lib/calculations/propertyMetrics';
+import {
+  RateShockScenario,
+  DevelopmentRateShockScenario,
+  DscrBand,
+} from '@/lib/calculations/propertyMetrics';
 import { formatZAR } from '@/lib/formatters';
 import { Activity, ShieldCheck, AlertTriangle, XCircle, Info } from 'lucide-react';
 
 export interface RateShockStripProps {
   scenarios: RateShockScenario[];
+  developmentScenarios?: DevelopmentRateShockScenario[];
+  seniorDebtZAR?: number;
   minDscr?: number;
   title?: string;
   subtitle?: string;
@@ -65,11 +71,15 @@ const BAND_CONFIG: Record<
 
 export const RateShockStrip: React.FC<RateShockStripProps> = ({
   scenarios,
+  developmentScenarios,
+  seniorDebtZAR = 0,
   minDscr = 1.2,
   title = 'Interest Rate Stress Test (SARB Shock Exposure)',
   subtitle,
   className = '',
 }) => {
+  const isDevelopmentMode = Boolean(developmentScenarios && developmentScenarios.length > 0);
+
   return (
     <div
       className={`rounded-xl border border-slate-200 bg-white overflow-hidden shadow-2xs print:border-slate-300 print:shadow-none print:break-inside-avoid ${className}`}
@@ -82,18 +92,101 @@ export const RateShockStrip: React.FC<RateShockStripProps> = ({
           </h4>
         </div>
         <div className="text-[11px] text-slate-500 font-medium">
-          {subtitle ?? (
-            <>
-              Lender DSCR Hurdle:{' '}
-              <span className="font-bold text-slate-800">{minDscr.toFixed(2)}x</span> (Rent must
-              cover bond by {Math.round((minDscr - 1) * 100)}% buffer)
-            </>
-          )}
+          {subtitle ??
+            (isDevelopmentMode ? (
+              <>
+                Senior Development Facility:{' '}
+                <span className="font-bold text-slate-800">{formatZAR(seniorDebtZAR)}</span> •
+                Stressed POC Hurdle: <span className="font-bold text-slate-800">≥ 15.0%</span> (+2
+                Mo Delay)
+              </>
+            ) : (
+              <>
+                Lender DSCR Hurdle:{' '}
+                <span className="font-bold text-slate-800">{minDscr.toFixed(2)}x</span> (Rent must
+                cover bond by {Math.round((minDscr - 1) * 100)}% buffer)
+              </>
+            ))}
         </div>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-slate-200 print:grid-cols-3 print:divide-y-0 print:divide-x print:divide-slate-300">
-        {scenarios.map((scenario) => {
+        {isDevelopmentMode && developmentScenarios
+          ? developmentScenarios.map((scenario) => {
+              const config = BAND_CONFIG[scenario.band];
+              const Icon = config.icon;
+
+              return (
+                <div
+                  key={scenario.label}
+                  className={`p-3.5 sm:p-4 border-t-4 ${config.borderTop} ${config.bg} flex flex-col justify-between print:border-t-2 print:p-2.5`}
+                >
+                  <div>
+                    <div className="flex items-center justify-between gap-1 mb-2">
+                      <span className="text-xs font-extrabold uppercase text-slate-900 tracking-wider">
+                        {scenario.label}
+                      </span>
+                      <span className="text-xs font-bold text-slate-700 tabular-nums">
+                        {scenario.ratePercent.toFixed(2)}%
+                      </span>
+                    </div>
+
+                    <div className="space-y-1.5 text-xs">
+                      <div className="flex items-center justify-between text-slate-600">
+                        <span className="text-[11px] font-medium">
+                          Avg Monthly S-Curve Interest
+                        </span>
+                        <span className="font-bold text-slate-900 tabular-nums">
+                          {formatZAR(scenario.avgMonthlySCurveInterestZAR)}
+                        </span>
+                      </div>
+
+                      <div className="flex items-center justify-between text-slate-600">
+                        <span className="text-[11px] font-medium">
+                          Total Carrying Burn (Incl. +2 Mo Delay)
+                        </span>
+                        <span className="font-bold text-amber-800 tabular-nums">
+                          {formatZAR(scenario.totalCarryingBurnWithDelayZAR)}
+                        </span>
+                      </div>
+
+                      <div className="flex items-center justify-between pt-1 border-t border-slate-200/80 print:border-slate-300">
+                        <span className="text-[11px] font-bold text-slate-700">
+                          {scenario.exitMode === 'Build-to-Rent Hold'
+                            ? 'Stressed POC / BTR DSCR'
+                            : 'Stressed Profit on Cost (POC %)'}
+                        </span>
+                        <span
+                          className={`font-extrabold tabular-nums ${
+                            scenario.stressedPocPercent >= 15
+                              ? 'text-emerald-700 print:text-black'
+                              : scenario.stressedPocPercent >= 10
+                              ? 'text-amber-700 print:text-black'
+                              : 'text-rose-700 print:text-black'
+                          }`}
+                        >
+                          {scenario.exitMode === 'Build-to-Rent Hold'
+                            ? `${scenario.stressedPocPercent.toFixed(1)}% • ${
+                                scenario.btrDscr !== null ? `${scenario.btrDscr.toFixed(2)}x` : 'Cash'
+                              }`
+                            : `${scenario.stressedPocPercent.toFixed(1)}%`}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="mt-3 pt-2.5 border-t border-slate-200/60 print:mt-1.5 print:pt-1">
+                    <div
+                      className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md border text-[10px] font-bold uppercase tracking-wider ${config.badgeBg} ${config.badgeText} ${config.badgeBorder}`}
+                    >
+                      <Icon className="w-3 h-3 shrink-0" />
+                      <span>{scenario.badgeLabel}</span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })
+          : scenarios.map((scenario) => {
           const config = BAND_CONFIG[scenario.band];
           const Icon = config.icon;
 

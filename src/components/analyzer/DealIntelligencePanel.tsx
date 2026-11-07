@@ -17,6 +17,7 @@ import {
   Building2,
   Hammer,
   RefreshCw,
+  HardHat,
   ChevronDown,
   ChevronUp,
 } from 'lucide-react';
@@ -44,7 +45,11 @@ export function DealIntelligencePanel({
     Rental: Building2,
     Flip: Hammer,
     BRRRR: RefreshCw,
+    Development: HardHat,
   };
+  const strategyKeys: DealStrategy[] = strategyMatrix.strategies.Development
+    ? ['Rental', 'Flip', 'BRRRR', 'Development']
+    : ['Rental', 'Flip', 'BRRRR'];
 
   return (
     <div
@@ -75,7 +80,7 @@ export function DealIntelligencePanel({
                 Deterministic Strategy Verdict &amp; Deal-Repair Engine
               </span>
               <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-700/60">
-                Recommended: {strategyMatrix.strategies[strategyMatrix.recommendedStrategy].label}
+                Recommended: {strategyMatrix.strategies[strategyMatrix.recommendedStrategy]?.label ?? strategyMatrix.recommendedStrategy}
               </span>
               {repairPrescription.meetsBuyBox ? (
                 <span
@@ -148,10 +153,11 @@ export function DealIntelligencePanel({
           data-testid="deal-intelligence-expanded-body"
           className="pt-3.5 mt-3 border-t border-slate-800 space-y-4 animate-fadeIn"
         >
-          {/* Part A: Side-by-Side 3-Strategy Comparison Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5">
-        {(['Rental', 'Flip', 'BRRRR'] as const).map((stratKey) => {
+          {/* Part A: Side-by-Side Strategy Comparison Cards */}
+          <div className={`grid grid-cols-1 ${strategyKeys.length === 4 ? 'md:grid-cols-2 lg:grid-cols-4' : 'md:grid-cols-3'} gap-2.5`}>
+        {strategyKeys.map((stratKey) => {
           const item = strategyMatrix.strategies[stratKey];
+          if (!item) return null;
           const Icon = strategyIcons[stratKey];
           const isActive = activeStrategy === stratKey;
           const isRecommended = strategyMatrix.recommendedStrategy === stratKey;
@@ -270,7 +276,8 @@ export function DealIntelligencePanel({
                   data-testid={`failed-hurdle-${h.key}`}
                   className="text-[10px] font-semibold px-2 py-0.5 rounded bg-rose-950/90 text-rose-200 border border-rose-700/70 font-mono"
                 >
-                  {h.label}: {h.actualLabel} (Need {h.targetLabel})
+                  {h.label}: {h.actualLabel} (Need {h.targetLabel}
+                  {h.key === 'maxDay1Cash' && activeStrategy === 'Development' ? ` • ${h.gapLabel}` : ''})
                 </span>
               ))}
             </div>
@@ -321,11 +328,15 @@ export function DealIntelligencePanel({
                     <Sliders className="w-3 h-3" />
                     <span>
                       {lever.id === 'price'
-                        ? `Apply Max Bid (${lever.targetValueLabel})`
+                        ? activeStrategy === 'Development'
+                          ? `Apply Max Land Bid: ${lever.targetValueLabel}`
+                          : `Apply Max Bid (${lever.targetValueLabel})`
                         : lever.id === 'rent'
                         ? `Apply Target Rent (${lever.targetValueLabel})`
                         : lever.id === 'ltv'
-                        ? `Apply ${lever.targetLtvPercent}% LTV`
+                        ? lever.targetSeniorDebtLtcPercent !== undefined
+                          ? `Increase LTC to ${lever.targetSeniorDebtLtcPercent}% (TUHF/DFI)`
+                          : `Apply ${lever.targetLtvPercent}% LTV`
                         : lever.id === 'exitPrice'
                         ? `Apply Exit (${lever.targetValueLabel})`
                         : `Switch to ${lever.targetStrategy}`}
