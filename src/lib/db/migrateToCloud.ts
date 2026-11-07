@@ -290,6 +290,10 @@ export function mapProfile(
     vat_exempt_agent: profile.vatExemptAgent ?? false,
     marginal_tax_rate_percent: toNumeric(profile.marginalTaxRatePercent, 31.0),
     custom_node_benchmarks: (profile.customNodeBenchmarks as any) || null,
+    min_dev_poc_percent: toNumeric(profile.minDevPocPercent ?? profile.minDevelopmentPocPercent, 20.0),
+    min_dev_yoc_percent: toNumeric(profile.minDevYocPercent, 12.0),
+    default_hard_build_rate_per_sqm_zar: toNumeric(profile.defaultHardBuildRatePerSqmZAR, 9800),
+    default_vat_registered_developer: profile.defaultVatRegisteredDeveloper ?? true,
     liquid_capital_reserve_zar: toNumeric(extra.liquidCapitalReserve, 0),
     rental_forecast_view: extra.rentalForecastView || 'wealth-only',
     ai_settings: extra.aiSettings
