@@ -196,10 +196,10 @@ export const GET_STARTED_STAGES: readonly JourneyStage[] = [
           },
           {
             id: 'analyzer-buy-box-dscr',
-            title: '3-Strategy Verdict & Deal Fixer',
-            summary: 'Simultaneous 3-strategy evaluation (Rental vs Flip vs BRRRR) with 1-click Deal Fixer prescription levers.',
+            title: 'Multi-Strategy Verdict & Deal Fixer',
+            summary: 'Simultaneous multi-strategy evaluation (Rental, Flip, BRRRR & Development) with 1-click Deal Fixer prescription levers.',
             howTo: [
-              'Switch to the Deal Sourcing Pipeline tab to inspect the 3-Strategy Verdict Strip evaluating Rental, Flip, and BRRRR fit scored 0–100.',
+              'Switch to the Deal Sourcing Pipeline tab to inspect the Strategy Verdict Strip evaluating Rental, Flip, BRRRR, and Development fit scored 0–100.',
               'When hurdles fail, review the 1-click Deal Fixer levers: "Apply Target Rent", "Apply Max Bid (MAO)", and "Rebalance LTV".',
               'Click any repair lever to immediately recalibrate the deal and turn the Buy-Box badge emerald green on the first click.',
             ],
@@ -514,7 +514,7 @@ export const GET_STARTED_STAGES: readonly JourneyStage[] = [
           {
             id: 'proposal-select-deal',
             title: 'Select a Deal',
-            summary: 'Pick any pipeline opportunity, flip or rental to pitch.',
+            summary: 'Pick any pipeline opportunity, flip, development scheme, or rental to pitch.',
             howTo: [
               'Open Proposal Generator, or click Pitch Deck on an Analyzer card.',
               'Choose the deal in Select Deal & Tailor Pitch Terms.',

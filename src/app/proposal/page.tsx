@@ -1162,7 +1162,7 @@ function ProposalGeneratorContent() {
             <div>
               <h3 className="font-bold text-sm text-slate-900">Select Deal & Tailor Pitch Terms</h3>
               <p className="text-xs text-slate-500">
-                Choose an opportunity, flip project, or portfolio rental to render the executive pitch tear-sheet.
+                Choose an opportunity, flip project, development scheme, or portfolio rental to render the executive pitch tear-sheet.
               </p>
             </div>
             <div className="flex flex-col sm:flex-row sm:items-center gap-1.5 sm:gap-2 w-full sm:w-auto min-w-0">
