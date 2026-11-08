@@ -2,6 +2,23 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Context-Aware Progressive Disclosure for Municipal Zoning & Bulk Envelopes] - 2026-11-08
+
+### Added
+- **Context-Aware Municipal Zoning Rights & Bulk Envelope Engine**:
+  - **Opportunity Analyzer (`/analyzer`) Progressive Disclosure**: Hides the `MUNICIPAL ZONING RIGHTS & BULK ENVELOPE` card completely on Sectional Title non-developments (`strategy !== 'Development' && propertyType === 'Sectional Title Apartment'`), recognizing that sectional units do not hold underlying erf FAR/coverage title. Defaults to collapsed on standard freehold single-unit flips while remaining 1-click expandable, and auto-expands on multi-unit, rezoning-required, or development schemes.
+  - **Authoritative Sub-Panel Expansion Synchronization**: Synchronized internal state with `defaultOpen` prop in `ZoningEnvelopeSubPanel.tsx` via `useEffect`, preventing stale expansion states during property type or strategy toggles.
+  - **Buy-and-Flip Manager (`/flips`) Header Zoning Badge**: Added a compact, high-ergonomics zoning pill (`🏛️ Residential 1 (As-of-Right)`) next to the erf $m^2$ pill in `FlipProjectHeader.tsx` for qualifying freehold, multi-unit, and build-to-rent projects, complete with hover tooltips detailing FAR, coverage %, storeys, and municipal consent uses.
+  - **Add/Edit Flip Modal Progressive Disclosure Drawer**: In `FlipProjectModal.tsx`, added a collapsible `"Municipal Zoning & Multi-Let Consent Rights (Optional)"` section with 4 South African presets (`Residential 1 (As-of-Right)`, `Residential 3 (Townhouses)`, `Residential 4 (High-Density)`, `Township Infill (High-Density)`) and consent use checkboxes (`2nd Dwelling / Cottage`, `Backyard Micro-Units`, `Student Commune`). Strictly hidden when Sectional Title is selected and scrubs `zoningProfile` on save.
+- **Unit Test Suite Expansion (`FlipZoningProgressiveDisclosure.test.tsx`)**: Added 11 comprehensive unit tests verifying header badge visibility, modal zoning drawer conditional disclosure, preset selection, consent use toggling, and Sectional Title payload scrubbing.
+
+### Fixed
+- **React Rules of Hooks Invariant in `FlipProjectModal.tsx`**: Reordered `useEffect` hook handling the `Escape` key to execute unconditionally above early return guards (`if (!isOpen) return null`), resolving Next.js dev overlay hook count mismatch errors.
+
+### Verified
+- Zero TypeScript compile errors (`tsc --noEmit`).
+- All 112 test files (1,300 tests) passing with 100% success rate (`vitest run`).
+
 ## [Dependencies Update & Framework Patch Releases] - 2026-11-07
 
 ### Updated

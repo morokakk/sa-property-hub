@@ -5335,7 +5335,7 @@ export default function OpportunityAnalyzerPage() {
             )}
 
             {/* Optional Zoning & Rights Envelope for Freehold/Commercial/Infill deals */}
-            {strategy !== 'Development' && (
+            {strategy !== 'Development' && propertyType !== 'Sectional Title Apartment' && (
               <ZoningEnvelopeSubPanel
                 zoningProfile={zoningProfile}
                 onUpdateZoning={handleUpdateZoning}
@@ -5348,7 +5348,11 @@ export default function OpportunityAnalyzerPage() {
                   updateAnalyzerDraft({ holdingPeriodMonths: months });
                 }}
                 isCollapsible={true}
-                defaultOpen={Boolean(zoningProfile)}
+                defaultOpen={
+                  strategy === 'Flip'
+                    ? Boolean((numberOfUnits || 1) > 1 || zoningProfile?.requiresRezoning)
+                    : Boolean(zoningProfile)
+                }
               />
             )}
 

@@ -19,6 +19,7 @@ import {
   Coins,
 } from 'lucide-react';
 import { isEvictionActive } from '@/lib/calculations/occupantRisk';
+import { formatZoningTransitionLabel } from '@/lib/calculations/zoning';
 
 export interface FlipProjectHeaderProps {
   flip: FlipProject;
@@ -96,6 +97,33 @@ export function FlipProjectHeader({
               </span>
             );
           })()}
+          {Boolean(flip.zoningProfile) &&
+            (flip.projectStrategy === 'build_to_rent' ||
+              (flip.numberOfUnits ?? 1) > 1 ||
+              flip.propertyType !== 'Sectional Title Apartment') && (
+              <span
+                className="inline-flex items-center gap-1 text-[10px] font-semibold bg-amber-50 text-amber-800 border border-amber-300 px-2 py-0.5 rounded-full"
+                title={`Municipal Zoning: ${flip.zoningProfile!.currentZoning} • FAR: ${flip.zoningProfile!.farRatio} • Coverage: ${flip.zoningProfile!.coveragePercent}% • Max Storeys: ${flip.zoningProfile!.maxHeightStoreys}${
+                  [
+                    flip.zoningProfile!.consentUses?.secondDwellingPermitted ? '2nd Dwelling' : null,
+                    flip.zoningProfile!.consentUses?.backyardMicroUnitsPermitted ? 'Backyard Micro-Units' : null,
+                    flip.zoningProfile!.consentUses?.studentCommuneConsent ? 'Student Commune' : null,
+                  ]
+                    .filter(Boolean)
+                    .length > 0
+                    ? ` • Consent: ${[
+                        flip.zoningProfile!.consentUses?.secondDwellingPermitted ? '2nd Dwelling' : null,
+                        flip.zoningProfile!.consentUses?.backyardMicroUnitsPermitted ? 'Backyard Micro-Units' : null,
+                        flip.zoningProfile!.consentUses?.studentCommuneConsent ? 'Student Commune' : null,
+                      ]
+                        .filter(Boolean)
+                        .join(', ')}`
+                    : ''
+                }`}
+              >
+                <span>🏛️ {formatZoningTransitionLabel(flip.zoningProfile!)}</span>
+              </span>
+            )}
           <AgmDateChip agmDate={flip.agmDate} />
 
           {/* Interactive Phase Selector */}

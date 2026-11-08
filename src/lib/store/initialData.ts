@@ -1640,6 +1640,21 @@ export const INITIAL_FLIPS: FlipProject[] = [
     exitCommissionPercent: 5.75,
     targetCompletionDate: '2026-11-15',
     taxEntityType: 'Company (27%)',
+    zoningProfile: {
+      currentZoning: 'Residential 1',
+      erfSizeSqm: 800,
+      farRatio: 0.5,
+      coveragePercent: 50,
+      maxHeightStoreys: 2,
+      maxDensityDuPerHa: 10,
+      requiresRezoning: false,
+      consentUses: {
+        secondDwellingPermitted: true,
+        studentCommuneConsent: false,
+        backyardMicroUnitsPermitted: false,
+        homeEnterprisePermitted: true,
+      },
+    },
     municipalClearance: {
       sec118ArrearsZAR: 14_500,
       advanceCouncilDepositZAR: 26_000,
@@ -1806,6 +1821,21 @@ export const INITIAL_FLIPS: FlipProject[] = [
     exitCommissionPercent: 5.75,
     targetCompletionDate: '2026-12-20',
     taxEntityType: 'Company (27%)',
+    zoningProfile: {
+      currentZoning: 'Residential 1',
+      erfSizeSqm: 800,
+      farRatio: 0.5,
+      coveragePercent: 50,
+      maxHeightStoreys: 2,
+      maxDensityDuPerHa: 10,
+      requiresRezoning: false,
+      consentUses: {
+        secondDwellingPermitted: true,
+        studentCommuneConsent: false,
+        backyardMicroUnitsPermitted: false,
+        homeEnterprisePermitted: true,
+      },
+    },
     municipalClearance: {
       sec118ArrearsZAR: 58_500,
       advanceCouncilDepositZAR: 24_000,

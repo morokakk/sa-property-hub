@@ -46,7 +46,11 @@ export function ZoningEnvelopeSubPanel({
   isCollapsible = true,
   defaultOpen = false,
 }: ZoningEnvelopeSubPanelProps) {
-  const [isOpen, setIsOpen] = useState(defaultOpen || Boolean(zoningProfile));
+  const [isOpen, setIsOpen] = useState(defaultOpen);
+
+  useEffect(() => {
+    setIsOpen(defaultOpen);
+  }, [defaultOpen]);
 
   // Comma-friendly decimal input state
   const [farInput, setFarInput] = useState<string>(String(zoningProfile?.farRatio ?? 0.8));

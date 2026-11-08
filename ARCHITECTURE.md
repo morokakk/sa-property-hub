@@ -2,7 +2,7 @@
 
 > **Status:** Institutional Reference & Definitive Architectural Standard  
 > **Target Audience:** Principal Systems Architects, Full-Stack Engineers, and Autonomous AI Coding Agents  
-> **System Baseline:** v2.8.0 • Next.js 16 (App Router), React 19, TypeScript 6, Tailwind CSS v4, Zustand v5 (11 Slices)  
+> **System Baseline:** v2.8.1 • Next.js 16 (App Router), React 19, TypeScript 6, Tailwind CSS v4, Zustand v5 (11 Slices)  
 > **Primary Jurisdiction:** Republic of South Africa (ZAR Institutional Real Estate Suite)
 
 ---
@@ -38,7 +38,7 @@ flowchart TD
     C4["src/components/proposal/DevelopmentFeasibilitySection.tsx"]
     C5["src/components/rentals/ (RentalCard, TenantStatement, LeaseInspectionDrawer, TenantNoticeModal, ExitSaleModal)"]
     C6["src/components/rentals/UnifiedPdfVerificationModal.tsx"]
-    C7["src/components/analyzer/DealIntelligencePanel.tsx"]
+    C7["src/components/analyzer/ (DealIntelligencePanel, ZoningEnvelopeSubPanel)"]
     C8["src/components/settings/NodeBenchmarkEditor.tsx"]
   end
 
@@ -53,6 +53,7 @@ flowchart TD
     CALC8["src/lib/calculations/inspections.ts"]
     CALC9["src/lib/calculations/dealIntelligence.ts & proposalIntelligence.ts"]
     CALC10["src/lib/calculations/recurrence.ts & taskCalendar.ts"]
+    CALC11["src/lib/calculations/zoning.ts (FAR, Coverage, Bulk & Rezoning)"]
   end
 
   subgraph Tier5["Tier 5: Modular Zustand State Store"]
@@ -113,6 +114,8 @@ flowchart TD
   - **Developments Modular Workstream Components ([`src/components/developments/`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/components/developments/)):** [`DevelopmentKpiBanner.tsx`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/components/developments/DevelopmentKpiBanner.tsx) (TDC, GDV, POC%, hard build pacing, pre-sales hurdle, hybrid split summary), [`DevelopmentUnitInventoryTab.tsx`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/components/developments/DevelopmentUnitInventoryTab.tsx) (unit inventory with 1-click debt paydown and rental graduation), [`DevelopmentCostStackTab.tsx`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/components/developments/DevelopmentCostStackTab.tsx) (soft professional fees, SPLUMA Sec 42 bulk contributions, and hard BOQ), [`DevelopmentApprovalsTab.tsx`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/components/developments/DevelopmentApprovalsTab.tsx) (6-milestone statutory gatekeeper), [`DevelopmentFinanceTab.tsx`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/components/developments/DevelopmentFinanceTab.tsx) (facility drawdowns & pre-sales debt wipeout), and [`DevelopmentProjectModal.tsx`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/components/developments/DevelopmentProjectModal.tsx).
   - [`DevelopmentFeasibilitySection.tsx`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/components/proposal/DevelopmentFeasibilitySection.tsx): Institutional proposal section with capital stack waterfall, pre-sales sensitivity matrices, and statutory approval status rings.
   - [`DealIntelligencePanel.tsx`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/components/analyzer/DealIntelligencePanel.tsx): Collapsible multi-strategy verdict and automated deal-repair engine panel comparing underwriting metrics against 35 SA regional investment node baselines.
+  - [`ZoningEnvelopeSubPanel.tsx`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/components/analyzer/ZoningEnvelopeSubPanel.tsx): Context-aware municipal zoning rights and bulk envelope evaluator calculating Floor Area Ratio (FAR), footprint coverage %, height storeys, density caps ($du/ha$), and SPLUMA Section 42 rezoning triggers. Implements responsive disclosure (auto-collapses on standard freehold flips with authoritative prop synchronization, and hides completely on Sectional Title non-developments).
+  - [`FlipProjectHeader.tsx`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/components/flips/FlipProjectHeader.tsx): Active flip project header featuring a context-aware municipal zoning badge pill with interactive hover tooltips (FAR, coverage %, storeys, and consent rights) for qualifying freehold, multi-unit, and build-to-rent projects.
   - [`NodeBenchmarkEditor.tsx`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/components/settings/NodeBenchmarkEditor.tsx): Regional node benchmark override manager with CSV/JSON import/export and remote Supabase synchronization.
 
 ### 1.4 Tier 4: Pure Calculation Engines (`src/lib/calculations/`)
@@ -131,6 +134,7 @@ flowchart TD
   - [`rentals.ts`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/lib/calculations/rentals.ts): `calculateDisposalMetrics`, Section 11(a) tax provisions, and time-weighted occupancy YTD.
   - [`maoSolver.ts`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/lib/calculations/maoSolver.ts): Maximum Allowable Offer closed-form inverse solver with $O(1)$ bid-dependent 90-day early settlement penalty factor $k_{\text{penalty}}$.
   - [`recurrence.ts`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/lib/calculations/recurrence.ts) & [`taskCalendar.ts`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/lib/calculations/taskCalendar.ts): Recurring task cadence engine (`Weekly`, `Monthly`, `Quarterly`, `Annually`), strict chronological sorting, overdue triage (`isTaskOverdue`), Monday-first 7-column calendar grid builder (`buildCalendarMonthGrid`), and future recurring ghost projections (`projectRecurringGhostTasks`).
+  - [`zoning.ts`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/lib/calculations/zoning.ts) (Tested in [`__tests__/zoning.test.ts`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/lib/calculations/__tests__/zoning.test.ts)): Pure statutory town planning bulk engine (`calculateZoningEnvelope`, `formatZoningTransitionLabel`, `ZONING_PRESETS`): Evaluates Floor Area Ratio (FAR), maximum permissible gross build area $m^2$, building footprint coverage %, allowable height storeys, dwelling unit density caps ($du/ha$), and statutory rezoning requirements under the Spatial Planning and Land Use Management Act (SPLUMA Section 42).
 
 ### 1.5 Tier 5: Modular Zustand State Store (`src/lib/store/`)
 - **Role:** Single source of truth for local-first reactive state, persistence, and cross-domain events.
@@ -580,3 +584,24 @@ An automated Equity Extraction Alert is triggered if and only if two simultaneou
     - Selling a development unit via `sellDevelopmentUnit` must apply net proceeds to `developmentFacilityRepaidZAR` first before crediting surplus cash to `liquidCapitalReserve`. If linked to a `FundingSource`, the corresponding funding record's `drawnAmountZAR` is paid down synchronously.
     - Graduating retained units via `graduateRetainedUnitsToRental` must scaffold multi-unit `RentalProperty` records with `leases[]` pre-populated, carrying over unextinguished debt, and setting `section13SexEligible: true` if $\ge 5$ units are retained.
     - Statutory approval target dates on `approvals` must sync to `tasks` using pure `syncDevelopmentApprovalTasks` in `taskSync.ts`, creating 14-day advance notice tasks with duplicate prevention.
+
+### 4.7 Context-Aware Progressive Disclosure & Statutory Zoning Rights Invariants
+1. **Sectional Title Land-Use Bulk Exclusion (Act 95 of 1986 & STSMA 8 of 2011):** Individual Sectional Title units (apartments, flats, and sectional scheme units) own an undivided share in common property governed by the body corporate, and do NOT possess independent unilateral title to the underlying cadastral erf. An individual sectional buyer cannot rezone, increase municipal Floor Area Ratio (FAR), expand building footprint coverage, or build independent backyard cottages. Consequently:
+   - **In `/analyzer` ([`page.tsx`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/app/analyzer/page.tsx)):** When `strategy !== 'Development' && propertyType === 'Sectional Title Apartment'`, the `MUNICIPAL ZONING RIGHTS & BULK ENVELOPE` sub-panel (`ZoningEnvelopeSubPanel.tsx`) must be **completely hidden** from DOM rendering to prevent polluting cosmetic apartment flips with inapplicable land-use controls.
+   - **In `/flips` ([`FlipProjectModal.tsx`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/components/flips/modals/FlipProjectModal.tsx)):** When `propertyType === 'Sectional Title Apartment'`, the municipal zoning and consent rights configuration section must be strictly hidden from the modal form. Upon submission, `zoningProfile` must be scrubbed (`zoningProfile: undefined`) to prevent stale zoning payloads from persisting to storage.
+2. **Progressive Disclosure on Flips vs. Multi-Unit & Build-to-Rent:**
+   - **In `/analyzer`:** For standard freehold single-unit flips (`strategy === 'Flip' && propertyType !== 'Sectional Title Apartment'`), `ZoningEnvelopeSubPanel` defaults to collapsed unless `numberOfUnits > 1` or `zoningProfile?.requiresRezoning === true`. Users can expand the full bulk envelope with a single click. For `Development` strategy or multi-unit schemes, it defaults to expanded.
+   - **In `/flips` Modal:** The collapsible `"Municipal Zoning & Multi-Let Consent Rights (Optional)"` section renders with the 4 South African statutory presets (`Residential 1 (As-of-Right)`, `Residential 3 (Townhouses)`, `Residential 4 (High-Density)`, `Township Infill (High-Density)`) and consent use checkboxes (`2nd Dwelling / Cottage`, `Backyard Micro-Units`, `Student Commune`) ONLY when `projectStrategy === 'build_to_rent'` OR `(numberOfUnits > 1 && propertyType !== 'Sectional Title Apartment')`.
+3. **Flip Project Header Zoning Badge Invariant ([`FlipProjectHeader.tsx`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/components/flips/FlipProjectHeader.tsx)):**
+   - The compact zoning badge pill (e.g. `🏛️ Residential 1 (As-of-Right)`) must render next to the `m²` pill if and only if `flip.zoningProfile` is defined AND `(flip.projectStrategy === 'build_to_rent' || (flip.numberOfUnits ?? 1) > 1 || flip.propertyType !== 'Sectional Title Apartment')`.
+   - The badge must include contextual hover tooltips displaying statutory FAR, ground coverage %, max storeys, and active municipal consent uses.
+4. **Authoritative Sub-Panel Expansion Synchronization:**
+   - Sub-panels accepting a `defaultOpen` prop driven by parent view state (such as `ZoningEnvelopeSubPanel`) must synchronize local expansion state via `useEffect([defaultOpen])`:
+     ```typescript
+     // CANONICAL SYNCHRONIZATION PATTERN:
+     const [isOpen, setIsOpen] = useState(defaultOpen);
+     useEffect(() => {
+       setIsOpen(defaultOpen);
+     }, [defaultOpen]);
+     ```
+   - This ensures immediate auto-collapse when switching property types or strategies without requiring unmounting or page reloads.

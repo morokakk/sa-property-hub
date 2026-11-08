@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { FlipProject, PropertyTitleType, CloudDriveVault, Province } from '@/types';
+import { FlipProject, PropertyTitleType, CloudDriveVault, Province, ZoningProfile, ConsentUseFlags } from '@/types';
 import { formatZAR } from '@/lib/formatters';
 import { parseRentalPdfStatement } from '@/lib/utilities/pdfParser';
 import {
@@ -12,11 +12,14 @@ import {
   Landmark,
   Scale,
   X,
+  ChevronDown,
+  ChevronRight,
 } from 'lucide-react';
 import { usePortfolioStore } from '@/lib/store/usePortfolioStore';
 import InvestmentNodeSelect, { InvestmentNodeBanner } from '@/components/common/InvestmentNodeSelect';
 import { getNodeComplianceProfile } from '@/lib/constants/investmentNodes';
 import AiApiKeyGuardrailBanner from '@/components/ai/AiApiKeyGuardrailBanner';
+import { ZONING_PRESETS, formatZoningTransitionLabel } from '@/lib/calculations/zoning';
 
 export interface FlipProjectModalProps {
   isOpen: boolean;
@@ -168,35 +171,37 @@ export const FlipProjectModal: React.FC<FlipProjectModalProps> = ({
   const [localAddress, setLocalAddress] = useState('');
   const [localCity, setLocalCity] = useState('Cape Town CBD & Foreshore');
   const [localProvince, setLocalProvince] = useState<Province>('Western Cape');
-  const [localPropertyType, setLocalPropertyType] = useState<PropertyTitleType>('Freehold House');
-  const [localAgmDate, setLocalAgmDate] = useState('');
-  const [localPurchasePrice, setLocalPurchasePrice] = useState<number>(2500000);
-  const [localAcquisitionCosts, setLocalAcquisitionCosts] = useState<number>(185000);
-  const [localRenovationBudget, setLocalRenovationBudget] = useState<number>(450000);
-  const [localEstimatedDuration, setLocalEstimatedDuration] = useState<number>(6);
-  const [localBondPayment, setLocalBondPayment] = useState<number>(9500);
-  const [localLevies, setLocalLevies] = useState<number>(0);
-  const [localRates, setLocalRates] = useState<number>(3500);
-  const [localOtherHoldingCost, setLocalOtherHoldingCost] = useState<number>(2000);
-  const [localTargetExit, setLocalTargetExit] = useState<number>(3800000);
-  const [localExitCommissionPercent, setLocalExitCommissionPercent] = useState<number>(5.75);
-  const [localCompletionDate, setLocalCompletionDate] = useState('');
-  const [localTaxEntityType, setLocalTaxEntityType] = useState<'Company (27%)' | 'Individual (45%)' | 'Pre-Tax'>('Company (27%)');
-  const [localSec118Arrears, setLocalSec118Arrears] = useState<number>(0);
-  const [localAdvanceDeposit, setLocalAdvanceDeposit] = useState<number>(0);
-  const [localRccStatus, setLocalRccStatus] = useState<NonNullable<FlipProject['municipalClearance']>['rccStatus']>('Pending Application');
-  const [localRccAppDate, setLocalRccAppDate] = useState('');
-  const [localDisputeNotes, setLocalDisputeNotes] = useState('');
-  const [localMasterFolderUrl, setLocalMasterFolderUrl] = useState('');
-  const [localOtpUrl, setLocalOtpUrl] = useState('');
-  const [localRatesBillUrl, setLocalRatesBillUrl] = useState('');
-  const [localTitleDeedUrl, setLocalTitleDeedUrl] = useState('');
+  const [localPropertyType, setLocalPropertyType] = useState<PropertyTitleType>(editingFlip?.propertyType || 'Freehold House');
+  const [localAgmDate, setLocalAgmDate] = useState(editingFlip?.agmDate || '');
+  const [localPurchasePrice, setLocalPurchasePrice] = useState<number>(editingFlip?.purchasePriceZAR ?? 2500000);
+  const [localAcquisitionCosts, setLocalAcquisitionCosts] = useState<number>(editingFlip?.acquisitionCostsZAR ?? 185000);
+  const [localRenovationBudget, setLocalRenovationBudget] = useState<number>(editingFlip?.baselineRenovationBudgetZAR ?? 450000);
+  const [localEstimatedDuration, setLocalEstimatedDuration] = useState<number>(editingFlip?.estimatedDurationMonths ?? 6);
+  const [localBondPayment, setLocalBondPayment] = useState<number>(editingFlip?.monthlyBondPaymentZAR ?? 9500);
+  const [localLevies, setLocalLevies] = useState<number>(editingFlip?.monthlyLeviesZAR ?? 0);
+  const [localRates, setLocalRates] = useState<number>(editingFlip?.monthlyRatesTaxesZAR ?? 3500);
+  const [localOtherHoldingCost, setLocalOtherHoldingCost] = useState<number>(editingFlip?.monthlyOtherHoldingCostZAR ?? 2000);
+  const [localTargetExit, setLocalTargetExit] = useState<number>(editingFlip?.targetExitPriceZAR ?? 3800000);
+  const [localExitCommissionPercent, setLocalExitCommissionPercent] = useState<number>(editingFlip?.exitCommissionPercent ?? 5.75);
+  const [localCompletionDate, setLocalCompletionDate] = useState(editingFlip?.targetCompletionDate || '');
+  const [localTaxEntityType, setLocalTaxEntityType] = useState<'Company (27%)' | 'Individual (45%)' | 'Pre-Tax'>(editingFlip?.taxEntityType || 'Company (27%)');
+  const [localSec118Arrears, setLocalSec118Arrears] = useState<number>(editingFlip?.municipalClearance?.sec118ArrearsZAR ?? 0);
+  const [localAdvanceDeposit, setLocalAdvanceDeposit] = useState<number>(editingFlip?.municipalClearance?.advanceCouncilDepositZAR ?? 0);
+  const [localRccStatus, setLocalRccStatus] = useState<NonNullable<FlipProject['municipalClearance']>['rccStatus']>(editingFlip?.municipalClearance?.rccStatus || 'Pending Application');
+  const [localRccAppDate, setLocalRccAppDate] = useState(editingFlip?.municipalClearance?.rccApplicationDate || '');
+  const [localDisputeNotes, setLocalDisputeNotes] = useState(editingFlip?.municipalClearance?.disputeNotes || '');
+  const [localMasterFolderUrl, setLocalMasterFolderUrl] = useState(editingFlip?.driveVault?.masterFolderUrl || '');
+  const [localOtpUrl, setLocalOtpUrl] = useState(editingFlip?.driveVault?.otpDocumentUrl || '');
+  const [localRatesBillUrl, setLocalRatesBillUrl] = useState(editingFlip?.driveVault?.ratesBillUrl || '');
+  const [localTitleDeedUrl, setLocalTitleDeedUrl] = useState(editingFlip?.driveVault?.titleDeedUrl || '');
   const [localPdfParseNotice, setLocalPdfParseNotice] = useState<string | null>(null);
   const [localExtractedValuation, setLocalExtractedValuation] = useState<number | null>(null);
   const [localIsParsingPdf, setLocalIsParsingPdf] = useState(false);
   const [cachedUploadFiles, setCachedUploadFiles] = useState<File[]>([]);
-  const [localProjectStrategy, setLocalProjectStrategy] = useState<'flip_for_sale' | 'build_to_rent'>('flip_for_sale');
-  const [localNumberOfUnits, setLocalNumberOfUnits] = useState<number>(1);
+  const [localProjectStrategy, setLocalProjectStrategy] = useState<'flip_for_sale' | 'build_to_rent'>(editingFlip?.projectStrategy || 'flip_for_sale');
+  const [localNumberOfUnits, setLocalNumberOfUnits] = useState<number>(editingFlip?.numberOfUnits || 1);
+  const [localZoningProfile, setLocalZoningProfile] = useState<ZoningProfile | undefined>(editingFlip?.zoningProfile);
+  const [isZoningDrawerOpen, setIsZoningDrawerOpen] = useState<boolean>(Boolean(editingFlip?.zoningProfile));
 
   useEffect(() => {
     if (editingFlip && isOpen && propFlipTitle === undefined) {
@@ -232,6 +237,8 @@ export const FlipProjectModal: React.FC<FlipProjectModalProps> = ({
       setLocalAgmDate(editingFlip.agmDate || '');
       setLocalProjectStrategy(editingFlip.projectStrategy || 'flip_for_sale');
       setLocalNumberOfUnits(editingFlip.numberOfUnits || 1);
+      setLocalZoningProfile(editingFlip.zoningProfile);
+      setIsZoningDrawerOpen(Boolean(editingFlip.zoningProfile));
       setLocalMasterFolderUrl(editingFlip.driveVault?.masterFolderUrl || '');
       setLocalOtpUrl(editingFlip.driveVault?.otpDocumentUrl || '');
       setLocalRatesBillUrl(editingFlip.driveVault?.ratesBillUrl || '');
@@ -264,6 +271,8 @@ export const FlipProjectModal: React.FC<FlipProjectModalProps> = ({
       setLocalAgmDate('');
       setLocalProjectStrategy('flip_for_sale');
       setLocalNumberOfUnits(1);
+      setLocalZoningProfile(undefined);
+      setIsZoningDrawerOpen(false);
       setLocalMasterFolderUrl('');
       setLocalOtpUrl('');
       setLocalRatesBillUrl('');
@@ -272,6 +281,57 @@ export const FlipProjectModal: React.FC<FlipProjectModalProps> = ({
       setLocalExtractedValuation(null);
     }
   }, [editingFlip, isOpen, propFlipTitle, investorProfile]);
+
+  const handleApplyZoningPreset = (presetId: string) => {
+    const preset = ZONING_PRESETS.find((p) => p.id === presetId);
+    if (!preset) return;
+    setLocalZoningProfile({
+      currentZoning: preset.profile.currentZoning,
+      targetZoning: preset.profile.targetZoning,
+      erfSizeSqm: localZoningProfile?.erfSizeSqm || preset.profile.defaultErfSizeSqm || 1000,
+      farRatio: preset.profile.farRatio,
+      coveragePercent: preset.profile.coveragePercent,
+      maxHeightStoreys: preset.profile.maxHeightStoreys,
+      maxDensityDuPerHa: preset.profile.maxDensityDuPerHa,
+      requiresRezoning: preset.profile.requiresRezoning,
+      consentUses: { ...preset.profile.consentUses },
+    });
+  };
+
+  const handleToggleConsentUse = (key: keyof ConsentUseFlags) => {
+    const base: ZoningProfile = localZoningProfile || {
+      currentZoning: 'Residential 1',
+      erfSizeSqm: 1000,
+      farRatio: 0.5,
+      coveragePercent: 50,
+      maxHeightStoreys: 2,
+      requiresRezoning: false,
+      consentUses: {
+        secondDwellingPermitted: false,
+        studentCommuneConsent: false,
+        backyardMicroUnitsPermitted: false,
+        homeEnterprisePermitted: false,
+      },
+    };
+
+    setLocalZoningProfile({
+      ...base,
+      consentUses: {
+        ...base.consentUses,
+        [key]: !base.consentUses?.[key],
+      },
+    });
+  };
+
+  const isZoningPresetActive = (presetId: string) => {
+    if (!localZoningProfile) return false;
+    const preset = ZONING_PRESETS.find((p) => p.id === presetId);
+    if (!preset) return false;
+    return (
+      localZoningProfile.currentZoning === preset.profile.currentZoning &&
+      Math.abs(localZoningProfile.farRatio - preset.profile.farRatio) < 0.001
+    );
+  };
 
   const flipTitle = propFlipTitle !== undefined ? propFlipTitle : localTitle;
   const setFlipTitle = propSetFlipTitle || setLocalTitle;
@@ -335,8 +395,6 @@ export const FlipProjectModal: React.FC<FlipProjectModalProps> = ({
 
   const isEditing = Boolean(propEditingFlipId !== undefined ? propEditingFlipId : editingFlip);
 
-  if (!isOpen) return null;
-
   const handleClose = () => {
     if (propSetEditingFlipId) propSetEditingFlipId(null);
     setPdfParseNotice(null);
@@ -345,12 +403,15 @@ export const FlipProjectModal: React.FC<FlipProjectModalProps> = ({
   };
 
   useEffect(() => {
+    if (!isOpen) return;
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') handleClose();
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
+  }, [isOpen]);
+
+  if (!isOpen) return null;
 
   const handlePdfUpload = async (files: File[], overrideAiSettings?: typeof aiSettings) => {
     if (!files || files.length === 0) return;
@@ -518,6 +579,7 @@ export const FlipProjectModal: React.FC<FlipProjectModalProps> = ({
       municipalClearance: municipalClearanceData,
       driveVault: updatedDriveVault,
       municipalValuationZAR: extractedValuationZAR || undefined,
+      zoningProfile: flipPropertyType === 'Sectional Title Apartment' ? undefined : localZoningProfile,
     };
 
     if (onSave) {
@@ -568,6 +630,7 @@ export const FlipProjectModal: React.FC<FlipProjectModalProps> = ({
           promisedPayoutSchedule: 'Monthly Interest',
           securityOffered: '2nd Mortgage Bond registered over title deed',
           status: 'Active',
+          zoningProfile: flipPropertyType === 'Sectional Title Apartment' ? undefined : localZoningProfile,
           driveVault: updatedDriveVault,
           boq: [],
         };
@@ -814,6 +877,119 @@ export const FlipProjectModal: React.FC<FlipProjectModalProps> = ({
               </div>
             )}
           </div>
+
+          {/* Progressive Disclosure: Municipal Zoning & Multi-Let Consent Rights (Optional) */}
+          {flipPropertyType !== 'Sectional Title Apartment' &&
+            (localProjectStrategy === 'build_to_rent' || Number(localNumberOfUnits) > 1) && (
+              <div className="p-3 bg-amber-50/60 rounded-lg border border-amber-200/90 space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <button
+                    type="button"
+                    onClick={() => setIsZoningDrawerOpen(!isZoningDrawerOpen)}
+                    className="flex items-center gap-1.5 text-left text-[11px] font-bold text-amber-950 uppercase tracking-wider hover:text-amber-800 transition-colors cursor-pointer select-none"
+                  >
+                    <Landmark className="w-3.5 h-3.5 text-amber-700" />
+                    <span>Municipal Zoning &amp; Multi-Let Consent Rights (Optional)</span>
+                    {isZoningDrawerOpen ? (
+                      <ChevronDown className="w-3.5 h-3.5 text-amber-700" />
+                    ) : (
+                      <ChevronRight className="w-3.5 h-3.5 text-amber-700" />
+                    )}
+                  </button>
+                  {localZoningProfile && (
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[10px] font-semibold text-amber-800 bg-amber-100/90 px-2 py-0.5 rounded border border-amber-300">
+                        🏛️ {formatZoningTransitionLabel(localZoningProfile)}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setLocalZoningProfile(undefined)}
+                        className="text-[10px] text-slate-500 hover:text-rose-600 underline cursor-pointer"
+                        title="Clear zoning configuration"
+                      >
+                        Reset
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                {isZoningDrawerOpen && (
+                  <div className="pt-2 border-t border-amber-200/70 space-y-3 text-xs animate-in fade-in duration-150">
+                    <div>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <label className="block text-[11px] font-semibold text-slate-700">
+                          South African Town Planning Presets
+                        </label>
+                        <span className="text-[10px] text-slate-500">
+                          Click to populate statutory density &amp; coverage parameters
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
+                        {(
+                          [
+                            { id: 'res-1', label: 'Res 1 (FAR 0.5)' },
+                            { id: 'res-3', label: 'Res 3 (40 du/ha)' },
+                            { id: 'res-4', label: 'Res 4 (80 du/ha)' },
+                            { id: 'township-infill', label: 'Township Infill' },
+                          ] as const
+                        ).map((preset) => {
+                          const active = isZoningPresetActive(preset.id);
+                          return (
+                            <button
+                              key={preset.id}
+                              type="button"
+                              onClick={() => handleApplyZoningPreset(preset.id)}
+                              className={`py-1.5 px-2 rounded-lg text-[11px] font-semibold transition-all text-center border cursor-pointer ${
+                                active
+                                  ? 'bg-amber-600 text-white border-amber-600 shadow-2xs font-bold'
+                                  : 'bg-white text-slate-700 border-slate-300 hover:bg-amber-50'
+                              }`}
+                            >
+                              {preset.label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-semibold text-slate-700 mb-1.5">
+                        Permissible Multi-Let Consent Uses (Council Approved)
+                      </label>
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                        <label className="inline-flex items-center gap-2 p-2 rounded-lg bg-white border border-slate-200 hover:border-amber-300 cursor-pointer select-none text-xs">
+                          <input
+                            type="checkbox"
+                            checked={Boolean(localZoningProfile?.consentUses?.secondDwellingPermitted)}
+                            onChange={() => handleToggleConsentUse('secondDwellingPermitted')}
+                            className="w-3.5 h-3.5 rounded text-amber-600 focus:ring-amber-500 cursor-pointer"
+                          />
+                          <span className="font-medium text-slate-800">2nd Dwelling / Cottage</span>
+                        </label>
+                        <label className="inline-flex items-center gap-2 p-2 rounded-lg bg-white border border-slate-200 hover:border-amber-300 cursor-pointer select-none text-xs">
+                          <input
+                            type="checkbox"
+                            checked={Boolean(localZoningProfile?.consentUses?.backyardMicroUnitsPermitted)}
+                            onChange={() => handleToggleConsentUse('backyardMicroUnitsPermitted')}
+                            className="w-3.5 h-3.5 rounded text-amber-600 focus:ring-amber-500 cursor-pointer"
+                          />
+                          <span className="font-medium text-slate-800">Backyard Micro-Units</span>
+                        </label>
+                        <label className="inline-flex items-center gap-2 p-2 rounded-lg bg-white border border-slate-200 hover:border-amber-300 cursor-pointer select-none text-xs">
+                          <input
+                            type="checkbox"
+                            checked={Boolean(localZoningProfile?.consentUses?.studentCommuneConsent)}
+                            onChange={() => handleToggleConsentUse('studentCommuneConsent')}
+                            className="w-3.5 h-3.5 rounded text-amber-600 focus:ring-amber-500 cursor-pointer"
+                          />
+                          <span className="font-medium text-slate-800">Student Commune</span>
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
 
           <div className="grid grid-cols-2 gap-3">
             <div>
