@@ -15,7 +15,7 @@ import {
   calculateDevelopmentRiskGate,
   calculateDevelopmentDebtWipeoutMatrix,
 } from '@/lib/calculations/developments';
-import { formatZoningTransitionLabel } from '@/lib/calculations/zoning';
+import { formatZoningTransitionLabel, calculateZoningEnvelope } from '@/lib/calculations/zoning';
 import { formatZAR, formatPercent } from '@/lib/formatters';
 import {
   Coins,
@@ -180,6 +180,13 @@ export function DevelopmentFeasibilitySection({
   const capitalStack = calculateDevelopmentCapitalStack(development, fin);
   const riskGate = calculateDevelopmentRiskGate(development, fin);
   const wipeoutMatrix = calculateDevelopmentDebtWipeoutMatrix(development, fin);
+  const zoningEnvelope = development.zoningProfile
+    ? calculateZoningEnvelope(
+        development.zoningProfile,
+        development.totalBuildableAreaSqm || 0,
+        development.units?.length || 1
+      )
+    : null;
 
   return (
     <section className={`space-y-6 print:space-y-4 ${className}`}>
@@ -222,13 +229,11 @@ export function DevelopmentFeasibilitySection({
               </span>
               <span className="text-slate-400">&bull;</span>
               <span className="text-slate-600">
-                Erf: {development.zoningProfile.erfSizeSqm.toLocaleString('en-ZA')} m² &bull; FAR {development.zoningProfile.farRatio} ({development.totalBuildableAreaSqm} m² planned / {Math.round(development.zoningProfile.erfSizeSqm * development.zoningProfile.farRatio)} m² max bulk)
+                Erf: {development.zoningProfile.erfSizeSqm.toLocaleString('en-ZA')} m² &bull; FAR {development.zoningProfile.farRatio} ({development.totalBuildableAreaSqm} m² planned / {zoningEnvelope?.maxPermittedBulkSqm.toLocaleString('en-ZA')} m² max bulk)
               </span>
             </div>
             <div>
-              {development.zoningProfile.requiresRezoning ||
-              (development.zoningProfile.targetZoning &&
-                development.zoningProfile.targetZoning !== development.zoningProfile.currentZoning) ? (
+              {zoningEnvelope?.isSplumaRezoningTriggered ? (
                 <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-amber-50 text-amber-800 border border-amber-200 print:bg-amber-100 print:text-amber-900">
                   Subject to SPLUMA Section 42 Rezoning
                 </span>

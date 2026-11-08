@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   DevelopmentProject,
   DevelopmentType,
@@ -22,6 +22,7 @@ import {
   X,
   ShieldCheck,
   CheckCircle2,
+  AlertTriangle,
 } from 'lucide-react';
 
 export interface DevelopmentProjectModalProps {
@@ -131,7 +132,9 @@ export function DevelopmentProjectModal({
   const [targetZoning, setTargetZoning] = useState<MunicipalZoningCode | ''>('');
   const [erfSizeSqm, setErfSizeSqm] = useState<number>(1200);
   const [farRatio, setFarRatio] = useState<number>(0.8);
+  const [farInput, setFarInput] = useState<string>('0.8');
   const [coveragePercent, setCoveragePercent] = useState<number>(50);
+  const [coverageInput, setCoverageInput] = useState<string>('50');
   const [maxHeightStoreys, setMaxHeightStoreys] = useState<number>(3);
   const [maxDensityDuPerHa, setMaxDensityDuPerHa] = useState<number | ''>(40);
   const [requiresRezoning, setRequiresRezoning] = useState<boolean>(false);
@@ -142,13 +145,46 @@ export function DevelopmentProjectModal({
     homeEnterprisePermitted: true,
   });
 
+  const parseDecimal = (val: string, fallback: number = 0): number => {
+    const cleaned = val.replace(',', '.');
+    const parsed = parseFloat(cleaned);
+    return isNaN(parsed) ? fallback : parsed;
+  };
+
+  const isPresetActive = (preset: typeof ZONING_PRESETS[number]) => {
+    const currentMatches = currentZoning === preset.profile.currentZoning;
+    const targetMatches = (targetZoning || '') === (preset.profile.targetZoning || '');
+    const farMatches = Math.abs(farRatio - preset.profile.farRatio) < 0.001;
+    const covMatches = Math.abs(coveragePercent - preset.profile.coveragePercent) < 0.001;
+    const heightMatches = maxHeightStoreys === preset.profile.maxHeightStoreys;
+    return currentMatches && targetMatches && farMatches && covMatches && heightMatches;
+  };
+
+  // Statutory Density Guardrail
+  const plannedUnits = isNew ? Number(initialUnitCount) : (editingDevelopment?.units?.length || 0);
+  const maxAllowedUnits =
+    maxDensityDuPerHa !== '' && Number(maxDensityDuPerHa) > 0
+      ? Math.max(1, Math.floor((erfSizeSqm / 10000) * Number(maxDensityDuPerHa)))
+      : undefined;
+  const isDensityCapExceeded = Boolean(maxAllowedUnits !== undefined && plannedUnits > maxAllowedUnits);
+
+  const prevDensityExceededRef = useRef(false);
+  useEffect(() => {
+    if (isDensityCapExceeded && !prevDensityExceededRef.current) {
+      setRequiresRezoning(true);
+    }
+    prevDensityExceededRef.current = isDensityCapExceeded;
+  }, [isDensityCapExceeded]);
+
   const applyZoningPreset = (presetId: string) => {
     const preset = ZONING_PRESETS.find((p) => p.id === presetId);
     if (!preset) return;
     setCurrentZoning(preset.profile.currentZoning);
     setTargetZoning(preset.profile.targetZoning || '');
     setFarRatio(preset.profile.farRatio);
+    setFarInput(String(preset.profile.farRatio));
     setCoveragePercent(preset.profile.coveragePercent);
+    setCoverageInput(String(preset.profile.coveragePercent));
     setMaxHeightStoreys(preset.profile.maxHeightStoreys);
     setMaxDensityDuPerHa(preset.profile.maxDensityDuPerHa ?? '');
     setRequiresRezoning(preset.profile.requiresRezoning);
@@ -186,8 +222,12 @@ export function DevelopmentProjectModal({
         setCurrentZoning(editingDevelopment.zoningProfile.currentZoning);
         setTargetZoning(editingDevelopment.zoningProfile.targetZoning || '');
         setErfSizeSqm(editingDevelopment.zoningProfile.erfSizeSqm || 1200);
-        setFarRatio(editingDevelopment.zoningProfile.farRatio ?? 0.8);
-        setCoveragePercent(editingDevelopment.zoningProfile.coveragePercent ?? 50);
+        const loadedFar = editingDevelopment.zoningProfile.farRatio ?? 0.8;
+        const loadedCov = editingDevelopment.zoningProfile.coveragePercent ?? 50;
+        setFarRatio(loadedFar);
+        setFarInput(String(loadedFar));
+        setCoveragePercent(loadedCov);
+        setCoverageInput(String(loadedCov));
         setMaxHeightStoreys(editingDevelopment.zoningProfile.maxHeightStoreys ?? 3);
         setMaxDensityDuPerHa(editingDevelopment.zoningProfile.maxDensityDuPerHa ?? 40);
         setRequiresRezoning(editingDevelopment.zoningProfile.requiresRezoning ?? false);
@@ -197,7 +237,9 @@ export function DevelopmentProjectModal({
         setTargetZoning('');
         setErfSizeSqm(1200);
         setFarRatio(0.8);
+        setFarInput('0.8');
         setCoveragePercent(50);
+        setCoverageInput('50');
         setMaxHeightStoreys(3);
         setMaxDensityDuPerHa(40);
         setRequiresRezoning(false);
@@ -239,7 +281,9 @@ export function DevelopmentProjectModal({
       setTargetZoning('');
       setErfSizeSqm(1200);
       setFarRatio(0.8);
+      setFarInput('0.8');
       setCoveragePercent(50);
+      setCoverageInput('50');
       setMaxHeightStoreys(3);
       setMaxDensityDuPerHa(40);
       setRequiresRezoning(false);
@@ -530,16 +574,23 @@ export function DevelopmentProjectModal({
               {/* Presets */}
               <div className="flex items-center gap-1.5 flex-wrap">
                 <span className="text-[10px] uppercase font-bold text-slate-500">Presets:</span>
-                {ZONING_PRESETS.map((preset) => (
-                  <button
-                    key={preset.id}
-                    type="button"
-                    onClick={() => applyZoningPreset(preset.id)}
-                    className="px-2 py-0.5 rounded text-[11px] font-semibold bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 cursor-pointer shadow-2xs transition-colors"
-                  >
-                    {preset.label}
-                  </button>
-                ))}
+                {ZONING_PRESETS.map((preset) => {
+                  const active = isPresetActive(preset);
+                  return (
+                    <button
+                      key={preset.id}
+                      type="button"
+                      onClick={() => applyZoningPreset(preset.id)}
+                      className={`px-2 py-0.5 rounded text-[11px] font-semibold cursor-pointer shadow-2xs transition-colors ${
+                        active
+                          ? 'bg-slate-900 text-white border border-slate-900'
+                          : 'bg-white hover:bg-slate-100 text-slate-700 border border-slate-300'
+                      }`}
+                    >
+                      {preset.label}
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
@@ -566,7 +617,7 @@ export function DevelopmentProjectModal({
                   onChange={(e) => setTargetZoning((e.target.value as MunicipalZoningCode) || '')}
                   className="w-full rounded border border-slate-300 px-2.5 py-1.5 bg-white text-xs font-medium"
                 >
-                  <option value="">Same as Current (As-of-Right)</option>
+                  <option value="">Same (As-of-Right)</option>
                   {MUNICIPAL_ZONING_CODES.map((code) => (
                     <option key={code} value={code}>
                       {code}
@@ -590,12 +641,24 @@ export function DevelopmentProjectModal({
               <div>
                 <label className="block font-semibold text-slate-700 mb-1 text-[11px]">Floor Area Ratio (FAR)</label>
                 <input
-                  type="number"
-                  min={0.1}
-                  max={10}
-                  step={0.1}
-                  value={farRatio}
-                  onChange={(e) => setFarRatio(Number(e.target.value))}
+                  type="text"
+                  inputMode="decimal"
+                  value={farInput}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setFarInput(val);
+                    const parsed = parseDecimal(val, 0);
+                    if (parsed > 0) setFarRatio(parsed);
+                  }}
+                  onBlur={() => {
+                    const parsed = parseDecimal(farInput, farRatio);
+                    if (parsed > 0) {
+                      setFarRatio(parsed);
+                      setFarInput(String(parsed));
+                    } else {
+                      setFarInput(String(farRatio));
+                    }
+                  }}
                   className="w-full rounded border border-slate-300 px-2.5 py-1.5 text-xs bg-white"
                 />
               </div>
@@ -603,12 +666,24 @@ export function DevelopmentProjectModal({
               <div>
                 <label className="block font-semibold text-slate-700 mb-1 text-[11px]">Max Coverage (%)</label>
                 <input
-                  type="number"
-                  min={10}
-                  max={100}
-                  step={5}
-                  value={coveragePercent}
-                  onChange={(e) => setCoveragePercent(Number(e.target.value))}
+                  type="text"
+                  inputMode="decimal"
+                  value={coverageInput}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setCoverageInput(val);
+                    const parsed = parseDecimal(val, 0);
+                    if (parsed > 0) setCoveragePercent(parsed);
+                  }}
+                  onBlur={() => {
+                    const parsed = parseDecimal(coverageInput, coveragePercent);
+                    if (parsed > 0) {
+                      setCoveragePercent(parsed);
+                      setCoverageInput(String(parsed));
+                    } else {
+                      setCoverageInput(String(coveragePercent));
+                    }
+                  }}
                   className="w-full rounded border border-slate-300 px-2.5 py-1.5 text-xs bg-white"
                 />
               </div>
@@ -640,18 +715,30 @@ export function DevelopmentProjectModal({
                 />
               </div>
 
-              <div className="flex items-center pt-3">
-                <label className="flex items-center gap-2 cursor-pointer font-medium text-slate-800 text-[11px]">
-                  <input
-                    type="checkbox"
-                    checked={requiresRezoning}
-                    onChange={(e) => setRequiresRezoning(e.target.checked)}
-                    className="rounded border-slate-300 text-amber-600 focus:ring-amber-500 w-4 h-4"
-                  />
-                  <span>SPLUMA Rezoning Required</span>
-                </label>
+              <div className="flex flex-col justify-end">
+                <div className="h-[34px] flex items-center">
+                  <label className="flex items-center gap-2 cursor-pointer font-medium text-slate-800 text-[11px] select-none">
+                    <input
+                      type="checkbox"
+                      checked={requiresRezoning}
+                      onChange={(e) => setRequiresRezoning(e.target.checked)}
+                      className="rounded border-slate-300 text-amber-600 focus:ring-amber-500 w-4 h-4 cursor-pointer"
+                    />
+                    <span>SPLUMA Rezoning Required</span>
+                  </label>
+                </div>
               </div>
             </div>
+
+            {/* Density Cap Exceeded Amber Alert */}
+            {isDensityCapExceeded && (
+              <div className="flex items-center gap-2 p-2 rounded-lg bg-amber-50 border border-amber-200 text-amber-900 text-[11px]">
+                <AlertTriangle className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                <span>
+                  <strong>Density Cap Exceeded:</strong> Planned {plannedUnits} units exceeds {maxAllowedUnits} units permitted on this {erfSizeSqm.toLocaleString('en-ZA')} m² stand ({maxDensityDuPerHa} du/ha). SPLUMA Section 42 rezoning tribunal required.
+                </span>
+              </div>
+            )}
 
             {/* Consent Uses */}
             <div className="pt-2 border-t border-slate-200 flex flex-wrap items-center gap-4 text-[11px]">

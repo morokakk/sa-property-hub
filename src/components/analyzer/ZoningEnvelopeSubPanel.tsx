@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { MunicipalZoningCode, ZoningProfile } from '@/types';
 import {
   calculateZoningEnvelope,
@@ -30,6 +30,7 @@ export interface ZoningEnvelopeSubPanelProps {
   plannedBuildableSqm: number;
   plannedUnits: number;
   preApprovalMonths?: number;
+  onSetPreApprovalMonths?: (months: number) => void;
   isCollapsible?: boolean;
   defaultOpen?: boolean;
 }
@@ -41,10 +42,43 @@ export function ZoningEnvelopeSubPanel({
   plannedBuildableSqm,
   plannedUnits,
   preApprovalMonths = 6,
+  onSetPreApprovalMonths,
   isCollapsible = true,
   defaultOpen = false,
 }: ZoningEnvelopeSubPanelProps) {
   const [isOpen, setIsOpen] = useState(defaultOpen || Boolean(zoningProfile));
+
+  // Comma-friendly decimal input state
+  const [farInput, setFarInput] = useState<string>(String(zoningProfile?.farRatio ?? 0.8));
+  const [coverageInput, setCoverageInput] = useState<string>(String(zoningProfile?.coveragePercent ?? 50));
+
+  useEffect(() => {
+    if (zoningProfile?.farRatio !== undefined) {
+      setFarInput(String(zoningProfile.farRatio));
+    }
+  }, [zoningProfile?.farRatio]);
+
+  useEffect(() => {
+    if (zoningProfile?.coveragePercent !== undefined) {
+      setCoverageInput(String(zoningProfile.coveragePercent));
+    }
+  }, [zoningProfile?.coveragePercent]);
+
+  const parseDecimal = (val: string, fallback: number = 0): number => {
+    const cleaned = val.replace(',', '.');
+    const parsed = parseFloat(cleaned);
+    return isNaN(parsed) ? fallback : parsed;
+  };
+
+  const isPresetActive = (preset: typeof ZONING_PRESETS[number]) => {
+    if (!zoningProfile) return false;
+    const currentMatches = zoningProfile.currentZoning === preset.profile.currentZoning;
+    const targetMatches = (zoningProfile.targetZoning || '') === (preset.profile.targetZoning || '');
+    const farMatches = Math.abs(zoningProfile.farRatio - preset.profile.farRatio) < 0.001;
+    const covMatches = Math.abs(zoningProfile.coveragePercent - preset.profile.coveragePercent) < 0.001;
+    const heightMatches = zoningProfile.maxHeightStoreys === preset.profile.maxHeightStoreys;
+    return currentMatches && targetMatches && farMatches && covMatches && heightMatches;
+  };
 
   const envelope = useMemo(() => {
     if (!zoningProfile) return null;
@@ -77,19 +111,26 @@ export function ZoningEnvelopeSubPanel({
         {/* Presets and Toggle */}
         <div className="flex items-center gap-1.5 flex-wrap">
           <span className="text-[10px] uppercase font-bold text-slate-500">Presets:</span>
-          {ZONING_PRESETS.map((preset) => (
-            <button
-              key={preset.id}
-              type="button"
-              onClick={() => {
-                onApplyPreset(preset.id);
-                setIsOpen(true);
-              }}
-              className="px-2 py-0.5 rounded text-[11px] font-semibold bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 cursor-pointer shadow-2xs transition-colors"
-            >
-              {preset.label}
-            </button>
-          ))}
+          {ZONING_PRESETS.map((preset) => {
+            const active = isPresetActive(preset);
+            return (
+              <button
+                key={preset.id}
+                type="button"
+                onClick={() => {
+                  onApplyPreset(preset.id);
+                  setIsOpen(true);
+                }}
+                className={`px-2 py-0.5 rounded text-[11px] font-semibold cursor-pointer shadow-2xs transition-colors ${
+                  active
+                    ? 'bg-slate-900 text-white border border-slate-900'
+                    : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200'
+                }`}
+              >
+                {preset.label}
+              </button>
+            );
+          })}
           {isCollapsible && (
             <button
               type="button"
@@ -102,9 +143,45 @@ export function ZoningEnvelopeSubPanel({
         </div>
       </div>
 
-      {/* Live Badge & Alerts */}
-      {zoningProfile && envelope && (
-        <div className="space-y-2">
+      {/* Collapsed Compact Live Summary Pill */}
+      {!isOpen && zoningProfile && envelope && (
+        <div className="flex flex-wrap items-center justify-between gap-2 p-2.5 rounded-lg bg-slate-50 border border-slate-200 text-xs animate-in fade-in duration-150">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="font-bold text-slate-900">
+              {formatZoningTransitionLabel(zoningProfile.currentZoning, zoningProfile.targetZoning)}
+            </span>
+            <span className="text-slate-400">&bull;</span>
+            <span className="text-slate-600">
+              Max Bulk:{' '}
+              <span
+                className={`font-bold font-mono tabular-nums ${
+                  envelope.isBulkExceeded ? 'text-rose-600' : 'text-slate-900'
+                }`}
+              >
+                {envelope.maxPermittedBulkSqm.toLocaleString('en-ZA')} m²
+              </span>{' '}
+              ({envelope.bulkUtilizationPercent.toFixed(1)}% Utilized)
+            </span>
+          </div>
+          <div>
+            {envelope.isSplumaRezoningTriggered ? (
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-100 text-amber-900 border border-amber-300">
+                <AlertTriangle className="w-3 h-3 text-amber-700 shrink-0" />
+                <span>SPLUMA Rezoning Required</span>
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-900 border border-emerald-300">
+                <CheckCircle2 className="w-3 h-3 text-emerald-700 shrink-0" />
+                <span>As-of-Right</span>
+              </span>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Expanded Live Badge & Alerts */}
+      {isOpen && zoningProfile && envelope && (
+        <div className="space-y-2 animate-in fade-in duration-150">
           <div className="flex flex-wrap items-center justify-between gap-2 p-2.5 rounded-lg bg-slate-50 border border-slate-200 text-xs">
             <div className="flex flex-wrap items-center gap-2">
               <span className="font-semibold text-slate-600">Max Permitted Bulk:</span>
@@ -117,7 +194,7 @@ export function ZoningEnvelopeSubPanel({
               </span>
               <span className="text-slate-400">&bull;</span>
               <span className="text-slate-600">
-                Planned: {plannedBuildableSqm || 320} m² ({envelope.bulkUtilizationPercent}% utilization)
+                Planned: {plannedBuildableSqm || 320} m² ({envelope.bulkUtilizationPercent.toFixed(1)}% utilization)
               </span>
             </div>
             <div>
@@ -171,12 +248,22 @@ export function ZoningEnvelopeSubPanel({
           )}
 
           {envelope.isSplumaRezoningTriggered && preApprovalMonths < 6 && (
-            <div className="p-2.5 rounded-lg bg-amber-50 border border-amber-300 text-amber-900 text-xs flex items-center gap-2">
-              <span className="font-bold shrink-0">SPLUMA Holding Delay Risk:</span>
-              <span>
-                Statutory rezoning is triggered. Stage 1 Pre-Approval ({preApprovalMonths} mos) is below municipal
-                tribunal standard (≥ 6 months). Adjust holding timeline to avoid underestimating pre-approval holding burn.
-              </span>
+            <div className="p-2.5 rounded-lg bg-amber-50 border border-amber-300 text-amber-900 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 text-amber-700 shrink-0" />
+                <span>
+                  <strong>SPLUMA Holding Delay Risk:</strong> Statutory rezoning typically requires 6–12 months tribunal review. Current Pre-Approval timeline ({preApprovalMonths} mos) may underestimate carrying holding burn.
+                </span>
+              </div>
+              {onSetPreApprovalMonths && (
+                <button
+                  type="button"
+                  onClick={() => onSetPreApprovalMonths(6)}
+                  className="shrink-0 px-2.5 py-1 text-[11px] font-bold rounded bg-amber-600 hover:bg-amber-700 text-white cursor-pointer transition-colors shadow-2xs"
+                >
+                  Set to 6m
+                </button>
+              )}
             </div>
           )}
         </div>
@@ -210,7 +297,7 @@ export function ZoningEnvelopeSubPanel({
                 }
                 className="w-full text-xs px-2.5 py-1.5 border border-slate-300 rounded-lg font-semibold text-slate-900 bg-white"
               >
-                <option value="">Same as Current (As-of-Right)</option>
+                <option value="">Same (As-of-Right)</option>
                 {MUNICIPAL_ZONING_CODES.map((code) => (
                   <option key={code} value={code}>
                     {code}
@@ -234,12 +321,24 @@ export function ZoningEnvelopeSubPanel({
             <div>
               <label className="block text-[11px] font-semibold text-slate-700 mb-1">Floor Area Ratio (FAR)</label>
               <input
-                type="number"
-                min="0.1"
-                max="10"
-                step="0.1"
-                value={zoningProfile?.farRatio || 0.5}
-                onChange={(e) => onUpdateZoning({ farRatio: Math.max(0, Number(e.target.value) || 0) })}
+                type="text"
+                inputMode="decimal"
+                value={farInput}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setFarInput(val);
+                  const parsed = parseDecimal(val, 0);
+                  if (parsed > 0) onUpdateZoning({ farRatio: parsed });
+                }}
+                onBlur={() => {
+                  const parsed = parseDecimal(farInput, zoningProfile?.farRatio || 0.8);
+                  if (parsed > 0) {
+                    onUpdateZoning({ farRatio: parsed });
+                    setFarInput(String(parsed));
+                  } else {
+                    setFarInput(String(zoningProfile?.farRatio || 0.8));
+                  }
+                }}
                 className="w-full text-xs px-2.5 py-1.5 border border-slate-300 rounded-lg font-semibold text-slate-900 bg-white"
               />
             </div>
@@ -247,12 +346,24 @@ export function ZoningEnvelopeSubPanel({
             <div>
               <label className="block text-[11px] font-semibold text-slate-700 mb-1">Coverage (%)</label>
               <input
-                type="number"
-                min="10"
-                max="100"
-                step="5"
-                value={zoningProfile?.coveragePercent || 50}
-                onChange={(e) => onUpdateZoning({ coveragePercent: Math.max(0, Number(e.target.value) || 0) })}
+                type="text"
+                inputMode="decimal"
+                value={coverageInput}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setCoverageInput(val);
+                  const parsed = parseDecimal(val, 0);
+                  if (parsed > 0) onUpdateZoning({ coveragePercent: parsed });
+                }}
+                onBlur={() => {
+                  const parsed = parseDecimal(coverageInput, zoningProfile?.coveragePercent || 50);
+                  if (parsed > 0) {
+                    onUpdateZoning({ coveragePercent: parsed });
+                    setCoverageInput(String(parsed));
+                  } else {
+                    setCoverageInput(String(zoningProfile?.coveragePercent || 50));
+                  }
+                }}
                 className="w-full text-xs px-2.5 py-1.5 border border-slate-300 rounded-lg font-semibold text-slate-900 bg-white"
               />
             </div>
@@ -288,16 +399,18 @@ export function ZoningEnvelopeSubPanel({
               />
             </div>
 
-            <div className="flex items-center pt-3">
-              <label className="flex items-center gap-2 cursor-pointer font-semibold text-slate-800 text-xs">
-                <input
-                  type="checkbox"
-                  checked={Boolean(zoningProfile?.requiresRezoning)}
-                  onChange={(e) => onUpdateZoning({ requiresRezoning: e.target.checked })}
-                  className="w-4 h-4 rounded text-amber-600 focus:ring-amber-500 cursor-pointer"
-                />
-                <span>SPLUMA Rezoning Required</span>
-              </label>
+            <div className="flex flex-col justify-end">
+              <div className="h-[34px] flex items-center">
+                <label className="flex items-center gap-2 cursor-pointer font-medium text-slate-800 text-[11px] select-none">
+                  <input
+                    type="checkbox"
+                    checked={Boolean(zoningProfile?.requiresRezoning)}
+                    onChange={(e) => onUpdateZoning({ requiresRezoning: e.target.checked })}
+                    className="w-4 h-4 rounded text-amber-600 focus:ring-amber-500 cursor-pointer"
+                  />
+                  <span>SPLUMA Rezoning Required</span>
+                </label>
+              </div>
             </div>
           </div>
 

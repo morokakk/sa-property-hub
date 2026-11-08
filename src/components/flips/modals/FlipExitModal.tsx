@@ -96,6 +96,15 @@ export const FlipExitModal: React.FC<FlipExitModalProps> = ({
     }
   }, [flip, isOpen, totalCostBasisZAR, propSalePrice, defaultComm, defaultBondCancel, hasActiveBond]);
 
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
   if (!isOpen || !flip) return null;
 
   const salePrice = propSalePrice !== undefined ? propSalePrice : localSalePrice;
@@ -187,8 +196,14 @@ export const FlipExitModal: React.FC<FlipExitModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 z-50">
-      <div className="bg-white rounded-t-3xl sm:rounded-xl max-w-lg w-full p-5 sm:p-6 shadow-xl border border-slate-200 animate-in fade-in max-h-[92vh] sm:max-h-none overflow-y-auto">
+    <div
+      onClick={onClose}
+      className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 z-50 cursor-pointer"
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="bg-white rounded-t-3xl sm:rounded-xl max-w-lg w-full p-5 sm:p-6 shadow-xl border border-slate-200 animate-in fade-in max-h-[92vh] sm:max-h-none overflow-y-auto cursor-default"
+      >
         <div className="w-12 h-1.5 bg-slate-300 rounded-full mx-auto mb-3 sm:hidden" />
         <div className="flex items-center justify-between pb-3 mb-4 border-b border-slate-100">
           <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">

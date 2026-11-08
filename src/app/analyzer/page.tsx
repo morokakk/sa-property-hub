@@ -67,6 +67,7 @@ import {
   ChevronDown,
   ChevronUp,
   CheckCircle2,
+  AlertTriangle,
   Info,
   Scale,
   Copy,
@@ -4892,6 +4893,10 @@ export default function OpportunityAnalyzerPage() {
                   plannedBuildableSqm={floorAreaSqm || 320}
                   plannedUnits={numberOfUnits || 4}
                   preApprovalMonths={preApprovalMonths}
+                  onSetPreApprovalMonths={(months) => {
+                    setPreApprovalMonths(months);
+                    updateAnalyzerDraft({ preApprovalMonths: months });
+                  }}
                   isCollapsible={true}
                   defaultOpen={false}
                 />
@@ -4917,6 +4922,27 @@ export default function OpportunityAnalyzerPage() {
                       }}
                       className="w-full text-xs px-3 py-1.5 border border-slate-300 rounded-lg font-semibold text-slate-900 bg-white"
                     />
+                    {strategy === 'Development' &&
+                      zoningProfile &&
+                      zoningEnvelopeResult?.isSplumaRezoningTriggered &&
+                      preApprovalMonths < 6 && (
+                        <div className="mt-1.5 flex items-center justify-between text-[10px] text-amber-800 bg-amber-50/90 border border-amber-200 rounded px-2 py-1">
+                          <span className="flex items-center gap-1">
+                            <AlertTriangle className="w-3 h-3 text-amber-600 shrink-0" />
+                            Rezoning typically requires 6&ndash;12m
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setPreApprovalMonths(6);
+                              updateAnalyzerDraft({ preApprovalMonths: 6 });
+                            }}
+                            className="ml-2 font-bold text-amber-900 hover:underline cursor-pointer"
+                          >
+                            [Set to 6m]
+                          </button>
+                        </div>
+                      )}
                   </div>
 
                   <div>
@@ -5317,6 +5343,10 @@ export default function OpportunityAnalyzerPage() {
                 plannedBuildableSqm={floorAreaSqm || 150}
                 plannedUnits={numberOfUnits || 1}
                 preApprovalMonths={holdingPeriodMonths || 6}
+                onSetPreApprovalMonths={(months) => {
+                  setHoldingPeriodMonths(months);
+                  updateAnalyzerDraft({ holdingPeriodMonths: months });
+                }}
                 isCollapsible={true}
                 defaultOpen={Boolean(zoningProfile)}
               />
