@@ -1,5 +1,5 @@
 import { StateCreator } from 'zustand';
-import { InvestorProfile, AnalyzerDraft, AiSettings } from '@/types';
+import { InvestorProfile, AnalyzerDraft, AiSettings, DealStrategy } from '@/types';
 import { RootStoreState, SettingsSlice } from '../types';
 import {
   INITIAL_INVESTOR_PROFILE,
@@ -7,6 +7,7 @@ import {
   DEFAULT_AI_SETTINGS,
   DEFAULT_ANALYZER_SECTION_ORDER,
   NAPKIN_VISIBLE_ANALYZER_SECTIONS,
+  STRATEGY_NAPKIN_VISIBLE_SECTIONS,
 } from '../initialData';
 
 export const createSettingsSlice: StateCreator<
@@ -74,11 +75,13 @@ export const createSettingsSlice: StateCreator<
       return { analyzerSectionOrder: order };
     }),
 
-  applyAnalyzerLayoutPreset: (preset) =>
+  applyAnalyzerLayoutPreset: (preset, strategy = 'Rental') =>
     set(() => {
       if (preset === 'napkin') {
+        const visibleSet =
+          STRATEGY_NAPKIN_VISIBLE_SECTIONS[strategy] ?? NAPKIN_VISIBLE_ANALYZER_SECTIONS;
         const hidden = DEFAULT_ANALYZER_SECTION_ORDER.filter(
-          (id) => !NAPKIN_VISIBLE_ANALYZER_SECTIONS.includes(id)
+          (id) => !visibleSet.includes(id)
         );
         return {
           hiddenAnalyzerSections: hidden,

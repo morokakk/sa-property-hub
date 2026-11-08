@@ -28,6 +28,7 @@ import {
   AnalyzerLayoutPreset,
   DevelopmentProject,
   DevelopmentUnit,
+  DealStrategy,
 } from '@/types';
 import type { PortfolioStateSnapshot } from '@/lib/db/mergePortfolioState';
 
@@ -218,7 +219,7 @@ export interface SettingsSliceActions {
   resetGuideProgress: () => void;
   toggleAnalyzerSectionVisibility: (id: AnalyzerSectionId) => void;
   moveAnalyzerSection: (id: AnalyzerSectionId, direction: 'up' | 'down') => void;
-  applyAnalyzerLayoutPreset: (preset: AnalyzerLayoutPreset) => void;
+  applyAnalyzerLayoutPreset: (preset: AnalyzerLayoutPreset, strategy?: DealStrategy) => void;
 }
 export type SettingsSlice = SettingsSliceState & SettingsSliceActions;
 

@@ -5,6 +5,7 @@ import {
   AnalyzerSectionId,
   AnalyzerLayoutPreset,
   DealStrategy,
+  DevelopmentExitMode,
 } from '@/types';
 import {
   SlidersHorizontal,
@@ -24,6 +25,8 @@ import {
   MapPin,
   TrendingUp,
   ShieldAlert,
+  HardHat,
+  Hammer,
 } from 'lucide-react';
 
 export interface SectionMeta {
@@ -34,6 +37,12 @@ export interface SectionMeta {
 }
 
 export const ANALYZER_SECTION_METADATA: Record<AnalyzerSectionId, SectionMeta> = {
+  capexRehabStack: {
+    id: 'capexRehabStack',
+    label: 'Rehabilitation Capex & Exit Target',
+    description: 'Renovation capex allowance, unit capex breakdown & flip/stabilized exit target',
+    icon: Hammer,
+  },
   scorecard: {
     id: 'scorecard',
     label: 'Location & Amenity Scorecard',
@@ -90,6 +99,89 @@ export const ANALYZER_SECTION_METADATA: Record<AnalyzerSectionId, SectionMeta> =
   },
 };
 
+export const getSectionMeta = (
+  id: AnalyzerSectionId,
+  strategy: DealStrategy = 'Rental'
+): SectionMeta => {
+  if (id === 'capexRehabStack') {
+    if (strategy === 'Development') {
+      return {
+        id: 'capexRehabStack',
+        label: 'Development Cost Stack, 2-Stage Burn & Exit Mode',
+        description: 'Hard build rate/m², SPLUMA Sec 42 bulk, 2-stage timeline burn & unit exit allocation',
+        icon: HardHat,
+      };
+    }
+    return ANALYZER_SECTION_METADATA.capexRehabStack;
+  }
+  if (id === 'mortgageEngine') {
+    if (strategy === 'Development') {
+      return {
+        id: 'mortgageEngine',
+        label: 'Senior Development Facility & S-Curve Engine',
+        description: 'LTC % senior facility, progressive S-Curve drawdown & pre-sales bank hurdle',
+        icon: HardHat,
+      };
+    }
+    return ANALYZER_SECTION_METADATA.mortgageEngine;
+  }
+  return ANALYZER_SECTION_METADATA[id] || {
+    id,
+    label: id,
+    description: '',
+    icon: Layers,
+  };
+};
+
+export interface SectionApplicability {
+  isApplicable: boolean;
+  notice: string | null;
+}
+
+export const getSectionApplicability = (
+  id: AnalyzerSectionId,
+  strategy: DealStrategy = 'Rental',
+  isDistressedSource: boolean = false,
+  developmentExitMode?: DevelopmentExitMode
+): SectionApplicability => {
+  if (id === 'holdingExit' && strategy === 'Development') {
+    return {
+      isApplicable: false,
+      notice: 'Inactive in Development (2-Stage Burn applies)',
+    };
+  }
+  if (id === 'auctionDistressed' && !isDistressedSource) {
+    return {
+      isApplicable: false,
+      notice: 'Auction/Repo sources only',
+    };
+  }
+  if (id === 'opexReserves') {
+    if (strategy === 'Flip') {
+      return {
+        isApplicable: false,
+        notice: 'Hidden for Buy & Flip',
+      };
+    }
+    if (strategy === 'Development' && developmentExitMode === 'Build-to-Sell') {
+      return {
+        isApplicable: false,
+        notice: 'Inactive in 100% Build-to-Sell',
+      };
+    }
+  }
+  if (id === 'vacancyAgent' && strategy === 'Development' && developmentExitMode === 'Build-to-Sell') {
+    return {
+      isApplicable: false,
+      notice: 'Inactive in 100% Build-to-Sell',
+    };
+  }
+  return {
+    isApplicable: true,
+    notice: null,
+  };
+};
+
 export interface AnalyzerLayoutCustomizerProps {
   sectionOrder: AnalyzerSectionId[];
   hiddenSections: AnalyzerSectionId[];
@@ -99,6 +191,7 @@ export interface AnalyzerLayoutCustomizerProps {
   activeOverrides?: Partial<Record<AnalyzerSectionId, { active: boolean; label?: string }>>;
   isDistressedSource?: boolean;
   strategy?: DealStrategy;
+  developmentExitMode?: DevelopmentExitMode;
 }
 
 export default function AnalyzerLayoutCustomizer({
@@ -110,6 +203,7 @@ export default function AnalyzerLayoutCustomizer({
   activeOverrides = {},
   isDistressedSource = false,
   strategy = 'Rental',
+  developmentExitMode,
 }: AnalyzerLayoutCustomizerProps) {
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -137,7 +231,7 @@ export default function AnalyzerLayoutCustomizer({
     };
   }, [isOpen]);
 
-  const totalSectionsCount = 9;
+  const totalSectionsCount = sectionOrder.length;
   const visibleSectionsCount = totalSectionsCount - hiddenSections.length;
   const isCustomized = hiddenSections.length > 0;
 
@@ -146,16 +240,6 @@ export default function AnalyzerLayoutCustomizer({
     (id) => activeOverrides[id]?.active
   );
   const hasHiddenActiveOverride = hiddenSectionsWithOverrides.length > 0;
-
-  const getSectionContextNotice = (id: AnalyzerSectionId): string | null => {
-    if (id === 'auctionDistressed' && !isDistressedSource) {
-      return 'Auction/Repo sources only';
-    }
-    if (id === 'opexReserves' && strategy === 'Flip') {
-      return 'Hidden for Buy & Flip';
-    }
-    return null;
-  };
 
   return (
     <div className="relative inline-block" ref={containerRef}>
@@ -283,24 +367,24 @@ export default function AnalyzerLayoutCustomizer({
                 Top & Bottom Core Anchors Pinned
               </span>
               <span className="text-[10px] text-slate-400">
-                Identity, Valuation, Bid & Results always visible
+                Identity, Valuation, Base Rent/Rates & Results always visible
               </span>
             </div>
 
-            {/* Section List (9 modular sections in current order) */}
+            {/* Modular Sections List (in active order) */}
             <div className="space-y-2 max-h-[50vh] overflow-y-auto pr-1">
               {sectionOrder.map((sectionId, index) => {
-                const meta = ANALYZER_SECTION_METADATA[sectionId] || {
-                  id: sectionId,
-                  label: sectionId,
-                  description: '',
-                  icon: Layers,
-                };
+                const meta = getSectionMeta(sectionId, strategy);
                 const SectionIcon = meta.icon;
                 const isHidden = hiddenSections.includes(sectionId);
                 const isFirst = index === 0;
                 const isLast = index === sectionOrder.length - 1;
-                const contextNotice = getSectionContextNotice(sectionId);
+                const { isApplicable, notice: contextNotice } = getSectionApplicability(
+                  sectionId,
+                  strategy,
+                  isDistressedSource,
+                  developmentExitMode
+                );
                 const sectionOverride = activeOverrides[sectionId];
                 const hasSectionActiveOverride = Boolean(sectionOverride?.active);
 
@@ -309,7 +393,9 @@ export default function AnalyzerLayoutCustomizer({
                     key={sectionId}
                     data-customizer-section={sectionId}
                     className={`p-3 rounded-xl border transition-all flex items-center justify-between gap-2.5 ${
-                      isHidden
+                      !isApplicable
+                        ? 'bg-slate-50/60 border-slate-200 text-slate-400'
+                        : isHidden
                         ? hasSectionActiveOverride
                           ? 'bg-amber-50/50 border-amber-300 text-slate-500'
                           : 'bg-slate-50/80 border-slate-200 text-slate-400'
@@ -325,21 +411,21 @@ export default function AnalyzerLayoutCustomizer({
                         <div className="flex items-center gap-1.5 flex-wrap">
                           <span
                             className={`text-xs font-bold truncate ${
-                              isHidden ? 'line-through opacity-70' : 'text-slate-900'
-                            }`}
+                              isHidden || !isApplicable ? 'opacity-70' : 'text-slate-900'
+                            } ${isHidden ? 'line-through' : ''}`}
                           >
                             {meta.label}
                           </span>
 
                           {/* Contextual notice if conditional on Strategy/Source */}
                           {contextNotice && (
-                            <span className="text-[9px] font-semibold bg-slate-100 text-slate-600 px-1.5 py-0.2 rounded border border-slate-200">
+                            <span className="text-[9px] font-bold bg-slate-100 text-slate-600 px-1.5 py-0.2 rounded border border-slate-300">
                               {contextNotice}
                             </span>
                           )}
 
                           {/* Active override hidden guardrail badge */}
-                          {isHidden && hasSectionActiveOverride && (
+                          {isHidden && hasSectionActiveOverride && isApplicable && (
                             <span
                               data-testid={`hidden-warning-${sectionId}`}
                               className="text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-300 px-1.5 py-0.2 rounded flex items-center gap-1"
@@ -385,31 +471,43 @@ export default function AnalyzerLayoutCustomizer({
                       </button>
 
                       {/* Visibility Toggle Button */}
-                      <button
-                        type="button"
-                        role="switch"
-                        data-testid={`toggle-visibility-${sectionId}`}
-                        aria-checked={!isHidden}
-                        onClick={() => onToggleVisibility(sectionId)}
-                        title={isHidden ? `Show ${meta.label}` : `Hide ${meta.label}`}
-                        className={`min-h-[36px] px-2.5 rounded-lg border text-xs font-semibold flex items-center gap-1 transition-all cursor-pointer ${
-                          isHidden
-                            ? 'bg-slate-100 text-slate-600 border-slate-300 hover:bg-slate-200'
-                            : 'bg-emerald-50 text-emerald-800 border-emerald-300 hover:bg-emerald-100'
-                        }`}
-                      >
-                        {isHidden ? (
-                          <>
-                            <EyeOff className="w-3.5 h-3.5 text-slate-500" />
-                            <span className="hidden sm:inline">Hidden</span>
-                          </>
-                        ) : (
-                          <>
-                            <Eye className="w-3.5 h-3.5 text-emerald-600" />
-                            <span className="hidden sm:inline">Visible</span>
-                          </>
-                        )}
-                      </button>
+                      {!isApplicable ? (
+                        <button
+                          type="button"
+                          disabled
+                          title={`Inactive: This section is bypassed for ${strategy}${developmentExitMode ? ` (${developmentExitMode})` : ''}`}
+                          className="min-h-[36px] px-2.5 rounded-lg border text-xs font-semibold flex items-center gap-1 bg-slate-100 text-slate-400 border-slate-200 opacity-60 cursor-not-allowed"
+                        >
+                          <EyeOff className="w-3.5 h-3.5 text-slate-400" />
+                          <span className="hidden sm:inline">Inactive</span>
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          role="switch"
+                          data-testid={`toggle-visibility-${sectionId}`}
+                          aria-checked={!isHidden}
+                          onClick={() => onToggleVisibility(sectionId)}
+                          title={isHidden ? `Show ${meta.label}` : `Hide ${meta.label}`}
+                          className={`min-h-[36px] px-2.5 rounded-lg border text-xs font-semibold flex items-center gap-1 transition-all cursor-pointer ${
+                            isHidden
+                              ? 'bg-slate-100 text-slate-600 border-slate-300 hover:bg-slate-200'
+                              : 'bg-emerald-50 text-emerald-800 border-emerald-300 hover:bg-emerald-100'
+                          }`}
+                        >
+                          {isHidden ? (
+                            <>
+                              <EyeOff className="w-3.5 h-3.5 text-slate-500" />
+                              <span className="hidden sm:inline">Hidden</span>
+                            </>
+                          ) : (
+                            <>
+                              <Eye className="w-3.5 h-3.5 text-emerald-600" />
+                              <span className="hidden sm:inline">Visible</span>
+                            </>
+                          )}
+                        </button>
+                      )}
                     </div>
                   </div>
                 );

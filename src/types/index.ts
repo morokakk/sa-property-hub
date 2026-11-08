@@ -154,6 +154,7 @@ export type PassReason =
 
 // Opportunity Analyzer Modular Section Layout Customizer
 export type AnalyzerSectionId =
+  | 'capexRehabStack'
   | 'scorecard'
   | 'holdingExit'
   | 'vacancyAgent'

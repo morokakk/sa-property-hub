@@ -72,7 +72,7 @@ describe('Refactoring Phase 3: Zustand Slice Pattern Migration Architectural Tes
       expect(state.rentalForecastView).toBe('wealth-only');
       expect(state.completedGuideSteps).toEqual([]);
       expect(Array.isArray(state.analyzerSectionOrder)).toBe(true);
-      expect(state.analyzerSectionOrder).toHaveLength(9);
+      expect(state.analyzerSectionOrder).toHaveLength(10);
       expect(state.hiddenAnalyzerSections).toEqual([]);
 
       // 10. SystemSlice
@@ -364,6 +364,7 @@ describe('Refactoring Phase 3: Zustand Slice Pattern Migration Architectural Tes
 
       // Initial state
       expect(store.analyzerSectionOrder).toEqual([
+        'capexRehabStack',
         'scorecard',
         'holdingExit',
         'vacancyAgent',
@@ -385,37 +386,46 @@ describe('Refactoring Phase 3: Zustand Slice Pattern Migration Architectural Tes
 
       // 2. Move section up / down
       // Boundary check: move first section up does nothing
-      store.moveAnalyzerSection('scorecard', 'up');
-      expect(usePortfolioStore.getState().analyzerSectionOrder[0]).toBe('scorecard');
+      store.moveAnalyzerSection('capexRehabStack', 'up');
+      expect(usePortfolioStore.getState().analyzerSectionOrder[0]).toBe('capexRehabStack');
 
-      // Move scorecard down
-      store.moveAnalyzerSection('scorecard', 'down');
-      expect(usePortfolioStore.getState().analyzerSectionOrder[0]).toBe('holdingExit');
-      expect(usePortfolioStore.getState().analyzerSectionOrder[1]).toBe('scorecard');
+      // Move capexRehabStack down
+      store.moveAnalyzerSection('capexRehabStack', 'down');
+      expect(usePortfolioStore.getState().analyzerSectionOrder[0]).toBe('scorecard');
+      expect(usePortfolioStore.getState().analyzerSectionOrder[1]).toBe('capexRehabStack');
 
       // Boundary check: move last section down does nothing
       store.moveAnalyzerSection('stressTaxOverrides', 'down');
-      expect(usePortfolioStore.getState().analyzerSectionOrder[8]).toBe('stressTaxOverrides');
+      expect(usePortfolioStore.getState().analyzerSectionOrder[9]).toBe('stressTaxOverrides');
 
-      // 3. Apply 'napkin' preset
-      store.applyAnalyzerLayoutPreset('napkin');
-      const napkinState = usePortfolioStore.getState();
-      expect(napkinState.hiddenAnalyzerSections).toContain('scorecard');
-      expect(napkinState.hiddenAnalyzerSections).toContain('holdingExit');
-      expect(napkinState.hiddenAnalyzerSections).toContain('opexReserves');
-      expect(napkinState.hiddenAnalyzerSections).toContain('auctionDistressed');
-      expect(napkinState.hiddenAnalyzerSections).toContain('pieActRisk');
-      expect(napkinState.hiddenAnalyzerSections).toContain('longTermProjections');
-      expect(napkinState.hiddenAnalyzerSections).toContain('stressTaxOverrides');
-      expect(napkinState.hiddenAnalyzerSections).not.toContain('vacancyAgent');
-      expect(napkinState.hiddenAnalyzerSections).not.toContain('mortgageEngine');
+      // 3. Apply 'napkin' preset with strategy awareness
+      // Default / Rental strategy: keeps vacancyAgent & mortgageEngine visible
+      store.applyAnalyzerLayoutPreset('napkin', 'Rental');
+      const napkinRentalState = usePortfolioStore.getState();
+      expect(napkinRentalState.hiddenAnalyzerSections).toContain('scorecard');
+      expect(napkinRentalState.hiddenAnalyzerSections).toContain('holdingExit');
+      expect(napkinRentalState.hiddenAnalyzerSections).toContain('opexReserves');
+      expect(napkinRentalState.hiddenAnalyzerSections).toContain('auctionDistressed');
+      expect(napkinRentalState.hiddenAnalyzerSections).toContain('pieActRisk');
+      expect(napkinRentalState.hiddenAnalyzerSections).toContain('longTermProjections');
+      expect(napkinRentalState.hiddenAnalyzerSections).toContain('stressTaxOverrides');
+      expect(napkinRentalState.hiddenAnalyzerSections).not.toContain('vacancyAgent');
+      expect(napkinRentalState.hiddenAnalyzerSections).not.toContain('mortgageEngine');
+
+      // Development strategy: keeps capexRehabStack & mortgageEngine visible
+      store.applyAnalyzerLayoutPreset('napkin', 'Development');
+      const napkinDevState = usePortfolioStore.getState();
+      expect(napkinDevState.hiddenAnalyzerSections).not.toContain('capexRehabStack');
+      expect(napkinDevState.hiddenAnalyzerSections).not.toContain('mortgageEngine');
+      expect(napkinDevState.hiddenAnalyzerSections).toContain('scorecard');
+      expect(napkinDevState.hiddenAnalyzerSections).toContain('vacancyAgent');
 
       // 4. Apply 'full' preset (resets order and clears hidden)
       store.applyAnalyzerLayoutPreset('full');
       const fullState = usePortfolioStore.getState();
       expect(fullState.hiddenAnalyzerSections).toEqual([]);
-      expect(fullState.analyzerSectionOrder[0]).toBe('scorecard');
-      expect(fullState.analyzerSectionOrder[1]).toBe('holdingExit');
+      expect(fullState.analyzerSectionOrder[0]).toBe('capexRehabStack');
+      expect(fullState.analyzerSectionOrder[1]).toBe('scorecard');
     });
   });
 

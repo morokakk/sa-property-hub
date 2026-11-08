@@ -3230,6 +3230,7 @@ export const EMPTY_ANALYZER_DRAFT: AnalyzerDraft = {
 };
 
 export const DEFAULT_ANALYZER_SECTION_ORDER: AnalyzerSectionId[] = [
+  'capexRehabStack',
   'scorecard',
   'holdingExit',
   'vacancyAgent',
@@ -3240,6 +3241,13 @@ export const DEFAULT_ANALYZER_SECTION_ORDER: AnalyzerSectionId[] = [
   'longTermProjections',
   'stressTaxOverrides',
 ];
+
+export const STRATEGY_NAPKIN_VISIBLE_SECTIONS: Record<DealStrategy, AnalyzerSectionId[]> = {
+  Development: ['capexRehabStack', 'mortgageEngine'],
+  Flip: ['capexRehabStack', 'holdingExit'],
+  Rental: ['vacancyAgent', 'mortgageEngine'],
+  BRRRR: ['capexRehabStack', 'vacancyAgent', 'mortgageEngine'],
+};
 
 export const NAPKIN_VISIBLE_ANALYZER_SECTIONS: AnalyzerSectionId[] = [
   'vacancyAgent',
