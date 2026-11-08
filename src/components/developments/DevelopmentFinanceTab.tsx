@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { DevelopmentProject } from '@/types';
 import {
   DevelopmentFinancialSummary,
@@ -41,6 +41,18 @@ export function DevelopmentFinanceTab({
   const [repayAmount, setRepayAmount] = useState(500000);
   const [isDrawModalOpen, setIsDrawModalOpen] = useState(false);
   const [drawAmount, setDrawAmount] = useState(500000);
+
+  useEffect(() => {
+    if (!isRepayModalOpen && !isDrawModalOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setIsRepayModalOpen(false);
+        setIsDrawModalOpen(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isRepayModalOpen, isDrawModalOpen]);
 
   const availableToDraw = financials.availableFacilityUndrawnZAR;
 
@@ -327,8 +339,16 @@ export function DevelopmentFinanceTab({
 
       {/* Record Repayment Modal */}
       {isRepayModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4">
-          <div className="bg-white rounded-xl border border-slate-200 shadow-xl max-w-sm w-full p-5 space-y-4 animate-in fade-in zoom-in-95 duration-150">
+        <div
+          role="dialog"
+          aria-modal="true"
+          onClick={() => setIsRepayModalOpen(false)}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4 cursor-pointer"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white rounded-xl border border-slate-200 shadow-xl max-w-sm w-full p-5 space-y-4 animate-in fade-in zoom-in-95 duration-150 cursor-default"
+          >
             <div className="flex items-center justify-between border-b border-slate-100 pb-2">
               <h4 className="text-base font-bold text-slate-900">Record Facility Repayment</h4>
               <button
@@ -379,8 +399,16 @@ export function DevelopmentFinanceTab({
 
       {/* Record Drawdown Modal */}
       {isDrawModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4">
-          <div className="bg-white rounded-xl border border-slate-200 shadow-xl max-w-sm w-full p-5 space-y-4 animate-in fade-in zoom-in-95 duration-150">
+        <div
+          role="dialog"
+          aria-modal="true"
+          onClick={() => setIsDrawModalOpen(false)}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4 cursor-pointer"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white rounded-xl border border-slate-200 shadow-xl max-w-sm w-full p-5 space-y-4 animate-in fade-in zoom-in-95 duration-150 cursor-default"
+          >
             <div className="flex items-center justify-between border-b border-slate-100 pb-2">
               <h4 className="text-base font-bold text-slate-900">Record Tranche Drawdown</h4>
               <button

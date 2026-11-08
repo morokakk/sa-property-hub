@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { DevelopmentProject, BOQItem, DevelopmentSoftCosts } from '@/types';
 import { DevelopmentFinancialSummary, calculateBOQItemTotals } from '@/lib/calculations/developments';
 import { formatZAR, formatPercent } from '@/lib/formatters';
@@ -60,6 +60,15 @@ export function DevelopmentCostStackTab({
   const [boqBaselineCost, setBoqBaselineCost] = useState(10000);
   const [boqActualCost, setBoqActualCost] = useState(10000);
   const [boqSupplier, setBoqSupplier] = useState('');
+
+  useEffect(() => {
+    if (!isAddBOQOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setIsAddBOQOpen(false);
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isAddBOQOpen]);
 
   const handleExportCSV = () => {
     if (onExportBOQCSV) {
@@ -423,8 +432,16 @@ export function DevelopmentCostStackTab({
 
       {/* Add BOQ Item Modal */}
       {isAddBOQOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4">
-          <div className="bg-white rounded-xl border border-slate-200 shadow-xl max-w-md w-full p-5 space-y-4 animate-in fade-in zoom-in-95 duration-150">
+        <div
+          role="dialog"
+          aria-modal="true"
+          onClick={() => setIsAddBOQOpen(false)}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4 cursor-pointer"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white rounded-xl border border-slate-200 shadow-xl max-w-md w-full p-5 space-y-4 animate-in fade-in zoom-in-95 duration-150 cursor-default"
+          >
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <div>
                 <h4 className="text-base font-bold text-slate-900">Add BOQ Trade Item</h4>

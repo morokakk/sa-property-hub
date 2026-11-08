@@ -553,6 +553,22 @@ describe('Development Module UI Components & Navigation (Milestone 3)', () => {
       expect(html).toContain('Edit Parkview Infill Clusters');
       expect(html).toContain('Save Changes');
     });
+
+    it('renders accessible dialog attributes and backdrop for light dismiss', () => {
+      const html = renderToString(
+        <DevelopmentProjectModal
+          isOpen={true}
+          editingDevelopment={null}
+          onClose={vi.fn()}
+          onSave={vi.fn()}
+        />
+      );
+
+      expect(html).toContain('role="dialog"');
+      expect(html).toContain('aria-modal="true"');
+      expect(html).toContain('id="development-project-modal-title"');
+      expect(html).toContain('cursor-pointer');
+    });
   });
 
   describe('7. DevelopmentsPage Controller Integration', () => {

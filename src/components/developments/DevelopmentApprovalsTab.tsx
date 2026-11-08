@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   DevelopmentProject,
   PreConstructionApprovals,
@@ -165,6 +165,15 @@ export function DevelopmentApprovalsTab({
       setIsDelayModalOpen(true);
     }
   };
+
+  useEffect(() => {
+    if (!isDelayModalOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setIsDelayModalOpen(false);
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isDelayModalOpen]);
 
   return (
     <div data-testid="development-approvals-tab" className="space-y-6">
@@ -453,8 +462,16 @@ export function DevelopmentApprovalsTab({
 
       {/* Delay Sensitivity Modal (Embedded Simulator) */}
       {isDelayModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4">
-          <div className="bg-white rounded-xl border border-slate-200 shadow-xl max-w-2xl w-full p-5 space-y-4 animate-in fade-in zoom-in-95 duration-150 max-h-[90vh] overflow-y-auto">
+        <div
+          role="dialog"
+          aria-modal="true"
+          onClick={() => setIsDelayModalOpen(false)}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4 cursor-pointer"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white rounded-xl border border-slate-200 shadow-xl max-w-2xl w-full p-5 space-y-4 animate-in fade-in zoom-in-95 duration-150 max-h-[90vh] overflow-y-auto cursor-default"
+          >
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <div>
                 <h4 className="text-base font-bold text-slate-900 flex items-center gap-2">

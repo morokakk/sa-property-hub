@@ -252,6 +252,16 @@ export function DevelopmentProjectModal({
     }
   }, [editingDevelopment, isOpen, defaultVatReg, defaultHardRate]);
 
+  // Close on Escape key press (matches rental modal behavior)
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
   if (!isOpen) return null;
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -350,13 +360,22 @@ export function DevelopmentProjectModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4 overflow-y-auto">
-      <div className="bg-white rounded-xl border border-slate-200 shadow-xl max-w-3xl w-full p-6 space-y-5 animate-in fade-in zoom-in-95 duration-150 my-8 max-h-[90vh] overflow-y-auto">
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="development-project-modal-title"
+      onClick={onClose}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4 overflow-y-auto cursor-pointer"
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="bg-white rounded-xl border border-slate-200 shadow-xl max-w-3xl w-full p-6 space-y-5 animate-in fade-in zoom-in-95 duration-150 my-8 max-h-[90vh] overflow-y-auto cursor-default"
+      >
         <div className="flex items-center justify-between border-b border-slate-100 pb-3">
           <div className="flex items-center gap-2">
             <Building2 className="w-5 h-5 text-emerald-600" />
             <div>
-              <h3 className="text-base font-bold text-slate-900">
+              <h3 id="development-project-modal-title" className="text-base font-bold text-slate-900">
                 {isNew ? 'Create New Development Project' : `Edit ${editingDevelopment?.title}`}
               </h3>
               <p className="text-xs text-slate-500">

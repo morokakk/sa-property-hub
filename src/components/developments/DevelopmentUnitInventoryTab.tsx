@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { DevelopmentProject, DevelopmentUnit, DevUnitStatus } from '@/types';
 import { DevelopmentFinancialSummary } from '@/lib/calculations/developments';
 import { formatZAR } from '@/lib/formatters';
@@ -59,6 +59,18 @@ export function DevelopmentUnitInventoryTab({
   const [newListPrice, setNewListPrice] = useState<number>(850000);
   const [newEstRent, setNewEstRent] = useState<number>(7500);
   const [newCostBasis, setNewCostBasis] = useState<number>(600000);
+
+  useEffect(() => {
+    if (!sellingUnit && !isAddUnitOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setSellingUnit(null);
+        setIsAddUnitOpen(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [sellingUnit, isAddUnitOpen]);
 
   // Ungraduated retained units
   const ungraduatedRetainedUnits = units.filter(
@@ -369,8 +381,16 @@ export function DevelopmentUnitInventoryTab({
 
       {/* Mark Sold & Pay Down Debt Modal */}
       {sellingUnit && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4">
-          <div className="bg-white rounded-xl border border-slate-200 shadow-xl max-w-md w-full p-5 space-y-4 animate-in fade-in zoom-in-95 duration-150">
+        <div
+          role="dialog"
+          aria-modal="true"
+          onClick={() => setSellingUnit(null)}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4 cursor-pointer"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white rounded-xl border border-slate-200 shadow-xl max-w-md w-full p-5 space-y-4 animate-in fade-in zoom-in-95 duration-150 cursor-default"
+          >
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <div>
                 <h4 className="text-base font-bold text-slate-900">
@@ -468,8 +488,16 @@ export function DevelopmentUnitInventoryTab({
 
       {/* Add Unit Modal */}
       {isAddUnitOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4">
-          <div className="bg-white rounded-xl border border-slate-200 shadow-xl max-w-md w-full p-5 space-y-4 animate-in fade-in zoom-in-95 duration-150">
+        <div
+          role="dialog"
+          aria-modal="true"
+          onClick={() => setIsAddUnitOpen(false)}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4 cursor-pointer"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white rounded-xl border border-slate-200 shadow-xl max-w-md w-full p-5 space-y-4 animate-in fade-in zoom-in-95 duration-150 cursor-default"
+          >
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <div>
                 <h4 className="text-base font-bold text-slate-900">Add Sectional Title Unit</h4>
