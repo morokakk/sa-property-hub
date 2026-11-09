@@ -143,6 +143,9 @@ function SettingsContent() {
   const [minDevYoc, setMinDevYoc] = useState<number>(
     investorProfile.minDevYocPercent ?? 12.0
   );
+  const [defaultPreSalesHurdle, setDefaultPreSalesHurdle] = useState<number>(
+    investorProfile.defaultPreSalesHurdlePercent ?? 40.0
+  );
   const [defaultHardBuildRatePerSqm, setDefaultHardBuildRatePerSqm] = useState<number>(
     investorProfile.defaultHardBuildRatePerSqmZAR ?? 9800
   );
@@ -342,6 +345,7 @@ function SettingsContent() {
       minFlipRoi !== (investorProfile.minFlipRoiPercent ?? 18.0) ||
       minDevPoc !== (investorProfile.minDevPocPercent ?? investorProfile.minDevelopmentPocPercent ?? 20.0) ||
       minDevYoc !== (investorProfile.minDevYocPercent ?? 12.0) ||
+      defaultPreSalesHurdle !== (investorProfile.defaultPreSalesHurdlePercent ?? 40.0) ||
       defaultHardBuildRatePerSqm !== (investorProfile.defaultHardBuildRatePerSqmZAR ?? 9800) ||
       defaultVatRegisteredDeveloper !== (investorProfile.defaultVatRegisteredDeveloper ?? true) ||
       maxDay1Cash !== (investorProfile.maxDay1CashZAR ?? 500000) ||
@@ -423,6 +427,7 @@ function SettingsContent() {
     setMinFlipRoi(investorProfile.minFlipRoiPercent ?? 18.0);
     setMinDevPoc(investorProfile.minDevPocPercent ?? investorProfile.minDevelopmentPocPercent ?? 20.0);
     setMinDevYoc(investorProfile.minDevYocPercent ?? 12.0);
+    setDefaultPreSalesHurdle(investorProfile.defaultPreSalesHurdlePercent ?? 40.0);
     setDefaultHardBuildRatePerSqm(investorProfile.defaultHardBuildRatePerSqmZAR ?? 9800);
     setDefaultVatRegisteredDeveloper(investorProfile.defaultVatRegisteredDeveloper ?? true);
     setMaxDay1Cash(investorProfile.maxDay1CashZAR ?? 500000);
@@ -724,6 +729,7 @@ function SettingsContent() {
       minDevPocPercent: minDevPoc,
       minDevelopmentPocPercent: minDevPoc,
       minDevYocPercent: minDevYoc,
+      defaultPreSalesHurdlePercent: defaultPreSalesHurdle,
       defaultHardBuildRatePerSqmZAR: defaultHardBuildRatePerSqm,
       defaultVatRegisteredDeveloper,
       maxDay1CashZAR: maxDay1Cash,
@@ -2262,7 +2268,7 @@ function SettingsContent() {
                       Ground-Up, Subdivision, Infill &amp; Build-to-Rent (BTR) Benchmarks
                     </span>
                   </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 text-xs">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
                     <div className="p-3.5 rounded-lg bg-amber-50/40 border border-amber-200/80">
                       <label className="block font-semibold text-slate-700 mb-1">
                         Min Development POC Hurdle (%)
@@ -2296,6 +2302,25 @@ function SettingsContent() {
                           value={minDevYoc}
                           onChange={(e) => setMinDevYoc(Number(e.target.value))}
                           className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg font-bold text-emerald-700 bg-white"
+                        />
+                        <span className="ml-1.5 font-bold text-slate-600">%</span>
+                      </div>
+                    </div>
+
+                    <div className="p-3.5 rounded-lg bg-amber-50/40 border border-amber-200/80">
+                      <label className="block font-semibold text-slate-700 mb-1">
+                        Default Pre-Sales Hurdle (%)
+                      </label>
+                      <p className="text-[10px] text-slate-500 mb-2">
+                        Minimum pre-sold GDV % required before bank construction drawdown
+                      </p>
+                      <div className="flex items-center">
+                        <input
+                          type="number"
+                          step="any"
+                          value={defaultPreSalesHurdle}
+                          onChange={(e) => setDefaultPreSalesHurdle(Number(e.target.value))}
+                          className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg font-bold text-sky-800 bg-white"
                         />
                         <span className="ml-1.5 font-bold text-slate-600">%</span>
                       </div>

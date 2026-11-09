@@ -147,6 +147,7 @@ export type Database = {
           drive_vault: Json | null
           id: string
           investment_node_id: string | null
+          is_deferred_land_payment_laa?: boolean
           is_vat_registered_developer: boolean
           land_purchase_price_zar: number
           linked_funding_source_id: string | null
@@ -158,6 +159,7 @@ export type Database = {
           province: string | null
           sec118_arrears_zar: number
           sell_down_months: number
+          senior_jv_partner_name?: string | null
           soft_costs: Json
           tax_entity_type: string | null
           title: string
@@ -185,6 +187,7 @@ export type Database = {
           drive_vault?: Json | null
           id?: string
           investment_node_id?: string | null
+          is_deferred_land_payment_laa?: boolean
           is_vat_registered_developer?: boolean
           land_purchase_price_zar?: number
           linked_funding_source_id?: string | null
@@ -196,6 +199,7 @@ export type Database = {
           province?: string | null
           sec118_arrears_zar?: number
           sell_down_months?: number
+          senior_jv_partner_name?: string | null
           soft_costs?: Json
           tax_entity_type?: string | null
           title: string
@@ -223,6 +227,7 @@ export type Database = {
           drive_vault?: Json | null
           id?: string
           investment_node_id?: string | null
+          is_deferred_land_payment_laa?: boolean
           is_vat_registered_developer?: boolean
           land_purchase_price_zar?: number
           linked_funding_source_id?: string | null
@@ -234,6 +239,7 @@ export type Database = {
           province?: string | null
           sec118_arrears_zar?: number
           sell_down_months?: number
+          senior_jv_partner_name?: string | null
           soft_costs?: Json
           tax_entity_type?: string | null
           title?: string
@@ -784,6 +790,7 @@ export type Database = {
           min_dev_poc_percent?: number | null
           min_dev_yoc_percent?: number | null
           default_hard_build_rate_per_sqm_zar?: number | null
+          default_pre_sales_hurdle_percent?: number | null
           default_vat_registered_developer?: boolean | null
         }
         Insert: {
@@ -827,6 +834,7 @@ export type Database = {
           min_dev_poc_percent?: number | null
           min_dev_yoc_percent?: number | null
           default_hard_build_rate_per_sqm_zar?: number | null
+          default_pre_sales_hurdle_percent?: number | null
           default_vat_registered_developer?: boolean | null
         }
         Update: {
@@ -870,6 +878,7 @@ export type Database = {
           min_dev_poc_percent?: number | null
           min_dev_yoc_percent?: number | null
           default_hard_build_rate_per_sqm_zar?: number | null
+          default_pre_sales_hurdle_percent?: number | null
           default_vat_registered_developer?: boolean | null
         }
         Relationships: []
@@ -1225,6 +1234,7 @@ export type Database = {
           user_id: string | null
           website: string | null
           custom_node_benchmarks?: Json | null
+          default_pre_sales_hurdle_percent?: number | null
         }
         Insert: {
           account_holder?: string | null
@@ -1255,6 +1265,7 @@ export type Database = {
           updated_at?: string | null
           user_id?: string | null
           website?: string | null
+          default_pre_sales_hurdle_percent?: number | null
         }
         Update: {
           account_holder?: string | null
@@ -1285,6 +1296,7 @@ export type Database = {
           updated_at?: string | null
           user_id?: string | null
           website?: string | null
+          default_pre_sales_hurdle_percent?: number | null
         }
         Relationships: []
       }

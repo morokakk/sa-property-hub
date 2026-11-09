@@ -1075,6 +1075,7 @@ export interface InvestorProfile {
   minDevPocPercent?: number; // default 20.0% — Minimum Profit on Cost % hurdle for developments
   minDevelopmentPocPercent?: number; // backward-compatible alias for minDevPocPercent
   minDevYocPercent?: number; // default 12.0% — Minimum Build-to-Rent Yield on Cost % hurdle
+  defaultPreSalesHurdlePercent?: number; // default 40.0% — Minimum pre-sold GDV % required before senior construction debt drawdowns
   defaultHardBuildRatePerSqmZAR?: number; // default 9800 — Baseline SA hard construction cost R/m²
   defaultVatRegisteredDeveloper?: boolean; // default true — Seeds isVatRegisteredDeveloper in /analyzer and /developments
   maxDay1CashZAR?: number; // default 500000 ZAR
@@ -1318,6 +1319,7 @@ export interface DevelopmentProject {
   developmentType: DevelopmentType;
   isVatRegisteredDeveloper: boolean;
   taxEntityType?: DevelopmentTaxEntityType;
+  seniorJvPartnerName?: string; // Optional Senior Co-Developer / JV Partner name for bank track-record credibility
 
   // Timeline
   currentPhase: DevelopmentPhase;
@@ -1327,6 +1329,7 @@ export interface DevelopmentProject {
 
   // Cost Stack
   landPurchasePriceZAR: number;
+  isDeferredLandPaymentLAA?: boolean; // Land Availability Agreement / Land JV where land is paid at unit transfer rather than Day-1 cash
   acquisitionCostsZAR: number;
   sec118ArrearsZAR: number;
   softCosts: DevelopmentSoftCosts;

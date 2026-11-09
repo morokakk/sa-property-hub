@@ -169,4 +169,104 @@ describe('proposalIntelligence — Guardrail #3 (Canonical ReturnTermType & Exit
     expect(synthesis.riskMitigants.some((m) => m.id === 'pie-act-eviction')).toBe(true);
     expect(synthesis.riskMitigants.some((m) => m.id === 'auction-municipal-clearance')).toBe(true);
   });
+
+  it('synthesizes dynamic bankability strengths and mitigants for development projects', () => {
+    const capitalStack = calculateCapitalStackSplit({
+      strategy: 'Development',
+      capitalRequestedZAR: 2_500_000,
+      fundingOfferType: 'Bullet Repayment',
+      offeredRatePercent: 16.0,
+      totalProjectCostZAR: 6_500_000,
+      targetExitPriceZAR: 9_200_000,
+      projectedNetProfitZAR: 2_700_000,
+      holdingDurationMonths: 14,
+      netMonthlyCashflowBeforeLenderZAR: -25_000,
+    });
+
+    const stressMatrix = calculateProposalStressScenarios({
+      targetExitPriceZAR: 9_200_000,
+      totalProjectCostZAR: 6_500_000,
+      capitalRequestedZAR: 2_500_000,
+      lenderReturnZAR: capitalStack.lenderReturnZAR,
+      exitCommissionPercent: 5.0,
+      exitLegalCostZAR: 5_200,
+      monthlyBurnRateZAR: 25_000,
+    });
+
+    const synthesis = synthesizeStrengthsAndMitigants({
+      deal: {
+        type: 'development',
+        city: 'Johannesburg',
+        province: 'Gauteng',
+        purchasePrice: 1_800_000,
+        openMarketValue: 9_200_000,
+        builtInEquity: 0,
+        builtInEquityPercent: 0,
+        renovationBudget: 0,
+        targetExitPrice: 9_200_000,
+        monthlyRent: 0,
+        developmentFinancials: {
+          tdcZAR: 6_500_000,
+          tdcPerSqmZAR: 13_500,
+          gdvInclVatZAR: 9_200_000,
+          totalUnitsCount: 8,
+          pocPercent: 41.5,
+          netProfitBeforeTaxZAR: 2_700_000,
+          isDeferredLandPaymentLAA: true,
+          seniorJvPartnerName: 'Apex Construction JV',
+          bankReadiness: {
+            paperRights: { met: true, statusLabel: 'Approved', details: 'SPLUMA & Plans Approved' },
+            qsAndGeotech: { met: true, statusLabel: 'Validated', details: 'NHBRC & QS engaged' },
+            preSalesGate: { met: true, statusLabel: 'Cleared', details: '60% pre-sold' },
+            deliveryTrackRecord: { met: true, statusLabel: 'JV Partnered', partnerOrEntity: 'Apex Construction JV', isJvPartnerBacked: true },
+            overallBankable: true,
+          },
+        },
+      },
+      strategy: 'Development',
+      capitalStack,
+      stressMatrix,
+    });
+
+    expect(synthesis.strengths.some((s) => s.id === 'development-bulk-value-creation')).toBe(true);
+    expect(synthesis.strengths.some((s) => s.id === 'shovel-ready-paper-rights')).toBe(true);
+    expect(synthesis.strengths.some((s) => s.id === 'laa-land-jv-structure')).toBe(true);
+    expect(synthesis.riskMitigants.some((m) => m.id === 'senior-jv-co-developer')).toBe(true);
+  });
+
+  it('reconciles VAT-stripped Base Case net profit for VAT-registered developments and avoids double-deducting capitalized carrying interest', () => {
+    // dev-1 numbers: GDV = 8,390,000; TDC = 7,061,813; Input VAT Credit = 693,913; Capital = 4,200,000
+    const stress = calculateProposalStressScenarios({
+      targetExitPriceZAR: 8_390_000,
+      totalProjectCostZAR: 7_061_813,
+      capitalRequestedZAR: 4_200_000,
+      lenderReturnZAR: 643_125,
+      exitCommissionPercent: 5.0,
+      exitLegalCostZAR: 0,
+      monthlyBurnRateZAR: 16_500,
+      isDevelopment: true,
+      isVatRegisteredDeveloper: true,
+      estimatedInputVatCreditZAR: 693_913,
+    });
+
+    const baseScenario = stress.scenarios.find((s) => s.id === 'base');
+    expect(baseScenario).toBeDefined();
+    // Base Case Net Deal Profit = (8,390,000 / 1.15) + 693,913 - 7,061,813 = R 927,752
+    expect(baseScenario!.projectedNetProfitZAR).toBe(927_752);
+
+    // Capital stack split for Development strategy does not double-deduct facility carrying interest
+    const split = calculateCapitalStackSplit({
+      strategy: 'Development',
+      capitalRequestedZAR: 4_200_000,
+      fundingOfferType: 'Monthly Coupon',
+      offeredRatePercent: 12.25,
+      totalProjectCostZAR: 7_061_813,
+      targetExitPriceZAR: 8_390_000,
+      projectedNetProfitZAR: 927_752,
+      holdingDurationMonths: 15,
+      netMonthlyCashflowBeforeLenderZAR: 0,
+    });
+
+    expect(split.sponsorNetProfitFlipZAR).toBe(927_752);
+  });
 });

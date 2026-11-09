@@ -247,6 +247,111 @@ export function DevelopmentFeasibilitySection({
         )}
       </div>
 
+      {/* 4-PILLAR BANK FINANCE CHECKLIST STRIP */}
+      <div className="rounded-xl border border-slate-200 bg-white p-5 text-slate-900 shadow-sm print:border-slate-300 print:bg-white print:text-slate-900 break-inside-avoid print:break-inside-avoid space-y-3">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-2">
+          <div className="flex items-center gap-2">
+            <ShieldCheck className="w-5 h-5 text-emerald-600 print:text-emerald-700" />
+            <h4 className="text-xs font-bold uppercase tracking-wider text-slate-800">
+              4-Pillar Commercial Bank Lending Readiness
+            </h4>
+          </div>
+          <span className={`text-[11px] font-bold px-2 py-0.5 rounded border ${
+            fin.bankReadiness.overallBankable
+              ? 'bg-emerald-50 text-emerald-800 border-emerald-200 print:bg-emerald-100'
+              : 'bg-amber-50 text-amber-800 border-amber-200 print:bg-amber-100'
+          }`}>
+            {fin.bankReadiness.overallBankable ? 'Bank Finance Pre-Vetted' : 'Bank Covenants In Progress'}
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 text-xs">
+          {/* Pillar 1: Paper Rights */}
+          <div className={`p-2.5 rounded-lg border flex flex-col justify-between ${
+            fin.bankReadiness.paperRights.met
+              ? 'bg-emerald-50/50 border-emerald-200 text-slate-900'
+              : 'bg-amber-50/50 border-amber-200 text-slate-900'
+          }`}>
+            <div className="flex items-center justify-between gap-1 mb-1">
+              <span className="font-semibold text-slate-700 text-[11px]">1. Paper Rights</span>
+              <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                fin.bankReadiness.paperRights.met
+                  ? 'bg-emerald-100 text-emerald-800'
+                  : 'bg-amber-100 text-amber-800'
+              }`}>
+                {fin.bankReadiness.paperRights.statusLabel}
+              </span>
+            </div>
+            <p className="text-[10px] text-slate-500 leading-tight">
+              {fin.bankReadiness.paperRights.details}
+            </p>
+          </div>
+
+          {/* Pillar 2: QS & Geotech */}
+          <div className={`p-2.5 rounded-lg border flex flex-col justify-between ${
+            fin.bankReadiness.qsAndGeotech.met
+              ? 'bg-emerald-50/50 border-emerald-200 text-slate-900'
+              : 'bg-amber-50/50 border-amber-200 text-slate-900'
+          }`}>
+            <div className="flex items-center justify-between gap-1 mb-1">
+              <span className="font-semibold text-slate-700 text-[11px]">2. QS &amp; Geotech</span>
+              <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                fin.bankReadiness.qsAndGeotech.met
+                  ? 'bg-emerald-100 text-emerald-800'
+                  : 'bg-amber-100 text-amber-800'
+              }`}>
+                {fin.bankReadiness.qsAndGeotech.statusLabel}
+              </span>
+            </div>
+            <p className="text-[10px] text-slate-500 leading-tight">
+              {fin.bankReadiness.qsAndGeotech.details}
+            </p>
+          </div>
+
+          {/* Pillar 3: Pre-Sales Gate */}
+          <div className={`p-2.5 rounded-lg border flex flex-col justify-between ${
+            fin.bankReadiness.preSalesGate.met
+              ? 'bg-emerald-50/50 border-emerald-200 text-slate-900'
+              : 'bg-amber-50/50 border-amber-200 text-slate-900'
+          }`}>
+            <div className="flex items-center justify-between gap-1 mb-1">
+              <span className="font-semibold text-slate-700 text-[11px]">3. Pre-Sales Gate</span>
+              <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                fin.bankReadiness.preSalesGate.met
+                  ? 'bg-emerald-100 text-emerald-800'
+                  : 'bg-amber-100 text-amber-800'
+              }`}>
+                {fin.bankReadiness.preSalesGate.statusLabel}
+              </span>
+            </div>
+            <p className="text-[10px] text-slate-500 leading-tight">
+              {fin.bankReadiness.preSalesGate.details}
+            </p>
+          </div>
+
+          {/* Pillar 4: Delivery Track Record */}
+          <div className={`p-2.5 rounded-lg border flex flex-col justify-between ${
+            fin.bankReadiness.deliveryTrackRecord.met
+              ? 'bg-emerald-50/50 border-emerald-200 text-slate-900'
+              : 'bg-slate-50 border-slate-200 text-slate-700'
+          }`}>
+            <div className="flex items-center justify-between gap-1 mb-1">
+              <span className="font-semibold text-slate-700 text-[11px]">4. Delivery Record</span>
+              <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                fin.bankReadiness.deliveryTrackRecord.met
+                  ? 'bg-emerald-100 text-emerald-800'
+                  : 'bg-slate-200 text-slate-700'
+              }`}>
+                {fin.bankReadiness.deliveryTrackRecord.statusLabel}
+              </span>
+            </div>
+            <p className="text-[10px] text-slate-500 leading-tight">
+              {fin.bankReadiness.deliveryTrackRecord.details}
+            </p>
+          </div>
+        </div>
+      </div>
+
       {/* PART 1: INSTITUTIONAL TDC VS GDV CAPITAL STACK */}
       <div className="rounded-xl border border-slate-200 bg-white p-6 text-slate-900 shadow-sm print:border-slate-300 print:bg-white print:text-slate-900 break-inside-avoid print:break-inside-avoid space-y-6">
         <div className="flex items-center gap-2 border-b border-slate-200 pb-3">
@@ -272,6 +377,17 @@ export function DevelopmentFeasibilitySection({
             <span className="text-[11px] text-slate-600 block mt-0.5">
               {formatZAR(capitalStack.tdcPerSqmZAR)}/m² &bull; {formatZAR(capitalStack.tdcPerUnitZAR)}/unit
             </span>
+            <span className="text-[10px] text-slate-500 block mt-0.5 font-medium">
+              Land: {formatZAR(fin.landCostPerUnitZAR)}/unit ({fin.landToGdvPercent.toFixed(1)}% GDV)
+              {fin.isLandCostElevated && (
+                <span className="ml-1 text-amber-700 font-bold">(Elevated Land Cost)</span>
+              )}
+            </span>
+            {fin.isDeferredLandPaymentLAA && (
+              <span className="text-[10px] text-emerald-700 font-semibold block mt-0.5">
+                Day-1 Equity: {formatZAR(fin.day1EquityOutlayZAR)} (LAA / Land JV)
+              </span>
+            )}
           </div>
 
           {/* Card 2: Gross Development Value */}
@@ -288,6 +404,17 @@ export function DevelopmentFeasibilitySection({
             <span className="text-[11px] text-slate-600 block mt-0.5">
               {formatZAR(capitalStack.netRealizableGdvZAR)} Net &bull; {capitalStack.gdvToTdcMultiple}x GDV
             </span>
+            <div className="mt-1">
+              <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold border ${
+                fin.isWithinEndUserBondCeiling
+                  ? 'bg-emerald-50 text-emerald-800 border-emerald-200 print:bg-emerald-100'
+                  : 'bg-rose-50 text-rose-800 border-rose-200 print:bg-rose-100'
+              }`}>
+                <span>Bond Ceiling:</span>
+                <span>Avg {formatZAR(fin.avgUnitListPriceZAR)} vs {formatZAR(fin.suburbEndUserBondCeilingZAR)}</span>
+                <span>({fin.isWithinEndUserBondCeiling ? 'Pass' : 'Exceeds'})</span>
+              </span>
+            </div>
           </div>
 
           {/* Card 3: Profit on Cost */}

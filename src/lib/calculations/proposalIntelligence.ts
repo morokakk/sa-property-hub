@@ -267,7 +267,11 @@ export function calculateCapitalStackSplit(params: {
 
   const lenderTotalPayoutZAR = principal + lenderReturnZAR;
   const sponsorCoInvestmentZAR = Math.max(0, Math.round(totalProjectCostZAR - principal - seniorDebtZAR));
-  const sponsorNetProfitFlipZAR = Math.round(projectedNetProfitZAR - lenderReturnZAR);
+  // In development projects, facility carrying interest is already capitalized within TDC; avoid double-deduction unless equity split
+  const sponsorNetProfitFlipZAR =
+    strategy === 'Development' && fundingOfferType !== 'Equity Profit Split'
+      ? projectedNetProfitZAR
+      : Math.round(projectedNetProfitZAR - lenderReturnZAR);
   const sponsorNetMonthlyCashflowZAR = Math.round(netMonthlyCashflowBeforeLenderZAR - monthlyLenderServiceZAR);
 
   const loanToCostPercent =
@@ -343,6 +347,9 @@ export function calculateProposalStressScenarios(params: {
   seniorDebtZAR?: number;
   fundingOfferType?: ReturnTermType;
   offeredRatePercent?: number;
+  isDevelopment?: boolean;
+  isVatRegisteredDeveloper?: boolean;
+  estimatedInputVatCreditZAR?: number;
 }): ProposalStressMatrixResult {
   const {
     targetExitPriceZAR,
@@ -355,6 +362,9 @@ export function calculateProposalStressScenarios(params: {
     seniorDebtZAR = 0,
     fundingOfferType = 'Fixed Interest',
     offeredRatePercent = 14,
+    isDevelopment = false,
+    isVatRegisteredDeveloper = false,
+    estimatedInputVatCreditZAR = 0,
   } = params;
 
   const commRate = Math.min(0.5, Math.max(0, (exitCommissionPercent || 0) / 100));
@@ -404,9 +414,19 @@ export function calculateProposalStressScenarios(params: {
 
   const scenarios: ProposalStressRow[] = scenarioDefs.map((def) => {
     const exitValuationZAR = Math.round(targetExitPriceZAR * (1 + def.deltaPercent / 100));
-    const scenarioExitCommission = exitValuationZAR * commRate;
-    const scenarioTotalCost = nonDisposalProjectCost + scenarioExitCommission + safeExitLegal;
-    const projectedNetProfitZAR = Math.round(exitValuationZAR - scenarioTotalCost);
+    const isVatStrippedDev = Boolean(isDevelopment && isVatRegisteredDeveloper);
+    let projectedNetProfitZAR: number;
+    let scenarioTotalCost: number;
+
+    if (isVatStrippedDev) {
+      scenarioTotalCost = totalProjectCostZAR;
+      const scenarioNetRealizableGdv = Math.round(exitValuationZAR / 1.15 + (estimatedInputVatCreditZAR || 0));
+      projectedNetProfitZAR = Math.round(scenarioNetRealizableGdv - scenarioTotalCost);
+    } else {
+      const scenarioExitCommission = exitValuationZAR * commRate;
+      scenarioTotalCost = nonDisposalProjectCost + scenarioExitCommission + safeExitLegal;
+      projectedNetProfitZAR = Math.round(exitValuationZAR - scenarioTotalCost);
+    }
 
     // Net proceeds available to repay lender after disposal costs and senior debt
     const netProceedsBeforeLenderZAR = Math.round(
@@ -501,6 +521,7 @@ export function synthesizeStrengthsAndMitigants(params: {
     tenantArrears?: number;
     occupantRisk?: OccupantRiskProfile;
     refinanceLtvPercent?: number;
+    rawDevelopment?: any;
     developmentFinancials?: {
       tdcZAR: number;
       tdcPerSqmZAR: number;
@@ -508,6 +529,15 @@ export function synthesizeStrengthsAndMitigants(params: {
       totalUnitsCount: number;
       pocPercent: number;
       netProfitBeforeTaxZAR: number;
+      isDeferredLandPaymentLAA?: boolean;
+      seniorJvPartnerName?: string;
+      bankReadiness?: {
+        paperRights: { met: boolean; statusLabel: string; details: string };
+        qsAndGeotech: { met: boolean; statusLabel: string; details: string };
+        preSalesGate: { met: boolean; statusLabel: string; details: string };
+        deliveryTrackRecord: { met: boolean; statusLabel: string; partnerOrEntity: string; isJvPartnerBacked?: boolean };
+        overallBankable: boolean;
+      };
     };
   };
   strategy: DealStrategy;
@@ -536,6 +566,33 @@ export function synthesizeStrengthsAndMitigants(params: {
       metricBadge: `+${devFin.pocPercent.toFixed(1)}% Pre-Tax POC (${formatCompactZAR(grossSpreadZAR)})`,
       detail: `Total Development Cost of ${formatCompactZAR(devFin.tdcZAR)} (${formatCompactZAR(devFin.tdcPerSqmZAR)}/m²) against a completed ${devFin.totalUnitsCount}-unit GDV of ${formatCompactZAR(devFin.gdvInclVatZAR)}, creating ${formatCompactZAR(grossSpreadZAR)} in gross development spread (+${devFin.pocPercent.toFixed(1)}% Pre-Tax POC)`,
     });
+
+    // Dynamic Bankability Strength: Shovel-Ready Paper Rights
+    const rawDev = deal.rawDevelopment;
+    const isPaperRightsMet =
+      devFin.bankReadiness?.paperRights.met ??
+      ((rawDev?.approvals?.splumaRezoningSubdivision?.status === 'Approved' || rawDev?.approvals?.splumaRezoningSubdivision?.status === 'N/A') &&
+       (rawDev?.approvals?.municipalBuildingPlans?.status === 'Approved' || rawDev?.approvals?.municipalBuildingPlans?.status === 'N/A'));
+
+    if (isPaperRightsMet) {
+      strengths.push({
+        id: 'shovel-ready-paper-rights',
+        title: 'Shovel-Ready Scheme: Zero 36-Month Rezoning Holding Drag',
+        metricBadge: 'Proclaimed Rights',
+        detail: 'Municipal SPLUMA planning rights and building plans are fully approved. Zero town planning holding drag; site is shovel-ready for immediate construction.',
+      });
+    }
+
+    // Dynamic Bankability Strength: LAA / Land JV Structure
+    const isLAA = devFin.isDeferredLandPaymentLAA ?? rawDev?.isDeferredLandPaymentLAA ?? false;
+    if (isLAA) {
+      strengths.push({
+        id: 'laa-land-jv-structure',
+        title: 'LAA / Land JV Structure: Zero Day-1 Land Outlay',
+        metricBadge: 'Zero Day-1 Land',
+        detail: 'Land is secured via a Land Availability Agreement (LAA / Land JV) with zero Day-1 equity outlay; land cost is settled from unit transfer proceeds at exit.',
+      });
+    }
   } else if (deal.builtInEquity > 0) {
     strengths.push({
       id: 'built-in-equity',
@@ -624,6 +681,21 @@ export function synthesizeStrengthsAndMitigants(params: {
   // ============================================================================
   // 2. SYNTHESIZE IDENTIFIED RISKS & CONCRETE SPONSOR MITIGANTS
   // ============================================================================
+
+  // Risk 0: Senior JV Co-Developer Track Record (Development Strategy)
+  const devJvPartner =
+    deal.developmentFinancials?.seniorJvPartnerName ||
+    deal.rawDevelopment?.seniorJvPartnerName;
+
+  if (deal.type === 'development' && devJvPartner) {
+    riskMitigants.push({
+      id: 'senior-jv-co-developer',
+      riskTitle: 'Developer Delivery & Construction Completion Risk',
+      severity: 'low',
+      exposureBadge: 'Senior JV Co-Dev',
+      mitigationDetail: `Delivery risk mitigated via senior co-developer partnership with ${devJvPartner}, strengthening main contractor bonding, QS sign-offs, and bank covenants.`,
+    });
+  }
 
   // Risk A: PIE Act Unlawful Occupation
   if (isEvictionActive(deal.occupantRisk)) {

@@ -409,7 +409,7 @@ export const createDevelopmentSlice: StateCreator<
       developmentFacilityLimitZAR: Math.round((landPrice + hardBuildCostZAR) * seniorLtcFraction),
       developmentFacilityDrawnZAR: 0,
       developmentFacilityRepaidZAR: 0,
-      preSalesHurdlePercent: opp.preSalesHurdlePercent ?? 60,
+      preSalesHurdlePercent: opp.preSalesHurdlePercent ?? (get().investorProfile?.defaultPreSalesHurdlePercent ?? 40),
       linkedFundingSourceId: existingLinkedFunding?.id,
       zoningProfile,
       approvals: {

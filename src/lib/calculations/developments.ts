@@ -13,12 +13,31 @@ import {
   DevUnitStatus,
   DevelopmentTaxEntityType,
   PreConstructionApprovals,
+  CustomNodeBenchmarkOverride,
 } from '@/types';
 import { formatZAR } from '@/lib/formatters';
+import {
+  findInvestmentNode,
+  getEffectiveNodeBenchmarks,
+} from '@/lib/constants/investmentNodes';
 import {
   calculateDelaySensitivityMatrix,
   DelaySensitivityMatrixResult,
 } from './holdingSensitivity';
+
+export interface BankReadinessPillar {
+  met: boolean;
+  statusLabel: string;
+  details: string;
+}
+
+export interface DevelopmentBankReadinessSummary {
+  paperRights: BankReadinessPillar;
+  qsAndGeotech: BankReadinessPillar;
+  preSalesGate: BankReadinessPillar;
+  deliveryTrackRecord: BankReadinessPillar & { partnerOrEntity: string; isJvPartnerBacked: boolean };
+  overallBankable: boolean;
+}
 
 export interface DevelopmentFinancialSummary {
   // Cost Stack Breakdowns
@@ -116,6 +135,28 @@ export interface DevelopmentFinancialSummary {
   gdvToTdcMultiple: number;
   /** 20-Year cumulative SARS Section 13sex tax shield: 20 * annualAllowance */
   section13sexTwentyYearSavingsZAR: number;
+
+  // --- SOUTH AFRICAN BANKABILITY & GUARDRAIL METRICS ---
+  /** Land Purchase Price per planned unit */
+  landCostPerUnitZAR: number;
+  /** Land Purchase Price as percentage of GDV (incl VAT) */
+  landToGdvPercent: number;
+  /** Elevated land cost flag (> R60,000 for Township Infill, or > 25% GDV for other developments) */
+  isLandCostElevated: boolean;
+  /** Land Availability Agreement / Land JV mode (land deferred from Day-1 equity to unit transfers) */
+  isDeferredLandPaymentLAA: boolean;
+  /** Senior Co-Developer / JV Partner name for institutional track record (optional) */
+  seniorJvPartnerName?: string;
+  /** Day-1 sponsor equity cash outlay (excludes landPurchasePriceZAR when isDeferredLandPaymentLAA is active) */
+  day1EquityOutlayZAR: number;
+  /** Land payment liability settled pro-rata at unit transfers out of gross exit proceeds */
+  deferredLandPayableAtExitZAR: number;
+  /** Node-derived suburb end-user bond ceiling (R/m² midpoint × avg unit sqm, or R 800,000 fallback) */
+  suburbEndUserBondCeilingZAR: number;
+  /** Whether average unit selling price falls comfortably within bank retail mortgage ceiling (<= ceiling * 1.05) */
+  isWithinEndUserBondCeiling: boolean;
+  /** 4-Pillar South African Commercial Bank Readiness Checklist */
+  bankReadiness: DevelopmentBankReadinessSummary;
 }
 
 const PRE_SOLD_STATUSES: ReadonlySet<DevUnitStatus> = new Set<DevUnitStatus>([
@@ -161,7 +202,9 @@ export function calculateDevelopmentSoftCostsTotal(
  * VAT mechanics, pre-sales hurdles, debt wipeout breakeven, and hybrid split-exit returns.
  */
 export function calculateDevelopmentFinancials(
-  dev?: DevelopmentProject | null
+  dev?: DevelopmentProject | null,
+  customNodeBenchmarks?: Record<string, CustomNodeBenchmarkOverride>,
+  sponsorEntityName?: string
 ): DevelopmentFinancialSummary {
   if (!dev) {
     return {
@@ -228,6 +271,22 @@ export function calculateDevelopmentFinancials(
       contingencyPercentOfTdc: 0,
       gdvToTdcMultiple: 0,
       section13sexTwentyYearSavingsZAR: 0,
+      landCostPerUnitZAR: 0,
+      landToGdvPercent: 0,
+      isLandCostElevated: false,
+      isDeferredLandPaymentLAA: false,
+      seniorJvPartnerName: undefined,
+      day1EquityOutlayZAR: 0,
+      deferredLandPayableAtExitZAR: 0,
+      suburbEndUserBondCeilingZAR: 800000,
+      isWithinEndUserBondCeiling: true,
+      bankReadiness: {
+        paperRights: { met: false, statusLabel: 'Not Started', details: 'No statutory approvals recorded' },
+        qsAndGeotech: { met: false, statusLabel: 'Not Validated', details: 'No professional fees recorded' },
+        preSalesGate: { met: false, statusLabel: 'Under Target', details: '0% pre-sold' },
+        deliveryTrackRecord: { met: false, statusLabel: 'Self-Delivered', details: 'Self-Delivered', partnerOrEntity: 'Self-Delivered', isJvPartnerBacked: false },
+        overallBankable: false,
+      },
     };
   }
 
@@ -410,11 +469,58 @@ export function calculateDevelopmentFinancials(
     return acc + (typeof price === 'number' && !isNaN(price) ? price : 0);
   }, 0);
 
+  // South African Bankability Metrics: Land economics & LAA Structure
+  const landCostPerUnitZAR =
+    totalUnitsCount > 0 ? Math.round(landPurchasePriceZAR / totalUnitsCount) : 0;
+
+  const landToGdvPercent =
+    gdvInclVatZAR > 0
+      ? Math.round(((landPurchasePriceZAR / gdvInclVatZAR) * 100) * 10) / 10
+      : 0;
+
+  const isTownshipInfill =
+    dev.developmentType === 'Township Micro-Units (Infill)' ||
+    /township|infill/i.test(dev.developmentType || '');
+
+  const isLandCostElevated = isTownshipInfill
+    ? landCostPerUnitZAR > 60000
+    : landToGdvPercent > 25.0;
+
+  const isDeferredLandPaymentLAA = Boolean(dev.isDeferredLandPaymentLAA);
+  const seniorJvPartnerName = dev.seniorJvPartnerName?.trim() || undefined;
+
+  const day1EquityOutlayZAR = isDeferredLandPaymentLAA
+    ? Math.round(acquisitionCostsZAR + sec118ArrearsZAR)
+    : totalLandAndAcquisitionZAR;
+
+  const totalSaleUnitsGdvZAR = unitsForSale.reduce(
+    (sum, u) =>
+      sum +
+      (typeof u.listPriceVatInclZAR === 'number' && !isNaN(u.listPriceVatInclZAR)
+        ? u.listPriceVatInclZAR
+        : 0),
+    0
+  );
+
+  const totalDebtToExtinguishZAR =
+    dev.developmentFacilityDrawnZAR && dev.developmentFacilityDrawnZAR > 0
+      ? dev.developmentFacilityDrawnZAR
+      : dev.developmentFacilityLimitZAR || 0;
+
+  const deferredLandPayableAtExitZAR = isDeferredLandPaymentLAA
+    ? Math.min(landPurchasePriceZAR, landCostPerUnitZAR * (unitsSoldAndTransferredCount || unitsForSale.length))
+    : 0;
+
   const netSalesProceedsAfterDebtZAR = Math.max(
     0,
-    totalSoldProceedsZAR - outstandingDevFacilityZAR
+    totalSaleUnitsGdvZAR - totalDebtToExtinguishZAR - deferredLandPayableAtExitZAR
   );
-  const netCashProceedsAfterDebtZAR = netSalesProceedsAfterDebtZAR;
+  const netCashProceedsAfterDebtZAR = Math.max(
+    0,
+    totalSoldProceedsZAR -
+      outstandingDevFacilityZAR -
+      (isDeferredLandPaymentLAA ? deferredLandPayableAtExitZAR : 0)
+  );
 
   const remainingDebtOnRetainedUnitsZAR = Math.max(
     0,
@@ -516,6 +622,80 @@ export function calculateDevelopmentFinancials(
 
   const unitsNeededForSection13Sex = Math.max(0, 5 - unitsRetainedCount);
 
+  // 12. Node-Derived Suburb End-User Bond Ceiling & 4-Pillar Bank Readiness
+  const avgUnitSqm =
+    totalUnitsCount > 0 && totalFloorAreaSqm > 0
+      ? totalFloorAreaSqm / totalUnitsCount
+      : totalUnitsCount > 0 && totalBuildableAreaSqm > 0
+        ? totalBuildableAreaSqm / totalUnitsCount
+        : 0;
+
+  const matchedNode =
+    (dev.investmentNodeId ? findInvestmentNode(dev.investmentNodeId) : undefined) ||
+    findInvestmentNode(`${dev.address || ''} ${dev.title || ''} ${dev.city || ''}`) ||
+    (dev.city ? findInvestmentNode(dev.city) : undefined);
+
+  let suburbEndUserBondCeilingZAR = 800000;
+  if (matchedNode && avgUnitSqm > 0) {
+    const effective = getEffectiveNodeBenchmarks(matchedNode, customNodeBenchmarks);
+    const range = effective?.pricePerSqmRangeZAR ?? matchedNode.benchmarks.pricePerSqmRangeZAR;
+    const upperPricePerSqmZAR = range[1] || range[0] || 0;
+    suburbEndUserBondCeilingZAR = Math.round(avgUnitSqm * upperPricePerSqmZAR * 1.15);
+  }
+
+  const isWithinEndUserBondCeiling =
+    avgUnitListPriceZAR <= Math.round(suburbEndUserBondCeilingZAR * 1.05);
+
+  // 4-Pillar Bank Readiness
+  const splumaStatus = dev.approvals?.splumaRezoningSubdivision?.status || 'Not Started';
+  const plansStatus = dev.approvals?.municipalBuildingPlans?.status || 'Not Started';
+  const isPaperRightsMet =
+    (splumaStatus === 'Approved' || splumaStatus === 'N/A') &&
+    (plansStatus === 'Approved' || plansStatus === 'N/A');
+
+  const nhbrcStatus = dev.approvals?.nhbrcEnrolment?.status || 'Not Started';
+  const isNhbrcValid = nhbrcStatus === 'Approved' || nhbrcStatus === 'N/A';
+  const hasQs = (dev.softCosts?.quantitySurveyorZAR ?? 0) > 0;
+  const hasCivilEng = (dev.softCosts?.structuralCivilEngineerZAR ?? 0) > 0;
+  const isQsGeotechMet = isNhbrcValid && hasQs && hasCivilEng;
+
+  const isPreSalesMet = isPreSalesHurdleMet;
+
+  const isJvPartnerBacked = Boolean(seniorJvPartnerName);
+  const partnerOrEntity = seniorJvPartnerName || sponsorEntityName || 'Self-Delivered (Owner Entity)';
+
+  const bankReadiness: DevelopmentBankReadinessSummary = {
+    paperRights: {
+      met: isPaperRightsMet,
+      statusLabel: isPaperRightsMet ? 'Approved / Shovel-Ready' : 'Pending Approvals',
+      details: isPaperRightsMet
+        ? 'SPLUMA rezoning & municipal building plans approved'
+        : `SPLUMA: ${splumaStatus} • Building Plans: ${plansStatus}`,
+    },
+    qsAndGeotech: {
+      met: isQsGeotechMet,
+      statusLabel: isQsGeotechMet ? 'Validated & Enrolled' : 'Incomplete Validation',
+      details: isQsGeotechMet
+        ? 'NHBRC enrolled with certified QS and Structural/Civil Engineer'
+        : `NHBRC: ${nhbrcStatus} • QS: ${hasQs ? 'Engaged' : 'Missing'} • Engineer: ${hasCivilEng ? 'Engaged' : 'Missing'}`,
+    },
+    preSalesGate: {
+      met: isPreSalesMet,
+      statusLabel: isPreSalesMet ? 'Hurdle Cleared' : 'Under Target',
+      details: `${preSoldGdvPercent.toFixed(1)}% pre-sold vs ${preSalesHurdlePercent}% hurdle target`,
+    },
+    deliveryTrackRecord: {
+      met: isJvPartnerBacked,
+      isJvPartnerBacked,
+      partnerOrEntity,
+      statusLabel: isJvPartnerBacked ? 'Senior JV Partnered' : 'Self-Delivered',
+      details: isJvPartnerBacked
+        ? `Institutional Co-Developer: ${partnerOrEntity}`
+        : `Delivery track record evidenced via ${partnerOrEntity}`,
+    },
+    overallBankable: isPaperRightsMet && isQsGeotechMet && isPreSalesMet,
+  };
+
   return {
     totalLandAndAcquisitionZAR,
     totalSoftCostsZAR,
@@ -580,6 +760,16 @@ export function calculateDevelopmentFinancials(
     contingencyPercentOfTdc,
     gdvToTdcMultiple,
     section13sexTwentyYearSavingsZAR,
+    landCostPerUnitZAR,
+    landToGdvPercent,
+    isLandCostElevated,
+    isDeferredLandPaymentLAA,
+    seniorJvPartnerName,
+    day1EquityOutlayZAR,
+    deferredLandPayableAtExitZAR,
+    suburbEndUserBondCeilingZAR,
+    isWithinEndUserBondCeiling,
+    bankReadiness,
   };
 }
 
@@ -760,7 +950,9 @@ export function calculateDevelopmentCapitalStack(
       statutoryBasis: 'Deeds Office Conveyancing & Section 118 Municipal Clearance',
       amountZAR: fin.totalLandAndAcquisitionZAR,
       percentOfTdc: landPercentOfTdc,
-      drawCondition: 'Day-1 Capital / 100% Sponsor Equity',
+      drawCondition: development.isDeferredLandPaymentLAA
+        ? 'Deferred — Paid at Unit Transfer (LAA / Land JV)'
+        : 'Day-1 Capital / 100% Sponsor Equity',
       subItems: [
         { label: 'Parent Erf Purchase Price', amountZAR: development.landPurchasePriceZAR || 0 },
         { label: 'Conveyancing & Transfer Costs', amountZAR: development.acquisitionCostsZAR || 0 },
@@ -1064,6 +1256,7 @@ export interface DevelopmentDebtWipeoutMatrix {
   unitsRetainedCount: number;
   unitsSoldAndTransferredCount: number;
   totalSoldProceedsZAR: number;
+  netSalesProceedsAfterDebtZAR: number;
   netCashProceedsAfterDebtZAR: number;
   remainingDebtOnRetainedUnitsZAR: number;
   isFreeCarryAchieved: boolean;
@@ -1144,6 +1337,7 @@ export function calculateDevelopmentDebtWipeoutMatrix(
     unitsRetainedCount: fin.unitsRetainedCount,
     unitsSoldAndTransferredCount: fin.unitsSoldAndTransferredCount,
     totalSoldProceedsZAR: fin.totalSoldProceedsZAR,
+    netSalesProceedsAfterDebtZAR: fin.netSalesProceedsAfterDebtZAR,
     netCashProceedsAfterDebtZAR: fin.netCashProceedsAfterDebtZAR,
     remainingDebtOnRetainedUnitsZAR: fin.remainingDebtOnRetainedUnitsZAR,
     isFreeCarryAchieved,

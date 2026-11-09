@@ -296,6 +296,7 @@ export function mapProfile(
     custom_node_benchmarks: (profile.customNodeBenchmarks as any) || null,
     min_dev_poc_percent: toNumeric(profile.minDevPocPercent ?? profile.minDevelopmentPocPercent, 20.0),
     min_dev_yoc_percent: toNumeric(profile.minDevYocPercent, 12.0),
+    default_pre_sales_hurdle_percent: toNumeric(profile.defaultPreSalesHurdlePercent, 40.0),
     default_hard_build_rate_per_sqm_zar: toNumeric(profile.defaultHardBuildRatePerSqmZAR, 9800),
     default_vat_registered_developer: profile.defaultVatRegisteredDeveloper ?? true,
     liquid_capital_reserve_zar: toNumeric(extra.liquidCapitalReserve, 0),
@@ -478,6 +479,7 @@ export function mapDevelopments(developments: DevelopmentProject[] = [], userId:
     construction_months: toInteger(d.constructionMonths, 0),
     sell_down_months: toInteger(d.sellDownMonths, 0),
     land_purchase_price_zar: toNumeric(d.landPurchasePriceZAR, 0),
+    is_deferred_land_payment_laa: Boolean(d.isDeferredLandPaymentLAA),
     acquisition_costs_zar: toNumeric(d.acquisitionCostsZAR, 0),
     sec118_arrears_zar: toNumeric(d.sec118ArrearsZAR, 0),
     soft_costs: (d.softCosts ? JSON.parse(JSON.stringify(d.softCosts)) : {}) as any,
@@ -491,6 +493,7 @@ export function mapDevelopments(developments: DevelopmentProject[] = [], userId:
     development_facility_drawn_zar: toNumeric(d.developmentFacilityDrawnZAR, 0),
     development_facility_repaid_zar: toNumeric(d.developmentFacilityRepaidZAR, 0),
     pre_sales_hurdle_percent: toNumeric(d.preSalesHurdlePercent, 0),
+    senior_jv_partner_name: d.seniorJvPartnerName || null,
     linked_funding_source_id: d.linkedFundingSourceId || null,
     approvals: (() => {
       const baseApprovals = d.approvals ? JSON.parse(JSON.stringify(d.approvals)) : {};

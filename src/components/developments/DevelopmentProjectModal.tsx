@@ -13,6 +13,8 @@ import {
 } from '@/types';
 import { generateInitialDevelopmentUnits } from '@/lib/calculations/developments';
 import { calculateZoningEnvelope, ZONING_PRESETS } from '@/lib/calculations/zoning';
+import { findInvestmentNode } from '@/lib/constants/investmentNodes';
+import InvestmentNodeSelect from '@/components/common/InvestmentNodeSelect';
 import { usePortfolioStore } from '@/lib/store/usePortfolioStore';
 import {
   Building2,
@@ -96,6 +98,7 @@ export function DevelopmentProjectModal({
   const [address, setAddress] = useState('');
   const [city, setCity] = useState('Johannesburg');
   const [province, setProvince] = useState<Province>('Gauteng');
+  const [investmentNodeId, setInvestmentNodeId] = useState<string | undefined>(undefined);
   const [developmentType, setDevelopmentType] = useState<DevelopmentType>('Sectional Title Apartments');
   const [currentPhase, setCurrentPhase] = useState<DevelopmentPhase>('Feasibility');
   const [isVatRegisteredDeveloper, setIsVatRegisteredDeveloper] = useState(defaultVatReg);
@@ -115,10 +118,13 @@ export function DevelopmentProjectModal({
   const [contingencyPercent, setContingencyPercent] = useState(7.5);
 
   // Holding & Facilities
+  const defaultPreSales = investorProfile?.defaultPreSalesHurdlePercent ?? 40;
   const [monthlyPreApprovalHoldingBurnZAR, setMonthlyPreApprovalHoldingBurnZAR] = useState(9500);
   const [monthlyConstructionHoldingBurnZAR, setMonthlyConstructionHoldingBurnZAR] = useState(16500);
   const [developmentFacilityLimitZAR, setDevelopmentFacilityLimitZAR] = useState(4500000);
-  const [preSalesHurdlePercent, setPreSalesHurdlePercent] = useState(60);
+  const [preSalesHurdlePercent, setPreSalesHurdlePercent] = useState(defaultPreSales);
+  const [isDeferredLandPaymentLAA, setIsDeferredLandPaymentLAA] = useState(false);
+  const [seniorJvPartnerName, setSeniorJvPartnerName] = useState('');
   const [notes, setNotes] = useState('');
 
   // Initial Unit Schedule Generator (new projects)
@@ -200,6 +206,7 @@ export function DevelopmentProjectModal({
       setAddress(editingDevelopment.address || '');
       setCity(editingDevelopment.city || 'Johannesburg');
       setProvince(editingDevelopment.province || 'Gauteng');
+      setInvestmentNodeId(editingDevelopment.investmentNodeId);
       setDevelopmentType(editingDevelopment.developmentType || 'Sectional Title Apartments');
       setCurrentPhase(editingDevelopment.currentPhase || 'Feasibility');
       setIsVatRegisteredDeveloper(editingDevelopment.isVatRegisteredDeveloper ?? true);
@@ -216,7 +223,9 @@ export function DevelopmentProjectModal({
       setMonthlyPreApprovalHoldingBurnZAR(editingDevelopment.monthlyPreApprovalHoldingBurnZAR ?? 9500);
       setMonthlyConstructionHoldingBurnZAR(editingDevelopment.monthlyConstructionHoldingBurnZAR ?? 16500);
       setDevelopmentFacilityLimitZAR(editingDevelopment.developmentFacilityLimitZAR ?? 4500000);
-      setPreSalesHurdlePercent(editingDevelopment.preSalesHurdlePercent ?? 60);
+      setPreSalesHurdlePercent(editingDevelopment.preSalesHurdlePercent ?? (investorProfile?.defaultPreSalesHurdlePercent ?? 40));
+      setIsDeferredLandPaymentLAA(editingDevelopment.isDeferredLandPaymentLAA ?? false);
+      setSeniorJvPartnerName(editingDevelopment.seniorJvPartnerName || '');
       setNotes(editingDevelopment.notes || '');
       if (editingDevelopment.zoningProfile) {
         setCurrentZoning(editingDevelopment.zoningProfile.currentZoning);
@@ -255,6 +264,7 @@ export function DevelopmentProjectModal({
       setAddress('');
       setCity('Johannesburg');
       setProvince('Gauteng');
+      setInvestmentNodeId(undefined);
       setDevelopmentType('Sectional Title Apartments');
       setCurrentPhase('Feasibility');
       setIsVatRegisteredDeveloper(defaultVatReg);
@@ -271,7 +281,9 @@ export function DevelopmentProjectModal({
       setMonthlyPreApprovalHoldingBurnZAR(9500);
       setMonthlyConstructionHoldingBurnZAR(16500);
       setDevelopmentFacilityLimitZAR(4500000);
-      setPreSalesHurdlePercent(60);
+      setPreSalesHurdlePercent(investorProfile?.defaultPreSalesHurdlePercent ?? 40);
+      setIsDeferredLandPaymentLAA(false);
+      setSeniorJvPartnerName('');
       setNotes('');
       setInitialUnitCount(6);
       setDefaultUnitConfiguration('2 Bed 1 Bath Cluster');
@@ -316,6 +328,7 @@ export function DevelopmentProjectModal({
       address,
       city,
       province,
+      investmentNodeId: investmentNodeId || findInvestmentNode(city)?.id,
       developmentType,
       currentPhase,
       isVatRegisteredDeveloper,
@@ -333,6 +346,8 @@ export function DevelopmentProjectModal({
       monthlyConstructionHoldingBurnZAR: Number(monthlyConstructionHoldingBurnZAR),
       developmentFacilityLimitZAR: Number(developmentFacilityLimitZAR),
       preSalesHurdlePercent: Number(preSalesHurdlePercent),
+      isDeferredLandPaymentLAA,
+      seniorJvPartnerName: seniorJvPartnerName.trim() || undefined,
       notes,
     };
 
@@ -482,30 +497,23 @@ export function DevelopmentProjectModal({
                 />
               </div>
 
-              <div>
-                <label className="block font-semibold text-slate-700 mb-1">City</label>
-                <input
-                  type="text"
-                  required
+              <div className="sm:col-span-2">
+                <InvestmentNodeSelect
+                  label="City / Suburb Investment Node"
+                  name="developmentCity"
                   value={city}
-                  onChange={(e) => setCity(e.target.value)}
-                  className="w-full rounded border border-slate-300 px-3 py-1.5"
+                  province={province}
+                  onChange={(newCity, newProvince) => {
+                    setCity(newCity);
+                    setProvince(newProvince);
+                    const node = findInvestmentNode(newCity);
+                    if (node) {
+                      setInvestmentNodeId(node.id);
+                    }
+                  }}
+                  showProfileBanner={false}
+                  selectClassName="w-full rounded border border-slate-300 px-3 py-1.5 bg-white text-xs text-slate-800 font-medium"
                 />
-              </div>
-
-              <div>
-                <label className="block font-semibold text-slate-700 mb-1">Province</label>
-                <select
-                  value={province}
-                  onChange={(e) => setProvince(e.target.value as Province)}
-                  className="w-full rounded border border-slate-300 px-3 py-1.5 bg-white"
-                >
-                  {SA_PROVINCES.map((p) => (
-                    <option key={p} value={p}>
-                      {p}
-                    </option>
-                  ))}
-                </select>
               </div>
             </div>
           </div>
@@ -799,6 +807,17 @@ export function DevelopmentProjectModal({
                   onChange={(e) => setLandPurchasePriceZAR(Number(e.target.value))}
                   className="w-full rounded border border-slate-300 px-3 py-1.5"
                 />
+                <label className="mt-2 flex items-center gap-1.5 cursor-pointer text-xs text-slate-700">
+                  <input
+                    type="checkbox"
+                    checked={isDeferredLandPaymentLAA}
+                    onChange={(e) => setIsDeferredLandPaymentLAA(e.target.checked)}
+                    className="rounded border-slate-300 text-amber-600 focus:ring-amber-500 w-3.5 h-3.5"
+                  />
+                  <span className="text-[11px] font-medium text-slate-600 leading-snug">
+                    Deferred Land Payment (LAA / Land JV — Paid from Unit Sales)
+                  </span>
+                </label>
               </div>
 
               <div>
@@ -961,6 +980,22 @@ export function DevelopmentProjectModal({
                 />
                 <span className="text-[10px] text-slate-400 mt-0.5 block">
                   Commercial bank requirement before releasing tranche draws (typically 50-70%)
+                </span>
+              </div>
+
+              <div className="sm:col-span-2">
+                <label className="block font-semibold text-slate-700 mb-1">
+                  Senior JV / Co-Developer Partner (Optional)
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. WBHO, Stefanutti Stocks, or leave blank for self-delivered"
+                  value={seniorJvPartnerName}
+                  onChange={(e) => setSeniorJvPartnerName(e.target.value)}
+                  className="w-full rounded border border-slate-300 px-3 py-1.5 text-xs text-slate-900 bg-white"
+                />
+                <span className="text-[10px] text-slate-400 mt-0.5 block">
+                  Optional institutional co-developer / JV partner name for commercial bank delivery track record (falls back to your entity name)
                 </span>
               </div>
             </div>

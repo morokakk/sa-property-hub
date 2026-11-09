@@ -104,6 +104,7 @@ export function unmapProfile(row?: Database['public']['Tables']['profiles']['Row
     minDevPocPercent: toNum((row as any).min_dev_poc_percent, 20.0),
     minDevelopmentPocPercent: toNum((row as any).min_dev_poc_percent, 20.0),
     minDevYocPercent: toNum((row as any).min_dev_yoc_percent, 12.0),
+    defaultPreSalesHurdlePercent: toNum((row as any).default_pre_sales_hurdle_percent, 40.0),
     defaultHardBuildRatePerSqmZAR: toNum((row as any).default_hard_build_rate_per_sqm_zar, 9800),
     defaultVatRegisteredDeveloper: (row as any).default_vat_registered_developer ?? true,
     maxDay1CashZAR: toNum((row as any).max_day1_cash_zar, 500000),
@@ -340,6 +341,7 @@ export function unmapDevelopments(
     constructionMonths: toNum(d.construction_months, 0),
     sellDownMonths: toNum(d.sell_down_months, 0),
     landPurchasePriceZAR: toNum(d.land_purchase_price_zar, 0),
+    isDeferredLandPaymentLAA: Boolean((d as any).is_deferred_land_payment_laa ?? false),
     acquisitionCostsZAR: toNum(d.acquisition_costs_zar, 0),
     sec118ArrearsZAR: toNum(d.sec118_arrears_zar, 0),
     softCosts: parseJson(d.soft_costs, {
@@ -362,6 +364,7 @@ export function unmapDevelopments(
     developmentFacilityDrawnZAR: toNum(d.development_facility_drawn_zar, 0),
     developmentFacilityRepaidZAR: toNum(d.development_facility_repaid_zar, 0),
     preSalesHurdlePercent: toNum(d.pre_sales_hurdle_percent, 0),
+    seniorJvPartnerName: (d as any).senior_jv_partner_name || undefined,
     linkedFundingSourceId: d.linked_funding_source_id || undefined,
     approvals: Object.keys(cleanApprovals).length > 0 ? cleanApprovals : fallbackApprovals,
     units: parseJson(d.units, []),

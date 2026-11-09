@@ -849,10 +849,19 @@ export function findInvestmentNode(nameOrCity?: string): InvestmentNode | undefi
     'sandton': 'sandton_bryanston',
     'fourways': 'fourways_lonehill',
     'randburg': 'randburg_ferndale_blairgowrie',
+    'ferndale': 'randburg_ferndale_blairgowrie',
+    'blairgowrie': 'randburg_ferndale_blairgowrie',
+    'randburg-ferndale': 'randburg_ferndale_blairgowrie',
+    'randburg_ferndale': 'randburg_ferndale_blairgowrie',
     'midrand': 'midrand_waterfall_noordwyk',
     'roodepoort': 'roodepoort_florida_weltevreden',
     'bedfordview-edenvale': 'bedfordview_edenvale',
     'east-rand': 'kempton_boksburg',
+    'kempton': 'kempton_boksburg',
+    'kempton-park': 'kempton_boksburg',
+    'kempton_park': 'kempton_boksburg',
+    'kempton_park_cbd': 'kempton_boksburg',
+    'boksburg': 'kempton_boksburg',
     'pta-central': 'pretoria_central_sunnyside',
     'hatfield-brooklyn': 'hatfield_brooklyn',
     'pta-east': 'pretoria_east',
@@ -882,6 +891,44 @@ export function findInvestmentNode(nameOrCity?: string): InvestmentNode | undefi
     const canonicalId = ALIAS_MAP[target] || ALIAS_MAP[normalizedTarget];
     const aliasMatch = ALL_INVESTMENT_NODES.find((n) => n.id === canonicalId);
     if (aliasMatch) return aliasMatch;
+  }
+
+  // 1c. Suburb keyword tokenization for composite strings (e.g., "422 York Avenue, Ferndale, Johannesburg")
+  // Prioritizes specific suburb aliases over generic metro city fallbacks.
+  const tokens = target
+    .toLowerCase()
+    .split(/[^a-z0-9_-]+/)
+    .filter((t) => t.length > 2);
+
+  // Check 2-word sliding window first (e.g. "kempton-park", "salt-rock")
+  for (let i = 0; i < tokens.length - 1; i++) {
+    const pair = `${tokens[i]}-${tokens[i + 1]}`;
+    if (ALIAS_MAP[pair]) {
+      const match = ALL_INVESTMENT_NODES.find((n) => n.id === ALIAS_MAP[pair]);
+      if (match) return match;
+    }
+  }
+
+  // Check single tokens against ALIAS_MAP (excluding broad metro names)
+  const METRO_GENERIC_TOKENS = new Set([
+    'johannesburg',
+    'joburg',
+    'jhb',
+    'pretoria',
+    'durban',
+    'cape',
+    'town',
+    'gauteng',
+    'park',
+    'avenue',
+    'street',
+    'road',
+  ]);
+  for (const token of tokens) {
+    if (!METRO_GENERIC_TOKENS.has(token) && ALIAS_MAP[token]) {
+      const match = ALL_INVESTMENT_NODES.find((n) => n.id === ALIAS_MAP[token]);
+      if (match) return match;
+    }
   }
 
   // 2. Direct metro aliases for legacy/default city names

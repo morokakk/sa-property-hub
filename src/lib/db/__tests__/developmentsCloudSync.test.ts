@@ -48,6 +48,8 @@ describe('Developments Cloud Sync Suite', () => {
     expect(dev1.development_type).toBe('Subdivision & Cluster');
     expect(dev1.current_phase).toBe('Finishes & Practical Completion');
     expect(dev1.land_purchase_price_zar).toBe(1850000);
+    expect(dev1.is_deferred_land_payment_laa).toBe(false);
+    expect(dev1.senior_jv_partner_name).toBeNull();
     expect(dev1.total_buildable_area_sqm).toBe(390);
 
     // JSONB columns should be properly structured
@@ -69,6 +71,21 @@ describe('Developments Cloud Sync Suite', () => {
     expect(unmappedDev1.units.length).toBe(6);
     expect(unmappedDev1.softCosts.townPlannerZAR).toBe(65000);
     expect(unmappedDev1.approvals.splumaRezoningSubdivision.status).toBe('Approved');
+    expect(unmappedDev1.isDeferredLandPaymentLAA).toBe(false);
+    expect(unmappedDev1.seniorJvPartnerName).toBeUndefined();
+
+    // Round-trip test with LAA and Senior JV partner set
+    const customDev: DevelopmentProject = {
+      ...INITIAL_DEVELOPMENTS[0],
+      isDeferredLandPaymentLAA: true,
+      seniorJvPartnerName: 'WBHO Construction Group',
+    };
+    const customMapped = mapDevelopments([customDev], mockUserId);
+    expect(customMapped[0].is_deferred_land_payment_laa).toBe(true);
+    expect(customMapped[0].senior_jv_partner_name).toBe('WBHO Construction Group');
+    const customUnmapped = unmapDevelopments(customMapped as any);
+    expect(customUnmapped[0].isDeferredLandPaymentLAA).toBe(true);
+    expect(customUnmapped[0].seniorJvPartnerName).toBe('WBHO Construction Group');
   });
 
   it('handles stock demo state detection accurately with developments', () => {

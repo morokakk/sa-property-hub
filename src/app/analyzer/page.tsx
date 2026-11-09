@@ -345,7 +345,7 @@ export default function OpportunityAnalyzerPage() {
     analyzerDraft?.sCurveUtilizationPercent ?? 60
   );
   const [preSalesHurdlePercent, setPreSalesHurdlePercent] = useState<number>(
-    analyzerDraft?.preSalesHurdlePercent ?? 60
+    analyzerDraft?.preSalesHurdlePercent ?? investorProfile?.defaultPreSalesHurdlePercent ?? 40
   );
 
   // Municipal Zoning Rights & Town Planning Bulk Envelope
@@ -1561,7 +1561,7 @@ export default function OpportunityAnalyzerPage() {
     setMonthlyConstructionBurnZAR(deal.monthlyConstructionBurnZAR ?? 12_500);
     setSeniorDebtLtcPercent(deal.seniorDebtLtcPercent ?? 65);
     setSCurveUtilizationPercent(deal.sCurveUtilizationPercent ?? 60);
-    setPreSalesHurdlePercent(deal.preSalesHurdlePercent ?? 60);
+    setPreSalesHurdlePercent(deal.preSalesHurdlePercent ?? investorProfile?.defaultPreSalesHurdlePercent ?? 40);
     setZoningProfile(deal.zoningProfile ? structuredClone(deal.zoningProfile) : undefined);
     setActiveWorkspaceTab('calculator');
     if (deal.strategy === 'Flip' || deal.strategy === 'BRRRR' || deal.strategy === 'Development') {

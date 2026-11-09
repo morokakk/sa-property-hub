@@ -8,6 +8,7 @@ import {
   calculateIncreasedAmount,
   type DevelopmentFinancialSummary,
 } from '../developments';
+import { INITIAL_DEVELOPMENTS } from '@/lib/store/initialData';
 import type {
   DevelopmentProject,
   DevelopmentSoftCosts,
@@ -640,12 +641,12 @@ describe('Developments Pure Calculation Engine', () => {
       // Only Unit 1 is 'Sold & Transferred' @ 1,610,000
       // Outstanding debt = 3,200,000
       // Sold proceeds = 1,610,000 < debt (3,200,000)
-      // Net cash proceeds after debt = 0
       // Remaining debt on retained units = 3,200,000 - 1,610,000 = 1,590,000
+      // All 4 units for sale total 6,440,000; drawn facility is 4,200,000 -> projected net proceeds across all sale units = 2,240,000
       const fin = calculateDevelopmentFinancials(sampleDevelopment);
 
       expect(fin.totalSoldProceedsZAR).toBe(1_610_000);
-      expect(fin.netSalesProceedsAfterDebtZAR).toBe(0);
+      expect(fin.netSalesProceedsAfterDebtZAR).toBe(2_240_000);
       expect(fin.remainingDebtOnRetainedUnitsZAR).toBe(1_590_000);
     });
 
@@ -653,8 +654,8 @@ describe('Developments Pure Calculation Engine', () => {
       // Mark Units 1, 2, 3 as 'Sold & Transferred'
       // Sold proceeds = 3 * 1,610,000 = 4,830,000
       // Outstanding debt = 3,200,000
-      // Net cash proceeds after debt = 4,830,000 - 3,200,000 = 1,630,000
       // Remaining debt on retained units = 0 (100% Free-Carry!)
+      // Projected net proceeds across all 4 sale units after 4.2m facility = 2,240,000
       const surplusSalesDev: DevelopmentProject = {
         ...sampleDevelopment,
         units: sampleUnits.map((u, i) =>
@@ -665,7 +666,7 @@ describe('Developments Pure Calculation Engine', () => {
 
       expect(fin.unitsSoldAndTransferredCount).toBe(3);
       expect(fin.totalSoldProceedsZAR).toBe(4_830_000);
-      expect(fin.netSalesProceedsAfterDebtZAR).toBe(1_630_000);
+      expect(fin.netSalesProceedsAfterDebtZAR).toBe(2_240_000);
       expect(fin.remainingDebtOnRetainedUnitsZAR).toBe(0);
     });
 
@@ -929,6 +930,191 @@ describe('Developments Pure Calculation Engine', () => {
       expect(calculateIncreasedAmount(null, 500_000)).toBe(500_000);
       expect(calculateIncreasedAmount(1_000_000, null)).toBe(1_000_000);
       expect(calculateIncreasedAmount(undefined, undefined)).toBe(0);
+    });
+
+    it('computes landCostPerUnitZAR and handles zero units division guard', () => {
+      // 6 units, R 1,500,000 land
+      const fin = calculateDevelopmentFinancials(sampleDevelopment);
+      expect(fin.landCostPerUnitZAR).toBe(250_000);
+      expect(fin.landToGdvPercent).toBeCloseTo((1_500_000 / fin.gdvInclVatZAR) * 100, 1);
+
+      // Zero units project
+      const zeroUnitsDev: DevelopmentProject = {
+        ...sampleDevelopment,
+        units: [],
+      };
+      const zeroFin = calculateDevelopmentFinancials(zeroUnitsDev);
+      expect(zeroFin.landCostPerUnitZAR).toBe(0);
+      expect(zeroFin.landToGdvPercent).toBe(0);
+    });
+
+    it('flags isLandCostElevated for Township Infill (> R60k/unit) vs other schemes (> 25% GDV)', () => {
+      // Township Infill with R 70,000/unit -> elevated
+      const townshipDevElevated: DevelopmentProject = {
+        ...sampleDevelopment,
+        developmentType: 'Township Micro-Units (Infill)',
+        landPurchasePriceZAR: 700_000,
+        units: Array.from({ length: 10 }, (_, i) => ({
+          ...sampleUnits[0],
+          id: `u-${i}`,
+          listPriceVatInclZAR: 300_000,
+        })),
+      };
+      const finTownshipElevated = calculateDevelopmentFinancials(townshipDevElevated);
+      expect(finTownshipElevated.landCostPerUnitZAR).toBe(70_000);
+      expect(finTownshipElevated.isLandCostElevated).toBe(true);
+
+      // Township Infill with R 50,000/unit -> normal
+      const townshipDevNormal: DevelopmentProject = {
+        ...townshipDevElevated,
+        landPurchasePriceZAR: 500_000,
+      };
+      const finTownshipNormal = calculateDevelopmentFinancials(townshipDevNormal);
+      expect(finTownshipNormal.landCostPerUnitZAR).toBe(50_000);
+      expect(finTownshipNormal.isLandCostElevated).toBe(false);
+
+      // Sectional Title with 30% GDV land -> elevated (> 25%)
+      const sectionalElevated: DevelopmentProject = {
+        ...sampleDevelopment,
+        developmentType: 'Sectional Title Apartments',
+        landPurchasePriceZAR: 3_000_000, // ~31% of ~R9.66m GDV
+      };
+      const finSectionalElevated = calculateDevelopmentFinancials(sectionalElevated);
+      expect(finSectionalElevated.landToGdvPercent).toBeGreaterThan(25.0);
+      expect(finSectionalElevated.isLandCostElevated).toBe(true);
+
+      // Sectional Title with 15% GDV land -> normal (<= 25%)
+      const finNormal = calculateDevelopmentFinancials(sampleDevelopment);
+      expect(finNormal.landToGdvPercent).toBeLessThanOrEqual(25.0);
+      expect(finNormal.isLandCostElevated).toBe(false);
+    });
+
+    it('models LAA Day-1 equity reduction and exit proceeds deduction accurately', () => {
+      // Baseline Day-1 equity (standard purchase): land + acquisition + sec118
+      const devNoDebt: DevelopmentProject = {
+        ...sampleDevelopment,
+        developmentFacilityLimitZAR: 0,
+        developmentFacilityDrawnZAR: 0,
+        developmentFacilityRepaidZAR: 0,
+      };
+      const finStandard = calculateDevelopmentFinancials(devNoDebt);
+      expect(finStandard.day1EquityOutlayZAR).toBe(1_500_000 + 120_000 + 45_000);
+      expect(finStandard.isDeferredLandPaymentLAA).toBe(false);
+
+      // LAA mode: Day-1 cash outlay excludes landPurchasePriceZAR
+      const laaDev: DevelopmentProject = {
+        ...devNoDebt,
+        isDeferredLandPaymentLAA: true,
+      };
+      const finLaa = calculateDevelopmentFinancials(laaDev);
+      expect(finLaa.isDeferredLandPaymentLAA).toBe(true);
+      expect(finLaa.day1EquityOutlayZAR).toBe(120_000 + 45_000); // 165,000
+
+      // In devNoDebt: 4 units for sale total R 6,440,000; facility debt to extinguish is 0
+      // 1 unit is 'Sold & Transferred' at R 1,610,000; landCostPerUnit = 250,000
+      // deferredLandPayableAtExit = 1 * 250,000 = 250,000
+      // netSalesProceedsAfterDebt = totalSaleUnitsGdv (6,440,000) - 250,000 = 6,190,000
+      expect(finLaa.deferredLandPayableAtExitZAR).toBe(250_000);
+      expect(finLaa.netSalesProceedsAfterDebtZAR).toBe(6_440_000 - 250_000);
+      expect(finStandard.netSalesProceedsAfterDebtZAR).toBe(6_440_000);
+
+      // dev-1 (Ferndale 6-Unit Cluster): 4 units for sale totaling R 5,540,000 minus R 4,200,000 facility = R 1,340,000
+      const dev1 = INITIAL_DEVELOPMENTS[0];
+      const finDev1 = calculateDevelopmentFinancials(dev1);
+      expect(finDev1.netSalesProceedsAfterDebtZAR).toBe(1_340_000);
+    });
+
+    it('derives suburbEndUserBondCeilingZAR from investment node and handles fallback ceiling', () => {
+      // Randburg / Ferndale node linked (avgUnitSqm = 65m², upper bound = 19,500 * 1.15 = 22,425)
+      // 65 * 22,425 = R 1,457,625 ceiling
+      const nodeDev: DevelopmentProject = {
+        ...sampleDevelopment,
+        city: 'Randburg',
+        investmentNodeId: 'randburg_ferndale_blairgowrie',
+      };
+      const finNode = calculateDevelopmentFinancials(nodeDev);
+      expect(finNode.suburbEndUserBondCeilingZAR).toBe(1_457_625);
+
+      // On dev-1: Ferndale, 65m² units, average unit list price R 1,398,333 <= R 1,457,625 * 1.05
+      const dev1 = INITIAL_DEVELOPMENTS[0];
+      const finDev1 = calculateDevelopmentFinancials(dev1);
+      expect(finDev1.suburbEndUserBondCeilingZAR).toBe(1_457_625);
+      expect(finDev1.isWithinEndUserBondCeiling).toBe(true);
+
+      // Multi-word address suburb resolution: "422 York Avenue, Ferndale, Johannesburg" resolves to randburg_ferndale_blairgowrie
+      const addressDev: DevelopmentProject = {
+        ...sampleDevelopment,
+        address: '422 York Avenue, Ferndale, Johannesburg',
+        city: 'Johannesburg',
+        investmentNodeId: undefined,
+      };
+      const finAddress = calculateDevelopmentFinancials(addressDev);
+      expect(finAddress.suburbEndUserBondCeilingZAR).toBe(1_457_625);
+
+      // No node linked: falls back to R 800,000 gap-market ceiling
+      const noNodeDev: DevelopmentProject = {
+        ...sampleDevelopment,
+        address: '99 NonExistent Rural Route',
+        title: 'Remote Farmstead',
+        city: 'NonExistentCityXYZ',
+        investmentNodeId: undefined,
+      };
+      const finNoNode = calculateDevelopmentFinancials(noNodeDev);
+      expect(finNoNode.suburbEndUserBondCeilingZAR).toBe(800_000);
+      // Average list price is R 1,610,000 > R 800,000 * 1.05 -> false
+      expect(finNoNode.isWithinEndUserBondCeiling).toBe(false);
+    });
+
+    it('evaluates 4-Pillar Bank Readiness summary correctly', () => {
+      // 1. Fully bankable scheme with Senior JV partner
+      const bankableDev: DevelopmentProject = {
+        ...sampleDevelopment,
+        seniorJvPartnerName: 'Apex Construction JV',
+        preSalesHurdlePercent: 30, // 3 out of 6 units pre-sold = 50% GDV >= 30% hurdle -> met
+        approvals: {
+          splumaRezoningSubdivision: { status: 'Approved' },
+          sgDiagramApproval: { status: 'Approved' },
+          municipalBuildingPlans: { status: 'Approved' },
+          nhbrcEnrolment: { status: 'Approved' },
+          sectionalTitleRegister: { status: 'Not Started' },
+          occupancyCertificate: { status: 'Not Started' },
+        },
+        softCosts: {
+          ...sampleSoftCosts,
+          quantitySurveyorZAR: 45_000,
+          structuralCivilEngineerZAR: 65_000,
+        },
+      };
+
+      const fin = calculateDevelopmentFinancials(bankableDev);
+      expect(fin.bankReadiness.paperRights.met).toBe(true);
+      expect(fin.bankReadiness.qsAndGeotech.met).toBe(true);
+      expect(fin.bankReadiness.preSalesGate.met).toBe(true);
+      expect(fin.bankReadiness.deliveryTrackRecord.met).toBe(true);
+      expect(fin.bankReadiness.deliveryTrackRecord.partnerOrEntity).toBe('Apex Construction JV');
+      expect(fin.bankReadiness.overallBankable).toBe(true);
+
+      // 2. Self-delivered scheme (no senior JV partner): deliveryTrackRecord.met is false (neutral/self-delivered)
+      const selfDeliveredDev: DevelopmentProject = {
+        ...bankableDev,
+        seniorJvPartnerName: undefined,
+      };
+      const finSelf = calculateDevelopmentFinancials(selfDeliveredDev, undefined, 'Acme Holdings');
+      expect(finSelf.bankReadiness.deliveryTrackRecord.met).toBe(false);
+      expect(finSelf.bankReadiness.deliveryTrackRecord.partnerOrEntity).toBe('Acme Holdings');
+      expect(finSelf.bankReadiness.overallBankable).toBe(true); // Pillars 1, 2, 3 met
+
+      // 3. Pending SPLUMA: Paper Rights fails
+      const pendingSplumaDev: DevelopmentProject = {
+        ...bankableDev,
+        approvals: {
+          ...bankableDev.approvals,
+          splumaRezoningSubdivision: { status: 'Submitted' },
+        },
+      };
+      const finPending = calculateDevelopmentFinancials(pendingSplumaDev);
+      expect(finPending.bankReadiness.paperRights.met).toBe(false);
+      expect(finPending.bankReadiness.overallBankable).toBe(false);
     });
   });
 });
