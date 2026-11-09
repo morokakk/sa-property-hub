@@ -64,6 +64,8 @@ export interface DevelopmentFinancialSummary {
   isVatRegisteredDeveloper: boolean;
   outputVatZAR: number;
   claimableInputVatZAR: number;
+  /** Alias for claimableInputVatZAR */
+  estimatedInputVatCreditZAR: number;
   netRealizableGdvZAR: number;
 
   // Profitability & Tax
@@ -225,6 +227,7 @@ export function calculateDevelopmentFinancials(
       isVatRegisteredDeveloper: false,
       outputVatZAR: 0,
       claimableInputVatZAR: 0,
+      estimatedInputVatCreditZAR: 0,
       netRealizableGdvZAR: 0,
       netProfitBeforeTaxZAR: 0,
       pocPercent: 0,
@@ -714,6 +717,7 @@ export function calculateDevelopmentFinancials(
     isVatRegisteredDeveloper,
     outputVatZAR,
     claimableInputVatZAR,
+    estimatedInputVatCreditZAR: claimableInputVatZAR,
     netRealizableGdvZAR,
     netProfitBeforeTaxZAR,
     pocPercent,

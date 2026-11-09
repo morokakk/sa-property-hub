@@ -367,12 +367,13 @@ export function calculateProposalStressScenarios(params: {
     estimatedInputVatCreditZAR = 0,
   } = params;
 
-  const commRate = Math.min(0.5, Math.max(0, (exitCommissionPercent || 0) / 100));
+  const safeExitCommissionPercent = isDevelopment ? 0 : (exitCommissionPercent || 0);
+  const commRate = Math.min(0.5, Math.max(0, safeExitCommissionPercent / 100));
   const netRetentionRate = Math.max(0.1, 1 - commRate);
-  const safeExitLegal = Math.max(0, exitLegalCostZAR || 0);
+  const safeExitLegal = isDevelopment ? 0 : Math.max(0, exitLegalCostZAR || 0);
   const safeSeniorDebt = Math.max(0, seniorDebtZAR || 0);
   const safePrincipal = Math.max(0, capitalRequestedZAR || 0);
-  const safeLenderReturn = Math.max(0, lenderReturnZAR || 0);
+  const safeLenderReturn = isDevelopment ? 0 : Math.max(0, lenderReturnZAR || 0);
 
   // Guardrail #3 exact formula:
   // Principal Break-Even Exit = (Capital Requested + Senior Debt (if any) + Exit Legal Fees) / (1 - Exit Commission Rate)
@@ -414,13 +415,14 @@ export function calculateProposalStressScenarios(params: {
 
   const scenarios: ProposalStressRow[] = scenarioDefs.map((def) => {
     const exitValuationZAR = Math.round(targetExitPriceZAR * (1 + def.deltaPercent / 100));
-    const isVatStrippedDev = Boolean(isDevelopment && isVatRegisteredDeveloper);
     let projectedNetProfitZAR: number;
     let scenarioTotalCost: number;
 
-    if (isVatStrippedDev) {
+    if (isDevelopment) {
       scenarioTotalCost = totalProjectCostZAR;
-      const scenarioNetRealizableGdv = Math.round(exitValuationZAR / 1.15 + (estimatedInputVatCreditZAR || 0));
+      const scenarioNetRealizableGdv = isVatRegisteredDeveloper
+        ? Math.round(exitValuationZAR / 1.15 + (estimatedInputVatCreditZAR || 0))
+        : exitValuationZAR;
       projectedNetProfitZAR = Math.round(scenarioNetRealizableGdv - scenarioTotalCost);
     } else {
       const scenarioExitCommission = exitValuationZAR * commRate;
@@ -437,12 +439,14 @@ export function calculateProposalStressScenarios(params: {
     const scenarioLenderReturn =
       fundingOfferType === 'Equity Profit Split'
         ? Math.max(0, Math.round(projectedNetProfitZAR * (offeredRatePercent / 100)))
+        : isDevelopment
+        ? 0
         : safeLenderReturn;
 
     const sponsorNetTakeHomeZAR = Math.round(projectedNetProfitZAR - scenarioLenderReturn);
     const sponsorRoiPercent =
       scenarioTotalCost > 0
-        ? Number(((projectedNetProfitZAR / scenarioTotalCost) * 100).toFixed(2))
+        ? Number(((projectedNetProfitZAR / scenarioTotalCost) * 100).toFixed(1))
         : 0;
 
     const lenderPrincipalCoveredPercent =
@@ -550,7 +554,11 @@ export function synthesizeStrengthsAndMitigants(params: {
   const strengths: SynthesizedStrengthItem[] = [];
   const riskMitigants: SynthesizedRiskMitigantItem[] = [];
 
-  const node = findInvestmentNode(deal.city);
+  const rawDev = deal.rawDevelopment;
+  const devNodeQuery = rawDev
+    ? rawDev.investmentNodeId || `${rawDev.address || ''} ${rawDev.title || ''} ${rawDev.city || ''}`
+    : undefined;
+  const node = findInvestmentNode(devNodeQuery || deal.city);
 
   // ============================================================================
   // 1. SYNTHESIZE UNDERWRITING STRENGTHS

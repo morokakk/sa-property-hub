@@ -6,6 +6,8 @@ import {
   synthesizeStrengthsAndMitigants,
 } from '@/lib/calculations/proposalIntelligence';
 import { ReturnTermType } from '@/types';
+import { INITIAL_DEVELOPMENTS } from '@/lib/store/initialData';
+import { calculateDevelopmentFinancials } from '@/lib/calculations/developments';
 
 const CANONICAL_RETURN_TYPES: ReturnTermType[] = [
   'Fixed Interest',
@@ -253,6 +255,31 @@ describe('proposalIntelligence — Guardrail #3 (Canonical ReturnTermType & Exit
     expect(baseScenario).toBeDefined();
     // Base Case Net Deal Profit = (8,390,000 / 1.15) + 693,913 - 7,061,813 = R 927,752
     expect(baseScenario!.projectedNetProfitZAR).toBe(927_752);
+    // Sponsor Net Take Home does not double-deduct lender return on Development deals
+    expect(baseScenario!.sponsorNetTakeHomeZAR).toBe(927_752);
+
+    // dev-1 calibration using actual seed project numbers
+    const dev1 = INITIAL_DEVELOPMENTS[0];
+    const dev1Fin = calculateDevelopmentFinancials(dev1);
+    const dev1Stress = calculateProposalStressScenarios({
+      targetExitPriceZAR: dev1Fin.gdvInclVatZAR,
+      totalProjectCostZAR: dev1Fin.tdcZAR,
+      capitalRequestedZAR: 4_200_000,
+      lenderReturnZAR: 643_125,
+      exitCommissionPercent: 5.0,
+      exitLegalCostZAR: 25_825,
+      monthlyBurnRateZAR: 19_400,
+      isDevelopment: true,
+      isVatRegisteredDeveloper: dev1.isVatRegisteredDeveloper,
+      estimatedInputVatCreditZAR: dev1Fin.estimatedInputVatCreditZAR,
+    });
+
+    const dev1Base = dev1Stress.scenarios.find((s) => s.id === 'base')!;
+    expect(dev1Base.projectedNetProfitZAR).toBe(dev1Fin.netProfitBeforeTaxZAR);
+    expect(dev1Base.sponsorRoiPercent).toBe(Number(dev1Fin.pocPercent.toFixed(1)));
+    expect(dev1Base.sponsorNetTakeHomeZAR).toBe(dev1Fin.netProfitBeforeTaxZAR);
+    expect(dev1Stress.threeMonthDelayBurnZAR).toBe(58_200);
+    expect(dev1Stress.profitAfterThreeMonthDelayZAR).toBe(dev1Fin.netProfitBeforeTaxZAR - 58_200);
 
     // Capital stack split for Development strategy does not double-deduct facility carrying interest
     const split = calculateCapitalStackSplit({

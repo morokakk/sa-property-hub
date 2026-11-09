@@ -68,6 +68,7 @@ import {
   synthesizeStrengthsAndMitigants,
   FundingPresetOption,
 } from '@/lib/calculations/proposalIntelligence';
+import { findInvestmentNode } from '@/lib/constants/investmentNodes';
 
 function getSafeLogoUri(uri?: string): string {
   if (!uri) return '';
@@ -841,6 +842,13 @@ function ProposalGeneratorContent() {
   // Financial calculations
   const isDevelopment = deal?.type === 'development';
   const activeDevelopment = isDevelopment ? (deal as any).rawDevelopment : undefined;
+  const selectedDevNode = useMemo(() => {
+    if (!activeDevelopment) return undefined;
+    return findInvestmentNode(
+      activeDevelopment.investmentNodeId ||
+        `${activeDevelopment.address || ''} ${activeDevelopment.title || ''} ${activeDevelopment.city || ''}`
+    );
+  }, [activeDevelopment]);
   const devFin = isDevelopment ? (deal as any).developmentFinancials : undefined;
 
   const holdingDuration =
@@ -984,15 +992,15 @@ function ProposalGeneratorContent() {
       totalProjectCostZAR: totalProjectCost,
       capitalRequestedZAR: capitalRequested,
       lenderReturnZAR: capitalStackSplit.lenderReturnZAR,
-      exitCommissionPercent,
-      exitLegalCostZAR: exitLegalCost,
+      exitCommissionPercent: isDevelopment ? 0 : exitCommissionPercent,
+      exitLegalCostZAR: isDevelopment ? 0 : exitLegalCost,
       monthlyBurnRateZAR: monthlyBurnRate,
       seniorDebtZAR: 0,
       fundingOfferType,
       offeredRatePercent: offeredRate,
       isDevelopment,
       isVatRegisteredDeveloper: Boolean(activeDevelopment?.isVatRegisteredDeveloper),
-      estimatedInputVatCreditZAR: devFin?.estimatedInputVatCreditZAR ?? 0,
+      estimatedInputVatCreditZAR: devFin?.estimatedInputVatCreditZAR ?? devFin?.claimableInputVatZAR ?? 0,
     });
   }, [
     deal,
@@ -1361,7 +1369,7 @@ function ProposalGeneratorContent() {
                   </span>
                   <span className="text-[10px] text-slate-500">
                     {isDevelopment || pitchStrategy === 'Development'
-                      ? `POC: ${devFin?.pocPercent ?? 0}% • Realizable exit net of VAT`
+                      ? `POC: ${(devFin?.pocPercent ?? 0).toFixed(1)}% • Realizable exit net of VAT`
                       : pitchStrategy === 'Flip'
                       ? `After ${formatZAR(capitalStackSplit.lenderReturnZAR)} lender return`
                       : `After ${formatZAR(capitalStackSplit.monthlyLenderServiceZAR)}/mo facility service`}
@@ -3216,7 +3224,7 @@ function ProposalGeneratorContent() {
               </div>
 
               {/* Interest Rate Stress Test Strip for Rental & BRRRR Proposals */}
-              {!isFlip && (
+              {!isFlip && !isDevelopment && pitchStrategy !== 'Development' && (
                 <div className="pt-2 print:break-inside-avoid">
                   {proposalRateShockScenarios.length > 0 ? (
                     <RateShockStrip
