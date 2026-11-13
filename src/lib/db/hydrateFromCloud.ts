@@ -368,9 +368,25 @@ export function unmapDevelopments(
     linkedFundingSourceId: d.linked_funding_source_id || undefined,
     approvals: Object.keys(cleanApprovals).length > 0 ? cleanApprovals : fallbackApprovals,
     units: parseJson(d.units, []),
+    commentsLedger: (() => {
+      const parsed = parseJson(d.comments_ledger, [] as any[]);
+      return Array.isArray(parsed)
+        ? parsed.filter(
+            (c) =>
+              Boolean(c) &&
+              typeof c === 'object' &&
+              !Array.isArray(c) &&
+              typeof c.id === 'string' &&
+              typeof c.message === 'string'
+          )
+        : [];
+    })(),
     compliance: d.compliance ? (parseJson(d.compliance, undefined) as any) : undefined,
     driveVault: d.drive_vault ? (parseJson(d.drive_vault, undefined) as any) : undefined,
     zoningProfile: devZoning || undefined,
+    shareToken: typeof (d as any).share_token === 'string' && (d as any).share_token.trim()
+      ? (d as any).share_token.trim()
+      : undefined,
     notes: d.notes || undefined,
     createdAt: d.created_at || undefined,
   };

@@ -8,12 +8,16 @@ export interface CloudPublishModalProps {
   isOpen: boolean;
   onClose: () => void;
   onCopyWhatsApp: () => void;
+  mode?: 'rental' | 'development';
+  offlineFallbackLabel?: string;
 }
 
 export default function CloudPublishModal({
   isOpen,
   onClose,
   onCopyWhatsApp,
+  mode = 'rental',
+  offlineFallbackLabel,
 }: CloudPublishModalProps) {
   useEffect(() => {
     if (!isOpen) return;
@@ -56,7 +60,9 @@ export default function CloudPublishModal({
                 Cloud Sync Required to Share Online
               </h2>
               <p className="text-xs text-slate-400 mt-0.5">
-                Public tenant statements require private cloud hosting
+                {mode === 'development'
+                  ? 'Public project deal rooms require private cloud hosting'
+                  : 'Public tenant statements require private cloud hosting'}
               </p>
             </div>
           </div>
@@ -73,35 +79,70 @@ export default function CloudPublishModal({
 
         {/* Modal Body */}
         <div className="p-5 sm:p-6 space-y-4 text-xs sm:text-sm text-slate-600 leading-relaxed">
-          <p>
-            Public tenant statement links are hosted securely in the cloud so tenants can view,
-            verify, and download their official itemized statements directly on their phone or
-            computer.
-          </p>
+          {mode === 'development' ? (
+            <>
+              <p>
+                Public deal room links are hosted securely in the cloud so quantity surveyors,
+                architects, town planners, and funders can inspect your POPIA-safe feasibility,
+                export the 5-sheet Excel pack, and submit team ledger notes directly.
+              </p>
 
-          <p>
-            Because this rental property was created locally in your browser (Local Storage mode), an
-            authenticated account is needed to publish and host it online.
-          </p>
+              <p>
+                Because this custom development project was created locally in your browser (Local
+                Storage mode), an authenticated account is needed to publish and host it online.
+              </p>
 
-          {/* Offline Fallback Callout */}
-          <div className="p-3.5 bg-emerald-50 border border-emerald-200 rounded-xl flex items-start gap-2.5 text-xs text-emerald-900">
-            <Info className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-            <div>
-              <span className="font-semibold block text-emerald-950">
-                100% Offline WhatsApp Statements Available
-              </span>
-              <span>
-                Don’t want to sign in right now? You can copy the full formatted text statement and send it directly via WhatsApp without creating an account.
-              </span>
-            </div>
-          </div>
+              {/* Offline Fallback Callout */}
+              <div className="p-3.5 bg-emerald-50 border border-emerald-200 rounded-xl flex items-start gap-2.5 text-xs text-emerald-900">
+                <Info className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                <div>
+                  <span className="font-semibold block text-emerald-950">
+                    100% Offline WhatsApp & Excel Pack Available
+                  </span>
+                  <span>
+                    Don’t want to sign in right now? You can copy the WhatsApp deal summary or
+                    export the 5-sheet Excel Team Pack without creating an account.
+                  </span>
+                </div>
+              </div>
+            </>
+          ) : (
+            <>
+              <p>
+                Public tenant statement links are hosted securely in the cloud so tenants can view,
+                verify, and download their official itemized statements directly on their phone or
+                computer.
+              </p>
+
+              <p>
+                Because this rental property was created locally in your browser (Local Storage mode), an
+                authenticated account is needed to publish and host it online.
+              </p>
+
+              {/* Offline Fallback Callout */}
+              <div className="p-3.5 bg-emerald-50 border border-emerald-200 rounded-xl flex items-start gap-2.5 text-xs text-emerald-900">
+                <Info className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                <div>
+                  <span className="font-semibold block text-emerald-950">
+                    100% Offline WhatsApp Statements Available
+                  </span>
+                  <span>
+                    Don’t want to sign in right now? You can copy the full formatted text statement and send it directly via WhatsApp without creating an account.
+                  </span>
+                </div>
+              </div>
+            </>
+          )}
         </div>
 
         {/* Modal Footer / Actions */}
         <div className="p-4 sm:p-6 bg-slate-50 border-t border-slate-100 flex flex-col gap-2.5">
           <Link
-            href="/settings?returnTo=rentals&action=publish_link"
+            href={
+              mode === 'development'
+                ? '/settings?returnTo=developments&action=publish_link'
+                : '/settings?returnTo=rentals&action=publish_link'
+            }
             data-testid="sign-in-to-publish-btn"
             onClick={onClose}
             className="w-full inline-flex items-center justify-center gap-2 bg-sky-600 hover:bg-sky-700 active:bg-sky-800 text-white font-semibold py-2.5 px-4 rounded-xl shadow-xs transition-colors text-xs sm:text-sm cursor-pointer text-center"
@@ -117,7 +158,12 @@ export default function CloudPublishModal({
             className="w-full inline-flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-semibold py-2.5 px-4 rounded-xl shadow-xs transition-colors text-xs sm:text-sm cursor-pointer"
           >
             <Share2 className="w-4 h-4" />
-            <span>Copy WhatsApp Statement Instead</span>
+            <span>
+              {offlineFallbackLabel ||
+                (mode === 'development'
+                  ? 'Copy WhatsApp Summary Instead'
+                  : 'Copy WhatsApp Statement Instead')}
+            </span>
           </button>
 
           <button

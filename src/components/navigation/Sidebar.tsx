@@ -42,6 +42,7 @@ export default function Sidebar() {
   // Hide sidebar completely on tenant statement portal, legal privacy page, and standalone landing/about pages
   if (
     pathname.startsWith('/statement') ||
+    pathname.startsWith('/deal-room') ||
     pathname.startsWith('/privacy') ||
     pathname.startsWith('/welcome') ||
     pathname.startsWith('/about')
@@ -123,6 +124,7 @@ export default function Sidebar() {
       {
         rentals: currentState.rentals,
         flips: currentState.flips,
+        developments: currentState.developments,
         funding: currentState.funding,
         opportunities: currentState.opportunities,
         suppliers: currentState.suppliers,

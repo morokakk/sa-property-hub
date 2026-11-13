@@ -316,6 +316,7 @@ export interface OpportunityDeal {
   passNotes?: string;
   passedAt?: string;
   notes?: string;
+  commentsLedger?: ProjectComment[];
   createdAt: string;
 }
 
@@ -468,6 +469,7 @@ export interface FlipProject {
     retentionReleased: boolean;
   };
   occupantRisk?: OccupantRiskProfile;
+  commentsLedger?: ProjectComment[];
 }
 
 // Maintenance Log Item
@@ -1050,6 +1052,8 @@ export interface CustomNodeBenchmarkOverride {
   updatedAt?: string;
 }
 
+export type CustomNodeBenchmarksMap = Record<string, CustomNodeBenchmarkOverride>;
+
 // Investor Profile & Platform Settings
 export interface InvestorProfile {
   entityName: string;
@@ -1083,7 +1087,7 @@ export interface InvestorProfile {
   vatExemptAgent?: boolean; // default false
   marginalTaxRatePercent?: number; // default 31.0%
   // Regional Node Market Benchmarks (35 Corridors Overrides)
-  customNodeBenchmarks?: Record<string, CustomNodeBenchmarkOverride>;
+  customNodeBenchmarks?: CustomNodeBenchmarksMap;
   // Remittance & Banking Details for Statements
   bankName?: string;
   accountHolder?: string;
@@ -1308,6 +1312,40 @@ export type DevelopmentTaxEntityType = 'Company (27%)' | 'Individual' | 'Trust';
 
 export type DriveVaultLinks = CloudDriveVault;
 
+// ==========================================
+// Tier 1 Project Collaboration: Comment & Action Ledger
+// ==========================================
+
+export type ProjectCommentStatus = 'Pending' | 'In Progress' | 'Resolved';
+
+export type ProjectCollaboratorRole =
+  | 'Lead Sponsor'
+  | 'Co-Developer / JV'
+  | 'Quantity Surveyor (QS)'
+  | 'Town Planner'
+  | 'Architect / Engineer'
+  | 'Lender / Funder'
+  | 'Sales Agent'
+  | 'External Team';
+
+export type ProjectCommentSectionTag =
+  | 'General'
+  | 'Unit Schedule'
+  | 'BOQ & Cost Stack'
+  | 'Paper Rights & Approvals'
+  | 'Finance & Pre-Sales';
+
+export interface ProjectComment {
+  id: string;
+  authorName: string;
+  authorRole: ProjectCollaboratorRole;
+  sectionTag?: ProjectCommentSectionTag;
+  message: string;
+  status: ProjectCommentStatus;
+  createdAt: string;
+  resolvedAt?: string;
+}
+
 export interface DevelopmentProject {
   // Identity & Node
   id: string;
@@ -1353,6 +1391,10 @@ export interface DevelopmentProject {
   compliance?: ComplianceCertificates;
   driveVault?: DriveVaultLinks;
   zoningProfile?: ZoningProfile;
+
+  // Collaboration & Action Ledger
+  commentsLedger?: ProjectComment[];
+  shareToken?: string;
 
   // General Metadata
   notes?: string;

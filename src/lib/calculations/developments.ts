@@ -167,6 +167,79 @@ const PRE_SOLD_STATUSES: ReadonlySet<DevUnitStatus> = new Set<DevUnitStatus>([
   'Sold & Transferred',
 ]);
 
+export interface DevelopmentApprovalDefinition {
+  key: keyof PreConstructionApprovals;
+  title: string;
+  stage: 'Stage 1: Paper Rights' | 'Stage 2: Municipal & Deeds Proclamation';
+  statutoryAct: string;
+  description: string;
+  authority: string;
+  leadTimeDays: number;
+}
+
+export const DEVELOPMENT_APPROVAL_DEFINITIONS: readonly DevelopmentApprovalDefinition[] = [
+  {
+    key: 'splumaRezoningSubdivision',
+    title: 'SPLUMA Section 42 Rezoning & Subdivision',
+    stage: 'Stage 1: Paper Rights',
+    statutoryAct: 'Spatial Planning & Land Use Management Act 16 of 2013',
+    description:
+      'Municipal Planning Tribunal departure rights, density increase, and parent erf subdivision approval.',
+    authority: 'Municipal Planning Tribunal (MPT)',
+    leadTimeDays: 120,
+  },
+  {
+    key: 'sgDiagramApproval',
+    title: 'Surveyor-General (SG) Diagram Approval',
+    stage: 'Stage 1: Paper Rights',
+    statutoryAct: 'Land Survey Act 8 of 1997',
+    description:
+      'Cadastral land survey, boundary beacon certification, and new erf/sectional diagrams framed by the SG Office.',
+    authority: 'Surveyor-General Office (SG)',
+    leadTimeDays: 60,
+  },
+  {
+    key: 'municipalBuildingPlans',
+    title: 'Municipal Building Plans (NBR Sec 7(1))',
+    stage: 'Stage 1: Paper Rights',
+    statutoryAct: 'National Building Regulations & Standards Act 103 of 1977',
+    description:
+      'Architectural, structural civil, stormwater, fire and municipal service connection plan approval.',
+    authority: 'Local Municipality Development Planning Dept',
+    leadTimeDays: 45,
+  },
+  {
+    key: 'nhbrcEnrolment',
+    title: 'NHBRC Enrolment Certificate',
+    stage: 'Stage 1: Paper Rights',
+    statutoryAct: 'Housing Consumers Protection Measures Act 95 of 1998',
+    description:
+      'Home warranty enrolment, geotechnical site classification and structural engineer sign-off.',
+    authority: 'National Home Builders Registration Council',
+    leadTimeDays: 30,
+  },
+  {
+    key: 'sectionalTitleRegister',
+    title: 'Sectional Title Register Proclamation',
+    stage: 'Stage 2: Municipal & Deeds Proclamation',
+    statutoryAct: 'Sectional Titles Act 95 of 1986',
+    description:
+      'Deeds Office opening of the sectional title register, common property delineation & unit title deed proclamation.',
+    authority: 'Deeds Registry Office',
+    leadTimeDays: 45,
+  },
+  {
+    key: 'occupancyCertificate',
+    title: 'Municipal Occupancy Certificate (Sec 14 NBR)',
+    stage: 'Stage 2: Municipal & Deeds Proclamation',
+    statutoryAct: 'Section 14 National Building Regulations',
+    description:
+      'Final municipal building inspector sign-off, structural engineer certificate, electrical & plumbing CoCs.',
+    authority: 'City Chief Building Inspector',
+    leadTimeDays: 14,
+  },
+];
+
 /**
  * Aggregates itemized professional fees, municipal contributions, and soft costs.
  * Strictly obeys the zero-override guard: explicit 0 is a valid override and not replaced.

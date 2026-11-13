@@ -273,6 +273,48 @@ describe('Zustand Persistence & Schema Migrations Engine', () => {
       const result = mergePortfolioPersistedState(persisted, stateWithoutRentals);
       expect(result.rentals).toHaveLength(1);
     });
+
+    it('backfills seeded dev-1 commentsLedger when persisted dev-1 has undefined commentsLedger while preserving explicit empty array', () => {
+      const legacyPersistedState: any = {
+        developments: [
+          {
+            id: 'dev-1',
+            title: 'Ferndale 6-Unit Cluster Subdivision',
+            softCosts: {},
+            boqItems: [],
+            approvals: {},
+            units: [],
+            // legacy persisted project prior to Tier 1 collaboration ledger (commentsLedger omitted)
+          },
+        ],
+      };
+
+      const healed = mergePortfolioPersistedState(legacyPersistedState, {
+        rentals: [],
+      } as any);
+      expect(healed.developments).toHaveLength(1);
+      expect(healed.developments![0].commentsLedger).toHaveLength(3);
+      expect(healed.developments![0].commentsLedger![0].id).toBe('dev1-comment-1');
+
+      // Explicit empty array (e.g., user intentionally deleted all comments) must remain []
+      const deletedAllState: any = {
+        developments: [
+          {
+            id: 'dev-1',
+            title: 'Ferndale 6-Unit Cluster Subdivision',
+            softCosts: {},
+            boqItems: [],
+            approvals: {},
+            units: [],
+            commentsLedger: [],
+          },
+        ],
+      };
+      const preservedEmpty = mergePortfolioPersistedState(deletedAllState, {
+        rentals: [],
+      } as any);
+      expect(preservedEmpty.developments![0].commentsLedger).toEqual([]);
+    });
   });
 
   describe('onRehydrateStorage', () => {

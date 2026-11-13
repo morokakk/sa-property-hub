@@ -6,13 +6,14 @@ import posthog, { type CaptureResult } from 'posthog-js';
  * POPIA Statutory Privacy Scrubber for PostHog Telemetry
  *
  * Strictly enforces:
- * 1. Capability Token Redaction: Scrubs `/statement/<id_or_uuid>` in URLs/pathnames/referrers to `/statement/[redacted_token]`.
- * 2. Statement Page Title Redaction: Overwrites `$title` on `/statement/` routes to `'Tenant Statement Portal (Redacted)'`.
+ * 1. Capability Token Redaction: Scrubs `/statement/<id_or_uuid>` and `/deal-room/<token>` in URLs/pathnames/referrers to `[redacted_token]`.
+ * 2. Portal Page Title Redaction: Overwrites `$title` on `/statement/` and `/deal-room/` routes.
  * 3. Autocapture Element Text Redaction: Deletes `$el_text` on `$autocapture` events and strips `$el_text` from `$elements`
  *    while preserving `data-testid` attributes for analytics insights.
  */
 
 const STATEMENT_ROUTE_REGEX = /(\/statement\/)([^/?#]+)/gi;
+const DEAL_ROOM_ROUTE_REGEX = /(\/deal-room\/)([^/?#]+)/gi;
 
 const SENSITIVE_PROPERTY_KEYS = new Set([
   'name',
@@ -60,9 +61,16 @@ const SENSITIVE_PROPERTY_KEYS = new Set([
   'total_due',
 ]);
 
+export function scrubDealRoomTokenInUrl(value: unknown): unknown {
+  if (typeof value !== 'string') return value;
+  return value.replace(DEAL_ROOM_ROUTE_REGEX, '$1[redacted_token]');
+}
+
 export function scrubStatementTokenInUrl(value: unknown): unknown {
   if (typeof value !== 'string') return value;
-  return value.replace(STATEMENT_ROUTE_REGEX, '$1[redacted_token]');
+  return value
+    .replace(STATEMENT_ROUTE_REGEX, '$1[redacted_token]')
+    .replace(DEAL_ROOM_ROUTE_REGEX, '$1[redacted_token]');
 }
 
 function isStatementPathname(pathname: unknown, currentUrl: unknown): boolean {
@@ -75,14 +83,25 @@ function isStatementPathname(pathname: unknown, currentUrl: unknown): boolean {
   return false;
 }
 
+function isDealRoomPathname(pathname: unknown, currentUrl: unknown): boolean {
+  if (typeof pathname === 'string' && /^\/deal-room(\/|$)/i.test(pathname.trim())) {
+    return true;
+  }
+  if (typeof currentUrl === 'string' && /\/deal-room\/[^/?#]+/i.test(currentUrl)) {
+    return true;
+  }
+  return false;
+}
+
 export function posthogBeforeSend(event: CaptureResult | null): CaptureResult | null {
   if (!event) return null;
 
   const props = event.properties ? { ...event.properties } : {};
 
   const isStatementRoute = isStatementPathname(props.$pathname, props.$current_url);
+  const isDealRoomRoute = isDealRoomPathname(props.$pathname, props.$current_url);
 
-  // 1. Statement Capability Token Redaction across URL/pathname/referrer properties
+  // 1. Capability Token Redaction across URL/pathname/referrer properties
   if (typeof props.$current_url === 'string') {
     props.$current_url = scrubStatementTokenInUrl(props.$current_url);
   }
@@ -96,9 +115,11 @@ export function posthogBeforeSend(event: CaptureResult | null): CaptureResult | 
     props.$referrer = scrubStatementTokenInUrl(props.$referrer);
   }
 
-  // 2. Statement Page Title Redaction
+  // 2. Public Portal Page Title Redaction
   if (isStatementRoute) {
     props.$title = 'Tenant Statement Portal (Redacted)';
+  } else if (isDealRoomRoute) {
+    props.$title = 'Development Deal Room Portal (Redacted)';
   }
 
   // 3. Autocapture Element Text Redaction (preserve data-testid, strip $el_text)

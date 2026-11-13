@@ -133,7 +133,9 @@ export function isStockDemoState(state?: PortfolioMigrationPayload | null): bool
       d.landPurchasePriceZAR !== orig.landPurchasePriceZAR ||
       d.totalBuildableAreaSqm !== orig.totalBuildableAreaSqm ||
       d.budgetedHardCostPerSqmZAR !== orig.budgetedHardCostPerSqmZAR ||
-      JSON.stringify(d.zoningProfile) !== JSON.stringify(orig.zoningProfile)
+      JSON.stringify(d.zoningProfile) !== JSON.stringify(orig.zoningProfile) ||
+      JSON.stringify(d.commentsLedger || []) !== JSON.stringify(orig.commentsLedger || []) ||
+      (d.shareToken || undefined) !== (orig.shareToken || undefined)
     );
   });
   if (isAnyDevModified) return false;
@@ -501,6 +503,10 @@ export function mapDevelopments(developments: DevelopmentProject[] = [], userId:
       return baseApprovals;
     })() as any,
     units: (Array.isArray(d.units) ? JSON.parse(JSON.stringify(d.units)) : []) as any,
+    comments_ledger: (Array.isArray(d.commentsLedger)
+      ? JSON.parse(JSON.stringify(d.commentsLedger))
+      : []) as any,
+    share_token: typeof d.shareToken === 'string' && d.shareToken.trim() ? d.shareToken.trim() : null,
     compliance: (d.compliance ? JSON.parse(JSON.stringify(d.compliance)) : null) as any,
     drive_vault: (d.driveVault ? JSON.parse(JSON.stringify(d.driveVault)) : null) as any,
     notes: d.notes || null,

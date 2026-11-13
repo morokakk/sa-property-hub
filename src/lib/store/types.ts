@@ -175,7 +175,7 @@ export interface TaskSliceState {
   tasks: TaskItem[];
 }
 export interface TaskSliceActions {
-  addTask: (task: Omit<TaskItem, 'id' | 'createdAt'>) => void;
+  addTask: (task: Omit<TaskItem, 'id' | 'createdAt'> & { id?: string; createdAt?: string }) => void;
   toggleTaskStatus: (taskId: string) => void;
   updateTask: (taskId: string, updates: Partial<TaskItem>) => void;
   deleteTask: (taskId: string) => void;

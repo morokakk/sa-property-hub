@@ -545,4 +545,71 @@ describe('hydrateFromCloud Execution Engine', () => {
     expect(res2.success).toBe(true);
     expect(res1).toEqual(res2);
   });
+
+  it('hydrates developments.comments_ledger safely and falls back to [] on null or object', async () => {
+    (supabase.auth.getUser as any).mockResolvedValue({
+      data: { user: { id: TEST_USER_ID, email: 'investor@example.com' } },
+      error: null,
+    });
+
+    const sampleComments = [
+      {
+        id: 'cloud-c-1',
+        authorName: 'K. Naidoo',
+        authorRole: 'Quantity Surveyor (QS)',
+        sectionTag: 'BOQ & Cost Stack',
+        message: 'Verify provisional piling sum.',
+        status: 'Pending',
+        createdAt: '2026-11-10T09:00:00.000Z',
+      },
+    ];
+
+    (supabase.from as any).mockImplementation((table: string) => {
+      if (table === 'developments') {
+        return {
+          select: vi.fn().mockReturnValue({
+            eq: vi.fn().mockResolvedValue({
+              data: [
+                {
+                  id: 'dev-cloud-ledger-1',
+                  user_id: TEST_USER_ID,
+                  title: 'Cloud Ledger Project',
+                  address: '10 Oak Ave',
+                  city: 'Randburg',
+                  development_type: 'Sectional Title Walk-Up',
+                  current_phase: 'Feasibility',
+                  comments_ledger: sampleComments,
+                },
+                {
+                  id: 'dev-cloud-ledger-2',
+                  user_id: TEST_USER_ID,
+                  title: 'Malformed Ledger Project',
+                  address: '12 Oak Ave',
+                  city: 'Sandton',
+                  development_type: 'Sectional Title Walk-Up',
+                  current_phase: 'Feasibility',
+                  comments_ledger: { malformed: true },
+                },
+              ],
+              error: null,
+            }),
+          }),
+        };
+      }
+      return {
+        select: vi.fn().mockReturnValue({
+          eq: vi.fn().mockResolvedValue({ data: [], error: null }),
+        }),
+      };
+    });
+
+    const res = await hydrateFromCloud();
+    expect(res.success).toBe(true);
+    expect(res.hydrated).toBe(true);
+    const hydratedDevs = usePortfolioStore.getState().developments;
+    expect(hydratedDevs.find((d) => d.id === 'dev-cloud-ledger-1')?.commentsLedger).toEqual(
+      sampleComments
+    );
+    expect(hydratedDevs.find((d) => d.id === 'dev-cloud-ledger-2')?.commentsLedger).toEqual([]);
+  });
 });

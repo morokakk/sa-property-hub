@@ -66,6 +66,7 @@ export default function TaskEnginePage() {
 
   const rentals = usePortfolioStore((state) => state.rentals);
   const flips = usePortfolioStore((state) => state.flips);
+  const developments = usePortfolioStore((state) => state.developments);
   const funding = usePortfolioStore((state) => state.funding);
   const opportunities = usePortfolioStore((state) => state.opportunities);
 
@@ -147,6 +148,9 @@ export default function TaskEnginePage() {
     } else if (linkedType === 'rental') {
       const r = rentals.find((item) => item.id === linkedId) || rentals[0];
       if (r) entityName = r.title;
+    } else if (linkedType === 'development') {
+      const dev = developments.find((item) => item.id === linkedId) || developments[0];
+      if (dev) entityName = dev.title;
     } else if (linkedType === 'funding') {
       const fund = funding.find((item) => item.id === linkedId) || funding[0];
       if (fund) entityName = fund.lenderName;
@@ -622,6 +626,7 @@ export default function TaskEnginePage() {
               <option value="ALL">All Linked Entities</option>
               <option value="flip">Buy-and-Flips</option>
               <option value="rental">Rental Properties</option>
+              <option value="development">Developments</option>
               <option value="funding">Funding Partners</option>
               <option value="opportunity">Opportunity Pipeline</option>
             </select>
@@ -1190,6 +1195,7 @@ export default function TaskEnginePage() {
                   >
                     <option value="flip">Buy-and-Flip Project</option>
                     <option value="rental">Rental Property</option>
+                    <option value="development">Development Project</option>
                     <option value="funding">Funding Partner / Lender</option>
                     <option value="opportunity">Opportunity Pipeline</option>
                     <option value="general">General Administration</option>
@@ -1214,6 +1220,12 @@ export default function TaskEnginePage() {
                       rentals.map((r) => (
                         <option key={r.id} value={r.id}>
                           {r.title}
+                        </option>
+                      ))}
+                    {linkedType === 'development' &&
+                      developments.map((d) => (
+                        <option key={d.id} value={d.id}>
+                          {d.title}
                         </option>
                       ))}
                     {linkedType === 'funding' &&

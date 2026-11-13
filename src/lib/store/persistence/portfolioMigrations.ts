@@ -201,7 +201,8 @@ export function mergePortfolioPersistedState<T extends {
     ...((pState as any).developments !== undefined || currentState?.developments !== undefined
       ? {
           developments: sanitizePersistedDevelopments(
-            (pState as any).developments || currentState?.developments || []
+            (pState as any).developments || currentState?.developments || [],
+            currentState?.developments
           ),
         }
       : {}),

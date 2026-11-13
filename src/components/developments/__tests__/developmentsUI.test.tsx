@@ -8,6 +8,13 @@ import { DevelopmentApprovalsTab } from '../DevelopmentApprovalsTab';
 import { DevelopmentFinanceTab } from '../DevelopmentFinanceTab';
 import { DevelopmentProjectModal } from '../DevelopmentProjectModal';
 import DevelopmentsPage from '@/app/developments/page';
+import ProjectCommentsLedgerModal from '@/components/developments/ProjectCommentsLedgerModal';
+import DealRoomViewer from '@/components/developments/DealRoomViewer';
+import TasksPage from '@/app/tasks/page';
+import {
+  buildProjectCommentTaskId,
+  maskDevelopmentForPublicDealRoom,
+} from '@/lib/calculations/commentsLedger';
 import Sidebar from '@/components/navigation/Sidebar';
 import {
   DevelopmentProject,
@@ -601,6 +608,328 @@ describe('Development Module UI Components & Navigation (Milestone 3)', () => {
 
       expect(html).toContain('href="/developments"');
       expect(html).toContain('Developments');
+    });
+  });
+
+  describe('9. Tier 1 Collaboration Ledger, Read-Only View & Task Entity Support', () => {
+    it('renders Team Ledger badge count, Export Team Excel button, and Read-Only View toggle on DevelopmentsPage', () => {
+      usePortfolioStore.setState({
+        developments: [
+          createSampleDevelopment({
+            commentsLedger: [
+              {
+                id: 'hdr-c-1',
+                authorName: 'K. Naidoo',
+                authorRole: 'Quantity Surveyor (QS)',
+                sectionTag: 'BOQ & Cost Stack',
+                message: 'Confirm raft foundation rate.',
+                status: 'In Progress',
+                createdAt: '2026-11-10T08:00:00.000Z',
+              },
+              {
+                id: 'hdr-c-2',
+                authorName: 'T. Molefe',
+                authorRole: 'Co-Developer / JV',
+                sectionTag: 'Finance & Pre-Sales',
+                message: 'Check Phase 1 price sheet.',
+                status: 'Pending',
+                createdAt: '2026-11-10T09:00:00.000Z',
+              },
+              {
+                id: 'hdr-c-3',
+                authorName: 'L. Mthembu',
+                authorRole: 'Town Planner',
+                sectionTag: 'Paper Rights & Approvals',
+                message: 'SPLUMA cleared.',
+                status: 'Resolved',
+                createdAt: '2026-11-08T08:00:00.000Z',
+                resolvedAt: '2026-11-09T12:00:00.000Z',
+              },
+            ],
+          }),
+        ],
+      });
+
+      const html = renderToString(<DevelopmentsPage />);
+      expect(html).toContain('Team Ledger (2 Open)');
+      expect(html).toContain('Export Team Excel (.xlsx)');
+      expect(html).toContain('Share Deal Room');
+      expect(html).toContain('data-testid="open-team-ledger-btn"');
+      expect(html).toContain('data-testid="export-team-excel-btn"');
+      expect(html).toContain('data-testid="share-deal-room-btn"');
+      expect(html).toContain('data-testid="share-deal-room-menu-btn"');
+      expect(html).toContain('data-testid="developments-header-toolbar"');
+      expect(html).not.toContain('data-testid="toggle-readonly-btn"');
+    });
+
+    it('renders ProjectCommentsLedgerModal controls in editable mode and locks mutations in readOnly mode', () => {
+      const dev = createSampleDevelopment({
+        commentsLedger: [
+          {
+            id: 'mod-c-1',
+            authorName: 'K. Naidoo',
+            authorRole: 'Quantity Surveyor (QS)',
+            sectionTag: 'BOQ & Cost Stack',
+            message: 'Raft foundation rate under QS review.',
+            status: 'Pending',
+            createdAt: '2026-11-10T08:00:00.000Z',
+          },
+          {
+            id: 'mod-c-2',
+            authorName: 'T. Molefe',
+            authorRole: 'Co-Developer / JV',
+            sectionTag: 'Finance & Pre-Sales',
+            message: 'Lender pricing check underway.',
+            status: 'In Progress',
+            createdAt: '2026-11-10T09:00:00.000Z',
+          },
+          {
+            id: 'mod-c-3',
+            authorName: 'L. Mthembu',
+            authorRole: 'Town Planner',
+            sectionTag: 'Paper Rights & Approvals',
+            message: 'SPLUMA Sec 42 approved.',
+            status: 'Resolved',
+            createdAt: '2026-11-07T08:00:00.000Z',
+            resolvedAt: '2026-11-08T15:00:00.000Z',
+          },
+        ],
+      });
+
+      const syncedSet = new Set<string>([buildProjectCommentTaskId(dev.id, 'mod-c-1')]);
+
+      const editableHtml = renderToString(
+        <ProjectCommentsLedgerModal
+          isOpen={true}
+          onClose={() => {}}
+          development={dev}
+          defaultAuthorName="Moremela Holdings"
+          readOnly={false}
+          existingTaskIds={syncedSet}
+          onAddComment={() => {}}
+          onTransitionStatus={() => {}}
+          onDeleteComment={() => {}}
+          onSyncCommentToTask={() => {}}
+        />
+      );
+
+      expect(editableHtml).toContain('data-testid="project-comments-ledger-modal"');
+      expect(editableHtml).toContain('All (3)');
+      expect(editableHtml).toContain('Pending (1)');
+      expect(editableHtml).toContain('In Progress (1)');
+      expect(editableHtml).toContain('Resolved (1)');
+      expect(editableHtml).toContain('bg-amber-100 text-amber-800 border-amber-300');
+      expect(editableHtml).toContain('bg-blue-100 text-blue-800 border-blue-300');
+      expect(editableHtml).toContain('bg-emerald-100 text-emerald-800 border-emerald-300');
+      expect(editableHtml).toContain('data-testid="add-comment-form"');
+      expect(editableHtml).toContain('data-testid="triage-btn-mod-c-1-Resolved"');
+      expect(editableHtml).toContain('data-testid="delete-comment-btn-mod-c-2"');
+      expect(editableHtml).toContain('data-testid="sync-task-btn-mod-c-1"');
+      expect(editableHtml).toContain('data-testid="sync-task-btn-mod-c-2"');
+      expect(editableHtml).not.toContain('data-testid="sync-task-btn-mod-c-3"');
+      expect(editableHtml).toContain('Synced to /tasks');
+      expect(editableHtml).toContain('Sync to /tasks');
+      expect(editableHtml).not.toContain('data-testid="ledger-readonly-banner"');
+
+      const readOnlyHtml = renderToString(
+        <ProjectCommentsLedgerModal
+          isOpen={true}
+          onClose={() => {}}
+          development={dev}
+          defaultAuthorName="Moremela Holdings"
+          readOnly={true}
+          existingTaskIds={syncedSet}
+          onAddComment={() => {}}
+          onTransitionStatus={() => {}}
+          onDeleteComment={() => {}}
+          onSyncCommentToTask={() => {}}
+        />
+      );
+
+      expect(readOnlyHtml).toContain('data-testid="project-comments-ledger-modal"');
+      expect(readOnlyHtml).toContain('data-testid="ledger-readonly-banner"');
+      expect(readOnlyHtml).toContain('data-testid="ledger-filter-Pending"');
+      expect(readOnlyHtml).toContain('Raft foundation rate under QS review.');
+      expect(readOnlyHtml).not.toContain('data-testid="add-comment-form"');
+      expect(readOnlyHtml).not.toContain('data-testid="triage-btn-');
+      expect(readOnlyHtml).not.toContain('data-testid="delete-comment-btn-');
+      expect(readOnlyHtml).not.toContain('data-testid="sync-task-btn-');
+    });
+
+    it('locks mutating controls across all 4 tabs in readOnly mode while preserving CSV export and delay simulator', () => {
+      const dev = createSampleDevelopment({
+        boqItems: [
+          {
+            id: 'boq-ro-1',
+            category: 'Plumbing & Wet Works',
+            itemDescription: 'Stormwater drainage pipes',
+            unit: 'm',
+            quantity: 50,
+            baselineUnitCostZAR: 400,
+            baselineTotalZAR: 20000,
+            actualCostZAR: 19500,
+            varianceZAR: -500,
+            supplierOrContractor: 'Jozi Civils',
+            status: 'In Progress',
+          },
+        ],
+      });
+      const fin = calculateDevelopmentFinancials(dev);
+
+      const unitsHtml = renderToString(
+        <DevelopmentUnitInventoryTab
+          development={dev}
+          financials={fin}
+          readOnly={true}
+          onUpdateUnit={() => {}}
+          onAddUnit={() => {}}
+          onDeleteUnit={() => {}}
+          onMarkUnitSold={() => {}}
+          onGraduateRetainedUnits={() => {}}
+        />
+      );
+      expect(unitsHtml).toContain('disabled=""');
+      expect(unitsHtml).toContain('Locked in Read-Only View');
+
+      const costsHtml = renderToString(
+        <DevelopmentCostStackTab
+          development={dev}
+          financials={fin}
+          readOnly={true}
+          onUpdateSoftCosts={() => {}}
+          onUpdateDevelopment={() => {}}
+          onAddBOQItem={() => {}}
+          onUpdateBOQItem={() => {}}
+          onDeleteBOQItem={() => {}}
+        />
+      );
+      expect(costsHtml).toContain('Export BOQ (CSV)');
+      expect(costsHtml).toContain('disabled=""');
+
+      const approvalsHtml = renderToString(
+        <DevelopmentApprovalsTab
+          development={dev}
+          financials={fin}
+          readOnly={true}
+          onUpdateApproval={() => {}}
+          onOpenDelayMatrix={() => {}}
+        />
+      );
+      expect(approvalsHtml).toContain('Simulate Objection Delay');
+      expect(approvalsHtml).toContain('disabled=""');
+
+      const financeHtml = renderToString(
+        <DevelopmentFinanceTab
+          development={dev}
+          financials={fin}
+          readOnly={true}
+          onUpdateDevelopment={() => {}}
+        />
+      );
+      expect(financeHtml).toContain('+ Record Drawdown');
+      expect(financeHtml).toContain('disabled=""');
+    });
+
+    it('includes development entity option in TasksPage filter and zero Unicode emojis in ProjectCommentsLedgerModal', async () => {
+      const html = renderToString(<TasksPage />);
+      expect(html).toContain('value="development"');
+      expect(html).toContain('Developments');
+
+      const fs = await import('node:fs');
+      const path = await import('node:path');
+      const modalSrc = fs.readFileSync(
+        path.resolve(process.cwd(), 'src/components/developments/ProjectCommentsLedgerModal.tsx'),
+        'utf-8'
+      );
+      const viewerSrc = fs.readFileSync(
+        path.resolve(process.cwd(), 'src/components/developments/DealRoomViewer.tsx'),
+        'utf-8'
+      );
+      const pageSrc = fs.readFileSync(
+        path.resolve(process.cwd(), 'src/app/developments/page.tsx'),
+        'utf-8'
+      );
+      expect(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/u.test(modalSrc)).toBe(false);
+      expect(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/u.test(viewerSrc)).toBe(false);
+      expect(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/u.test(pageSrc)).toBe(false);
+    });
+
+    it('renders public DealRoomViewer with POPIA unit buyer/conveyancer masking, Pending comment form, and zero mutation controls', () => {
+      const rawDev = createSampleDevelopment({
+        shareToken: 'secret-token-should-not-leak',
+        units: [
+          {
+            id: 'u-popia-1',
+            unitNumber: 'Unit 1A',
+            configuration: '2 Bed 1 Bath',
+            floorAreaSqm: 68,
+            allocatedCostBasisZAR: 620000,
+            listPriceVatInclZAR: 950000,
+            estimatedMonthlyRentZAR: 8500,
+            status: 'Sold & Transferred',
+            buyerName: 'Kagiso Sithole',
+            conveyancerRef: 'CV/2026/091',
+            depositHeldZAR: 50000,
+          },
+          {
+            id: 'u-popia-2',
+            unitNumber: 'Unit 2A',
+            configuration: '2 Bed 1 Bath',
+            floorAreaSqm: 68,
+            allocatedCostBasisZAR: 620000,
+            listPriceVatInclZAR: 960000,
+            estimatedMonthlyRentZAR: 8600,
+            status: 'Available',
+            depositHeldZAR: 0,
+          },
+        ],
+        commentsLedger: [
+          {
+            id: 'dr-c-1',
+            authorName: 'K. Naidoo',
+            authorRole: 'Quantity Surveyor (QS)',
+            sectionTag: 'BOQ & Cost Stack',
+            message: 'BOQ foundation rate verified.',
+            status: 'In Progress',
+            createdAt: '2026-11-10T08:00:00.000Z',
+          },
+        ],
+      });
+
+      const masked = maskDevelopmentForPublicDealRoom(rawDev);
+      expect(masked.shareToken).toBeUndefined();
+      expect(masked.units[0].buyerName).toBe('Private Buyer (Masked)');
+      expect(masked.units[0].conveyancerRef).toBeUndefined();
+      expect(masked.units[1].buyerName).toBeUndefined();
+
+      const viewerHtml = renderToString(
+        <DealRoomViewer
+          token="dev-1"
+          dealRoomData={{
+            development: rawDev, // Viewer also enforces defense-in-depth masking
+            sponsor: {
+              entityName: 'L&M Property Investments (Pty) Ltd',
+              registrationNumber: '2026/123456/07',
+            },
+            isDemo: true,
+          }}
+        />
+      );
+
+      expect(viewerHtml).toContain('data-testid="public-deal-room-viewer"');
+      expect(viewerHtml).toContain('data-sensitive="true"');
+      expect(viewerHtml).toContain('POPIA Privacy Masked');
+      expect(viewerHtml).toContain('Private Buyer (Masked)');
+      expect(viewerHtml).not.toContain('Kagiso Sithole');
+      expect(viewerHtml).not.toContain('CV/2026/091');
+      expect(viewerHtml).not.toContain('secret-token-should-not-leak');
+      expect(viewerHtml).toContain('data-testid="deal-room-export-excel-btn"');
+      expect(viewerHtml).toContain('Team Ledger (1 Open)');
+      expect(viewerHtml).toContain('data-testid="deal-room-add-comment-form"');
+      expect(viewerHtml).toContain('Logs as Pending');
+      expect(viewerHtml).not.toContain('data-testid="triage-btn-');
+      expect(viewerHtml).not.toContain('data-testid="delete-comment-btn-');
+      expect(viewerHtml).not.toContain('data-testid="sync-task-btn-');
     });
   });
 });

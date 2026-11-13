@@ -214,6 +214,12 @@ export const createOpportunitySlice: StateCreator<
       notes: fullFlipNote,
       driveVault: opp.driveVault ? { ...opp.driveVault } : undefined,
       zoningProfile: opp.zoningProfile ? structuredClone(opp.zoningProfile) : undefined,
+      commentsLedger: Array.isArray(opp.commentsLedger)
+        ? opp.commentsLedger.map((comment, idx) => ({
+            ...structuredClone(comment),
+            id: `flip-comment-${Date.now()}-${idx}-${Math.random().toString(36).substring(2, 7)}`,
+          }))
+        : [],
       boq: [
         {
           id: `boq-${Date.now()}-1`,
@@ -465,6 +471,12 @@ export const createOpportunitySlice: StateCreator<
         cloned.ancillaryIncomes = cloned.ancillaryIncomes.map((item) => ({
           ...item,
           id: `anc-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+        }));
+      }
+      if (cloned.commentsLedger && Array.isArray(cloned.commentsLedger)) {
+        cloned.commentsLedger = cloned.commentsLedger.map((comment, idx) => ({
+          ...comment,
+          id: `comment-${Date.now()}-${idx}-${Math.random().toString(36).substring(2, 7)}`,
         }));
       }
       return {

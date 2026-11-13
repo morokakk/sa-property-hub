@@ -11,6 +11,7 @@ import { formatZAR, formatPercent, formatDate } from '@/lib/formatters';
 import {
   calculateDevelopmentHoldingSensitivity,
   calculateApprovalsProgress,
+  DEVELOPMENT_APPROVAL_DEFINITIONS,
   DevelopmentFinancialSummary,
 } from '@/lib/calculations/developments';
 import {
@@ -37,79 +38,13 @@ import {
 export interface DevelopmentApprovalsTabProps {
   development: DevelopmentProject;
   financials?: DevelopmentFinancialSummary;
+  readOnly?: boolean;
   onUpdateApproval: (
     key: keyof PreConstructionApprovals,
     updates: Partial<PreConstructionApprovalItem>
   ) => void;
   onOpenDelayMatrix?: () => void;
 }
-
-interface ApprovalDefinition {
-  key: keyof PreConstructionApprovals;
-  title: string;
-  stage: 'Stage 1: Paper Rights' | 'Stage 2: Municipal & Deeds Proclamation';
-  statutoryAct: string;
-  description: string;
-  authority: string;
-  leadTimeDays: number;
-}
-
-const APPROVAL_DEFS: ApprovalDefinition[] = [
-  {
-    key: 'splumaRezoningSubdivision',
-    title: 'SPLUMA Section 42 Rezoning & Subdivision',
-    stage: 'Stage 1: Paper Rights',
-    statutoryAct: 'Spatial Planning & Land Use Management Act 16 of 2013',
-    description: 'Municipal Planning Tribunal departure rights, density increase, and parent erf subdivision approval.',
-    authority: 'Municipal Planning Tribunal (MPT)',
-    leadTimeDays: 120,
-  },
-  {
-    key: 'sgDiagramApproval',
-    title: 'Surveyor-General (SG) Diagram Approval',
-    stage: 'Stage 1: Paper Rights',
-    statutoryAct: 'Land Survey Act 8 of 1997',
-    description: 'Cadastral land survey, boundary beacon certification, and new erf/sectional diagrams framed by the SG Office.',
-    authority: 'Surveyor-General Office (SG)',
-    leadTimeDays: 60,
-  },
-  {
-    key: 'municipalBuildingPlans',
-    title: 'Municipal Building Plans (NBR Sec 7(1))',
-    stage: 'Stage 1: Paper Rights',
-    statutoryAct: 'National Building Regulations & Standards Act 103 of 1977',
-    description: 'Architectural, structural civil, stormwater, fire and municipal service connection plan approval.',
-    authority: 'Local Municipality Development Planning Dept',
-    leadTimeDays: 45,
-  },
-  {
-    key: 'nhbrcEnrolment',
-    title: 'NHBRC Enrolment Certificate',
-    stage: 'Stage 1: Paper Rights',
-    statutoryAct: 'Housing Consumers Protection Measures Act 95 of 1998',
-    description: 'Home warranty enrolment, geotechnical site classification and structural engineer sign-off.',
-    authority: 'National Home Builders Registration Council',
-    leadTimeDays: 30,
-  },
-  {
-    key: 'sectionalTitleRegister',
-    title: 'Sectional Title Register Proclamation',
-    stage: 'Stage 2: Municipal & Deeds Proclamation',
-    statutoryAct: 'Sectional Titles Act 95 of 1986',
-    description: 'Deeds Office opening of the sectional title register, common property delineation & unit title deed proclamation.',
-    authority: 'Deeds Registry Office',
-    leadTimeDays: 45,
-  },
-  {
-    key: 'occupancyCertificate',
-    title: 'Municipal Occupancy Certificate (Sec 14 NBR)',
-    stage: 'Stage 2: Municipal & Deeds Proclamation',
-    statutoryAct: 'Section 14 National Building Regulations',
-    description: 'Final municipal building inspector sign-off, structural engineer certificate, electrical & plumbing CoCs.',
-    authority: 'City Chief Building Inspector',
-    leadTimeDays: 14,
-  },
-];
 
 const APPROVAL_STATUSES: ApprovalStatus[] = [
   'Not Started',
@@ -122,6 +57,7 @@ const APPROVAL_STATUSES: ApprovalStatus[] = [
 export function DevelopmentApprovalsTab({
   development,
   financials,
+  readOnly = false,
   onUpdateApproval,
   onOpenDelayMatrix,
 }: DevelopmentApprovalsTabProps) {
@@ -133,7 +69,7 @@ export function DevelopmentApprovalsTab({
 
   // Approvals progress and stage 1 gate status
   const approvalsProgress = useMemo(
-    () => calculateApprovalsProgress(approvals, APPROVAL_DEFS.length),
+    () => calculateApprovalsProgress(approvals, DEVELOPMENT_APPROVAL_DEFINITIONS.length),
     [approvals]
   );
   const {
@@ -346,7 +282,7 @@ export function DevelopmentApprovalsTab({
 
       {/* 6 Statutory Approval Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {APPROVAL_DEFS.map((def) => {
+        {DEVELOPMENT_APPROVAL_DEFINITIONS.map((def) => {
           const item = approvals[def.key] || { status: 'Not Started' };
           const status = item.status || 'Not Started';
 
@@ -379,7 +315,9 @@ export function DevelopmentApprovalsTab({
                   </span>
                   <select
                     value={status}
+                    disabled={readOnly}
                     onChange={(e) =>
+                      !readOnly &&
                       onUpdateApproval(def.key, {
                         status: e.target.value as ApprovalStatus,
                         approvedDate:
@@ -389,7 +327,9 @@ export function DevelopmentApprovalsTab({
                       })
                     }
                     aria-label={`Status for ${def.title}`}
-                    className={`text-xs rounded border px-2 py-0.5 outline-hidden ${statusBadgeClasses}`}
+                    className={`text-xs rounded border px-2 py-0.5 outline-hidden ${
+                      readOnly ? 'bg-slate-100 text-slate-500 border-slate-200 cursor-not-allowed' : statusBadgeClasses
+                    }`}
                   >
                     {APPROVAL_STATUSES.map((st) => (
                       <option key={st} value={st}>
@@ -414,10 +354,11 @@ export function DevelopmentApprovalsTab({
                   </label>
                   <input
                     type="text"
+                    disabled={readOnly}
                     placeholder="e.g. MPT-2026/0812"
                     value={item.referenceNo || ''}
-                    onChange={(e) => onUpdateApproval(def.key, { referenceNo: e.target.value })}
-                    className="w-full rounded border border-slate-300 px-2.5 py-1 text-xs focus:ring-1 focus:ring-slate-400"
+                    onChange={(e) => !readOnly && onUpdateApproval(def.key, { referenceNo: e.target.value })}
+                    className="w-full rounded border border-slate-300 px-2.5 py-1 text-xs focus:ring-1 focus:ring-slate-400 disabled:bg-slate-100 disabled:text-slate-500"
                   />
                 </div>
 
@@ -429,9 +370,10 @@ export function DevelopmentApprovalsTab({
                     </label>
                     <input
                       type="date"
+                      disabled={readOnly}
                       value={item.submittedDate || ''}
-                      onChange={(e) => onUpdateApproval(def.key, { submittedDate: e.target.value })}
-                      className="w-full rounded border border-slate-300 px-2 py-1 text-[11px]"
+                      onChange={(e) => !readOnly && onUpdateApproval(def.key, { submittedDate: e.target.value })}
+                      className="w-full rounded border border-slate-300 px-2 py-1 text-[11px] disabled:bg-slate-100 disabled:text-slate-500"
                     />
                   </div>
                   <div>
@@ -440,11 +382,12 @@ export function DevelopmentApprovalsTab({
                     </label>
                     <input
                       type="date"
+                      disabled={readOnly}
                       value={item.targetApprovalDate || ''}
                       onChange={(e) =>
-                        onUpdateApproval(def.key, { targetApprovalDate: e.target.value })
+                        !readOnly && onUpdateApproval(def.key, { targetApprovalDate: e.target.value })
                       }
-                      className="w-full rounded border border-slate-300 px-2 py-1 text-[11px]"
+                      className="w-full rounded border border-slate-300 px-2 py-1 text-[11px] disabled:bg-slate-100 disabled:text-slate-500"
                     />
                   </div>
                 </div>

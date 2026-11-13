@@ -7,6 +7,7 @@ import { FileSpreadsheet, PlusCircle, Gift, Trash2, CheckCircle2 } from 'lucide-
 
 export interface FlipBOQTableProps {
   flip: FlipProject;
+  readOnly?: boolean;
   onOpenAddBOQ: () => void;
   onUpdateBOQItem: (itemId: string, updates: Partial<BOQItem>) => void;
   onDeleteBOQItem: (itemId: string) => void;
@@ -15,6 +16,7 @@ export interface FlipBOQTableProps {
 
 export function FlipBOQTable({
   flip,
+  readOnly = false,
   onOpenAddBOQ,
   onUpdateBOQItem,
   onDeleteBOQItem,
@@ -65,8 +67,13 @@ export function FlipBOQTable({
           )}
           <button
             type="button"
-            onClick={onOpenAddBOQ}
-            className="inline-flex items-center gap-1 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold px-3 py-2 rounded-lg transition-colors cursor-pointer shadow-xs"
+            disabled={readOnly}
+            onClick={() => !readOnly && onOpenAddBOQ()}
+            className={`inline-flex items-center gap-1 text-xs font-semibold px-3 py-2 rounded-lg transition-colors shadow-xs ${
+              readOnly
+                ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                : 'bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer'
+            }`}
           >
             <PlusCircle className="w-3.5 h-3.5" />
             <span>Add BOQ Item</span>
@@ -99,13 +106,19 @@ export function FlipBOQTable({
                 <td className="py-2.5 px-3">
                   <select
                     value={item.milestonePhase || 'First Fix / Wet Works'}
+                    disabled={readOnly}
                     onChange={(e) =>
+                      !readOnly &&
                       onUpdateBOQItem(item.id, {
                         milestonePhase: e.target.value as NonNullable<BOQItem['milestonePhase']>,
                       })
                     }
-                    className="text-[10px] font-semibold px-2 py-1 rounded-md border border-slate-200 cursor-pointer bg-slate-50 text-slate-700 hover:bg-white shadow-2xs block"
-                    title="Change milestone draw phase"
+                    className={`text-[10px] font-semibold px-2 py-1 rounded-md border border-slate-200 shadow-2xs block ${
+                      readOnly
+                        ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                        : 'cursor-pointer bg-slate-50 text-slate-700 hover:bg-white'
+                    }`}
+                    title={readOnly ? 'Locked in Read-Only View' : 'Change milestone draw phase'}
                   >
                     <option value="Deposit">Phase 1: Deposit (20%)</option>
                     <option value="First Fix / Wet Works">Phase 2: First Fix (30%)</option>
@@ -163,17 +176,21 @@ export function FlipBOQTable({
                 <td className="py-2.5 px-3">
                   <select
                     value={item.status}
+                    disabled={readOnly}
                     onChange={(e) =>
+                      !readOnly &&
                       onUpdateBOQItem(item.id, {
                         status: e.target.value as BOQItem['status'],
                       })
                     }
-                    className={`text-[11px] font-semibold px-2 py-0.5 rounded-md border border-slate-200 cursor-pointer ${
-                      item.status === 'Completed'
-                        ? 'bg-emerald-50 text-emerald-800'
+                    className={`text-[11px] font-semibold px-2 py-0.5 rounded-md border border-slate-200 ${
+                      readOnly
+                        ? 'bg-slate-100 text-slate-500 cursor-not-allowed'
+                        : item.status === 'Completed'
+                        ? 'bg-emerald-50 text-emerald-800 cursor-pointer'
                         : item.status === 'In Progress'
-                        ? 'bg-indigo-50 text-indigo-800'
-                        : 'bg-slate-100 text-slate-700'
+                        ? 'bg-indigo-50 text-indigo-800 cursor-pointer'
+                        : 'bg-slate-100 text-slate-700 cursor-pointer'
                     }`}
                   >
                     <option value="Not Started">Not Started</option>
@@ -185,13 +202,19 @@ export function FlipBOQTable({
                 <td className="py-2.5 px-3 pr-4 text-right whitespace-nowrap">
                   <button
                     type="button"
+                    disabled={readOnly}
                     onClick={() => {
+                      if (readOnly) return;
                       if (confirm(`Delete BOQ item "${item.itemDescription}"?`)) {
                         onDeleteBOQItem(item.id);
                       }
                     }}
-                    className="p-1 text-slate-400 hover:text-rose-600 rounded cursor-pointer transition-colors"
-                    title="Delete line item"
+                    className={`p-1 rounded transition-colors ${
+                      readOnly
+                        ? 'text-slate-300 cursor-not-allowed'
+                        : 'text-slate-400 hover:text-rose-600 cursor-pointer'
+                    }`}
+                    title={readOnly ? 'Locked in Read-Only View' : 'Delete line item'}
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>

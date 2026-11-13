@@ -152,6 +152,35 @@ describe('PostHogProvider Client-Side Telemetry & POPIA Privacy Masking', () => 
     expect(scrubbed?.properties.$title).toBe('Tenant Statement Portal (Redacted)');
   });
 
+  it('scrubs capability tokens on /deal-room/<uuid> routes and genericizes $title via before_send', () => {
+    const rawEvent = {
+      uuid: 'evt-deal-room-1',
+      event: '$pageview',
+      properties: {
+        $current_url: 'https://moremela.co.za/deal-room/f3b1e9c0-token-99?tab=units',
+        $pathname: '/deal-room/f3b1e9c0-token-99',
+        $prev_pageview_pathname: '/deal-room/dev-1',
+        $referrer: 'https://moremela.co.za/deal-room/f3b1e9c0-token-99',
+        $title: 'Ferndale 6-Unit Cluster - Private Deal Room',
+      },
+    } as unknown as CaptureResult;
+
+    const scrubbed = posthogBeforeSend(rawEvent);
+
+    expect(scrubbed).not.toBeNull();
+    expect(scrubbed?.properties.$current_url).toBe(
+      'https://moremela.co.za/deal-room/[redacted_token]?tab=units'
+    );
+    expect(scrubbed?.properties.$pathname).toBe('/deal-room/[redacted_token]');
+    expect(scrubbed?.properties.$prev_pageview_pathname).toBe(
+      '/deal-room/[redacted_token]'
+    );
+    expect(scrubbed?.properties.$referrer).toBe(
+      'https://moremela.co.za/deal-room/[redacted_token]'
+    );
+    expect(scrubbed?.properties.$title).toBe('Development Deal Room Portal (Redacted)');
+  });
+
   it('strips $el_text from $autocapture events and $elements while preserving data-testid attributes', () => {
     const autocaptureEvent = {
       uuid: 'evt-2',

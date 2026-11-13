@@ -25,6 +25,7 @@ import {
 export interface DevelopmentFinanceTabProps {
   development: DevelopmentProject;
   financials: DevelopmentFinancialSummary;
+  readOnly?: boolean;
   onUpdateDevelopment: (updates: Partial<DevelopmentProject>) => void;
   onOpenFundingModal?: () => void;
   onPayDownDebt?: (amountZAR: number) => void;
@@ -33,6 +34,7 @@ export interface DevelopmentFinanceTabProps {
 export function DevelopmentFinanceTab({
   development,
   financials,
+  readOnly = false,
   onUpdateDevelopment,
   onOpenFundingModal,
   onPayDownDebt,
@@ -41,6 +43,13 @@ export function DevelopmentFinanceTab({
   const [repayAmount, setRepayAmount] = useState(500000);
   const [isDrawModalOpen, setIsDrawModalOpen] = useState(false);
   const [drawAmount, setDrawAmount] = useState(500000);
+
+  useEffect(() => {
+    if (readOnly) {
+      setIsRepayModalOpen(false);
+      setIsDrawModalOpen(false);
+    }
+  }, [readOnly]);
 
   useEffect(() => {
     if (!isRepayModalOpen && !isDrawModalOpen) return;
@@ -58,7 +67,7 @@ export function DevelopmentFinanceTab({
 
   const handleRecordRepayment = (e: React.FormEvent) => {
     e.preventDefault();
-    if (repayAmount <= 0) return;
+    if (readOnly || repayAmount <= 0) return;
     if (onPayDownDebt) {
       onPayDownDebt(repayAmount);
     } else {
@@ -73,7 +82,7 @@ export function DevelopmentFinanceTab({
 
   const handleRecordDrawdown = (e: React.FormEvent) => {
     e.preventDefault();
-    if (drawAmount <= 0) return;
+    if (readOnly || drawAmount <= 0) return;
     const newDrawn = calculateIncreasedAmount(
       development.developmentFacilityDrawnZAR,
       drawAmount
@@ -147,15 +156,25 @@ export function DevelopmentFinanceTab({
           <div className="flex items-center gap-2 pt-2">
             <button
               type="button"
-              onClick={() => setIsDrawModalOpen(true)}
-              className="flex-1 text-center text-xs font-semibold px-2.5 py-1.5 rounded border border-slate-300 hover:bg-slate-50 text-slate-700 transition-colors cursor-pointer"
+              disabled={readOnly}
+              onClick={() => !readOnly && setIsDrawModalOpen(true)}
+              className={`flex-1 text-center text-xs font-semibold px-2.5 py-1.5 rounded border transition-colors ${
+                readOnly
+                  ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'
+                  : 'border-slate-300 hover:bg-slate-50 text-slate-700 cursor-pointer'
+              }`}
             >
               + Record Drawdown
             </button>
             <button
               type="button"
-              onClick={() => setIsRepayModalOpen(true)}
-              className="flex-1 text-center text-xs font-semibold px-2.5 py-1.5 rounded bg-emerald-600 hover:bg-emerald-700 text-white transition-colors cursor-pointer"
+              disabled={readOnly}
+              onClick={() => !readOnly && setIsRepayModalOpen(true)}
+              className={`flex-1 text-center text-xs font-semibold px-2.5 py-1.5 rounded transition-colors ${
+                readOnly
+                  ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                  : 'bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer'
+              }`}
             >
               Record Repayment
             </button>
@@ -338,7 +357,7 @@ export function DevelopmentFinanceTab({
       </div>
 
       {/* Record Repayment Modal */}
-      {isRepayModalOpen && (
+      {isRepayModalOpen && !readOnly && (
         <div
           role="dialog"
           aria-modal="true"
@@ -398,7 +417,7 @@ export function DevelopmentFinanceTab({
       )}
 
       {/* Record Drawdown Modal */}
-      {isDrawModalOpen && (
+      {isDrawModalOpen && !readOnly && (
         <div
           role="dialog"
           aria-modal="true"

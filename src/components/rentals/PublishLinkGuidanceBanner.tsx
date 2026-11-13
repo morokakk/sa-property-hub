@@ -19,6 +19,8 @@ export default function PublishLinkGuidanceBanner({
     return null;
   }
 
+  const isDevelopmentsReturn = returnTo === 'developments' || returnTo === '/developments';
+
   return (
     <div
       data-testid="publish-link-guidance-banner"
@@ -30,10 +32,12 @@ export default function PublishLinkGuidanceBanner({
         </div>
         <div className="space-y-0.5">
           <h3 className="font-bold text-sm text-amber-950">
-            Cloud Statement Publishing
+            {isDevelopmentsReturn ? 'Cloud Deal Room Publishing' : 'Cloud Statement Publishing'}
           </h3>
           <p className="text-amber-800">
-            Sign in or create your account below to publish your rental property statement link online.
+            {isDevelopmentsReturn
+              ? 'Sign in or create your account below to publish your development deal room link online.'
+              : 'Sign in or create your account below to publish your rental property statement link online.'}
           </p>
         </div>
       </div>
@@ -48,7 +52,7 @@ export default function PublishLinkGuidanceBanner({
           data-testid="return-to-rentals-btn"
           className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-semibold bg-amber-600 hover:bg-amber-700 text-white shrink-0 shadow-xs transition-colors text-center"
         >
-          <span>← Return to Rental Statements</span>
+          <span>{isDevelopmentsReturn ? '← Return to Developments' : '← Return to Rental Statements'}</span>
         </Link>
       )}
     </div>

@@ -2479,6 +2479,36 @@ export const INITIAL_DEVELOPMENTS: DevelopmentProject[] = [
         status: 'Retained for Rental',
       },
     ],
+    commentsLedger: [
+      {
+        id: 'dev1-comment-1',
+        authorName: 'Sipho Dlamini (QS)',
+        authorRole: 'Quantity Surveyor (QS)',
+        sectionTag: 'BOQ & Cost Stack',
+        message: 'Raft foundation & civil drainage BOQ allowance variation (+R 25,000) under verification against Civils SA Contractors invoice.',
+        status: 'In Progress',
+        createdAt: '2026-10-18T09:30:00Z',
+      },
+      {
+        id: 'dev1-comment-2',
+        authorName: 'Annelize Botha (Pr.Pln)',
+        authorRole: 'Town Planner',
+        sectionTag: 'Paper Rights & Approvals',
+        message: 'SPLUMA Section 42 conditions (COJ/SPLUMA/2024/7781) and SG Diagram (SG/JHB/2024/1104) formally cleared for Stage 2.',
+        status: 'Resolved',
+        createdAt: '2026-10-12T14:15:00Z',
+        resolvedAt: '2026-10-14T11:00:00Z',
+      },
+      {
+        id: 'dev1-comment-3',
+        authorName: 'Thabo Mokoena (JV)',
+        authorRole: 'Co-Developer / JV',
+        sectionTag: 'Finance & Pre-Sales',
+        message: 'Confirm Phase 1 pre-sales pricing for Units 3-4 and lock Unit 5-6 long-term rental retention split before sectional register opening.',
+        status: 'Pending',
+        createdAt: '2026-10-22T16:45:00Z',
+      },
+    ],
   },
 
   // dev-2: Kempton Park 10-Unit Micro-Apartment Infill

@@ -94,7 +94,11 @@ export const createDevelopmentSlice: StateCreator<
     set((state) => ({
       developments: state.developments.filter((d) => d.id !== id),
       tasks: state.tasks.filter(
-        (t) => !(t.linkedEntity?.id === id && t.id.startsWith('task-dev-approval-'))
+        (t) =>
+          !(
+            t.linkedEntity?.id === id &&
+            (t.id.startsWith('task-dev-approval-') || t.id.startsWith('task-dev-comment-'))
+          )
       ),
     })),
 
@@ -424,6 +428,12 @@ export const createDevelopmentSlice: StateCreator<
         occupancyCertificate: { status: 'Not Started' },
       },
       units,
+      commentsLedger: Array.isArray(opp.commentsLedger)
+        ? opp.commentsLedger.map((comment, idx) => ({
+            ...structuredClone(comment),
+            id: `dev-comment-${Date.now()}-${idx}-${Math.random().toString(36).substring(2, 7)}`,
+          }))
+        : [],
     };
 
     const onboardingTask: TaskItem = {

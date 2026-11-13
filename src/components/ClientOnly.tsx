@@ -13,9 +13,9 @@ export default function ClientOnly({ children }: { children: React.ReactNode }) 
     setHasMounted(true);
   }, []);
 
-  // Public tenant statement portal must render immediately with SSR,
-  // bypassing mount spinner and avoiding landlord state hydrators.
-  if (pathname?.startsWith('/statement')) {
+  // Public tenant statement & deal room portals must render immediately with SSR,
+  // bypassing mount spinner and avoiding developer/landlord state hydrators.
+  if (pathname?.startsWith('/statement') || pathname?.startsWith('/deal-room')) {
     return <>{children}</>;
   }
 

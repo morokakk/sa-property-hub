@@ -165,6 +165,7 @@ export default function TopHeader({ title, subtitle, actionButton }: TopHeaderPr
       {
         rentals: currentState.rentals,
         flips: currentState.flips,
+        developments: currentState.developments,
         funding: currentState.funding,
         opportunities: currentState.opportunities,
         suppliers: currentState.suppliers,

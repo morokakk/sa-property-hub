@@ -14,7 +14,10 @@ export const createTaskSlice: StateCreator<
 
   addTask: (task) =>
     set((state) => {
-      const taskId = `task-${Date.now()}`;
+      const taskId = task.id?.trim() ? task.id.trim() : `task-${Date.now()}`;
+      if (state.tasks.some((t) => t.id === taskId)) {
+        return state;
+      }
       const isRecurring = task.recurrence && task.recurrence !== 'None';
       const recurrenceGroupId = task.recurrenceGroupId || (isRecurring ? `series-${taskId}` : undefined);
       return {
@@ -23,7 +26,7 @@ export const createTaskSlice: StateCreator<
             ...task,
             id: taskId,
             recurrenceGroupId,
-            createdAt: new Date().toISOString(),
+            createdAt: task.createdAt || new Date().toISOString(),
           },
           ...state.tasks,
         ],

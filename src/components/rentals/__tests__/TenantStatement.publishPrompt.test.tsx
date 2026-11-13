@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import React from 'react';
 import { renderToString } from 'react-dom/server';
 import { DEMO_RENTAL_IDS, isDemoRentalProperty } from '@/lib/db/mergePortfolioState';
+import { isDemoDevelopment } from '@/lib/calculations/commentsLedger';
 import CloudPublishModal from '../CloudPublishModal';
 import PublishLinkGuidanceBanner from '../PublishLinkGuidanceBanner';
 
@@ -312,6 +313,37 @@ describe('Tenant Statement Link Publishing & Auth Prompt Workflow', () => {
         />
       );
       expect(htmlNullAction).toBe('');
+    });
+
+    it('renders development deal room publishing guidance in CloudPublishModal and PublishLinkGuidanceBanner', () => {
+      expect(isDemoDevelopment('dev-1')).toBe(true);
+      expect(isDemoDevelopment('dev-2')).toBe(true);
+      expect(isDemoDevelopment('demo-dev-sandton')).toBe(true);
+      expect(isDemoDevelopment('dev-custom-999')).toBe(false);
+
+      const modalHtml = renderToString(
+        <CloudPublishModal
+          isOpen={true}
+          onClose={() => {}}
+          onCopyWhatsApp={() => {}}
+          mode="development"
+          offlineFallbackLabel="Copy WhatsApp Summary Instead"
+        />
+      );
+      expect(modalHtml).toContain('Public project deal rooms require private cloud hosting');
+      expect(modalHtml).toContain('href="/settings?returnTo=developments&amp;action=publish_link"');
+      expect(modalHtml).toContain('Copy WhatsApp Summary Instead');
+
+      const bannerHtml = renderToString(
+        <PublishLinkGuidanceBanner
+          action="publish_link"
+          returnTo="developments"
+          currentUser={{ id: 'user-1' }}
+        />
+      );
+      expect(bannerHtml).toContain('Cloud Deal Room Publishing');
+      expect(bannerHtml).toContain('href="/developments"');
+      expect(bannerHtml).toContain('Return to Developments');
     });
   });
 });

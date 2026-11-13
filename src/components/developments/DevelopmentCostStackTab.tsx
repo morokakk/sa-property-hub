@@ -21,6 +21,7 @@ import {
 export interface DevelopmentCostStackTabProps {
   development: DevelopmentProject;
   financials: DevelopmentFinancialSummary;
+  readOnly?: boolean;
   onUpdateSoftCosts: (softCosts: Partial<DevelopmentSoftCosts>) => void;
   onUpdateDevelopment: (updates: Partial<DevelopmentProject>) => void;
   onAddBOQItem?: (item: Omit<BOQItem, 'id'>) => void;
@@ -32,6 +33,7 @@ export interface DevelopmentCostStackTabProps {
 export function DevelopmentCostStackTab({
   development,
   financials,
+  readOnly = false,
   onUpdateSoftCosts,
   onUpdateDevelopment,
   onAddBOQItem,
@@ -62,6 +64,10 @@ export function DevelopmentCostStackTab({
   const [boqSupplier, setBoqSupplier] = useState('');
 
   useEffect(() => {
+    if (readOnly) setIsAddBOQOpen(false);
+  }, [readOnly]);
+
+  useEffect(() => {
     if (!isAddBOQOpen) return;
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') setIsAddBOQOpen(false);
@@ -83,7 +89,7 @@ export function DevelopmentCostStackTab({
 
   const handleCreateBOQItem = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!boqDesc) return;
+    if (readOnly || !boqDesc) return;
 
     if (onAddBOQItem) {
       const { baselineTotalZAR, varianceZAR } = calculateBOQItemTotals(
@@ -113,6 +119,7 @@ export function DevelopmentCostStackTab({
   };
 
   const handleSoftCostChange = (field: keyof DevelopmentSoftCosts, val: number) => {
+    if (readOnly) return;
     onUpdateSoftCosts({ [field]: val });
   };
 
@@ -213,9 +220,10 @@ export function DevelopmentCostStackTab({
               type="number"
               min={0}
               step={1000}
+              disabled={readOnly}
               value={softCosts.townPlannerZAR || 0}
-              onChange={(e) => handleSoftCostChange('townPlannerZAR', Number(e.target.value))}
-              className="w-full rounded border border-slate-300 px-3 py-1.5 focus:ring-1 focus:ring-blue-500"
+              onChange={(e) => !readOnly && handleSoftCostChange('townPlannerZAR', Number(e.target.value))}
+              className="w-full rounded border border-slate-300 px-3 py-1.5 focus:ring-1 focus:ring-blue-500 disabled:bg-slate-100 disabled:text-slate-500"
             />
             <span className="text-[10px] text-slate-400 mt-0.5 block">Rezoning, SDP & subdivision</span>
           </div>
@@ -228,9 +236,10 @@ export function DevelopmentCostStackTab({
               type="number"
               min={0}
               step={1000}
+              disabled={readOnly}
               value={softCosts.architectZAR || 0}
-              onChange={(e) => handleSoftCostChange('architectZAR', Number(e.target.value))}
-              className="w-full rounded border border-slate-300 px-3 py-1.5 focus:ring-1 focus:ring-blue-500"
+              onChange={(e) => !readOnly && handleSoftCostChange('architectZAR', Number(e.target.value))}
+              className="w-full rounded border border-slate-300 px-3 py-1.5 focus:ring-1 focus:ring-blue-500 disabled:bg-slate-100 disabled:text-slate-500"
             />
             <span className="text-[10px] text-slate-400 mt-0.5 block">Working drawings & council</span>
           </div>
@@ -243,9 +252,10 @@ export function DevelopmentCostStackTab({
               type="number"
               min={0}
               step={1000}
+              disabled={readOnly}
               value={softCosts.structuralCivilEngineerZAR || 0}
-              onChange={(e) => handleSoftCostChange('structuralCivilEngineerZAR', Number(e.target.value))}
-              className="w-full rounded border border-slate-300 px-3 py-1.5 focus:ring-1 focus:ring-blue-500"
+              onChange={(e) => !readOnly && handleSoftCostChange('structuralCivilEngineerZAR', Number(e.target.value))}
+              className="w-full rounded border border-slate-300 px-3 py-1.5 focus:ring-1 focus:ring-blue-500 disabled:bg-slate-100 disabled:text-slate-500"
             />
             <span className="text-[10px] text-slate-400 mt-0.5 block">Slabs, raft foundations, stormwater</span>
           </div>
@@ -258,9 +268,10 @@ export function DevelopmentCostStackTab({
               type="number"
               min={0}
               step={1000}
+              disabled={readOnly}
               value={softCosts.quantitySurveyorZAR || 0}
-              onChange={(e) => handleSoftCostChange('quantitySurveyorZAR', Number(e.target.value))}
-              className="w-full rounded border border-slate-300 px-3 py-1.5 focus:ring-1 focus:ring-blue-500"
+              onChange={(e) => !readOnly && handleSoftCostChange('quantitySurveyorZAR', Number(e.target.value))}
+              className="w-full rounded border border-slate-300 px-3 py-1.5 focus:ring-1 focus:ring-blue-500 disabled:bg-slate-100 disabled:text-slate-500"
             />
             <span className="text-[10px] text-slate-400 mt-0.5 block">Bank drawdown verification</span>
           </div>
@@ -273,9 +284,10 @@ export function DevelopmentCostStackTab({
               type="number"
               min={0}
               step={1000}
+              disabled={readOnly}
               value={softCosts.councilBulkContributionsZAR || 0}
-              onChange={(e) => handleSoftCostChange('councilBulkContributionsZAR', Number(e.target.value))}
-              className="w-full rounded border border-slate-300 px-3 py-1.5 focus:ring-1 focus:ring-blue-500"
+              onChange={(e) => !readOnly && handleSoftCostChange('councilBulkContributionsZAR', Number(e.target.value))}
+              className="w-full rounded border border-slate-300 px-3 py-1.5 focus:ring-1 focus:ring-blue-500 disabled:bg-slate-100 disabled:text-slate-500"
             />
             <span className="text-[10px] text-slate-400 mt-0.5 block">SPLUMA Section 42 bulk services</span>
           </div>
@@ -288,9 +300,10 @@ export function DevelopmentCostStackTab({
               type="number"
               min={0}
               step={1000}
+              disabled={readOnly}
               value={softCosts.nhbrcEnrolmentFeeZAR || 0}
-              onChange={(e) => handleSoftCostChange('nhbrcEnrolmentFeeZAR', Number(e.target.value))}
-              className="w-full rounded border border-slate-300 px-3 py-1.5 focus:ring-1 focus:ring-blue-500"
+              onChange={(e) => !readOnly && handleSoftCostChange('nhbrcEnrolmentFeeZAR', Number(e.target.value))}
+              className="w-full rounded border border-slate-300 px-3 py-1.5 focus:ring-1 focus:ring-blue-500 disabled:bg-slate-100 disabled:text-slate-500"
             />
             <span className="text-[10px] text-slate-400 mt-0.5 block">Housing warranty certificate</span>
           </div>
@@ -303,9 +316,10 @@ export function DevelopmentCostStackTab({
               type="number"
               min={0}
               step={1000}
+              disabled={readOnly}
               value={softCosts.planScrutinyAndSubdivisionFeesZAR || 0}
-              onChange={(e) => handleSoftCostChange('planScrutinyAndSubdivisionFeesZAR', Number(e.target.value))}
-              className="w-full rounded border border-slate-300 px-3 py-1.5 focus:ring-1 focus:ring-blue-500"
+              onChange={(e) => !readOnly && handleSoftCostChange('planScrutinyAndSubdivisionFeesZAR', Number(e.target.value))}
+              className="w-full rounded border border-slate-300 px-3 py-1.5 focus:ring-1 focus:ring-blue-500 disabled:bg-slate-100 disabled:text-slate-500"
             />
             <span className="text-[10px] text-slate-400 mt-0.5 block">Municipal submission & approvals</span>
           </div>
@@ -318,9 +332,10 @@ export function DevelopmentCostStackTab({
               type="number"
               min={0}
               step={1000}
+              disabled={readOnly}
               value={softCosts.marketingAndShowUnitZAR || 0}
-              onChange={(e) => handleSoftCostChange('marketingAndShowUnitZAR', Number(e.target.value))}
-              className="w-full rounded border border-slate-300 px-3 py-1.5 focus:ring-1 focus:ring-blue-500"
+              onChange={(e) => !readOnly && handleSoftCostChange('marketingAndShowUnitZAR', Number(e.target.value))}
+              className="w-full rounded border border-slate-300 px-3 py-1.5 focus:ring-1 focus:ring-blue-500 disabled:bg-slate-100 disabled:text-slate-500"
             />
             <span className="text-[10px] text-slate-400 mt-0.5 block">CGI renders, hoarding & brochures</span>
           </div>
@@ -343,7 +358,8 @@ export function DevelopmentCostStackTab({
             baselineRenovationBudgetZAR: financials.budgetedHardBuildCostZAR,
             numberOfUnits: development.units?.length || 0,
           } as any}
-          onOpenAddBOQ={() => setIsAddBOQOpen(true)}
+          readOnly={readOnly}
+          onOpenAddBOQ={() => !readOnly && setIsAddBOQOpen(true)}
           onUpdateBOQItem={onUpdateBOQItem}
           onDeleteBOQItem={onDeleteBOQItem}
           onExportCSV={handleExportCSV}
@@ -363,9 +379,10 @@ export function DevelopmentCostStackTab({
             <input
               type="number"
               min={0}
+              disabled={readOnly}
               value={development.preApprovalMonths}
-              onChange={(e) => onUpdateDevelopment({ preApprovalMonths: Number(e.target.value) })}
-              className="w-full rounded border border-slate-300 px-3 py-1.5"
+              onChange={(e) => !readOnly && onUpdateDevelopment({ preApprovalMonths: Number(e.target.value) })}
+              className="w-full rounded border border-slate-300 px-3 py-1.5 disabled:bg-slate-100 disabled:text-slate-500"
             />
             <span className="text-[10px] text-slate-400 mt-0.5 block">Paper rights & zoning timeline</span>
           </div>
@@ -376,11 +393,13 @@ export function DevelopmentCostStackTab({
               type="number"
               min={0}
               step={500}
+              disabled={readOnly}
               value={development.monthlyPreApprovalHoldingBurnZAR}
               onChange={(e) =>
+                !readOnly &&
                 onUpdateDevelopment({ monthlyPreApprovalHoldingBurnZAR: Number(e.target.value) })
               }
-              className="w-full rounded border border-slate-300 px-3 py-1.5"
+              className="w-full rounded border border-slate-300 px-3 py-1.5 disabled:bg-slate-100 disabled:text-slate-500"
             />
             <span className="text-[10px] text-slate-400 mt-0.5 block">Rates, basic utilities, site security</span>
           </div>
@@ -390,9 +409,10 @@ export function DevelopmentCostStackTab({
             <input
               type="number"
               min={1}
+              disabled={readOnly}
               value={development.constructionMonths}
-              onChange={(e) => onUpdateDevelopment({ constructionMonths: Number(e.target.value) })}
-              className="w-full rounded border border-slate-300 px-3 py-1.5"
+              onChange={(e) => !readOnly && onUpdateDevelopment({ constructionMonths: Number(e.target.value) })}
+              className="w-full rounded border border-slate-300 px-3 py-1.5 disabled:bg-slate-100 disabled:text-slate-500"
             />
             <span className="text-[10px] text-slate-400 mt-0.5 block">Wet works to practical completion</span>
           </div>
@@ -403,11 +423,13 @@ export function DevelopmentCostStackTab({
               type="number"
               min={0}
               step={500}
+              disabled={readOnly}
               value={development.monthlyConstructionHoldingBurnZAR}
               onChange={(e) =>
+                !readOnly &&
                 onUpdateDevelopment({ monthlyConstructionHoldingBurnZAR: Number(e.target.value) })
               }
-              className="w-full rounded border border-slate-300 px-3 py-1.5"
+              className="w-full rounded border border-slate-300 px-3 py-1.5 disabled:bg-slate-100 disabled:text-slate-500"
             />
             <span className="text-[10px] text-slate-400 mt-0.5 block">Water, temporary power, security</span>
           </div>
@@ -419,9 +441,10 @@ export function DevelopmentCostStackTab({
               min={0}
               max={30}
               step={0.5}
+              disabled={readOnly}
               value={development.contingencyPercent}
-              onChange={(e) => onUpdateDevelopment({ contingencyPercent: Number(e.target.value) })}
-              className="w-full rounded border border-slate-300 px-3 py-1.5"
+              onChange={(e) => !readOnly && onUpdateDevelopment({ contingencyPercent: Number(e.target.value) })}
+              className="w-full rounded border border-slate-300 px-3 py-1.5 disabled:bg-slate-100 disabled:text-slate-500"
             />
             <span className="text-[10px] text-slate-400 mt-0.5 block">
               Reserve: {formatZAR(financials.contingencyReserveZAR)}
@@ -431,7 +454,7 @@ export function DevelopmentCostStackTab({
       </div>
 
       {/* Add BOQ Item Modal */}
-      {isAddBOQOpen && (
+      {isAddBOQOpen && !readOnly && (
         <div
           role="dialog"
           aria-modal="true"

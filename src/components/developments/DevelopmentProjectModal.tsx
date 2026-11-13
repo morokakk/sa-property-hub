@@ -402,6 +402,7 @@ export function DevelopmentProjectModal({
         occupancyCertificate: { status: 'Not Started' },
       };
       projectData.boqItems = [];
+      projectData.commentsLedger = [];
       projectData.units = generateInitialDevelopmentUnits({
         projectId: newProjectId,
         unitCount: Number(initialUnitCount),

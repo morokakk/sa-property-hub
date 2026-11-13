@@ -19,6 +19,7 @@ import {
 export interface DevelopmentUnitInventoryTabProps {
   development: DevelopmentProject;
   financials: DevelopmentFinancialSummary;
+  readOnly?: boolean;
   onUpdateUnit: (unitId: string, updates: Partial<DevelopmentUnit>) => void;
   onAddUnit?: (unit: Omit<DevelopmentUnit, 'id'>) => void;
   onDeleteUnit?: (unitId: string) => void;
@@ -37,6 +38,7 @@ const DEV_UNIT_STATUSES: DevUnitStatus[] = [
 export function DevelopmentUnitInventoryTab({
   development,
   financials,
+  readOnly = false,
   onUpdateUnit,
   onAddUnit,
   onDeleteUnit,
@@ -61,6 +63,13 @@ export function DevelopmentUnitInventoryTab({
   const [newCostBasis, setNewCostBasis] = useState<number>(600000);
 
   useEffect(() => {
+    if (readOnly) {
+      setSellingUnit(null);
+      setIsAddUnitOpen(false);
+    }
+  }, [readOnly]);
+
+  useEffect(() => {
     if (!sellingUnit && !isAddUnitOpen) return;
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
@@ -81,6 +90,7 @@ export function DevelopmentUnitInventoryTab({
 
   // Open Sale Modal
   const handleOpenSaleModal = (unit: DevelopmentUnit) => {
+    if (readOnly) return;
     setSellingUnit(unit);
     setSaleBuyerName(unit.buyerName || '');
     setSalePriceZAR(unit.listPriceVatInclZAR || 0);
@@ -89,7 +99,7 @@ export function DevelopmentUnitInventoryTab({
 
   const handleConfirmSale = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!sellingUnit) return;
+    if (readOnly || !sellingUnit) return;
     onMarkUnitSold(sellingUnit.id, saleBuyerName || 'Private Buyer', salePriceZAR);
     if (conveyancerRef) {
       onUpdateUnit(sellingUnit.id, { conveyancerRef });
@@ -99,7 +109,7 @@ export function DevelopmentUnitInventoryTab({
 
   const handleCreateUnit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newUnitNumber) return;
+    if (readOnly || !newUnitNumber) return;
 
     if (onAddUnit) {
       onAddUnit({
@@ -118,6 +128,7 @@ export function DevelopmentUnitInventoryTab({
   };
 
   const handleOpenAddUnitModal = () => {
+    if (readOnly) return;
     const nextIndex = units.length + 1;
     setNewUnitNumber(`Unit ${nextIndex}`);
     setIsAddUnitOpen(true);
@@ -162,24 +173,31 @@ export function DevelopmentUnitInventoryTab({
           <div className="flex flex-wrap items-center gap-2">
             <button
               type="button"
-              onClick={handleOpenAddUnitModal}
-              className="inline-flex items-center gap-1.5 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold px-3 py-2 rounded-lg border border-slate-300 shadow-2xs transition-colors cursor-pointer"
+              disabled={readOnly}
+              onClick={() => !readOnly && handleOpenAddUnitModal()}
+              className={`inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-lg border shadow-2xs transition-colors ${
+                readOnly
+                  ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'
+                  : 'bg-white hover:bg-slate-50 text-slate-700 border-slate-300 cursor-pointer'
+              }`}
             >
-              <PlusCircle className="w-3.5 h-3.5 text-slate-600" />
+              <PlusCircle className={`w-3.5 h-3.5 ${readOnly ? 'text-slate-400' : 'text-slate-600'}`} />
               <span>+ Add Unit</span>
             </button>
 
             <button
               type="button"
-              onClick={onGraduateRetainedUnits}
-              disabled={!canGraduate}
-              className={`inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-lg shadow-2xs transition-colors cursor-pointer ${
-                canGraduate
-                  ? 'bg-purple-600 hover:bg-purple-700 text-white'
+              onClick={() => !readOnly && onGraduateRetainedUnits()}
+              disabled={readOnly || !canGraduate}
+              className={`inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-lg shadow-2xs transition-colors ${
+                !readOnly && canGraduate
+                  ? 'bg-purple-600 hover:bg-purple-700 text-white cursor-pointer'
                   : 'bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed'
               }`}
               title={
-                canGraduate
+                readOnly
+                  ? 'Locked in Read-Only View'
+                  : canGraduate
                   ? `Graduate ${ungraduatedRetainedUnits.length} retained units to /rentals`
                   : 'No ungraduated retained units available'
               }
@@ -285,14 +303,18 @@ export function DevelopmentUnitInventoryTab({
                       <td className="py-2.5 px-3 whitespace-nowrap">
                         <select
                           value={unit.status}
+                          disabled={readOnly}
                           onChange={(e) =>
+                            !readOnly &&
                             onUpdateUnit(unit.id, {
                               status: e.target.value as DevUnitStatus,
                             })
                           }
                           aria-label={`Status for ${unit.unitNumber}`}
                           className={`text-xs rounded border px-2 py-1 font-medium focus:ring-1 focus:ring-slate-400 outline-hidden ${
-                            isSold
+                            readOnly
+                              ? 'bg-slate-100 text-slate-500 border-slate-200 cursor-not-allowed'
+                              : isSold
                               ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
                               : isRetained
                               ? 'bg-purple-50 text-purple-800 border-purple-300'
@@ -331,9 +353,14 @@ export function DevelopmentUnitInventoryTab({
                         {!isSold && !isRetained && (
                           <button
                             type="button"
-                            onClick={() => handleOpenSaleModal(unit)}
-                            title="Record sale and pay down debt"
-                            className="inline-flex items-center gap-1 bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-semibold px-2 py-1 rounded transition-colors cursor-pointer"
+                            disabled={readOnly}
+                            onClick={() => !readOnly && handleOpenSaleModal(unit)}
+                            title={readOnly ? 'Locked in Read-Only View' : 'Record sale and pay down debt'}
+                            className={`inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-1 rounded transition-colors ${
+                              readOnly
+                                ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                                : 'bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer'
+                            }`}
                           >
                             <DollarSign className="w-3 h-3" />
                             <span>Mark Sold</span>
@@ -342,13 +369,19 @@ export function DevelopmentUnitInventoryTab({
                         {onDeleteUnit && (
                           <button
                             type="button"
+                            disabled={readOnly}
                             onClick={() => {
+                              if (readOnly) return;
                               if (confirm(`Remove ${unit.unitNumber} from inventory?`)) {
                                 onDeleteUnit(unit.id);
                               }
                             }}
-                            title="Delete unit"
-                            className="text-slate-400 hover:text-rose-600 p-1 rounded transition-colors cursor-pointer"
+                            title={readOnly ? 'Locked in Read-Only View' : 'Delete unit'}
+                            className={`p-1 rounded transition-colors ${
+                              readOnly
+                                ? 'text-slate-300 cursor-not-allowed'
+                                : 'text-slate-400 hover:text-rose-600 cursor-pointer'
+                            }`}
                           >
                             <Trash2 className="w-3.5 h-3.5" />
                           </button>
@@ -380,7 +413,7 @@ export function DevelopmentUnitInventoryTab({
       </div>
 
       {/* Mark Sold & Pay Down Debt Modal */}
-      {sellingUnit && (
+      {sellingUnit && !readOnly && (
         <div
           role="dialog"
           aria-modal="true"
@@ -487,7 +520,7 @@ export function DevelopmentUnitInventoryTab({
       )}
 
       {/* Add Unit Modal */}
-      {isAddUnitOpen && (
+      {isAddUnitOpen && !readOnly && (
         <div
           role="dialog"
           aria-modal="true"

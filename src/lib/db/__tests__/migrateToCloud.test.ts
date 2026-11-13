@@ -1054,5 +1054,78 @@ describe('migrateToCloud Execution Engine', () => {
       expect(result.success).toBe(true);
       expect(mockDelete).not.toHaveBeenCalled();
     });
+
+    it('detects modified development commentsLedger in isStockDemoState and syncs comments_ledger during migration', async () => {
+      (supabase.auth.getUser as any).mockResolvedValue({
+        data: { user: { id: TEST_USER_ID, email: 'investor@example.com' } },
+        error: null,
+      });
+
+      const modifiedDev = {
+        id: 'dev-1',
+        title: 'Ferndale 6-Unit Cluster Subdivision',
+        address: '42 Main Avenue, Ferndale',
+        city: 'Randburg',
+        developmentType: 'Subdivision & Cluster' as const,
+        isVatRegisteredDeveloper: true,
+        currentPhase: 'Feasibility' as const,
+        preApprovalMonths: 6,
+        constructionMonths: 10,
+        sellDownMonths: 4,
+        landPurchasePriceZAR: 1_850_000,
+        acquisitionCostsZAR: 95_000,
+        sec118ArrearsZAR: 0,
+        softCosts: {
+          townPlannerZAR: 65_000,
+          architectZAR: 165_000,
+          structuralCivilEngineerZAR: 110_000,
+          quantitySurveyorZAR: 85_000,
+          nhbrcEnrolmentFeeZAR: 42_000,
+          councilBulkContributionsZAR: 180_000,
+          planScrutinyAndSubdivisionFeesZAR: 28_000,
+          marketingAndShowUnitZAR: 45_000,
+        },
+        totalBuildableAreaSqm: 540,
+        budgetedHardCostPerSqmZAR: 9_800,
+        contingencyPercent: 7.5,
+        boqItems: [],
+        monthlyPreApprovalHoldingBurnZAR: 14_500,
+        monthlyConstructionHoldingBurnZAR: 26_000,
+        developmentFacilityLimitZAR: 5_200_000,
+        developmentFacilityDrawnZAR: 850_000,
+        developmentFacilityRepaidZAR: 0,
+        preSalesHurdlePercent: 60,
+        approvals: {} as any,
+        units: [],
+        commentsLedger: [
+          {
+            id: 'custom-user-note-1',
+            authorName: 'Custom User',
+            authorRole: 'Lead Sponsor' as const,
+            sectionTag: 'General' as const,
+            message: 'Modified ledger comment marks project as customized',
+            status: 'Pending' as const,
+            createdAt: '2026-11-10T10:00:00.000Z',
+          },
+        ],
+      };
+
+      expect(
+        isStockDemoState({
+          rentals: INITIAL_RENTALS,
+          flips: INITIAL_FLIPS,
+          developments: [modifiedDev],
+          investorProfile: INITIAL_INVESTOR_PROFILE,
+        })
+      ).toBe(false);
+
+      const res = await migrateToCloud({
+        state: {
+          developments: [modifiedDev],
+        },
+      });
+      expect(res.success).toBe(true);
+      expect(supabase.from).toHaveBeenCalledWith('developments');
+    });
   });
 });

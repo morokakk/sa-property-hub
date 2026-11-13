@@ -135,6 +135,7 @@ export type Database = {
           boq_items: Json
           budgeted_hard_cost_per_sqm_zar: number
           city: string
+          comments_ledger?: Json | null
           compliance: Json | null
           construction_months: number
           contingency_percent: number
@@ -160,6 +161,7 @@ export type Database = {
           sec118_arrears_zar: number
           sell_down_months: number
           senior_jv_partner_name?: string | null
+          share_token?: string | null
           soft_costs: Json
           tax_entity_type: string | null
           title: string
@@ -175,6 +177,7 @@ export type Database = {
           boq_items?: Json
           budgeted_hard_cost_per_sqm_zar?: number
           city?: string
+          comments_ledger?: Json | null
           compliance?: Json | null
           construction_months?: number
           contingency_percent?: number
@@ -200,6 +203,7 @@ export type Database = {
           sec118_arrears_zar?: number
           sell_down_months?: number
           senior_jv_partner_name?: string | null
+          share_token?: string | null
           soft_costs?: Json
           tax_entity_type?: string | null
           title: string
@@ -215,6 +219,7 @@ export type Database = {
           boq_items?: Json
           budgeted_hard_cost_per_sqm_zar?: number
           city?: string
+          comments_ledger?: Json | null
           compliance?: Json | null
           construction_months?: number
           contingency_percent?: number
@@ -240,6 +245,7 @@ export type Database = {
           sec118_arrears_zar?: number
           sell_down_months?: number
           senior_jv_partner_name?: string | null
+          share_token?: string | null
           soft_costs?: Json
           tax_entity_type?: string | null
           title?: string
@@ -1304,6 +1310,10 @@ export type Database = {
     Functions: {
       get_public_tenant_statement: {
         Args: { p_lease_id: string }
+        Returns: Json
+      }
+      get_public_development_deal_room: {
+        Args: { p_token: string }
         Returns: Json
       }
     }
