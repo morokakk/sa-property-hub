@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useRef, useState, useEffect } from 'react';
+import { usePathname } from 'next/navigation';
 import { usePortfolioStore, usePortfolioSummary } from '@/lib/store/usePortfolioStore';
 import { formatZAR } from '@/lib/formatters';
 import {
@@ -81,6 +82,15 @@ interface TopHeaderProps {
 }
 
 export default function TopHeader({ title, subtitle, actionButton }: TopHeaderProps) {
+  const pathname = usePathname();
+  const isStandalonePublicRoute =
+    pathname?.startsWith('/statement') ||
+    pathname?.startsWith('/privacy') ||
+    pathname?.startsWith('/deal-room');
+  if (isStandalonePublicRoute) {
+    return null;
+  }
+
   const summary = usePortfolioSummary();
   const resetToDemoData = usePortfolioStore((state) => state.resetToDemoData);
   const clearAllData = usePortfolioStore((state) => state.clearAllData);

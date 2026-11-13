@@ -39,14 +39,15 @@ export const SHOW_ABOUT_PAGE_IN_NAV = false;
 export default function Sidebar() {
   const pathname = usePathname();
 
-  // Hide sidebar completely on tenant statement portal, legal privacy page, and standalone landing/about pages
-  if (
-    pathname.startsWith('/statement') ||
-    pathname.startsWith('/deal-room') ||
-    pathname.startsWith('/privacy') ||
-    pathname.startsWith('/welcome') ||
-    pathname.startsWith('/about')
-  ) {
+  // Execute standalone route check unconditionally before any store/state/effect hooks
+  // so SSR and initial client hydration produce identical output with zero mismatch.
+  const isStandalonePublicRoute =
+    pathname?.startsWith('/statement') ||
+    pathname?.startsWith('/privacy') ||
+    pathname?.startsWith('/deal-room') ||
+    pathname?.startsWith('/welcome') ||
+    pathname?.startsWith('/about');
+  if (isStandalonePublicRoute) {
     return null;
   }
 

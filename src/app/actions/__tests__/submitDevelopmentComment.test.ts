@@ -129,6 +129,32 @@ describe('submitDevelopmentComment & getExternalDevelopmentComments Server Actio
     expect(fetched.comments.some((c) => c.id === res.comment?.id)).toBe(true);
   });
 
+  it('normalizes demo- prefix tokens so demo-dev-1 shares the demo ledger with dev-1', async () => {
+    const res = await submitDevelopmentComment({
+      token: 'demo-dev-1',
+      authorName: 'Sipho Dlamini',
+      authorRole: 'Quantity Surveyor (QS)',
+      sectionTag: 'BOQ & Cost Stack',
+      message: 'Verified demo- prefix external submission.',
+    });
+
+    expect(res.success).toBe(true);
+    expect(res.comment?.status).toBe('Pending');
+
+    const byDemoToken = await getExternalDevelopmentComments({
+      developmentId: 'dev-1',
+      shareToken: 'demo-dev-1',
+    });
+    expect(byDemoToken.success).toBe(true);
+    expect(byDemoToken.comments.some((c) => c.id === res.comment?.id)).toBe(true);
+
+    const byCanonicalDevId = await getExternalDevelopmentComments({
+      developmentId: 'dev-1',
+    });
+    expect(byCanonicalDevId.success).toBe(true);
+    expect(byCanonicalDevId.comments.some((c) => c.id === res.comment?.id)).toBe(true);
+  });
+
   it('persists cloud comment to Supabase developments.comments_ledger and forces Pending status', async () => {
     const res = await submitDevelopmentComment({
       token: 'cloud-share-token-abc',

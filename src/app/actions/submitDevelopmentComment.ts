@@ -197,12 +197,20 @@ export async function submitDevelopmentComment(
     }
 
     // Demo development fallback (never mutates INITIAL_DEVELOPMENTS)
+    const normalizedDemoId = cleanToken.startsWith('demo-')
+      ? cleanToken.replace(/^demo-/, '')
+      : cleanToken;
     const demoDev = INITIAL_DEVELOPMENTS.find(
-      (d) => isDemoDevelopment(d.id) && (d.id === cleanToken || d.shareToken === cleanToken)
+      (d) =>
+        isDemoDevelopment(d.id) &&
+        (d.id === cleanToken || d.id === normalizedDemoId || d.shareToken === cleanToken)
     );
 
     if (demoDev) {
       recordInMemoryComment(cleanToken, newComment);
+      if (normalizedDemoId && normalizedDemoId !== cleanToken) {
+        recordInMemoryComment(normalizedDemoId, newComment);
+      }
       recordInMemoryComment(demoDev.id, newComment);
       return {
         success: true,
@@ -232,6 +240,8 @@ export async function getExternalDevelopmentComments(
   try {
     const devId = typeof params?.developmentId === 'string' ? params.developmentId.trim() : '';
     const token = typeof params?.shareToken === 'string' ? params.shareToken.trim() : '';
+    const normalizedDevId = devId.startsWith('demo-') ? devId.replace(/^demo-/, '') : devId;
+    const normalizedTokenId = token.startsWith('demo-') ? token.replace(/^demo-/, '') : token;
 
     let collected: ProjectComment[] = [];
 
@@ -240,8 +250,14 @@ export async function getExternalDevelopmentComments(
     if (devId && isDemoDevelopment(devId)) {
       collected = mergeProjectComments(collected, inMemoryDealRoomComments.get(devId));
     }
+    if (normalizedDevId && normalizedDevId !== devId && isDemoDevelopment(normalizedDevId)) {
+      collected = mergeProjectComments(collected, inMemoryDealRoomComments.get(normalizedDevId));
+    }
     if (token) {
       collected = mergeProjectComments(collected, inMemoryDealRoomComments.get(token));
+    }
+    if (normalizedTokenId && normalizedTokenId !== token && isDemoDevelopment(normalizedTokenId)) {
+      collected = mergeProjectComments(collected, inMemoryDealRoomComments.get(normalizedTokenId));
     }
 
     const supabase = getServerSupabaseClient();

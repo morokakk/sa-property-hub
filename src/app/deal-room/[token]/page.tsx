@@ -75,9 +75,14 @@ async function fetchDealRoomData(token: string): Promise<PublicDealRoomPayload |
     }
   }
 
-  // Demo fallback for initial portfolio projects (e.g. dev-1, dev-2)
+  // Demo fallback for initial portfolio projects (e.g. dev-1, demo-dev-1, dev-2, demo-dev-2)
+  const normalizedDemoId = cleanToken.startsWith('demo-')
+    ? cleanToken.replace(/^demo-/, '')
+    : cleanToken;
   const demoDev = INITIAL_DEVELOPMENTS.find(
-    (d) => isDemoDevelopment(d.id) && (d.id === cleanToken || d.shareToken === cleanToken)
+    (d) =>
+      isDemoDevelopment(d.id) &&
+      (d.id === cleanToken || d.id === normalizedDemoId || d.shareToken === cleanToken)
   );
 
   if (demoDev) {
