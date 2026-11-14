@@ -675,7 +675,7 @@ export default function DealRoomViewer({ dealRoomData, token }: DealRoomViewerPr
       <footer className="text-center text-xs text-slate-500 py-5 border-t border-slate-200 bg-white">
         Operated by{' '}
         <strong className="font-semibold text-slate-700">Moremela Properties (Pty) Ltd</strong>{' '}
-        (2026/838397/07) as POPIA Operator &bull;{' '}
+        as POPIA Operator &bull;{' '}
         <Link
           href="/privacy"
           className="text-emerald-700 hover:text-emerald-800 underline font-semibold"

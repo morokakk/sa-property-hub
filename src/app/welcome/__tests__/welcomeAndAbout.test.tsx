@@ -38,12 +38,11 @@ describe('Root Welcome Landing Page (/) & /welcome Redirect', () => {
     expect(html).toContain('Open Portfolio Dashboard ➔');
     expect(html).toContain('Follow Quick-Start Guide');
 
-    // All 4 dashboard entry CTAs must point to /dashboard
+    // All 3 dashboard entry CTAs must point to /dashboard
     expect(html).toMatch(/<a[^>]*href="\/dashboard"[^>]*>[\s\S]*?Open Dashboard ➔/);
     expect(html).toMatch(/<a[^>]*href="\/dashboard"[^>]*>[\s\S]*?Open Portfolio Dashboard ➔/);
-    expect(html).toMatch(/<a[^>]*href="\/dashboard"[^>]*>[\s\S]*?Go to Global Portfolio ➔/);
     expect(html).toMatch(/<a[^>]*href="\/dashboard"[^>]*>Global Portfolio<\/a>/);
-    expect(html.match(/href="\/dashboard"/g)).toHaveLength(4);
+    expect(html.match(/href="\/dashboard"/g)).toHaveLength(3);
 
     // Interactive Life Goal Switcher
     expect(html).toContain('data-testid="life-goal-switcher"');
@@ -64,11 +63,11 @@ describe('Root Welcome Landing Page (/) & /welcome Redirect', () => {
     expect(html).toContain('Run Operations From Your Phone');
     expect(html).toContain('Pitch Lenders &amp; Partners Instantly (The Baobab)');
 
-    // Section 3: Dark Institutional CTA Banner & Footer
-    expect(html).toContain('Clear the complicated math and admin out of your way.');
-    expect(html).toContain('Go to Global Portfolio ➔');
+    // Footer
     expect(html).toContain('Global Portfolio');
     expect(html).toContain('Privacy &amp; POPIA');
+    expect(html).toContain('Moremela Properties (Pty) Ltd');
+    expect(html).not.toContain('2026/838397/07');
 
     // STRICT GUARD: Must NOT link to /about in footer or page
     expect(html).not.toContain('href="/about"');

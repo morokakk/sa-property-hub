@@ -313,7 +313,7 @@ export default function WelcomePage() {
         <div className="max-w-6xl mx-auto px-4 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500">
           <div className="flex items-center gap-2">
             <img src="/moremela-logo.svg" alt="Moremela Logo" className="w-5 h-5 rounded object-contain shrink-0" />
-            <span>Moremela Properties (Pty) Ltd (2026/838397/07)</span>
+            <span>Moremela Properties (Pty) Ltd</span>
           </div>
 
           <div className="flex items-center gap-4">

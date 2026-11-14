@@ -95,7 +95,8 @@ describe('Official POPIA Privacy Policy (/privacy) & Legal Footers', () => {
       path.resolve(__dirname, '../../../components/navigation/Sidebar.tsx'),
       'utf-8'
     );
-    expect(sidebarSource).toContain('Moremela Properties (Pty) Ltd (2026/838397/07) • POC Estimates Only');
+    expect(sidebarSource).toContain('Moremela Properties (Pty) Ltd • POC Estimates Only');
+    expect(sidebarSource).not.toContain('2026/838397/07');
     expect(sidebarSource).toContain('data-testid="sidebar-privacy-link"');
     expect(sidebarSource).toContain('Privacy, POPIA &amp; Legal Disclaimer');
     expect(sidebarSource).toContain('href="/privacy"');
@@ -112,7 +113,8 @@ describe('Official POPIA Privacy Policy (/privacy) & Legal Footers', () => {
       'utf-8'
     );
     expect(viewerSource).toContain('Moremela Properties (Pty) Ltd');
-    expect(viewerSource).toContain('(2026/838397/07) as POPIA Operator');
+    expect(viewerSource).toContain('as POPIA Operator');
+    expect(viewerSource).not.toContain('2026/838397/07');
     expect(viewerSource).toContain('href="/privacy"');
     expect(viewerSource).toContain('Privacy Notice');
   });

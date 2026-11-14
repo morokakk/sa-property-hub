@@ -376,7 +376,7 @@ export default function Sidebar() {
           </p>
           <div className="pt-2 border-t border-slate-800/80 space-y-1 text-[10px] text-slate-500">
             <p className="font-medium text-slate-400">
-              Moremela Properties (Pty) Ltd (2026/838397/07) • POC Estimates Only
+              Moremela Properties (Pty) Ltd • POC Estimates Only
             </p>
             <Link
               href="/privacy"
@@ -598,7 +598,7 @@ export default function Sidebar() {
               </p>
               <div className="pt-2 border-t border-slate-800/80 space-y-1 text-[10px] text-slate-500">
                 <p className="font-medium text-slate-400">
-                  Moremela Properties (Pty) Ltd (2026/838397/07) • POC Estimates Only
+                  Moremela Properties (Pty) Ltd • POC Estimates Only
                 </p>
                 <Link
                   href="/privacy"

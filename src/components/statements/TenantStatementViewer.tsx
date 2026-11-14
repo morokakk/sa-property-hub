@@ -1813,7 +1813,7 @@ export default function TenantStatementViewer({
 
         {/* Bottom Web Footer (Print-Hidden) */}
         <footer className="text-center text-xs text-slate-500 pt-2 pb-4 print:hidden print-hidden-element">
-          Operated by <strong className="font-semibold text-slate-700">Moremela Properties (Pty) Ltd</strong> (2026/838397/07) as POPIA Operator •{' '}
+          Operated by <strong className="font-semibold text-slate-700">Moremela Properties (Pty) Ltd</strong> as POPIA Operator •{' '}
           <Link
             href="/privacy"
             className="text-emerald-700 hover:text-emerald-800 underline font-semibold"

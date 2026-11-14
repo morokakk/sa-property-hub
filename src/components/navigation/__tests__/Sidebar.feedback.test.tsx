@@ -31,7 +31,7 @@ describe('Sidebar Feedback Engine Triggers', () => {
     // Existing privacy & POPIA links remain 100% intact
     expect(sidebarSource).toContain('data-testid="sidebar-privacy-link"');
     expect(sidebarSource).toContain('data-testid="sidebar-mobile-privacy-link"');
-    expect(sidebarSource).toContain('Moremela Properties (Pty) Ltd (2026/838397/07) • POC Estimates Only');
+    expect(sidebarSource).toContain('Moremela Properties (Pty) Ltd • POC Estimates Only');
   });
 
   it('renders the Desktop feedback trigger button when rendered', () => {
