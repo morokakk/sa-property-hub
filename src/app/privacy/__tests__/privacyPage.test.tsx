@@ -20,6 +20,8 @@ describe('Official POPIA Privacy Policy (/privacy) & Legal Footers', () => {
     expect(html).toContain('POPIA &amp; Statutory Compliance Framework');
     expect(html).toContain('Privacy Notice &amp; Legal Disclaimers');
     expect(html).toContain('Back to Workspace');
+    expect(html).toMatch(/<a[^>]*href="\/dashboard"[^>]*>[\s\S]*?Back to Workspace/);
+    expect(html).toMatch(/<a[^>]*href="\/dashboard"[^>]*>Return to Portfolio Dashboard ➔<\/a>/);
     expect(html).toContain('Print / Save PDF');
 
     // POC Pilot & FAIS / SARS Financial Calculation Disclaimer Banner

@@ -167,7 +167,7 @@ test.describe('Competitor-Inspired Upgrades Verification', () => {
 
   test.describe('Phase 3: Actuals vs Budget KPI Strip, Section 11(a) & ITR12 Export', () => {
     test('Dashboard renders Actuals vs Budget KPI Strip with SA Tax Year and 4 KPI columns', async ({ page }) => {
-      await page.goto('/', { waitUntil: 'domcontentloaded' });
+      await page.goto('/dashboard', { waitUntil: 'domcontentloaded' });
       await page.locator('text=Initializing Moremela Property Hub...').waitFor({ state: 'detached', timeout: 30_000 }).catch(() => {});
 
       // Verify Actuals vs Budget KPI Strip

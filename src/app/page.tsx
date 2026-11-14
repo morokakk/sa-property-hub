@@ -1,764 +1,358 @@
 'use client';
 
-import React from 'react';
-import TopHeader from '@/components/navigation/TopHeader';
-import AssetAllocationChart from '@/components/dashboard/AssetAllocationChart';
-import UpcomingDeadlines from '@/components/dashboard/UpcomingDeadlines';
-import PriorityTasksWidget from '@/components/dashboard/PriorityTasksWidget';
-import ActualVsBudgetKpiStrip from '@/components/dashboard/ActualVsBudgetKpiStrip';
-import ConsolidatedTaxCard from '@/components/dashboard/ConsolidatedTaxCard';
-import EquityExtractionCard from '@/components/dashboard/EquityExtractionCard';
-import { usePortfolioStore, usePortfolioSummary } from '@/lib/store/usePortfolioStore';
-import { formatZAR, formatPercent, formatDate } from '@/lib/formatters';
-import { calculateRentalCashflow } from '@/lib/calculations/propertyMetrics';
-import { calculatePropertyArrears } from '@/lib/calculations/arrears';
-import { calculateDevelopmentFinancials } from '@/lib/calculations/developments';
-import {
-  TrendingUp,
-  ShieldCheck,
-  Building,
-  Hammer,
-  Layers,
-  Coins,
-  ArrowUpRight,
-  PlusCircle,
-  FileCheck2,
-  Users,
-  Wallet,
-  Edit3,
-  ArrowRight,
-  Check,
-  Sparkles,
-  AlertTriangle,
-  Landmark,
-  Compass,
-  X,
-} from 'lucide-react';
+import React, { useState } from 'react';
 import Link from 'next/link';
+import {
+  Building2,
+  Hammer,
+  Calculator,
+  FileText,
+  ShieldCheck,
+  Smartphone,
+  TrendingUp,
+  ArrowRight,
+  Compass,
+} from 'lucide-react';
 
-export default function GlobalDashboardPage() {
-  const summary = usePortfolioSummary();
-  const rentals = usePortfolioStore((state) => state.rentals);
-  const flips = usePortfolioStore((state) => state.flips);
-  const developments = usePortfolioStore((state) => state.developments) ?? [];
-  const funding = usePortfolioStore((state) => state.funding);
-  const updateLiquidReserve = usePortfolioStore((state) => state.updateLiquidReserve);
+interface LifeGoalOption {
+  id: string;
+  title: string;
+  icon: React.ComponentType<{ className?: string; strokeWidth?: number }>;
+  humanGoal: string;
+  howClearsWay: string;
+  ctaLabel: string;
+  ctaHref: string;
+}
 
-  const activeDevelopments = developments.filter((d) => d && d.currentPhase !== 'Completed');
+const LIFE_GOALS: LifeGoalOption[] = [
+  {
+    id: 'cashflow',
+    title: 'Monthly Cash Flow',
+    icon: Building2,
+    humanGoal: 'Cover school or varsity fees, supplement household income, or replace your salary.',
+    howClearsWay:
+      'Track single-lets or multi-let rooms, manage utility & prepaid sub-meter recoveries, monitor arrears, and generate 1-click tenant statements.',
+    ctaLabel: 'Explore Rental Portfolio ➔',
+    ctaHref: '/rentals',
+  },
+  {
+    id: 'flips',
+    title: 'Build a Lump-Sum Cash War Chest',
+    icon: Hammer,
+    humanGoal: 'Generate lump-sum capital from renovations and flips to pay off debt or fund your next acquisition.',
+    howClearsWay:
+      'Manage 10-trade BOQ budgets, stage-gated contractor draws, Section 118 municipal clearance timelines, and holding cost burn on-site.',
+    ctaLabel: 'Explore Buy-and-Flip Manager ➔',
+    ctaHref: '/flips',
+  },
+  {
+    id: 'vetting',
+    title: 'Vet a Deal Before You Sign',
+    icon: Calculator,
+    humanGoal: "Know your true Day-1 cash requirement and net return before committing your family's capital.",
+    howClearsWay:
+      'Instant SARS transfer duty, LSSA conveyancing & bond tariffs, Section 118 arrears buffers, and Maximum Allowable Offer (Max Bid) calculation.',
+    ctaLabel: 'Open Opportunity Analyzer ➔',
+    ctaHref: '/analyzer',
+  },
+  {
+    id: 'wealth',
+    title: 'Long-Term Wealth & Partners',
+    icon: FileText,
+    humanGoal: 'Compound debt-free equity over 20 years, recycle capital via BRRRR, and raise private funding professionally.',
+    howClearsWay:
+      'Track 70% LTV refinance readiness, SARS provisional tax reserves, and generate 1-page PDF pitch decks or WhatsApp summaries in 60 seconds.',
+    ctaLabel: 'Open Proposal Generator ➔',
+    ctaHref: '/proposal',
+  },
+];
 
-  const [showEditSeedModal, setShowEditSeedModal] = React.useState(false);
-  const [seedAmount, setSeedAmount] = React.useState(summary.liquidCapitalReserve);
-
-  const equityRatio = summary.totalGrossAssetValue > 0
-    ? (summary.netEquity / summary.totalGrossAssetValue) * 100
-    : 0;
+export default function WelcomePage() {
+  const [selectedGoalId, setSelectedGoalId] = useState<string>('cashflow');
+  const activeGoal = LIFE_GOALS.find((g) => g.id === selectedGoalId) || LIFE_GOALS[0];
+  const ActiveIcon = activeGoal.icon;
 
   return (
-    <div className="flex-1 flex flex-col">
-      <TopHeader
-        title="Global Portfolio Dashboard"
-        subtitle="Executive South African real estate portfolio overview, net equity, and operations"
-        actionButton={
-          <Link
-            href="/analyzer"
-            className="inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold px-3 py-2 rounded-lg shadow-xs border-t border-white/15 transition-colors shrink-0 whitespace-nowrap"
-          >
-            <PlusCircle className="w-3.5 h-3.5" />
-            Analyze New Deal
+    <div className="min-h-screen bg-slate-50 text-slate-800 flex flex-col justify-between selection:bg-emerald-500 selection:text-white">
+      {/* ========================================================================= */}
+      {/* A. TOP BAR                                                               */}
+      {/* ========================================================================= */}
+      <header className="bg-slate-900 border-b border-slate-800 text-white sticky top-0 z-30">
+        <div className="max-w-6xl mx-auto px-3 sm:px-6 h-16 flex items-center justify-between gap-2 sm:gap-4">
+          <Link href="/" className="flex items-center gap-2 sm:gap-3 group shrink min-w-0">
+            <img
+              src="/moremela-logo.svg"
+              alt="Moremela Properties Emblem"
+              className="w-9 h-9 sm:w-11 sm:h-11 md:w-12 md:h-12 rounded-lg object-contain shrink-0 shadow-xs"
+            />
+            <span className="font-bold text-xs sm:text-base tracking-tight text-white group-hover:text-emerald-400 transition-colors truncate">
+              Moremela Property Hub
+            </span>
           </Link>
-        }
-      />
 
-      <main className="flex-1 p-4 sm:p-6 space-y-6 max-w-7xl w-full mx-auto">
-        {/* Available Liquidity & Purchasing Power Banner */}
-        <div className="bg-slate-900 rounded-xl p-5 text-white border border-slate-800 shadow-xs relative overflow-hidden">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-4 items-stretch relative z-10">
-            {/* Primary Hero Block (4 of 12 columns) */}
-            <div className="sm:col-span-2 lg:col-span-4 flex flex-col justify-between">
-              <div>
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-[11px] font-semibold uppercase tracking-wider text-emerald-400 bg-slate-800/90 px-2 py-0.5 rounded border border-slate-700">
-                    Seed Capital &amp; Purchasing Power
-                  </span>
-                  <span className="text-xs text-slate-400">Ready for next acquisition</span>
-                </div>
-                <div className="mt-2">
-                  <div className="text-2xl sm:text-3xl font-bold text-white tracking-tight tabular-nums whitespace-nowrap">
-                    {formatZAR(summary.totalAvailablePurchasingPower)}
-                  </div>
-                  <span className="text-xs font-medium text-emerald-400 block mt-0.5">
-                    Net Deployable Purchasing Power
-                  </span>
-                </div>
-              </div>
-
-              <div
-                className="text-xs text-slate-300 mt-3 bg-slate-950/80 p-2.5 rounded-lg border border-slate-800 space-y-1"
-                title={`Free Cash: ${formatZAR(summary.freeUnallocatedCash)} (${formatZAR(summary.liquidCapitalReserve)} Bank − ${formatZAR(summary.ringFencedWorkingCapital)} Ring-Fenced) + Standby Facilities: ${formatZAR(summary.unallocatedFundingReserve)} = Net Deployable Purchasing Power: ${formatZAR(summary.totalAvailablePurchasingPower)}`}
-              >
-                <div className="flex items-center justify-between gap-1 text-[11px] text-slate-300">
-                  <span>Free Cash (Post-Escrow):</span>
-                  <strong className="font-semibold text-white tabular-nums whitespace-nowrap">{formatZAR(summary.freeUnallocatedCash)}</strong>
-                </div>
-                <div className="flex items-center justify-between gap-1 text-[11px] text-slate-300 border-t border-slate-800/80 pt-1">
-                  <span className="text-slate-400">+ Standby Facilities:</span>
-                  <strong className="font-semibold text-emerald-300 tabular-nums whitespace-nowrap">+{formatZAR(summary.unallocatedFundingReserve)}</strong>
-                </div>
-              </div>
-            </div>
-
-            {/* 4 Breakdown Cards (2 columns each = 8 of 12 columns) */}
-            <div className="col-span-1 lg:col-span-2 bg-slate-800/60 rounded-lg p-3 border border-slate-700/60 flex flex-col justify-between">
-              <div>
-                <div className="flex items-center justify-between text-[11px] text-slate-400 mb-0.5">
-                  <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Free Cash</span>
-                  <button
-                    onClick={() => {
-                      setSeedAmount(summary.liquidCapitalReserve);
-                      setShowEditSeedModal(true);
-                    }}
-                    className="text-emerald-400 hover:text-emerald-300 p-0.5 rounded hover:bg-slate-700/60 transition-colors cursor-pointer"
-                    title="Edit Seed Capital Reserve"
-                  >
-                    <Edit3 className="w-3 h-3" />
-                  </button>
-                </div>
-                <div className="text-base sm:text-lg font-bold text-white tabular-nums tracking-tight whitespace-nowrap">
-                  {formatZAR(summary.freeUnallocatedCash)}
-                </div>
-              </div>
-              <div
-                className="text-[10px] text-slate-400 mt-2 leading-tight"
-                title={`${formatZAR(summary.ringFencedWorkingCapital)} is committed to active contractor draws and council deposits, leaving ${formatZAR(summary.freeUnallocatedCash)} unallocated cash from the ${formatZAR(summary.liquidCapitalReserve)} bank balance.`}
-              >
-                {summary.ringFencedWorkingCapital > 0 ? (
-                  <span>
-                    {formatZAR(summary.ringFencedWorkingCapital)} committed to active draws &amp; deposits
-                  </span>
-                ) : (
-                  <span>Of {formatZAR(summary.liquidCapitalReserve)} total reserve</span>
-                )}
-              </div>
-            </div>
-
-            <div className="col-span-1 lg:col-span-2 bg-slate-800/60 rounded-lg p-3 border border-slate-700/60 flex flex-col justify-between">
-              <div>
-                <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-0.5">Ring-Fenced</div>
-                <div className="text-base sm:text-lg font-bold text-amber-300 tabular-nums tracking-tight whitespace-nowrap">
-                  {formatZAR(summary.ringFencedWorkingCapital)}
-                </div>
-              </div>
-              <div className="text-[10px] text-slate-400 mt-2 leading-tight" title="Retentions, pending milestone draws, and municipal rates deposits">
-                Committed contractor draws, retentions &amp; council deposits
-              </div>
-            </div>
-
-            <div className="col-span-1 lg:col-span-2 bg-slate-800/60 rounded-lg p-3 border border-slate-700/60 flex flex-col justify-between">
-              <div>
-                <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-0.5">Pre-Approved Lines</div>
-                <div className="text-base sm:text-lg font-bold text-white tabular-nums tracking-tight whitespace-nowrap">
-                  {formatZAR(summary.unallocatedFundingReserve)}
-                </div>
-              </div>
-              <div className="text-[10px] text-slate-400 mt-2 leading-tight">
-                Standby credit lines ready for acquisition
-              </div>
-            </div>
-
-            <div className="col-span-1 lg:col-span-2 bg-slate-800/60 rounded-lg p-3 border border-slate-700/60 flex flex-col justify-between">
-              <div>
-                <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-0.5">Realized Profit</div>
-                <div className="text-base sm:text-lg font-bold text-emerald-400 tabular-nums tracking-tight whitespace-nowrap">
-                  {formatZAR(summary.totalRealizedFlipProfits)}
-                </div>
-              </div>
-              <div className="text-[10px] text-slate-400 mt-2 leading-tight">
-                From {summary.completedFlipsCount} completed exits
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Clean Slate Onboarding Guide (Shown when portfolio is empty) */}
-        {rentals.length === 0 && flips.length === 0 && activeDevelopments.length === 0 && (
-          <div className="bg-white rounded-2xl p-6 border-2 border-dashed border-emerald-300 shadow-xs">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-slate-100">
-              <div className="flex items-start gap-3">
-                <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-800 flex items-center justify-center shrink-0">
-                  <Sparkles className="w-5 h-5" />
-                </div>
-                <div>
-                  <h3 className="text-base font-bold text-slate-900">
-                    Clean Slate: Ready to Model Your Real Portfolio
-                  </h3>
-                  <p className="text-xs text-slate-500 mt-0.5">
-                    Demo records have been cleared. Begin entering your own South African assets, or analyze potential acquisition deals below.
-                  </p>
-                </div>
-              </div>
-              <div className="text-xs text-slate-400">
-                Tip: You can restore demo data anytime via <strong className="text-slate-700">Reset Demo</strong> in the top bar.
-              </div>
-            </div>
-
+          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
             <Link
               href="/get-started"
-              data-testid="clean-slate-quick-start-link"
-              className="mt-4 flex items-center gap-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-3 shadow-sm transition-colors"
+              className="hidden sm:inline-flex items-center gap-1.5 text-xs font-semibold text-slate-300 hover:text-white px-3 py-2 rounded-lg hover:bg-slate-800 transition-colors whitespace-nowrap"
             >
-              <Compass className="w-5 h-5 shrink-0" />
-              <span className="text-sm font-bold">New here? Follow the 5-minute Quick Start Guide →</span>
+              <Compass className="w-4 h-4 text-emerald-400" strokeWidth={1.75} />
+              <span>Get Started Guide</span>
             </Link>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-4">
+            <Link
+              href="/dashboard"
+              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 sm:px-3 text-xs font-medium text-slate-300 hover:text-white bg-slate-800/80 hover:bg-slate-800 border border-slate-700 rounded-lg transition-colors shrink-0 whitespace-nowrap"
+            >
+              <span>Open Dashboard ➔</span>
+            </Link>
+          </div>
+        </div>
+      </header>
+
+      {/* ========================================================================= */}
+      {/* MAIN CONTAINER                                                            */}
+      {/* ========================================================================= */}
+      <main className="flex-1 max-w-6xl w-full mx-auto px-4 sm:px-6 py-8 sm:py-12 space-y-12 sm:space-y-16">
+        {/* ======================================================================= */}
+        {/* B. SECTION 1: HERO & INTERACTIVE GOAL SWITCHER                          */}
+        {/* ======================================================================= */}
+        <section className="space-y-8 sm:space-y-10">
+          {/* Hero Header */}
+          <div className="text-center max-w-3xl mx-auto space-y-4">
+            <div className="inline-flex items-center px-3.5 py-1 rounded-full text-xs font-semibold tracking-wide bg-emerald-50 border border-emerald-300/80 text-emerald-900 shadow-2xs">
+              <span>MOREMELA — &ldquo;THE ONE WHO CLEARS THE WAY&rdquo;</span>
+            </div>
+
+            <h1 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight text-slate-900 leading-tight">
+              Build Your Foundation. One Property at a Time.
+            </h1>
+
+            <p className="text-sm sm:text-base text-slate-600 leading-relaxed font-normal">
+              We give solo South African property entrepreneurs the speed and simplicity to vet profitable deals,
+              manage flips on-site, and compound their portfolio equity from their phones—without needing fragile
+              spreadsheets or expensive corporate software.
+            </p>
+
+            {/* Primary Hero CTAs */}
+            <div className="pt-2 flex flex-wrap items-center justify-center gap-3">
               <Link
-                href="/analyzer"
-                className="p-3.5 rounded-xl border border-slate-200 bg-slate-50/70 hover:bg-emerald-50/60 hover:border-emerald-300 transition-all group cursor-pointer"
+                href="/dashboard"
+                className="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold px-5 py-2.5 rounded-xl shadow-xs transition-colors"
               >
-                <div className="flex items-center gap-2 mb-1.5">
-                  <div className="p-1.5 bg-emerald-100 text-emerald-700 rounded-lg group-hover:bg-emerald-600 group-hover:text-white transition-colors">
-                    <PlusCircle className="w-4 h-4" />
-                  </div>
-                  <span className="text-xs font-bold text-slate-900 group-hover:text-emerald-800">1. Analyze Deal</span>
-                </div>
-                <p className="text-[11px] text-slate-500">Calculate SARS transfer duty, bond repayments, and Day-1 outlays.</p>
+                <span>Open Portfolio Dashboard ➔</span>
               </Link>
 
               <Link
-                href="/rentals"
-                className="p-3.5 rounded-xl border border-slate-200 bg-slate-50/70 hover:bg-emerald-50/60 hover:border-emerald-300 transition-all group cursor-pointer"
+                href="/get-started"
+                className="inline-flex items-center gap-2 bg-white border border-slate-300 text-slate-800 hover:bg-slate-100 text-sm font-semibold px-5 py-2.5 rounded-xl transition-colors"
               >
-                <div className="flex items-center gap-2 mb-1.5">
-                  <div className="p-1.5 bg-indigo-100 text-indigo-700 rounded-lg group-hover:bg-indigo-600 group-hover:text-white transition-colors">
-                    <Building className="w-4 h-4" />
-                  </div>
-                  <span className="text-xs font-bold text-slate-900 group-hover:text-indigo-800">2. Add Rental Unit</span>
-                </div>
-                <p className="text-[11px] text-slate-500">Track leases, Sectional Title levies, agency fees, and utility arrears.</p>
+                <span>Follow Quick-Start Guide</span>
               </Link>
-
-              <Link
-                href="/flips"
-                className="p-3.5 rounded-xl border border-slate-200 bg-slate-50/70 hover:bg-emerald-50/60 hover:border-emerald-300 transition-all group cursor-pointer"
-              >
-                <div className="flex items-center gap-2 mb-1.5">
-                  <div className="p-1.5 bg-amber-100 text-amber-700 rounded-lg group-hover:bg-amber-600 group-hover:text-white transition-colors">
-                    <Hammer className="w-4 h-4" />
-                  </div>
-                  <span className="text-xs font-bold text-slate-900 group-hover:text-amber-800">3. Start Flip Project</span>
-                </div>
-                <p className="text-[11px] text-slate-500">Manage BOQ contractor lines, holding carrying burn, and target exit profit.</p>
-              </Link>
-
-              <button
-                type="button"
-                onClick={() => {
-                  setSeedAmount(summary.liquidCapitalReserve);
-                  setShowEditSeedModal(true);
-                }}
-                className="p-3.5 rounded-xl border border-slate-200 bg-slate-50/70 hover:bg-teal-50/60 hover:border-teal-300 transition-all group text-left cursor-pointer"
-              >
-                <div className="flex items-center gap-2 mb-1.5">
-                  <div className="p-1.5 bg-teal-100 text-teal-700 rounded-lg group-hover:bg-teal-600 group-hover:text-white transition-colors">
-                    <Wallet className="w-4 h-4" />
-                  </div>
-                  <span className="text-xs font-bold text-slate-900 group-hover:text-teal-800">4. Set Liquid Reserve</span>
-                </div>
-                <p className="text-[11px] text-slate-500">Configure your starting cash balance to measure purchasing power.</p>
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Top Executive KPI Metric Cards */}
-        <div id="dashboard-kpis" className="scroll-mt-20 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-          {/* Total Portfolio Value */}
-          <div className="bg-white rounded-xl p-4 border border-slate-200/90 shadow-2xs">
-            <div className="flex items-center justify-between text-slate-500 mb-1">
-              <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Total Portfolio Value</span>
-              <Building className="w-4 h-4 text-emerald-600" />
-            </div>
-            <div className="text-xl font-bold text-slate-900 tabular-nums tracking-tight mt-1">
-              {formatZAR(summary.totalGrossAssetValue)}
-            </div>
-            <div className="text-[11px] text-slate-500 mt-1 flex items-center justify-between">
-              <span>Gross Assets</span>
-              <span className="font-medium text-slate-700">
-                {summary.activeRentalsCount + summary.activeFlipsCount + (summary.activeDevelopmentsCount ?? activeDevelopments.length)} assets
-              </span>
             </div>
           </div>
 
-          {/* Total Liabilities */}
-          <div className="bg-white rounded-xl p-4 border border-slate-200/90 shadow-2xs">
-            <div className="flex items-center justify-between text-slate-500 mb-1">
-              <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Total Liabilities</span>
-              <Coins className="w-4 h-4 text-rose-500" />
-            </div>
-            <div className="text-xl font-bold text-slate-900 tabular-nums tracking-tight mt-1">
-              {formatZAR(summary.totalFundingLiabilities)}
-            </div>
-            <div className="text-[11px] text-slate-500 mt-1 flex items-center justify-between">
-              <span>Drawn Bonds + Active Private Debt</span>
-              <span className="text-rose-600 font-medium tabular-nums">
-                {formatPercent(100 - equityRatio)} Gearing
-              </span>
-            </div>
-          </div>
-
-          {/* Net Equity */}
-          <div className="bg-slate-900 text-white rounded-xl p-4 border border-slate-800 shadow-xs">
-            <div className="flex items-center justify-between text-slate-400 mb-1">
-              <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Net Equity (ZAR)</span>
-              <ShieldCheck className="w-4 h-4 text-emerald-400" />
-            </div>
-            <div className="text-xl font-bold text-emerald-400 tabular-nums tracking-tight mt-1">
-              {formatZAR(summary.netEquity)}
-            </div>
-            <div className="text-[11px] text-slate-400 mt-1 flex items-center justify-between">
-              <span>Assets minus Debt</span>
-              <span className="bg-slate-800 px-1.5 py-0.5 rounded text-emerald-400 border border-slate-700 font-semibold tabular-nums text-[10px]">
-                {formatPercent(equityRatio)} Equity
-              </span>
-            </div>
-          </div>
-
-          {/* Monthly Net Cash Flow */}
-          <div className="bg-white rounded-xl p-4 border border-slate-200/90 shadow-2xs">
-            <div className="flex items-center justify-between text-slate-500 mb-1">
-              <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Net Monthly Cash Flow</span>
-              <TrendingUp className="w-4 h-4 text-teal-600" />
-            </div>
-            <div className={`text-xl font-bold tabular-nums tracking-tight mt-1 ${summary.monthlyNetRentalCashflow >= 0 ? 'text-slate-900' : 'text-rose-600'}`}>
-              {formatZAR(summary.monthlyNetRentalCashflow)}
-              <span className="text-xs font-normal text-slate-400">/mo</span>
-            </div>
-            <div className="text-[11px] text-slate-500 mt-1 flex items-center justify-between">
-              <span>Rentals Net Cash</span>
-              <span className="text-emerald-600 font-medium">After Levies & Bonds</span>
-            </div>
-          </div>
-
-          {/* Flip Pipeline Upside */}
+          {/* Interactive Life Goal Switcher */}
           <div
-            className="bg-white rounded-xl p-4 border border-slate-200/90 shadow-2xs flex flex-col justify-between"
-            title="Reflects Projected Flip Profits & Build-to-Rent Equity across active construction projects (Build-to-Rent holds incur R 0 sale commission and R 0 SARS flip disposal tax)."
+            data-testid="life-goal-switcher"
+            className="bg-white border border-slate-200 rounded-2xl p-5 sm:p-7 shadow-xs space-y-6 max-w-3xl mx-auto"
           >
             <div>
-              <div className="flex items-center justify-between text-slate-500 mb-1">
-                <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Projected Flip Profits</span>
-                <Hammer className="w-4 h-4 text-indigo-600" />
-              </div>
-              <div className="flex items-baseline justify-between mt-1">
-                <div className="text-xl font-bold text-slate-900 tabular-nums tracking-tight">
-                  {formatZAR(summary.totalGrossProjectedFlipProfits)}
-                </div>
-                <span className="text-[10px] font-semibold bg-indigo-50 text-indigo-700 px-1.5 py-0.5 rounded border border-indigo-100 tabular-nums">
-                  Gross Pre-Tax
-                </span>
-              </div>
-              <div className="mt-2 pt-2 border-t border-slate-100 space-y-1">
-                <div className="text-[11px] text-slate-500 flex items-center justify-between">
-                  <span className="text-rose-600 font-medium tabular-nums">− {formatZAR(summary.totalSarsFlipTaxReserve)}</span>
-                  <span className="text-slate-400 text-[10px]">Flip Prov. Tax (27%)</span>
-                </div>
-                <div className="text-[11px] flex items-center justify-between font-bold text-emerald-800 bg-emerald-50 px-2 py-1 rounded border border-emerald-100/80">
-                  <span>Net Realizable:</span>
-                  <span className="tabular-nums">{formatZAR(summary.totalNetProjectedFlipProfits)}</span>
-                </div>
-              </div>
-            </div>
-            <div className="text-[10px] text-slate-400 mt-2 flex items-center justify-between gap-1">
-              <span className="truncate" title="Projected Flip Profits & Build-to-Rent Equity">
-                Projected Flip Profits &amp; Build-to-Rent Equity
+              <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-700 block mb-1">
+                Interactive Goal Alignment
               </span>
-              <span className="text-indigo-600 font-medium shrink-0">{summary.activeFlipsCount} in progress</span>
+              <h2 className="text-base sm:text-lg font-bold text-slate-900">
+                &ldquo;What is your next property meant to do for your life?&rdquo;
+              </h2>
             </div>
-          </div>
-        </div>
 
-        {/* Consolidated SARS Provisional Tax Reserve & Scale-Safe Equity Extraction Row (2-Column Grid) */}
-        <div id="dashboard-tax-reserve" className="scroll-mt-20 grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch">
-          <ConsolidatedTaxCard summary={summary} rentals={rentals} />
-          <EquityExtractionCard summary={summary} rentals={rentals} />
-        </div>
+            {/* 4 Goal Selection Pills in 2x2 Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+              {LIFE_GOALS.map((goal) => {
+                const Icon = goal.icon;
+                const isSelected = goal.id === selectedGoalId;
+                return (
+                  <button
+                    key={goal.id}
+                    type="button"
+                    onClick={() => setSelectedGoalId(goal.id)}
+                    className={`flex items-center gap-3 p-3.5 rounded-xl text-left border transition-all cursor-pointer ${
+                      isSelected
+                        ? 'border-emerald-600 bg-emerald-50 text-emerald-950 font-bold shadow-2xs ring-1 ring-emerald-600'
+                        : 'border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-medium'
+                    }`}
+                  >
+                    <div
+                      className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${
+                        isSelected ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-600'
+                      }`}
+                    >
+                      <Icon className="w-4 h-4" strokeWidth={1.75} />
+                    </div>
+                    <span className="text-xs sm:text-sm">{goal.title}</span>
+                  </button>
+                );
+              })}
+            </div>
 
-        {/* Actuals YTD vs. Budget KPI Strip (SA Tax Year 1 Mar - 28/29 Feb) - Default Collapsed on Dashboard */}
-        <div id="dashboard-actuals" className="scroll-mt-20">
-          <ActualVsBudgetKpiStrip rentals={rentals} collapsible defaultCollapsed />
-        </div>
-
-        {/* Middle Operational Section: Allocation Chart + Deadlines + Priority Tasks */}
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-          <AssetAllocationChart summary={summary} />
-          <UpcomingDeadlines />
-          <PriorityTasksWidget />
-        </div>
-
-        {/* Bottom Section: Active Deals Summary Grids */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Active Buy-and-Flips Quick Look */}
-          <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-xs">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2">
-                <Hammer className="w-4 h-4 text-indigo-600" />
-                <h3 className="font-semibold text-slate-900 text-sm">Active Buy-and-Flips</h3>
+            {/* Preview Card Linking Goal to Live Module */}
+            <div className="bg-slate-50 border border-slate-200 rounded-xl p-5 space-y-4">
+              <div className="flex items-center gap-2.5 pb-3 border-b border-slate-200/80">
+                <div className="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-800 flex items-center justify-center shrink-0">
+                  <ActiveIcon className="w-4 h-4" strokeWidth={1.75} />
+                </div>
+                <h3 className="text-sm sm:text-base font-bold text-slate-900">{activeGoal.title}</h3>
               </div>
-              <Link
-                href="/flips"
-                className="text-xs text-indigo-600 hover:text-indigo-700 font-medium flex items-center gap-1"
-              >
-                View Flips <ArrowUpRight className="w-3.5 h-3.5" />
-              </Link>
-            </div>
 
-            {flips.length === 0 ? (
-              <div className="p-6 rounded-lg border border-dashed border-slate-200 text-center bg-slate-50/50">
-                <Hammer className="w-6 h-6 text-slate-400 mx-auto mb-1.5" />
-                <p className="text-xs font-semibold text-slate-700">No active flips in pipeline</p>
-                <p className="text-[11px] text-slate-400 mt-0.5 mb-3">Model your renovation, carrying costs, and exit upside.</p>
+              <div className="space-y-3 text-xs sm:text-sm">
+                <div>
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 block mb-0.5">
+                    Goal
+                  </span>
+                  <p className="text-slate-800 font-medium leading-relaxed">{activeGoal.humanGoal}</p>
+                </div>
+
+                <div>
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-700 block mb-0.5">
+                    How Moremela Clears the Way
+                  </span>
+                  <p className="text-slate-600 leading-relaxed">{activeGoal.howClearsWay}</p>
+                </div>
+              </div>
+
+              <div className="pt-2">
                 <Link
-                  href="/flips"
-                  className="inline-flex items-center gap-1 text-[11px] font-semibold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 px-2.5 py-1 rounded-md border border-indigo-200 transition-colors"
+                  href={activeGoal.ctaHref}
+                  className="inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs sm:text-sm font-semibold px-4 py-2 rounded-lg shadow-xs transition-colors"
                 >
-                  <PlusCircle className="w-3 h-3" /> New Flip Project
+                  <span>{activeGoal.ctaLabel}</span>
                 </Link>
               </div>
-            ) : (
-              <div className="space-y-3">
-                {flips.map((flip) => {
-                  const totalBoqActual = (flip.boq || []).reduce(
-                    (sum, item) => sum + (item.actualCostZAR || item.baselineTotalZAR || 0),
-                    0
-                  );
-                  const progressPct =
-                    flip.baselineRenovationBudgetZAR > 0
-                      ? Math.min(100, (totalBoqActual / flip.baselineRenovationBudgetZAR) * 100)
-                      : 0;
+            </div>
+          </div>
+        </section>
 
-                  return (
-                    <div
-                      key={flip.id}
-                      className="p-3 rounded-lg border border-slate-100 bg-slate-50/70 hover:bg-slate-100/80 transition-colors"
-                    >
-                      <div className="flex items-start justify-between gap-2">
-                        <div>
-                          <h4 className="text-xs font-bold text-slate-900">{flip.title}</h4>
-                          <p className="text-[11px] text-slate-500">{flip.address}, {flip.city}</p>
-                        </div>
-                        <span className="text-[10px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200 px-2 py-0.5 rounded-full">
-                          {flip.currentPhase}
-                        </span>
-                      </div>
-
-                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs mt-3 pt-2 border-t border-slate-200/60">
-                        <div>
-                          <span className="text-[10px] text-slate-400 block">Purchase</span>
-                          <span className="font-semibold text-slate-800">{formatZAR(flip.purchasePriceZAR)}</span>
-                        </div>
-                        <div>
-                          <span className="text-[10px] text-slate-400 block">Target Exit</span>
-                          <span className="font-semibold text-emerald-700">{formatZAR(flip.targetExitPriceZAR)}</span>
-                        </div>
-                        <div>
-                          <span className="text-[10px] text-slate-400 block">BOQ Spend</span>
-                          <span className="font-semibold text-slate-800">
-                            {formatZAR(totalBoqActual)} ({formatPercent(progressPct)})
-                          </span>
-                        </div>
-                        <div>
-                          <span className="text-[10px] text-amber-700 block font-medium">Holding ({flip.estimatedDurationMonths ?? 6}m)</span>
-                          <span className="font-semibold text-amber-700">
-                            -{formatZAR((flip.estimatedDurationMonths ?? 6) * (flip.monthlyHoldingCostZAR ?? 0))}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
+        {/* ======================================================================= */}
+        {/* C. SECTION 2: "GUARD THE KRAAL. GROW THE BAOBAB." CARD GRID             */}
+        {/* ======================================================================= */}
+        <section className="space-y-6">
+          <div className="text-center max-w-2xl mx-auto space-y-1.5">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-700">
+              Protection &amp; Growth Architecture
+            </span>
+            <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900">
+              Guard the Kraal. Grow the Baobab.
+            </h2>
+            <p className="text-xs sm:text-sm text-slate-500">
+              Engineered specifically for South African transaction friction, municipal reality, and solo operators.
+            </p>
           </div>
 
-          {/* Active Developments & Subdivisions Quick Look */}
-          <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-xs">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2">
-                <Layers className="w-4 h-4 text-amber-600" />
-                <h3 className="font-semibold text-slate-900 text-sm">Active Developments</h3>
-              </div>
-              <Link
-                href="/developments"
-                className="text-xs text-amber-600 hover:text-amber-700 font-medium flex items-center gap-1"
-              >
-                View Developments <ArrowUpRight className="w-3.5 h-3.5" />
-              </Link>
-            </div>
-
-            {activeDevelopments.length === 0 ? (
-              <div className="p-6 rounded-lg border border-dashed border-slate-200 text-center bg-slate-50/50">
-                <Layers className="w-6 h-6 text-slate-400 mx-auto mb-1.5" />
-                <p className="text-xs font-semibold text-slate-700">No active developments in pipeline</p>
-                <p className="text-[11px] text-slate-400 mt-0.5 mb-3">Model ground-up clusters, statutory approvals, and split-exit units.</p>
-                <Link
-                  href="/developments"
-                  className="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-700 bg-amber-50 hover:bg-amber-100 px-2.5 py-1 rounded-md border border-amber-200 transition-colors"
-                >
-                  <PlusCircle className="w-3 h-3" /> New Development Project
-                </Link>
-              </div>
-            ) : (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+            {/* Card 1 */}
+            <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-2xs flex flex-col justify-between space-y-4">
               <div className="space-y-3">
-                {activeDevelopments.map((dev) => {
-                  const financials = calculateDevelopmentFinancials(dev);
-                  const pocColor =
-                    financials.pocPercent >= 18
-                      ? 'text-emerald-700'
-                      : financials.pocPercent >= 12
-                      ? 'text-amber-700'
-                      : 'text-rose-600';
-
-                  return (
-                    <div
-                      key={dev.id}
-                      className="p-3 rounded-lg border border-slate-100 bg-slate-50/70 hover:bg-slate-100/80 transition-colors"
-                    >
-                      <div className="flex items-start justify-between gap-2">
-                        <div>
-                          <h4 className="text-xs font-bold text-slate-900">{dev.title}</h4>
-                          <p className="text-[11px] text-slate-500">{dev.address}, {dev.city}</p>
-                        </div>
-                        <span className="text-[10px] font-semibold bg-amber-50 text-amber-700 border border-amber-200 px-2 py-0.5 rounded-full">
-                          {dev.currentPhase}
-                        </span>
-                      </div>
-
-                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs mt-3 pt-2 border-t border-slate-200/60">
-                        <div>
-                          <span className="text-[10px] text-slate-400 block">Total TDC</span>
-                          <span className="font-semibold text-slate-800">{formatZAR(financials.tdcZAR)}</span>
-                        </div>
-                        <div>
-                          <span className="text-[10px] text-slate-400 block">Target GDV</span>
-                          <span className="font-semibold text-emerald-700">{formatZAR(financials.gdvInclVatZAR)}</span>
-                        </div>
-                        <div>
-                          <span className="text-[10px] text-slate-400 block">Scale</span>
-                          <span className="font-semibold text-slate-800">
-                            {dev.units?.length || 0} Units ({dev.totalBuildableAreaSqm} m²)
-                          </span>
-                        </div>
-                        <div>
-                          <span className="text-[10px] text-slate-400 block">POC Margin</span>
-                          <span className={`font-semibold ${pocColor}`}>
-                            {financials.pocPercent >= 0 ? `+${financials.pocPercent.toFixed(1)}%` : `${financials.pocPercent.toFixed(1)}%`}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
+                <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-800 flex items-center justify-center shrink-0">
+                  <ShieldCheck className="w-5 h-5" strokeWidth={1.75} />
+                </div>
+                <h3 className="text-base font-bold text-slate-900">
+                  Guard Your Day-1 Cash (The Kraal)
+                </h3>
+                <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
+                  Stop losing margin to hidden South African transaction traps. Automatically model SARS transfer duties,
+                  LSSA legal fees, Section 118 municipal arrears, and provisional tax reserves.
+                </p>
               </div>
-            )}
-          </div>
-
-          {/* Active Rental Portfolio Quick Look */}
-          <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-xs">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2">
-                <Building className="w-4 h-4 text-emerald-600" />
-                <h3 className="font-semibold text-slate-900 text-sm">Active Rental Units</h3>
+              <div className="pt-2 border-t border-slate-100 text-xs font-semibold text-emerald-700 flex items-center gap-1">
+                <span>SARS &amp; Legal Practice Council tariffs</span>
               </div>
-              <Link
-                href="/rentals"
-                className="text-xs text-emerald-600 hover:text-emerald-700 font-medium flex items-center gap-1"
-              >
-                View Rentals <ArrowUpRight className="w-3.5 h-3.5" />
-              </Link>
             </div>
 
-            {rentals.length === 0 ? (
-              <div className="p-6 rounded-lg border border-dashed border-slate-200 text-center bg-slate-50/50">
-                <Building className="w-6 h-6 text-slate-400 mx-auto mb-1.5" />
-                <p className="text-xs font-semibold text-slate-700">No active rental units</p>
-                <p className="text-[11px] text-slate-400 mt-0.5 mb-3">Track leases, Sectional Title levies, and cashflows.</p>
-                <Link
-                  href="/rentals"
-                  className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-2.5 py-1 rounded-md border border-emerald-200 transition-colors"
-                >
-                  <PlusCircle className="w-3 h-3" /> Add Rental Property
-                </Link>
-              </div>
-            ) : (
+            {/* Card 2 */}
+            <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-2xs flex flex-col justify-between space-y-4">
               <div className="space-y-3">
-                {rentals.map((rental) => {
-                  const { netMonthlyCashflowZAR: netMonthly } = calculateRentalCashflow(rental);
-                  const arrearsInfo = calculatePropertyArrears(rental);
-                  const totalArrears = Math.max(0, arrearsInfo.totalArrearsZAR);
-                  const hasArrears = totalArrears > 0;
-
-                  return (
-                    <div
-                      key={rental.id}
-                      className="p-3 rounded-lg border border-slate-100 bg-slate-50/70 hover:bg-slate-100/80 transition-colors"
-                    >
-                      <div className="flex items-start justify-between gap-2">
-                        <div>
-                          <h4 className="text-xs font-bold text-slate-900">{rental.title}</h4>
-                          <p className="text-[11px] text-slate-500">
-                            {(rental.leases?.length || 0) > 1 ? (
-                              <span className="font-medium text-slate-700">
-                                {rental.leases.length} Units • {rental.leases.filter(l => l.status === 'Occupied').length} Occupied • {formatZAR(rental.leases.filter(l => l.status === 'Occupied').reduce((s, l) => s + l.monthlyRentZAR, 0))}/m
-                              </span>
-                            ) : (
-                              <>Tenant: <span className="font-medium text-slate-700">{rental.leases?.[0]?.tenantName}</span> (Lease to {formatDate(rental.leases?.[0]?.leaseEndDate || '')})</>
-                            )}
-                          </p>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          {hasArrears && (
-                            <span className="text-[9px] font-semibold bg-rose-50 text-rose-700 border border-rose-200 px-2 py-0.5 rounded-md flex items-center gap-1 tabular-nums">
-                              <AlertTriangle className="w-3 h-3 text-rose-600 shrink-0" />
-                              <span>Arrears: -{formatZAR(totalArrears)}</span>
-                            </span>
-                          )}
-                          <span className="text-[10px] font-semibold bg-slate-100 text-slate-700 border border-slate-200 px-2 py-0.5 rounded-md">
-                            {rental.status}
-                          </span>
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-3 gap-2 text-xs mt-3 pt-2 border-t border-slate-200/60">
-                        <div>
-                          <span className="text-[10px] uppercase font-semibold text-slate-400 block">Market Value</span>
-                          <span className="font-semibold text-slate-900 tabular-nums">{formatZAR(rental.marketValueZAR)}</span>
-                        </div>
-                        <div>
-                          <span className="text-[10px] uppercase font-semibold text-slate-400 block">Gross Rent</span>
-                          <span className="font-semibold text-slate-900 tabular-nums">{formatZAR(rental.monthlyGrossRentZAR)}/m</span>
-                        </div>
-                        <div>
-                          <span className="text-[10px] uppercase font-semibold text-slate-400 block">Net Cashflow</span>
-                          <span className={`font-bold tabular-nums ${netMonthly >= 0 ? 'text-emerald-700' : 'text-rose-600'}`}>
-                            {formatZAR(netMonthly)}/m
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
+                <div className="w-10 h-10 rounded-xl bg-slate-100 text-slate-800 flex items-center justify-center shrink-0">
+                  <Smartphone className="w-5 h-5" strokeWidth={1.75} />
+                </div>
+                <h3 className="text-base font-bold text-slate-900">Run Operations From Your Phone</h3>
+                <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
+                  Built for building sites and hardware store aisles—not corporate boardrooms. Track BOQ trade draws,
+                  holding cost burn, lease ledgers, and statutory deadlines on mobile.
+                </p>
               </div>
-            )}
-          </div>
-        </div>
-
-        {/* Centralized Financing Summary Banner */}
-        <div className="bg-slate-900 rounded-xl p-5 text-white border border-slate-800 shadow-xs flex flex-col md:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-md bg-slate-800 border border-slate-700 text-slate-200 flex items-center justify-center shrink-0">
-              <Users className="w-5 h-5" />
+              <div className="pt-2 border-t border-slate-100 text-xs font-semibold text-slate-700 flex items-center gap-1">
+                <span>10-Trade Bill of Quantities &amp; Ledgers</span>
+              </div>
             </div>
-            <div>
-              <h4 className="text-sm font-semibold tracking-tight">Funding & Capital Facility Status</h4>
-              <p className="text-xs text-slate-300 mt-0.5">
-                {funding.length} Active capital sources registered across private lenders, joint ventures, and angel investors.
+
+            {/* Card 3 */}
+            <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-2xs flex flex-col justify-between space-y-4">
+              <div className="space-y-3">
+                <div className="w-10 h-10 rounded-xl bg-indigo-100 text-indigo-800 flex items-center justify-center shrink-0">
+                  <TrendingUp className="w-5 h-5" strokeWidth={1.75} />
+                </div>
+                <h3 className="text-base font-bold text-slate-900">
+                  Pitch Lenders &amp; Partners Instantly (The Baobab)
+                </h3>
+                <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
+                  Turn any analyzed deal, active flip, or rental into a structured WhatsApp investment memo or a
+                  printable 1-page PDF tear-sheet.
+                </p>
+              </div>
+              <div className="pt-2 border-t border-slate-100 text-xs font-semibold text-indigo-700 flex items-center gap-1">
+                <span>1-Click PDF Decks &amp; WhatsApp Memos</span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* ======================================================================= */}
+        {/* D. SECTION 3: DARK INSTITUTIONAL CTA BANNER                             */}
+        {/* ======================================================================= */}
+        <section className="bg-slate-900 border border-slate-800 rounded-xl p-6 sm:p-8 text-white shadow-xs relative overflow-hidden">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
+            <div className="max-w-xl space-y-2">
+              <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-white">
+                Clear the complicated math and admin out of your way.
+              </h2>
+              <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
+                Explore the pre-loaded South African demo portfolio or clear it in one click to enter your own deals.
               </p>
             </div>
-          </div>
-          <div className="flex items-center gap-4 text-right">
-            <div>
-              <span className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold block">Active Private Debt</span>
-              <span className="text-base font-bold text-emerald-400 tabular-nums">{formatZAR(summary.totalPrivateFundingLiability)}</span>
+            <div className="shrink-0">
+              <Link
+                href="/dashboard"
+                className="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs sm:text-sm font-semibold px-4 py-2.5 rounded-lg shadow-xs transition-colors"
+              >
+                <span>Go to Global Portfolio ➔</span>
+              </Link>
             </div>
-            <Link
-              href="/funding"
-              className="bg-slate-800 hover:bg-slate-700 text-white text-xs font-semibold px-3 py-2 rounded-lg transition-colors border border-slate-700 shadow-xs"
-            >
-              Manage Ledger
+          </div>
+        </section>
+      </main>
+
+      {/* ========================================================================= */}
+      {/* FOOTER                                                                    */}
+      {/* ========================================================================= */}
+      <footer className="border-t border-slate-200 bg-white py-6 mt-12">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500">
+          <div className="flex items-center gap-2">
+            <img src="/moremela-logo.svg" alt="Moremela Logo" className="w-5 h-5 rounded object-contain shrink-0" />
+            <span>Moremela Properties (Pty) Ltd (2026/838397/07)</span>
+          </div>
+
+          <div className="flex items-center gap-4">
+            <Link href="/dashboard" className="hover:text-emerald-700 transition-colors font-medium">
+              Global Portfolio
+            </Link>
+            <Link href="/get-started" className="hover:text-emerald-700 transition-colors font-medium">
+              Get Started Guide
+            </Link>
+            <Link href="/privacy" className="hover:text-emerald-700 transition-colors font-medium">
+              Privacy &amp; POPIA
             </Link>
           </div>
         </div>
-
-        {/* Quick Edit Seed Capital Modal (Mobile Bottom-Sheet / Desktop Centered Dialog) */}
-        {showEditSeedModal && (
-          <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/70 backdrop-blur-xs animate-in fade-in duration-150">
-            <div className="bg-white rounded-t-3xl sm:rounded-2xl max-w-md w-full p-5 sm:p-6 shadow-2xl border border-slate-200 max-h-[92vh] sm:max-h-none overflow-y-auto">
-              {/* Mobile Drag Indicator */}
-              <div className="w-12 h-1.5 bg-slate-300 rounded-full mx-auto mb-3 sm:hidden" />
-              <div className="flex items-center justify-between pb-3 sm:pb-4 border-b border-slate-100">
-                <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-md bg-slate-100 border border-slate-200/80 text-slate-700 flex items-center justify-center shrink-0">
-                    <Wallet className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <h3 className="text-base font-bold text-slate-900">Adjust Liquid Seed Capital</h3>
-                    <p className="text-xs text-slate-500">Unallocated cash reserve for future deals</p>
-                  </div>
-                </div>
-                <button
-                  onClick={() => setShowEditSeedModal(false)}
-                  className="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-100 min-h-[36px] min-w-[36px] flex items-center justify-center cursor-pointer"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-
-              <div className="py-4 space-y-4">
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                    Liquid Cash in Reserve (ZAR)
-                  </label>
-                  <div className="relative">
-                    <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm font-semibold text-slate-400">R</span>
-                    <input
-                      type="number"
-                      name="liquidCashReserveZAR"
-                      autoComplete="off"
-                      min="0"
-                      step="any"
-                      value={seedAmount}
-                      onChange={(e) => setSeedAmount(Number(e.target.value))}
-                      className="w-full pl-8 pr-4 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-slate-900 font-bold text-lg focus:ring-2 focus:ring-emerald-500 focus:bg-white transition-all"
-                      placeholder="650000"
-                    />
-                  </div>
-                  <p className="text-[11px] text-slate-500 mt-2 leading-relaxed">
-                    Note: Marking flipped projects or sold rental properties as completed will automatically credit 100% of their net sale cash proceeds into this liquid balance.
-                  </p>
-                </div>
-
-                <div className="p-3 bg-emerald-50 rounded-xl border border-emerald-200/60 flex items-start gap-2.5 text-xs text-emerald-900">
-                  <Check className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-                  <div>
-                    <p className="font-semibold">Automatic Multi-Property Flow</p>
-                    <p className="text-emerald-700 text-[11px] mt-0.5">
-                      Current realized profits from closed exits: <span className="font-bold">{formatZAR(summary.totalRealizedFlipProfits)}</span>
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex items-center justify-end gap-2.5 pt-4 border-t border-slate-100">
-                <button
-                  onClick={() => setShowEditSeedModal(false)}
-                  className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={() => {
-                    updateLiquidReserve(Number(seedAmount));
-                    setShowEditSeedModal(false);
-                  }}
-                  className="px-5 py-2 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm transition-colors"
-                >
-                  Save Reserve Balance
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-      </main>
+      </footer>
     </div>
   );
 }

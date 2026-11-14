@@ -42,11 +42,12 @@ export default function Sidebar() {
   // Execute standalone route check unconditionally before any store/state/effect hooks
   // so SSR and initial client hydration produce identical output with zero mismatch.
   const isStandalonePublicRoute =
+    pathname === '/' ||
+    pathname?.startsWith('/welcome') ||
     pathname?.startsWith('/statement') ||
     pathname?.startsWith('/privacy') ||
-    pathname?.startsWith('/deal-room') ||
-    pathname?.startsWith('/welcome') ||
-    pathname?.startsWith('/about');
+    pathname?.startsWith('/about') ||
+    pathname?.startsWith('/deal-room');
   if (isStandalonePublicRoute) {
     return null;
   }
@@ -184,7 +185,7 @@ export default function Sidebar() {
   const navItems = [
     {
       name: 'Global Portfolio',
-      href: '/',
+      href: '/dashboard',
       icon: LayoutDashboard,
       badge: null,
     },
@@ -244,7 +245,7 @@ export default function Sidebar() {
   const utilityNavItems = [
     {
       name: 'Welcome & Overview',
-      href: '/welcome',
+      href: '/',
       icon: Sparkles,
     },
     {
@@ -265,7 +266,7 @@ export default function Sidebar() {
 
   // Mobile Bottom Quick Navigation Tabs (4 Core Modules + More Drawer Trigger)
   const bottomTabs = [
-    { name: 'Dashboard', href: '/', icon: LayoutDashboard },
+    { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
     { name: 'Rentals', href: '/rentals', icon: Building2 },
     { name: 'Analyzer', href: '/analyzer', icon: Calculator },
     { name: 'Flips', href: '/flips', icon: Hammer },
@@ -278,7 +279,10 @@ export default function Sidebar() {
       {/* ========================================================================= */}
       <aside className="no-print hidden md:flex w-64 bg-slate-900 text-slate-100 flex-col shrink-0 min-h-screen border-r border-slate-800">
         {/* Brand Header */}
-        <div className="p-4 border-b border-slate-800 flex items-center gap-3">
+        <Link
+          href="/dashboard"
+          className="p-4 border-b border-slate-800 flex items-center gap-3 hover:bg-slate-800/50 transition-colors"
+        >
           <img
             src="/moremela-logo.svg"
             alt="Moremela Properties Logo"
@@ -289,7 +293,7 @@ export default function Sidebar() {
               Moremela Property Hub
             </div>
           </div>
-        </div>
+        </Link>
 
         {/* Navigation Links */}
         <nav className="flex-1 p-3 space-y-1">
@@ -390,7 +394,7 @@ export default function Sidebar() {
       {/* 2. MOBILE TOP APP BAR (< md)                                              */}
       {/* ========================================================================= */}
       <header className="no-print md:hidden bg-slate-900 text-white px-4 py-3 border-b border-slate-800 flex items-center justify-between sticky top-0 z-40 shadow-xs">
-        <Link href="/" className="flex items-center gap-2.5">
+        <Link href="/dashboard" className="flex items-center gap-2.5">
           <img
             src="/moremela-logo.svg"
             alt="Moremela Properties Logo"
@@ -421,7 +425,11 @@ export default function Sidebar() {
             <div className="flex-1 overflow-y-auto">
               {/* Drawer Brand Header */}
               <div className="p-4 border-b border-slate-800 flex items-center justify-between sticky top-0 bg-slate-900/95 backdrop-blur-xs z-10">
-                <div className="flex items-center gap-3">
+                <Link
+                  href="/dashboard"
+                  onClick={() => setIsMobileDrawerOpen(false)}
+                  className="flex items-center gap-3"
+                >
                   <img
                     src="/moremela-logo.svg"
                     alt="Moremela Properties Logo"
@@ -430,7 +438,7 @@ export default function Sidebar() {
                   <div className="min-w-0">
                     <span className="font-semibold tracking-tight text-white text-sm block">Moremela Property Hub</span>
                   </div>
-                </div>
+                </Link>
 
                 <button
                   onClick={() => setIsMobileDrawerOpen(false)}

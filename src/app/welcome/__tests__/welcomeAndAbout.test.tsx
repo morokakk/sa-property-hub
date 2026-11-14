@@ -1,20 +1,27 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import React from 'react';
 import { renderToString } from 'react-dom/server';
 import fs from 'fs';
 import path from 'path';
-import WelcomePage from '../page';
+import { usePathname, redirect } from 'next/navigation';
+import WelcomePage from '../../page';
+import WelcomeRedirectPage from '../page';
 import AboutPage, { metadata as aboutMetadata } from '../../about/page';
 import Sidebar, { SHOW_ABOUT_PAGE_IN_NAV } from '@/components/navigation/Sidebar';
 
 vi.mock('next/navigation', () => ({
-  usePathname: vi.fn(() => '/'),
+  usePathname: vi.fn(() => '/dashboard'),
   useRouter: vi.fn(() => ({ push: vi.fn(), replace: vi.fn() })),
   useSearchParams: vi.fn(() => new URLSearchParams()),
+  redirect: vi.fn(),
 }));
 
-describe('Welcome Landing Page (/welcome)', () => {
-  it('renders brand header, hero copy, interactive life goal switcher, and module links', () => {
+describe('Root Welcome Landing Page (/) & /welcome Redirect', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('renders brand header, hero copy, interactive life goal switcher, and /dashboard CTAs', () => {
     const html = renderToString(<WelcomePage />);
 
     // Brand and Top Bar
@@ -30,6 +37,13 @@ describe('Welcome Landing Page (/welcome)', () => {
     );
     expect(html).toContain('Open Portfolio Dashboard ➔');
     expect(html).toContain('Follow Quick-Start Guide');
+
+    // All 4 dashboard entry CTAs must point to /dashboard
+    expect(html).toMatch(/<a[^>]*href="\/dashboard"[^>]*>[\s\S]*?Open Dashboard ➔/);
+    expect(html).toMatch(/<a[^>]*href="\/dashboard"[^>]*>[\s\S]*?Open Portfolio Dashboard ➔/);
+    expect(html).toMatch(/<a[^>]*href="\/dashboard"[^>]*>[\s\S]*?Go to Global Portfolio ➔/);
+    expect(html).toMatch(/<a[^>]*href="\/dashboard"[^>]*>Global Portfolio<\/a>/);
+    expect(html.match(/href="\/dashboard"/g)).toHaveLength(4);
 
     // Interactive Life Goal Switcher
     expect(html).toContain('data-testid="life-goal-switcher"');
@@ -59,6 +73,11 @@ describe('Welcome Landing Page (/welcome)', () => {
     // STRICT GUARD: Must NOT link to /about in footer or page
     expect(html).not.toContain('href="/about"');
   });
+
+  it('redirects /welcome cleanly to / for backward compatibility', () => {
+    WelcomeRedirectPage();
+    expect(redirect).toHaveBeenCalledWith('/');
+  });
 });
 
 describe('Hidden About Us & Founder Story Page (/about)', () => {
@@ -71,7 +90,7 @@ describe('Hidden About Us & Founder Story Page (/about)', () => {
     expect(aboutMetadata.title).toContain('About Us & Founder Story');
   });
 
-  it('renders private GTM draft notice pill, complete founder story, and legacy tribute', () => {
+  it('renders private GTM draft notice pill, complete founder story, and /dashboard workspace links', () => {
     const html = renderToString(<AboutPage />);
 
     // Private Draft Notice Pill
@@ -79,8 +98,9 @@ describe('Hidden About Us & Founder Story Page (/about)', () => {
       'Private GTM Draft — This page (/about) is currently hidden from public navigation and search engines.'
     );
 
-    // Header Back Link
+    // Header Back Link -> /dashboard
     expect(html).toContain('Back to Workspace');
+    expect(html).toMatch(/<a[^>]*href="\/dashboard"[^>]*>[\s\S]*?Back to Workspace/);
 
     // Founder Story Container
     expect(html).toContain('data-testid="about-founder-story"');
@@ -98,17 +118,30 @@ describe('Hidden About Us & Founder Story Page (/about)', () => {
     expect(html).toContain('The Stepped Kraal at the base is protection');
     expect(html).toContain('The Baobab rising from the center is why you do the work');
 
-    // Bottom CTA
+    // Bottom CTA -> /dashboard
     expect(html).toContain('Open Portfolio Workspace ➔');
-    expect(html).toContain('href="/"');
+    expect(html).toMatch(/<a[^>]*href="\/dashboard"[^>]*>[\s\S]*?Open Portfolio Workspace ➔/);
   });
 });
 
 describe('Sidebar Navigation Route Guard & GTM Feature Flag', () => {
-  it('renders Welcome & Overview link to /welcome in Help & Reference', () => {
+  beforeEach(() => {
+    vi.mocked(usePathname).mockReturnValue('/dashboard');
+  });
+
+  it('hides Sidebar completely on root landing page (pathname === "/")', () => {
+    vi.mocked(usePathname).mockReturnValue('/');
     const html = renderToString(<Sidebar />);
+    expect(html).toBe('');
+  });
+
+  it('renders Global Portfolio (/dashboard) and Welcome & Overview (/) when pathname === "/dashboard"', () => {
+    vi.mocked(usePathname).mockReturnValue('/dashboard');
+    const html = renderToString(<Sidebar />);
+    expect(html).toContain('Global Portfolio');
+    expect(html).toContain('href="/dashboard"');
     expect(html).toContain('Welcome &amp; Overview');
-    expect(html).toContain('href="/welcome"');
+    expect(html).toContain('href="/"');
   });
 
   it('keeps SHOW_ABOUT_PAGE_IN_NAV false and omits /about links while in draft mode', () => {
@@ -119,13 +152,14 @@ describe('Sidebar Navigation Route Guard & GTM Feature Flag', () => {
     expect(html).not.toContain('About &amp; Founder Story');
   });
 
-  it('declares standalone route exclusions for /welcome and /about in Sidebar source code', () => {
+  it('declares standalone route exclusions for /, /welcome and /about in Sidebar source code', () => {
     const sidebarSource = fs.readFileSync(
       path.resolve(__dirname, '../../../components/navigation/Sidebar.tsx'),
       'utf-8'
     );
-    expect(sidebarSource).toContain("pathname.startsWith('/welcome')");
-    expect(sidebarSource).toContain("pathname.startsWith('/about')");
+    expect(sidebarSource).toContain("pathname === '/'");
+    expect(sidebarSource).toMatch(/pathname\??\.startsWith\('\/welcome'\)/);
+    expect(sidebarSource).toMatch(/pathname\??\.startsWith\('\/about'\)/);
     expect(sidebarSource).toContain('export const SHOW_ABOUT_PAGE_IN_NAV = false;');
   });
 });

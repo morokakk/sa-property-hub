@@ -28,7 +28,7 @@ describe('Get Started content integrity', () => {
     expect(GET_STARTED_STAGES[2].modules.map((m) => m.route)).toEqual(['/funding']);
     expect(GET_STARTED_STAGES[3].modules.map((m) => m.route)).toEqual(['/flips', '/developments', '/rentals']);
     expect(GET_STARTED_STAGES[4].modules.map((m) => m.route)).toEqual(['/proposal']);
-    expect(GET_STARTED_STAGES[5].modules.map((m) => m.route)).toEqual(['/', '/tasks']);
+    expect(GET_STARTED_STAGES[5].modules.map((m) => m.route)).toEqual(['/dashboard', '/tasks']);
   });
 
   it('splits Settings into Entity & Branding, Finance Defaults, Buy Box and Regional Benchmarks, each stating what it powers', () => {
@@ -136,7 +136,7 @@ describe('guide helpers', () => {
   it('parseGuideHref splits path and anchor', () => {
     expect(parseGuideHref('/settings#settings-finance')).toEqual({ path: '/settings', anchor: 'settings-finance' });
     expect(parseGuideHref('/tasks')).toEqual({ path: '/tasks', anchor: null });
-    expect(parseGuideHref('/#dashboard-kpis')).toEqual({ path: '/', anchor: 'dashboard-kpis' });
+    expect(parseGuideHref('/dashboard#dashboard-kpis')).toEqual({ path: '/dashboard', anchor: 'dashboard-kpis' });
     expect(parseGuideHref('/flips#')).toEqual({ path: '/flips', anchor: null });
   });
 

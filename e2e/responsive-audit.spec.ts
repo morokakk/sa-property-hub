@@ -6,7 +6,7 @@ import * as fs from 'fs';
 const BASE_URL = 'http://localhost:3000';
 
 const PAGES = [
-  { name: 'Dashboard', path: '/' },
+  { name: 'Dashboard', path: '/dashboard' },
   { name: 'Analyzer', path: '/analyzer' },
   { name: 'Flips', path: '/flips' },
   { name: 'Funding', path: '/funding' },
@@ -177,7 +177,7 @@ test.describe('Mobile Navigation Audit', () => {
       return;
     }
 
-    await page.goto('/', { waitUntil: 'domcontentloaded' });
+    await page.goto('/dashboard', { waitUntil: 'domcontentloaded' });
     await page.waitForTimeout(1000);
 
     // Check bottom nav exists
@@ -197,7 +197,7 @@ test.describe('Mobile Navigation Audit', () => {
       return;
     }
 
-    await page.goto('/', { waitUntil: 'domcontentloaded' });
+    await page.goto('/dashboard', { waitUntil: 'domcontentloaded' });
     await page.waitForTimeout(1000);
 
     // Desktop sidebar should be hidden
@@ -211,7 +211,7 @@ test.describe('Mobile Navigation Audit', () => {
       return;
     }
 
-    await page.goto('/', { waitUntil: 'domcontentloaded' });
+    await page.goto('/dashboard', { waitUntil: 'domcontentloaded' });
     await page.waitForTimeout(1000);
 
     // Click the "More" button in bottom nav
@@ -240,7 +240,7 @@ test.describe('Desktop Navigation Audit', () => {
       return;
     }
 
-    await page.goto('/', { waitUntil: 'domcontentloaded' });
+    await page.goto('/dashboard', { waitUntil: 'domcontentloaded' });
     await page.waitForTimeout(1000);
 
     // Desktop sidebar should be visible
@@ -261,7 +261,7 @@ test.describe('Modal Responsiveness Audit', () => {
     const screenshotDir = path.join('e2e', 'screenshots', projectName);
     fs.mkdirSync(screenshotDir, { recursive: true });
 
-    await page.goto('/', { waitUntil: 'domcontentloaded' });
+    await page.goto('/dashboard', { waitUntil: 'domcontentloaded' });
     await page.waitForTimeout(1500);
 
     // Try to find and click the Edit icon for seed capital

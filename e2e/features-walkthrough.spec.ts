@@ -8,7 +8,7 @@ test.describe('Moremela Platform Rebrand & Supplier Directory Enhancements', () 
     test.setTimeout(180_000);
     // 1. Visit Dashboard (Visible Desktop Viewport)
     await page.setViewportSize({ width: 1280, height: 850 });
-    await page.goto('/', { waitUntil: 'domcontentloaded' });
+    await page.goto('/dashboard', { waitUntil: 'domcontentloaded' });
 
     // Wait for ClientOnly mount gate if present
     await page.locator('text=Initializing Moremela Property Hub...').waitFor({ state: 'detached', timeout: 30_000 }).catch(() => {});

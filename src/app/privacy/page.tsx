@@ -66,7 +66,7 @@ export default function PrivacyNoticePage() {
           {/* Action Bar (print:hidden) */}
           <div className="flex flex-wrap items-center justify-between gap-3 print:hidden">
             <Link
-              href="/"
+              href="/dashboard"
               data-testid="privacy-back-to-workspace"
               className="inline-flex items-center gap-2 text-xs font-semibold text-slate-200 hover:text-white bg-slate-800/80 hover:bg-slate-800 border border-slate-700 px-3.5 py-2 rounded-lg transition-colors"
             >
@@ -881,7 +881,7 @@ export default function PrivacyNoticePage() {
               Investor Profile &amp; Settings
             </Link>
             <span>•</span>
-            <Link href="/" className="text-emerald-700 hover:text-emerald-800 font-semibold">
+            <Link href="/dashboard" className="text-emerald-700 hover:text-emerald-800 font-semibold">
               Return to Portfolio Dashboard ➔
             </Link>
           </div>

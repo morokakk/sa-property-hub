@@ -10,7 +10,7 @@
  */
 
 export type GuideRoute =
-  | '/'
+  | '/dashboard'
   | '/analyzer'
   | '/funding'
   | '/developments'
@@ -22,7 +22,7 @@ export type GuideRoute =
 
 /** Every route a guide is allowed to deep link into. */
 export const GUIDE_ROUTES: readonly GuideRoute[] = [
-  '/',
+  '/dashboard',
   '/analyzer',
   '/funding',
   '/developments',
@@ -571,7 +571,7 @@ export const GET_STARTED_STAGES: readonly JourneyStage[] = [
       {
         id: 'dashboard',
         moduleName: 'Global Portfolio Dashboard',
-        route: '/',
+        route: '/dashboard',
         purpose: 'One view of net equity, cash flow, actuals vs budget and your SARS tax reserve.',
         features: [
           {
@@ -585,7 +585,7 @@ export const GET_STARTED_STAGES: readonly JourneyStage[] = [
             ],
             proTip:
               'Use the latest municipal valuation roll or a recent bank valuation as your market value. Agent asking prices overstate equity.',
-            href: '/#dashboard-kpis',
+            href: '/dashboard#dashboard-kpis',
             ctaLabel: 'View KPIs',
           },
           {
@@ -599,7 +599,7 @@ export const GET_STARTED_STAGES: readonly JourneyStage[] = [
             ],
             proTip:
               'The SA tax year runs from 1 March to the end of February, so this strip lines up with your ITR12 return rather than the calendar year.',
-            href: '/#dashboard-actuals',
+            href: '/dashboard#dashboard-actuals',
             ctaLabel: 'View actuals',
           },
           {
@@ -613,7 +613,7 @@ export const GET_STARTED_STAGES: readonly JourneyStage[] = [
             ],
             proTip:
               'If you earn rental income outside a salary, you are probably a provisional taxpayer. IRP6 payments are due by the end of August and the end of February, and a reserve account stops them becoming a cash crunch.',
-            href: '/#dashboard-tax-reserve',
+            href: '/dashboard#dashboard-tax-reserve',
             ctaLabel: 'View tax reserve',
           },
           {

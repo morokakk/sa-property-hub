@@ -30,7 +30,7 @@ export default function AboutPage() {
           </Link>
 
           <Link
-            href="/"
+            href="/dashboard"
             className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-300 hover:text-white px-2.5 py-1.5 sm:px-3 sm:py-2 rounded-lg hover:bg-slate-800 border border-slate-700 transition-colors shrink-0 whitespace-nowrap"
           >
             <ArrowLeft className="w-3.5 h-3.5 text-emerald-400" strokeWidth={1.75} />
@@ -146,7 +146,7 @@ export default function AboutPage() {
 
             <div className="pt-6 border-t border-slate-100 flex justify-start">
               <Link
-                href="/"
+                href="/dashboard"
                 className="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold px-5 py-2.5 rounded-xl shadow-xs transition-colors"
               >
                 <span>Open Portfolio Workspace ➔</span>

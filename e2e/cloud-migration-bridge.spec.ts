@@ -8,7 +8,7 @@ test.describe('Local-to-Cloud Database Migration Bridge', () => {
     test.setTimeout(120_000);
 
     const pages = [
-      { name: 'Dashboard', path: '/' },
+      { name: 'Dashboard', path: '/dashboard' },
       { name: 'Analyzer', path: '/analyzer' },
       { name: 'Flips', path: '/flips' },
       { name: 'Funding', path: '/funding' },

@@ -13,7 +13,7 @@ function isMobile(page: Page) {
 
 test.describe('Get Started Reference & Quick-Start Hub', () => {
   test('sidebar has a permanent Get Started entry that opens the hub', async ({ page }) => {
-    await page.goto('/', { waitUntil: 'domcontentloaded' });
+    await page.goto('/dashboard', { waitUntil: 'domcontentloaded' });
     await waitForApp(page);
 
     if (isMobile(page)) {
@@ -127,7 +127,7 @@ test.describe('Get Started Reference & Quick-Start Hub', () => {
 
   test('Clean Slate card shows the Quick Start link after Clear Demo', async ({ page }) => {
     page.on('dialog', (dialog) => dialog.accept());
-    await page.goto('/', { waitUntil: 'domcontentloaded' });
+    await page.goto('/dashboard', { waitUntil: 'domcontentloaded' });
     await waitForApp(page);
 
     // Demo data present: no Clean Slate link yet
