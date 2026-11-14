@@ -304,30 +304,6 @@ export default function WelcomePage() {
             </div>
           </div>
         </section>
-
-        {/* ======================================================================= */}
-        {/* D. SECTION 3: DARK INSTITUTIONAL CTA BANNER                             */}
-        {/* ======================================================================= */}
-        <section className="bg-slate-900 border border-slate-800 rounded-xl p-6 sm:p-8 text-white shadow-xs relative overflow-hidden">
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
-            <div className="max-w-xl space-y-2">
-              <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-white">
-                Clear the complicated math and admin out of your way.
-              </h2>
-              <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
-                Explore the pre-loaded South African demo portfolio or clear it in one click to enter your own deals.
-              </p>
-            </div>
-            <div className="shrink-0">
-              <Link
-                href="/dashboard"
-                className="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs sm:text-sm font-semibold px-4 py-2.5 rounded-lg shadow-xs transition-colors"
-              >
-                <span>Go to Global Portfolio ➔</span>
-              </Link>
-            </div>
-          </div>
-        </section>
       </main>
 
       {/* ========================================================================= */}
