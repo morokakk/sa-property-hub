@@ -452,7 +452,7 @@ export function DevelopmentProjectModal({
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-5 text-xs">
+        <form onSubmit={handleSubmit} noValidate className="space-y-5 text-xs">
           {/* Section 1: Identity & Location */}
           <div className="space-y-3">
             <h4 className="font-bold text-slate-900 flex items-center gap-1.5 text-xs border-b border-slate-100 pb-1">
@@ -803,7 +803,7 @@ export function DevelopmentProjectModal({
                   type="number"
                   required
                   min={0}
-                  step={10000}
+                  step="any"
                   value={landPurchasePriceZAR}
                   onChange={(e) => setLandPurchasePriceZAR(Number(e.target.value))}
                   className="w-full rounded border border-slate-300 px-3 py-1.5"
@@ -826,7 +826,7 @@ export function DevelopmentProjectModal({
                 <input
                   type="number"
                   min={0}
-                  step={5000}
+                  step="any"
                   value={acquisitionCostsZAR}
                   onChange={(e) => setAcquisitionCostsZAR(Number(e.target.value))}
                   className="w-full rounded border border-slate-300 px-3 py-1.5"
@@ -838,7 +838,7 @@ export function DevelopmentProjectModal({
                 <input
                   type="number"
                   min={0}
-                  step={5000}
+                  step="any"
                   value={sec118ArrearsZAR}
                   onChange={(e) => setSec118ArrearsZAR(Number(e.target.value))}
                   className="w-full rounded border border-slate-300 px-3 py-1.5"
@@ -863,7 +863,7 @@ export function DevelopmentProjectModal({
                   type="number"
                   required
                   min={0}
-                  step={500}
+                  step="any"
                   value={budgetedHardCostPerSqmZAR}
                   onChange={(e) => setBudgetedHardCostPerSqmZAR(Number(e.target.value))}
                   className="w-full rounded border border-slate-300 px-3 py-1.5"
@@ -926,7 +926,7 @@ export function DevelopmentProjectModal({
                 <input
                   type="number"
                   min={0}
-                  step={500}
+                  step="any"
                   value={monthlyPreApprovalHoldingBurnZAR}
                   onChange={(e) => setMonthlyPreApprovalHoldingBurnZAR(Number(e.target.value))}
                   className="w-full rounded border border-slate-300 px-3 py-1.5"
@@ -937,7 +937,7 @@ export function DevelopmentProjectModal({
                 <input
                   type="number"
                   min={0}
-                  step={500}
+                  step="any"
                   value={monthlyConstructionHoldingBurnZAR}
                   onChange={(e) => setMonthlyConstructionHoldingBurnZAR(Number(e.target.value))}
                   className="w-full rounded border border-slate-300 px-3 py-1.5"
@@ -959,7 +959,7 @@ export function DevelopmentProjectModal({
                 <input
                   type="number"
                   min={0}
-                  step={50000}
+                  step="any"
                   value={developmentFacilityLimitZAR}
                   onChange={(e) => setDevelopmentFacilityLimitZAR(Number(e.target.value))}
                   className="w-full rounded border border-slate-300 px-3 py-1.5"
@@ -1040,7 +1040,7 @@ export function DevelopmentProjectModal({
                   <input
                     type="number"
                     min={0}
-                    step={10000}
+                    step="any"
                     value={targetListPricePerUnitZAR}
                     onChange={(e) => setTargetListPricePerUnitZAR(Number(e.target.value))}
                     className="w-full rounded border border-slate-300 bg-white px-3 py-1.5"
@@ -1053,7 +1053,7 @@ export function DevelopmentProjectModal({
                   <input
                     type="number"
                     min={0}
-                    step={500}
+                    step="any"
                     value={estMonthlyRentPerUnitZAR}
                     onChange={(e) => setEstMonthlyRentPerUnitZAR(Number(e.target.value))}
                     className="w-full rounded border border-slate-300 bg-white px-3 py-1.5"

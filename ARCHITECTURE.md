@@ -14,14 +14,14 @@ The Moremela Property Investment Hub adheres to a rigid 5-tier unidirectional de
 ```mermaid
 flowchart TD
   subgraph Tier1["Tier 1: Thin View Controllers"]
-    P1["src/app/page.tsx (Dashboard)"]
+    P1["src/app/dashboard/page.tsx (Dashboard)"]
     P2["src/app/analyzer/page.tsx (Underwriting)"]
     P3["src/app/flips/page.tsx (Buy & Flip)"]
     P4["src/app/developments/page.tsx (Developments)"]
     P5["src/app/rentals/page.tsx (Rentals)"]
     P6["src/app/funding/page.tsx (Facilities)"]
     P7["src/app/tasks/page.tsx (Task Ledger & Calendar)"]
-    P8["src/app/welcome/page.tsx (Landing Page)"]
+    P8["src/app/page.tsx (Landing Page)"]
     P9["src/app/about/page.tsx (Founder Story)"]
   end
 
@@ -86,7 +86,7 @@ flowchart TD
   - [`submitTenantMaintenanceTicket.ts`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/app/actions/submitTenantMaintenanceTicket.ts): Secure unauthenticated public intake for tenant work orders with sliding-window rate limiting (max 3/lease/hr), short tracking reference generation (e.g. `WO-4921`), and Supabase service-role persistence into `properties.maintenance_history`.
   - [`sendStatementEmail.ts`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/app/actions/sendStatementEmail.ts): Resend-powered tenant statement delivery with attached PDF and payment reminders.
   - **Developments Thin Controller ([`src/app/developments/page.tsx`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/app/developments/page.tsx)):** Declarative orchestrator for ground-up developments, sectional title clusters, and township infill schemes, routing between 4 operational tabs (`units`, `costs`, `approvals`, `finance`) with reactive URL hash synchronization for deep links.
-  - **Standalone Layout & Chrome Isolation:** Standard operational routes render within the shared desktop navigation sidebar and mobile bottom tab bar (`Sidebar.tsx`). Standalone public routes ([`/welcome`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/app/welcome/page.tsx), [`/about`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/app/about/page.tsx), `/privacy`, and `/statement/*`) are explicitly bypassed in `Sidebar.tsx` to render full-width institutional headers and clean reading canvases without sidebar shell interference.
+  - **Standalone Layout & Chrome Isolation:** Standard operational routes (including the primary workspace dashboard at [`/dashboard`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/app/dashboard/page.tsx)) render within the shared desktop navigation sidebar and mobile bottom tab bar (`Sidebar.tsx`). Standalone public routes ([`/`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/app/page.tsx) with [`/welcome`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/app/welcome/page.tsx) redirecting to `/`, [`/about`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/app/about/page.tsx), [`/privacy`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/app/privacy/page.tsx), [`/statement/[lease_id]`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/app/statement/[lease_id]/page.tsx), and `/deal-room/*`) are explicitly bypassed in `Sidebar.tsx` to render full-width institutional headers and clean reading canvases without sidebar shell interference.
   - **Server Component Stealth Invariant ([`/about`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/app/about/page.tsx)):** Pages requiring deterministic search engine exclusion (such as the private GTM founder story) must be implemented strictly as React Server Components (omitting `'use client'`) to guarantee that `export const metadata: Metadata` with `robots: { index: false, follow: false, nocache: true }` evaluates natively during static page prerendering, using pure `<Link>` tags for client transitions.
 
 ### 1.2 Tier 2: Headless Domain UI Hooks (`src/hooks/`)
@@ -579,7 +579,19 @@ An automated Equity Extraction Alert is triggered if and only if two simultaneou
    This guarantees exact $O(1)$ evaluation without circular numerical loops or iterative convergence drift.
 7. **Strict ASCII / Emoji-Free WhatsApp Formatting:** All `whatsappFormatter.ts` templates (including `formatInspectionForWhatsApp`, syndicate pitch copy, and payment receipts) must remain strictly free of Unicode emojis, utilizing clean ASCII brackets (e.g. `[Good]`, `[Defective]`, `[Tenant Agreed]`), bullets (`•`), and standard typography to ensure complete test compliance with `whatsappFormatter.test.ts` and cross-platform compatibility across all mobile SMS/WhatsApp gateways.
 8. **Realized Cash Flow & Maintenance Incurred Cost Guard:** Open or in-progress work orders (`status !== 'Resolved'`) carry `costZAR: 0` or estimated contractor quotes and must NEVER be deducted from realized cash flow or net operating income. Only work orders marked `status: 'Resolved'` with a verified final invoice amount represent incurred deductible expenses.
-9. **GTM Stealth & Standalone Route Isolation:** New unlaunched marketing or founder narrative routes must be protected with both search-engine directives (`robots: { index: false, follow: false, nocache: true }`) and navigation feature flags (e.g., `SHOW_ABOUT_PAGE_IN_NAV = false` in `Sidebar.tsx`). Standalone routes that bypass app Chrome must be registered in the route guard `if (pathname.startsWith('/welcome') || ...)` to ensure pure full-width rendering.
+9. **GTM Stealth & Standalone Route Isolation:** New unlaunched marketing or founder narrative routes must be protected with both search-engine directives (`robots: { index: false, follow: false, nocache: true }`) and navigation feature flags (e.g., `SHOW_ABOUT_PAGE_IN_NAV = false` in `Sidebar.tsx`). Standalone routes that bypass app Chrome must be registered in the `Sidebar.tsx` standalone route guard to ensure pure full-width rendering:
+   ```typescript
+   if (
+     pathname === '/' ||
+     pathname.startsWith('/welcome') ||
+     pathname.startsWith('/statement') ||
+     pathname.startsWith('/privacy') ||
+     pathname.startsWith('/about') ||
+     pathname.startsWith('/deal-room')
+   ) {
+     return null;
+   }
+   ```
 10. **Development Cross-Module Bridge Invariants:**
     - Selling a development unit via `sellDevelopmentUnit` must apply net proceeds to `developmentFacilityRepaidZAR` first before crediting surplus cash to `liquidCapitalReserve`. If linked to a `FundingSource`, the corresponding funding record's `drawnAmountZAR` is paid down synchronously.
     - Graduating retained units via `graduateRetainedUnitsToRental` must scaffold multi-unit `RentalProperty` records with `leases[]` pre-populated, carrying over unextinguished debt, and setting `section13SexEligible: true` if $\ge 5$ units are retained.

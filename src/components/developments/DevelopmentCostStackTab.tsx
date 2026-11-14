@@ -219,7 +219,7 @@ export function DevelopmentCostStackTab({
             <input
               type="number"
               min={0}
-              step={1000}
+              step="any"
               disabled={readOnly}
               value={softCosts.townPlannerZAR || 0}
               onChange={(e) => !readOnly && handleSoftCostChange('townPlannerZAR', Number(e.target.value))}
@@ -235,7 +235,7 @@ export function DevelopmentCostStackTab({
             <input
               type="number"
               min={0}
-              step={1000}
+              step="any"
               disabled={readOnly}
               value={softCosts.architectZAR || 0}
               onChange={(e) => !readOnly && handleSoftCostChange('architectZAR', Number(e.target.value))}
@@ -251,7 +251,7 @@ export function DevelopmentCostStackTab({
             <input
               type="number"
               min={0}
-              step={1000}
+              step="any"
               disabled={readOnly}
               value={softCosts.structuralCivilEngineerZAR || 0}
               onChange={(e) => !readOnly && handleSoftCostChange('structuralCivilEngineerZAR', Number(e.target.value))}
@@ -267,7 +267,7 @@ export function DevelopmentCostStackTab({
             <input
               type="number"
               min={0}
-              step={1000}
+              step="any"
               disabled={readOnly}
               value={softCosts.quantitySurveyorZAR || 0}
               onChange={(e) => !readOnly && handleSoftCostChange('quantitySurveyorZAR', Number(e.target.value))}
@@ -283,7 +283,7 @@ export function DevelopmentCostStackTab({
             <input
               type="number"
               min={0}
-              step={1000}
+              step="any"
               disabled={readOnly}
               value={softCosts.councilBulkContributionsZAR || 0}
               onChange={(e) => !readOnly && handleSoftCostChange('councilBulkContributionsZAR', Number(e.target.value))}
@@ -299,7 +299,7 @@ export function DevelopmentCostStackTab({
             <input
               type="number"
               min={0}
-              step={1000}
+              step="any"
               disabled={readOnly}
               value={softCosts.nhbrcEnrolmentFeeZAR || 0}
               onChange={(e) => !readOnly && handleSoftCostChange('nhbrcEnrolmentFeeZAR', Number(e.target.value))}
@@ -315,7 +315,7 @@ export function DevelopmentCostStackTab({
             <input
               type="number"
               min={0}
-              step={1000}
+              step="any"
               disabled={readOnly}
               value={softCosts.planScrutinyAndSubdivisionFeesZAR || 0}
               onChange={(e) => !readOnly && handleSoftCostChange('planScrutinyAndSubdivisionFeesZAR', Number(e.target.value))}
@@ -331,7 +331,7 @@ export function DevelopmentCostStackTab({
             <input
               type="number"
               min={0}
-              step={1000}
+              step="any"
               disabled={readOnly}
               value={softCosts.marketingAndShowUnitZAR || 0}
               onChange={(e) => !readOnly && handleSoftCostChange('marketingAndShowUnitZAR', Number(e.target.value))}
@@ -392,7 +392,7 @@ export function DevelopmentCostStackTab({
             <input
               type="number"
               min={0}
-              step={500}
+              step="any"
               disabled={readOnly}
               value={development.monthlyPreApprovalHoldingBurnZAR}
               onChange={(e) =>
@@ -422,7 +422,7 @@ export function DevelopmentCostStackTab({
             <input
               type="number"
               min={0}
-              step={500}
+              step="any"
               disabled={readOnly}
               value={development.monthlyConstructionHoldingBurnZAR}
               onChange={(e) =>
@@ -479,7 +479,7 @@ export function DevelopmentCostStackTab({
               </button>
             </div>
 
-            <form onSubmit={handleCreateBOQItem} className="space-y-3 text-xs">
+            <form onSubmit={handleCreateBOQItem} noValidate className="space-y-3 text-xs">
               <div>
                 <label className="block font-semibold text-slate-700 mb-1">Description</label>
                 <input
@@ -553,7 +553,7 @@ export function DevelopmentCostStackTab({
                   <input
                     type="number"
                     min={0}
-                    step={500}
+                    step="any"
                     value={boqBaselineCost}
                     onChange={(e) => setBoqBaselineCost(Number(e.target.value))}
                     className="w-full rounded border border-slate-300 px-3 py-1.5"
@@ -567,7 +567,7 @@ export function DevelopmentCostStackTab({
                   <input
                     type="number"
                     min={0}
-                    step={500}
+                    step="any"
                     value={boqActualCost}
                     onChange={(e) => setBoqActualCost(Number(e.target.value))}
                     className="w-full rounded border border-slate-300 px-3 py-1.5"

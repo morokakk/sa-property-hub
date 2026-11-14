@@ -49,6 +49,82 @@ test.describe('Cross-Device Cloud Hydration and Safe Data Merge', () => {
     },
   ];
 
+  const cloudDevelopments = [
+    {
+      id: 'cloud-dev-playwright-1',
+      user_id: 'usr_playwright_test_999',
+      title: 'Cloud Hydrated Bryanston Cluster Scheme',
+      address: '88 Coleraine Drive, Bryanston',
+      city: 'Johannesburg North (Sandton / Bryanston / Fourways)',
+      province: 'Gauteng',
+      development_type: 'Subdivision & Cluster',
+      is_vat_registered_developer: true,
+      tax_entity_type: 'Company (27%)',
+      current_phase: 'Earthworks & Services',
+      pre_approval_months: 6,
+      construction_months: 10,
+      sell_down_months: 4,
+      land_purchase_price_zar: 3200000,
+      acquisition_costs_zar: 220000,
+      sec118_arrears_zar: 0,
+      soft_costs: {
+        townPlannerZAR: 65000,
+        architectZAR: 140000,
+        structuralCivilEngineerZAR: 95000,
+        quantitySurveyorZAR: 55000,
+        nhbrcEnrolmentFeeZAR: 60000,
+        councilBulkContributionsZAR: 350000,
+        planScrutinyAndSubdivisionFeesZAR: 45000,
+        marketingAndShowUnitZAR: 180000,
+      },
+      total_buildable_area_sqm: 720,
+      budgeted_hard_cost_per_sqm_zar: 9800,
+      contingency_percent: 7.5,
+      boq_items: [],
+      monthly_pre_approval_holding_burn_zar: 12000,
+      monthly_construction_holding_burn_zar: 18000,
+      development_facility_limit_zar: 6600000,
+      development_facility_drawn_zar: 2400000,
+      development_facility_repaid_zar: 0,
+      pre_sales_hurdle_percent: 40,
+      approvals: {
+        splumaRezoningSubdivision: { status: 'N/A' },
+        sgDiagramApproval: { status: 'Approved' },
+        municipalBuildingPlans: { status: 'Approved' },
+        nhbrcEnrolment: { status: 'Approved' },
+        sectionalTitleRegister: { status: 'Not Started' },
+        occupancyCertificate: { status: 'Not Started' },
+        _zoningProfile: {
+          currentZoning: 'Residential 3',
+          erfSizeSqm: 1500,
+          farRatio: 0.8,
+          coveragePercent: 50,
+          maxHeightStoreys: 3,
+          requiresRezoning: false,
+          consentUses: {
+            secondDwellingPermitted: true,
+            studentCommuneConsent: false,
+            backyardMicroUnitsPermitted: false,
+            homeEnterprisePermitted: true,
+          },
+        },
+      },
+      comments_ledger: [
+        {
+          id: 'cmt-cloud-1',
+          authorName: 'Cloud QS',
+          authorRole: 'Quantity Surveyor (QS)',
+          sectionTag: 'BOQ & Cost Stack',
+          message: 'Cloud hydrated QS note on civil servicing',
+          status: 'Pending',
+          createdAt: '2026-11-10T10:00:00.000Z',
+        },
+      ],
+      units: [],
+      created_at: '2026-11-01',
+    },
+  ];
+
   test('1. Hydrates cloud portfolio, merges non-conflicting local items, and resets to demo on sign-out', async ({
     page,
   }) => {
@@ -107,6 +183,14 @@ test.describe('Cross-Device Cloud Hydration and Safe Data Merge', () => {
           });
           return;
         }
+        if (url.includes('/developments')) {
+          await route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify(cloudDevelopments),
+          });
+          return;
+        }
       }
 
       // Default empty array for other tables / upsert / delete
@@ -120,7 +204,7 @@ test.describe('Cross-Device Cloud Hydration and Safe Data Merge', () => {
     // Navigate to settings page
     await page.goto('/settings', { waitUntil: 'domcontentloaded' });
 
-    // Seed local storage with a user-created local rental before signing in
+    // Seed local storage with a user-created local rental & local development before signing in
     await page.evaluate(() => {
       const raw = localStorage.getItem('sa_property_portfolio_hub_v1');
       const parsed = raw ? JSON.parse(raw) : { state: {} };
@@ -137,6 +221,54 @@ test.describe('Cross-Device Cloud Hydration and Safe Data Merge', () => {
           status: 'Occupied',
           leases: [],
           maintenanceHistory: [],
+        },
+      ];
+      parsed.state.developments = [
+        {
+          id: 'dev-local-unique-888',
+          title: 'Local Unsynced Infill Scheme',
+          address: '99 Jan Smuts Ave, Rosebank',
+          city: 'Johannesburg',
+          province: 'Gauteng',
+          developmentType: 'Township Micro-Units (Infill)',
+          isVatRegisteredDeveloper: false,
+          taxEntityType: 'Company (27%)',
+          currentPhase: 'Feasibility',
+          preApprovalMonths: 3,
+          constructionMonths: 8,
+          sellDownMonths: 2,
+          landPurchasePriceZAR: 950000,
+          acquisitionCostsZAR: 45000,
+          sec118ArrearsZAR: 0,
+          softCosts: {
+            townPlannerZAR: 25000,
+            architectZAR: 40000,
+            structuralCivilEngineerZAR: 30000,
+            quantitySurveyorZAR: 20000,
+            nhbrcEnrolmentFeeZAR: 25000,
+            councilBulkContributionsZAR: 35000,
+            planScrutinyAndSubdivisionFeesZAR: 15000,
+            marketingAndShowUnitZAR: 15000,
+          },
+          totalBuildableAreaSqm: 280,
+          budgetedHardCostPerSqmZAR: 8500,
+          contingencyPercent: 7.5,
+          boqItems: [],
+          monthlyPreApprovalHoldingBurnZAR: 5000,
+          monthlyConstructionHoldingBurnZAR: 10000,
+          developmentFacilityLimitZAR: 1800000,
+          developmentFacilityDrawnZAR: 0,
+          developmentFacilityRepaidZAR: 0,
+          preSalesHurdlePercent: 40,
+          approvals: {
+            splumaRezoningSubdivision: { status: 'Not Started' },
+            sgDiagramApproval: { status: 'Not Started' },
+            municipalBuildingPlans: { status: 'Not Started' },
+            nhbrcEnrolment: { status: 'Not Started' },
+            sectionalTitleRegister: { status: 'Not Started' },
+            occupancyCertificate: { status: 'Not Started' },
+          },
+          units: [],
         },
       ];
       parsed.state.analyzerDraft = {
@@ -186,11 +318,18 @@ test.describe('Cross-Device Cloud Hydration and Safe Data Merge', () => {
       if (!raw) return null;
       const parsed = JSON.parse(raw);
       const rentals = parsed.state?.rentals || [];
+      const developments = parsed.state?.developments || [];
+      const cloudDev = developments.find((d: any) => d.id === 'cloud-dev-playwright-1');
       return {
         rentalCount: rentals.length,
         hasCloudItem: rentals.some((r: any) => r.id === 'cloud-rental-playwright-1'),
         hasLocalItem: rentals.some((r: any) => r.id === 'rental-local-unique-777'),
         hasStockDemoItem: rentals.some((r: any) => r.id === 'rental-1'),
+        hasCloudDev: Boolean(cloudDev),
+        hasLocalDev: developments.some((d: any) => d.id === 'dev-local-unique-888'),
+        hasStockDemoDev: developments.some((d: any) => d.id === 'dev-1'),
+        devZoning: cloudDev?.zoningProfile?.currentZoning,
+        devCommentsCount: cloudDev?.commentsLedger?.length || 0,
         profileName: parsed.state?.investorProfile?.entityName,
         analyzerPurchasePrice: parsed.state?.analyzerDraft?.purchasePrice,
       };
@@ -201,6 +340,11 @@ test.describe('Cross-Device Cloud Hydration and Safe Data Merge', () => {
     expect(stateCheck?.hasLocalItem).toBe(true);
     // Stock demo item (rental-1) should NOT be present in merged state
     expect(stateCheck?.hasStockDemoItem).toBe(false);
+    expect(stateCheck?.hasCloudDev).toBe(true);
+    expect(stateCheck?.hasLocalDev).toBe(true);
+    expect(stateCheck?.hasStockDemoDev).toBe(false);
+    expect(stateCheck?.devZoning).toBe('Residential 3');
+    expect(stateCheck?.devCommentsCount).toBe(1);
     expect(stateCheck?.profileName).toBe('Cloud Playwright Holdings');
     // Active in-flight analyzer draft must have been preserved during hydration
     expect(stateCheck?.analyzerPurchasePrice).toBe(2450000);
@@ -219,11 +363,16 @@ test.describe('Cross-Device Cloud Hydration and Safe Data Merge', () => {
       if (!raw) return null;
       const parsed = JSON.parse(raw);
       const rentals = parsed.state?.rentals || [];
+      const developments = parsed.state?.developments || [];
       const syncCompleted = localStorage.getItem('cloud_sync_completed');
       return {
         hasStockDemo: rentals.some((r: any) => r.id === 'rental-1'),
         hasCloudItem: rentals.some((r: any) => r.id === 'cloud-rental-playwright-1'),
         hasLocalUniqueItem: rentals.some((r: any) => r.id === 'rental-local-unique-777'),
+        hasStockDemoDev1: developments.some((d: any) => d.id === 'dev-1'),
+        hasStockDemoDev2: developments.some((d: any) => d.id === 'dev-2'),
+        hasCloudDev: developments.some((d: any) => d.id === 'cloud-dev-playwright-1'),
+        hasLocalUniqueDev: developments.some((d: any) => d.id === 'dev-local-unique-888'),
         syncCompleted,
       };
     });
@@ -231,6 +380,10 @@ test.describe('Cross-Device Cloud Hydration and Safe Data Merge', () => {
     expect(resetCheck?.hasStockDemo).toBe(true);
     expect(resetCheck?.hasCloudItem).toBe(false);
     expect(resetCheck?.hasLocalUniqueItem).toBe(false);
+    expect(resetCheck?.hasStockDemoDev1).toBe(true);
+    expect(resetCheck?.hasStockDemoDev2).toBe(true);
+    expect(resetCheck?.hasCloudDev).toBe(false);
+    expect(resetCheck?.hasLocalUniqueDev).toBe(false);
     expect(resetCheck?.syncCompleted).toBeNull();
   });
 });

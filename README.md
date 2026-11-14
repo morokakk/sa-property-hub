@@ -9,7 +9,7 @@
 [![React](https://img.shields.io/badge/React-19.3-blue.svg)](https://react.dev/)
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind-v4.3-38bdf8.svg)](https://tailwindcss.com/)
 [![Zustand](https://img.shields.io/badge/Zustand-v5.1-orange.svg)](https://github.com/pmndrs/zustand)
-[![Tests](https://img.shields.io/badge/Vitest-1300%20Passed%20(112%20Files)-brightgreen.svg)](https://vitest.dev/)
+[![Tests](https://img.shields.io/badge/Vitest-1353%20Passed%20(115%20Files)-brightgreen.svg)](https://vitest.dev/)
 [![E2E](https://img.shields.io/badge/Playwright-Multi--Device-purple.svg)](https://playwright.dev/)
 [![Compliance](https://img.shields.io/badge/SARS%20%2F%20LPC%20%2F%20RHA-2026%20Compliant-emerald.svg)](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/lib/calculations/sarsTax.ts)
 
@@ -30,8 +30,8 @@ The **Moremela Property Investment Hub** addresses the structural complexities u
 
 ## 2. Core Module Inventory
 
-### 2.1 Executive Dashboard (`/`)
-* **Live Route:** [`src/app/page.tsx`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/app/page.tsx)
+### 2.1 Executive Dashboard (`/dashboard`)
+* **Live Route:** [`src/app/dashboard/page.tsx`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/app/dashboard/page.tsx)
 * **Global Portfolio KPIs:** Aggregates Gross Asset Value (GAV), total active bond liabilities, private syndicate debt, drawn senior development facilities, and net equity via the memoized [`usePortfolioSummary`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/lib/store/selectors/portfolioSummarySelector.ts) selector hook.
 * **Liquid Capital Reserve ("War Chest"):** Tracks total deployable capital combining unallocated liquid cash reserves, ring-fenced contractor retentions, and pre-approved private investor credit lines.
 * **4-Slice Asset Allocation Donut:** Reconciles Active Rentals, Ongoing Flips, Active Developments (`developmentsValueZAR` strictly for unsold/un-graduated units), and Liquid Cash Reserve to 100.0% precision without balance-sheet double counting.
@@ -138,8 +138,8 @@ The **Moremela Property Investment Hub** addresses the structural complexities u
 * **RFC 5545 iCalendar (.ics) Export & External Calendar Deep Links ([`calendarExport.ts`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/lib/export/calendarExport.ts)):** Pure client-side export generating RFC 5545 `.ics` calendar payloads with CRLF line endings, exclusive all-day `DTEND` dates (`dueDate + 1 day`), native recurrence rules (`RRULE:FREQ=WEEKLY|MONTHLY|YEARLY` with `INTERVAL=3` quarterly and `UNTIL` bounds), and 9:00 AM `VALARM` display reminders. Includes bulk filtered active export (`[ 📅 Export .ics (N) ]`) and per-task quick actions for direct Google Calendar and Outlook 365 compose deep links.
 * **Automated Cross-Domain Reminders ([`taskSync.ts`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/lib/store/utils/taskSync.ts)):** Automatically schedules and synchronizes 60-day lease expiry renewal notices, 14-day Body Corporate AGM budget reviews, and pre-construction statutory approval warning tasks across rentals, flips, developments, and pipeline opportunities.
 
-### 2.9 Standalone Human-First Landing Page (`/welcome`)
-* **Live Route:** [`src/app/welcome/page.tsx`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/app/welcome/page.tsx)
+### 2.9 Standalone Human-First Landing Page (`/`)
+* **Live Route:** [`src/app/page.tsx`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/app/page.tsx) *(with [`src/app/welcome/page.tsx`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/app/welcome/page.tsx) redirecting to `/` via `redirect('/')` for backward compatibility)*
 * **Human-Centric Deal Alignment:** A low-word-count institutional landing page linking an entrepreneur's core life goals directly to live underwriting and management modules:
   - **Monthly Cash Flow:** Feeds single-let/multi-let tracking, utility recovery, and 1-click statements ([`/rentals`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/app/rentals/page.tsx)).
   - **Build a Lump-Sum Cash War Chest:** Drives 10-trade BOQ management, stage draws, and Section 118 clearance timelines ([`/flips`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/app/flips/page.tsx)).
@@ -169,7 +169,7 @@ The **Moremela Property Investment Hub** addresses the structural complexities u
 | **Document Processing** | PDF-Lib / PDF.js | `pdf-lib 1.17.1`, `pdfjs-dist 6.5.438`, `html2pdf.js 0.14.0` |
 | **Database & Cloud** | Supabase | `@supabase/supabase-js 2.119.0` (Row-Level Security, Google OAuth, cloud sync) |
 | **Product Telemetry** | PostHog | `posthog-js 1.447.3` (POPIA-compliant input masking & client analytics) |
-| **Unit & Integration** | Vitest | `5.1.0` (112 test files, 1,300 passing tests) |
+| **Unit & Integration** | Vitest | `5.1.0` (115 test files, 1,353 passing tests) |
 | **End-to-End (E2E)** | Playwright | `1.65.0` (Mobile, Tablet, Desktop responsive regression suite) |
 | **Mutation Testing** | Stryker | `@stryker-mutator/core 10.0.0` |
 
@@ -228,8 +228,9 @@ npm run build
 ├── src/
 │   ├── app/                      # Tier 1: Thin Next.js App Router Page Controllers
 │   │   ├── actions/              # Next.js Server Actions (submitTenantMaintenanceTicket, sendStatementEmail)
-│   │   ├── page.tsx              # Executive Dashboard
-│   │   ├── welcome/page.tsx      # Human-First Landing Page & Goal Switcher
+│   │   ├── page.tsx              # Human-First Landing Page & Goal Switcher
+│   │   ├── dashboard/page.tsx    # Executive Global Portfolio Dashboard
+│   │   ├── welcome/page.tsx      # Legacy Route Redirect (-> /)
 │   │   ├── about/page.tsx        # Stealth Founder Story & Cultural Vision (GTM Private Draft)
 │   │   ├── analyzer/page.tsx     # Opportunity Deal Sourcing & Underwriting
 │   │   ├── developments/page.tsx # Ground-Up Clusters, Infill & Subdivision Command Center

@@ -442,7 +442,7 @@ export function DevelopmentUnitInventoryTab({
               </button>
             </div>
 
-            <form onSubmit={handleConfirmSale} className="space-y-3 text-xs">
+            <form onSubmit={handleConfirmSale} noValidate className="space-y-3 text-xs">
               <div>
                 <label className="block font-semibold text-slate-700 mb-1">
                   Buyer Name / Purchasing SPV
@@ -465,7 +465,7 @@ export function DevelopmentUnitInventoryTab({
                   type="number"
                   required
                   min={0}
-                  step={1000}
+                  step="any"
                   value={salePriceZAR}
                   onChange={(e) => setSalePriceZAR(Number(e.target.value))}
                   className="w-full rounded border border-slate-300 px-3 py-1.5 focus:ring-1 focus:ring-emerald-500"
@@ -545,7 +545,7 @@ export function DevelopmentUnitInventoryTab({
               </button>
             </div>
 
-            <form onSubmit={handleCreateUnit} className="space-y-3 text-xs">
+            <form onSubmit={handleCreateUnit} noValidate className="space-y-3 text-xs">
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">Unit Number</label>
@@ -589,7 +589,7 @@ export function DevelopmentUnitInventoryTab({
                     type="number"
                     required
                     min={0}
-                    step={1000}
+                    step="any"
                     value={newCostBasis}
                     onChange={(e) => setNewCostBasis(Number(e.target.value))}
                     className="w-full rounded border border-slate-300 px-3 py-1.5"
@@ -604,7 +604,7 @@ export function DevelopmentUnitInventoryTab({
                     type="number"
                     required
                     min={0}
-                    step={1000}
+                    step="any"
                     value={newListPrice}
                     onChange={(e) => setNewListPrice(Number(e.target.value))}
                     className="w-full rounded border border-slate-300 px-3 py-1.5"
@@ -616,7 +616,7 @@ export function DevelopmentUnitInventoryTab({
                     type="number"
                     required
                     min={0}
-                    step={100}
+                    step="any"
                     value={newEstRent}
                     onChange={(e) => setNewEstRent(Number(e.target.value))}
                     className="w-full rounded border border-slate-300 px-3 py-1.5"

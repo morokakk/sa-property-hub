@@ -28,6 +28,106 @@ test.describe('Competitor-Inspired Upgrades Verification', () => {
       // Verify VAT-Exempt Agent checkbox in Section 2 / Acquisition defaults
       const vatExemptCheckbox = page.locator('label:has-text("Agency is VAT-Exempt (no 1.15x VAT)") input[type="checkbox"]');
       await expect(vatExemptCheckbox).toBeVisible();
+
+      // Verify Development Strategy Hurdles sub-section
+      await expect(page.locator('text=Development Strategy Hurdles')).toBeVisible();
+      await expect(page.locator('text=Min Development POC Hurdle (%)')).toBeVisible();
+      await expect(page.locator('text=Min Build-to-Rent YoC (%)')).toBeVisible();
+      await expect(page.locator('text=Default Pre-Sales Hurdle (%)')).toBeVisible();
+      await expect(page.locator('text=Default Hard Build Rate (R/m²)')).toBeVisible();
+
+      // Update Development Hurdle inputs and verify persistence across reload
+      const pocContainer = page.locator('div', { has: page.locator('label:has-text("Min Development POC Hurdle (%)")') }).filter({ has: page.locator('input[type="number"]') }).last();
+      const pocInput = pocContainer.locator('input[type="number"]');
+      await pocInput.fill('22');
+
+      const rateContainer = page.locator('div', { has: page.locator('label:has-text("Default Hard Build Rate (R/m²)")') }).filter({ has: page.locator('input[type="number"]') }).last();
+      const rateInput = rateContainer.locator('input[type="number"]');
+      await rateInput.fill('10500');
+
+      const saveBtn = page.locator('button:has-text("Save Profile & Settings")').first();
+      await expect(saveBtn).toBeVisible();
+      await saveBtn.click();
+      await page.waitForTimeout(500);
+
+      await page.goto('/settings#settings-buybox', { waitUntil: 'domcontentloaded' });
+      await page.locator('text=Initializing Moremela Property Hub...').waitFor({ state: 'detached', timeout: 30_000 }).catch(() => {});
+
+      const reloadedTab = page.locator('button:has-text("Underwriting, Buy Box")');
+      await expect(reloadedTab).toBeVisible({ timeout: 15_000 });
+      await reloadedTab.click();
+
+      const reloadedPocInput = page
+        .locator('div', { has: page.locator('label:has-text("Min Development POC Hurdle (%)")') })
+        .filter({ has: page.locator('input[type="number"]') })
+        .last()
+        .locator('input[type="number"]');
+      const reloadedRateInput = page
+        .locator('div', { has: page.locator('label:has-text("Default Hard Build Rate (R/m²)")') })
+        .filter({ has: page.locator('input[type="number"]') })
+        .last()
+        .locator('input[type="number"]');
+
+      await expect(reloadedPocInput).toHaveValue('22');
+      await expect(reloadedRateInput).toHaveValue('10500');
+    });
+
+    test('Analyzer: Development strategy adapts Layout Customizer labels/inactive badges and expands Municipal Zoning & Bulk Envelope', async ({ page }) => {
+      await page.goto('/analyzer', { waitUntil: 'domcontentloaded' });
+      await page.locator('text=Initializing Moremela Property Hub...').waitFor({ state: 'detached', timeout: 30_000 }).catch(() => {});
+
+      // Ensure Calculator tab is active
+      const calcTab = page.locator('button:has-text("Deal Calculator")');
+      if (await calcTab.isVisible()) {
+        await calcTab.click();
+      }
+
+      // Switch strategy to Development
+      const devStrategyBtn = page.locator('button:has-text("Development")').first();
+      await expect(devStrategyBtn).toBeVisible({ timeout: 15_000 });
+      await devStrategyBtn.click();
+
+      // Open Strategy-Aware Layout Customizer
+      const customizerTrigger = page.getByTestId('analyzer-layout-customizer-trigger');
+      await expect(customizerTrigger).toBeVisible();
+      await customizerTrigger.click();
+
+      const customizerPanel = page.getByTestId('analyzer-layout-customizer-panel');
+      await expect(customizerPanel).toBeVisible();
+
+      // Verify strategy-adapted labels and inactive section badges
+      await expect(customizerPanel.locator('[data-customizer-section="capexRehabStack"]')).toContainText(
+        'Development Cost Stack, 2-Stage Burn & Exit Mode'
+      );
+      await expect(customizerPanel.locator('[data-customizer-section="mortgageEngine"]')).toContainText(
+        'Senior Development Facility & S-Curve Engine'
+      );
+      await expect(customizerPanel.locator('[data-customizer-section="holdingExit"]')).toContainText(
+        'Inactive in Development (2-Stage Burn applies)'
+      );
+      await expect(customizerPanel.locator('[data-customizer-section="opexReserves"]')).toContainText(
+        'Inactive in 100% Build-to-Sell'
+      );
+
+      // Close customizer
+      await customizerPanel.locator('button:has-text("Done")').click();
+      await expect(customizerPanel).toBeHidden();
+
+      // Verify Municipal Zoning Rights & Bulk Envelope sub-panel
+      const zoningHeading = page.locator('text=Municipal Zoning Rights & Bulk Envelope').first();
+      await expect(zoningHeading).toBeVisible();
+
+      const editParamsBtn = page.locator('button:has-text("Edit Parameters")').first();
+      if (await editParamsBtn.isVisible()) {
+        await editParamsBtn.click();
+      }
+
+      const res3PresetBtn = page.locator('button:has-text("Res 3 (40 du/ha / FAR 0.8)")').first();
+      await expect(res3PresetBtn).toBeVisible();
+      await res3PresetBtn.click();
+
+      await expect(page.locator('text=Max Permitted Bulk:').first()).toBeVisible();
+      await expect(page.locator('text=As-of-Right Statutory Rights').first()).toBeVisible();
     });
 
     test('Analyzer renders Buy Box badge, DSCR, Prime Spread slider, and Exit VAT toggle', async ({ page }) => {
@@ -59,7 +159,7 @@ test.describe('Competitor-Inspired Upgrades Verification', () => {
       // Verify Prime Spread slider in calculator form
       const primeSpreadLabel = page.locator('text=Prime Spread (±200 bps)');
       await expect(primeSpreadLabel).toBeVisible();
-      const spreadSlider = page.locator('input[type="range"][min="-2"][max="2"]');
+      const spreadSlider = page.locator('input[type="range"][min="-2"][max="4"]');
       await expect(spreadSlider).toBeVisible();
 
       // Verify Holding Period & Exit VAT sensitivity section in calculator

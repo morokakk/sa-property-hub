@@ -985,6 +985,7 @@ function SettingsContent() {
                 <div>• Profile: {syncResult.counts.profile}</div>
                 <div>• Rentals: {syncResult.counts.properties}</div>
                 <div>• Flips: {syncResult.counts.flips}</div>
+                <div>• Developments: {syncResult.counts.developments}</div>
                 <div>• BOQ Items: {syncResult.counts.boqItems}</div>
                 <div>• Funding: {syncResult.counts.fundingSources}</div>
                 <div>• Opportunities: {syncResult.counts.opportunities}</div>

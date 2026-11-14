@@ -8,9 +8,11 @@ test.describe('Local-to-Cloud Database Migration Bridge', () => {
     test.setTimeout(120_000);
 
     const pages = [
+      { name: 'Welcome', path: '/' },
       { name: 'Dashboard', path: '/dashboard' },
       { name: 'Analyzer', path: '/analyzer' },
       { name: 'Flips', path: '/flips' },
+      { name: 'Developments', path: '/developments' },
       { name: 'Funding', path: '/funding' },
       { name: 'Rentals', path: '/rentals' },
       { name: 'Tasks', path: '/tasks' },
@@ -26,6 +28,9 @@ test.describe('Local-to-Cloud Database Migration Bridge', () => {
 
       // Verify main container renders
       await expect(page.locator('main')).toBeVisible();
+      if (p.path === '/') {
+        await expect(page.locator('h1').first()).toBeVisible();
+      }
 
       // Ensure no blocking modal forcing login
       const forcedLoginModal = page.locator('text="Please log in to continue"');
@@ -161,5 +166,6 @@ test.describe('Local-to-Cloud Database Migration Bridge', () => {
     await expect(successBanner).toBeVisible({ timeout: 15000 });
     await expect(successBanner).toContainText('Cloud Portfolio Migration Complete');
     await expect(successBanner).toContainText('Profile: 1');
+    await expect(successBanner).toContainText('Developments:');
   });
 });

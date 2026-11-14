@@ -6,9 +6,12 @@ import * as fs from 'fs';
 const BASE_URL = 'http://localhost:3000';
 
 const PAGES = [
+  { name: 'Welcome', path: '/' },
+  { name: 'About', path: '/about' },
   { name: 'Dashboard', path: '/dashboard' },
   { name: 'Analyzer', path: '/analyzer' },
   { name: 'Flips', path: '/flips' },
+  { name: 'Developments', path: '/developments' },
   { name: 'Funding', path: '/funding' },
   { name: 'Rentals', path: '/rentals' },
   { name: 'Tasks', path: '/tasks' },
@@ -330,7 +333,7 @@ test.describe('Modal Responsiveness Audit', () => {
     }
   });
 
-  test('Add Funding modal', async ({ page }, testInfo) => {
+  test('Add Funding modal with light-dismiss checks', async ({ page }, testInfo) => {
     const projectName = testInfo.project.name;
     const screenshotDir = path.join('e2e', 'screenshots', projectName);
     fs.mkdirSync(screenshotDir, { recursive: true });
@@ -341,19 +344,112 @@ test.describe('Modal Responsiveness Audit', () => {
     const addBtn = page.locator('text=Add Capital Source').first();
     if (await addBtn.isVisible()) {
       await addBtn.click();
-      await page.waitForTimeout(800);
+      await page.waitForTimeout(600);
+
+      const modalHeading = page.locator('h3:has-text("Add Financing / Capital Source")');
+      await expect(modalHeading).toBeVisible();
 
       await page.screenshot({
         path: path.join(screenshotDir, 'Modal-AddFunding.png'),
         fullPage: false,
       });
 
+      const hasHorizontalOverflow = await page.evaluate(
+        () => document.documentElement.scrollWidth > document.documentElement.clientWidth + 2
+      );
+      expect(hasHorizontalOverflow).toBe(false);
+
       const overflowIssues = await checkHorizontalOverflow(page);
       if (overflowIssues.length > 0) {
         console.log(`⚠️  Add Funding Modal overflow at ${projectName}:`);
         overflowIssues.forEach((i) => console.log(`   → ${i.description}`));
       }
+
+      // Light-dismiss 1: Escape key
+      await page.keyboard.press('Escape');
+      await expect(modalHeading).toBeHidden();
+
+      // Light-dismiss 2: Backdrop click
+      await addBtn.click();
+      await expect(modalHeading).toBeVisible();
+      await page.mouse.click(10, 10);
+      await expect(modalHeading).toBeHidden();
     }
+  });
+
+  test('New Flip Project modal with light-dismiss checks on Flips', async ({ page }, testInfo) => {
+    const projectName = testInfo.project.name;
+    const screenshotDir = path.join('e2e', 'screenshots', projectName);
+    fs.mkdirSync(screenshotDir, { recursive: true });
+
+    await page.goto('/flips', { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(1500);
+
+    const newFlipBtn = page.locator('button:has-text("New Flip Project")').first();
+    await expect(newFlipBtn).toBeVisible();
+    await newFlipBtn.click();
+    await page.waitForTimeout(600);
+
+    const modalHeading = page.locator('h3:has-text("Scaffold New Buy-and-Flip Project")');
+    await expect(modalHeading).toBeVisible();
+
+    await page.screenshot({
+      path: path.join(screenshotDir, 'Modal-NewFlip.png'),
+      fullPage: false,
+    });
+
+    const hasHorizontalOverflow = await page.evaluate(
+      () => document.documentElement.scrollWidth > document.documentElement.clientWidth + 2
+    );
+    expect(hasHorizontalOverflow).toBe(false);
+
+    // Light-dismiss 1: Escape key
+    await page.keyboard.press('Escape');
+    await expect(modalHeading).toBeHidden();
+
+    // Light-dismiss 2: Backdrop click
+    await newFlipBtn.click();
+    await expect(modalHeading).toBeVisible();
+    await page.mouse.click(10, 10);
+    await expect(modalHeading).toBeHidden();
+  });
+
+  test('Create Development Project modal and light-dismiss checks on Developments', async ({ page }, testInfo) => {
+    const projectName = testInfo.project.name;
+    const viewportWidth = page.viewportSize()?.width ?? 1280;
+    const screenshotDir = path.join('e2e', 'screenshots', projectName);
+    fs.mkdirSync(screenshotDir, { recursive: true });
+
+    await page.goto('/developments', { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(1500);
+
+    const newDevBtn = page.locator('button:has-text("New Development Project")').first();
+    await expect(newDevBtn).toBeVisible();
+    await newDevBtn.click();
+    await page.waitForTimeout(600);
+
+    const modalDialog = page.locator('[role="dialog"]').filter({ hasText: 'Create New Development Project' });
+    await expect(modalDialog).toBeVisible();
+
+    await page.screenshot({
+      path: path.join(screenshotDir, `modal-developments-create-${viewportWidth}.png`),
+      fullPage: false,
+    });
+
+    const hasHorizontalOverflow = await page.evaluate(
+      () => document.documentElement.scrollWidth > document.documentElement.clientWidth + 2
+    );
+    expect(hasHorizontalOverflow).toBe(false);
+
+    // Light-dismiss 1: Escape key
+    await page.keyboard.press('Escape');
+    await expect(modalDialog).toBeHidden();
+
+    // Light-dismiss 2: Backdrop click
+    await newDevBtn.click();
+    await expect(modalDialog).toBeVisible();
+    await page.mouse.click(10, 10);
+    await expect(modalDialog).toBeHidden();
   });
 
   test('MAO Quick Solver modal on Analyzer', async ({ page }, testInfo) => {

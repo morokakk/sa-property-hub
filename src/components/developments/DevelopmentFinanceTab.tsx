@@ -378,7 +378,7 @@ export function DevelopmentFinanceTab({
                 <X className="w-5 h-5" />
               </button>
             </div>
-            <form onSubmit={handleRecordRepayment} className="space-y-3 text-xs">
+            <form onSubmit={handleRecordRepayment} noValidate className="space-y-3 text-xs">
               <div>
                 <label className="block font-semibold text-slate-700 mb-1">
                   Repayment Amount (ZAR)
@@ -386,8 +386,8 @@ export function DevelopmentFinanceTab({
                 <input
                   type="number"
                   required
-                  min={1000}
-                  step={10000}
+                  min={0}
+                  step="any"
                   value={repayAmount}
                   onChange={(e) => setRepayAmount(Number(e.target.value))}
                   className="w-full rounded border border-slate-300 px-3 py-1.5 focus:ring-1 focus:ring-emerald-500"
@@ -438,7 +438,7 @@ export function DevelopmentFinanceTab({
                 <X className="w-5 h-5" />
               </button>
             </div>
-            <form onSubmit={handleRecordDrawdown} className="space-y-3 text-xs">
+            <form onSubmit={handleRecordDrawdown} noValidate className="space-y-3 text-xs">
               <div>
                 <label className="block font-semibold text-slate-700 mb-1">
                   Drawdown Amount (ZAR)
@@ -446,8 +446,8 @@ export function DevelopmentFinanceTab({
                 <input
                   type="number"
                   required
-                  min={1000}
-                  step={10000}
+                  min={0}
+                  step="any"
                   value={drawAmount}
                   onChange={(e) => setDrawAmount(Number(e.target.value))}
                   className="w-full rounded border border-slate-300 px-3 py-1.5 focus:ring-1 focus:ring-blue-500"

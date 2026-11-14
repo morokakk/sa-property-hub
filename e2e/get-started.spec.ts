@@ -150,4 +150,44 @@ test.describe('Get Started Reference & Quick-Start Hub', () => {
     await link.click();
     await expect(page).toHaveURL(/\/get-started$/);
   });
+
+  test('Stage 3 Developments Manager guide steps deep-link cleanly to /developments anchors', async ({ page }) => {
+    test.setTimeout(90_000);
+
+    const targets = [
+      {
+        stepTestId: 'guide-step-developments-approvals-tracker',
+        expectedHref: '/developments#developments-approvals',
+        anchorSelector: '#developments-approvals',
+      },
+      {
+        stepTestId: 'guide-step-developments-presales-debt-wipeout',
+        expectedHref: '/developments#developments-finance',
+        anchorSelector: '#developments-finance',
+      },
+      {
+        stepTestId: 'guide-step-developments-hybrid-split-exit',
+        expectedHref: '/developments#developments-inventory',
+        anchorSelector: '#developments-inventory',
+      },
+    ];
+
+    for (const target of targets) {
+      await page.goto('/get-started', { waitUntil: 'domcontentloaded' });
+      await waitForApp(page);
+
+      const step = page.getByTestId(target.stepTestId);
+      await expect(step).toBeAttached();
+      await step.locator('button[aria-expanded]').click();
+
+      const deepLink = step.locator('a:has-text("Go to feature")');
+      await expect(deepLink).toHaveAttribute('href', target.expectedHref);
+      await deepLink.click();
+
+      await expect(page).toHaveURL(new RegExp(`${target.expectedHref.replace('#', '#')}$`));
+      await waitForApp(page);
+      await expect(page.locator(target.anchorSelector)).toBeVisible({ timeout: 15_000 });
+      await expect(page.locator(target.anchorSelector)).toBeInViewport({ timeout: 15_000 });
+    }
+  });
 });
