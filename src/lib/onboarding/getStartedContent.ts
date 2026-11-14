@@ -368,7 +368,7 @@ export const GET_STARTED_STAGES: readonly JourneyStage[] = [
         id: 'developments',
         moduleName: 'Developments Manager',
         route: '/developments',
-        purpose: 'Run ground-up clusters, infill schemes, statutory approvals, pre-sales debt wipeout, and hybrid split-exit portfolios.',
+        purpose: 'Run ground-up clusters, infill schemes, statutory approvals, pre-sales debt wipeout, hybrid split-exits, and external consultant Deal Rooms.',
         features: [
           {
             id: 'developments-promote-deal',
@@ -387,14 +387,14 @@ export const GET_STARTED_STAGES: readonly JourneyStage[] = [
           {
             id: 'developments-approvals-tracker',
             title: 'Statutory Approvals & Paper Rights',
-            summary: 'Track municipal planning, zoning envelopes, SPLUMA rezoning, SG diagrams, building plans, and NHBRC enrolment.',
+            summary: 'Track municipal planning, zoning envelopes, SPLUMA rezoning, SG diagrams, building plans, NHBRC enrolment, and Team Ledger review notes.',
             howTo: [
               'Open the Paper Rights & Approvals tab to inspect the statutory zoning envelope (FAR bulk, coverage, height, and density cap) alongside the 6 pre-construction milestones.',
               'Update each approval stage status from Not Started to Submitted, Objection or Query, or Approved with council reference numbers.',
-              'For As-of-Right infill developments, verify SPLUMA rezoning automatically defaults to N/A, eliminating 6–18 month tribunal delays.',
+              'Use Simulate Objection Delay to stress-test municipal carrying burn and log Town Planner, QS, or Architect action notes in Team Ledger (triage Pending -> In Progress -> Resolved).',
             ],
             proTip:
-              'As-of-Right infill developments automatically mark SPLUMA Section 42 rezoning as N/A, derisking holding timelines. Never break ground without an approved SG diagram and NHBRC enrolment certificate to prevent municipal stop orders.',
+              'As-of-Right infill developments automatically mark SPLUMA Section 42 rezoning as N/A, derisking holding timelines. Logging Town Planner, QS, and Architect conditions in Team Ledger keeps objection responses auditable before breaking ground.',
             href: '/developments#developments-approvals',
             ctaLabel: 'Track statutory approvals',
           },
@@ -414,15 +414,15 @@ export const GET_STARTED_STAGES: readonly JourneyStage[] = [
           },
           {
             id: 'developments-hybrid-split-exit',
-            title: 'Hybrid Split-Exit & Rental Graduation',
-            summary: 'Sell a portion of units to repay the development loan and graduate retained units to the rental portfolio debt-free.',
+            title: 'Hybrid Split-Exit, Team Excel & Public Deal Room',
+            summary: 'Graduate debt-free retained units to rentals, export the 5-sheet Team Excel (.xlsx) workbook, and share a POPIA-masked Deal Room link (/deal-room/[token]).',
             howTo: [
-              'In Unit Inventory, assign each unit as Available, Reserved, Bond Approved, Sold, or Retained for Rental.',
-              'Use Mark Sold & Pay Down Debt on completed sales to apply net proceeds directly against the senior development facility.',
-              'Click Graduate Retained Units to Rentals to create a multi-unit rental property with Section 13sex 55% tax deductions enabled if holding 5 or more units.',
+              'In Unit Inventory, assign units as Sold or Retained for Rental, use Mark Sold to pay down senior debt, and click Graduate Retained Units to Rentals (unlocking Section 13sex 55% write-offs on 5+ new units).',
+              'Click Export Team Excel (.xlsx) in the project bar to download a 5-sheet workbook with raw numeric ZAR cells for your QS, Town Planner, Architect, and Bank Credit Team.',
+              'Click Share Deal Room to copy the POPIA-masked public link (/deal-room/[token]) or open an external preview where consultants can review feasibility and post Pending notes that auto-sync back to your Team Ledger.',
             ],
             proTip:
-              'Retaining five or more newly constructed residential units in South Africa unlocks SARS Section 13sex allowances, providing a 55% tax write-off on the unit cost basis over twenty years.',
+              'Retaining five or more newly constructed residential units unlocks SARS Section 13sex allowances (a 55% write-off over 20 years), while public /deal-room/[token] links mask private buyer names and strip conveyancer references under POPIA.',
             href: '/developments#developments-inventory',
             ctaLabel: 'Manage unit inventory',
           },
@@ -641,10 +641,10 @@ export const GET_STARTED_STAGES: readonly JourneyStage[] = [
           {
             id: 'tasks-create',
             title: 'Create Linked Tasks',
-            summary: 'Tasks with priority, due date and a linked property, funder or deal.',
+            summary: 'Tasks with priority, due date and a linked property, development, funder or deal, plus 1-click sync from the Development Team Ledger.',
             howTo: [
               'Click Create Task on the Tasks page.',
-              'Set the priority and due date, and link the task to a property, funder or deal.',
+              'Set the priority and due date, and link the task to a rental, flip, development, funder or pipeline deal — or click Sync to /tasks on any Pending note inside the Development Team Ledger.',
               'Tick it off when done. Urgent items also appear on the Dashboard.',
             ],
             proTip:

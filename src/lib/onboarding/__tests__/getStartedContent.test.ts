@@ -113,6 +113,23 @@ describe('Get Started content integrity', () => {
     expect(GO_LIVE_STEP.title).toMatch(/Go Live/);
     expect(GO_LIVE_STEP.howTo.join(' ')).toMatch(/Clear Demo/);
   });
+
+  it('documents Developments Team Ledger, Export Team Excel (.xlsx), Public Deal Room, and Tasks sync', () => {
+    const devMod = GET_STARTED_STAGES[3].modules.find((m) => m.id === 'developments');
+    expect(devMod).toBeDefined();
+    const devText = [
+      devMod!.purpose,
+      ...devMod!.features.flatMap((f) => [f.title, f.summary, ...f.howTo, f.proTip]),
+    ].join(' ');
+    expect(devText).toContain('Team Ledger');
+    expect(devText).toContain('Export Team Excel (.xlsx)');
+    expect(devText).toContain('/deal-room/[token]');
+
+    const tasksMod = GET_STARTED_STAGES[5].modules.find((m) => m.id === 'tasks');
+    const tasksCreate = tasksMod?.features.find((f) => f.id === 'tasks-create');
+    expect(tasksCreate).toBeDefined();
+    expect([tasksCreate!.summary, ...tasksCreate!.howTo].join(' ')).toContain('Sync to /tasks');
+  });
 });
 
 describe('guide helpers', () => {
