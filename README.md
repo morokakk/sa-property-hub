@@ -228,6 +228,9 @@ npm run build
 ├── src/
 │   ├── app/                      # Tier 1: Thin Next.js App Router Page Controllers
 │   │   ├── actions/              # Next.js Server Actions (submitTenantMaintenanceTicket, sendStatementEmail)
+│   │   ├── layout.tsx            # Root Layout, OpenGraph & JSON-LD Entity Schema
+│   │   ├── robots.ts             # Crawler Indexing & POPIA Privacy Rules (/robots.txt)
+│   │   ├── sitemap.ts            # Public Entry Route XML Sitemap (/sitemap.xml)
 │   │   ├── page.tsx              # Human-First Landing Page & Goal Switcher
 │   │   ├── dashboard/page.tsx    # Executive Global Portfolio Dashboard
 │   │   ├── welcome/page.tsx      # Legacy Route Redirect (-> /)
@@ -240,6 +243,7 @@ npm run build
 │   │   ├── proposal/page.tsx     # Deal Memorandums & Investment Proposals
 │   │   ├── settings/page.tsx     # Investor Profile, SARS Settings & AI Keys
 │   │   ├── tasks/page.tsx        # Global Task Board & Compliance Calendar
+│   │   ├── deal-room/[token]/    # POPIA-Masked External Development Deal Room
 │   │   └── statement/[lease_id]/ # Public Tokenized Tenant Statement Viewer
 │   ├── components/               # Tier 3: Modular Component Trees & Modals
 │   │   ├── dashboard/            # KPI strips, allocation graphs, tax widgets
