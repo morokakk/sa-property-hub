@@ -15,6 +15,7 @@ export interface FlipToRentalModalProps {
     marketValuationZAR: number;
     monthlyGrossRentZAR: number;
     numberOfUnits?: number;
+    unitsToGraduateNow?: number;
     loanTermYears?: number;
     tenantName?: string;
   }) => void;
@@ -84,10 +85,24 @@ export const FlipToRentalModal: React.FC<FlipToRentalModalProps> = ({
   const [localNumberOfUnits, setLocalNumberOfUnits] = useState<number>(1);
   const [localLoanTermYears, setLocalLoanTermYears] = useState<number>(20);
 
+  const totalPlannedUnits = Math.max(1, flip?.numberOfUnits ?? 1);
+  const alreadyGraduated = flip?.graduatedUnitsCount ?? 0;
+  const remainingUnits = Math.max(1, totalPlannedUnits - alreadyGraduated);
+  const isMultiUnitProject = totalPlannedUnits > 1;
+  const hasPreviousPhase = Boolean(flip?.linkedRentalPropertyId) && alreadyGraduated > 0;
+
   useEffect(() => {
     if (flip && isOpen && propMarketValue === undefined) {
+      const totalUnits = Math.max(1, flip.numberOfUnits || 1);
+      const graduated = flip.graduatedUnitsCount || 0;
+      const remaining = Math.max(1, totalUnits - graduated);
+      const totalEstimatedRent = Math.round(((flip.targetExitPriceZAR || 0) * 0.008) / 500) * 500 || 18000;
+      const defaultPhaseRent =
+        totalUnits > 1
+          ? Math.max(1000, Math.round(((totalEstimatedRent / totalUnits) * remaining) / 500) * 500)
+          : totalEstimatedRent;
       setLocalMarketValue(flip.targetExitPriceZAR || 0);
-      setLocalGrossRent(Math.round(((flip.targetExitPriceZAR || 0) * 0.008) / 500) * 500 || 18000);
+      setLocalGrossRent(defaultPhaseRent);
       setLocalTenantName('Tenant Pending Placement');
       setLocalTenantPhone('');
       setLocalTenantEmail('');
@@ -95,8 +110,8 @@ export const FlipToRentalModal: React.FC<FlipToRentalModalProps> = ({
       setLocalAgencyName('Pam Golding Sandton');
       setLocalAgencyCommission(8.0);
       setLocalNotes('');
-      setLocalNumberOfUnits(Math.max(1, flip.numberOfUnits || 1));
-      setLocalLoanTermYears((flip.numberOfUnits || 1) > 1 || flip.projectStrategy === 'build_to_rent' ? 15 : 20);
+      setLocalNumberOfUnits(remaining);
+      setLocalLoanTermYears(totalUnits > 1 || flip.projectStrategy === 'build_to_rent' ? 15 : 20);
     }
   }, [flip, isOpen, propMarketValue]);
 
@@ -166,6 +181,22 @@ export const FlipToRentalModal: React.FC<FlipToRentalModalProps> = ({
     else setLocalNotes(v);
   };
 
+  const clampedUnitsToGraduate = Math.min(remainingUnits, Math.max(1, localNumberOfUnits));
+  const startUnitNum = alreadyGraduated + 1;
+  const endUnitNum = alreadyGraduated + clampedUnitsToGraduate;
+  const isPartialHandover = isMultiUnitProject && clampedUnitsToGraduate < remainingUnits;
+  const isFinalPhaseMerge = hasPreviousPhase && clampedUnitsToGraduate >= remainingUnits;
+  const halfRemainingUnits = Math.max(1, Math.floor(remainingUnits / 2));
+
+  const handleUnitsGraduatingChange = (nextRaw: number) => {
+    const nextUnits = Math.min(remainingUnits, Math.max(1, Math.round(nextRaw) || 1));
+    if (propGrossRent === undefined && clampedUnitsToGraduate > 0 && nextUnits !== clampedUnitsToGraduate) {
+      const perUnitRent = localGrossRent / clampedUnitsToGraduate;
+      setLocalGrossRent(Math.max(500, Math.round(perUnitRent * nextUnits)));
+    }
+    setLocalNumberOfUnits(nextUnits);
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     if (propOnSubmit) {
       propOnSubmit(e);
@@ -176,7 +207,8 @@ export const FlipToRentalModal: React.FC<FlipToRentalModalProps> = ({
     onConverted({
       marketValuationZAR: marketValue,
       monthlyGrossRentZAR: grossRent,
-      numberOfUnits: Math.max(1, localNumberOfUnits),
+      numberOfUnits: clampedUnitsToGraduate,
+      unitsToGraduateNow: clampedUnitsToGraduate,
       loanTermYears: localLoanTermYears,
       tenantName: tenantName || undefined,
     });
@@ -287,52 +319,139 @@ export const FlipToRentalModal: React.FC<FlipToRentalModalProps> = ({
                 placeholder="e.g. 24000"
               />
               <span className="text-[10px] text-slate-400 mt-0.5 block">
-                {localNumberOfUnits > 1
-                  ? `Scaffolds ${localNumberOfUnits} leases at ~${formatZAR(Math.round(grossRent / localNumberOfUnits))}/unit/mo`
-                  : 'Starting rental rate for incoming lease'}
+                {clampedUnitsToGraduate > 1
+                  ? `Scaffolds ${clampedUnitsToGraduate} leases (Unit ${startUnitNum}–Unit ${endUnitNum}) at ~${formatZAR(Math.round(grossRent / clampedUnitsToGraduate))}/unit/mo`
+                  : isMultiUnitProject
+                    ? `Lease rate for Unit ${startUnitNum} in this phase`
+                    : 'Starting rental rate for incoming lease'}
               </span>
             </div>
           </div>
 
-          {/* Multi-Unit Lease Scaffolding & Loan Term */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 bg-slate-50 rounded-xl border border-slate-200">
-            <div>
-              <label className="block font-semibold text-slate-700 mb-1">
-                Units to Scaffold in Leases[]
-              </label>
-              <input
-                type="number"
-                min="1"
-                step="1"
-                value={localNumberOfUnits}
-                onChange={(e) => setLocalNumberOfUnits(Math.max(1, Number(e.target.value) || 1))}
-                className="w-full px-3 py-1.5 border border-slate-300 rounded-lg bg-white font-bold text-indigo-700"
-              />
-              <span className="text-[10px] text-slate-500 mt-0.5 block">
-                {localNumberOfUnits > 1
-                  ? `Auto-creates Unit 1..${localNumberOfUnits} + defaults utility to Prepaid Sub-Meter`
-                  : 'Single-unit lease (Main Unit)'}
-              </span>
+          {/* Multi-Unit Phased Graduation & Loan Term */}
+          <div className="space-y-3 p-3 bg-slate-50 rounded-xl border border-slate-200">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {isMultiUnitProject ? (
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">
+                    Units Graduating in This Phase
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    max={remainingUnits}
+                    step="1"
+                    aria-label="Units Graduating in This Phase"
+                    value={clampedUnitsToGraduate}
+                    onChange={(e) => handleUnitsGraduatingChange(Number(e.target.value) || 1)}
+                    className="w-full px-3 py-1.5 border border-slate-300 rounded-lg bg-white font-bold text-indigo-700"
+                  />
+                  {remainingUnits >= 2 && (
+                    <div className="flex flex-wrap gap-1.5 mt-1.5">
+                      <button
+                        type="button"
+                        onClick={() => handleUnitsGraduatingChange(halfRemainingUnits)}
+                        className={`px-2 py-0.5 rounded-md text-[10px] font-semibold border transition-colors cursor-pointer ${
+                          clampedUnitsToGraduate === halfRemainingUnits
+                            ? 'bg-indigo-600 text-white border-indigo-600'
+                            : 'bg-white text-indigo-700 border-indigo-200 hover:bg-indigo-50'
+                        }`}
+                      >
+                        First Half ({halfRemainingUnits} {halfRemainingUnits === 1 ? 'Unit' : 'Units'})
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleUnitsGraduatingChange(remainingUnits)}
+                        className={`px-2 py-0.5 rounded-md text-[10px] font-semibold border transition-colors cursor-pointer ${
+                          clampedUnitsToGraduate === remainingUnits
+                            ? 'bg-emerald-600 text-white border-emerald-600'
+                            : 'bg-white text-emerald-700 border-emerald-200 hover:bg-emerald-50'
+                        }`}
+                      >
+                        All Remaining ({remainingUnits} Units)
+                      </button>
+                    </div>
+                  )}
+                  <span className="text-[10px] text-slate-500 mt-1 block">
+                    {alreadyGraduated > 0
+                      ? `${alreadyGraduated} of ${totalPlannedUnits} units already live • ${remainingUnits} remaining`
+                      : `Auto-creates Unit ${startUnitNum}..${endUnitNum} + defaults utility to Prepaid Sub-Meter`}
+                  </span>
+                </div>
+              ) : (
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">
+                    Units to Scaffold in Leases[]
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    step="1"
+                    value={localNumberOfUnits}
+                    onChange={(e) => setLocalNumberOfUnits(Math.max(1, Number(e.target.value) || 1))}
+                    className="w-full px-3 py-1.5 border border-slate-300 rounded-lg bg-white font-bold text-indigo-700"
+                  />
+                  <span className="text-[10px] text-slate-500 mt-0.5 block">
+                    {localNumberOfUnits > 1
+                      ? `Auto-creates Unit 1..${localNumberOfUnits} + defaults utility to Prepaid Sub-Meter`
+                      : 'Single-unit lease (Main Unit)'}
+                  </span>
+                </div>
+              )}
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">
+                  Facility Amortization Term
+                </label>
+                <select
+                  value={localLoanTermYears}
+                  onChange={(e) => setLocalLoanTermYears(Number(e.target.value))}
+                  className="w-full px-3 py-1.5 border border-slate-300 rounded-lg bg-white font-semibold text-slate-800"
+                >
+                  <option value={5}>5 Years (Micro / Bridge)</option>
+                  <option value={10}>10 Years (Commercial Bank)</option>
+                  <option value={15}>15 Years (DFI: TUHF / uMaStandi)</option>
+                  <option value={20}>20 Years (Retail Home Loan)</option>
+                  <option value={30}>30 Years (Extended Retail)</option>
+                </select>
+                <span className="text-[10px] text-slate-500 mt-0.5 block">
+                  Used to derive bond balance &amp; long-term payoff curve
+                </span>
+              </div>
             </div>
-            <div>
-              <label className="block font-semibold text-slate-700 mb-1">
-                Facility Amortization Term
-              </label>
-              <select
-                value={localLoanTermYears}
-                onChange={(e) => setLocalLoanTermYears(Number(e.target.value))}
-                className="w-full px-3 py-1.5 border border-slate-300 rounded-lg bg-white font-semibold text-slate-800"
+
+            {isMultiUnitProject && (
+              <div
+                data-testid="phased-handover-helper-banner"
+                className={`p-2.5 rounded-lg border text-[11px] leading-relaxed ${
+                  isPartialHandover
+                    ? 'bg-indigo-50 border-indigo-200 text-indigo-900'
+                    : isFinalPhaseMerge
+                      ? 'bg-emerald-50 border-emerald-200 text-emerald-900'
+                      : 'bg-slate-100 border-slate-200 text-slate-700'
+                }`}
               >
-                <option value={5}>5 Years (Micro / Bridge)</option>
-                <option value={10}>10 Years (Commercial Bank)</option>
-                <option value={15}>15 Years (DFI: TUHF / uMaStandi)</option>
-                <option value={20}>20 Years (Retail Home Loan)</option>
-                <option value={30}>30 Years (Extended Retail)</option>
-              </select>
-              <span className="text-[10px] text-slate-500 mt-0.5 block">
-                Used to derive bond balance &amp; long-term payoff curve
-              </span>
-            </div>
+                {isPartialHandover ? (
+                  <>
+                    <strong>Phased Handover:</strong> Scaffolds Unit {startUnitNum}–Unit {endUnitNum} in{' '}
+                    <code>/rentals</code> now for immediate tenant onboarding while keeping this project
+                    active in <code>/flips</code> to finish building the remaining{' '}
+                    {remainingUnits - clampedUnitsToGraduate} units.
+                  </>
+                ) : isFinalPhaseMerge ? (
+                  <>
+                    <strong>Final Phase Merge:</strong> Appends Unit {startUnitNum}–Unit {endUnitNum}{' '}
+                    directly into your existing linked Rental Property under the same title deed and closes
+                    out the construction phase.
+                  </>
+                ) : (
+                  <>
+                    <strong>Full Project Handover:</strong> Scaffolds Unit 1–Unit {endUnitNum} in{' '}
+                    <code>/rentals</code> with Prepaid Sub-Meter utilities and closes out the construction
+                    phase.
+                  </>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Tenant Details */}

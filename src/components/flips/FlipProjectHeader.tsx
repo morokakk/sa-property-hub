@@ -60,6 +60,11 @@ export function FlipProjectHeader({
     };
   }, [isExitMenuOpen]);
 
+  const graduatedUnits = flip.graduatedUnitsCount ?? 0;
+  const totalUnits = Math.max(1, flip.numberOfUnits ?? 1);
+  const remainingUnits = Math.max(1, totalUnits - graduatedUnits);
+  const hasPartialGraduation = graduatedUnits > 0 && flip.status !== 'Completed';
+
   return (
     <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
       <div className="min-w-0 flex-1">
@@ -79,6 +84,15 @@ export function FlipProjectHeader({
               title={`Multi-Unit Project (${flip.numberOfUnits} Units)`}
             >
               🏢 {flip.numberOfUnits} Units
+            </span>
+          )}
+          {hasPartialGraduation && (
+            <span
+              data-testid="phased-btr-progress-badge"
+              className="inline-flex items-center gap-1 text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300 px-2 py-0.5 rounded-full"
+              title={`${graduatedUnits} of ${totalUnits} completed units already generating income in Rentals (${remainingUnits} remaining)`}
+            >
+              PHASED BTR: {graduatedUnits}/{totalUnits} UNITS LIVE IN RENTALS
             </span>
           )}
           {(() => {
@@ -242,7 +256,7 @@ export function FlipProjectHeader({
             title="Project exit & conversion options"
           >
             <Coins className="w-3.5 h-3.5 text-emerald-200" />
-            <span>Exit / Convert</span>
+            <span>{hasPartialGraduation ? `Graduate Remaining (${remainingUnits}) Units` : 'Exit / Convert'}</span>
             <ChevronDown
               className={`w-3.5 h-3.5 text-emerald-200 transition-transform duration-150 ${
                 isExitMenuOpen ? 'rotate-180' : ''
@@ -281,9 +295,13 @@ export function FlipProjectHeader({
               >
                 <ArrowRightLeft className="w-4 h-4 text-indigo-600 shrink-0" />
                 <div>
-                  <div className="font-bold text-slate-900">Convert to Rental (BRRRR)</div>
+                  <div className="font-bold text-slate-900">
+                    {hasPartialGraduation ? `Graduate Remaining (${remainingUnits}) Units` : 'Convert to Rental (BRRRR)'}
+                  </div>
                   <div className="text-[10px] text-slate-500 font-normal">
-                    Transition asset into active rental portfolio
+                    {hasPartialGraduation
+                      ? `Merge Unit ${graduatedUnits + 1}–${totalUnits} into linked rental & close build`
+                      : 'Transition asset into active rental portfolio'}
                   </div>
                 </div>
               </button>

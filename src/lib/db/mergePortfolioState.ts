@@ -24,7 +24,7 @@ export function isDemoRentalProperty(propertyId?: string | null): boolean {
   if (!propertyId || typeof propertyId !== 'string') return false;
   return DEMO_RENTAL_IDS.has(propertyId) || propertyId.startsWith('demo-rental-');
 }
-export const DEMO_FLIP_IDS = new Set(['flip-1', 'flip-2', 'flip-3']);
+export const DEMO_FLIP_IDS = new Set(['flip-1', 'flip-2', 'flip-3', 'flip-btr-tembisa']);
 export const DEMO_DEV_IDS = new Set(['dev-1', 'dev-2']);
 
 export function isDemoDevelopment(devId?: string | null): boolean {
@@ -34,6 +34,7 @@ export function isDemoDevelopment(devId?: string | null): boolean {
 export const DEMO_BOQ_IDS = new Set([
   'boq-1', 'boq-2', 'boq-3', 'boq-4', 'boq-5', 'boq-6', 'boq-7', 'boq-8',
   'boq-9', 'boq-10', 'boq-11', 'boq-12', 'boq-13', 'boq-14', 'boq-15', 'boq-16',
+  'boq-tembisa-1', 'boq-tembisa-2', 'boq-tembisa-3', 'boq-tembisa-4', 'boq-tembisa-5',
 ]);
 export const DEMO_OPP_IDS = new Set(['opp-1', 'opp-2', 'opp-3', 'opp-4']);
 export const DEMO_FUNDING_IDS = new Set([

@@ -453,6 +453,8 @@ export interface FlipProject {
   exitNotes?: string;
   exitStrategy?: 'Sold' | 'BRRRR';
   convertedToRentalId?: string;
+  graduatedUnitsCount?: number; // Number of units already handed over to /rentals (default 0)
+  linkedRentalPropertyId?: string; // ID of the target RentalProperty created during Phase 1 handover so subsequent graduations merge into the same title deed
   // Professional SA Flipping Extensions (Archetype Alignment)
   taxEntityType?: 'Company (27%)' | 'Individual (45%)' | 'Pre-Tax';
   municipalClearance?: {
@@ -592,6 +594,7 @@ export interface Lease {
   noticeReason?: TenantDepartureReason | string;
   noticeNotes?: string;
   statementToken?: string; // 128-bit unguessable UUID token for public tenant statement portal
+  utilityType?: 'postpaid' | 'prepaid_submeter' | 'hybrid';
 }
 
 // Archived / Past Tenant Lease Record
@@ -772,6 +775,7 @@ export interface RentalProperty {
   section13SexEligible?: boolean;
   isBrrrrProperty?: boolean;
   totalEquityExtractedZAR?: number;
+  totalCapitalDeployedZAR?: number; // Reconciled full accumulated cost basis across phased graduations
   refinanceHistory?: RentalRefinanceRecord[];
   // Historical Utility Statements & Variance Ledger
   utilityStatements?: UtilityStatement[];
@@ -966,6 +970,7 @@ export interface FlipToRentalConversionParams {
   initialGrossRentZAR: number;
   marketValuationZAR?: number;
   numberOfUnits?: number;
+  unitsToGraduateNow?: number; // Number of units graduating in the current handover phase
   loanTermYears?: number;
   bondInterestRatePercent?: number;
   tenantName?: string;

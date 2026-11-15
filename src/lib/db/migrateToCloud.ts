@@ -437,6 +437,8 @@ export function mapFlips(flips: FlipProject[] = [], userId: string): FlipInsert[
     coc_checklist: (() => {
       const baseCoc = f.cocChecklist ? JSON.parse(JSON.stringify(f.cocChecklist)) : {};
       if (f.zoningProfile !== undefined) baseCoc._zoningProfile = f.zoningProfile;
+      if (f.graduatedUnitsCount !== undefined) baseCoc._graduatedUnitsCount = f.graduatedUnitsCount;
+      if (f.linkedRentalPropertyId !== undefined) baseCoc._linkedRentalPropertyId = f.linkedRentalPropertyId;
       return baseCoc;
     })() as any,
     drive_vault: (f.driveVault ? JSON.parse(JSON.stringify(f.driveVault)) : {}) as any,

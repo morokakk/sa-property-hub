@@ -251,7 +251,12 @@ export function unmapFlips(
 
   return flipRows.map((f) => {
     const rawCoc = f.coc_checklist ? (parseJson(f.coc_checklist, undefined) as any) : undefined;
-    const { _zoningProfile: flipZoning, ...cleanCoc } = rawCoc || {};
+    const {
+      _zoningProfile: flipZoning,
+      _graduatedUnitsCount: flipGraduatedUnitsCount,
+      _linkedRentalPropertyId: flipLinkedRentalPropertyId,
+      ...cleanCoc
+    } = rawCoc || {};
     return {
     id: f.id,
     title: f.title,
@@ -303,6 +308,8 @@ export function unmapFlips(
     exitNotes: f.exit_notes || undefined,
     exitStrategy: (f.exit_strategy as any) || undefined,
     convertedToRentalId: f.converted_to_rental_id || undefined,
+    graduatedUnitsCount: flipGraduatedUnitsCount !== undefined ? Number(flipGraduatedUnitsCount) : undefined,
+    linkedRentalPropertyId: flipLinkedRentalPropertyId || undefined,
     taxEntityType: (f.tax_entity_type as any) || undefined,
     municipalClearance: f.municipal_clearance ? (parseJson(f.municipal_clearance, undefined) as any) : undefined,
     drawSchedule: f.draw_schedule ? (parseJson(f.draw_schedule, undefined) as any) : undefined,

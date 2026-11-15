@@ -95,7 +95,29 @@ export default function FlipsManagerPage() {
       {active && (
         <>
           <FlipExitModal isOpen={modals.isOpen('exit')} flip={active} totalCostBasisZAR={financials?.totalCostBasisZAR || active.purchasePriceZAR} onClose={modals.closeModal} onFlipCompleted={() => selection.setViewTab('archive')} />
-          <FlipToRentalModal isOpen={modals.isOpen('convert')} flip={active} totalAllInCostZAR={financials?.totalAllInCostZAR || active.purchasePriceZAR} onClose={modals.closeModal} onConverted={({ marketValuationZAR, monthlyGrossRentZAR, numberOfUnits, loanTermYears, tenantName }) => { const created = usePortfolioStore.getState().convertFlipToRental({ flipId: active.id, initialGrossRentZAR: monthlyGrossRentZAR, marketValuationZAR, numberOfUnits, loanTermYears, tenantName }); setConvertedRentalId(created.id); selection.setViewTab('archive'); }} />
+          <FlipToRentalModal
+            isOpen={modals.isOpen('convert')}
+            flip={active}
+            totalAllInCostZAR={financials?.totalAllInCostZAR || active.purchasePriceZAR}
+            onClose={modals.closeModal}
+            onConverted={({ marketValuationZAR, monthlyGrossRentZAR, numberOfUnits, unitsToGraduateNow, loanTermYears, tenantName }) => {
+              const store = usePortfolioStore.getState();
+              const created = store.convertFlipToRental({
+                flipId: active.id,
+                initialGrossRentZAR: monthlyGrossRentZAR,
+                marketValuationZAR,
+                numberOfUnits,
+                unitsToGraduateNow,
+                loanTermYears,
+                tenantName,
+              });
+              setConvertedRentalId(created.id);
+              const updatedFlip = usePortfolioStore.getState().flips.find((f) => f.id === active.id);
+              if (updatedFlip?.status === 'Completed') {
+                selection.setViewTab('archive');
+              }
+            }}
+          />
           <FlipFundingModal isOpen={modals.isOpen('funding')} flip={active} totalCostBasisZAR={financials?.totalCostBasisZAR || active.purchasePriceZAR} totalCapitalSecuredZAR={fundingSummary?.totalCapitalSecuredZAR || 0} onClose={modals.closeModal} />
           {modals.isOpen('delayMatrix') && <DelayMatrixModal isOpen={modals.isOpen('delayMatrix')} flip={active} totalCostBasisZAR={financials?.totalCostBasisZAR || active.purchasePriceZAR} onClose={modals.closeModal} />}
         </>
