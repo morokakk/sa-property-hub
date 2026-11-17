@@ -8,6 +8,11 @@ import {
   DevelopmentExitMode,
 } from '@/types';
 import {
+  DEFAULT_ANALYZER_SECTION_ORDER,
+  STRATEGY_NAPKIN_VISIBLE_SECTIONS,
+  NAPKIN_VISIBLE_ANALYZER_SECTIONS,
+} from '@/lib/store/initialData';
+import {
   SlidersHorizontal,
   Eye,
   EyeOff,
@@ -180,6 +185,24 @@ export const getSectionApplicability = (
     isApplicable: true,
     notice: null,
   };
+};
+
+/**
+ * Checks whether hiddenSections exactly matches the active strategy's Quick Napkin preset.
+ */
+export const isStrategyNapkinPreset = (
+  hiddenSections: AnalyzerSectionId[],
+  strategy: DealStrategy = 'Rental'
+): boolean => {
+  const visibleSet =
+    STRATEGY_NAPKIN_VISIBLE_SECTIONS[strategy] ?? NAPKIN_VISIBLE_ANALYZER_SECTIONS;
+  const expectedHidden = DEFAULT_ANALYZER_SECTION_ORDER.filter(
+    (id) => !visibleSet.includes(id)
+  );
+  return (
+    hiddenSections.length === expectedHidden.length &&
+    expectedHidden.every((id) => hiddenSections.includes(id))
+  );
 };
 
 export interface AnalyzerLayoutCustomizerProps {

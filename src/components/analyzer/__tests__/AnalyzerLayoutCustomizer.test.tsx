@@ -5,9 +5,13 @@ import AnalyzerLayoutCustomizer, {
   ANALYZER_SECTION_METADATA,
   getSectionMeta,
   getSectionApplicability,
+  isStrategyNapkinPreset,
 } from '../AnalyzerLayoutCustomizer';
-import { AnalyzerSectionId } from '@/types';
-import { DEFAULT_ANALYZER_SECTION_ORDER } from '@/lib/store/initialData';
+import { AnalyzerSectionId, DealStrategy } from '@/types';
+import {
+  DEFAULT_ANALYZER_SECTION_ORDER,
+  STRATEGY_NAPKIN_VISIBLE_SECTIONS,
+} from '@/lib/store/initialData';
 
 describe('AnalyzerLayoutCustomizer Component', () => {
   const defaultProps = {
@@ -122,6 +126,43 @@ describe('AnalyzerLayoutCustomizer Component', () => {
       const auctionApp = getSectionApplicability('auctionDistressed', 'Rental', true);
       expect(auctionApp.isApplicable).toBe(true);
       expect(auctionApp.notice).toBeNull();
+    });
+  });
+
+  describe('isStrategyNapkinPreset', () => {
+    it('returns false when hiddenSections is empty (Full Institutional mode)', () => {
+      expect(isStrategyNapkinPreset([], 'Rental')).toBe(false);
+      expect(isStrategyNapkinPreset([], 'Flip')).toBe(false);
+      expect(isStrategyNapkinPreset([], 'BRRRR')).toBe(false);
+      expect(isStrategyNapkinPreset([], 'Development')).toBe(false);
+    });
+
+    it('returns true when hiddenSections exactly matches each strategy napkin preset', () => {
+      const strategies: DealStrategy[] = ['Rental', 'Flip', 'BRRRR', 'Development'];
+      for (const strategy of strategies) {
+        const visibleSet = STRATEGY_NAPKIN_VISIBLE_SECTIONS[strategy];
+        const hiddenForPreset = DEFAULT_ANALYZER_SECTION_ORDER.filter(
+          (id) => !visibleSet.includes(id)
+        );
+        expect(isStrategyNapkinPreset(hiddenForPreset, strategy)).toBe(true);
+      }
+    });
+
+    it('returns false when an additional section is hidden or a napkin-hidden section is unhidden', () => {
+      const rentalVisible = STRATEGY_NAPKIN_VISIBLE_SECTIONS.Rental;
+      const rentalNapkinHidden = DEFAULT_ANALYZER_SECTION_ORDER.filter(
+        (id) => !rentalVisible.includes(id)
+      );
+
+      // Hide one extra visible section
+      expect(
+        isStrategyNapkinPreset([...rentalNapkinHidden, rentalVisible[0]], 'Rental')
+      ).toBe(false);
+
+      // Unhide one of the napkin-hidden sections
+      expect(
+        isStrategyNapkinPreset(rentalNapkinHidden.slice(1), 'Rental')
+      ).toBe(false);
     });
   });
 });

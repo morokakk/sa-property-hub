@@ -108,7 +108,7 @@ import AnalyzerStickyRibbon from '@/components/analyzer/AnalyzerStickyRibbon';
 import AnalyzerResultsGrid from '@/components/analyzer/AnalyzerResultsGrid';
 import RateShockStrip from '@/components/analytics/RateShockStrip';
 import PipelineDealCard from '@/components/analyzer/PipelineDealCard';
-import AnalyzerLayoutCustomizer from '@/components/analyzer/AnalyzerLayoutCustomizer';
+import AnalyzerLayoutCustomizer, { isStrategyNapkinPreset } from '@/components/analyzer/AnalyzerLayoutCustomizer';
 import { ZoningEnvelopeSubPanel } from '@/components/analyzer/ZoningEnvelopeSubPanel';
 import { trackPrivacySafeEvent } from '@/lib/analytics/posthogClient';
 
@@ -290,6 +290,11 @@ export default function OpportunityAnalyzerPage() {
 
   // Strategy Selection
   const [strategy, setStrategy] = useState<DealStrategy>(analyzerDraft?.strategy ?? 'Rental');
+
+  const isNapkinMode = useMemo(
+    () => isStrategyNapkinPreset(hiddenAnalyzerSections, strategy),
+    [hiddenAnalyzerSections, strategy]
+  );
 
   // Development Feasibility Underwriting State
   const [developmentType, setDevelopmentType] = useState<DevelopmentType>(
@@ -599,6 +604,9 @@ export default function OpportunityAnalyzerPage() {
 
   const handleStrategyChange = (newStrategy: DealStrategy) => {
     setStrategy(newStrategy);
+    if (isNapkinMode) {
+      applyAnalyzerLayoutPreset('napkin', newStrategy);
+    }
     if (newStrategy === 'Flip' || newStrategy === 'BRRRR' || newStrategy === 'Development') {
       setIsHoldingOpen(true);
     } else {
@@ -4631,6 +4639,32 @@ export default function OpportunityAnalyzerPage() {
                 )}
               </div>
 
+              {/* 1-Tap Quick Napkin Toggle Pill */}
+              <button
+                type="button"
+                data-testid="quick-napkin-header-pill"
+                aria-pressed={isNapkinMode}
+                onClick={() => {
+                  const nextPreset = isNapkinMode ? 'full' : 'napkin';
+                  applyAnalyzerLayoutPreset(nextPreset, strategy);
+                  trackPrivacySafeEvent('analyzer_mode_switched', {
+                    mode: nextPreset === 'napkin' ? 'napkin' : 'deep_dive',
+                  });
+                }}
+                title={
+                  isNapkinMode
+                    ? 'Quick Napkin Mode Active — Click to restore Full Institutional layout'
+                    : 'Switch to Quick Napkin Mode (60-second high-level screen)'
+                }
+                className={`text-xs px-3 py-1.5 rounded-lg border transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs ${
+                  isNapkinMode
+                    ? 'bg-amber-50 text-amber-900 border-amber-300 ring-1 ring-amber-300/60 font-semibold'
+                    : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50 font-medium'
+                }`}
+              >
+                <span>⚡ Quick Napkin</span>
+              </button>
+
               {/* Customize Layout Popover Button */}
               <AnalyzerLayoutCustomizer
                 sectionOrder={analyzerSectionOrder}
@@ -4732,27 +4766,29 @@ export default function OpportunityAnalyzerPage() {
             </div>
 
             {/* Selected Investment Node Profile & Regional Compliance Strip */}
-            <InvestmentNodeBanner
-              city={city}
-              province={province}
-              liveInputs={{
-                strategy,
-                purchasePrice,
-                openMarketValue,
-                grossYield:
-                  strategy === 'Development'
-                    ? calculatedMetrics.devYieldOnCostPercent
-                    : calculatedMetrics.grossYield,
-                vacancyRatePercent: vacancyRate,
-                annualCapitalGrowthPercent: annualCapitalGrowth,
-                monthlyRatesZAR: monthlyRates,
-                purchasePricePerSqm:
-                  strategy === 'Development'
-                    ? calculatedMetrics.devTdcPerSqmZAR
-                    : calculatedMetrics.purchasePricePerSqm,
-              }}
-              onApplyNodeBenchmarks={handleApplyNodeBenchmarks}
-            />
+            {!isNapkinMode && (
+              <InvestmentNodeBanner
+                city={city}
+                province={province}
+                liveInputs={{
+                  strategy,
+                  purchasePrice,
+                  openMarketValue,
+                  grossYield:
+                    strategy === 'Development'
+                      ? calculatedMetrics.devYieldOnCostPercent
+                      : calculatedMetrics.grossYield,
+                  vacancyRatePercent: vacancyRate,
+                  annualCapitalGrowthPercent: annualCapitalGrowth,
+                  monthlyRatesZAR: monthlyRates,
+                  purchasePricePerSqm:
+                    strategy === 'Development'
+                      ? calculatedMetrics.devTdcPerSqmZAR
+                      : calculatedMetrics.purchasePricePerSqm,
+                }}
+                onApplyNodeBenchmarks={handleApplyNodeBenchmarks}
+              />
+            )}
 
             {/* Investment Strategy & Property Title Type 2-Column Row */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
