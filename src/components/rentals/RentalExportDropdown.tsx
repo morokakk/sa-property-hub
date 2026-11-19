@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { FileSpreadsheet, ChevronDown, BookOpen, FileText, FileUp, Download } from 'lucide-react';
 
 interface RentalExportDropdownProps {
@@ -25,7 +25,46 @@ export default function RentalExportDropdown({
   className = '',
 }: RentalExportDropdownProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const [align, setAlign] = useState<'left' | 'right'>('right');
+  const [menuStyle, setMenuStyle] = useState<React.CSSProperties | undefined>(undefined);
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  const updateMenuPosition = useCallback(() => {
+    if (!dropdownRef.current || typeof window === 'undefined') return;
+    const rect = dropdownRef.current.getBoundingClientRect();
+    const viewportWidth = window.innerWidth;
+    const padding = 16; // Matches calc(100vw - 2rem)
+    const desiredWidth = viewportWidth >= 640 ? 320 : 288; // sm:w-80 vs w-72
+    const menuWidth = Math.min(desiredWidth, viewportWidth - padding * 2);
+
+    const fitsRightAligned = rect.right - menuWidth >= padding;
+    const fitsLeftAligned = rect.left + menuWidth <= viewportWidth - padding;
+
+    if (viewportWidth >= 640) {
+      if (fitsRightAligned) {
+        setAlign('right');
+        setMenuStyle(undefined);
+      } else if (fitsLeftAligned) {
+        setAlign('left');
+        setMenuStyle(undefined);
+      } else {
+        setAlign('left');
+        setMenuStyle({ left: padding - rect.left, right: 'auto' });
+      }
+    } else {
+      if (fitsLeftAligned) {
+        setAlign('left');
+        setMenuStyle(undefined);
+      } else if (fitsRightAligned) {
+        setAlign('right');
+        setMenuStyle(undefined);
+      } else {
+        const clampedScreenLeft = Math.max(padding, viewportWidth - padding - menuWidth);
+        setAlign('left');
+        setMenuStyle({ left: clampedScreenLeft - rect.left, right: 'auto' });
+      }
+    }
+  }, []);
 
   // Close dropdown menu on outside click
   useEffect(() => {
@@ -38,18 +77,32 @@ export default function RentalExportDropdown({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  // Recompute alignment if viewport resizes while menu is open
+  useEffect(() => {
+    if (!isOpen) return;
+    window.addEventListener('resize', updateMenuPosition);
+    return () => window.removeEventListener('resize', updateMenuPosition);
+  }, [isOpen, updateMenuPosition]);
+
+  const handleToggle = () => {
+    if (!isOpen) {
+      updateMenuPosition();
+    }
+    setIsOpen((prev) => !prev);
+  };
+
   const handleSelect = (callback?: () => void) => {
     setIsOpen(false);
     if (callback) callback();
   };
 
   return (
-    <div id={id} className={`relative ${className}`} ref={dropdownRef}>
+    <div id={id} className={`relative inline-block ${className}`} ref={dropdownRef}>
       <button
         type="button"
         id="rentals-export-csv-dropdown"
         data-testid="rentals-export-csv-dropdown"
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={handleToggle}
         title="Import or export rental portfolio spreadsheets, GL journals, and SARS schedules"
         className="inline-flex items-center gap-1.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 text-xs font-semibold px-3 py-2 rounded-lg cursor-pointer shrink-0 transition-colors shadow-xs"
       >
@@ -61,7 +114,11 @@ export default function RentalExportDropdown({
       </button>
 
       {isOpen && (
-        <div className="absolute right-0 mt-1.5 w-72 sm:w-80 bg-white rounded-xl shadow-xl border border-slate-200 py-1.5 z-50 animate-in fade-in zoom-in-95 duration-150">
+        <div
+          data-testid="rentals-export-dropdown-menu"
+          style={menuStyle}
+          className={`absolute ${align === 'left' ? 'left-0' : 'right-0'} mt-1.5 w-72 sm:w-80 max-w-[calc(100vw-2rem)] bg-white rounded-xl shadow-xl border border-slate-200 py-1.5 z-50 animate-in fade-in zoom-in-95 duration-150`}
+        >
           {/* Section 1: Import & Templates */}
           {(onTriggerImport || onDownloadTemplate) && (
             <>
