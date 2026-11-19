@@ -328,6 +328,7 @@ export interface FundingTranche {
   disbursedDate?: string;
   isDisbursed: boolean;
   linkedMilestonePhase?: 'Deposit' | 'First Fix / Wet Works' | 'Finishes' | 'Retention';
+  verifiedPhysicalProgress?: boolean;
 }
 
 // Funding & Capital Tracker

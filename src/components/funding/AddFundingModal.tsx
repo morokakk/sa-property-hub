@@ -5,6 +5,7 @@ import { Coins, X } from 'lucide-react';
 import { usePortfolioStore } from '@/lib/store/usePortfolioStore';
 import { formatZAR } from '@/lib/formatters';
 import { FundingSource, FundingTranche, FundingType, ReturnTermType } from '@/types';
+import { buildFourPhaseBoqTranches, BOQ_MILESTONE_PHASE_CONFIG } from '@/lib/calculations/flips';
 
 export interface AddFundingModalProps {
   isOpen: boolean;
@@ -151,43 +152,29 @@ export default function AddFundingModal({
     }
   };
 
+  const selectedLinkedFlip = flips.find((f) => f.id === linkedDealId);
+
   const applyFourPhaseMilestonePreset = (totalAmount: number) => {
-    const base = Math.max(0, totalAmount || 500000);
-    const t1 = Math.round(base * 0.25);
-    const t2 = Math.round(base * 0.35);
-    const t3 = Math.round(base * 0.30);
-    const t4 = Math.max(0, base - t1 - t2 - t3);
     setEnableTranches(true);
-    setCustomTranches([
-      {
-        id: `tr-${Date.now()}-1`,
-        name: 'Phase 1: Deposit & Foundation (25%)',
-        amountZAR: t1,
-        isDisbursed: true,
-        linkedMilestonePhase: 'Deposit',
-      },
-      {
-        id: `tr-${Date.now()}-2`,
-        name: 'Phase 2: First Fix & Wet Works (35%)',
-        amountZAR: t2,
-        isDisbursed: false,
-        linkedMilestonePhase: 'First Fix / Wet Works',
-      },
-      {
-        id: `tr-${Date.now()}-3`,
-        name: 'Phase 3: Finishes & Sub-Meters (30%)',
-        amountZAR: t3,
-        isDisbursed: false,
-        linkedMilestonePhase: 'Finishes',
-      },
-      {
-        id: `tr-${Date.now()}-4`,
-        name: 'Phase 4: Snagging & Retention (10%)',
-        amountZAR: t4,
-        isDisbursed: false,
-        linkedMilestonePhase: 'Retention',
-      },
-    ]);
+    setCustomTranches(
+      buildFourPhaseBoqTranches({
+        totalAmountZAR: totalAmount,
+      })
+    );
+  };
+
+  const handleMatchFlipBoq = () => {
+    if (!selectedLinkedFlip) return;
+    const matchedTranches = buildFourPhaseBoqTranches({
+      totalAmountZAR: capitalAmountZAR,
+      flip: selectedLinkedFlip,
+    });
+    const matchedTotal = matchedTranches.reduce((s, t) => s + t.amountZAR, 0);
+    setEnableTranches(true);
+    setCustomTranches(matchedTranches);
+    if (matchedTotal > 0) {
+      setCapitalAmountZAR(matchedTotal);
+    }
   };
 
   const handleAddFunding = (e: React.FormEvent) => {
@@ -215,6 +202,9 @@ export default function AddFundingModal({
         isDisbursed: Boolean(t.isDisbursed),
         disbursedDate: t.isDisbursed ? (t.disbursedDate || disbursementDate) : undefined,
         linkedMilestonePhase: t.linkedMilestonePhase,
+        ...(t.verifiedPhysicalProgress !== undefined
+          ? { verifiedPhysicalProgress: t.verifiedPhysicalProgress }
+          : {}),
       }));
       const trTotal = finalTranches.reduce((sum, tr) => sum + tr.amountZAR, 0);
       if (trTotal > 0) {
@@ -614,7 +604,7 @@ export default function AddFundingModal({
 
           {/* Phased Milestone Tranches Toggle & Configuration */}
           <div className="border-t border-slate-200 pt-3">
-            <div className="flex items-center justify-between mb-2">
+            <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
               <label className="flex items-center gap-2 cursor-pointer select-none font-semibold text-slate-800">
                 <input
                   type="checkbox"
@@ -624,26 +614,38 @@ export default function AddFundingModal({
                 />
                 <span>Configure Phased Milestone Tranches</span>
               </label>
-              {enableTranches && (
-                <button
-                  type="button"
-                  onClick={() =>
-                    setCustomTranches([
-                      ...customTranches,
-                      {
-                        id: `tr-${Date.now()}-${customTranches.length + 1}`,
-                        name: `Tranche ${customTranches.length + 1}`,
-                        amountZAR: 100_000,
-                        isDisbursed: false,
-                        linkedMilestonePhase: 'Finishes',
-                      },
-                    ])
-                  }
-                  className="text-xs font-semibold text-emerald-600 hover:text-emerald-700 cursor-pointer"
-                >
-                  + Add Tranche
-                </button>
-              )}
+              <div className="flex items-center gap-2">
+                {selectedLinkedFlip && (
+                  <button
+                    type="button"
+                    onClick={handleMatchFlipBoq}
+                    className="text-[11px] font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 px-2.5 py-1 rounded-lg transition-colors cursor-pointer"
+                    title={`Match 4 tranches to ${selectedLinkedFlip.title}'s 4-phase BOQ (20/30/30/20)`}
+                  >
+                    Match 4-Phase BOQ (20/30/30/20)
+                  </button>
+                )}
+                {enableTranches && (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setCustomTranches([
+                        ...customTranches,
+                        {
+                          id: `tr-${Date.now()}-${customTranches.length + 1}`,
+                          name: `Tranche ${customTranches.length + 1}`,
+                          amountZAR: 100_000,
+                          isDisbursed: false,
+                          linkedMilestonePhase: 'Finishes',
+                        },
+                      ])
+                    }
+                    className="text-xs font-semibold text-emerald-600 hover:text-emerald-700 cursor-pointer"
+                  >
+                    + Add Tranche
+                  </button>
+                )}
+              </div>
             </div>
 
             {enableTranches && (
@@ -656,7 +658,7 @@ export default function AddFundingModal({
                     key={idx}
                     className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center bg-white p-2.5 rounded-lg border border-slate-200 shadow-2xs"
                   >
-                    <div className="sm:col-span-5">
+                    <div className="sm:col-span-4">
                       <label className="text-[10px] text-slate-400 block mb-0.5">Tranche Label</label>
                       <input
                         type="text"
@@ -664,13 +666,34 @@ export default function AddFundingModal({
                         value={tr.name}
                         onChange={(e) => {
                           const updated = [...customTranches];
-                          updated[idx].name = e.target.value;
+                          updated[idx] = { ...updated[idx], name: e.target.value };
                           setCustomTranches(updated);
                         }}
                         className="w-full px-2 py-1 border border-slate-200 rounded text-xs font-medium"
                       />
                     </div>
                     <div className="sm:col-span-3">
+                      <label className="text-[10px] text-slate-400 block mb-0.5">BOQ Phase</label>
+                      <select
+                        value={tr.linkedMilestonePhase || 'Deposit'}
+                        onChange={(e) => {
+                          const updated = [...customTranches];
+                          updated[idx] = {
+                            ...updated[idx],
+                            linkedMilestonePhase: e.target.value as FundingTranche['linkedMilestonePhase'],
+                          };
+                          setCustomTranches(updated);
+                        }}
+                        className="w-full px-1.5 py-1 border border-slate-200 rounded text-[11px] bg-white font-medium text-slate-700"
+                      >
+                        {BOQ_MILESTONE_PHASE_CONFIG.map((cfg) => (
+                          <option key={cfg.phase} value={cfg.phase}>
+                            P{cfg.phaseNumber}: {cfg.phase}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="sm:col-span-2">
                       <label className="text-[10px] text-slate-400 block mb-0.5">Amount (ZAR)</label>
                       <input
                         type="number"
@@ -679,25 +702,25 @@ export default function AddFundingModal({
                         value={tr.amountZAR}
                         onChange={(e) => {
                           const updated = [...customTranches];
-                          updated[idx].amountZAR = Number(e.target.value);
+                          updated[idx] = { ...updated[idx], amountZAR: Number(e.target.value) };
                           setCustomTranches(updated);
                         }}
                         className="w-full px-2 py-1 border border-slate-200 rounded text-xs font-bold"
                       />
                     </div>
-                    <div className="sm:col-span-3 flex items-center pt-3.5 sm:pt-0">
+                    <div className="sm:col-span-2 flex items-center pt-3.5 sm:pt-0">
                       <label className="flex items-center gap-1.5 text-[11px] text-slate-700 cursor-pointer select-none">
                         <input
                           type="checkbox"
                           checked={tr.isDisbursed}
                           onChange={(e) => {
                             const updated = [...customTranches];
-                            updated[idx].isDisbursed = e.target.checked;
+                            updated[idx] = { ...updated[idx], isDisbursed: e.target.checked };
                             setCustomTranches(updated);
                           }}
                           className="w-3.5 h-3.5 accent-emerald-600 rounded"
                         />
-                        <span>Drawn Day 1</span>
+                        <span>Drawn</span>
                       </label>
                     </div>
                     <div className="sm:col-span-1 text-right">

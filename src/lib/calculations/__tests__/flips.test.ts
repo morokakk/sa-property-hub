@@ -5,8 +5,10 @@ import {
   calculateArchivedFlipFinancials,
   calculateMilestonePhaseTargets,
   calculateRingFencedWorkingCapital,
+  buildFourPhaseBoqTranches,
+  getTrancheBoqSignOffStatus,
 } from '../flips';
-import { FlipProject, BOQItem, FundingSource } from '@/types';
+import { FlipProject, BOQItem, FundingSource, FundingTranche } from '@/types';
 
 describe('Flips Pure Calculations Engine', () => {
   const sampleBOQ: BOQItem[] = [
@@ -666,6 +668,169 @@ describe('Flips Pure Calculations Engine', () => {
     it('returns 0 for empty active flips array or flips without BOQ', () => {
       expect(calculateRingFencedWorkingCapital([])).toBe(0);
       expect(calculateRingFencedWorkingCapital(undefined as any)).toBe(0);
+    });
+  });
+
+  describe('buildFourPhaseBoqTranches (20/30/30/20 Alignment)', () => {
+    it('splits generic facility amount strictly 20/30/30/20 when no flip is linked', () => {
+      const tranches = buildFourPhaseBoqTranches({
+        totalAmountZAR: 500_000,
+        idPrefix: 'test-tr',
+      });
+      expect(tranches).toHaveLength(4);
+      expect(tranches.map((t) => t.amountZAR)).toEqual([100_000, 150_000, 150_000, 100_000]);
+      expect(tranches.map((t) => t.linkedMilestonePhase)).toEqual([
+        'Deposit',
+        'First Fix / Wet Works',
+        'Finishes',
+        'Retention',
+      ]);
+      expect(tranches[0].isDisbursed).toBe(true);
+      expect(tranches[1].isDisbursed).toBe(false);
+    });
+
+    it('uses actual BOQ phase sums when linked flip has phased BOQ items and syncs verifiedPhysicalProgress from drawSchedule', () => {
+      const flipWithDrawSchedule: FlipProject = {
+        ...sampleFlip,
+        drawSchedule: {
+          depositPaid: true,
+          firstFixApproved: true,
+          finishesApproved: false,
+          retentionReleased: false,
+        },
+      };
+
+      const tranches = buildFourPhaseBoqTranches({
+        totalAmountZAR: 999_999,
+        flip: flipWithDrawSchedule,
+        idPrefix: 'boq-tr',
+      });
+
+      // Matches sampleBOQ phase totals (45k, 75k, 30k, 20k)
+      expect(tranches.map((t) => t.amountZAR)).toEqual([45_000, 75_000, 30_000, 20_000]);
+      expect(tranches.map((t) => t.verifiedPhysicalProgress)).toEqual([true, true, false, false]);
+      expect(tranches.map((t) => t.isDisbursed)).toEqual([true, true, false, false]);
+    });
+
+    it('falls back to 20/30/30/20 of baselineRenovationBudgetZAR when flip BOQ is empty, and to capitalAmountZAR when budget is 0', () => {
+      const emptyBoqFlip: FlipProject = {
+        ...sampleFlip,
+        boq: [],
+        baselineRenovationBudgetZAR: 200_000,
+      };
+      const fromBudget = buildFourPhaseBoqTranches({
+        totalAmountZAR: 500_000,
+        flip: emptyBoqFlip,
+      });
+      expect(fromBudget.map((t) => t.amountZAR)).toEqual([40_000, 60_000, 60_000, 40_000]);
+
+      const zeroBudgetFlip: FlipProject = {
+        ...emptyBoqFlip,
+        baselineRenovationBudgetZAR: 0,
+      };
+      const fromCapital = buildFourPhaseBoqTranches({
+        totalAmountZAR: 400_000,
+        flip: zeroBudgetFlip,
+      });
+      expect(fromCapital.map((t) => t.amountZAR)).toEqual([80_000, 120_000, 120_000, 80_000]);
+    });
+
+    it('preserves existing disbursement state and disbursedDate when rematching existing tranches', () => {
+      const existing: FundingTranche[] = [
+        {
+          id: 'orig-1',
+          name: 'Old Deposit',
+          amountZAR: 50_000,
+          isDisbursed: true,
+          disbursedDate: '2026-06-01',
+          linkedMilestonePhase: 'Deposit',
+        },
+        {
+          id: 'orig-2',
+          name: 'Old First Fix',
+          amountZAR: 50_000,
+          isDisbursed: false,
+          linkedMilestonePhase: 'First Fix / Wet Works',
+        },
+      ];
+
+      const rematched = buildFourPhaseBoqTranches({
+        totalAmountZAR: 500_000,
+        flip: {
+          ...sampleFlip,
+          drawSchedule: {
+            depositPaid: false,
+            firstFixApproved: true,
+            finishesApproved: false,
+            retentionReleased: false,
+          },
+        },
+        existingTranches: existing,
+      });
+
+      expect(rematched[0].id).toBe('orig-1');
+      expect(rematched[0].isDisbursed).toBe(true);
+      expect(rematched[0].disbursedDate).toBe('2026-06-01');
+      expect(rematched[1].id).toBe('orig-2');
+      expect(rematched[1].isDisbursed).toBe(false);
+    });
+  });
+
+  describe('getTrancheBoqSignOffStatus', () => {
+    const flipWithSchedule: FlipProject = {
+      ...sampleFlip,
+      drawSchedule: {
+        depositPaid: true,
+        firstFixApproved: true,
+        finishesApproved: false,
+        retentionReleased: false,
+      },
+    };
+
+    it('returns all 4 audit statuses comparing Flip drawSchedule against disbursement', () => {
+      const signedDisbursed = getTrancheBoqSignOffStatus(
+        { id: 't1', name: 'P1', amountZAR: 50_000, isDisbursed: true, linkedMilestonePhase: 'Deposit' },
+        flipWithSchedule
+      );
+      expect(signedDisbursed.statusKey).toBe('signed_disbursed');
+      expect(signedDisbursed.label).toBe('Phase 1: BOQ Signed Off ✓ • Disbursed');
+
+      const signedReady = getTrancheBoqSignOffStatus(
+        { id: 't2', name: 'P2', amountZAR: 75_000, isDisbursed: false, linkedMilestonePhase: 'First Fix / Wet Works' },
+        flipWithSchedule
+      );
+      expect(signedReady.statusKey).toBe('signed_ready');
+      expect(signedReady.label).toBe('Phase 2: BOQ Signed Off ✓ • Ready to Draw');
+
+      const earlyDisbursed = getTrancheBoqSignOffStatus(
+        { id: 't3', name: 'P3', amountZAR: 75_000, isDisbursed: true, linkedMilestonePhase: 'Finishes' },
+        flipWithSchedule
+      );
+      expect(earlyDisbursed.statusKey).toBe('early_disbursed');
+      expect(earlyDisbursed.label).toBe('Phase 3: Disbursed • Awaiting BOQ Sign-Off');
+
+      const awaiting = getTrancheBoqSignOffStatus(
+        { id: 't4', name: 'P4', amountZAR: 50_000, isDisbursed: false, linkedMilestonePhase: 'Retention' },
+        flipWithSchedule
+      );
+      expect(awaiting.statusKey).toBe('awaiting_signoff');
+      expect(awaiting.label).toBe('Phase 4: Awaiting On-Site Sign-Off');
+    });
+
+    it('honors tranche.verifiedPhysicalProgress === true as sign-off fallback', () => {
+      const verifiedOverride = getTrancheBoqSignOffStatus(
+        {
+          id: 't3',
+          name: 'P3',
+          amountZAR: 75_000,
+          isDisbursed: true,
+          linkedMilestonePhase: 'Finishes',
+          verifiedPhysicalProgress: true,
+        },
+        flipWithSchedule
+      );
+      expect(verifiedOverride.isBoqSignedOff).toBe(true);
+      expect(verifiedOverride.statusKey).toBe('signed_disbursed');
     });
   });
 });

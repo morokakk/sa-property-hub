@@ -39,6 +39,15 @@ export function calculateRentalHoldingCosts(rental: RentalProperty): RentalHoldi
   };
 }
 
+export interface TrackRecord6MonthSummary {
+  sixMonthCollectionRatePercent: number;
+  verifiedRefCount: number;
+  netPrepaidUtilityRecoveryZAR: number;
+  totalBilled6m: number;
+  totalCollected6m: number;
+  trackedMonths6m: number;
+}
+
 export interface Collection12MonthMetrics {
   totalBilled12m: number;
   totalCollected12m: number;
@@ -51,10 +60,99 @@ export interface Collection12MonthMetrics {
   isCollectionRisk: boolean;
   actualCollectedRentAvg: number;
   adjustedVacancyRate: number;
+  sixMonthCollectionRatePercent: number;
+  verifiedRefCount: number;
+  netPrepaidUtilityRecoveryZAR: number;
+}
+
+function compute6MonthSummaryFromLedger(
+  rental: RentalProperty,
+  ledger: ReturnType<typeof calculateMonthlyLedger>
+): TrackRecord6MonthSummary {
+  const last6 = ledger.slice(-6);
+  const totalBilled6m = last6.reduce(
+    (sum, item) => sum + (Number.isFinite(item.totalBilled) ? item.totalBilled : 0),
+    0
+  );
+  const totalCollected6m = last6.reduce(
+    (sum, item) => sum + (Number.isFinite(item.paymentsReceived) ? item.paymentsReceived : 0),
+    0
+  );
+
+  const hasPaymentRecords = Array.isArray(rental.paymentRecords) && rental.paymentRecords.length > 0;
+  const sixMonthCollectionRatePercent =
+    hasPaymentRecords && totalBilled6m > 0
+      ? Math.min(100, Math.max(0, Math.round((totalCollected6m / totalBilled6m) * 1000) / 10))
+      : 0;
+
+  // Deduplicate payment IDs across the 6-month window so multi-month allocations are counted once
+  const verifiedPaymentIds = new Set<string>();
+  last6.forEach((item) => {
+    const monthPayments = [
+      ...(item.payments || []),
+      ...(item.allocatedPayments || []).map((ap) => ap.payment),
+    ];
+    monthPayments.forEach((payment) => {
+      if (
+        payment &&
+        typeof payment.reference === 'string' &&
+        payment.reference.trim().length > 0
+      ) {
+        verifiedPaymentIds.add(payment.id);
+      }
+    });
+  });
+  const verifiedRefCount = verifiedPaymentIds.size;
+
+  const totalUtilities6m = last6.reduce(
+    (sum, item) => sum + (Number.isFinite(item.utilitiesBilled) ? item.utilitiesBilled : 0),
+    0
+  );
+  const avgMonthlyUtilities6m = last6.length > 0 ? totalUtilities6m / last6.length : 0;
+  const vendingFee =
+    typeof rental.monthlyPrepaidVendingFeeZAR === 'number' && Number.isFinite(rental.monthlyPrepaidVendingFeeZAR)
+      ? Math.max(0, rental.monthlyPrepaidVendingFeeZAR)
+      : 0;
+  const netPrepaidUtilityRecoveryZAR =
+    totalUtilities6m === 0 && vendingFee === 0
+      ? 0
+      : Math.round(avgMonthlyUtilities6m - vendingFee);
+
+  return {
+    sixMonthCollectionRatePercent,
+    verifiedRefCount,
+    netPrepaidUtilityRecoveryZAR,
+    totalBilled6m,
+    totalCollected6m,
+    trackedMonths6m: last6.length,
+  };
 }
 
 /**
- * Computes 12-month track record metrics and collection risk flag from property ledger and arrears.
+ * Computes 6-month verified track record metrics (collection rate, verified bank reference count,
+ * and net monthly utility recovery after prepaid vending fees) with safe 0 fallbacks.
+ */
+export function calculate6MonthTrackRecordSummary(
+  rental?: RentalProperty | null,
+  referenceDate: Date | string = new Date()
+): TrackRecord6MonthSummary {
+  if (!rental) {
+    return {
+      sixMonthCollectionRatePercent: 0,
+      verifiedRefCount: 0,
+      netPrepaidUtilityRecoveryZAR: 0,
+      totalBilled6m: 0,
+      totalCollected6m: 0,
+      trackedMonths6m: 0,
+    };
+  }
+  const ledger = calculateMonthlyLedger(rental, referenceDate);
+  return compute6MonthSummaryFromLedger(rental, ledger);
+}
+
+/**
+ * Computes 12-month track record metrics and collection risk flag from property ledger and arrears,
+ * along with the 6-month verified track record summary.
  */
 export function calculate12MonthCollectionMetrics(
   rental: RentalProperty,
@@ -90,6 +188,8 @@ export function calculate12MonthCollectionMetrics(
     ? Math.max(5, Math.round(100 - collectionRate))
     : 5;
 
+  const sixMonthSummary = compute6MonthSummaryFromLedger(rental, ledger);
+
   return {
     totalBilled12m,
     totalCollected12m,
@@ -102,6 +202,9 @@ export function calculate12MonthCollectionMetrics(
     isCollectionRisk,
     actualCollectedRentAvg,
     adjustedVacancyRate,
+    sixMonthCollectionRatePercent: sixMonthSummary.sixMonthCollectionRatePercent,
+    verifiedRefCount: sixMonthSummary.verifiedRefCount,
+    netPrepaidUtilityRecoveryZAR: sixMonthSummary.netPrepaidUtilityRecoveryZAR,
   };
 }
 

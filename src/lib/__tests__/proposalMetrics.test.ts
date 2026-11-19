@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   calculateRentalHoldingCosts,
   calculate12MonthCollectionMetrics,
+  calculate6MonthTrackRecordSummary,
   maskTenantName,
 } from '../calculations/proposalMetrics';
 import { calculateRentalCashflow } from '../calculations/propertyMetrics';
@@ -152,6 +153,226 @@ describe('Proposal Metrics & Rental Holding Costs Alignment', () => {
       expect(metrics.collectionRate).toBe(100);
       expect(metrics.isCollectionRisk).toBe(false);
       expect(metrics.adjustedVacancyRate).toBe(5);
+    });
+  });
+
+  describe('6-Month Verified Track Record & Utility Recovery Summary', () => {
+    it('computes 6-month collection rate, deduplicated verified bank refs, and net utility recovery', () => {
+      const trackedRental: RentalProperty = {
+        ...sandhurstRental,
+        id: 'rental-6m-1',
+        utilityType: 'hybrid',
+        monthlyPrepaidVendingFeeZAR: 150,
+        arrearsOpeningBalanceZAR: 0,
+        leases: [
+          {
+            id: 'lease-6m-1',
+            unitName: 'Unit 1',
+            tenantName: 'Test Tenant',
+            leaseStartDate: '2026-01-01',
+            leaseEndDate: '2027-12-31',
+            monthlyRentZAR: 10_000,
+            depositHeldZAR: 10_000,
+            annualEscalationPercent: 6,
+            status: 'Occupied',
+          },
+        ],
+        utilityStatements: [
+          {
+            id: 'u-1',
+            statementDate: '2026-05-15',
+            provider: 'City of Johannesburg',
+            electricityZAR: 600,
+            waterZAR: 300,
+            refuseZAR: 0,
+            sewerageZAR: 0,
+            totalDueZAR: 900,
+            parsedVia: 'manual',
+            createdAt: '2026-05-15T00:00:00Z',
+          },
+          {
+            id: 'u-2',
+            statementDate: '2026-06-15',
+            provider: 'City of Johannesburg',
+            electricityZAR: 600,
+            waterZAR: 300,
+            refuseZAR: 0,
+            sewerageZAR: 0,
+            totalDueZAR: 900,
+            parsedVia: 'manual',
+            createdAt: '2026-06-15T00:00:00Z',
+          },
+          {
+            id: 'u-3',
+            statementDate: '2026-07-15',
+            provider: 'City of Johannesburg',
+            electricityZAR: 600,
+            waterZAR: 300,
+            refuseZAR: 0,
+            sewerageZAR: 0,
+            totalDueZAR: 900,
+            parsedVia: 'manual',
+            createdAt: '2026-07-15T00:00:00Z',
+          },
+          {
+            id: 'u-4',
+            statementDate: '2026-08-15',
+            provider: 'City of Johannesburg',
+            electricityZAR: 600,
+            waterZAR: 300,
+            refuseZAR: 0,
+            sewerageZAR: 0,
+            totalDueZAR: 900,
+            parsedVia: 'manual',
+            createdAt: '2026-08-15T00:00:00Z',
+          },
+          {
+            id: 'u-5',
+            statementDate: '2026-09-15',
+            provider: 'City of Johannesburg',
+            electricityZAR: 600,
+            waterZAR: 300,
+            refuseZAR: 0,
+            sewerageZAR: 0,
+            totalDueZAR: 900,
+            parsedVia: 'manual',
+            createdAt: '2026-09-15T00:00:00Z',
+          },
+          {
+            id: 'u-6',
+            statementDate: '2026-10-15',
+            provider: 'City of Johannesburg',
+            electricityZAR: 600,
+            waterZAR: 300,
+            refuseZAR: 0,
+            sewerageZAR: 0,
+            totalDueZAR: 900,
+            parsedVia: 'manual',
+            createdAt: '2026-10-15T00:00:00Z',
+          },
+        ],
+        paymentRecords: [
+          // Older than 6-month window (May-Oct 2026) -> should NOT be counted in verifiedRefCount
+          {
+            id: 'p-old',
+            propertyId: 'rental-6m-1',
+            leaseId: 'lease-6m-1',
+            periodMonth: '2026-03',
+            paymentDate: '2026-03-02',
+            amountReceivedZAR: 10_000,
+            paymentMethod: 'EFT',
+            reference: 'FNB-OLD-001',
+            createdAt: '2026-03-02T00:00:00Z',
+          },
+          // Multi-month split payment covering May & June -> single unique bank ref
+          {
+            id: 'p-split',
+            propertyId: 'rental-6m-1',
+            leaseId: 'lease-6m-1',
+            periodMonth: '2026-05',
+            paymentDate: '2026-05-02',
+            amountReceivedZAR: 21_800,
+            paymentMethod: 'EFT',
+            reference: 'FNB-MAYJUN-2026',
+            allocations: [
+              { periodMonth: '2026-05', amountZAR: 10_900 },
+              { periodMonth: '2026-06', amountZAR: 10_900 },
+            ],
+            createdAt: '2026-05-02T00:00:00Z',
+          },
+          {
+            id: 'p-jul',
+            propertyId: 'rental-6m-1',
+            leaseId: 'lease-6m-1',
+            periodMonth: '2026-07',
+            paymentDate: '2026-07-02',
+            amountReceivedZAR: 10_900,
+            paymentMethod: 'Instant EFT / Card',
+            reference: 'SBSA-JUL-2026',
+            createdAt: '2026-07-02T00:00:00Z',
+          },
+          {
+            id: 'p-aug',
+            propertyId: 'rental-6m-1',
+            leaseId: 'lease-6m-1',
+            periodMonth: '2026-08',
+            paymentDate: '2026-08-02',
+            amountReceivedZAR: 10_900,
+            paymentMethod: 'Cash Deposit',
+            reference: '   ', // blank whitespace reference should NOT count
+            createdAt: '2026-08-02T00:00:00Z',
+          },
+          {
+            id: 'p-sep',
+            propertyId: 'rental-6m-1',
+            leaseId: 'lease-6m-1',
+            periodMonth: '2026-09',
+            paymentDate: '2026-09-02',
+            amountReceivedZAR: 10_900,
+            paymentMethod: 'EFT',
+            reference: 'ABSA-SEP-2026',
+            createdAt: '2026-09-02T00:00:00Z',
+          },
+          // October unpaid -> 5 of 6 months collected (54,500 / 65,400 = 83.3%)
+        ],
+      };
+
+      const summary = calculate6MonthTrackRecordSummary(trackedRental, '2026-10-15');
+      expect(summary.trackedMonths6m).toBe(6);
+      expect(summary.totalBilled6m).toBe(65_400);
+      expect(summary.totalCollected6m).toBe(54_500);
+      expect(summary.sixMonthCollectionRatePercent).toBe(83.3);
+      // p-split (deduplicated across 2 months), p-jul, p-sep -> 3 verified refs
+      expect(summary.verifiedRefCount).toBe(3);
+      // Avg monthly utilities billed (900) - prepaid vending fee (150) = 750
+      expect(summary.netPrepaidUtilityRecoveryZAR).toBe(750);
+
+      // Extended calculate12MonthCollectionMetrics returns identical 6-month fields
+      const combined = calculate12MonthCollectionMetrics(trackedRental, '2026-10-15');
+      expect(combined.sixMonthCollectionRatePercent).toBe(83.3);
+      expect(combined.verifiedRefCount).toBe(3);
+      expect(combined.netPrepaidUtilityRecoveryZAR).toBe(750);
+    });
+
+    it('returns negative monthly vending fee for prepaid sub-meter properties with no municipal recovery', () => {
+      const prepaidRental: RentalProperty = {
+        ...sandhurstRental,
+        id: 'rental-prepaid-1',
+        utilityType: 'prepaid_submeter',
+        monthlyPrepaidVendingFeeZAR: 180,
+        utilityStatements: [],
+        paymentRecords: [],
+      };
+
+      const summary = calculate6MonthTrackRecordSummary(prepaidRental, '2026-10-15');
+      expect(summary.netPrepaidUtilityRecoveryZAR).toBe(-180);
+      expect(summary.sixMonthCollectionRatePercent).toBe(0);
+      expect(summary.verifiedRefCount).toBe(0);
+    });
+
+    it('returns safe zero fallbacks with zero NaN when paymentRecords, leases, or rental are missing/empty', () => {
+      const emptyRental: RentalProperty = {
+        ...sandhurstRental,
+        id: 'rental-empty-1',
+        leases: [],
+        monthlyGrossRentZAR: 0,
+        paymentRecords: undefined,
+        utilityStatements: undefined,
+        monthlyPrepaidVendingFeeZAR: undefined,
+      };
+
+      const summaryEmpty = calculate6MonthTrackRecordSummary(emptyRental, '2026-10-15');
+      expect(summaryEmpty.sixMonthCollectionRatePercent).toBe(0);
+      expect(summaryEmpty.verifiedRefCount).toBe(0);
+      expect(summaryEmpty.netPrepaidUtilityRecoveryZAR).toBe(0);
+      expect(Number.isNaN(summaryEmpty.sixMonthCollectionRatePercent)).toBe(false);
+      expect(Number.isNaN(summaryEmpty.verifiedRefCount)).toBe(false);
+      expect(Number.isNaN(summaryEmpty.netPrepaidUtilityRecoveryZAR)).toBe(false);
+
+      const summaryNull = calculate6MonthTrackRecordSummary(null, '2026-10-15');
+      expect(summaryNull.sixMonthCollectionRatePercent).toBe(0);
+      expect(summaryNull.verifiedRefCount).toBe(0);
+      expect(summaryNull.netPrepaidUtilityRecoveryZAR).toBe(0);
     });
   });
 });

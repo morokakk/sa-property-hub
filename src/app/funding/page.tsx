@@ -5,7 +5,11 @@ import TopHeader from '@/components/navigation/TopHeader';
 import AddFundingModal from '@/components/funding/AddFundingModal';
 import { usePortfolioStore, usePortfolioSummary } from '@/lib/store/usePortfolioStore';
 import { formatZAR, formatPercent, formatDate } from '@/lib/formatters';
-import { FundingSource, FundingTranche, FundingType, ReturnTermType } from '@/types';
+import { FlipProject, FundingSource, FundingTranche, FundingType, ReturnTermType } from '@/types';
+import {
+  buildFourPhaseBoqTranches,
+  getTrancheBoqSignOffStatus,
+} from '@/lib/calculations/flips';
 import {
   Coins,
   PlusCircle,
@@ -120,6 +124,23 @@ export default function FundingTrackerPage() {
       updateDevelopment(linkedDev.id, { developmentFacilityDrawnZAR: nextDrawn });
     }
     setToastMessage('Tranche disbursement status updated');
+  };
+
+  const handleMatchFacilityToBoq = (sourceId: string, flip: FlipProject) => {
+    const source = funding.find((f) => f.id === sourceId);
+    if (!source) return;
+    const matchedTranches = buildFourPhaseBoqTranches({
+      totalAmountZAR: source.capitalAmountZAR,
+      flip,
+      existingTranches: source.tranches,
+    });
+    const matchedTotal = matchedTranches.reduce((s, t) => s + t.amountZAR, 0);
+    updateFunding(sourceId, {
+      tranches: matchedTranches,
+      ...(matchedTotal > 0 ? { capitalAmountZAR: matchedTotal } : {}),
+    });
+    setExpandedTranchesId(sourceId);
+    setToastMessage(`Matched 4-phase BOQ (20/30/30/20) for ${flip.title}`);
   };
 
   const handleProcessRepayment = async (e: React.FormEvent) => {
@@ -425,9 +446,10 @@ export default function FundingTrackerPage() {
                     const linkedDev = developments.find(
                       (d) => d.id === item.linkedDealId || d.linkedFundingSourceId === item.id
                     );
+                    const linkedFlip = flips.find((f) => f.id === item.linkedDealId);
                     const linkedDeal =
                       linkedDev ||
-                      flips.find((f) => f.id === item.linkedDealId) ||
+                      linkedFlip ||
                       rentals.find((r) => r.id === item.linkedDealId);
                     const isLinkedFlipDelayed =
                       linkedDeal &&
@@ -500,7 +522,19 @@ export default function FundingTrackerPage() {
                             <div className="text-[10px] text-slate-400">Pre-approved standby capacity</div>
                           </div>
                         ) : (
-                          <div className="text-[10px] text-slate-400">Lump Sum Facility</div>
+                          <div className="space-y-1">
+                            <div className="text-[10px] text-slate-400">Lump Sum Facility</div>
+                            {linkedFlip && (
+                              <button
+                                type="button"
+                                onClick={() => handleMatchFacilityToBoq(item.id, linkedFlip)}
+                                className="text-[10px] font-semibold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 px-1.5 py-0.5 rounded transition-colors cursor-pointer"
+                                title={`Split facility into 4 BOQ tranches (20/30/30/20) for ${linkedFlip.title}`}
+                              >
+                                Match 4-Phase BOQ
+                              </button>
+                            )}
+                          </div>
                         )}
                       </td>
                       <td className="p-3.5">
@@ -668,11 +702,21 @@ export default function FundingTrackerPage() {
                         <td colSpan={9} className="p-4 pl-6 sm:pl-8">
                           <div className="bg-white rounded-xl border border-slate-200 p-3.5 shadow-xs">
                             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3 pb-2 border-b border-slate-100">
-                              <div className="flex items-center gap-2">
+                              <div className="flex items-center gap-2 flex-wrap">
                                 <Layers className="w-4 h-4 text-indigo-600" />
                                 <span className="font-bold text-slate-900 text-xs">
                                   Milestone Tranches: {item.lenderName}
                                 </span>
+                                {linkedFlip && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleMatchFacilityToBoq(item.id, linkedFlip)}
+                                    className="text-[10px] font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 px-2 py-0.5 rounded transition-colors cursor-pointer"
+                                    title={`Align tranches to ${linkedFlip.title}'s 4-phase BOQ (20/30/30/20)`}
+                                  >
+                                    Match 4-Phase BOQ (20/30/30/20)
+                                  </button>
+                                )}
                               </div>
                               <span className="text-[11px] text-slate-500">
                                 Interest accrues only on disbursed tranches ({formatZAR(drawn)} of {formatZAR(item.capitalAmountZAR)})
@@ -680,59 +724,83 @@ export default function FundingTrackerPage() {
                             </div>
 
                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
-                              {item.tranches.map((tr) => (
-                                <div
-                                  key={tr.id}
-                                  className={`p-3 rounded-lg border text-xs flex flex-col justify-between ${
-                                    tr.isDisbursed
-                                      ? 'bg-emerald-50/40 border-emerald-200 text-emerald-950'
-                                      : 'bg-slate-50 border-slate-200 text-slate-600'
-                                  }`}
-                                >
-                                  <div>
-                                    <div className="flex items-center justify-between gap-1 mb-1">
-                                      <span className="font-bold text-slate-900 truncate">{tr.name}</span>
-                                      <span
-                                        className={`text-[9px] font-bold px-1.5 py-0.2 rounded border ${
+                              {item.tranches.map((tr) => {
+                                const showBoqStatus = Boolean(linkedFlip) || tr.verifiedPhysicalProgress !== undefined;
+                                const boqStatus = showBoqStatus
+                                  ? getTrancheBoqSignOffStatus(tr, linkedFlip)
+                                  : null;
+
+                                return (
+                                  <div
+                                    key={tr.id}
+                                    className={`p-3 rounded-lg border text-xs flex flex-col justify-between ${
+                                      tr.isDisbursed
+                                        ? 'bg-emerald-50/40 border-emerald-200 text-emerald-950'
+                                        : 'bg-slate-50 border-slate-200 text-slate-600'
+                                    }`}
+                                  >
+                                    <div>
+                                      <div className="flex items-center justify-between gap-1 mb-1">
+                                        <span className="font-bold text-slate-900 truncate">{tr.name}</span>
+                                        <span
+                                          className={`text-[9px] font-bold px-1.5 py-0.2 rounded border shrink-0 ${
+                                            tr.isDisbursed
+                                              ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                                              : 'bg-slate-200 text-slate-700 border-slate-300'
+                                          }`}
+                                        >
+                                          {tr.isDisbursed ? 'Disbursed' : 'Undrawn'}
+                                        </span>
+                                      </div>
+                                      <div className="text-base font-extrabold text-slate-900 mt-1">
+                                        {formatZAR(tr.amountZAR)}
+                                      </div>
+                                      <div className="text-[10px] text-slate-500 mt-1">
+                                        Milestone Phase: <strong className="text-slate-800">{tr.linkedMilestonePhase || 'Deposit'}</strong>
+                                      </div>
+                                      {boqStatus && (
+                                        <div className="mt-1.5">
+                                          <span
+                                            className={`inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded border ${
+                                              boqStatus.statusKey === 'signed_disbursed'
+                                                ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                                                : boqStatus.statusKey === 'signed_ready'
+                                                ? 'bg-indigo-50 text-indigo-800 border-indigo-200'
+                                                : boqStatus.statusKey === 'early_disbursed'
+                                                ? 'bg-amber-100 text-amber-900 border-amber-300'
+                                                : 'bg-slate-100 text-slate-600 border-slate-300'
+                                            }`}
+                                          >
+                                            {boqStatus.label}
+                                          </span>
+                                        </div>
+                                      )}
+                                      {tr.disbursedDate && (
+                                        <div className="text-[10px] text-slate-400 mt-1">
+                                          Disbursed: {formatDate(tr.disbursedDate)}
+                                        </div>
+                                      )}
+                                    </div>
+
+                                    <div className="mt-2.5 pt-2 border-t border-slate-200/60 flex items-center justify-between">
+                                      <span className="text-[10px] text-slate-400">
+                                        {tr.isDisbursed ? 'Accruing interest' : 'No interest burn'}
+                                      </span>
+                                      <button
+                                        type="button"
+                                        onClick={() => handleToggleTrancheDisburse(item.id, tr.id)}
+                                        className={`text-[10px] font-semibold px-2 py-0.5 rounded transition-colors cursor-pointer ${
                                           tr.isDisbursed
-                                            ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
-                                            : 'bg-slate-200 text-slate-700 border-slate-300'
+                                            ? 'text-slate-600 hover:text-slate-900 hover:bg-slate-100 border border-slate-200'
+                                            : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-2xs'
                                         }`}
                                       >
-                                        {tr.isDisbursed ? 'Disbursed' : 'Undrawn'}
-                                      </span>
+                                        {tr.isDisbursed ? 'Mark Undrawn' : 'Disburse Tranche'}
+                                      </button>
                                     </div>
-                                    <div className="text-base font-extrabold text-slate-900 mt-1">
-                                      {formatZAR(tr.amountZAR)}
-                                    </div>
-                                    <div className="text-[10px] text-slate-500 mt-1">
-                                      Milestone Phase: <strong className="text-slate-800">{tr.linkedMilestonePhase || 'Deposit'}</strong>
-                                    </div>
-                                    {tr.disbursedDate && (
-                                      <div className="text-[10px] text-slate-400 mt-0.5">
-                                        Disbursed: {formatDate(tr.disbursedDate)}
-                                      </div>
-                                    )}
                                   </div>
-
-                                  <div className="mt-2.5 pt-2 border-t border-slate-200/60 flex items-center justify-between">
-                                    <span className="text-[10px] text-slate-400">
-                                      {tr.isDisbursed ? 'Accruing interest' : 'No interest burn'}
-                                    </span>
-                                    <button
-                                      type="button"
-                                      onClick={() => handleToggleTrancheDisburse(item.id, tr.id)}
-                                      className={`text-[10px] font-semibold px-2 py-0.5 rounded transition-colors cursor-pointer ${
-                                        tr.isDisbursed
-                                          ? 'text-slate-600 hover:text-slate-900 hover:bg-slate-100 border border-slate-200'
-                                          : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-2xs'
-                                      }`}
-                                    >
-                                      {tr.isDisbursed ? 'Mark Undrawn' : 'Disburse Tranche'}
-                                    </button>
-                                  </div>
-                                </div>
-                              ))}
+                                );
+                              })}
                             </div>
                           </div>
                         </td>
