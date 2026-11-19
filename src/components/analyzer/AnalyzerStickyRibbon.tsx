@@ -4,6 +4,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { formatZAR, formatPercent } from '@/lib/formatters';
 import { PlusCircle, Check, ArrowDownCircle, ChevronUp, Sparkles, X } from 'lucide-react';
 import { DealStrategy } from '@/types';
+import { useViewportDropdownPosition } from '@/hooks/useViewportDropdownPosition';
 
 export interface AnalyzerStickyRibbonProps {
   strategy?: DealStrategy;
@@ -78,6 +79,10 @@ export function AnalyzerStickyRibbon({
 }: AnalyzerStickyRibbonProps) {
   const [showBreakdownPopover, setShowBreakdownPopover] = useState(false);
   const popoverRef = useRef<HTMLDivElement>(null);
+  const popoverPosition = useViewportDropdownPosition(popoverRef, showBreakdownPopover, {
+    width: 320,
+    smWidth: 384,
+  });
 
   // Close breakdown popover on click outside
   useEffect(() => {
@@ -215,7 +220,10 @@ export function AnalyzerStickyRibbon({
         <div className="relative flex items-center gap-2 shrink-0 self-end lg:self-center" ref={popoverRef}>
           {/* Breakdown Popover */}
           {showBreakdownPopover && (
-            <div className="absolute bottom-full right-0 mb-3 w-80 sm:w-96 bg-slate-900 text-white rounded-xl shadow-2xl border border-slate-700 p-4 z-50 animate-in fade-in zoom-in-95 duration-150">
+            <div
+              style={popoverPosition.style}
+              className={`absolute bottom-full ${popoverPosition.alignClass} mb-3 w-80 sm:w-96 max-w-[calc(100vw-2rem)] bg-slate-900 text-white rounded-xl shadow-2xl border border-slate-700 p-4 z-50 animate-in fade-in zoom-in-95 duration-150`}
+            >
               <div className="flex items-center justify-between pb-2.5 mb-2.5 border-b border-slate-700">
                 <div className="flex items-center gap-1.5">
                   <Sparkles className="w-4 h-4 text-emerald-400" />
@@ -294,7 +302,12 @@ export function AnalyzerStickyRibbon({
           {/* Breakdown Toggle Button */}
           <button
             type="button"
-            onClick={() => setShowBreakdownPopover(!showBreakdownPopover)}
+            onClick={() => {
+              if (!showBreakdownPopover) {
+                popoverPosition.updatePosition();
+              }
+              setShowBreakdownPopover((prev) => !prev);
+            }}
             className={`text-[11px] px-2.5 py-1.5 rounded-lg border transition-colors flex items-center gap-1 cursor-pointer ${
               showBreakdownPopover
                 ? 'bg-slate-700 text-white border-slate-500 shadow-inner'

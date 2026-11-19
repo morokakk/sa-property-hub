@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
+import { useViewportDropdownPosition } from '@/hooks/useViewportDropdownPosition';
 import {
   X,
   Printer,
@@ -98,6 +99,10 @@ export default function TenantStatement({
   const [isShareDropdownOpen, setIsShareDropdownOpen] = useState(false);
   const [copiedBankField, setCopiedBankField] = useState<string | null>(null);
   const shareDropdownRef = useRef<HTMLDivElement>(null);
+  const shareDropdownPosition = useViewportDropdownPosition(shareDropdownRef, isShareDropdownOpen, {
+    width: 288,
+    smWidth: 320,
+  });
 
   const handleCopyAccount = (accountNumber: string) => {
     if (!accountNumber) return;
@@ -969,7 +974,12 @@ export default function TenantStatement({
                       data-testid="share-statement-dropdown-toggle"
                       aria-label="More share actions"
                       aria-expanded={isShareDropdownOpen}
-                      onClick={() => setIsShareDropdownOpen((prev) => !prev)}
+                      onClick={() => {
+                        if (!isShareDropdownOpen) {
+                          shareDropdownPosition.updatePosition();
+                        }
+                        setIsShareDropdownOpen((prev) => !prev);
+                      }}
                       disabled={isPublishingLink || isSendingEmail}
                       className="inline-flex items-center justify-center bg-sky-600 hover:bg-sky-700 active:bg-sky-800 disabled:opacity-60 disabled:cursor-not-allowed text-white px-2 py-1.5 transition-colors cursor-pointer shrink-0"
                       title="More share and distribution options"
@@ -990,7 +1000,8 @@ export default function TenantStatement({
                   {isShareDropdownOpen && (
                     <div
                       data-testid="share-statement-dropdown-menu"
-                      className="absolute right-0 top-full mt-1.5 w-72 sm:w-80 bg-white rounded-xl shadow-xl border border-slate-200 z-50 py-1.5 text-slate-800 animate-in fade-in zoom-in-95 duration-150"
+                      style={shareDropdownPosition.style}
+                      className={`absolute ${shareDropdownPosition.alignClass} top-full mt-1.5 w-72 sm:w-80 max-w-[calc(100vw-2rem)] bg-white rounded-xl shadow-xl border border-slate-200 z-50 py-1.5 text-slate-800 animate-in fade-in zoom-in-95 duration-150`}
                     >
                       {/* Notice: Manual Verification On-Demand */}
                       <div className="px-3.5 py-2 border-b border-slate-100 bg-slate-50/80">
