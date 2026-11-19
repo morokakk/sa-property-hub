@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo, useEffect, useRef } from 'react';
+import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import TopHeader from '@/components/navigation/TopHeader';
@@ -93,9 +93,47 @@ export default function DevelopmentsPage() {
   const [exportToast, setExportToast] = useState<string | null>(null);
   const [shareError, setShareError] = useState<string | null>(null);
   const [isShareMenuOpen, setIsShareMenuOpen] = useState(false);
+  const [shareMenuAlign, setShareMenuAlign] = useState<'left' | 'right'>('right');
+  const [shareMenuStyle, setShareMenuStyle] = useState<React.CSSProperties | undefined>(undefined);
   const [isPublishingDealRoom, setIsPublishingDealRoom] = useState(false);
   const [showCloudPublishModal, setShowCloudPublishModal] = useState(false);
   const shareMenuRef = useRef<HTMLDivElement>(null);
+
+  const updateShareMenuPosition = useCallback(() => {
+    if (!shareMenuRef.current || typeof window === 'undefined') return;
+    const rect = shareMenuRef.current.getBoundingClientRect();
+    const viewportWidth = window.innerWidth;
+    const padding = 16; // Matches calc(100vw - 2rem)
+    const menuWidth = Math.min(256, viewportWidth - padding * 2); // w-64
+
+    const fitsRightAligned = rect.right - menuWidth >= padding;
+    const fitsLeftAligned = rect.left + menuWidth <= viewportWidth - padding;
+
+    if (viewportWidth >= 640) {
+      if (fitsRightAligned) {
+        setShareMenuAlign('right');
+        setShareMenuStyle(undefined);
+      } else if (fitsLeftAligned) {
+        setShareMenuAlign('left');
+        setShareMenuStyle(undefined);
+      } else {
+        setShareMenuAlign('left');
+        setShareMenuStyle({ left: padding - rect.left, right: 'auto' });
+      }
+    } else {
+      if (fitsLeftAligned) {
+        setShareMenuAlign('left');
+        setShareMenuStyle(undefined);
+      } else if (fitsRightAligned) {
+        setShareMenuAlign('right');
+        setShareMenuStyle(undefined);
+      } else {
+        const clampedScreenLeft = Math.max(padding, viewportWidth - padding - menuWidth);
+        setShareMenuAlign('left');
+        setShareMenuStyle({ left: clampedScreenLeft - rect.left, right: 'auto' });
+      }
+    }
+  }, []);
 
   useEffect(() => {
     const handleHash = () => {
@@ -134,12 +172,14 @@ export default function DevelopmentsPage() {
       }
     };
     window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('resize', updateShareMenuPosition);
     document.addEventListener('mousedown', handleClickOutside);
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('resize', updateShareMenuPosition);
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, [isShareMenuOpen]);
+  }, [isShareMenuOpen, updateShareMenuPosition]);
 
   const activeDev = useMemo(
     () => developments.find((d) => d.id === selectedDevId) || developments[0] || null,
@@ -511,7 +551,12 @@ export default function DevelopmentsPage() {
                     aria-label="Deal Room sharing options"
                     aria-haspopup="menu"
                     aria-expanded={isShareMenuOpen}
-                    onClick={() => setIsShareMenuOpen((prev) => !prev)}
+                    onClick={() => {
+                      if (!isShareMenuOpen) {
+                        updateShareMenuPosition();
+                      }
+                      setIsShareMenuOpen((prev) => !prev);
+                    }}
                     className="inline-flex items-center justify-center px-1.5 py-1 border-l border-slate-700 hover:bg-slate-800 rounded-r transition-colors cursor-pointer"
                   >
                     <ChevronDown className="w-3.5 h-3.5" />
@@ -521,7 +566,8 @@ export default function DevelopmentsPage() {
                     <div
                       role="menu"
                       data-testid="share-deal-room-menu"
-                      className="absolute right-0 top-full mt-1.5 w-64 rounded-xl bg-white text-slate-800 border border-slate-200 shadow-xl py-1.5 z-40"
+                      style={shareMenuStyle}
+                      className={`absolute ${shareMenuAlign === 'left' ? 'left-0' : 'right-0'} top-full mt-1.5 w-64 max-w-[calc(100vw-2rem)] rounded-xl bg-white text-slate-800 border border-slate-200 shadow-xl py-1.5 z-40`}
                     >
                       <button
                         type="button"
