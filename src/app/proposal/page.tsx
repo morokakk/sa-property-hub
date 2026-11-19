@@ -238,6 +238,16 @@ function ProposalGeneratorContent() {
         securityOfferedDefault: f.securityOffered || '2nd Mortgage Bond registered over title deed',
       });
 
+      const linkedRental = rentals.find(
+        (r) =>
+          (f.convertedToRentalId && r.id === f.convertedToRentalId) ||
+          (f.linkedRentalPropertyId && r.id === f.linkedRentalPropertyId) ||
+          r.convertedFromFlipId === f.id
+      );
+      const linkedCollectionMetrics = linkedRental
+        ? calculate12MonthCollectionMetrics(linkedRental)
+        : null;
+
       return {
         id: f.id,
         type: 'flip' as const,
@@ -295,7 +305,7 @@ function ProposalGeneratorContent() {
         promisedReturnRatePercent: fundingDetails.promisedReturnRatePercent,
         promisedPayoutSchedule: fundingDetails.promisedPayoutSchedule,
         securityOffered: fundingDetails.securityOffered,
-        monthlyRent: Math.round(f.purchasePriceZAR * 0.009),
+        monthlyRent: linkedRental?.monthlyGrossRentZAR || Math.round(f.purchasePriceZAR * 0.009),
         monthlyLevies: f.monthlyLeviesZAR || 0,
         monthlyRates: f.monthlyRatesTaxesZAR || 0,
         depositZAR: 0,
@@ -306,19 +316,22 @@ function ProposalGeneratorContent() {
         annualRentalEscalationPercent: 6.0,
         annualExpenseInflationPercent: 6.0,
         bondTermYears: 20,
-        ancillaryIncomes: [],
-        tenantArrears: 0,
-        overdueMonths: 0,
-        collectionRate: 100,
-        totalCollected12m: 0,
-        totalBilled12m: 0,
-        paidInFullMonths: 0,
-        totalTrackedMonths: 0,
-        arrearsWriteOffsTotal: 0,
-        isCollectionRisk: false,
-        actualCollectedRentAvg: 0,
-        adjustedVacancyRate: 5,
-        rawRental: undefined,
+        ancillaryIncomes: linkedRental?.ancillaryIncomes || [],
+        tenantArrears: linkedCollectionMetrics?.tenantArrears ?? 0,
+        overdueMonths: linkedCollectionMetrics?.overdueMonths ?? 0,
+        collectionRate: linkedCollectionMetrics?.collectionRate ?? 100,
+        totalCollected12m: linkedCollectionMetrics?.totalCollected12m ?? 0,
+        totalBilled12m: linkedCollectionMetrics?.totalBilled12m ?? 0,
+        paidInFullMonths: linkedCollectionMetrics?.paidInFullMonths ?? 0,
+        totalTrackedMonths: linkedCollectionMetrics?.totalTrackedMonths ?? 0,
+        arrearsWriteOffsTotal: linkedCollectionMetrics?.totalBadDebt ?? 0,
+        isCollectionRisk: linkedCollectionMetrics?.isCollectionRisk ?? false,
+        actualCollectedRentAvg: linkedCollectionMetrics?.actualCollectedRentAvg ?? 0,
+        adjustedVacancyRate: linkedCollectionMetrics?.adjustedVacancyRate ?? 5,
+        sixMonthCollectionRatePercent: linkedCollectionMetrics?.sixMonthCollectionRatePercent ?? 0,
+        verifiedRefCount: linkedCollectionMetrics?.verifiedRefCount ?? 0,
+        netPrepaidUtilityRecoveryZAR: linkedCollectionMetrics?.netPrepaidUtilityRecoveryZAR ?? 0,
+        rawRental: linkedRental,
         occupantRisk: f.occupantRisk,
       };
     }),
@@ -442,6 +455,9 @@ function ProposalGeneratorContent() {
         isCollectionRisk: false,
         actualCollectedRentAvg: 0,
         adjustedVacancyRate: o.vacancyRatePercent ?? 5,
+        sixMonthCollectionRatePercent: 0,
+        verifiedRefCount: 0,
+        netPrepaidUtilityRecoveryZAR: 0,
         rawRental: undefined,
         occupantRisk: o.occupantRisk,
       };
@@ -560,6 +576,9 @@ function ProposalGeneratorContent() {
         isCollectionRisk: collectionMetrics.isCollectionRisk,
         actualCollectedRentAvg: collectionMetrics.actualCollectedRentAvg,
         adjustedVacancyRate: collectionMetrics.adjustedVacancyRate,
+        sixMonthCollectionRatePercent: collectionMetrics.sixMonthCollectionRatePercent,
+        verifiedRefCount: collectionMetrics.verifiedRefCount,
+        netPrepaidUtilityRecoveryZAR: collectionMetrics.netPrepaidUtilityRecoveryZAR,
         rawRental: r,
         occupantRisk: undefined,
       };
@@ -2048,17 +2067,19 @@ function ProposalGeneratorContent() {
               )}
             </div>
 
-            {/* Rent Roll & Collection Track Record (Portfolio Rentals) */}
-            {deal.type === 'rental' && (
+            {/* Rent Roll & Collection Track Record (Portfolio Rentals & BRRRR-Converted Assets) */}
+            {Boolean(deal.rawRental) && (
               <div data-testid="rent-roll-card" className="space-y-3.5 print:break-inside-avoid">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-200 pb-1.5">
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <h2 className="text-sm uppercase tracking-wider font-extrabold text-slate-900">
                       Rent Roll &amp; Collection Track Record
                     </h2>
                     <span className="text-[10px] bg-teal-100 text-teal-800 font-bold px-2 py-0.5 rounded border border-teal-300 inline-flex items-center gap-1">
                       <Briefcase className="w-3 h-3 text-teal-700" />
-                      Stabilized Portfolio Asset
+                      {deal.rawRental?.isBrrrrProperty || pitchStrategy === 'BRRRR' || deal.type === 'flip'
+                        ? 'BRRRR Stabilized Track Record'
+                        : 'Stabilized Portfolio Asset'}
                     </span>
                   </div>
                   <label className="no-print inline-flex items-center gap-2 cursor-pointer bg-slate-100 hover:bg-slate-200 border border-slate-300 px-2.5 py-1 rounded-md text-xs font-semibold text-slate-700 transition-colors">
@@ -2142,12 +2163,77 @@ function ProposalGeneratorContent() {
                   </div>
                 </div>
 
+                {/* 6-Month Verified Track Record & Utility Recovery Sub-Row */}
+                <div
+                  data-testid="verified-track-record-subrow"
+                  className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 p-2.5 rounded-lg bg-slate-50/90 border border-slate-200 text-xs print:break-inside-avoid"
+                >
+                  <div className="flex items-center justify-between sm:block px-1">
+                    <span className="text-[10px] uppercase font-bold text-slate-500 block">
+                      6-Month Collection Rate
+                    </span>
+                    <span
+                      className={`text-sm font-extrabold font-mono ${
+                        deal.sixMonthCollectionRatePercent >= 90
+                          ? 'text-emerald-700'
+                          : deal.sixMonthCollectionRatePercent > 0
+                          ? 'text-amber-700'
+                          : 'text-slate-600'
+                      }`}
+                    >
+                      {deal.sixMonthCollectionRatePercent.toFixed(1)}%
+                    </span>
+                  </div>
+
+                  <div className="flex items-center justify-between sm:block px-1 sm:border-l sm:border-slate-200 sm:pl-3">
+                    <span className="text-[10px] uppercase font-bold text-slate-500 block">
+                      Verified Bank Refs (6 Mo)
+                    </span>
+                    <div className="flex items-center gap-1.5 mt-0.5">
+                      <span className="text-sm font-extrabold text-slate-900 font-mono">
+                        {deal.verifiedRefCount}
+                      </span>
+                      {deal.verifiedRefCount > 0 ? (
+                        <span className="inline-flex items-center gap-0.5 text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 border border-emerald-200">
+                          <ShieldCheck className="w-2.5 h-2.5" /> Proof Logged
+                        </span>
+                      ) : (
+                        <span className="text-[9px] text-slate-400">No refs logged</span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between sm:block px-1 sm:border-l sm:border-slate-200 sm:pl-3">
+                    <span className="text-[10px] uppercase font-bold text-slate-500 block">
+                      Net Utility Recovery (6 Mo)
+                    </span>
+                    <div className="flex items-baseline gap-1.5">
+                      <span
+                        className={`text-sm font-extrabold font-mono ${
+                          deal.netPrepaidUtilityRecoveryZAR > 0
+                            ? 'text-emerald-700'
+                            : deal.netPrepaidUtilityRecoveryZAR < 0
+                            ? 'text-slate-700'
+                            : 'text-slate-600'
+                        }`}
+                      >
+                        {formatZAR(deal.netPrepaidUtilityRecoveryZAR)}/mo
+                      </span>
+                      {deal.rawRental?.utilityType === 'prepaid_submeter' && (
+                        <span className="text-[9px] text-slate-500">
+                          ({deal.rawRental.prepaidVendorName || 'Prepaid'} fee)
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
                 {/* Secondary Rent & Cashflow Summary */}
                 <div className="p-3 rounded-lg bg-emerald-50/50 border border-emerald-200 flex flex-wrap items-center justify-between gap-3 text-xs">
                   <div className="flex items-center gap-4 flex-wrap">
                     <div>
                       <span className="text-[10px] uppercase font-bold text-slate-500 block">Contracted Gross Rent</span>
-                      <strong className="text-slate-900 font-mono">{formatZAR(deal.monthlyRent)}/mo</strong>
+                      <strong className="text-slate-900 font-mono">{formatZAR(deal.rawRental?.monthlyGrossRentZAR ?? deal.monthlyRent)}/mo</strong>
                     </div>
                     <div className="border-l border-emerald-300 pl-4">
                       <span className="text-[10px] uppercase font-bold text-slate-500 block">Actual Collected (Last 12 Mo Avg)</span>

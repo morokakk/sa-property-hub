@@ -1,4 +1,4 @@
-import { FlipProject, BOQItem, FundingSource } from '@/types';
+import { FlipProject, BOQItem, FundingSource, FundingTranche } from '@/types';
 
 export interface FlipFinancialSummary {
   totalBOQBaselineZAR: number;
@@ -437,3 +437,189 @@ export function calculateRingFencedWorkingCapital(activeFlips: FlipProject[]): n
     return sum + advanceCouncil + retentionPool + pendingMilestoneDraws;
   }, 0);
 }
+
+export type BoqMilestonePhase = NonNullable<FundingTranche['linkedMilestonePhase']>;
+export type DrawSchedulePhaseKey = keyof NonNullable<FlipProject['drawSchedule']>;
+
+export const BOQ_MILESTONE_PHASE_CONFIG: ReadonlyArray<{
+  phaseNumber: 1 | 2 | 3 | 4;
+  phase: BoqMilestonePhase;
+  drawScheduleKey: DrawSchedulePhaseKey;
+  weightPercent: number;
+  defaultLabel: string;
+}> = [
+  {
+    phaseNumber: 1,
+    phase: 'Deposit',
+    drawScheduleKey: 'depositPaid',
+    weightPercent: 20,
+    defaultLabel: 'Phase 1: Deposit & Mobilization (20%)',
+  },
+  {
+    phaseNumber: 2,
+    phase: 'First Fix / Wet Works',
+    drawScheduleKey: 'firstFixApproved',
+    weightPercent: 30,
+    defaultLabel: 'Phase 2: First Fix & Wet Works (30%)',
+  },
+  {
+    phaseNumber: 3,
+    phase: 'Finishes',
+    drawScheduleKey: 'finishesApproved',
+    weightPercent: 30,
+    defaultLabel: 'Phase 3: Finishes & Tiling (30%)',
+  },
+  {
+    phaseNumber: 4,
+    phase: 'Retention',
+    drawScheduleKey: 'retentionReleased',
+    weightPercent: 20,
+    defaultLabel: 'Phase 4: Snagging & Retention (20%)',
+  },
+];
+
+export interface BuildFourPhaseBoqTranchesParams {
+  totalAmountZAR: number;
+  flip?: FlipProject | null;
+  idPrefix?: string;
+  existingTranches?: FundingTranche[];
+}
+
+/**
+ * Builds 4 funding tranches aligned to the 4-phase BOQ milestone structure (20/30/30/20).
+ * - If `flip` has phased BOQ items (`milestonePhase` totals > 0), uses the actual BOQ phase sums.
+ * - Else if `flip.baselineRenovationBudgetZAR > 0`, splits the baseline budget 20/30/30/20.
+ * - Else splits `totalAmountZAR` 20/30/30/20 (falling back to R 500,000 when unspecified).
+ * Preserves existing disbursement state by `linkedMilestonePhase` when `existingTranches` is supplied,
+ * and populates `verifiedPhysicalProgress` from `flip.drawSchedule` when linked to a Flip.
+ */
+export function buildFourPhaseBoqTranches({
+  totalAmountZAR,
+  flip,
+  idPrefix = `tr-${Date.now()}`,
+  existingTranches,
+}: BuildFourPhaseBoqTranchesParams): FundingTranche[] {
+  const split20303020 = (baseAmount: number): [number, number, number, number] => {
+    const safeBase = Math.max(0, Math.round(Number.isFinite(baseAmount) ? baseAmount : 0));
+    const targets = calculateMilestonePhaseTargets(safeBase);
+    const t4 = Math.max(0, safeBase - targets.deposit - targets.firstFix - targets.finishes);
+    return [targets.deposit, targets.firstFix, targets.finishes, t4];
+  };
+
+  let amounts: [number, number, number, number];
+  let matchedFromBoqItems = false;
+
+  if (flip) {
+    const boq = flip.boq || [];
+    const boqSums: [number, number, number, number] = [
+      boq
+        .filter((i) => i.milestonePhase === 'Deposit')
+        .reduce((s, i) => s + (i.actualCostZAR || i.baselineTotalZAR || 0), 0),
+      boq
+        .filter((i) => i.milestonePhase === 'First Fix / Wet Works')
+        .reduce((s, i) => s + (i.actualCostZAR || i.baselineTotalZAR || 0), 0),
+      boq
+        .filter((i) => i.milestonePhase === 'Finishes')
+        .reduce((s, i) => s + (i.actualCostZAR || i.baselineTotalZAR || 0), 0),
+      boq
+        .filter((i) => i.milestonePhase === 'Retention')
+        .reduce((s, i) => s + (i.actualCostZAR || i.baselineTotalZAR || 0), 0),
+    ];
+    const boqTotal = boqSums.reduce((s, v) => s + v, 0);
+
+    if (boqTotal > 0) {
+      amounts = [
+        Math.round(boqSums[0]),
+        Math.round(boqSums[1]),
+        Math.round(boqSums[2]),
+        Math.round(boqSums[3]),
+      ];
+      matchedFromBoqItems = true;
+    } else if ((flip.baselineRenovationBudgetZAR || 0) > 0) {
+      amounts = split20303020(flip.baselineRenovationBudgetZAR);
+    } else {
+      amounts = split20303020(totalAmountZAR > 0 ? totalAmountZAR : 500_000);
+    }
+  } else {
+    amounts = split20303020(totalAmountZAR > 0 ? totalAmountZAR : 500_000);
+  }
+
+  return BOQ_MILESTONE_PHASE_CONFIG.map((cfg, idx) => {
+    const existingMatch = existingTranches?.find((t) => t.linkedMilestonePhase === cfg.phase);
+    const drawSignedOff = flip ? Boolean(flip.drawSchedule?.[cfg.drawScheduleKey]) : undefined;
+
+    const isDisbursed = existingMatch
+      ? existingMatch.isDisbursed
+      : flip
+      ? Boolean(drawSignedOff)
+      : idx === 0;
+
+    return {
+      id: existingMatch?.id || `${idPrefix}-${cfg.phaseNumber}`,
+      name: matchedFromBoqItems
+        ? `Phase ${cfg.phaseNumber}: ${cfg.phase} (BOQ)`
+        : cfg.defaultLabel,
+      amountZAR: amounts[idx],
+      isDisbursed,
+      disbursedDate: existingMatch?.disbursedDate,
+      linkedMilestonePhase: cfg.phase,
+      ...(flip ? { verifiedPhysicalProgress: drawSignedOff } : {}),
+    };
+  });
+}
+
+export type TrancheBoqStatusKey =
+  | 'signed_disbursed'
+  | 'signed_ready'
+  | 'early_disbursed'
+  | 'awaiting_signoff';
+
+export interface TrancheBoqSignOffStatus {
+  phaseNumber: 1 | 2 | 3 | 4 | null;
+  phaseLabel: string;
+  isBoqSignedOff: boolean;
+  statusKey: TrancheBoqStatusKey;
+  label: string;
+}
+
+/**
+ * Cross-references a funding tranche's `linkedMilestonePhase` and `isDisbursed` state against
+ * the linked FlipProject's on-site `drawSchedule` sign-offs (or `tranche.verifiedPhysicalProgress`).
+ */
+export function getTrancheBoqSignOffStatus(
+  tranche: FundingTranche,
+  flip?: FlipProject | null
+): TrancheBoqSignOffStatus {
+  const cfg = BOQ_MILESTONE_PHASE_CONFIG.find((c) => c.phase === tranche.linkedMilestonePhase);
+  const phaseNumber = cfg?.phaseNumber ?? null;
+  const phaseLabel = cfg ? `Phase ${cfg.phaseNumber}` : tranche.linkedMilestonePhase || 'Milestone';
+
+  const drawScheduleApproved = Boolean(cfg && flip?.drawSchedule?.[cfg.drawScheduleKey]);
+  const isBoqSignedOff = drawScheduleApproved || tranche.verifiedPhysicalProgress === true;
+
+  let statusKey: TrancheBoqStatusKey;
+  let statusText: string;
+
+  if (isBoqSignedOff && tranche.isDisbursed) {
+    statusKey = 'signed_disbursed';
+    statusText = 'BOQ Signed Off ✓ • Disbursed';
+  } else if (isBoqSignedOff && !tranche.isDisbursed) {
+    statusKey = 'signed_ready';
+    statusText = 'BOQ Signed Off ✓ • Ready to Draw';
+  } else if (!isBoqSignedOff && tranche.isDisbursed) {
+    statusKey = 'early_disbursed';
+    statusText = 'Disbursed • Awaiting BOQ Sign-Off';
+  } else {
+    statusKey = 'awaiting_signoff';
+    statusText = 'Awaiting On-Site Sign-Off';
+  }
+
+  return {
+    phaseNumber,
+    phaseLabel,
+    isBoqSignedOff,
+    statusKey,
+    label: cfg ? `${phaseLabel}: ${statusText}` : statusText,
+  };
+}
+
