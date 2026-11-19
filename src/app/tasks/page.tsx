@@ -19,6 +19,10 @@ import {
   buildOutlookWebUrl,
 } from '@/lib/export/calendarExport';
 import {
+  computeViewportDropdownPosition,
+  type ViewportDropdownPosition,
+} from '@/hooks/useViewportDropdownPosition';
+import {
   CheckSquare,
   PlusCircle,
   Calendar,
@@ -90,6 +94,10 @@ export default function TaskEnginePage() {
 
   // Per-task Calendar Quick Action Menu State
   const [openCalendarMenuTaskId, setOpenCalendarMenuTaskId] = useState<string | null>(null);
+  const [calendarMenuPosition, setCalendarMenuPosition] = useState<ViewportDropdownPosition>({
+    alignClass: 'right-0',
+  });
+  const calendarMenuAnchorRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
     if (!openCalendarMenuTaskId) return;
@@ -107,11 +115,19 @@ export default function TaskEnginePage() {
       }
     };
 
+    const handleResize = () => {
+      setCalendarMenuPosition(
+        computeViewportDropdownPosition(calendarMenuAnchorRef.current, { width: 256 })
+      );
+    };
+
     document.addEventListener('keydown', handleKeyDown);
     document.addEventListener('mousedown', handleMouseDown);
+    window.addEventListener('resize', handleResize);
     return () => {
       document.removeEventListener('keydown', handleKeyDown);
       document.removeEventListener('mousedown', handleMouseDown);
+      window.removeEventListener('resize', handleResize);
     };
   }, [openCalendarMenuTaskId]);
 
@@ -424,9 +440,17 @@ export default function TaskEnginePage() {
             <button
               type="button"
               data-testid={`task-calendar-menu-btn-${task.id}`}
-              onClick={() =>
-                setOpenCalendarMenuTaskId((prev) => (prev === task.id ? null : task.id))
-              }
+              onClick={(e) => {
+                const isOpening = openCalendarMenuTaskId !== task.id;
+                if (isOpening) {
+                  const anchor =
+                    (e.currentTarget.closest('[data-calendar-menu-container]') as HTMLElement | null) ??
+                    e.currentTarget;
+                  calendarMenuAnchorRef.current = anchor;
+                  setCalendarMenuPosition(computeViewportDropdownPosition(anchor, { width: 256 }));
+                }
+                setOpenCalendarMenuTaskId((prev) => (prev === task.id ? null : task.id));
+              }}
               aria-expanded={openCalendarMenuTaskId === task.id}
               aria-haspopup="menu"
               title="Add to External Calendar (.ics / Google / Outlook)"
@@ -444,7 +468,8 @@ export default function TaskEnginePage() {
               <div
                 role="menu"
                 data-testid={`task-calendar-menu-${task.id}`}
-                className="absolute right-0 mt-1.5 w-64 rounded-xl bg-white border border-slate-200 shadow-lg py-1.5 z-30 text-xs"
+                style={calendarMenuPosition.style}
+                className={`absolute ${calendarMenuPosition.alignClass} mt-1.5 w-64 max-w-[calc(100vw-2rem)] rounded-xl bg-white border border-slate-200 shadow-lg py-1.5 z-30 text-xs`}
               >
                 <div className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 border-b border-slate-100">
                   Add Task to Calendar

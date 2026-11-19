@@ -12,6 +12,7 @@ import { RentalCardHeader } from './RentalCardHeader';
 import { RentalFinancialsTab } from './RentalFinancialsTab';
 import { RentalPaymentsTab } from './RentalPaymentsTab';
 import { RentalForecastSection } from './RentalForecastSection';
+import { useViewportDropdownPosition } from '@/hooks/useViewportDropdownPosition';
 import {
   UserCheck,
   CreditCard,
@@ -90,6 +91,7 @@ function RentalCard({
   const [activeTab, setActiveTab] = useState<'financials' | 'payments' | 'coc' | 'vault'>('financials');
   const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
   const moreMenuRef = useRef<HTMLDivElement>(null);
+  const moreMenuPosition = useViewportDropdownPosition(moreMenuRef, isMoreMenuOpen, { width: 176 });
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -349,7 +351,12 @@ function RentalCard({
               type="button"
               aria-label="More property actions"
               data-testid={`rental-card-more-${property.id}`}
-              onClick={() => setIsMoreMenuOpen((prev) => !prev)}
+              onClick={() => {
+                if (!isMoreMenuOpen) {
+                  moreMenuPosition.updatePosition();
+                }
+                setIsMoreMenuOpen((prev) => !prev);
+              }}
               className="p-1.5 text-slate-500 hover:text-slate-800 hover:bg-slate-200/70 rounded-md border border-slate-200 bg-white transition-colors cursor-pointer inline-flex items-center justify-center"
               title="More actions"
             >
@@ -357,7 +364,10 @@ function RentalCard({
             </button>
 
             {isMoreMenuOpen && (
-              <div className="absolute right-0 bottom-full mb-1.5 w-44 bg-white rounded-lg shadow-lg border border-slate-200 py-1 z-30 animate-in fade-in zoom-in-95 duration-100">
+              <div
+                style={moreMenuPosition.style}
+                className={`absolute ${moreMenuPosition.alignClass} bottom-full mb-1.5 w-44 max-w-[calc(100vw-2rem)] bg-white rounded-lg shadow-lg border border-slate-200 py-1 z-30 animate-in fade-in zoom-in-95 duration-100`}
+              >
                 <button
                   type="button"
                   onClick={() => {

@@ -9,6 +9,7 @@ import { isEvictionActive } from '@/lib/calculations/occupantRisk';
 import { formatOpportunityForWhatsApp } from '@/lib/whatsappFormatter';
 import { formatZAR, formatPercent } from '@/lib/formatters';
 import { calculateDealDscr, evaluateDealCriteria } from '@/lib/calculations/propertyMetrics';
+import { useViewportDropdownPosition } from '@/hooks/useViewportDropdownPosition';
 import {
   TrendingUp,
   Target,
@@ -78,6 +79,7 @@ function PipelineDealCard({
 
   const menuRef = useRef<HTMLDivElement>(null);
   const proximityRef = useRef<HTMLDivElement>(null);
+  const menuPosition = useViewportDropdownPosition(menuRef, isMenuOpen, { width: 208 });
 
   // Close menus on outside click
   useEffect(() => {
@@ -271,7 +273,12 @@ function PipelineDealCard({
           <div className="relative" ref={menuRef}>
             <button
               type="button"
-              onClick={() => setIsMenuOpen(!isMenuOpen)}
+              onClick={() => {
+                if (!isMenuOpen) {
+                  menuPosition.updatePosition();
+                }
+                setIsMenuOpen((prev) => !prev);
+              }}
               className="p-1.5 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg border border-slate-200 transition-colors cursor-pointer"
               title="More actions"
             >
@@ -279,7 +286,10 @@ function PipelineDealCard({
             </button>
 
             {isMenuOpen && (
-              <div className="absolute right-0 mt-1.5 w-52 bg-white rounded-xl shadow-xl border border-slate-200 py-1.5 z-40 animate-in fade-in zoom-in-95 duration-100 text-xs">
+              <div
+                style={menuPosition.style}
+                className={`absolute ${menuPosition.alignClass} mt-1.5 w-52 max-w-[calc(100vw-2rem)] bg-white rounded-xl shadow-xl border border-slate-200 py-1.5 z-40 animate-in fade-in zoom-in-95 duration-100 text-xs`}
+              >
                 <button
                   type="button"
                   onClick={() => {

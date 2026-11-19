@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { isEvictionActive } from '@/lib/calculations/occupantRisk';
 import { formatZoningTransitionLabel } from '@/lib/calculations/zoning';
+import { useViewportDropdownPosition } from '@/hooks/useViewportDropdownPosition';
 
 export interface FlipProjectHeaderProps {
   flip: FlipProject;
@@ -44,6 +45,7 @@ export function FlipProjectHeader({
 }: FlipProjectHeaderProps) {
   const [isExitMenuOpen, setIsExitMenuOpen] = useState(false);
   const exitMenuRef = useRef<HTMLDivElement>(null);
+  const exitMenuPosition = useViewportDropdownPosition(exitMenuRef, isExitMenuOpen, { width: 224 });
 
   // Close exit dropdown menu on outside click
   useEffect(() => {
@@ -251,7 +253,12 @@ export function FlipProjectHeader({
             type="button"
             id="flips-exit-lifecycle-btn"
             data-testid="flips-exit-lifecycle-btn"
-            onClick={() => setIsExitMenuOpen((prev) => !prev)}
+            onClick={() => {
+              if (!isExitMenuOpen) {
+                exitMenuPosition.updatePosition();
+              }
+              setIsExitMenuOpen((prev) => !prev);
+            }}
             className="inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-3 py-1.5 rounded-lg shadow-sm transition-all cursor-pointer"
             title="Project exit & conversion options"
           >
@@ -265,7 +272,10 @@ export function FlipProjectHeader({
           </button>
 
           {isExitMenuOpen && (
-            <div className="absolute right-0 mt-1.5 w-56 bg-white rounded-xl shadow-xl border border-slate-200 py-1.5 z-30 animate-in fade-in zoom-in-95 duration-100">
+            <div
+              style={exitMenuPosition.style}
+              className={`absolute ${exitMenuPosition.alignClass} mt-1.5 w-56 max-w-[calc(100vw-2rem)] bg-white rounded-xl shadow-xl border border-slate-200 py-1.5 z-30 animate-in fade-in zoom-in-95 duration-100`}
+            >
               <button
                 type="button"
                 onClick={() => {
