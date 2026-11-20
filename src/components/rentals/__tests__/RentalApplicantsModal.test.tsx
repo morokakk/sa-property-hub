@@ -144,7 +144,7 @@ describe('RentalApplicantsModal, TenantVettingDrawer & RentalCard Turnover UI', 
     ).replace(/<!-- -->/g, '');
 
     expect(html).toContain('Open-Day Applicants &amp; Waitlist (2)');
-    expect(html).toContain('5-Second Open-Day Quick Capture');
+    expect(html).toContain('Open-Day Quick Capture');
     expect(html).toContain('All (2)');
     expect(html).toContain('Viewing (1)');
     expect(html).toContain('Vetted (1)');

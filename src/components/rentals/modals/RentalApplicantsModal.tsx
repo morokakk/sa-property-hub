@@ -497,7 +497,7 @@ export function RentalApplicantsModal({
           <div className="flex items-center justify-between flex-wrap gap-2">
             <span className="text-xs font-bold text-indigo-950 flex items-center gap-1.5">
               <Plus className="w-3.5 h-3.5 text-indigo-600" />
-              <span>5-Second Open-Day Quick Capture</span>
+              <span>Open-Day Quick Capture</span>
             </span>
             {hasBudgetInput && (
               <div>
@@ -789,7 +789,7 @@ export function RentalApplicantsModal({
         {/* Applicants Shortlist */}
         {filteredApplicants.length === 0 ? (
           <div className="p-8 rounded-xl border border-dashed border-slate-200 text-center text-xs text-slate-500">
-            No applicants logged{stageFilter !== 'All' ? ` in "${stageFilter}" stage` : ''}. Use the 5-second form above during viewings to log leads.
+            No applicants logged{stageFilter !== 'All' ? ` in "${stageFilter}" stage` : ''}. Use the form above during viewings to log leads.
           </div>
         ) : (
           <div className="space-y-3">
