@@ -166,6 +166,17 @@ describe('migrateToCloud Payload Mappers', () => {
               status: 'Occupied',
             },
           ],
+          applicants: [
+            {
+              id: 'app-1',
+              unitName: 'Unit 4',
+              fullName: 'Open Day Lead',
+              phone: '0821234567',
+              monthlyBudgetZAR: 15500,
+              status: 'Viewing',
+              createdAt: '2026-11-20T10:00:00Z',
+            },
+          ],
           maintenanceHistory: [],
         },
       ];
@@ -190,6 +201,8 @@ describe('migrateToCloud Payload Mappers', () => {
       ]);
       expect(mapped[0].leases).toHaveLength(1);
       expect((mapped[0].leases as any)[0].tenantName).toBe('John Doe');
+      expect(mapped[0].applicants).toHaveLength(1);
+      expect((mapped[0].applicants as any)[0].fullName).toBe('Open Day Lead');
     });
 
     it('maps rental funding campaign fields correctly', () => {
@@ -907,6 +920,31 @@ describe('migrateToCloud Execution Engine', () => {
             {
               ...INITIAL_RENTALS[0],
               monthlyGrossRentZAR: 28_000,
+            },
+            ...INITIAL_RENTALS.slice(1),
+          ],
+          flips: INITIAL_FLIPS,
+          investorProfile: INITIAL_INVESTOR_PROFILE,
+        })
+      ).toBe(false);
+
+      // User adds an open-day applicant to demo rental-1 -> should NOT be considered unmodified demo data
+      expect(
+        isStockDemoState({
+          rentals: [
+            {
+              ...INITIAL_RENTALS[0],
+              applicants: [
+                {
+                  id: 'app-demo-edit',
+                  unitName: 'Main Unit',
+                  fullName: 'Walk-in Lead',
+                  phone: '0825551234',
+                  monthlyBudgetZAR: 12000,
+                  status: 'Viewing',
+                  createdAt: '2026-11-20T10:00:00Z',
+                },
+              ],
             },
             ...INITIAL_RENTALS.slice(1),
           ],

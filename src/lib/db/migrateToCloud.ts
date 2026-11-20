@@ -103,7 +103,8 @@ export function isStockDemoState(state?: PortfolioMigrationPayload | null): bool
       r.purchasePriceZAR !== orig.purchasePriceZAR ||
       r.monthlyGrossRentZAR !== orig.monthlyGrossRentZAR ||
       r.outstandingBondBalanceZAR !== orig.outstandingBondBalanceZAR ||
-      JSON.stringify(r.zoningProfile) !== JSON.stringify(orig.zoningProfile)
+      JSON.stringify(r.zoningProfile) !== JSON.stringify(orig.zoningProfile) ||
+      JSON.stringify(r.applicants || []) !== JSON.stringify(orig.applicants || [])
     );
   });
   if (isAnyRentalModified) return false;
@@ -343,6 +344,7 @@ export function mapRentals(rentals: RentalProperty[] = [], userId: string): Prop
     bond_revision_note: r.bondRevisionNote || null,
     leases: (r.leases ? JSON.parse(JSON.stringify(r.leases)) : []) as any,
     archived_leases: (r.archivedLeases ? JSON.parse(JSON.stringify(r.archivedLeases)) : []) as any,
+    applicants: (Array.isArray(r.applicants) ? JSON.parse(JSON.stringify(r.applicants)) : []) as any,
     management_type: r.managementType || null,
     agency_name: r.agencyName || null,
     agency_commission_percent: toNullableNumeric(r.agencyCommissionPercent),

@@ -900,6 +900,7 @@ export type Database = {
           agm_date: string | null
           ancillary_incomes: Json
           annual_building_insurance_zar: number | null
+          applicants?: Json | null
           arrears_opening_balance_zar: number | null
           arrears_write_offs: Json | null
           bond_interest_rate_percent: number | null
@@ -975,6 +976,7 @@ export type Database = {
           agm_date?: string | null
           ancillary_incomes?: Json
           annual_building_insurance_zar?: number | null
+          applicants?: Json | null
           arrears_opening_balance_zar?: number | null
           arrears_write_offs?: Json | null
           bond_interest_rate_percent?: number | null
@@ -1050,6 +1052,7 @@ export type Database = {
           agm_date?: string | null
           ancillary_incomes?: Json
           annual_building_insurance_zar?: number | null
+          applicants?: Json | null
           arrears_opening_balance_zar?: number | null
           arrears_write_offs?: Json | null
           bond_interest_rate_percent?: number | null

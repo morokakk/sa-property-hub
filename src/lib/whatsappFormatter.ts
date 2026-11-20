@@ -1408,3 +1408,79 @@ export function formatTenantMaintenanceRequestForWhatsApp(params: TenantMaintena
   }
   return text;
 }
+
+export interface ApplicantDocsRequestWhatsAppParams {
+  applicantName: string;
+  propertyTitle: string;
+  unitName: string;
+  monthlyRentZAR: number;
+}
+
+/**
+ * Formats a concise, emoji-free WhatsApp message requesting FICA & affordability vetting documents.
+ */
+export function formatApplicantDocsRequestForWhatsApp(
+  params: ApplicantDocsRequestWhatsAppParams
+): string {
+  const { applicantName, propertyTitle, unitName, monthlyRentZAR } = params;
+  const unitLabel = unitName && unitName !== 'Any / Waitlist' ? ` (${unitName})` : '';
+
+  let text = `Hi ${applicantName},\n\n`;
+  text += `Thank you for your interest in *${propertyTitle}*${unitLabel} at *${formatZAR(monthlyRentZAR)}/month*.\n\n`;
+  text += `To proceed with your rental application, please send the following documents:\n`;
+  text += `1. Copy of SA ID / Passport\n`;
+  text += `2. Latest 3 months' payslips\n`;
+  text += `3. Latest 3 months' bank statements\n\n`;
+  text += `_POPIA Consent:_ By submitting your documents, you consent to standard credit and affordability verification for this rental application.`;
+  return text;
+}
+
+export interface ApplicantApprovalWhatsAppParams {
+  applicantName: string;
+  propertyTitle: string;
+  unitName: string;
+  monthlyRentZAR: number;
+  depositZAR: number;
+  moveInDate?: string;
+}
+
+/**
+ * Formats a concise, emoji-free WhatsApp lease approval & onboarding message.
+ */
+export function formatApplicantApprovalForWhatsApp(
+  params: ApplicantApprovalWhatsAppParams
+): string {
+  const { applicantName, propertyTitle, unitName, monthlyRentZAR, depositZAR, moveInDate } = params;
+  const unitLabel = unitName && unitName !== 'Any / Waitlist' ? ` (${unitName})` : '';
+  const formattedMoveIn = moveInDate ? formatDate(moveInDate) : 'To be confirmed';
+
+  let text = `Hi ${applicantName},\n\n`;
+  text += `Good news — your rental application for *${propertyTitle}*${unitLabel} has been approved!\n\n`;
+  text += `*LEASE SUMMARY:*\n`;
+  text += `• Monthly Rent: *${formatZAR(monthlyRentZAR)}/m*\n`;
+  text += `• Deposit Required: *${formatZAR(depositZAR)}*\n`;
+  text += `• Target Move-In Date: *${formattedMoveIn}*\n\n`;
+  text += `Next steps: Please confirm your email address so we can send the lease agreement for signature and share EFT banking details to secure the unit.`;
+  return text;
+}
+
+export interface ApplicantDeclineWhatsAppParams {
+  applicantName: string;
+  propertyTitle: string;
+  unitName: string;
+}
+
+/**
+ * Formats a polite, emoji-free WhatsApp decline message for unsuccessful applicants.
+ */
+export function formatApplicantDeclineForWhatsApp(
+  params: ApplicantDeclineWhatsAppParams
+): string {
+  const { applicantName, propertyTitle, unitName } = params;
+  const unitLabel = unitName && unitName !== 'Any / Waitlist' ? ` (${unitName})` : '';
+
+  let text = `Hi ${applicantName},\n\n`;
+  text += `Thank you for viewing *${propertyTitle}*${unitLabel} and submitting your details.\n\n`;
+  text += `We have selected another applicant for this unit on this occasion. We appreciate your time and wish you every success with your property search.`;
+  return text;
+}

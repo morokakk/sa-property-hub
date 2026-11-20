@@ -467,15 +467,30 @@ describe('Milestone 5 Challenger: E2E Cross-Module Lifecycle & Adversarial Stres
       const devId = 'dev-statutory-sync';
       const devTitle = 'Statutory Test Scheme';
 
+      const futureTargetDate = new Date(Date.now() + 45 * 24 * 60 * 60 * 1000)
+        .toISOString()
+        .split('T')[0];
+      const expectedReminderDate = new Date(
+        new Date(futureTargetDate).getTime() - 14 * 24 * 60 * 60 * 1000
+      )
+        .toISOString()
+        .split('T')[0];
+      const sgTargetDate = new Date(Date.now() + 60 * 24 * 60 * 60 * 1000)
+        .toISOString()
+        .split('T')[0];
+      const ocTargetDate = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000)
+        .toISOString()
+        .split('T')[0];
+
       const approvals: PreConstructionApprovals = {
         splumaRezoningSubdivision: {
           status: 'Submitted',
-          targetApprovalDate: '2026-12-01',
+          targetApprovalDate: futureTargetDate,
           referenceNo: 'SPL/2026/01',
         },
         sgDiagramApproval: {
           status: 'Submitted',
-          targetApprovalDate: '2026-12-15',
+          targetApprovalDate: sgTargetDate,
         },
         municipalBuildingPlans: {
           status: 'Approved', // Should not generate a pending reminder task
@@ -489,7 +504,7 @@ describe('Milestone 5 Challenger: E2E Cross-Module Lifecycle & Adversarial Stres
         },
         occupancyCertificate: {
           status: 'Submitted',
-          targetApprovalDate: '2027-01-30',
+          targetApprovalDate: ocTargetDate,
         },
       };
 
@@ -502,8 +517,8 @@ describe('Milestone 5 Challenger: E2E Cross-Module Lifecycle & Adversarial Stres
       expect(splumaTask).toBeDefined();
       expect(splumaTask?.priority).toBe('Urgent');
       expect(splumaTask?.status).toBe('Pending');
-      // Due date is 14 days prior to target: 2026-12-01 - 14 days = 2026-11-17
-      expect(splumaTask?.dueDate).toBe('2026-11-17');
+      // Due date is 14 days prior to target approval date
+      expect(splumaTask?.dueDate).toBe(expectedReminderDate);
 
       // Now approve SPLUMA and simulate resync: task must be removed
       const updatedApprovals: PreConstructionApprovals = {

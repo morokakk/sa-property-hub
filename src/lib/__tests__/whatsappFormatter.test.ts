@@ -12,6 +12,9 @@ import {
   getStatementDueDate,
   formatContractorDispatchForWhatsApp,
   formatTenantMaintenanceRequestForWhatsApp,
+  formatApplicantDocsRequestForWhatsApp,
+  formatApplicantApprovalForWhatsApp,
+  formatApplicantDeclineForWhatsApp,
 } from '../whatsappFormatter';
 import { formatZAR, formatDate } from '../formatters';
 import { OpportunityDeal, FlipProject, InvestorProfile, OccupantRiskProfile, RentalProperty, AncillaryIncome, UtilityStatement } from '@/types';
@@ -1211,6 +1214,58 @@ describe('whatsappFormatter - Strategy Adaptive Formatting', () => {
       expect(prompt).toContain('*ISSUE DETAILS (please complete)*');
       expect(prompt).toContain('• Category (Plumbing / Electrical / Appliance / Structural / General Wear):');
       expect(prompt).not.toMatch(emojiRegex);
+    });
+  });
+
+  describe('Open-Day Rental Applicant WhatsApp Formatting', () => {
+    const emojiRegex = /[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{1F600}-\u{1F64F}\u{1F680}-\u{1F6FF}\u{1F1E6}-\u{1F1FF}]/u;
+
+    it('formats applicant document request cleanly without emojis', () => {
+      const msg = formatApplicantDocsRequestForWhatsApp({
+        applicantName: 'Thabo Mokoena',
+        propertyTitle: 'Ferndale Suites',
+        unitName: 'Unit 2',
+        monthlyRentZAR: 9500,
+      });
+
+      expect(msg).toContain('Hi Thabo Mokoena');
+      expect(msg).toContain('*Ferndale Suites* (Unit 2)');
+      expect(msg).toContain(formatZAR(9500));
+      expect(msg).toContain('Copy of SA ID / Passport');
+      expect(msg).toContain("Latest 3 months' payslips");
+      expect(msg).toContain("Latest 3 months' bank statements");
+      expect(msg).not.toMatch(emojiRegex);
+    });
+
+    it('formats applicant approval omitting Any / Waitlist unit label', () => {
+      const msg = formatApplicantApprovalForWhatsApp({
+        applicantName: 'Lerato',
+        propertyTitle: 'Rosebank Loft',
+        unitName: 'Any / Waitlist',
+        monthlyRentZAR: 12000,
+        depositZAR: 18000,
+        moveInDate: '2026-12-01',
+      });
+
+      expect(msg).toContain('*Rosebank Loft* has been approved!');
+      expect(msg).not.toContain('Any / Waitlist');
+      expect(msg).toContain(formatZAR(12000));
+      expect(msg).toContain(formatZAR(18000));
+      expect(msg).toContain(formatDate('2026-12-01'));
+      expect(msg).not.toMatch(emojiRegex);
+    });
+
+    it('formats polite applicant decline without emojis', () => {
+      const msg = formatApplicantDeclineForWhatsApp({
+        applicantName: 'Kagiso',
+        propertyTitle: 'Rosebank Loft',
+        unitName: 'Unit 1',
+      });
+
+      expect(msg).toContain('Hi Kagiso');
+      expect(msg).toContain('*Rosebank Loft* (Unit 1)');
+      expect(msg).toContain('selected another applicant');
+      expect(msg).not.toMatch(emojiRegex);
     });
   });
 });

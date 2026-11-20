@@ -5,12 +5,35 @@ import {
   RentalRefinanceParams,
   Lease,
   ArchivedLease,
+  RentalApplicant,
 } from '@/types';
 import { RootStoreState, RentalSlice } from '../types';
 import { INITIAL_RENTALS } from '../initialData';
 import { syncAgmReminderTask, syncLeaseExpiryTasks } from '../utils/taskSync';
 import { calculatePropertyArrears } from '@/lib/calculations/arrears';
 import { reconcilePropertyStatus } from '@/lib/calculations/rentals';
+
+function computeActiveGrossRentZAR(leases: Lease[]): number {
+  return leases
+    .filter((l) => l.status !== 'Vacant')
+    .reduce((sum, l) => sum + (l.monthlyRentZAR || 0), 0);
+}
+
+function settleUnitApplicantsAfterPlacement(
+  applicants: RentalApplicant[] | undefined,
+  placedApplicantId: string,
+  unitName: string,
+  declineCompetingForUnit: boolean | undefined,
+  nowIso: string
+): RentalApplicant[] {
+  const remaining = (applicants || []).filter((a) => a.id !== placedApplicantId);
+  if (!declineCompetingForUnit) return remaining;
+  return remaining.map((a) =>
+    a.unitName === unitName && a.status !== 'Declined'
+      ? { ...a, status: 'Declined' as const, updatedAt: nowIso }
+      : a
+  );
+}
 
 export const createRentalSlice: StateCreator<
   RootStoreState,
@@ -528,10 +551,15 @@ export const createRentalSlice: StateCreator<
         };
 
         let updatedLeases: Lease[];
+        let updatedGrossRent = r.monthlyGrossRentZAR;
+        let updatedApplicants = r.applicants;
+        const unitName = departingLease.unitName || 'Main Unit';
+        const nowIso = new Date().toISOString();
+
         if (params.action === 'replacement' && params.replacementLease) {
           const replacement: Lease = {
-            id: `lease-${Date.now()}`,
-            unitName: departingLease.unitName || 'Main Unit',
+            id: `lease-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`,
+            unitName,
             tenantName: params.replacementLease.tenantName || 'Tenant Unassigned',
             tenantPhone: params.replacementLease.tenantPhone || '',
             tenantEmail: params.replacementLease.tenantEmail || '',
@@ -544,9 +572,26 @@ export const createRentalSlice: StateCreator<
             annualEscalationPercent: params.replacementLease.annualEscalationPercent ?? 7.0,
             status: 'Occupied',
             roomType: departingLease.roomType,
+            utilityType: departingLease.utilityType,
+            vettingScorecard: params.replacementLease.vettingScorecard,
+            guarantorName: params.replacementLease.guarantorName,
+            guarantorContact: params.replacementLease.guarantorContact,
+            deedOfSuretyshipRef: params.replacementLease.deedOfSuretyshipRef,
             inspectionRecord: undefined,
           };
           updatedLeases = (r.leases || []).map((l) => (l.id === leaseId ? replacement : l));
+          if (replacement.monthlyRentZAR !== departingLease.monthlyRentZAR) {
+            updatedGrossRent = computeActiveGrossRentZAR(updatedLeases);
+          }
+          if (params.placedApplicantId) {
+            updatedApplicants = settleUnitApplicantsAfterPlacement(
+              r.applicants,
+              params.placedApplicantId,
+              unitName,
+              params.declineCompetingForUnit,
+              nowIso
+            );
+          }
         } else {
           // Vacant unit
           const vacantLease: Lease = {
@@ -571,8 +616,113 @@ export const createRentalSlice: StateCreator<
         return {
           ...r,
           leases: updatedLeases,
+          monthlyGrossRentZAR: updatedGrossRent,
           archivedLeases: [archivedRecord, ...existingArchived],
+          applicants: updatedApplicants,
           status: reconciledStatus,
+        };
+      });
+
+      const target = updatedRentals.find((r) => r.id === propertyId);
+      let tasks = state.tasks;
+      if (target) {
+        tasks = syncLeaseExpiryTasks(tasks, propertyId, target.title, target.leases);
+      }
+
+      return {
+        rentals: updatedRentals,
+        tasks,
+      };
+    }),
+
+  addRentalApplicant: (propertyId, applicant) =>
+    set((state) => ({
+      rentals: state.rentals.map((r) => {
+        if (r.id !== propertyId) return r;
+        const newApplicant: RentalApplicant = {
+          ...applicant,
+          id: `app-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+          createdAt: new Date().toISOString(),
+        };
+        return {
+          ...r,
+          applicants: [newApplicant, ...(r.applicants || [])],
+        };
+      }),
+    })),
+
+  updateRentalApplicant: (propertyId, applicantId, updates) =>
+    set((state) => ({
+      rentals: state.rentals.map((r) => {
+        if (r.id !== propertyId) return r;
+        const nowIso = new Date().toISOString();
+        return {
+          ...r,
+          applicants: (r.applicants || []).map((a) =>
+            a.id === applicantId ? { ...a, ...updates, updatedAt: nowIso } : a
+          ),
+        };
+      }),
+    })),
+
+  deleteRentalApplicant: (propertyId, applicantId) =>
+    set((state) => ({
+      rentals: state.rentals.map((r) => {
+        if (r.id !== propertyId) return r;
+        return {
+          ...r,
+          applicants: (r.applicants || []).filter((a) => a.id !== applicantId),
+        };
+      }),
+    })),
+
+  onboardApplicantToVacantUnit: (propertyId, leaseId, applicantId, params) =>
+    set((state) => {
+      const updatedRentals = state.rentals.map((r) => {
+        if (r.id !== propertyId) return r;
+        const targetLease = (r.leases || []).find((l) => l.id === leaseId);
+        const applicant = (r.applicants || []).find((a) => a.id === applicantId);
+        if (!targetLease || targetLease.status !== 'Vacant' || !applicant) {
+          return r;
+        }
+
+        const nowIso = new Date().toISOString();
+        const unitName = targetLease.unitName || 'Main Unit';
+        const newLease: Lease = {
+          id: `lease-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`,
+          unitName,
+          roomType: targetLease.roomType,
+          utilityType: targetLease.utilityType,
+          tenantName: applicant.fullName,
+          tenantPhone: applicant.phone,
+          tenantEmail: params.tenantEmail?.trim() || undefined,
+          leaseStartDate: params.leaseStartDate,
+          leaseEndDate: params.leaseEndDate,
+          monthlyRentZAR: params.monthlyRentZAR,
+          depositHeldZAR: params.depositHeldZAR,
+          annualEscalationPercent:
+            params.annualEscalationPercent ?? targetLease.annualEscalationPercent ?? 7.0,
+          status: 'Occupied',
+          vettingScorecard: applicant.vettingScorecard,
+          inspectionRecord: undefined,
+          statementToken: undefined,
+        };
+
+        const updatedLeases = (r.leases || []).map((l) => (l.id === leaseId ? newLease : l));
+        const updatedApplicants = settleUnitApplicantsAfterPlacement(
+          r.applicants,
+          applicantId,
+          unitName,
+          params.declineCompetingForUnit,
+          nowIso
+        );
+
+        return {
+          ...r,
+          leases: updatedLeases,
+          monthlyGrossRentZAR: computeActiveGrossRentZAR(updatedLeases),
+          status: reconcilePropertyStatus(updatedLeases),
+          applicants: updatedApplicants,
         };
       });
 

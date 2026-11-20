@@ -621,6 +621,26 @@ export interface ArchivedLease {
   inspectionRecord?: LeaseInspectionRecord;
 }
 
+export type RentalApplicantStatus = 'Viewing' | 'Applied' | 'Vetted' | 'Declined';
+export type RentalApplicantSource = 'Walk-In' | 'WhatsApp' | 'Property24' | 'Facebook' | 'Referral';
+
+export interface RentalApplicant {
+  id: string;
+  unitName: string; // Specific unitName from leases[] or 'Any / Waitlist'
+  fullName: string;
+  phone: string;
+  monthlyBudgetZAR: number;
+  status: RentalApplicantStatus;
+  source?: RentalApplicantSource;
+  desiredMoveInDate?: string;
+  statedNetIncomeZAR?: number;
+  notes?: string;
+  vettingScorecard?: TenantVettingScorecard;
+  recommendedDepositZAR?: number;
+  createdAt: string;
+  updatedAt?: string;
+}
+
 export interface AncillaryIncome {
   id: string;
   type: 'cell_tower' | 'billboard' | 'parking' | 'storage' | 'other';
@@ -761,6 +781,7 @@ export interface RentalProperty {
   maintenanceHistory: MaintenanceLog[];
   status: 'Occupied' | 'Vacant' | 'Notice Given' | 'Partially Vacant' | 'Sold';
   archivedLeases?: ArchivedLease[];
+  applicants?: RentalApplicant[];
   cocChecklist?: ComplianceCertificates;
   driveVault?: CloudDriveVault;
   zoningProfile?: ZoningProfile;

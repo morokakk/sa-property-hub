@@ -28,7 +28,9 @@ import {
   Check,
   Camera,
   ShieldAlert,
+  ShieldCheck,
 } from 'lucide-react';
+import type { NoticeReplacementPrefill } from '@/hooks/rentals/useRentalModalState';
 import {
   calculateInspectionDepositSummary,
   ensureInspectionItems,
@@ -40,6 +42,7 @@ export interface TenantNoticeModalProps {
   isOpen: boolean;
   property: RentalProperty | null;
   initialLeaseId?: string | null;
+  prefillReplacement?: NoticeReplacementPrefill | null;
   onClose: () => void;
   onMarkNotice: (
     propertyId: string,
@@ -63,6 +66,8 @@ export interface TenantNoticeModalProps {
       replacementLease?: Partial<Lease>;
       inspectionRecord?: LeaseInspectionRecord;
       depositRefundedZAR?: number;
+      placedApplicantId?: string;
+      declineCompetingForUnit?: boolean;
     }
   ) => void;
 }
@@ -82,6 +87,7 @@ export function TenantNoticeModal({
   isOpen,
   property,
   initialLeaseId,
+  prefillReplacement,
   onClose,
   onMarkNotice,
   onCancelNotice,
@@ -89,6 +95,8 @@ export function TenantNoticeModal({
 }: TenantNoticeModalProps) {
   const [selectedLeaseId, setSelectedLeaseId] = useState<string>('');
   const [activeView, setActiveView] = useState<'notice' | 'finalize'>('notice');
+  const [activePrefill, setActivePrefill] = useState<NoticeReplacementPrefill | null>(null);
+  const [declineCompetingForUnit, setDeclineCompetingForUnit] = useState<boolean>(true);
 
   // Notice form states
   const [noticeGivenDate, setNoticeGivenDate] = useState<string>('');
@@ -175,7 +183,7 @@ export function TenantNoticeModal({
         setFinalReason(targetLease.noticeReason || DEPARTURE_REASONS[0]);
         initializeExitRecord(targetLease, targetLease.vacationDate || todayStr);
       } else {
-        setActiveView('notice');
+        setActiveView(prefillReplacement ? 'finalize' : 'notice');
         setNoticeGivenDate(todayStr);
         setVacationDate(nextMonthEnd);
         setNoticeReason(DEPARTURE_REASONS[0]);
@@ -187,24 +195,46 @@ export function TenantNoticeModal({
       }
 
       setForwardingNotes('');
-      setTransitionAction('vacant');
+
+      if (prefillReplacement) {
+        setActivePrefill(prefillReplacement);
+        setDeclineCompetingForUnit(true);
+        setTransitionAction('replacement');
+        setNewTenantName(prefillReplacement.tenantName);
+        setNewTenantPhone(prefillReplacement.tenantPhone || '');
+        setNewTenantEmail('');
+      } else {
+        setActivePrefill(null);
+        setDeclineCompetingForUnit(true);
+        setTransitionAction('vacant');
+        setNewTenantName('');
+        setNewTenantPhone('');
+        setNewTenantEmail('');
+      }
 
       if (targetLease) {
         setNewMonthlyRent(targetLease.monthlyRentZAR);
-        setNewDepositHeld(targetLease.depositHeldZAR);
-        setNewLeaseStartDate(nextMonthEnd);
-        const oneYearLater = new Date(new Date(nextMonthEnd).getTime() + 365 * 24 * 60 * 60 * 1000)
+        setNewDepositHeld(
+          prefillReplacement?.recommendedDepositZAR ??
+            (prefillReplacement
+              ? targetLease.depositHeldZAR || targetLease.monthlyRentZAR
+              : targetLease.depositHeldZAR)
+        );
+        const startDefault = targetLease.vacationDate || nextMonthEnd;
+        setNewLeaseStartDate(startDefault);
+        const oneYearLater = new Date(new Date(startDefault).getTime() + 365 * 24 * 60 * 60 * 1000)
           .toISOString()
           .split('T')[0];
         setNewLeaseEndDate(oneYearLater);
       }
     }
-  }, [isOpen, property, initialLeaseId]);
+  }, [isOpen, property, initialLeaseId, prefillReplacement]);
 
   if (!isOpen || !property || !currentLease) return null;
 
   const handleLeaseChange = (leaseId: string) => {
     setSelectedLeaseId(leaseId);
+    setActivePrefill(null);
     const target = leases.find((l) => l.id === leaseId);
     if (target?.status === 'Notice Given') {
       setActiveView('finalize');
@@ -313,6 +343,7 @@ export function TenantNoticeModal({
         leaseEndDate: newLeaseEndDate,
         monthlyRentZAR: newMonthlyRent,
         depositHeldZAR: newDepositHeld,
+        vettingScorecard: activePrefill?.vettingScorecard,
       };
     }
 
@@ -331,6 +362,12 @@ export function TenantNoticeModal({
       replacementLease,
       inspectionRecord: finalizedInspectionRecord,
       depositRefundedZAR: Math.max(0, effectiveDepositRefunded),
+      placedApplicantId:
+        transitionAction === 'replacement' ? activePrefill?.applicantId : undefined,
+      declineCompetingForUnit:
+        transitionAction === 'replacement' && activePrefill
+          ? declineCompetingForUnit
+          : undefined,
     });
     onClose();
   };
@@ -959,9 +996,23 @@ export function TenantNoticeModal({
               {/* Replacement Tenant Details Form */}
               {transitionAction === 'replacement' && (
                 <div className="p-3.5 rounded-xl border border-emerald-200 bg-emerald-50/40 space-y-3 animate-in fade-in">
-                  <span className="text-[11px] font-bold text-emerald-900 block">
-                    New Incoming Tenant Details
-                  </span>
+                  <div className="flex items-center justify-between flex-wrap gap-2">
+                    <span className="text-[11px] font-bold text-emerald-900 block">
+                      New Incoming Tenant Details
+                    </span>
+                    {activePrefill && (
+                      <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">
+                        <ShieldCheck className="w-3 h-3 text-emerald-700" />
+                        <span>Pre-filled from Applicant Shortlist</span>
+                        {activePrefill.vettingScorecard &&
+                          !activePrefill.vettingScorecard.isPendingInputs && (
+                            <span className="ml-0.5 text-emerald-950">
+                              • {activePrefill.vettingScorecard.riskGrade}
+                            </span>
+                          )}
+                      </span>
+                    )}
+                  </div>
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                     <div>
                       <label className="block text-[10px] font-semibold text-slate-600 mb-0.5">Full Name</label>
@@ -1038,6 +1089,18 @@ export function TenantNoticeModal({
                       />
                     </div>
                   </div>
+
+                  {activePrefill && (
+                    <label className="flex items-center gap-2 text-[11px] font-semibold text-emerald-950 cursor-pointer pt-1 border-t border-emerald-200/70">
+                      <input
+                        type="checkbox"
+                        checked={declineCompetingForUnit}
+                        onChange={(e) => setDeclineCompetingForUnit(e.target.checked)}
+                        className="w-3.5 h-3.5 rounded border-emerald-400 text-emerald-600 focus:ring-emerald-500"
+                      />
+                      <span>Auto-decline competing applicants for this unit</span>
+                    </label>
+                  )}
                 </div>
               )}
 

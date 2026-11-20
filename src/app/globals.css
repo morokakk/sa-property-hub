@@ -35,6 +35,15 @@ table, th, td, .tabular-nums, [data-metric], [data-currency] {
   font-variant-numeric: tabular-nums;
 }
 
+/* Native modal dialog scroll-chain containment */
+dialog:modal {
+  overscroll-behavior: contain;
+}
+dialog::backdrop {
+  overflow: hidden;
+  overscroll-behavior: contain;
+}
+
 /* Custom Scrollbar for clean financial dashboards */
 ::-webkit-scrollbar {
   width: 6px;

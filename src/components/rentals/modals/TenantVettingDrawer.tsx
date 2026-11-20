@@ -27,8 +27,9 @@ export interface TenantVettingDrawerProps {
   scorecard?: TenantVettingScorecard;
   monthlyRentZAR: number;
   onUpdateScorecard: (scorecard: TenantVettingScorecard) => void;
-  onApplyDeposit: (calculatedDepositZAR: number) => void;
+  onApplyDeposit?: (calculatedDepositZAR: number) => void;
   isGuarantorNeeded?: boolean;
+  defaultExpanded?: boolean;
 }
 
 export const TenantVettingDrawer: React.FC<TenantVettingDrawerProps> = ({
@@ -36,8 +37,9 @@ export const TenantVettingDrawer: React.FC<TenantVettingDrawerProps> = ({
   monthlyRentZAR,
   onUpdateScorecard,
   onApplyDeposit,
+  defaultExpanded = false,
 }) => {
-  const [isOpen, setIsOpen] = useState<boolean>(false);
+  const [isOpen, setIsOpen] = useState<boolean>(Boolean(defaultExpanded));
 
   // Local editable input values fallback to scorecard or defaults
   const todayIso = new Date().toISOString().split('T')[0];
@@ -492,20 +494,22 @@ export const TenantVettingDrawer: React.FC<TenantVettingDrawerProps> = ({
               )}
             </div>
 
-            <button
-              type="button"
-              disabled={
-                !isPopiaChecked ||
-                evaluation.riskGrade === 'Grade D (Decline)' ||
-                evaluation.isPendingInputs ||
-                recommendedDepositAmount <= 0
-              }
-              onClick={() => onApplyDeposit(recommendedDepositAmount)}
-              className="px-3 py-1.5 text-[11px] font-bold rounded-lg transition-colors cursor-pointer disabled:cursor-not-allowed disabled:opacity-40 bg-indigo-600 hover:bg-indigo-700 text-white shadow-xs shrink-0 flex items-center justify-center gap-1.5"
-            >
-              <CheckCircle2 className="w-3.5 h-3.5" />
-              Apply Recommended Deposit ({formatZAR(recommendedDepositAmount)})
-            </button>
+            {onApplyDeposit && (
+              <button
+                type="button"
+                disabled={
+                  !isPopiaChecked ||
+                  evaluation.riskGrade === 'Grade D (Decline)' ||
+                  evaluation.isPendingInputs ||
+                  recommendedDepositAmount <= 0
+                }
+                onClick={() => onApplyDeposit(recommendedDepositAmount)}
+                className="px-3 py-1.5 text-[11px] font-bold rounded-lg transition-colors cursor-pointer disabled:cursor-not-allowed disabled:opacity-40 bg-indigo-600 hover:bg-indigo-700 text-white shadow-xs shrink-0 flex items-center justify-center gap-1.5"
+              >
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                Apply Recommended Deposit ({formatZAR(recommendedDepositAmount)})
+              </button>
+            )}
           </div>
         </div>
       )}

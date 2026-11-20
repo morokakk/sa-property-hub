@@ -1,5 +1,13 @@
 import { useState, useCallback } from 'react';
-import { RentalProperty } from '@/types';
+import { RentalProperty, TenantVettingScorecard } from '@/types';
+
+export interface NoticeReplacementPrefill {
+  applicantId: string;
+  tenantName: string;
+  tenantPhone?: string;
+  vettingScorecard?: TenantVettingScorecard;
+  recommendedDepositZAR?: number;
+}
 
 export interface UseRentalModalStateReturn {
   isRentalFormOpen: boolean;
@@ -47,8 +55,19 @@ export interface UseRentalModalStateReturn {
   isNoticeModalOpen: boolean;
   noticeProperty: RentalProperty | null;
   noticeLeaseId: string | null;
-  openNoticeModal: (property: RentalProperty, leaseId?: string) => void;
+  noticeReplacementPrefill: NoticeReplacementPrefill | null;
+  openNoticeModal: (
+    property: RentalProperty,
+    leaseId?: string,
+    prefillReplacement?: NoticeReplacementPrefill
+  ) => void;
   closeNoticeModal: () => void;
+
+  isApplicantsModalOpen: boolean;
+  applicantsProperty: RentalProperty | null;
+  applicantsUnitFilter: string | null;
+  openApplicantsModal: (property: RentalProperty, unitName?: string) => void;
+  closeApplicantsModal: () => void;
 }
 
 export function useRentalModalState(): UseRentalModalStateReturn {
@@ -172,17 +191,45 @@ export function useRentalModalState(): UseRentalModalStateReturn {
   const [isNoticeModalOpen, setIsNoticeModalOpen] = useState(false);
   const [noticeProperty, setNoticeProperty] = useState<RentalProperty | null>(null);
   const [noticeLeaseId, setNoticeLeaseId] = useState<string | null>(null);
+  const [noticeReplacementPrefill, setNoticeReplacementPrefill] =
+    useState<NoticeReplacementPrefill | null>(null);
 
-  const openNoticeModal = useCallback((property: RentalProperty, leaseId?: string) => {
-    setNoticeProperty(property);
-    setNoticeLeaseId(leaseId || null);
-    setIsNoticeModalOpen(true);
-  }, []);
+  const openNoticeModal = useCallback(
+    (
+      property: RentalProperty,
+      leaseId?: string,
+      prefillReplacement?: NoticeReplacementPrefill
+    ) => {
+      setNoticeProperty(property);
+      setNoticeLeaseId(leaseId || null);
+      setNoticeReplacementPrefill(prefillReplacement || null);
+      setIsNoticeModalOpen(true);
+    },
+    []
+  );
 
   const closeNoticeModal = useCallback(() => {
     setIsNoticeModalOpen(false);
     setNoticeProperty(null);
     setNoticeLeaseId(null);
+    setNoticeReplacementPrefill(null);
+  }, []);
+
+  // Open-Day Rental Applicants & Waitlist Modal
+  const [isApplicantsModalOpen, setIsApplicantsModalOpen] = useState(false);
+  const [applicantsProperty, setApplicantsProperty] = useState<RentalProperty | null>(null);
+  const [applicantsUnitFilter, setApplicantsUnitFilter] = useState<string | null>(null);
+
+  const openApplicantsModal = useCallback((property: RentalProperty, unitName?: string) => {
+    setApplicantsProperty(property);
+    setApplicantsUnitFilter(unitName || null);
+    setIsApplicantsModalOpen(true);
+  }, []);
+
+  const closeApplicantsModal = useCallback(() => {
+    setIsApplicantsModalOpen(false);
+    setApplicantsProperty(null);
+    setApplicantsUnitFilter(null);
   }, []);
 
   return {
@@ -231,7 +278,14 @@ export function useRentalModalState(): UseRentalModalStateReturn {
     isNoticeModalOpen,
     noticeProperty,
     noticeLeaseId,
+    noticeReplacementPrefill,
     openNoticeModal,
     closeNoticeModal,
+
+    isApplicantsModalOpen,
+    applicantsProperty,
+    applicantsUnitFilter,
+    openApplicantsModal,
+    closeApplicantsModal,
   };
 }

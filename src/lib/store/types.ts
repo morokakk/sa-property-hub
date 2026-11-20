@@ -3,6 +3,7 @@ import {
   RentalProperty,
   Lease,
   LeaseInspectionRecord,
+  RentalApplicant,
   ExtractedRentalUnit,
   RentalRefinanceParams,
   FlipProject,
@@ -79,6 +80,32 @@ export interface RentalSliceActions {
       replacementLease?: Partial<Lease>;
       inspectionRecord?: LeaseInspectionRecord;
       depositRefundedZAR?: number;
+      placedApplicantId?: string;
+      declineCompetingForUnit?: boolean;
+    }
+  ) => void;
+  addRentalApplicant: (
+    propertyId: string,
+    applicant: Omit<RentalApplicant, 'id' | 'createdAt'>
+  ) => void;
+  updateRentalApplicant: (
+    propertyId: string,
+    applicantId: string,
+    updates: Partial<Omit<RentalApplicant, 'id' | 'createdAt'>>
+  ) => void;
+  deleteRentalApplicant: (propertyId: string, applicantId: string) => void;
+  onboardApplicantToVacantUnit: (
+    propertyId: string,
+    leaseId: string,
+    applicantId: string,
+    params: {
+      monthlyRentZAR: number;
+      depositHeldZAR: number;
+      leaseStartDate: string;
+      leaseEndDate: string;
+      annualEscalationPercent?: number;
+      tenantEmail?: string;
+      declineCompetingForUnit?: boolean;
     }
   ) => void;
 }

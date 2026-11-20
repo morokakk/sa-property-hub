@@ -157,6 +157,10 @@ export function unmapRentals(rows: Database['public']['Tables']['properties']['R
     extraMonthlyPaymentZAR: toNullableNum((r as any).extra_monthly_payment_zar) ?? undefined,
     leases: parseJson(r.leases, []),
     archivedLeases: parseJson((r as any).archived_leases, []),
+    applicants: (() => {
+      const parsed = parseJson((r as any).applicants, [] as any[]);
+      return Array.isArray(parsed) ? parsed : [];
+    })(),
     managementType: (r.management_type as any) || undefined,
     agencyName: r.agency_name || undefined,
     agencyCommissionPercent: toNullableNum(r.agency_commission_percent),

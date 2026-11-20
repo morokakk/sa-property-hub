@@ -27,6 +27,8 @@ import {
   Trash2,
   Clock,
   MoreHorizontal,
+  Users,
+  UserPlus,
 } from 'lucide-react';
 
 export interface RentalCardProps {
@@ -44,6 +46,7 @@ export interface RentalCardProps {
   onOpenStatementModal: (propertyId: string) => void;
   onOpenPmtCalculator: (property: RentalProperty) => void;
   onOpenNoticeModal?: (property: RentalProperty, leaseId?: string) => void;
+  onOpenApplicantsModal?: (property: RentalProperty, unitName?: string) => void;
   onOpenLogPayment: (
     property: RentalProperty,
     targetMonth?: string,
@@ -77,6 +80,7 @@ function RentalCard({
   onOpenStatementModal,
   onOpenPmtCalculator,
   onOpenNoticeModal,
+  onOpenApplicantsModal,
   onOpenLogPayment,
   onOpenEditPayment,
   onOpenWriteOff,
@@ -122,7 +126,19 @@ function RentalCard({
     [property, calculatedCashflow.netMonthlyCashflowZAR, investorDefaultTaxType]
   );
   const arrearsInfo = useMemo(() => calculatePropertyArrears(property), [property]);
-  const noticeLease = (property.leases || []).find((l) => l.status === 'Notice Given');
+  const leases = property.leases || [];
+  const noticeLeases = leases.filter((l) => l.status === 'Notice Given');
+  const noticeLease = noticeLeases[0];
+  const vacantLeases = leases.filter((l) => l.status === 'Vacant');
+  const totalApplicants = property.applicants?.length || 0;
+  const isVacantBanner =
+    noticeLeases.length === 0 &&
+    (vacantLeases.length > 0 ||
+      property.status === 'Vacant' ||
+      property.status === 'Partially Vacant');
+  const isPartialVacancy =
+    property.status === 'Partially Vacant' ||
+    (vacantLeases.length > 0 && vacantLeases.length < leases.length);
 
   return (
     <div
@@ -145,8 +161,8 @@ function RentalCard({
           onDeleteProperty={() => onDeleteProperty(property.id, property.title)}
         />
 
-        {/* Tenant Notice Alert Banner */}
-        {noticeLease && (
+        {/* Contextual Turnover & Applicant Banner */}
+        {noticeLease ? (
           <div
             data-sensitive="true"
             className="bg-amber-50 border-b border-amber-200 px-4 py-2 flex items-center justify-between text-xs gap-2"
@@ -154,20 +170,114 @@ function RentalCard({
             <span className="flex items-center gap-1.5 font-bold text-amber-900 truncate">
               <Clock className="w-3.5 h-3.5 text-amber-600 shrink-0" />
               <span className="truncate">
-                Notice: {noticeLease.tenantName} vacating {formatDate(noticeLease.vacationDate || '')} ({noticeLease.noticeReason || 'Moving Out'})
+                {noticeLeases.length > 1
+                  ? `${noticeLeases.length} Units on Notice (${noticeLeases
+                      .map((l) => l.unitName)
+                      .join(', ')})`
+                  : `Notice: ${noticeLease.tenantName} vacating ${formatDate(
+                      noticeLease.vacationDate || ''
+                    )} (${noticeLease.noticeReason || 'Moving Out'})`}
               </span>
             </span>
-            {onOpenNoticeModal && (
+            <div className="flex items-center gap-1.5 shrink-0">
+              {onOpenApplicantsModal && (
+                <button
+                  type="button"
+                  onClick={() =>
+                    onOpenApplicantsModal(
+                      property,
+                      noticeLeases.length === 1 ? noticeLease.unitName : undefined
+                    )
+                  }
+                  className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-950 bg-white/80 hover:bg-white border border-amber-300 px-2 py-0.5 rounded shrink-0 transition-colors cursor-pointer"
+                >
+                  <Users className="w-3 h-3 text-amber-700" />
+                  <span>Applicants ({totalApplicants})</span>
+                </button>
+              )}
+              {onOpenNoticeModal && (
+                <button
+                  type="button"
+                  onClick={() => onOpenNoticeModal(property, noticeLease.id)}
+                  className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-900 bg-amber-200/80 hover:bg-amber-300 px-2 py-0.5 rounded shrink-0 transition-colors cursor-pointer"
+                >
+                  <span>Move-Out</span>
+                </button>
+              )}
+            </div>
+          </div>
+        ) : isVacantBanner ? (
+          <div
+            data-sensitive="true"
+            className={`border-b px-4 py-2 flex items-center justify-between text-xs gap-2 ${
+              isPartialVacancy
+                ? 'bg-orange-50 border-orange-200 text-orange-900'
+                : 'bg-rose-50 border-rose-200 text-rose-900'
+            }`}
+          >
+            <span className="flex items-center gap-1.5 font-bold truncate">
+              <Users
+                className={`w-3.5 h-3.5 shrink-0 ${
+                  isPartialVacancy ? 'text-orange-600' : 'text-rose-600'
+                }`}
+              />
+              <span className="truncate">
+                {leases.length > 1 && vacantLeases.length > 0
+                  ? `${vacantLeases.length} of ${leases.length} Units Vacant`
+                  : 'Vacant Unit'}
+              </span>
+            </span>
+            {onOpenApplicantsModal && (
               <button
                 type="button"
-                onClick={() => onOpenNoticeModal(property, noticeLease.id)}
-                className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-900 bg-amber-200/80 hover:bg-amber-300 px-2 py-0.5 rounded shrink-0 transition-colors cursor-pointer"
+                onClick={() =>
+                  onOpenApplicantsModal(
+                    property,
+                    vacantLeases.length === 1 ? vacantLeases[0].unitName : undefined
+                  )
+                }
+                className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded border shrink-0 transition-colors cursor-pointer ${
+                  isPartialVacancy
+                    ? 'bg-orange-100 hover:bg-orange-200 text-orange-950 border-orange-300'
+                    : 'bg-rose-100 hover:bg-rose-200 text-rose-950 border-rose-300'
+                }`}
               >
-                <span>Move-Out</span>
+                {totalApplicants > 0 ? (
+                  <>
+                    <Users className="w-3 h-3" />
+                    <span>Applicants ({totalApplicants})</span>
+                  </>
+                ) : (
+                  <>
+                    <UserPlus className="w-3 h-3" />
+                    <span>+ Log Lead</span>
+                  </>
+                )}
               </button>
             )}
           </div>
-        )}
+        ) : totalApplicants > 0 ? (
+          <div
+            data-sensitive="true"
+            className="bg-slate-50 border-b border-slate-200 px-4 py-1.5 flex items-center justify-between text-xs gap-2"
+          >
+            <span className="flex items-center gap-1.5 font-semibold text-slate-700 truncate">
+              <Users className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+              <span className="truncate">
+                {totalApplicants} Waitlist Lead{totalApplicants === 1 ? '' : 's'}
+              </span>
+            </span>
+            {onOpenApplicantsModal && (
+              <button
+                type="button"
+                onClick={() => onOpenApplicantsModal(property)}
+                className="inline-flex items-center gap-1 text-[10px] font-bold text-slate-700 bg-white hover:bg-slate-100 border border-slate-300 px-2 py-0.5 rounded shrink-0 transition-colors cursor-pointer"
+              >
+                <span>View</span>
+              </button>
+            )}
+          </div>
+        ) : null}
 
         {/* Card Tab Switcher */}
         <div className="flex border-b border-slate-200 bg-slate-100/70 p-1 gap-1 text-[11px] font-semibold">
@@ -379,6 +489,26 @@ function RentalCard({
                   <Edit3 className="w-3.5 h-3.5 text-indigo-500" />
                   <span>Edit Property</span>
                 </button>
+                {onOpenApplicantsModal && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsMoreMenuOpen(false);
+                      onOpenApplicantsModal(property);
+                    }}
+                    className="w-full text-left px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 hover:text-indigo-700 flex items-center justify-between gap-2 transition-colors cursor-pointer"
+                  >
+                    <span className="flex items-center gap-2">
+                      <Users className="w-3.5 h-3.5 text-indigo-500" />
+                      <span>Applicants / Waitlist</span>
+                    </span>
+                    {totalApplicants > 0 && (
+                      <span className="text-[10px] font-bold px-1.5 py-0.2 rounded-full bg-indigo-100 text-indigo-800">
+                        {totalApplicants}
+                      </span>
+                    )}
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={() => {

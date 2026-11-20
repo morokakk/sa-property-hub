@@ -82,6 +82,17 @@ describe('hydrateFromCloud Reverse Mappers', () => {
         bond_payment_effective_date: '2024-06-01',
         bond_revision_note: null,
         leases: [{ id: 'lease-1', tenantName: 'Jane Doe', monthlyRentZAR: 16000 }],
+        applicants: [
+          {
+            id: 'app-c1',
+            unitName: 'Main Unit',
+            fullName: 'Sipho Lead',
+            phone: '0821113333',
+            monthlyBudgetZAR: 16000,
+            status: 'Applied',
+            createdAt: '2026-11-20T08:00:00Z',
+          },
+        ],
         management_type: 'Agency',
         agency_name: 'Rawson Sandton',
         agency_commission_percent: 8,
@@ -146,7 +157,13 @@ describe('hydrateFromCloud Reverse Mappers', () => {
     expect(result[0].meterRegistry?.[0].meterNumber).toBe('EM-100');
     expect(result[0].leases).toHaveLength(1);
     expect(result[0].leases[0].tenantName).toBe('Jane Doe');
+    expect(result[0].applicants).toHaveLength(1);
+    expect(result[0].applicants?.[0].fullName).toBe('Sipho Lead');
     expect(result[0].agencyVatApplicable).toBe(true);
+
+    // Non-array applicants column normalizes safely to []
+    const malformed = unmapRentals([{ ...propRows[0], applicants: { bad: true } } as any]);
+    expect(malformed[0].applicants).toEqual([]);
   });
 
   it('correctly reverse-maps flips and de-normalizes child BOQ items into flip.boq', () => {
