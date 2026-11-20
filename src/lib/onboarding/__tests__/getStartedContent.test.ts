@@ -130,6 +130,16 @@ describe('Get Started content integrity', () => {
     expect(tasksCreate).toBeDefined();
     expect([tasksCreate!.summary, ...tasksCreate!.howTo].join(' ')).toContain('Sync to /tasks');
   });
+
+  it('documents Rental Portfolio Open-Day Applicants & Waitlist and Place Tenant workflow', () => {
+    const rentalsMod = GET_STARTED_STAGES[3].modules.find((m) => m.id === 'rentals');
+    expect(rentalsMod).toBeDefined();
+    const rentalsText = rentalsMod!.features
+      .flatMap((f) => [f.title, f.summary, ...f.howTo, f.proTip])
+      .join(' ');
+    expect(rentalsText).toContain('Applicants / Waitlist');
+    expect(rentalsText).toContain('Place Tenant');
+  });
 });
 
 describe('guide helpers', () => {

@@ -437,10 +437,11 @@ export const GET_STARTED_STAGES: readonly JourneyStage[] = [
           {
             id: 'rentals-tenants-ledger',
             title: 'Tenants, Ledger & Inspections',
-            summary: 'Lease details, tenant vetting, RHA Section 5 joint inspections, bond paydown, and monthly arrears.',
+            summary:
+              'Lease details, open-day applicants & waitlist, POPIA/PIE Act tenant vetting, RHA Section 5 joint inspections, bond paydown, and monthly arrears.',
             howTo: [
               'On a rental card, open Lease & Costs to score credit with Pre-Lease Vetting and record an 8-Point Ingoing Inspection (RHA Sec 5).',
-              'When a tenant vacates, use Notice & Move-Out to run a joint Exit Inspection, log repair deductions, and settle the net deposit refund.',
+              'Use Applicants / Waitlist (from the turnover banner or More menu) to capture open-day leads, vet them inline under POPIA/PIE Act, and click Place Tenant or Assign as Replacement when a tenant gives notice or vacates via Notice & Move-Out.',
               'Click Maintenance (N) to track work orders with status badges (Open/In Progress/Resolved), dispatch contractors via WhatsApp, and record final invoice amounts.',
             ],
             proTip:
