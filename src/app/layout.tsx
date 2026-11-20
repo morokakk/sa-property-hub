@@ -25,11 +25,14 @@ export const metadata: Metadata = {
   },
   icons: {
     icon: [
-      { url: '/moremela-icon.svg?v=3', type: 'image/svg+xml' },
-      { url: '/favicon.ico?v=3', sizes: '32x32' },
+      { url: '/favicon.ico?v=4', sizes: 'any' },
+      { url: '/icon-48.png?v=4', sizes: '48x48', type: 'image/png' },
+      { url: '/icon-96.png?v=4', sizes: '96x96', type: 'image/png' },
+      { url: '/icon-192.png?v=4', sizes: '192x192', type: 'image/png' },
+      { url: '/moremela-icon.svg?v=4', type: 'image/svg+xml' },
     ],
-    shortcut: '/moremela-icon.svg?v=3',
-    apple: '/apple-icon.png?v=3',
+    shortcut: '/favicon.ico?v=4',
+    apple: '/apple-icon.png?v=4',
   },
 };
 
@@ -44,6 +47,7 @@ const softwareApplicationJsonLd = {
     '@type': 'Organization',
     name: 'Moremela Properties (Pty) Ltd',
     identifier: '2026/838397/07',
+    logo: 'https://www.moremelaproperties.co.za/icon-192.png',
   },
   description:
     'South African property underwriting for SARS transfer duty, LSSA conveyancing tariffs, flips, and rentals.',
