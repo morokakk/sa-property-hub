@@ -20,25 +20,27 @@ test.describe('Welcome Landing Page (/) & /welcome Redirect', () => {
 
     const goals = [
       {
-        tab: 'Monthly Cash Flow',
+        tab: 'Generate Monthly Cash Flow',
         goalText: 'Cover school or varsity fees, supplement household income, or replace your salary.',
-        ctaText: 'Explore Rental Portfolio',
+        ctaText: 'Open Rental Portfolio',
         ctaHref: '/rentals',
       },
       {
-        tab: 'Build a Lump-Sum Cash War Chest',
-        goalText: 'Generate lump-sum capital from renovations and flips to pay off debt or fund your next acquisition.',
-        ctaText: 'Explore Buy-and-Flip Manager',
+        tab: 'Build a Lump-Sum War Chest',
+        goalText: 'Turn renovations and flips into cash to pay off debt or fund your next acquisition.',
+        ctaText: 'Open Buy-and-Flip Manager',
         ctaHref: '/flips',
       },
       {
         tab: 'Vet a Deal Before You Sign',
         goalText: "Know your true Day-1 cash requirement and net return before committing your family's capital.",
+        howText:
+          'Calculate instant SARS transfer duty, LPC conveyancing & bond tariffs, Section 118 arrears buffers, and your Maximum Allowable Offer (Max Bid).',
         ctaText: 'Open Opportunity Analyzer',
         ctaHref: '/analyzer',
       },
       {
-        tab: 'Long-Term Wealth & Partners',
+        tab: 'Compound Wealth & Pitch Partners',
         goalText: 'Compound debt-free equity over 20 years, recycle capital via BRRRR, and raise private funding professionally.',
         ctaText: 'Open Proposal Generator',
         ctaHref: '/proposal',
@@ -48,6 +50,9 @@ test.describe('Welcome Landing Page (/) & /welcome Redirect', () => {
     for (const goal of goals) {
       await switcher.locator('button', { hasText: goal.tab }).click();
       await expect(switcher).toContainText(goal.goalText);
+      if (goal.howText) {
+        await expect(switcher).toContainText(goal.howText);
+      }
       const ctaLink = switcher.locator('a', { hasText: goal.ctaText });
       await expect(ctaLink).toBeVisible();
       await expect(ctaLink).toHaveAttribute('href', goal.ctaHref);

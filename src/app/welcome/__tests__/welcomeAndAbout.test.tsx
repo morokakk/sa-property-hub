@@ -46,22 +46,30 @@ describe('Root Welcome Landing Page (/) & /welcome Redirect', () => {
 
     // Interactive Life Goal Switcher
     expect(html).toContain('data-testid="life-goal-switcher"');
+    expect(html).toContain('Start With Your Goal');
+    expect(html).not.toContain('Interactive Goal Alignment');
     expect(html).toContain('“What is your next property meant to do for your life?”');
-    expect(html).toContain('Monthly Cash Flow');
-    expect(html).toContain('Build a Lump-Sum Cash War Chest');
+    expect(html).toContain('Generate Monthly Cash Flow');
+    expect(html).toContain('Build a Lump-Sum War Chest');
     expect(html).toContain('Vet a Deal Before You Sign');
-    expect(html).toContain('Long-Term Wealth &amp; Partners');
+    expect(html).toContain('Compound Wealth &amp; Pitch Partners');
 
-    // Default active goal (Monthly Cash Flow)
+    // Default active goal (Generate Monthly Cash Flow)
     expect(html).toContain('Cover school or varsity fees, supplement household income, or replace your salary.');
-    expect(html).toContain('Explore Rental Portfolio ➔');
+    expect(html).toContain('Open Rental Portfolio ➔');
     expect(html).toContain('href="/rentals"');
 
     // Section 2: 3-Column Card Grid
+    expect(html).toContain('Built for South Africa');
+    expect(html).not.toContain('Protection &amp; Growth Architecture');
     expect(html).toContain('Guard the Kraal. Grow the Baobab.');
-    expect(html).toContain('Guard Your Day-1 Cash (The Kraal)');
+    expect(html).toContain('Guard Your Day-1 Cash');
+    expect(html).not.toContain('Guard Your Day-1 Cash (The Kraal)');
+    expect(html).toContain('LPC legal fees');
+    expect(html).not.toContain('LSSA legal fees');
     expect(html).toContain('Run Operations From Your Phone');
-    expect(html).toContain('Pitch Lenders &amp; Partners Instantly (The Baobab)');
+    expect(html).toContain('Pitch Lenders &amp; Partners Instantly');
+    expect(html).not.toContain('Pitch Lenders &amp; Partners Instantly (The Baobab)');
 
     // Footer
     expect(html).toContain('Global Portfolio');
@@ -101,9 +109,14 @@ describe('Hidden About Us & Founder Story Page (/about)', () => {
     expect(html).toContain('Back to Workspace');
     expect(html).toMatch(/<a[^>]*href="\/dashboard"[^>]*>[\s\S]*?Back to Workspace/);
 
+    // Card Entity Header
+    expect(html).toContain('Founder Story &amp; Vision');
+    expect(html).not.toContain('2026/838397/07');
+    expect(html).not.toContain('Reg. No:');
+
     // Founder Story Container
     expect(html).toContain('data-testid="about-founder-story"');
-    expect(html).toContain('Build Your Family. Build South Africa. One Property at a Time.');
+    expect(html).toContain('Build Your Family’s Legacy. Build South Africa. One Property at a Time.');
 
     // Historical & Cultural Narrative Details
     expect(html).toContain('Nobody buys a property because they are in love with spreadsheets or tax brackets');
@@ -113,9 +126,21 @@ describe('Hidden About Us & Founder Story Page (/about)', () => {
     expect(html).toContain('lesaka');
     expect(html).toContain('Sally Motlana');
     expect(html).toContain('Order of the Baobab');
+    expect(html).not.toContain('National <strong>Order of the Baobab</strong>');
     expect(html).toContain('Our Vision');
     expect(html).toContain('The Stepped Kraal at the base is protection');
     expect(html).toContain('The Baobab rising from the center is why you do the work');
+
+    // Zero em dashes in founder story prose
+    const storyHtml = html.slice(html.indexOf('data-testid="about-founder-story"'));
+    expect(storyHtml).not.toContain('—');
+
+    // Standalone closing paragraph and Founder Sign-Off before CTA
+    expect(html).toContain('Kenosi Moroka');
+    expect(html).toContain('Founder, Moremela Properties');
+    expect(html).toMatch(
+      /<\/ul>[\s\S]*Whether you are adding a cottage to your family home[\s\S]*Kenosi Moroka[\s\S]*Founder, Moremela Properties[\s\S]*Open Portfolio Workspace ➔/
+    );
 
     // Bottom CTA -> /dashboard
     expect(html).toContain('Open Portfolio Workspace ➔');

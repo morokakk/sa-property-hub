@@ -65,7 +65,7 @@ export default function AboutPage() {
                 Moremela Properties (Pty) Ltd
               </span>
               <span className="text-[11px] text-slate-500 font-medium">
-                Reg. No: 2026/838397/07 • Founder Story &amp; Vision
+                Founder Story &amp; Vision
               </span>
             </div>
           </div>
@@ -73,7 +73,7 @@ export default function AboutPage() {
           {/* Founder Story Container */}
           <div data-testid="about-founder-story" className="space-y-6 text-slate-700 leading-relaxed text-sm sm:text-base">
             <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900 leading-snug">
-              Build Your Family. Build South Africa. One Property at a Time.
+              Build Your Family’s Legacy. Build South Africa. One Property at a Time.
             </h1>
 
             <p className="text-slate-800 font-medium">
@@ -81,7 +81,7 @@ export default function AboutPage() {
               rental flat, build backyard units, or flip a run-down house in the suburbs because life is moving. Maybe
               your family is growing and you need extra income that doesn&apos;t depend on a boss. Maybe you want one rental
               property paying for each of your children’s university fees. Or maybe you want to make sure that when you
-              retire, you leave your kids a tangible foundation—not debt.
+              retire, you leave your kids a tangible foundation, not debt.
             </p>
 
             <div className="space-y-2.5 pt-2">
@@ -89,7 +89,7 @@ export default function AboutPage() {
               <p>
                 I didn’t start building Moremela Properties as a tech company. I started building it for a friend who
                 was trying to grow a property portfolio on his own. When we looked at the tools available in South
-                Africa, we saw a massive gap. On one side were the banks and big corporate software platforms—built for
+                Africa, we saw a massive gap. On one side were the banks and big corporate software platforms, built for
                 institutional funds with teams of accountants, full of cold numbers that treat you like a credit score.
                 On the other side were fragile Excel sheets and back-of-the-napkin calculations that leave solo
                 investors blind to the real traps of our local market: Deeds Office delays, surprise municipal arrears,
@@ -103,10 +103,10 @@ export default function AboutPage() {
               </h2>
               <p>
                 In Setswana, Sesotho, and Sepedi, <em>Moremela</em> (from <em>go remela</em>) means{' '}
-                <strong>&lsquo;the one who clears the way&rsquo;</strong>—the person who goes ahead with an axe to clear
-                the thorns and bush so the family can build the homestead (<em>lesaka</em> / <em>kraal</em>). That
-                name—and our emblem of the Baobab tree rising out of a stepped Kraal—is personal to me. My grandmother,{' '}
-                <strong>Sally Motlana</strong>, was awarded the National <strong>Order of the Baobab</strong> for
+                <strong>&lsquo;the one who clears the way&rsquo;</strong>: the person who goes ahead with an axe to
+                clear the thorns and bush so the family can build the homestead (<em>lesaka / kraal</em>). That name,
+                along with our emblem of the Baobab tree rising out of a stepped Kraal, is personal to me. My
+                grandmother, <strong>Sally Motlana</strong>, was awarded the <strong>Order of the Baobab</strong> for
                 spending her life fighting for the dignity and upliftment of our people. Her generation fought for our
                 right to stand on this soil. Our generation’s job is to turn that soil into lasting family security and
                 national wealth.
@@ -132,16 +132,22 @@ export default function AboutPage() {
                     <strong className="text-slate-900">
                       The Baobab rising from the center is why you do the work:
                     </strong>{' '}
-                    <span>
-                      Deep roots, shelter for your family, and wealth that outlives you. Whether you are adding a
-                      cottage to your family home, building multi-lets brick by brick, sourcing deals for partners, or
-                      flipping suburban houses—Moremela is here to clear the complicated math and admin out of your way,
-                      so you can focus on what actually matters: building a legacy for your family, and rebuilding our
-                      country from the ground up.
-                    </span>
+                    <span>Deep roots, shelter for your family, and wealth that outlives you.</span>
                   </div>
                 </li>
               </ul>
+
+              <p className="pt-2">
+                Whether you are adding a cottage to your family home, building multi-lets brick by brick, sourcing deals
+                for partners, or flipping suburban houses, Moremela is here to clear the complicated math and admin out
+                of your way, so you can focus on what actually matters: building a legacy for your family, and
+                rebuilding our country from the ground up.
+              </p>
+            </div>
+
+            <div className="pt-2">
+              <p className="font-semibold text-slate-900">Kenosi Moroka</p>
+              <p className="text-sm text-slate-500">Founder, Moremela Properties</p>
             </div>
 
             <div className="pt-6 border-t border-slate-100 flex justify-start">

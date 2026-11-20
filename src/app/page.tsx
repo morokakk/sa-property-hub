@@ -27,22 +27,22 @@ interface LifeGoalOption {
 const LIFE_GOALS: LifeGoalOption[] = [
   {
     id: 'cashflow',
-    title: 'Monthly Cash Flow',
+    title: 'Generate Monthly Cash Flow',
     icon: Building2,
     humanGoal: 'Cover school or varsity fees, supplement household income, or replace your salary.',
     howClearsWay:
       'Track single-lets or multi-let rooms, manage utility & prepaid sub-meter recoveries, monitor arrears, and generate 1-click tenant statements.',
-    ctaLabel: 'Explore Rental Portfolio ➔',
+    ctaLabel: 'Open Rental Portfolio ➔',
     ctaHref: '/rentals',
   },
   {
     id: 'flips',
-    title: 'Build a Lump-Sum Cash War Chest',
+    title: 'Build a Lump-Sum War Chest',
     icon: Hammer,
-    humanGoal: 'Generate lump-sum capital from renovations and flips to pay off debt or fund your next acquisition.',
+    humanGoal: 'Turn renovations and flips into cash to pay off debt or fund your next acquisition.',
     howClearsWay:
       'Manage 10-trade BOQ budgets, stage-gated contractor draws, Section 118 municipal clearance timelines, and holding cost burn on-site.',
-    ctaLabel: 'Explore Buy-and-Flip Manager ➔',
+    ctaLabel: 'Open Buy-and-Flip Manager ➔',
     ctaHref: '/flips',
   },
   {
@@ -51,13 +51,13 @@ const LIFE_GOALS: LifeGoalOption[] = [
     icon: Calculator,
     humanGoal: "Know your true Day-1 cash requirement and net return before committing your family's capital.",
     howClearsWay:
-      'Instant SARS transfer duty, LSSA conveyancing & bond tariffs, Section 118 arrears buffers, and Maximum Allowable Offer (Max Bid) calculation.',
+      'Calculate instant SARS transfer duty, LPC conveyancing & bond tariffs, Section 118 arrears buffers, and your Maximum Allowable Offer (Max Bid).',
     ctaLabel: 'Open Opportunity Analyzer ➔',
     ctaHref: '/analyzer',
   },
   {
     id: 'wealth',
-    title: 'Long-Term Wealth & Partners',
+    title: 'Compound Wealth & Pitch Partners',
     icon: FileText,
     humanGoal: 'Compound debt-free equity over 20 years, recycle capital via BRRRR, and raise private funding professionally.',
     howClearsWay:
@@ -158,7 +158,7 @@ export default function WelcomePage() {
           >
             <div>
               <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-700 block mb-1">
-                Interactive Goal Alignment
+                Start With Your Goal
               </span>
               <h2 className="text-base sm:text-lg font-bold text-slate-900">
                 &ldquo;What is your next property meant to do for your life?&rdquo;
@@ -237,7 +237,7 @@ export default function WelcomePage() {
         <section className="space-y-6">
           <div className="text-center max-w-2xl mx-auto space-y-1.5">
             <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-700">
-              Protection &amp; Growth Architecture
+              Built for South Africa
             </span>
             <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900">
               Guard the Kraal. Grow the Baobab.
@@ -255,11 +255,11 @@ export default function WelcomePage() {
                   <ShieldCheck className="w-5 h-5" strokeWidth={1.75} />
                 </div>
                 <h3 className="text-base font-bold text-slate-900">
-                  Guard Your Day-1 Cash (The Kraal)
+                  Guard Your Day-1 Cash
                 </h3>
                 <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
                   Stop losing margin to hidden South African transaction traps. Automatically model SARS transfer duties,
-                  LSSA legal fees, Section 118 municipal arrears, and provisional tax reserves.
+                  LPC legal fees, Section 118 municipal arrears, and provisional tax reserves.
                 </p>
               </div>
               <div className="pt-2 border-t border-slate-100 text-xs font-semibold text-emerald-700 flex items-center gap-1">
@@ -291,7 +291,7 @@ export default function WelcomePage() {
                   <TrendingUp className="w-5 h-5" strokeWidth={1.75} />
                 </div>
                 <h3 className="text-base font-bold text-slate-900">
-                  Pitch Lenders &amp; Partners Instantly (The Baobab)
+                  Pitch Lenders &amp; Partners Instantly
                 </h3>
                 <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
                   Turn any analyzed deal, active flip, or rental into a structured WhatsApp investment memo or a
