@@ -468,24 +468,25 @@ export async function exportPortfolioToExcel(data: ExportPortfolioData) {
 }
 
 /**
- * Builds and downloads a SARS ITR12 Rental Income and Expenses Tax Report (.xlsx)
- * strictly formatted with official SARS ITR12 rental codes:
- * - Gross Rental Income (Code 4210)
- * - Rates & Taxes (Code 4212)
- * - Body Corporate / HOA Levies (Code 4214)
- * - Bond Interest Section 11(a) (Code 4216 - excludes non-deductible capital repayments)
- * - Agent Commission / Management Fees (Code 4218)
- * - Insurance Premiums (Code 4220)
- * - Repairs & Maintenance (Code 4222)
- * - Bad Debts Written Off (Code 4226)
- * - SARS Section 13sex Allowance (Code 4224)
+ * Builds and downloads an entity-neutral SARS Rental Income & Expenses Tax Report (.xlsx)
+ * covering both Individual (ITR12) and Corporate (ITR14) schedules:
+ * - Gross Rental Income
+ * - Rates & Taxes
+ * - Body Corporate / HOA Levies
+ * - Section 11(a) Bond Interest (Deductible Expense - excludes non-deductible capital repayments)
+ * - Agent Commission / Management Fees
+ * - Insurance Premiums
+ * - Repairs & Maintenance
+ * - Bad Debts Written Off
+ * - Section 13sex Allowance
+ * - Net Taxable Rental Income / Loss (official rental source codes 4210 Profit / 4211 Loss)
  */
 export async function exportITR12TaxReport(rentals: RentalProperty[], taxYear: number | string = 2026) {
   const XLSX = await import('xlsx');
   const wb = XLSX.utils.book_new();
 
   const titleRows = [
-    ['SARS ITR12 - RENTAL INCOME & EXPENSES TAX SCHEDULE'],
+    ['SARS RENTAL INCOME & EXPENSES TAX SCHEDULE (ITR12 / ITR14)'],
     ['Tax Assessment Year', String(taxYear)],
     ['Generated On', new Date().toLocaleString('en-ZA')],
     ['Accounting Standard', 'SARS Section 11(a) Interest Deductions & Section 13sex Building Allowances'],
@@ -497,17 +498,17 @@ export async function exportITR12TaxReport(rentals: RentalProperty[], taxYear: n
     'Property Title',
     'Address',
     'City',
-    'Gross Rent (Code 4210)',
-    'Rates & Taxes (Code 4212)',
-    'Levies (Code 4214)',
-    'Bond Interest Sec 11(a) (Code 4216)',
-    'Agent Commission (Code 4218)',
-    'Insurance (Code 4220)',
-    'Repairs & Maint (Code 4222)',
-    'Bad Debts Written Off (Code 4226)',
-    'Section 13sex Allowance (Code 4224)',
+    'Gross Rental Income',
+    'Rates & Taxes',
+    'Body Corporate / HOA Levies',
+    'Section 11(a) Bond Interest (Deductible Expense)',
+    'Agent Commission / Management Fees',
+    'Insurance Premiums',
+    'Repairs & Maintenance',
+    'Bad Debts Written Off',
+    'Section 13sex Allowance',
     'Total Allowable Deductions',
-    'Net Taxable Rental Income / Loss',
+    'Net Taxable Rental Income / Loss (Code 4210 Profit / 4211 Loss)',
   ];
 
   let totalGross = 0;
@@ -612,16 +613,16 @@ export async function exportITR12TaxReport(rentals: RentalProperty[], taxYear: n
     { wch: 26 },
     { wch: 16 },
     { wch: 22 },
-    { wch: 22 },
-    { wch: 18 },
-    { wch: 30 },
-    { wch: 24 },
-    { wch: 18 },
-    { wch: 22 },
+    { wch: 20 },
     { wch: 26 },
-    { wch: 28 },
+    { wch: 44 },
+    { wch: 32 },
+    { wch: 20 },
+    { wch: 22 },
     { wch: 24 },
-    { wch: 28 },
+    { wch: 26 },
+    { wch: 26 },
+    { wch: 52 },
   ];
 
   XLSX.utils.book_append_sheet(wb, ws, `ITR12 Tax ${taxYear}`);

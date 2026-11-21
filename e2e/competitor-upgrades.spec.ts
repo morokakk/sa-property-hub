@@ -290,8 +290,9 @@ test.describe('Competitor-Inspired Upgrades Verification', () => {
       await expect(page.locator('text=Net Cash Flow YTD')).toBeVisible();
       await expect(page.getByText('Sec 11(a) Deductible Interest', { exact: true })).toBeVisible();
 
-      // Verify Section 11(a) ITR12 Code 4216 badge
-      await expect(page.locator('text=ITR12 Code 4216').first()).toBeVisible();
+      // Verify Section 11(a) bond interest badge (entity-neutral)
+      await expect(page.locator('text=Section 11(a) Interest').first()).toBeVisible();
+      await expect(page.locator('text=Rental Tax Shield').first()).toBeVisible();
       await expect(page.locator('text=SARS Shield Active')).toBeVisible();
 
       // Verify Consolidated Tax Reserve card

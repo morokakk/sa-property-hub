@@ -326,7 +326,7 @@ export default function ActualVsBudgetKpiStrip({
             Portfolio Occupancy YTD: <strong className="text-slate-900 font-bold">{formatPercent(occupancy.occupancyRatePercent)}</strong>
           </span>
           <span className="text-xs bg-emerald-50 border border-emerald-200 px-2.5 py-1.5 rounded-lg text-emerald-800 font-medium">
-            ITR12 Code 4216 Shield: <strong className="font-bold">{formatZAR(effectiveActualInterest)}</strong>
+            Sec 11(a) Rental Tax Shield: <strong className="font-bold">{formatZAR(effectiveActualInterest)}</strong>
           </span>
         </div>
       )}
@@ -426,7 +426,7 @@ export default function ActualVsBudgetKpiStrip({
           </div>
 
           <div className="mt-2.5 pt-2 border-t border-emerald-200/60 flex items-center justify-between text-[11px] text-emerald-800">
-            <span className="font-medium">ITR12 Code 4216</span>
+            <span className="font-medium">Section 11(a) Interest</span>
             <span className="font-bold">SARS Shield Active</span>
           </div>
         </div>

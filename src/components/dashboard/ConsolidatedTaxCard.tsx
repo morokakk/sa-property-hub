@@ -96,25 +96,25 @@ export default function ConsolidatedTaxCard({ summary, rentals }: ConsolidatedTa
       {/* Footer: SARS Section 11(a) Deductible Interest Shield */}
       <div
         className="pt-2.5 border-t border-slate-100 flex items-center justify-between gap-2 text-xs"
-        title="Reflects interest-only deduction per SARS ITR12 guidelines"
+        title="Reflects interest-only bond deduction under SARS Section 11(a); capital repayments are excluded."
       >
         <div className="flex items-center gap-1.5 min-w-0">
           <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
           <span className="text-slate-700 font-medium truncate">
-            Sec 11(a) Deductible Interest: <strong className="text-emerald-800 font-bold">{formatZAR(sec11aDeductibleInterest)}</strong>
+            Sec 11(a) Deductible Bond Interest: <strong className="text-emerald-800 font-bold">{formatZAR(sec11aDeductibleInterest)}</strong>
           </span>
           <span
             className="text-slate-400 hover:text-slate-600 cursor-help shrink-0"
-            title="Reflects interest-only deduction per SARS ITR12 guidelines"
+            title="Reflects interest-only bond deduction under SARS Section 11(a); capital repayments are excluded."
           >
             <Info className="w-3.5 h-3.5" />
           </span>
         </div>
         <span
           className="text-[10px] font-bold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full border border-emerald-200 shrink-0 whitespace-nowrap"
-          title="Reflects interest-only deduction per SARS ITR12 guidelines"
+          title="Reflects interest-only bond deduction under SARS Section 11(a); capital repayments are excluded."
         >
-          Code 4216 Shield
+          Rental Tax Shield
         </span>
       </div>
     </div>
