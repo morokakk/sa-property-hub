@@ -83,16 +83,16 @@ flowchart TD
   - Maximum file size target: `< 250 LOC`.
   - Responsible only for connecting Tier 2 domain hooks to Tier 3 visual components and passing action callbacks to the store facade.
 - **Key Server Actions & Standalone Controllers:**
-  - [`submitTenantMaintenanceTicket.ts`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/app/actions/submitTenantMaintenanceTicket.ts): Secure unauthenticated public intake for tenant work orders with sliding-window rate limiting (max 3/lease/hr), short tracking reference generation (e.g. `WO-4921`), and Supabase service-role persistence into `properties.maintenance_history`.
-  - [`sendStatementEmail.ts`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/app/actions/sendStatementEmail.ts): Resend-powered tenant statement delivery with attached PDF and payment reminders.
+  - [`submitTenantMaintenanceTicket.ts`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/app/actions/submitTenantMaintenanceTicket.ts): Capability-token validated public intake for tenant work orders (allowing `leaseId` fallback strictly for un-tokenized demo leases) with targeted JSONB containment lookup (zero full-table scans or in-place `INITIAL_RENTALS` mutations), `MaintenanceLog['category']` and urgency allowlists, sliding-window rate limiting, bounded in-memory Maps, tracking reference generation (e.g. `WO-4921`), and Supabase service-role persistence into `properties.maintenance_history`. Companion `getTenantReportedMaintenance` enforces dual authorization: either an authenticated landlord Supabase JWT (scoped strictly to `.eq('user_id', user.id)`) or a valid tenant capability token scoped to a single lease.
+  - [`sendStatementEmail.ts`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/app/actions/sendStatementEmail.ts), [`submitDevelopmentComment.ts`](src/app/actions/submitDevelopmentComment.ts), and [`sendFeedbackEmail.ts`](src/app/actions/sendFeedbackEmail.ts): Harden public/external actions with a 10 MB PDF attachment cap, email/CRLF header injection checks, external link sanitization via [`sanitizeSafeHttpUrl`](src/lib/utils/urlSanitizer.ts), composite `${cleanToken}:${clientIp}` rate limiting with Map eviction, and payload/diagnostics truncation.
   - **Developments Thin Controller ([`src/app/developments/page.tsx`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/app/developments/page.tsx)):** Declarative orchestrator for ground-up developments, sectional title clusters, and township infill schemes, routing between 4 operational tabs (`units`, `costs`, `approvals`, `finance`) with reactive URL hash synchronization for deep links.
-  - **Standalone Layout & Chrome Isolation:** Standard operational routes (including the primary workspace dashboard at [`/dashboard`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/app/dashboard/page.tsx)) render within the shared desktop navigation sidebar and mobile bottom tab bar (`Sidebar.tsx`). Standalone public routes ([`/`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/app/page.tsx) with [`/welcome`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/app/welcome/page.tsx) redirecting to `/`, [`/about`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/app/about/page.tsx), [`/privacy`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/app/privacy/page.tsx), [`/statement/[lease_id]`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/app/statement/[lease_id]/page.tsx), and `/deal-room/*`) are explicitly bypassed in `Sidebar.tsx` to render full-width institutional headers and clean reading canvases without sidebar shell interference.
+  - **Standalone Layout, SSR Boundaries & Hook-Order Isolation:** Standard operational routes (including the primary workspace dashboard at [`/dashboard`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/app/dashboard/page.tsx)) render within the shared desktop navigation sidebar and mobile bottom tab bar ([`Sidebar.tsx`](src/components/navigation/Sidebar.tsx)), which splits a thin route-guard `Sidebar` wrapper from an inner `SidebarContent` holding all hooks unconditionally so public-to-workspace navigation never triggers React hook-order mismatches. [`ClientOnly.tsx`](src/components/ClientOnly.tsx) enforces a 3-tier boundary: (1) standalone public portals ([`/statement/[lease_id]`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/app/statement/[lease_id]/page.tsx), `/deal-room/*`) render immediately with zero landlord `<AuthHydrator />` or `<HashScroller />`, (2) public marketing & legal routes ([`/`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/app/page.tsx), [`/about`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/app/about/page.tsx), [`/privacy`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/app/privacy/page.tsx)) bypass the client mount spinner for full first-paint SSR while keeping `<AuthHydrator />` + `<HashScroller />` mounted for Supabase password-recovery redirects, and (3) authenticated/workspace routes keep the client mount gate active.
   - **Server Component Stealth & Crawler Privacy Invariant ([`/about`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/app/about/page.tsx), [`/statement/[lease_id]`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/app/statement/%5Blease_id%5D/page.tsx), [`/deal-room/[token]`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/app/deal-room/%5Btoken%5D/page.tsx)):** Two-layer indexing protection combines route-level metadata (`robots: { index: false, follow: false }` evaluated natively on React Server Components, omitting `'use client'`) with global crawler rules in [`src/app/robots.ts`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/app/robots.ts) (`allow: ['/', '/welcome', '/analyzer', '/privacy', '/get-started']`, `disallow: ['/dashboard', '/settings', '/funding', '/tasks', '/statement/', '/deal-room/', '/about']`) and [`src/app/sitemap.ts`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/app/sitemap.ts). Root metadata and `SoftwareApplication` JSON-LD entity schema live in [`src/app/layout.tsx`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/app/layout.tsx) using `metadataBase` (`https://www.moremelaproperties.co.za`) and PNG OpenGraph/Twitter image references (`/apple-icon.png`) for WhatsApp compatibility.
 
 ### 1.2 Tier 2: Headless Domain UI Hooks (`src/hooks/`)
 - **Role:** Coordinates form state, UI filter machines, modal visibility orchestration, and asynchronous client events.
 - **Key Modules:**
-  - [`useAutoCloudSync.ts`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/hooks/useAutoCloudSync.ts): Continuous multi-tenant Supabase synchronization engine with 1500ms debounced outbound mutations, auto-hydration on session load/sign-in, hydration loop suppression (`isHydratingFromCloud`), and reactive sync status store (`useCloudSyncStore`).
+  - [`useAutoCloudSync.ts`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/hooks/useAutoCloudSync.ts): Continuous multi-tenant Supabase synchronization engine with 1500ms debounced outbound mutations, `isPushing`/`pendingRepush` single-flight mutex, cross-tab `storage` and 30s-idle `visibilitychange` sync listeners, auto-hydration on session load/sign-in, fail-closed `developments` error propagation, hydration loop suppression (`isHydratingFromCloud`), and reactive sync status store (`useCloudSyncStore`).
   - [`useRentalPortfolio.ts`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/hooks/rentals/useRentalPortfolio.ts): Assembles active vs. archived rental portfolios, executes CSV/Excel exports, handles optimistic write-offs and monthly rent marks.
   - [`useRentalModalState.ts`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/hooks/rentals/useRentalModalState.ts): Centralized modal open/close state machine for 9 rental dialogs.
   - [`useFlipCalculations.ts`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/hooks/flips/useFlipCalculations.ts): Bridges active flip project state into pure calculation results (`financials`, `fundingSummary`).
@@ -141,7 +141,7 @@ flowchart TD
 - **Constraints:**
   - Slices are split into domain boundaries (`src/lib/store/slices/`).
   - Cross-domain task mutations must route through pure leaf utilities (`src/lib/store/utils/taskSync.ts`) to maintain an acyclic graph.
-  - Persistence auto-heals outdated schema versions in `onRehydrateStorage` via [`portfolioMigrations.ts`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/lib/store/persistence/portfolioMigrations.ts).
+  - Persistence auto-heals outdated schema versions in `onRehydrateStorage` via [`portfolioMigrations.ts`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/lib/store/persistence/portfolioMigrations.ts), which wraps `globalThis.localStorage` inside `getSafeStorage()` (`try/catch` protection against `QuotaExceededError` and storage security exceptions so in-memory Zustand state never crashes).
 
 ---
 
@@ -379,9 +379,9 @@ Illustrates the local-first storage hierarchy, client-side exports, and continuo
 flowchart TD
   subgraph ClientRuntime["Browser Client Runtime"]
     ZUSTAND["Zustand Store Engine"]
-    LOCAL["localStorage ('sa_property_portfolio_hub_v1')"]
+    LOCAL["localStorage + getSafeStorage() Quota Shield ('sa_property_portfolio_hub_v1')"]
     AUTO_HEAL["hydrationHelpers.ts (migratePersistedRental)"]
-    SYNC_HOOK["useAutoCloudSync.ts (Debounce 1500ms + Loop Guard)"]
+    SYNC_HOOK["useAutoCloudSync.ts (Debounce 1500ms + Single-Flight Mutex + Multi-Tab)"]
     PILL["TopHeader.tsx (CloudSyncStatusPill: Synced / Syncing / Local Only)"]
   end
 
@@ -395,8 +395,8 @@ flowchart TD
   subgraph CloudSync["Supabase Multi-Tenant Cloud Sync"]
     AUTH["Supabase Auth (user_id session)"]
     RLS["Row-Level Security: auth.uid() = user_id"]
-    SANITIZE["migrateToCloud.ts: Strip BYOK Keys & Sensitive OCR"]
-    TABLES["PostgreSQL Schema: properties, flips, developments, funding_sources, profiles"]
+    SANITIZE["migrateToCloud.ts: Strip BYOK Keys + Upsert (user_id, id)"]
+    TABLES["PostgreSQL Composite PKs (user_id, id): properties, flips, boq_items, funding_sources, opportunities, tasks, suppliers, developments, profiles"]
   end
 
   ZUSTAND <-->|"persist middleware"| LOCAL
@@ -406,7 +406,7 @@ flowchart TD
   ZUSTAND --> ExportEngine
 
   ZUSTAND -->|"Mutations Subscribe"| SYNC_HOOK
-  SYNC_HOOK -->|"Debounced Push (1500ms)"| SANITIZE
+  SYNC_HOOK -->|"Debounced Single-Flight Push (1500ms)"| SANITIZE
   SYNC_HOOK -.->|"Sync Status Reactive State"| PILL
   SANITIZE -->|"Sanitized JSON Payload"| AUTH
   AUTH --> RLS
@@ -415,11 +415,13 @@ flowchart TD
 ```
 
 **Key Cloud Sync Guarantees:**
-1. **Loop Suppression:** Outbound debounce listener checks `isHydratingFromCloud.current`. Inbound hydration from Supabase into Zustand never triggers an unintended echo push.
-2. **Session Teardown (`DBSYNC-02`):** On `SIGNED_OUT`, local sync identifiers (`last_sync_user_id`, `cloud_sync_completed`) are purged alongside restoring demo state, preventing cross-user data leakage on shared terminals.
-3. **Reactive UI Header Pill:** [`CloudSyncStatusPill`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/components/navigation/TopHeader.tsx) observes `useCloudSyncStore` to render immediate visual feedback (`Synced`, `Syncing...`, `Local Only`, or `Sync Error`).
-4. **Developments Cloud Schema Parity:** Remote `public.developments` table (36 columns) isolates user records via Row-Level Security (`developments_select_own`, `developments_insert_own`, `developments_update_own`, `developments_delete_own`).
-5. **Investor Profile Settings Persistence:** User-configured development underwriting hurdles (`min_dev_poc_percent`, `min_dev_yoc_percent`, `default_hard_build_rate_per_sqm_zar`, `default_vat_registered_developer`) persist directly to `public.profiles` and hydrate seamlessly into local Zustand storage upon authentication.
+1. **Loop Suppression & Single-Flight Concurrency Mutex:** Outbound debounce listener checks `isHydratingFromCloud.current` so inbound hydration never triggers an echo push, and `pushNow()` enforces an `isPushing` / `pendingRepush` single-flight mutex in [`useAutoCloudSync.ts`](src/hooks/useAutoCloudSync.ts) so overlapping edits queue at most one trailing push rather than racing on `deleteRecordsNotInPayload`.
+2. **Multi-Tab Sync & Quota Shield:** `startMultiTabSyncListeners()` listens for cross-tab `storage` events and 30s-idle `visibilitychange` triggers to re-hydrate stale tabs; [`getSafeStorage()`](src/lib/store/persistence/portfolioMigrations.ts) wraps `localStorage` calls in `try/catch` (`QuotaExceededError`-safe), and [`settings/page.tsx`](src/app/settings/page.tsx) enforces a 200 KB (`200 * 1024`) base64 cap on `FileReader` logo fallbacks.
+3. **Session Teardown (`DBSYNC-02`):** On `SIGNED_OUT`, local sync identifiers (`last_sync_user_id`, `cloud_sync_completed`) are purged alongside restoring demo state, preventing cross-user data leakage on shared terminals.
+4. **Fail-Closed `developments` Error Propagation:** [`migrateToCloud.ts`](src/lib/db/migrateToCloud.ts) and [`hydrateFromCloud.ts`](src/lib/db/hydrateFromCloud.ts) throw explicitly on Supabase `developments` write/read errors so transient fetch failures never hydrate `[]`, mask failures as `'Synced'`, or wipe remote records.
+5. **Composite Multi-Tenant Primary Keys & Security-Invoker Views:** All 8 synced portfolio tables (`properties`, `flips`, `boq_items`, `funding_sources`, `opportunities`, `tasks`, `suppliers`, `developments`) enforce `PRIMARY KEY (user_id, id)` (plus composite `boq_items_flip_id_fkey` and `.upsert(..., { onConflict: 'user_id,id' })`) via [`20261121_composite_primary_keys.sql`](supabase/migrations/20261121_composite_primary_keys.sql), while [`20261121_schema_parity_v2.sql`](supabase/migrations/20261121_schema_parity_v2.sql) aligns column parity, sets `WITH (security_invoker = true)` on `investor_profiles` and `schema_columns_inspection`, and revokes `PUBLIC`/`anon` privileges on `schema_columns_inspection` and `get_schema_columns(text)`.
+6. **Reactive UI Header Pill:** [`CloudSyncStatusPill`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/components/navigation/TopHeader.tsx) observes `useCloudSyncStore` to render immediate visual feedback (`Synced`, `Syncing...`, `Local Only`, or `Sync Error`).
+7. **Investor Profile Settings Persistence:** User-configured development underwriting hurdles (`min_dev_poc_percent`, `min_dev_yoc_percent`, `default_hard_build_rate_per_sqm_zar`, `default_vat_registered_developer`) persist directly to `public.profiles` and hydrate seamlessly into local Zustand storage upon authentication.
 
 ---
 
@@ -468,16 +470,16 @@ Illustrates the end-to-end work order lifecycle spanning public tenant reporting
 flowchart TD
   T_VIEW["Tenant Views Statement (/statement/[lease_id])"] --> T_BTN["Clicks 'Report Maintenance'"]
   T_BTN --> T_MODAL["Intake Modal: Category, Description, Urgency, Access Window"]
-  T_MODAL --> SA_ACTION["Server Action: submitTenantMaintenanceTicket(payload)"]
-  SA_ACTION --> RATE_LIMIT{"Rate Limit Check (Max 3/hr)"}
-  RATE_LIMIT -->|"Exceeded"| RATE_ERR["Return Friendly Rate Limit Notice"]
-  RATE_LIMIT -->|"Permitted"| WO_GEN["Generate Ref: WO-XXXX + costZAR: 0 + status: Open + reportedByTenant: true"]
-  WO_GEN --> DB_WRITE["Supabase properties.maintenance_history & Server Session Cache"]
+  T_MODAL --> SA_ACTION["Server Action: submitTenantMaintenanceTicket(token, leaseId, payload)"]
+  SA_ACTION --> TOKEN_CHECK{"Capability Token & Allowlist Check + Sliding Rate Limit"}
+  TOKEN_CHECK -->|"Invalid Token / Denied / Exceeded"| RATE_ERR["Reject Invalid Request or Return Friendly Notice"]
+  TOKEN_CHECK -->|"Permitted"| WO_GEN["Targeted JSONB Lookup + Generate Ref: WO-XXXX (costZAR: 0, status: Open)"]
+  WO_GEN --> DB_WRITE["Supabase properties.maintenance_history & Bounded In-Memory Store"]
   DB_WRITE --> WA_OUT["Bridge to WhatsApp: Pre-filled with Ticket Ref (Strictly Emoji-Free)"]
 
   LL_DASH["Landlord Visits /rentals Dashboard"] --> LL_MODAL["Opens MaintenanceModal.tsx"]
   LL_MODAL --> AUTO_CHECK["Auto-triggers checkCloudAndTenantTickets()"]
-  AUTO_CHECK --> GET_TICKETS["getTenantReportedMaintenance(propertyId, leaseIds) + hydrateNow()"]
+  AUTO_CHECK --> GET_TICKETS["getTenantReportedMaintenance(landlord JWT or capability token) + hydrateNow()"]
   GET_TICKETS --> MERGE_STORE["Zustand store: addMaintenanceLog with 'Tenant Reported' Badge"]
 
   MERGE_STORE --> DISPATCH["1-Click Contractor WhatsApp Dispatch (Local Suppliers Directory)"]
@@ -489,7 +491,7 @@ flowchart TD
 
 **Work Order Domain Invariants:**
 1. **Zero Cash-Flow Deduction on Open Tickets:** Open or in-progress tickets start with `costZAR: 0` (or estimated quotes) and do not reduce realized cash flow or net operating income until transitioned to `Resolved`.
-2. **Elevated Server-Action Ingestion:** Unauthenticated tenants submit tickets through [`submitTenantMaintenanceTicket.ts`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/app/actions/submitTenantMaintenanceTicket.ts), which uses Supabase service-role credentials server-side, shielding the database from open anonymous write permissions.
+2. **Capability-Token & Dual-Auth Server Ingestion:** Public tenants submit tickets through [`submitTenantMaintenanceTicket.ts`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/app/actions/submitTenantMaintenanceTicket.ts), which validates the lease's capability `token` (allowing `leaseId` fallback strictly for un-tokenized demo leases), queries via targeted JSONB containment (no full-table scan or `INITIAL_RENTALS` mutation), validates category/urgency allowlists, and persists via Supabase `service_role`. Reads via `getTenantReportedMaintenance` are strictly gated behind dual authorization: either an authenticated landlord Supabase session/JWT scoped to `.eq('user_id', user.id)` or a valid lease capability token.
 3. **Interactive Final Resolution Flow:** Clicking **"Mark Resolved"** in [`MaintenanceModal.tsx`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/components/rentals/modals/MaintenanceModal.tsx) presents the landlord with a dedicated final invoice input strip, capturing the true contractor cost before closing.
 
 ---
@@ -562,7 +564,7 @@ An automated Equity Extraction Alert is triggered if and only if two simultaneou
 ### 4.6 Architectural & AI Coding Agent Guardrails
 1. **Zero Inline Math in JSX:** Never embed mathematical calculations or business rules inside component render blocks. Delegate strictly to [`src/lib/calculations/`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/lib/calculations/).
 2. **Playwright E2E Stability:** Never delete or alter `data-testid` attributes on interactive inputs, tables, or buttons.
-3. **Security & POPIA Hygiene:** Never transmit or store raw BYOK API keys (OpenAI, Anthropic, Gemini) in remote Supabase tables. Cloud migration mappers must explicitly strip API keys (`apiKey: ''`).
+3. **Security & POPIA Hygiene:** Never transmit or store raw BYOK API keys (OpenAI, Anthropic, Gemini) in remote Supabase tables — cloud migration mappers must explicitly strip API keys (`apiKey: ''`), and Gemini requests in [`pdfParser.ts`](src/lib/utilities/pdfParser.ts) must pass keys exclusively via the `x-goog-api-key` header (never `?key=` URL query strings). External links rendered from user/tenant data or embedded in emails must pass through [`sanitizeSafeHttpUrl`](src/lib/utils/urlSanitizer.ts) (`http:`/`https:` protocols only), and analytics telemetry in [`posthogClient.ts`](src/lib/analytics/posthogClient.ts) must redact `SENSITIVE_PROPERTY_KEYS` (including `buyerName`, `buyer_name`, `propertyTitle`, `property_title`, and `title`).
 4. **Acyclic Synchronization:** Never import state slices into other state slices. Use `taskSync.ts` for all inter-domain task workflows.
 5. **Strict Zero-Override Nullish Guard (`!== undefined && !== null`):** Fee and penalty overrides (`bondCancellationFeeZAR`, `earlyTerminationPenaltyZAR`, `repairDeductionZAR`) must NEVER use truthy `||` fallbacks. A user-entered `0` (e.g. a negotiated bank fee waiver, an unrepresented private sale commission waiver, or a zero-deduction repair) is a valid, intentional financial override that would be mistakenly erased by `|| defaultFee`:
    ```typescript
@@ -582,23 +584,31 @@ An automated Equity Extraction Alert is triggered if and only if two simultaneou
 9. **GTM Stealth, Crawler Privacy & OpenGraph Invariants:**
    - **Two-Layer Crawler & POPIA Guardrail:** Private GTM drafts (`/about`) and tokenized external routes (`/statement/[lease_id]`, `/deal-room/[token]`) must enforce route-level `robots: { index: false, follow: false }` alongside global `robots.ts` (`allow: ['/', '/welcome', '/analyzer', '/privacy', '/get-started']`, `disallow: ['/dashboard', '/settings', '/funding', '/tasks', '/statement/', '/deal-room/', '/about']`) and `sitemap.ts`, plus navigation feature flags (e.g., `SHOW_ABOUT_PAGE_IN_NAV = false` in `Sidebar.tsx`).
    - **WhatsApp OpenGraph & JSON-LD Invariant ([`src/app/layout.tsx`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/app/layout.tsx)):** Because WhatsApp ignores `.svg` files in `og:image`, `openGraph.images` and `twitter.images` must reference a raster PNG (`/apple-icon.png`), resolved via `metadataBase: new URL('https://www.moremelaproperties.co.za')`, and `RootLayout` emits the `SoftwareApplication` JSON-LD schema for `Moremela Properties (Pty) Ltd` (`2026/838397/07`).
-   - **Standalone Route Isolation:** Standalone routes that bypass app Chrome must be registered in the `Sidebar.tsx` standalone route guard to ensure pure full-width rendering:
+   - **Standalone Route Isolation & Hook-Order Safety:** Standalone routes that bypass app Chrome must be guarded in a thin `Sidebar` wrapper (rendering `SidebarContent` cleanly so hooks run unconditionally across `/` -> `/dashboard` navigation), paired with the 3-tier [`ClientOnly.tsx`](src/components/ClientOnly.tsx) boundary (standalone `/statement` and `/deal-room` with zero landlord hydration; public `/`, `/about`, `/privacy` immediate SSR with `<AuthHydrator />` + `<HashScroller />` preserved; workspace routes client-gated):
    ```typescript
-   if (
-     pathname === '/' ||
-     pathname.startsWith('/welcome') ||
-     pathname.startsWith('/statement') ||
-     pathname.startsWith('/privacy') ||
-     pathname.startsWith('/about') ||
-     pathname.startsWith('/deal-room')
-   ) {
-     return null;
+   export function Sidebar() {
+     const pathname = usePathname();
+     if (
+       pathname === '/' ||
+       pathname.startsWith('/welcome') ||
+       pathname.startsWith('/statement') ||
+       pathname.startsWith('/privacy') ||
+       pathname.startsWith('/about') ||
+       pathname.startsWith('/deal-room')
+     ) {
+       return null;
+     }
+     return <SidebarContent />;
    }
    ```
 10. **Development Cross-Module Bridge Invariants:**
     - Selling a development unit via `sellDevelopmentUnit` must apply net proceeds to `developmentFacilityRepaidZAR` first before crediting surplus cash to `liquidCapitalReserve`. If linked to a `FundingSource`, the corresponding funding record's `drawnAmountZAR` is paid down synchronously.
     - Graduating retained units via `graduateRetainedUnitsToRental` must scaffold multi-unit `RentalProperty` records with `leases[]` pre-populated, carrying over unextinguished debt, and setting `section13SexEligible: true` if $\ge 5$ units are retained.
     - Statutory approval target dates on `approvals` must sync to `tasks` using pure `syncDevelopmentApprovalTasks` in `taskSync.ts`, creating 14-day advance notice tasks with duplicate prevention.
+11. **Multi-Tenant Composite Primary Key & View Security Invariant ([`20261121_composite_primary_keys.sql`](supabase/migrations/20261121_composite_primary_keys.sql), [`20261121_schema_parity_v2.sql`](supabase/migrations/20261121_schema_parity_v2.sql)):**
+    - Every user-owned synced portfolio table in Supabase (`properties`, `flips`, `boq_items`, `funding_sources`, `opportunities`, `tasks`, `suppliers`, and `developments`) MUST enforce a composite `PRIMARY KEY (user_id, id)` (alongside composite foreign keys such as `boq_items_flip_id_fkey (user_id, flip_id)`) so multi-tenant syncs of seeded demo IDs never collide across users.
+    - All Supabase cloud upserts in [`migrateToCloud.ts`](src/lib/db/migrateToCloud.ts) MUST target `.upsert(..., { onConflict: 'user_id,id' })`.
+    - Public PostgreSQL views (`investor_profiles`, `schema_columns_inspection`) MUST be declared `WITH (security_invoker = true)`, and internal schema inspection helpers (`schema_columns_inspection`, `get_schema_columns(text)`) MUST have `PUBLIC` and `anon` grants revoked.
 
 ### 4.7 Context-Aware Progressive Disclosure & Statutory Zoning Rights Invariants
 1. **Sectional Title Land-Use Bulk Exclusion (Act 95 of 1986 & STSMA 8 of 2011):** Individual Sectional Title units (apartments, flats, and sectional scheme units) own an undivided share in common property governed by the body corporate, and do NOT possess independent unilateral title to the underlying cadastral erf. An individual sectional buyer cannot rezone, increase municipal Floor Area Ratio (FAR), expand building footprint coverage, or build independent backyard cottages. Consequently:

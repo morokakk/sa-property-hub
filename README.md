@@ -9,7 +9,7 @@
 [![React](https://img.shields.io/badge/React-19.3-blue.svg)](https://react.dev/)
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind-v4.3-38bdf8.svg)](https://tailwindcss.com/)
 [![Zustand](https://img.shields.io/badge/Zustand-v5.1-orange.svg)](https://github.com/pmndrs/zustand)
-[![Tests](https://img.shields.io/badge/Vitest-1353%20Passed%20(115%20Files)-brightgreen.svg)](https://vitest.dev/)
+[![Tests](https://img.shields.io/badge/Vitest-1400%20Passed%20(119%20Files)-brightgreen.svg)](https://vitest.dev/)
 [![E2E](https://img.shields.io/badge/Playwright-Multi--Device-purple.svg)](https://playwright.dev/)
 [![Compliance](https://img.shields.io/badge/SARS%20%2F%20LPC%20%2F%20RHA-2026%20Compliant-emerald.svg)](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/lib/calculations/sarsTax.ts)
 
@@ -105,8 +105,8 @@ The **Moremela Property Investment Hub** addresses the structural complexities u
   - **Interactive Final Resolution Flow:** Clicking **"Mark Resolved"** opens an inline input strip for **Final Invoice Amount (R)** and optional **Invoice #**, ensuring realized cash-flow only deducts actual incurred expenses.
   - **Automated Cloud & Server Check:** Opening the modal triggers `checkCloudAndTenantTickets()`, automatically syncing new tenant reports from Supabase or server memory into the landlord's Zustand store.
 * **Tenant Maintenance Intake Portal & Direct Database Persistence ([`submitTenantMaintenanceTicket.ts`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/app/actions/submitTenantMaintenanceTicket.ts)):**
-  - **Interactive Public Intake:** Public tenant statements feature a responsive **"Report Maintenance"** action opening a structured intake dialog (Category, Urgency level, Issue Description, and Preferred Access Window).
-  - **Secure Server Action:** Runs with elevated service-role privileges, enforces sliding-window rate limiting (max 3 tickets/lease/hour), generates tracking references (e.g. `WO-4921`), and appends the work order directly to the landlord's `properties.maintenance_history` in Supabase.
+  - **Interactive Public Intake:** Public tenant statements feature a responsive **"Report Maintenance"** action opening a structured intake dialog (Category, Urgency level, Issue Description, and Preferred Access Window), with external Photo Vault links validated via [`sanitizeSafeHttpUrl`](src/lib/utils/urlSanitizer.ts).
+  - **Capability-Token & Dual-Auth Server Actions:** `submitTenantMaintenanceTicket` validates lease capability tokens (allowing `leaseId` fallback only for un-tokenized demo leases), enforces category/urgency allowlists and sliding-window rate limits, generates tracking references (e.g. `WO-4921`), and persists via targeted JSONB lookup into `properties.maintenance_history`; `getTenantReportedMaintenance` requires either an authenticated landlord Supabase JWT or a valid tenant capability token.
   - **Instant WhatsApp Bridge:** Automatically copies pre-formatted request copy to clipboard and opens WhatsApp pre-populated with the generated ticket reference.
 * **Disposal & Exit Settlement Engine ([`ExitSaleModal.tsx`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/components/rentals/modals/ExitSaleModal.tsx) & [`calculateDisposalMetrics`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/lib/calculations/rentals.ts)):** Reconciles gross capital gains, estate agent commission (private treaty vs. agent), bond cancellation fees (`R5,200`), NCA 90-day early termination penalties, and negative-equity settlement shortfall warnings (`shortfallToSettleZAR`) when debt and legal friction exceed realized sale value.
 * **Ancillary Income Matrix:** Commercial non-lease revenue aggregation (MNO cellular towers, rooftop advertising billboards, dedicated parking bays, storage units).
@@ -126,7 +126,7 @@ The **Moremela Property Investment Hub** addresses the structural complexities u
 ### 2.7 Global Settings & Investor Profile (`/settings`)
 * **Live Route:** [`src/app/settings/page.tsx`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/app/settings/page.tsx)
 * **Investor Profile & Corporate Tax Routing:** Configures tax entity (`Company (27%)`, `Individual (45%)`, or `Pre-Tax`), VAT-exempt managing agency toggle, buy-box investment hurdle thresholds, Google OAuth cloud authentication, and LLM provider API credentials.
-* **Automatic Cross-Device Supabase Sync ([`useAutoCloudSync.ts`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/hooks/useAutoCloudSync.ts)):** Continuous multi-device synchronization engine with live navigation header status pill ([`CloudSyncStatusPill`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/components/navigation/TopHeader.tsx)), 1500ms debounced push on portfolio mutations, automatic cloud hydration on session load or sign-in, loop suppression guard (`isHydratingFromCloud`), and `DBSYNC-02` cross-user contamination prevention.
+* **Automatic Cross-Device Supabase Sync ([`useAutoCloudSync.ts`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/hooks/useAutoCloudSync.ts)):** Continuous multi-device synchronization engine with live navigation header status pill ([`CloudSyncStatusPill`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/components/navigation/TopHeader.tsx)), 1500ms debounced push protected by an `isPushing`/`pendingRepush` single-flight mutex, cross-tab `storage` + 30s-idle `visibilitychange` listeners, composite `(user_id, id)` multi-tenant primary keys across portfolio tables, fail-closed `developments` error propagation, automatic cloud hydration on session load or sign-in, `localStorage` quota protection (plus a 200 KB base64 fallback logo cap), loop suppression guard (`isHydratingFromCloud`), and `DBSYNC-02` cross-user contamination prevention.
 * **Regional Node Market Benchmark Editor ([`NodeBenchmarkEditor.tsx`](file:///c:/Users/morok/OneDrive/L%20and%20M%20trading/src/components/settings/NodeBenchmarkEditor.tsx)):** Interactive editor for customizing gross yield, cap rate, price-per-$m^2$, and statutory municipal tariff baselines across all 35 South African investment nodes with CSV/JSON import/export and Supabase cloud sync.
 * **Conveyancing & Transfer Legal Settings:** Configures `defaultBondCancellationFeeZAR` (defaulting to `R5,200` incl. 15% VAT per 1 July 2026 LSSA tariffs + Deeds Office cancellation levy + bank instruction fee), synchronizing baseline exit legal cost assumptions across `/analyzer`, `/flips`, `/rentals`, and `/proposal`.
 
@@ -169,7 +169,7 @@ The **Moremela Property Investment Hub** addresses the structural complexities u
 | **Document Processing** | PDF-Lib / PDF.js | `pdf-lib 1.17.1`, `pdfjs-dist 6.5.438`, `html2pdf.js 0.14.0` |
 | **Database & Cloud** | Supabase | `@supabase/supabase-js 2.119.0` (Row-Level Security, Google OAuth, cloud sync) |
 | **Product Telemetry** | PostHog | `posthog-js 1.447.3` (POPIA-compliant input masking & client analytics) |
-| **Unit & Integration** | Vitest | `5.1.0` (115 test files, 1,353 passing tests) |
+| **Unit & Integration** | Vitest | `5.1.0` (119 test files, 1,400 passing tests) |
 | **End-to-End (E2E)** | Playwright | `1.65.0` (Mobile, Tablet, Desktop responsive regression suite) |
 | **Mutation Testing** | Stryker | `@stryker-mutator/core 10.0.0` |
 
@@ -227,7 +227,7 @@ npm run build
 ```text
 ├── src/
 │   ├── app/                      # Tier 1: Thin Next.js App Router Page Controllers
-│   │   ├── actions/              # Next.js Server Actions (submitTenantMaintenanceTicket, sendStatementEmail)
+│   │   ├── actions/              # Next.js Server Actions (submitTenantMaintenanceTicket, sendStatementEmail, submitDevelopmentComment, sendFeedbackEmail)
 │   │   ├── layout.tsx            # Root Layout, OpenGraph & JSON-LD Entity Schema
 │   │   ├── robots.ts             # Crawler Indexing & POPIA Privacy Rules (/robots.txt)
 │   │   ├── sitemap.ts            # Public Entry Route XML Sitemap (/sitemap.xml)
@@ -282,7 +282,8 @@ npm run build
 │   │   │   └── usePortfolioStore.ts # Central store facade
 │   │   ├── export/               # CSV, Excel, GL Journal, SARS ITR12 & RFC 5545 .ics exporters
 │   │   ├── pdf/                  # PDF generators (Dispute letters, Tenant Statements)
-│   │   └── utilities/            # Client-side CoJ, Eskom, Cape Town regex parser
+│   │   ├── utilities/            # Client-side CoJ, Eskom, Cape Town regex parser & Gemini fallback
+│   │   └── utils/                # urlSanitizer.ts (sanitizeSafeHttpUrl for http/https link safety)
 │   └── types/                    # Canonical TypeScript interfaces & domain models
 │       ├── index.ts              # Core system types
 │       └── supabase.ts           # Generated Supabase database schema types
