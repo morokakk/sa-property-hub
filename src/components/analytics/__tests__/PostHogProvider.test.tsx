@@ -226,6 +226,11 @@ describe('PostHogProvider Client-Side Telemetry & POPIA Privacy Masking', () => 
       strategy: 'BRRRR',
       meetsBuyBox: true,
       tenantName: 'Should Be Stripped',
+      buyerName: 'Should Be Stripped',
+      buyer_name: 'Should Be Stripped',
+      propertyTitle: 'Should Be Stripped',
+      property_title: 'Should Be Stripped',
+      title: 'Should Be Stripped',
       purchasePrice: 1500000,
       bankAccount: '62000000000',
     });

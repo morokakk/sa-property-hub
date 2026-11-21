@@ -29,6 +29,25 @@ export interface SendStatementEmailResult {
 const rateLimitMap = new Map<string, number[]>();
 const RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000; // 1 hour
 const MAX_REQUESTS_PER_WINDOW = 5;
+const MAX_RATE_LIMIT_KEYS = 500;
+const MAX_PDF_BYTES = 10 * 1024 * 1024; // 10 MB
+const EMAIL_REGEX = /^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/;
+
+function pruneRateLimitMap(now: number): void {
+  for (const [key, timestamps] of rateLimitMap.entries()) {
+    const valid = timestamps.filter((ts) => now - ts < RATE_LIMIT_WINDOW_MS);
+    if (valid.length === 0) {
+      rateLimitMap.delete(key);
+    } else if (valid.length !== timestamps.length) {
+      rateLimitMap.set(key, valid);
+    }
+  }
+  while (rateLimitMap.size >= MAX_RATE_LIMIT_KEYS) {
+    const oldestKey = rateLimitMap.keys().next().value;
+    if (oldestKey === undefined) break;
+    rateLimitMap.delete(oldestKey);
+  }
+}
 
 /**
  * Server Action for sending tenant statements via Resend with PDF attachment.
@@ -66,6 +85,7 @@ export async function sendStatementEmail(
       }
 
       const now = Date.now();
+      pruneRateLimitMap(now);
       const timestamps = (rateLimitMap.get(clientIp) || []).filter(
         (ts) => now - ts < RATE_LIMIT_WINDOW_MS
       );
@@ -85,6 +105,21 @@ export async function sendStatementEmail(
       return {
         success: false,
         error: 'Tenant email address is required.',
+      };
+    }
+
+    const trimmedTo = to.trim();
+    if (/[\r\n]/.test(to) || !EMAIL_REGEX.test(trimmedTo)) {
+      return {
+        success: false,
+        error: 'Invalid tenant email address format.',
+      };
+    }
+
+    if (billingPeriod && /[\r\n]/.test(billingPeriod)) {
+      return {
+        success: false,
+        error: 'Invalid billing period format.',
       };
     }
 
@@ -119,12 +154,26 @@ export async function sendStatementEmail(
       .replace(/^data:application\/pdf;[^,]*,/, '')
       .replace(/\s+/g, '');
 
+    if (cleanBase64.length > Math.ceil((MAX_PDF_BYTES * 4) / 3) + 16) {
+      return {
+        success: false,
+        error: 'Statement PDF exceeds the maximum allowed size of 10 MB.',
+      };
+    }
+
     const pdfBuffer = Buffer.from(cleanBase64, 'base64');
 
     if (pdfBuffer.length === 0) {
       return {
         success: false,
         error: 'Statement PDF payload is invalid or empty.',
+      };
+    }
+
+    if (pdfBuffer.length > MAX_PDF_BYTES) {
+      return {
+        success: false,
+        error: 'Statement PDF exceeds the maximum allowed size of 10 MB.',
       };
     }
 
@@ -136,7 +185,7 @@ export async function sendStatementEmail(
       };
     }
 
-    const subject = `Your Monthly Rental & Utility Statement - ${displayPeriod}`;
+    const subject = `Your Monthly Rental & Utility Statement - ${displayPeriod}`.replace(/[\r\n]+/g, ' ').trim();
 
     const html = generateStatementEmailHtml({
       tenantName,
@@ -154,7 +203,7 @@ export async function sendStatementEmail(
     const resend = new Resend(apiKey);
     const { data, error } = await resend.emails.send({
       from: fromEmail,
-      to: to.trim(),
+      to: trimmedTo,
       subject,
       html,
       attachments: [

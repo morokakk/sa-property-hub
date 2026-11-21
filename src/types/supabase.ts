@@ -14,39 +14,6 @@ export type Database = {
   }
   public: {
     Tables: {
-      user_feedback: {
-        Row: {
-          category: string
-          contact_optional: string | null
-          created_at: string
-          diagnostics: Json
-          id: string
-          message: string
-          module_route: string
-          user_id: string | null
-        }
-        Insert: {
-          category: string
-          contact_optional?: string | null
-          created_at?: string
-          diagnostics?: Json
-          id?: string
-          message: string
-          module_route: string
-          user_id?: string | null
-        }
-        Update: {
-          category?: string
-          contact_optional?: string | null
-          created_at?: string
-          diagnostics?: Json
-          id?: string
-          message?: string
-          module_route?: string
-          user_id?: string | null
-        }
-        Relationships: []
-      }
       boq_items: {
         Row: {
           actual_cash_outflow_zar: number | null
@@ -120,10 +87,10 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "boq_items_flip_id_fkey"
-            columns: ["flip_id"]
+            columns: ["user_id", "flip_id"]
             isOneToOne: false
             referencedRelation: "flips"
-            referencedColumns: ["id"]
+            referencedColumns: ["user_id", "id"]
           },
         ]
       }
@@ -135,7 +102,7 @@ export type Database = {
           boq_items: Json
           budgeted_hard_cost_per_sqm_zar: number
           city: string
-          comments_ledger?: Json | null
+          comments_ledger: Json | null
           compliance: Json | null
           construction_months: number
           contingency_percent: number
@@ -148,7 +115,7 @@ export type Database = {
           drive_vault: Json | null
           id: string
           investment_node_id: string | null
-          is_deferred_land_payment_laa?: boolean
+          is_deferred_land_payment_laa: boolean | null
           is_vat_registered_developer: boolean
           land_purchase_price_zar: number
           linked_funding_source_id: string | null
@@ -160,8 +127,8 @@ export type Database = {
           province: string | null
           sec118_arrears_zar: number
           sell_down_months: number
-          senior_jv_partner_name?: string | null
-          share_token?: string | null
+          senior_jv_partner_name: string | null
+          share_token: string | null
           soft_costs: Json
           tax_entity_type: string | null
           title: string
@@ -190,7 +157,7 @@ export type Database = {
           drive_vault?: Json | null
           id?: string
           investment_node_id?: string | null
-          is_deferred_land_payment_laa?: boolean
+          is_deferred_land_payment_laa?: boolean | null
           is_vat_registered_developer?: boolean
           land_purchase_price_zar?: number
           linked_funding_source_id?: string | null
@@ -232,7 +199,7 @@ export type Database = {
           drive_vault?: Json | null
           id?: string
           investment_node_id?: string | null
-          is_deferred_land_payment_laa?: boolean
+          is_deferred_land_payment_laa?: boolean | null
           is_vat_registered_developer?: boolean
           land_purchase_price_zar?: number
           linked_funding_source_id?: string | null
@@ -295,10 +262,10 @@ export type Database = {
           primary_funder_contact: string | null
           primary_funder_name: string | null
           primary_funder_type: string | null
+          project_strategy: string | null
           promised_payout_schedule: string | null
           promised_return_rate_percent: number | null
           promised_return_type: string | null
-          project_strategy: string | null
           property_type: string | null
           province: string | null
           purchase_date: string | null
@@ -353,10 +320,10 @@ export type Database = {
           primary_funder_contact?: string | null
           primary_funder_name?: string | null
           primary_funder_type?: string | null
+          project_strategy?: string | null
           promised_payout_schedule?: string | null
           promised_return_rate_percent?: number | null
           promised_return_type?: string | null
-          project_strategy?: string | null
           property_type?: string | null
           province?: string | null
           purchase_date?: string | null
@@ -411,10 +378,10 @@ export type Database = {
           primary_funder_contact?: string | null
           primary_funder_name?: string | null
           primary_funder_type?: string | null
+          project_strategy?: string | null
           promised_payout_schedule?: string | null
           promised_return_rate_percent?: number | null
           promised_return_type?: string | null
-          project_strategy?: string | null
           property_type?: string | null
           province?: string | null
           purchase_date?: string | null
@@ -553,12 +520,15 @@ export type Database = {
           estimated_rehab_cost_zar: number | null
           exit_commission_percent: number | null
           extra_monthly_payment_zar: number | null
+          floor_area_sqm?: number | null
           funding_required_zar: number | null
           gross_yield: number | null
           holding_period_months: number | null
           id: string
           initial_capital_required_zar: number | null
+          interest_rate_margin: number | null
           interest_rate_percent: number | null
+          is_vat_inclusive_developer_sale?: boolean | null
           loan_term_years: number | null
           loan_to_value_percent: number | null
           management_fee_percent: number | null
@@ -567,12 +537,15 @@ export type Database = {
           monthly_communal_services_zar: number | null
           monthly_holding_cost_zar: number | null
           monthly_levies_zar: number | null
+          monthly_maintenance_reserve_zar?: number | null
           monthly_other_holding_cost_zar: number | null
+          monthly_prepaid_vending_fee_zar?: number | null
           monthly_rates_taxes_zar: number | null
           monthly_rental_estimate_zar: number | null
           municipal_arrears_zar: number | null
           net_roi: number | null
           notes: string | null
+          number_of_units?: number | null
           occupant_risk: Json | null
           open_market_value_zar: number | null
           pass_notes: string | null
@@ -595,10 +568,12 @@ export type Database = {
           status: string
           strategy: string | null
           target_exit_price_zar: number | null
+          tenant_placement_fee_percent?: number | null
           title: string
           updated_at: string
           user_id: string
           vacancy_rate_percent: number | null
+          vat_exempt_agent: boolean | null
         }
         Insert: {
           address?: string
@@ -629,12 +604,15 @@ export type Database = {
           estimated_rehab_cost_zar?: number | null
           exit_commission_percent?: number | null
           extra_monthly_payment_zar?: number | null
+          floor_area_sqm?: number | null
           funding_required_zar?: number | null
           gross_yield?: number | null
           holding_period_months?: number | null
           id?: string
           initial_capital_required_zar?: number | null
+          interest_rate_margin?: number | null
           interest_rate_percent?: number | null
+          is_vat_inclusive_developer_sale?: boolean | null
           loan_term_years?: number | null
           loan_to_value_percent?: number | null
           management_fee_percent?: number | null
@@ -643,12 +621,15 @@ export type Database = {
           monthly_communal_services_zar?: number | null
           monthly_holding_cost_zar?: number | null
           monthly_levies_zar?: number | null
+          monthly_maintenance_reserve_zar?: number | null
           monthly_other_holding_cost_zar?: number | null
+          monthly_prepaid_vending_fee_zar?: number | null
           monthly_rates_taxes_zar?: number | null
           monthly_rental_estimate_zar?: number | null
           municipal_arrears_zar?: number | null
           net_roi?: number | null
           notes?: string | null
+          number_of_units?: number | null
           occupant_risk?: Json | null
           open_market_value_zar?: number | null
           pass_notes?: string | null
@@ -671,10 +652,12 @@ export type Database = {
           status?: string
           strategy?: string | null
           target_exit_price_zar?: number | null
+          tenant_placement_fee_percent?: number | null
           title: string
           updated_at?: string
           user_id?: string
           vacancy_rate_percent?: number | null
+          vat_exempt_agent?: boolean | null
         }
         Update: {
           address?: string
@@ -705,12 +688,15 @@ export type Database = {
           estimated_rehab_cost_zar?: number | null
           exit_commission_percent?: number | null
           extra_monthly_payment_zar?: number | null
+          floor_area_sqm?: number | null
           funding_required_zar?: number | null
           gross_yield?: number | null
           holding_period_months?: number | null
           id?: string
           initial_capital_required_zar?: number | null
+          interest_rate_margin?: number | null
           interest_rate_percent?: number | null
+          is_vat_inclusive_developer_sale?: boolean | null
           loan_term_years?: number | null
           loan_to_value_percent?: number | null
           management_fee_percent?: number | null
@@ -719,12 +705,15 @@ export type Database = {
           monthly_communal_services_zar?: number | null
           monthly_holding_cost_zar?: number | null
           monthly_levies_zar?: number | null
+          monthly_maintenance_reserve_zar?: number | null
           monthly_other_holding_cost_zar?: number | null
+          monthly_prepaid_vending_fee_zar?: number | null
           monthly_rates_taxes_zar?: number | null
           monthly_rental_estimate_zar?: number | null
           municipal_arrears_zar?: number | null
           net_roi?: number | null
           notes?: string | null
+          number_of_units?: number | null
           occupant_risk?: Json | null
           open_market_value_zar?: number | null
           pass_notes?: string | null
@@ -747,10 +736,12 @@ export type Database = {
           status?: string
           strategy?: string | null
           target_exit_price_zar?: number | null
+          tenant_placement_fee_percent?: number | null
           title?: string
           updated_at?: string
           user_id?: string
           vacancy_rate_percent?: number | null
+          vat_exempt_agent?: boolean | null
         }
         Relationships: []
       }
@@ -767,14 +758,27 @@ export type Database = {
           branch_code: string | null
           contact_number: string | null
           created_at: string
+          custom_node_benchmarks: Json | null
           default_agent_commission_percent: number | null
+          default_hard_build_rate_per_sqm_zar: number | null
+          default_pre_sales_hurdle_percent: number | null
           default_prime_rate_percent: number | null
           default_tax_entity_type: string | null
+          default_vat_registered_developer: boolean | null
           email: string | null
           entity_name: string
           id: string
           liquid_capital_reserve_zar: number | null
           logo_base64: string | null
+          marginal_tax_rate_percent: number | null
+          max_day1_cash_zar: number | null
+          min_dev_poc_percent: number | null
+          min_dev_yoc_percent: number | null
+          min_dscr: number | null
+          min_flip_roi_percent: number | null
+          min_monthly_cashflow_zar: number | null
+          min_net_roi_percent: number | null
+          min_net_yield_percent: number | null
           physical_address: string | null
           registration_or_id: string | null
           remittance_instructions: string | null
@@ -783,21 +787,8 @@ export type Database = {
           trading_as: string | null
           updated_at: string
           user_id: string
+          vat_exempt_agent: boolean | null
           website: string | null
-          min_net_yield_percent?: number | null
-          min_monthly_cashflow_zar?: number | null
-          min_net_roi_percent?: number | null
-          min_flip_roi_percent?: number | null
-          max_day1_cash_zar?: number | null
-          min_dscr?: number | null
-          vat_exempt_agent?: boolean | null
-          marginal_tax_rate_percent?: number | null
-          custom_node_benchmarks?: Json | null
-          min_dev_poc_percent?: number | null
-          min_dev_yoc_percent?: number | null
-          default_hard_build_rate_per_sqm_zar?: number | null
-          default_pre_sales_hurdle_percent?: number | null
-          default_vat_registered_developer?: boolean | null
         }
         Insert: {
           account_holder?: string | null
@@ -811,14 +802,27 @@ export type Database = {
           branch_code?: string | null
           contact_number?: string | null
           created_at?: string
+          custom_node_benchmarks?: Json | null
           default_agent_commission_percent?: number | null
+          default_hard_build_rate_per_sqm_zar?: number | null
+          default_pre_sales_hurdle_percent?: number | null
           default_prime_rate_percent?: number | null
           default_tax_entity_type?: string | null
+          default_vat_registered_developer?: boolean | null
           email?: string | null
           entity_name?: string
           id: string
           liquid_capital_reserve_zar?: number | null
           logo_base64?: string | null
+          marginal_tax_rate_percent?: number | null
+          max_day1_cash_zar?: number | null
+          min_dev_poc_percent?: number | null
+          min_dev_yoc_percent?: number | null
+          min_dscr?: number | null
+          min_flip_roi_percent?: number | null
+          min_monthly_cashflow_zar?: number | null
+          min_net_roi_percent?: number | null
+          min_net_yield_percent?: number | null
           physical_address?: string | null
           registration_or_id?: string | null
           remittance_instructions?: string | null
@@ -827,21 +831,8 @@ export type Database = {
           trading_as?: string | null
           updated_at?: string
           user_id?: string
-          website?: string | null
-          min_net_yield_percent?: number | null
-          min_monthly_cashflow_zar?: number | null
-          min_net_roi_percent?: number | null
-          min_flip_roi_percent?: number | null
-          max_day1_cash_zar?: number | null
-          min_dscr?: number | null
           vat_exempt_agent?: boolean | null
-          marginal_tax_rate_percent?: number | null
-          custom_node_benchmarks?: Json | null
-          min_dev_poc_percent?: number | null
-          min_dev_yoc_percent?: number | null
-          default_hard_build_rate_per_sqm_zar?: number | null
-          default_pre_sales_hurdle_percent?: number | null
-          default_vat_registered_developer?: boolean | null
+          website?: string | null
         }
         Update: {
           account_holder?: string | null
@@ -855,14 +846,27 @@ export type Database = {
           branch_code?: string | null
           contact_number?: string | null
           created_at?: string
+          custom_node_benchmarks?: Json | null
           default_agent_commission_percent?: number | null
+          default_hard_build_rate_per_sqm_zar?: number | null
+          default_pre_sales_hurdle_percent?: number | null
           default_prime_rate_percent?: number | null
           default_tax_entity_type?: string | null
+          default_vat_registered_developer?: boolean | null
           email?: string | null
           entity_name?: string
           id?: string
           liquid_capital_reserve_zar?: number | null
           logo_base64?: string | null
+          marginal_tax_rate_percent?: number | null
+          max_day1_cash_zar?: number | null
+          min_dev_poc_percent?: number | null
+          min_dev_yoc_percent?: number | null
+          min_dscr?: number | null
+          min_flip_roi_percent?: number | null
+          min_monthly_cashflow_zar?: number | null
+          min_net_roi_percent?: number | null
+          min_net_yield_percent?: number | null
           physical_address?: string | null
           registration_or_id?: string | null
           remittance_instructions?: string | null
@@ -871,21 +875,8 @@ export type Database = {
           trading_as?: string | null
           updated_at?: string
           user_id?: string
-          website?: string | null
-          min_net_yield_percent?: number | null
-          min_monthly_cashflow_zar?: number | null
-          min_net_roi_percent?: number | null
-          min_flip_roi_percent?: number | null
-          max_day1_cash_zar?: number | null
-          min_dscr?: number | null
           vat_exempt_agent?: boolean | null
-          marginal_tax_rate_percent?: number | null
-          custom_node_benchmarks?: Json | null
-          min_dev_poc_percent?: number | null
-          min_dev_yoc_percent?: number | null
-          default_hard_build_rate_per_sqm_zar?: number | null
-          default_pre_sales_hurdle_percent?: number | null
-          default_vat_registered_developer?: boolean | null
+          website?: string | null
         }
         Relationships: []
       }
@@ -900,7 +891,8 @@ export type Database = {
           agm_date: string | null
           ancillary_incomes: Json
           annual_building_insurance_zar: number | null
-          applicants?: Json | null
+          applicants: Json | null
+          archived_leases: Json | null
           arrears_opening_balance_zar: number | null
           arrears_write_offs: Json | null
           bond_interest_rate_percent: number | null
@@ -977,6 +969,7 @@ export type Database = {
           ancillary_incomes?: Json
           annual_building_insurance_zar?: number | null
           applicants?: Json | null
+          archived_leases?: Json | null
           arrears_opening_balance_zar?: number | null
           arrears_write_offs?: Json | null
           bond_interest_rate_percent?: number | null
@@ -1053,6 +1046,7 @@ export type Database = {
           ancillary_incomes?: Json
           annual_building_insurance_zar?: number | null
           applicants?: Json | null
+          archived_leases?: Json | null
           arrears_opening_balance_zar?: number | null
           arrears_write_offs?: Json | null
           bond_interest_rate_percent?: number | null
@@ -1132,6 +1126,7 @@ export type Database = {
           has_coc: boolean | null
           id: string
           name: string
+          notes?: string | null
           phone: string
           rating: number | null
           updated_at: string
@@ -1148,6 +1143,7 @@ export type Database = {
           has_coc?: boolean | null
           id?: string
           name: string
+          notes?: string | null
           phone?: string
           rating?: number | null
           updated_at?: string
@@ -1164,6 +1160,7 @@ export type Database = {
           has_coc?: boolean | null
           id?: string
           name?: string
+          notes?: string | null
           phone?: string
           rating?: number | null
           updated_at?: string
@@ -1179,6 +1176,9 @@ export type Database = {
           id: string
           linked_entity: Json
           priority: string
+          recurrence?: string | null
+          recurrence_end_date?: string | null
+          recurrence_group_id?: string | null
           status: string
           title: string
           updated_at: string
@@ -1191,6 +1191,9 @@ export type Database = {
           id?: string
           linked_entity?: Json
           priority?: string
+          recurrence?: string | null
+          recurrence_end_date?: string | null
+          recurrence_group_id?: string | null
           status?: string
           title: string
           updated_at?: string
@@ -1203,10 +1206,46 @@ export type Database = {
           id?: string
           linked_entity?: Json
           priority?: string
+          recurrence?: string | null
+          recurrence_end_date?: string | null
+          recurrence_group_id?: string | null
           status?: string
           title?: string
           updated_at?: string
           user_id?: string
+        }
+        Relationships: []
+      }
+      user_feedback: {
+        Row: {
+          category: string
+          contact_optional: string | null
+          created_at: string
+          diagnostics: Json
+          id: string
+          message: string
+          module_route: string
+          user_id: string | null
+        }
+        Insert: {
+          category: string
+          contact_optional?: string | null
+          created_at?: string
+          diagnostics?: Json
+          id?: string
+          message: string
+          module_route: string
+          user_id?: string | null
+        }
+        Update: {
+          category?: string
+          contact_optional?: string | null
+          created_at?: string
+          diagnostics?: Json
+          id?: string
+          message?: string
+          module_route?: string
+          user_id?: string | null
         }
         Relationships: []
       }
@@ -1225,14 +1264,27 @@ export type Database = {
           branch_code: string | null
           contact_number: string | null
           created_at: string | null
+          custom_node_benchmarks: Json | null
           default_agent_commission_percent: number | null
+          default_hard_build_rate_per_sqm_zar: number | null
+          default_pre_sales_hurdle_percent: number | null
           default_prime_rate_percent: number | null
           default_tax_entity_type: string | null
+          default_vat_registered_developer: boolean | null
           email: string | null
           entity_name: string | null
           id: string | null
           liquid_capital_reserve_zar: number | null
           logo_base64: string | null
+          marginal_tax_rate_percent: number | null
+          max_day1_cash_zar: number | null
+          min_dev_poc_percent: number | null
+          min_dev_yoc_percent: number | null
+          min_dscr: number | null
+          min_flip_roi_percent: number | null
+          min_monthly_cashflow_zar: number | null
+          min_net_roi_percent: number | null
+          min_net_yield_percent: number | null
           physical_address: string | null
           registration_or_id: string | null
           remittance_instructions: string | null
@@ -1241,9 +1293,8 @@ export type Database = {
           trading_as: string | null
           updated_at: string | null
           user_id: string | null
+          vat_exempt_agent: boolean | null
           website: string | null
-          custom_node_benchmarks?: Json | null
-          default_pre_sales_hurdle_percent?: number | null
         }
         Insert: {
           account_holder?: string | null
@@ -1257,14 +1308,27 @@ export type Database = {
           branch_code?: string | null
           contact_number?: string | null
           created_at?: string | null
+          custom_node_benchmarks?: Json | null
           default_agent_commission_percent?: number | null
+          default_hard_build_rate_per_sqm_zar?: number | null
+          default_pre_sales_hurdle_percent?: number | null
           default_prime_rate_percent?: number | null
           default_tax_entity_type?: string | null
+          default_vat_registered_developer?: boolean | null
           email?: string | null
           entity_name?: string | null
           id?: string | null
           liquid_capital_reserve_zar?: number | null
           logo_base64?: string | null
+          marginal_tax_rate_percent?: number | null
+          max_day1_cash_zar?: number | null
+          min_dev_poc_percent?: number | null
+          min_dev_yoc_percent?: number | null
+          min_dscr?: number | null
+          min_flip_roi_percent?: number | null
+          min_monthly_cashflow_zar?: number | null
+          min_net_roi_percent?: number | null
+          min_net_yield_percent?: number | null
           physical_address?: string | null
           registration_or_id?: string | null
           remittance_instructions?: string | null
@@ -1273,8 +1337,8 @@ export type Database = {
           trading_as?: string | null
           updated_at?: string | null
           user_id?: string | null
+          vat_exempt_agent?: boolean | null
           website?: string | null
-          default_pre_sales_hurdle_percent?: number | null
         }
         Update: {
           account_holder?: string | null
@@ -1288,14 +1352,27 @@ export type Database = {
           branch_code?: string | null
           contact_number?: string | null
           created_at?: string | null
+          custom_node_benchmarks?: Json | null
           default_agent_commission_percent?: number | null
+          default_hard_build_rate_per_sqm_zar?: number | null
+          default_pre_sales_hurdle_percent?: number | null
           default_prime_rate_percent?: number | null
           default_tax_entity_type?: string | null
+          default_vat_registered_developer?: boolean | null
           email?: string | null
           entity_name?: string | null
           id?: string | null
           liquid_capital_reserve_zar?: number | null
           logo_base64?: string | null
+          marginal_tax_rate_percent?: number | null
+          max_day1_cash_zar?: number | null
+          min_dev_poc_percent?: number | null
+          min_dev_yoc_percent?: number | null
+          min_dscr?: number | null
+          min_flip_roi_percent?: number | null
+          min_monthly_cashflow_zar?: number | null
+          min_net_roi_percent?: number | null
+          min_net_yield_percent?: number | null
           physical_address?: string | null
           registration_or_id?: string | null
           remittance_instructions?: string | null
@@ -1304,20 +1381,37 @@ export type Database = {
           trading_as?: string | null
           updated_at?: string | null
           user_id?: string | null
+          vat_exempt_agent?: boolean | null
           website?: string | null
-          default_pre_sales_hurdle_percent?: number | null
+        }
+        Relationships: []
+      }
+      schema_columns_inspection: {
+        Row: {
+          column_name: string | null
+          data_type: string | null
+          is_nullable: string | null
+          table_name: string | null
         }
         Relationships: []
       }
     }
     Functions: {
+      get_public_development_deal_room: {
+        Args: { p_token: string }
+        Returns: Json
+      }
       get_public_tenant_statement: {
         Args: { p_lease_id: string }
         Returns: Json
       }
-      get_public_development_deal_room: {
-        Args: { p_token: string }
-        Returns: Json
+      get_schema_columns: {
+        Args: { target_table?: string }
+        Returns: {
+          column_name: string
+          data_type: string
+          table_name: string
+        }[]
       }
     }
     Enums: {

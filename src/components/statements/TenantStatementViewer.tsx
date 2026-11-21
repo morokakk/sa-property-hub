@@ -50,16 +50,19 @@ import {
   ensureInspectionItems,
   normalizeWhatsAppPhone,
 } from '@/lib/calculations/inspections';
+import { sanitizeSafeHttpUrl } from '@/lib/utils/urlSanitizer';
 import { trackPrivacySafeEvent } from '@/lib/analytics/posthogClient';
 
 interface TenantStatementViewerProps {
   statementData: PublicTenantStatementPayload;
+  portalToken?: string;
   initialMonth?: string;
   initialTab?: 'ledger' | 'inspection';
 }
 
 export default function TenantStatementViewer({
   statementData,
+  portalToken,
   initialMonth,
   initialTab,
 }: TenantStatementViewerProps) {
@@ -205,6 +208,7 @@ export default function TenantStatementViewer({
 
     try {
       const res = await submitTenantMaintenanceTicket({
+        token: portalToken || lease.id,
         leaseId: lease.id,
         category: maintenanceCategory as any,
         description: maintenanceDescription.trim(),
@@ -959,17 +963,23 @@ export default function TenantStatementViewer({
                   <div className="text-sm font-bold text-slate-900">
                     {lease.inspectionRecord.ingoingDate ? formatDate(lease.inspectionRecord.ingoingDate) : 'Not recorded'}
                   </div>
-                  {lease.inspectionRecord.ingoingPhotoVaultUrl && (
-                    <a
-                      href={lease.inspectionRecord.ingoingPhotoVaultUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-[10px] font-semibold text-indigo-700 hover:underline flex items-center gap-1 pt-1"
-                    >
-                      <Camera className="w-3 h-3" />
-                      <span>Ingoing Photo Vault ↗</span>
-                    </a>
-                  )}
+                  {(() => {
+                    const safeIngoingVaultUrl = sanitizeSafeHttpUrl(
+                      lease.inspectionRecord.ingoingPhotoVaultUrl
+                    );
+                    if (!safeIngoingVaultUrl) return null;
+                    return (
+                      <a
+                        href={safeIngoingVaultUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-[10px] font-semibold text-indigo-700 hover:underline flex items-center gap-1 pt-1"
+                      >
+                        <Camera className="w-3 h-3" />
+                        <span>Ingoing Photo Vault ↗</span>
+                      </a>
+                    );
+                  })()}
                 </div>
 
                 <div className="p-3 rounded-xl bg-white border border-slate-200 shadow-2xs space-y-1">
@@ -990,17 +1000,23 @@ export default function TenantStatementViewer({
                   <div className="text-sm font-bold text-slate-900">
                     {lease.inspectionRecord.exitDate ? formatDate(lease.inspectionRecord.exitDate) : 'Pending Vacating'}
                   </div>
-                  {lease.inspectionRecord.exitPhotoVaultUrl && (
-                    <a
-                      href={lease.inspectionRecord.exitPhotoVaultUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-[10px] font-semibold text-indigo-700 hover:underline flex items-center gap-1 pt-1"
-                    >
-                      <Camera className="w-3 h-3" />
-                      <span>Exit Photo Vault ↗</span>
-                    </a>
-                  )}
+                  {(() => {
+                    const safeExitVaultUrl = sanitizeSafeHttpUrl(
+                      lease.inspectionRecord.exitPhotoVaultUrl
+                    );
+                    if (!safeExitVaultUrl) return null;
+                    return (
+                      <a
+                        href={safeExitVaultUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-[10px] font-semibold text-indigo-700 hover:underline flex items-center gap-1 pt-1"
+                      >
+                        <Camera className="w-3 h-3" />
+                        <span>Exit Photo Vault ↗</span>
+                      </a>
+                    );
+                  })()}
                 </div>
 
                 <div className="p-3 rounded-xl bg-white border border-slate-200 shadow-2xs space-y-1">

@@ -36,11 +36,11 @@ import { trackPrivacySafeEvent } from '@/lib/analytics/posthogClient';
 // Top-level GTM feature flag: keep /about hidden from public navigation until official launch
 export const SHOW_ABOUT_PAGE_IN_NAV = false;
 
-export default function Sidebar() {
+export function Sidebar() {
   const pathname = usePathname();
 
-  // Execute standalone route check unconditionally before any store/state/effect hooks
-  // so SSR and initial client hydration produce identical output with zero mismatch.
+  // Execute standalone route check unconditionally before mounting SidebarContent
+  // so navigating between public routes and workspace routes never changes hook order.
   const isStandalonePublicRoute =
     pathname === '/' ||
     pathname?.startsWith('/welcome') ||
@@ -51,6 +51,13 @@ export default function Sidebar() {
   if (isStandalonePublicRoute) {
     return null;
   }
+
+  return <SidebarContent pathname={pathname} />;
+}
+
+export default Sidebar;
+
+function SidebarContent({ pathname }: { pathname: string | null }) {
 
   const pendingOpportunitiesCount = usePortfolioStore((state) => state.opportunities.length);
   const activeFlipsCount = usePortfolioStore((state) => state.flips.filter((f) => f.status === 'Active').length);

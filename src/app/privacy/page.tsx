@@ -873,7 +873,7 @@ export default function PrivacyNoticePage() {
         {/* Bottom Print & Return Footer */}
         <footer className="pt-2 pb-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500 border-t border-slate-200">
           <div>
-            © {new Date().getFullYear()} <strong className="text-slate-700">{LEGAL_ENTITY}</strong> (Reg. No:{' '}
+            © <span suppressHydrationWarning>{new Date().getFullYear()}</span> <strong className="text-slate-700">{LEGAL_ENTITY}</strong> (Reg. No:{' '}
             {CIPC_REG_NUMBER}) • All Rights Reserved.
           </div>
           <div className="flex items-center gap-4 print:hidden">

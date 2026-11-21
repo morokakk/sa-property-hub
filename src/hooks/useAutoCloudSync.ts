@@ -6,6 +6,7 @@ import { supabase } from '@/lib/supabaseClient';
 import { hydrateFromCloud } from '@/lib/db/hydrateFromCloud';
 import { migrateToCloud } from '@/lib/db/migrateToCloud';
 import { usePortfolioStore } from '@/lib/store/usePortfolioStore';
+import { PORTFOLIO_STORAGE_KEY } from '@/lib/store/persistence/portfolioMigrations';
 import type { RootStoreState } from '@/lib/store/types';
 import {
   resetAnalyticsSession,
@@ -25,6 +26,7 @@ export interface CloudSyncState {
 }
 
 export const SYNC_DEBOUNCE_MS = 1500;
+export const VISIBILITY_HYDRATE_STALE_MS = 30_000;
 
 /** Persisted portfolio slices whose mutation triggers an outbound push. */
 export const SYNCED_SLICE_KEYS = [
@@ -52,7 +54,9 @@ export const useCloudSyncStore = create<CloudSyncState>(() => ({
 
 // Module-level singletons: one listener / one debounce timer globally.
 export const isHydratingFromCloud = { current: false };
+export const isPushing = { current: false };
 let hasHydratedThisSession = false;
+let pendingRepush = false;
 let debounceTimer: ReturnType<typeof setTimeout> | null = null;
 let lastFailedOp: 'hydrate' | 'push' | null = null;
 
@@ -105,32 +109,54 @@ export async function hydrateNow(): Promise<void> {
   }
 }
 
-/** Outbound: push current portfolio state to Supabase immediately. */
+/** Outbound: push current portfolio state to Supabase immediately with single-flight mutex. */
 export async function pushNow(): Promise<void> {
   cancelPendingPush();
   const { isAuthenticated } = useCloudSyncStore.getState();
   if (!isAuthenticated || !hasHydratedThisSession) return;
-  setSync({ status: 'syncing', error: null });
+
+  if (isPushing.current) {
+    pendingRepush = true;
+    return;
+  }
+
+  isPushing.current = true;
   try {
-    const res = await migrateToCloud({ state: usePortfolioStore.getState() });
-    if (res.success) {
-      recordSyncedNow();
-      syncAnalyticsStorageMode('cloud_synced');
-      trackPrivacySafeEvent('cloud_sync_triggered', { status: 'synced' });
-    } else if (res.error === 'NO_AUTH') {
-      setSync({ isAuthenticated: false, status: 'local_only', error: null });
-      syncAnalyticsStorageMode('local_only');
-    } else {
-      lastFailedOp = 'push';
-      setSync({ status: 'error', error: res.error || 'Cloud sync failed' });
-      trackPrivacySafeEvent('cloud_sync_triggered', { status: 'error' });
-      captureSanitizedError('CLOUD_SYNC_FAILED', { operation: 'push' });
-    }
-  } catch (err: any) {
-    lastFailedOp = 'push';
-    setSync({ status: 'error', error: err?.message || 'Cloud sync failed' });
-    trackPrivacySafeEvent('cloud_sync_triggered', { status: 'error' });
-    captureSanitizedError('CLOUD_SYNC_EXCEPTION', { operation: 'push' });
+    do {
+      pendingRepush = false;
+      if (!useCloudSyncStore.getState().isAuthenticated || !hasHydratedThisSession) break;
+
+      setSync({ status: 'syncing', error: null });
+      try {
+        const res = await migrateToCloud({ state: usePortfolioStore.getState() });
+        if (res.success) {
+          recordSyncedNow();
+          syncAnalyticsStorageMode('cloud_synced');
+          trackPrivacySafeEvent('cloud_sync_triggered', { status: 'synced' });
+        } else if (res.error === 'NO_AUTH') {
+          setSync({ isAuthenticated: false, status: 'local_only', error: null });
+          syncAnalyticsStorageMode('local_only');
+        } else {
+          lastFailedOp = 'push';
+          setSync({ status: 'error', error: res.error || 'Cloud sync failed' });
+          trackPrivacySafeEvent('cloud_sync_triggered', { status: 'error' });
+          captureSanitizedError('CLOUD_SYNC_FAILED', { operation: 'push' });
+        }
+      } catch (err: any) {
+        lastFailedOp = 'push';
+        setSync({ status: 'error', error: err?.message || 'Cloud sync failed' });
+        trackPrivacySafeEvent('cloud_sync_triggered', { status: 'error' });
+        captureSanitizedError('CLOUD_SYNC_EXCEPTION', { operation: 'push' });
+      }
+    } while (
+      pendingRepush &&
+      useCloudSyncStore.getState().isAuthenticated &&
+      hasHydratedThisSession &&
+      !isHydratingFromCloud.current
+    );
+  } finally {
+    isPushing.current = false;
+    pendingRepush = false;
   }
 }
 
@@ -156,6 +182,8 @@ export async function retrySync(): Promise<void> {
 
 export function markSignedOut() {
   cancelPendingPush();
+  isPushing.current = false;
+  pendingRepush = false;
   hasHydratedThisSession = false;
   lastFailedOp = null;
   setSync({ isAuthenticated: false, status: 'local_only', error: null, lastSyncedAt: null });
@@ -170,10 +198,66 @@ export function startPortfolioMutationListener(): () => void {
   });
 }
 
+/** Subscribes to cross-tab localStorage updates and stale-tab visibility rehydration. */
+export function startMultiTabSyncListeners(): () => void {
+  let hiddenAt: number | null = null;
+
+  const handleStorage = (e: StorageEvent) => {
+    if (e.key !== PORTFOLIO_STORAGE_KEY) return;
+    if (isHydratingFromCloud.current || isPushing.current) return;
+    const persistApi = (usePortfolioStore as typeof usePortfolioStore & {
+      persist?: { rehydrate?: () => Promise<void> | void };
+    }).persist;
+    if (persistApi && typeof persistApi.rehydrate === 'function') {
+      void persistApi.rehydrate();
+    }
+  };
+
+  const handleVisibilityChange = () => {
+    if (typeof document === 'undefined') return;
+    if (document.visibilityState === 'hidden') {
+      hiddenAt = Date.now();
+      return;
+    }
+    if (document.visibilityState === 'visible') {
+      const elapsed = hiddenAt !== null ? Date.now() - hiddenAt : 0;
+      hiddenAt = null;
+      const { isAuthenticated } = useCloudSyncStore.getState();
+      if (
+        elapsed >= VISIBILITY_HYDRATE_STALE_MS &&
+        isAuthenticated &&
+        !isHydratingFromCloud.current &&
+        !isPushing.current &&
+        debounceTimer === null
+      ) {
+        void hydrateNow();
+      }
+    }
+  };
+
+  if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
+    window.addEventListener('storage', handleStorage);
+  }
+  if (typeof document !== 'undefined' && typeof document.addEventListener === 'function') {
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+  }
+
+  return () => {
+    if (typeof window !== 'undefined' && typeof window.removeEventListener === 'function') {
+      window.removeEventListener('storage', handleStorage);
+    }
+    if (typeof document !== 'undefined' && typeof document.removeEventListener === 'function') {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    }
+  };
+}
+
 /** Test helper: reset module singletons. */
 export function __resetAutoCloudSyncForTests() {
   cancelPendingPush();
   isHydratingFromCloud.current = false;
+  isPushing.current = false;
+  pendingRepush = false;
   hasHydratedThisSession = false;
   lastFailedOp = null;
   useCloudSyncStore.setState({ status: 'local_only', lastSyncedAt: null, error: null, isAuthenticated: false });
@@ -195,7 +279,12 @@ export function useAutoCloudSync() {
     };
   }, []);
 
-  // 2. Auth lifecycle (kept last so its cleanup is the final effect cleanup)
+  // 2. Multi-tab localStorage & stale-tab visibility rehydration
+  useEffect(() => {
+    return startMultiTabSyncListeners();
+  }, []);
+
+  // 3. Auth lifecycle (kept last so its cleanup is the final effect cleanup)
   useEffect(() => {
     const {
       data: { subscription },
@@ -229,24 +318,28 @@ export function useAutoCloudSync() {
         syncAnalyticsStorageMode('cloud_synced');
 
         if (typeof localStorage !== 'undefined') {
-          const signupKey = `ph_signup_tracked_${session.user.id}`;
-          const isAlreadyTracked = localStorage.getItem(signupKey);
-          const userCreatedAtMs = session.user.created_at
-            ? new Date(session.user.created_at).getTime()
-            : 0;
-          const isRecentCreation =
-            userCreatedAtMs > 0 && Date.now() - userCreatedAtMs < 60000;
+          try {
+            const signupKey = `ph_signup_tracked_${session.user.id}`;
+            const isAlreadyTracked = localStorage.getItem(signupKey);
+            const userCreatedAtMs = session.user.created_at
+              ? new Date(session.user.created_at).getTime()
+              : 0;
+            const isRecentCreation =
+              userCreatedAtMs > 0 && Date.now() - userCreatedAtMs < 60000;
 
-          if (!isAlreadyTracked && isRecentCreation) {
-            const provider =
-              session.user.app_metadata?.provider ||
-              session.user.app_metadata?.providers?.[0] ||
-              'google';
-            trackPrivacySafeEvent('account_created', {
-              method: provider,
-              requires_verification: false,
-            });
-            localStorage.setItem(signupKey, 'true');
+            if (!isAlreadyTracked && isRecentCreation) {
+              const provider =
+                session.user.app_metadata?.provider ||
+                session.user.app_metadata?.providers?.[0] ||
+                'google';
+              trackPrivacySafeEvent('account_created', {
+                method: provider,
+                requires_verification: false,
+              });
+              localStorage.setItem(signupKey, 'true');
+            }
+          } catch (err) {
+            console.warn('useAutoCloudSync: localStorage signup tracking skipped:', err);
           }
         }
 

@@ -13,6 +13,7 @@ import { formatZAR, formatPercent, formatDate } from '@/lib/formatters';
 import { calculateRentalCashflow } from '@/lib/calculations/propertyMetrics';
 import { calculatePropertyArrears } from '@/lib/calculations/arrears';
 import { calculateDevelopmentFinancials } from '@/lib/calculations/developments';
+import type { DevelopmentProject } from '@/types';
 import {
   TrendingUp,
   ShieldCheck,
@@ -36,15 +37,23 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 
+const EMPTY_DEVELOPMENTS: DevelopmentProject[] = [];
+
 export default function GlobalDashboardPage() {
   const summary = usePortfolioSummary();
   const rentals = usePortfolioStore((state) => state.rentals);
   const flips = usePortfolioStore((state) => state.flips);
-  const developments = usePortfolioStore((state) => state.developments) ?? [];
+  const developments = usePortfolioStore((state) => state.developments) ?? EMPTY_DEVELOPMENTS;
   const funding = usePortfolioStore((state) => state.funding);
   const updateLiquidReserve = usePortfolioStore((state) => state.updateLiquidReserve);
 
-  const activeDevelopments = developments.filter((d) => d && d.currentPhase !== 'Completed');
+  const activeDevelopmentsWithFinancials = React.useMemo(
+    () =>
+      developments
+        .filter((d) => d && d.currentPhase !== 'Completed')
+        .map((dev) => ({ dev, financials: calculateDevelopmentFinancials(dev) })),
+    [developments]
+  );
 
   const [showEditSeedModal, setShowEditSeedModal] = React.useState(false);
   const [seedAmount, setSeedAmount] = React.useState(summary.liquidCapitalReserve);
@@ -180,7 +189,7 @@ export default function GlobalDashboardPage() {
         </div>
 
         {/* Clean Slate Onboarding Guide (Shown when portfolio is empty) */}
-        {rentals.length === 0 && flips.length === 0 && activeDevelopments.length === 0 && (
+        {rentals.length === 0 && flips.length === 0 && activeDevelopmentsWithFinancials.length === 0 && (
           <div className="bg-white rounded-2xl p-6 border-2 border-dashed border-emerald-300 shadow-xs">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-slate-100">
               <div className="flex items-start gap-3">
@@ -284,7 +293,7 @@ export default function GlobalDashboardPage() {
             <div className="text-[11px] text-slate-500 mt-1 flex items-center justify-between">
               <span>Gross Assets</span>
               <span className="font-medium text-slate-700">
-                {summary.activeRentalsCount + summary.activeFlipsCount + (summary.activeDevelopmentsCount ?? activeDevelopments.length)} assets
+                {summary.activeRentalsCount + summary.activeFlipsCount + (summary.activeDevelopmentsCount ?? activeDevelopmentsWithFinancials.length)} assets
               </span>
             </div>
           </div>
@@ -495,7 +504,7 @@ export default function GlobalDashboardPage() {
               </Link>
             </div>
 
-            {activeDevelopments.length === 0 ? (
+            {activeDevelopmentsWithFinancials.length === 0 ? (
               <div className="p-6 rounded-lg border border-dashed border-slate-200 text-center bg-slate-50/50">
                 <Layers className="w-6 h-6 text-slate-400 mx-auto mb-1.5" />
                 <p className="text-xs font-semibold text-slate-700">No active developments in pipeline</p>
@@ -509,8 +518,7 @@ export default function GlobalDashboardPage() {
               </div>
             ) : (
               <div className="space-y-3">
-                {activeDevelopments.map((dev) => {
-                  const financials = calculateDevelopmentFinancials(dev);
+                {activeDevelopmentsWithFinancials.map(({ dev, financials }) => {
                   const pocColor =
                     financials.pocPercent >= 18
                       ? 'text-emerald-700'

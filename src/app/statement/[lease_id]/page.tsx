@@ -171,6 +171,7 @@ export default async function TenantStatementPage({ params, searchParams }: Page
   return (
     <TenantStatementViewer
       statementData={statementData}
+      portalToken={lease_id}
       initialMonth={initialMonth}
       initialTab={initialTab}
     />

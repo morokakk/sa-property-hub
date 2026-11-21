@@ -35,25 +35,29 @@ import {
 
 function loadEnvCredentials() {
   let url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  let serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
   let anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-  if (!url || !anonKey) {
+  if (!url || (!serviceRoleKey && !anonKey)) {
     const envPath = path.resolve(process.cwd(), '.env.local');
     if (fs.existsSync(envPath)) {
       const content = fs.readFileSync(envPath, 'utf-8');
       for (const line of content.split('\n')) {
         const trimmed = line.trim();
-        if (trimmed.startsWith('NEXT_PUBLIC_SUPABASE_URL=')) {
+        if (!url && trimmed.startsWith('NEXT_PUBLIC_SUPABASE_URL=')) {
           url = trimmed.split('=')[1]?.trim();
         }
-        if (trimmed.startsWith('NEXT_PUBLIC_SUPABASE_ANON_KEY=')) {
+        if (!serviceRoleKey && trimmed.startsWith('SUPABASE_SERVICE_ROLE_KEY=')) {
+          serviceRoleKey = trimmed.split('=')[1]?.trim();
+        }
+        if (!anonKey && trimmed.startsWith('NEXT_PUBLIC_SUPABASE_ANON_KEY=')) {
           anonKey = trimmed.split('=')[1]?.trim();
         }
       }
     }
   }
 
-  return { url, anonKey };
+  return { url, key: serviceRoleKey || anonKey, anonKey };
 }
 
 describe('Remote Supabase Schema Parity Integration Test', () => {
@@ -63,15 +67,21 @@ describe('Remote Supabase Schema Parity Integration Test', () => {
   let isOffline = false;
 
   beforeAll(async () => {
-    const { url, anonKey } = loadEnvCredentials();
+    const { url, key, anonKey } = loadEnvCredentials();
     expect(url, 'NEXT_PUBLIC_SUPABASE_URL must be defined for integration testing').toBeDefined();
-    expect(anonKey, 'NEXT_PUBLIC_SUPABASE_ANON_KEY must be defined for integration testing').toBeDefined();
+    expect(key || anonKey, 'SUPABASE_SERVICE_ROLE_KEY or NEXT_PUBLIC_SUPABASE_ANON_KEY must be defined for integration testing').toBeDefined();
 
-    client = createClient(url!, anonKey!);
+    client = createClient(url!, (key || anonKey)!);
 
-    // Query information_schema.columns via RPC
+    // Query information_schema.columns via RPC (requires authenticated or service_role after SEC-V2-02 hardening)
     const { data, error } = await client.rpc('get_schema_columns');
-    if (error && (error.message?.includes('fetch failed') || error.details?.includes('ENOTFOUND'))) {
+    if (
+      error &&
+      (error.message?.includes('fetch failed') ||
+        error.details?.includes('ENOTFOUND') ||
+        error.code === '42501' ||
+        /permission denied|unauthorized/i.test(error.message || ''))
+    ) {
       isOffline = true;
       return;
     }

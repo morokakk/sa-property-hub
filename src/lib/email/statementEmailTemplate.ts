@@ -1,4 +1,5 @@
 import { StatementBankingDetails } from '@/types';
+import { sanitizeSafeHttpUrl } from '@/lib/utils/urlSanitizer';
 
 export interface GenerateEmailHtmlParams {
   tenantName?: string;
@@ -51,7 +52,8 @@ export function generateStatementEmailHtml(params: GenerateEmailHtmlParams): str
   const safeLandlordName = landlordName ? escapeHtml(landlordName) : undefined;
   const safeFilename = escapeHtml(filename);
   const safeRemainingLeaseTerm = remainingLeaseTerm ? escapeHtml(remainingLeaseTerm) : undefined;
-  const safeStatementUrl = escapeHtml(statementUrl);
+  const validatedUrl = sanitizeSafeHttpUrl(statementUrl);
+  const safeStatementUrl = validatedUrl ? escapeHtml(validatedUrl) : undefined;
 
   const safeBankingDetails = bankingDetails
     ? {
@@ -195,6 +197,7 @@ export function generateStatementEmailHtml(params: GenerateEmailHtmlParams): str
                 </tr>
               </table>` : ''}
 
+              ${safeStatementUrl ? `
               <!-- Prominent CTA Button -->
               <table role="presentation" width="100%" border="0" cellpadding="0" cellspacing="0" style="margin-bottom: 24px;">
                 <tr>
@@ -207,7 +210,7 @@ export function generateStatementEmailHtml(params: GenerateEmailHtmlParams): str
                     </p>
                   </td>
                 </tr>
-              </table>
+              </table>` : ''}
 
               <p style="margin: 0; font-size: 12px; line-height: 1.5; color: #64748b; text-align: center;">
                 You can review your itemized municipal ledger, meter readings, and transaction history online anytime.

@@ -237,5 +237,28 @@ describe('sendFeedbackEmail Server Action', () => {
       expect(html).toContain('auth-user-999');
       expect(html).toContain('2026-10-31T12:30:00.000Z');
     });
+
+    it('strips CRLF characters from subject and caps message & diagnostics length in sendFeedbackEmail', async () => {
+      process.env.RESEND_API_KEY = 're_test_key';
+      mockSend.mockResolvedValueOnce({ data: { id: 'msg_sanitized' }, error: null });
+
+      const res = await sendFeedbackEmail({
+        category: 'bug',
+        moduleRoute: '/rentals\r\nBcc: attacker@evil.com',
+        message: 'X'.repeat(6200),
+        diagnostics: {
+          viewport: 'V'.repeat(700),
+          storageMode: 'Local',
+        },
+      });
+
+      expect(res.success).toBe(true);
+      const callArgs = mockSend.mock.calls[0][0];
+      expect(callArgs.subject).not.toMatch(/[\r\n]/);
+      expect(callArgs.html).toContain('X'.repeat(5000));
+      expect(callArgs.html).not.toContain('X'.repeat(5001));
+      expect(callArgs.html).toContain('V'.repeat(500));
+      expect(callArgs.html).not.toContain('V'.repeat(501));
+    });
   });
 });

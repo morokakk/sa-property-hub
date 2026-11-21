@@ -97,21 +97,21 @@ export function unmapProfile(row?: Database['public']['Tables']['profiles']['Row
     baselineHurdleYieldPercent: toNum(row.baseline_hurdle_yield_percent, 10.0),
     defaultAgentCommissionPercent: toNum(row.default_agent_commission_percent, 5.0),
     defaultTaxEntityType: (row.default_tax_entity_type as any) || 'Company (27%)',
-    minNetYieldPercent: toNum((row as any).min_net_yield_percent, 8.0),
-    minMonthlyCashflowZAR: toNum((row as any).min_monthly_cashflow_zar, 1500),
-    minNetRoiPercent: toNum((row as any).min_net_roi_percent, 8.0),
-    minFlipRoiPercent: toNum((row as any).min_flip_roi_percent, 18.0),
-    minDevPocPercent: toNum((row as any).min_dev_poc_percent, 20.0),
-    minDevelopmentPocPercent: toNum((row as any).min_dev_poc_percent, 20.0),
-    minDevYocPercent: toNum((row as any).min_dev_yoc_percent, 12.0),
-    defaultPreSalesHurdlePercent: toNum((row as any).default_pre_sales_hurdle_percent, 40.0),
-    defaultHardBuildRatePerSqmZAR: toNum((row as any).default_hard_build_rate_per_sqm_zar, 9800),
-    defaultVatRegisteredDeveloper: (row as any).default_vat_registered_developer ?? true,
-    maxDay1CashZAR: toNum((row as any).max_day1_cash_zar, 500000),
-    minDscr: toNum((row as any).min_dscr, 1.20),
-    vatExemptAgent: Boolean((row as any).vat_exempt_agent ?? false),
-    marginalTaxRatePercent: toNum((row as any).marginal_tax_rate_percent, 31.0),
-    customNodeBenchmarks: parseJson<Record<string, CustomNodeBenchmarkOverride> | undefined>((row as any).custom_node_benchmarks, undefined),
+    minNetYieldPercent: toNum(row.min_net_yield_percent, 8.0),
+    minMonthlyCashflowZAR: toNum(row.min_monthly_cashflow_zar, 1500),
+    minNetRoiPercent: toNum(row.min_net_roi_percent, 8.0),
+    minFlipRoiPercent: toNum(row.min_flip_roi_percent, 18.0),
+    minDevPocPercent: toNum(row.min_dev_poc_percent, 20.0),
+    minDevelopmentPocPercent: toNum(row.min_dev_poc_percent, 20.0),
+    minDevYocPercent: toNum(row.min_dev_yoc_percent, 12.0),
+    defaultPreSalesHurdlePercent: toNum(row.default_pre_sales_hurdle_percent, 40.0),
+    defaultHardBuildRatePerSqmZAR: toNum(row.default_hard_build_rate_per_sqm_zar, 9800),
+    defaultVatRegisteredDeveloper: row.default_vat_registered_developer ?? true,
+    maxDay1CashZAR: toNum(row.max_day1_cash_zar, 500000),
+    minDscr: toNum(row.min_dscr, 1.20),
+    vatExemptAgent: Boolean(row.vat_exempt_agent ?? false),
+    marginalTaxRatePercent: toNum(row.marginal_tax_rate_percent, 31.0),
+    customNodeBenchmarks: parseJson<Record<string, CustomNodeBenchmarkOverride> | undefined>(row.custom_node_benchmarks, undefined),
     bankName: row.bank_name || undefined,
     accountHolder: row.account_holder || undefined,
     accountNumber: row.account_number || undefined,
@@ -139,26 +139,26 @@ export function unmapRentals(rows: Database['public']['Tables']['properties']['R
     title: r.title,
     address: r.address,
     city: r.city,
-    province: (r as any).province || undefined,
+    province: (r.province as any) || undefined,
     propertyType: (r.property_type as any) || 'Sectional Title Apartment',
     source: (r.source as any) || undefined,
-    numberOfUnits: toNullableNum((r as any).number_of_units) ?? 1,
-    floorAreaSqm: toNullableNum((r as any).floor_area_sqm) ?? undefined,
+    numberOfUnits: toNullableNum(r.number_of_units) ?? 1,
+    floorAreaSqm: toNullableNum(r.floor_area_sqm) ?? undefined,
     agmDate: r.agm_date || undefined,
     marketValueZAR: toNum(r.market_value_zar, 0),
     purchasePriceZAR: toNum(r.purchase_price_zar, 0),
     purchaseDate: r.purchase_date || new Date().toISOString().split('T')[0],
     outstandingBondBalanceZAR: toNum(r.outstanding_bond_balance_zar, 0),
     bondInterestRatePercent: toNum(r.bond_interest_rate_percent, 0),
-    loanTermYears: toNullableNum((r as any).loan_term_years) ?? 20,
+    loanTermYears: toNullableNum(r.loan_term_years) ?? 20,
     monthlyBondPaymentZAR: toNum(r.monthly_bond_payment_zar, 0),
     bondPaymentEffectiveDate: r.bond_payment_effective_date || undefined,
     bondRevisionNote: r.bond_revision_note || undefined,
-    extraMonthlyPaymentZAR: toNullableNum((r as any).extra_monthly_payment_zar) ?? undefined,
+    extraMonthlyPaymentZAR: toNullableNum(r.extra_monthly_payment_zar) ?? undefined,
     leases: parseJson(r.leases, []),
-    archivedLeases: parseJson((r as any).archived_leases, []),
+    archivedLeases: parseJson(r.archived_leases, []),
     applicants: (() => {
-      const parsed = parseJson((r as any).applicants, [] as any[]);
+      const parsed = parseJson(r.applicants, [] as any[]);
       return Array.isArray(parsed) ? parsed : [];
     })(),
     managementType: (r.management_type as any) || undefined,
@@ -173,14 +173,14 @@ export function unmapRentals(rows: Database['public']['Tables']['properties']['R
     monthlyMaintenanceReserveZAR: toNum(r.monthly_maintenance_reserve_zar, 0),
     annualBuildingInsuranceZAR: toNullableNum(r.annual_building_insurance_zar),
     unpaidUtilityArrearsZAR: toNullableNum(r.unpaid_utility_arrears_zar),
-    arrearsWriteOffs: (r as any).arrears_write_offs
-      ? parseJson((r as any).arrears_write_offs, [])
+    arrearsWriteOffs: r.arrears_write_offs
+      ? parseJson(r.arrears_write_offs, [])
       : [],
-    paymentRecords: (r as any).payment_records
-      ? parseJson((r as any).payment_records, [])
+    paymentRecords: r.payment_records
+      ? parseJson(r.payment_records, [])
       : (Array.isArray(r.leases) && (r.leases[0] as any)?.paymentRecords) || [],
     arrearsOpeningBalanceZAR:
-      toNullableNum((r as any).arrears_opening_balance_zar) ??
+      toNullableNum(r.arrears_opening_balance_zar) ??
       (Array.isArray(r.leases) && (r.leases[0] as any)?.arrearsOpeningBalanceZAR) ??
       undefined,
     maintenanceHistory: parseJson(r.maintenance_history, []),
@@ -193,14 +193,14 @@ export function unmapRentals(rows: Database['public']['Tables']['properties']['R
     netCashProceedsZAR: toNullableNum(r.net_cash_proceeds_zar),
     soldDate: r.sold_date || undefined,
     exitNotes: r.exit_notes || undefined,
-    transactions: (r as any).transactions ? parseJson((r as any).transactions, []) : undefined,
+    transactions: r.transactions ? parseJson(r.transactions, []) : undefined,
     convertedFromFlipId: r.converted_from_flip_id || undefined,
     isBrrrrProperty: r.is_brrrr_property ?? undefined,
     totalEquityExtractedZAR: toNullableNum(r.total_equity_extracted_zar),
     refinanceHistory: parseJson(r.refinance_history, []),
     utilityStatements: parseJson(r.utility_statements, []),
     meterReadings: parseJson(r.meter_readings, []),
-    meterRegistry: parseJson((r as any).meter_registry, []),
+    meterRegistry: parseJson(r.meter_registry, []),
     taxEntityTypeOverride: (r.tax_entity_type_override as any) || undefined,
     section13sexAnnualShieldZAR: toNullableNum(r.section_13sex_annual_shield_zar),
     utilityType: (r.utility_type as any) || undefined,
@@ -266,7 +266,7 @@ export function unmapFlips(
     title: f.title,
     address: f.address,
     city: f.city,
-    province: (f as any).province || undefined,
+    province: (f.province as any) || undefined,
     propertyType: (f.property_type as any) || undefined,
     agmDate: f.agm_date || undefined,
     purchaseDate: f.purchase_date || new Date().toISOString().split('T')[0],
@@ -274,10 +274,10 @@ export function unmapFlips(
     acquisitionCostsZAR: toNum(f.acquisition_costs_zar, 0),
     baselineRenovationBudgetZAR: toNum(f.baseline_renovation_budget_zar, 0),
     strategy: (f.strategy as any) || undefined,
-    projectStrategy: ((f as any).project_strategy as any) || 'flip_for_sale',
+    projectStrategy: (f.project_strategy as any) || 'flip_for_sale',
     source: (f.source as any) || undefined,
-    numberOfUnits: toNullableNum((f as any).number_of_units) ?? 1,
-    floorAreaSqm: toNullableNum((f as any).floor_area_sqm) ?? undefined,
+    numberOfUnits: toNullableNum(f.number_of_units) ?? 1,
+    floorAreaSqm: toNullableNum(f.floor_area_sqm) ?? undefined,
     estimatedDurationMonths: toNullableNum(f.estimated_duration_months),
     monthlyHoldingCostZAR: toNullableNum(f.monthly_holding_cost_zar),
     monthlyBondPaymentZAR: toNullableNum(f.monthly_bond_payment_zar),
@@ -352,7 +352,7 @@ export function unmapDevelopments(
     constructionMonths: toNum(d.construction_months, 0),
     sellDownMonths: toNum(d.sell_down_months, 0),
     landPurchasePriceZAR: toNum(d.land_purchase_price_zar, 0),
-    isDeferredLandPaymentLAA: Boolean((d as any).is_deferred_land_payment_laa ?? false),
+    isDeferredLandPaymentLAA: Boolean(d.is_deferred_land_payment_laa ?? false),
     acquisitionCostsZAR: toNum(d.acquisition_costs_zar, 0),
     sec118ArrearsZAR: toNum(d.sec118_arrears_zar, 0),
     softCosts: parseJson(d.soft_costs, {
@@ -375,7 +375,7 @@ export function unmapDevelopments(
     developmentFacilityDrawnZAR: toNum(d.development_facility_drawn_zar, 0),
     developmentFacilityRepaidZAR: toNum(d.development_facility_repaid_zar, 0),
     preSalesHurdlePercent: toNum(d.pre_sales_hurdle_percent, 0),
-    seniorJvPartnerName: (d as any).senior_jv_partner_name || undefined,
+    seniorJvPartnerName: d.senior_jv_partner_name || undefined,
     linkedFundingSourceId: d.linked_funding_source_id || undefined,
     approvals: Object.keys(cleanApprovals).length > 0 ? cleanApprovals : fallbackApprovals,
     units: parseJson(d.units, []),
@@ -395,8 +395,8 @@ export function unmapDevelopments(
     compliance: d.compliance ? (parseJson(d.compliance, undefined) as any) : undefined,
     driveVault: d.drive_vault ? (parseJson(d.drive_vault, undefined) as any) : undefined,
     zoningProfile: devZoning || undefined,
-    shareToken: typeof (d as any).share_token === 'string' && (d as any).share_token.trim()
-      ? (d as any).share_token.trim()
+    shareToken: typeof d.share_token === 'string' && d.share_token.trim()
+      ? d.share_token.trim()
       : undefined,
     notes: d.notes || undefined,
     createdAt: d.created_at || undefined,
@@ -499,33 +499,29 @@ export function unmapOpportunities(
       monthlyRatesTaxes: toNum(opp.monthly_rates_taxes_zar, 0),
       monthlyCommunalServicesZAR: toNullableNum(opp.monthly_communal_services_zar) ?? undefined,
       monthlyMaintenanceReserveZAR:
-        toNullableNum((opp as any).monthly_maintenance_reserve_zar) ??
+        toNullableNum(opp.monthly_maintenance_reserve_zar) ??
         toNullableNum(rawCosts?.monthlyMaintenanceReserveZAR),
       monthlyPrepaidVendingFeeZAR:
-        toNullableNum((opp as any).monthly_prepaid_vending_fee_zar) ??
+        toNullableNum(opp.monthly_prepaid_vending_fee_zar) ??
         toNullableNum(rawCosts?.monthlyPrepaidVendingFeeZAR),
       numberOfUnits:
-        toNullableNum((opp as any).number_of_units) ??
+        toNullableNum(opp.number_of_units) ??
         toNullableNum(rawCosts?.numberOfUnits),
       floorAreaSqm:
-        toNullableNum((opp as any).floor_area_sqm) ??
+        toNullableNum(opp.floor_area_sqm) ??
         toNullableNum(rawCosts?.floorAreaSqm),
       isVatInclusiveDeveloperSale:
-        (opp as any).is_vat_inclusive_developer_sale !== undefined &&
-        (opp as any).is_vat_inclusive_developer_sale !== null
-          ? Boolean((opp as any).is_vat_inclusive_developer_sale)
+        opp.is_vat_inclusive_developer_sale !== undefined &&
+        opp.is_vat_inclusive_developer_sale !== null
+          ? Boolean(opp.is_vat_inclusive_developer_sale)
           : rawCosts?.isVatInclusiveDeveloperSale !== undefined
           ? Boolean(rawCosts.isVatInclusiveDeveloperSale)
           : undefined,
       tenantPlacementFeePercent:
-        toNullableNum((opp as any).tenant_placement_fee_percent) ??
+        toNullableNum(opp.tenant_placement_fee_percent) ??
         toNullableNum(rawCosts?.tenantPlacementFeePercent),
-      annualSpvAdminAuditFeeZAR:
-        toNullableNum((opp as any).annual_spv_admin_audit_fee_zar) ??
-        toNullableNum(rawCosts?.annualSpvAdminAuditFeeZAR),
-      refinanceLtvPercent:
-        toNullableNum((opp as any).refinance_ltv_percent) ??
-        toNullableNum(rawCosts?.refinanceLtvPercent),
+      annualSpvAdminAuditFeeZAR: toNullableNum(rawCosts?.annualSpvAdminAuditFeeZAR),
+      refinanceLtvPercent: toNullableNum(rawCosts?.refinanceLtvPercent),
       developmentType: rawCosts?.developmentType || undefined,
       isVatRegisteredDeveloper:
         rawCosts?.isVatRegisteredDeveloper !== undefined
@@ -609,7 +605,7 @@ export function unmapOpportunities(
       passNotes: opp.pass_notes || undefined,
       passedAt: opp.passed_at || undefined,
       notes: opp.notes || undefined,
-      createdAt: (opp as any).created_at || new Date().toISOString(),
+      createdAt: opp.created_at || new Date().toISOString(),
     };
   });
 }
@@ -619,9 +615,9 @@ export function unmapTasks(
 ): TaskItem[] {
   return rows.map((t) => {
     const linked = parseJson(t.linked_entity, { type: 'general', name: 'General' } as any);
-    const recurrence = (t as any).recurrence || linked?.recurrence || undefined;
-    const recurrenceEndDate = (t as any).recurrence_end_date || linked?.recurrenceEndDate || undefined;
-    const recurrenceGroupId = (t as any).recurrence_group_id || linked?.recurrenceGroupId || undefined;
+    const recurrence = (t.recurrence || linked?.recurrence || undefined) as TaskItem['recurrence'];
+    const recurrenceEndDate = t.recurrence_end_date || linked?.recurrenceEndDate || undefined;
+    const recurrenceGroupId = t.recurrence_group_id || linked?.recurrenceGroupId || undefined;
 
     return {
       id: t.id,
@@ -634,7 +630,7 @@ export function unmapTasks(
       recurrence,
       recurrenceEndDate,
       recurrenceGroupId,
-      createdAt: (t as any).created_at || new Date().toISOString(),
+      createdAt: t.created_at || new Date().toISOString(),
     };
   });
 }
@@ -710,7 +706,7 @@ export async function hydrateFromCloud(): Promise<HydrationResult> {
       if (suppliersRes.error) throw new Error(`Suppliers fetch failed: ${suppliersRes.error.message}`);
 
       if (devsRes.error) {
-        console.warn('Developments fetch warning (table may be pending migration):', devsRes.error.message);
+        throw new Error(`Developments fetch failed: ${devsRes.error.message}`);
       }
 
       const profileRow = profilesRes.data?.[0];

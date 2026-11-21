@@ -668,6 +668,14 @@ function SettingsContent() {
       const reader = new FileReader();
       reader.onload = (event) => {
         const result = event.target?.result as string;
+        const MAX_FALLBACK_LOGO_BASE64_LENGTH = 200 * 1024;
+        if (!result || result.length > MAX_FALLBACK_LOGO_BASE64_LENGTH) {
+          setLogoError(
+            'Logo image exceeds the safe 200KB encoded storage limit. Please upload a smaller image or simplified SVG.'
+          );
+          if (fileInputRef.current) fileInputRef.current.value = '';
+          return;
+        }
         setLogoBase64(result);
         setLogoError(null);
       };

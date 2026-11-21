@@ -17,10 +17,15 @@ const DEAL_ROOM_ROUTE_REGEX = /(\/deal-room\/)([^/?#]+)/gi;
 
 const SENSITIVE_PROPERTY_KEYS = new Set([
   'name',
+  'buyerName',
+  'buyer_name',
   'tenantName',
   'tenant_name',
   'fullName',
   'full_name',
+  'propertyTitle',
+  'property_title',
+  'title',
   'email',
   'tenantEmail',
   'tenant_email',

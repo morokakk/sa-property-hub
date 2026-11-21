@@ -19,6 +19,22 @@ export default function ClientOnly({ children }: { children: React.ReactNode }) 
     return <>{children}</>;
   }
 
+  // Public marketing & legal routes stream full SSR HTML immediately without the loading spinner,
+  // while keeping AuthHydrator & HashScroller mounted so password recovery redirects on `/` still work.
+  if (
+    pathname === '/' ||
+    pathname?.startsWith('/about') ||
+    pathname?.startsWith('/privacy')
+  ) {
+    return (
+      <>
+        <AuthHydrator />
+        <HashScroller />
+        {children}
+      </>
+    );
+  }
+
   if (!hasMounted) {
     return (
       <div className="flex-1 flex items-center justify-center p-12">

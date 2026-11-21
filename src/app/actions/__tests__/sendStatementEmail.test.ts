@@ -218,6 +218,40 @@ describe('sendStatementEmail Server Action', () => {
       expect(result.success).toBe(false);
       expect(result.error).toContain('Statement PDF payload is invalid or empty');
     });
+
+    it('rejects malformed email addresses, CRLF header injection, and oversized (>10 MB) PDFs', async () => {
+      process.env.RESEND_API_KEY = 're_test_key_123';
+
+      const badEmailRes = await sendStatementEmail({
+        ...validPayload,
+        to: 'not-an-email',
+      });
+      expect(badEmailRes.success).toBe(false);
+      expect(badEmailRes.error).toContain('Invalid tenant email address format');
+
+      const crlfEmailRes = await sendStatementEmail({
+        ...validPayload,
+        to: 'tenant@example.com\r\nBcc: evil@attacker.com',
+      });
+      expect(crlfEmailRes.success).toBe(false);
+      expect(crlfEmailRes.error).toContain('Invalid tenant email address format');
+
+      const crlfPeriodRes = await sendStatementEmail({
+        ...validPayload,
+        billingPeriod: 'October 2026\r\nBcc: evil@attacker.com',
+      });
+      expect(crlfPeriodRes.success).toBe(false);
+      expect(crlfPeriodRes.error).toContain('Invalid billing period format');
+
+      const oversizedBase64 = 'A'.repeat(14 * 1024 * 1024);
+      const bigPdfRes = await sendStatementEmail({
+        ...validPayload,
+        pdfBase64: oversizedBase64,
+      });
+      expect(bigPdfRes.success).toBe(false);
+      expect(bigPdfRes.error).toContain('exceeds the maximum allowed size of 10 MB');
+      expect(mockSend).not.toHaveBeenCalled();
+    });
   });
 
   describe('3. Branded HTML Email Template Generation', () => {
@@ -344,6 +378,21 @@ describe('sendStatementEmail Server Action', () => {
       });
 
       expect(htmlWithEmptyAccount).not.toContain('Remittance Banking Details (EFT)');
+    });
+
+    it('omits CTA portal links when statementUrl uses an unsafe javascript: or data: scheme', () => {
+      const htmlJs = generateStatementEmailHtml({
+        tenantName: 'Thabo Mokoena',
+        propertyName: 'Sandhurst Executive Suite',
+        billingPeriod: 'October 2026',
+        totalAmountDueFormatted: 'R 18,500.00',
+        statementUrl: 'javascript:alert(1)',
+        filename: 'Statement_October_2026.pdf',
+      });
+
+      expect(htmlJs).not.toContain('javascript:alert(1)');
+      expect(htmlJs).not.toContain('View Secure Online Statement');
+      expect(htmlJs).not.toContain('Direct portal link:');
     });
 
     it('passes bankingDetails through sendStatementEmail into Resend send html call', async () => {

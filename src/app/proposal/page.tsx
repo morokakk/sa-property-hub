@@ -2319,7 +2319,10 @@ function ProposalGeneratorContent() {
             )}
 
             {deal.type === 'development' && (deal as any).rawDevelopment && (
-              <DevelopmentFeasibilitySection development={(deal as any).rawDevelopment} />
+              <DevelopmentFeasibilitySection
+                development={(deal as any).rawDevelopment}
+                financials={(deal as any).developmentFinancials}
+              />
             )}
 
             {/* Capital Requirement & Use of Funds */}

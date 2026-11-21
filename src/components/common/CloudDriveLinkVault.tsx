@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { CloudDriveVault } from '@/types';
+import { sanitizeSafeHttpUrl } from '@/lib/utils/urlSanitizer';
 import {
   FolderArchive,
   ExternalLink,
@@ -162,14 +163,29 @@ export default function CloudDriveLinkVault({
   ];
 
   const handleSaveUrl = (key: keyof CloudDriveVault) => {
-    let cleanUrl = urlInput.trim();
-    if (cleanUrl && !cleanUrl.startsWith('http://') && !cleanUrl.startsWith('https://')) {
-      cleanUrl = `https://${cleanUrl}`;
+    const raw = urlInput.trim();
+    if (!raw) {
+      const updated: CloudDriveVault = {
+        ...links,
+        [key]: undefined,
+      };
+      setLinks(updated);
+      if (onUpdate) onUpdate(updated);
+      setEditingKey(null);
+      setUrlInput('');
+      return;
+    }
+
+    const hasExplicitScheme = /^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(raw);
+    const candidate = hasExplicitScheme ? raw : `https://${raw}`;
+    const safeUrl = sanitizeSafeHttpUrl(candidate);
+    if (!safeUrl) {
+      return;
     }
 
     const updated: CloudDriveVault = {
       ...links,
-      [key]: cleanUrl || undefined,
+      [key]: safeUrl,
     };
     setLinks(updated);
     if (onUpdate) onUpdate(updated);
@@ -323,16 +339,28 @@ export default function CloudDriveLinkVault({
                 </div>
               ) : hasUrl ? (
                 <div className="flex items-center justify-between gap-1 mt-auto pt-1.5 border-t border-slate-100 min-w-0">
-                  <a
-                    href={currentUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1 text-[11px] font-bold text-indigo-600 hover:text-indigo-800 hover:underline truncate min-w-0"
-                    title={`Open ${label} (${provider?.name || 'Link'})`}
-                  >
-                    <span className="truncate">Open Link</span>
-                    <ExternalLink className="w-3 h-3 shrink-0" />
-                  </a>
+                  {(() => {
+                    const safeUrl = sanitizeSafeHttpUrl(currentUrl);
+                    if (!safeUrl) {
+                      return (
+                        <span className="text-[11px] font-medium text-rose-600 truncate min-w-0">
+                          Invalid URL
+                        </span>
+                      );
+                    }
+                    return (
+                      <a
+                        href={safeUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 text-[11px] font-bold text-indigo-600 hover:text-indigo-800 hover:underline truncate min-w-0"
+                        title={`Open ${label} (${provider?.name || 'Link'})`}
+                      >
+                        <span className="truncate">Open Link</span>
+                        <ExternalLink className="w-3 h-3 shrink-0" />
+                      </a>
+                    );
+                  })()}
 
                   {!readOnly && (
                     <div className="flex items-center gap-0.5 shrink-0">

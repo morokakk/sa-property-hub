@@ -247,7 +247,7 @@ const fallbackMemoryStorage: Storage = {
   },
 };
 
-function getSafeStorage(): Storage {
+export function getSafeStorage(): Storage {
   try {
     if (
       typeof globalThis !== 'undefined' &&
@@ -255,7 +255,52 @@ function getSafeStorage(): Storage {
       typeof globalThis.localStorage.getItem === 'function' &&
       typeof globalThis.localStorage.setItem === 'function'
     ) {
-      return globalThis.localStorage;
+      const rawStorage = globalThis.localStorage;
+      return {
+        get length() {
+          try {
+            return rawStorage.length;
+          } catch {
+            return 0;
+          }
+        },
+        clear() {
+          try {
+            rawStorage.clear();
+          } catch (err) {
+            console.warn('localStorage.clear failed:', err);
+          }
+        },
+        getItem(key: string) {
+          try {
+            return rawStorage.getItem(key);
+          } catch (err) {
+            console.warn('localStorage.getItem failed:', err);
+            return null;
+          }
+        },
+        key(index: number) {
+          try {
+            return rawStorage.key(index);
+          } catch {
+            return null;
+          }
+        },
+        removeItem(key: string) {
+          try {
+            rawStorage.removeItem(key);
+          } catch (err) {
+            console.warn('localStorage.removeItem failed:', err);
+          }
+        },
+        setItem(key: string, value: string) {
+          try {
+            rawStorage.setItem(key, value);
+          } catch (err) {
+            console.warn('localStorage.setItem failed (quota or storage restriction):', err);
+          }
+        },
+      };
     }
   } catch {
     // Node 22+ without --localstorage-file or SSR environment

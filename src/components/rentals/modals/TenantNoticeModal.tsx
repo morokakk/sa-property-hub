@@ -37,6 +37,7 @@ import {
   normalizeWhatsAppPhone,
 } from '@/lib/calculations/inspections';
 import { formatInspectionForWhatsApp } from '@/lib/whatsappFormatter';
+import { sanitizeSafeHttpUrl } from '@/lib/utils/urlSanitizer';
 
 export interface TenantNoticeModalProps {
   isOpen: boolean;
@@ -673,16 +674,22 @@ export function TenantNoticeModal({
                           RHA Compliant • Agreed Ingoing on {formatDate(exitRecord.ingoingTenantAgreedDate || exitRecord.ingoingDate || '')}
                         </span>
                       </span>
-                      {exitRecord.ingoingPhotoVaultUrl && (
-                        <a
-                          href={exitRecord.ingoingPhotoVaultUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-[10px] font-bold text-indigo-700 hover:underline"
-                        >
-                          View Ingoing Vault ↗
-                        </a>
-                      )}
+                      {(() => {
+                        const safeIngoingVaultUrl = sanitizeSafeHttpUrl(
+                          exitRecord.ingoingPhotoVaultUrl
+                        );
+                        if (!safeIngoingVaultUrl) return null;
+                        return (
+                          <a
+                            href={safeIngoingVaultUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-[10px] font-bold text-indigo-700 hover:underline"
+                          >
+                            View Ingoing Vault ↗
+                          </a>
+                        );
+                      })()}
                     </div>
                   )}
 

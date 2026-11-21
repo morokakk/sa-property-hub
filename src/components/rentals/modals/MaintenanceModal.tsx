@@ -10,6 +10,7 @@ import { formatContractorDispatchForWhatsApp } from '@/lib/whatsappFormatter';
 import { normalizeWhatsAppPhone } from '@/lib/calculations/inspections';
 import { hydrateNow, useCloudSyncStore } from '@/hooks/useAutoCloudSync';
 import { getTenantReportedMaintenance } from '@/app/actions/submitTenantMaintenanceTicket';
+import { supabase } from '@/lib/supabaseClient';
 
 type WorkOrderStatus = MaintenanceLog['status'];
 
@@ -94,10 +95,23 @@ export const MaintenanceModal: React.FC<MaintenanceModalProps> = ({
 
       const activeProp = liveProperty || property;
       const leaseIds = (activeProp?.leases || []).map((l) => l.id);
+      const leaseTokens = (activeProp?.leases || [])
+        .map((l) => l.statementToken || l.id)
+        .filter(Boolean);
       if (activeProp?.id) {
+        let accessToken: string | undefined;
+        if (auth) {
+          const {
+            data: { session },
+          } = await supabase.auth.getSession();
+          accessToken = session?.access_token;
+        }
+
         const res = await getTenantReportedMaintenance({
           propertyId: activeProp.id,
           leaseIds,
+          accessToken,
+          tokens: leaseTokens,
         });
 
         if (res.success && Array.isArray(res.tickets) && res.tickets.length > 0) {

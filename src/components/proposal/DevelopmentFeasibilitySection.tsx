@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
   DevelopmentProject,
   FundingSource,
@@ -179,17 +179,22 @@ export function DevelopmentFeasibilitySection({
   financials,
   className = '',
 }: DevelopmentFeasibilitySectionProps) {
-  const fin = financials || calculateDevelopmentFinancials(development);
-  const capitalStack = calculateDevelopmentCapitalStack(development, fin);
-  const riskGate = calculateDevelopmentRiskGate(development, fin);
-  const wipeoutMatrix = calculateDevelopmentDebtWipeoutMatrix(development, fin);
-  const zoningEnvelope = development.zoningProfile
-    ? calculateZoningEnvelope(
-        development.zoningProfile,
-        development.totalBuildableAreaSqm || 0,
-        development.units?.length || 1
-      )
-    : null;
+  const { fin, capitalStack, riskGate, wipeoutMatrix, zoningEnvelope } = useMemo(() => {
+    const computedFin = financials || calculateDevelopmentFinancials(development);
+    return {
+      fin: computedFin,
+      capitalStack: calculateDevelopmentCapitalStack(development, computedFin),
+      riskGate: calculateDevelopmentRiskGate(development, computedFin),
+      wipeoutMatrix: calculateDevelopmentDebtWipeoutMatrix(development, computedFin),
+      zoningEnvelope: development.zoningProfile
+        ? calculateZoningEnvelope(
+            development.zoningProfile,
+            development.totalBuildableAreaSqm || 0,
+            development.units?.length || 1
+          )
+        : null,
+    };
+  }, [development, financials]);
 
   return (
     <section className={`space-y-6 print:space-y-4 ${className}`}>

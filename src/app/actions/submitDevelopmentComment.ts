@@ -41,18 +41,38 @@ export interface GetExternalDevelopmentCommentsResult {
   error?: string;
 }
 
-// Sliding-window rate limiting map (token -> submission timestamps ms)
+// Sliding-window rate limiting map (token:ip -> submission timestamps ms)
 const rateLimitMap = new Map<string, number[]>();
 const RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000; // 1 hour
 const MAX_REQUESTS_PER_TOKEN = 3;
+const MAX_RATE_LIMIT_KEYS = 500;
 
 // In-memory store for external collaborator submissions keyed by devId and/or shareToken
 // Avoids mutating INITIAL_DEVELOPMENTS while surviving across requests in a server session.
 const inMemoryDealRoomComments = new Map<string, ProjectComment[]>();
+const MAX_IN_MEMORY_KEYS = 200;
+const MAX_COMMENTS_PER_KEY = 100;
 
-function isRateLimited(tokenKey: string): boolean {
+function pruneRateLimitMap(now: number): void {
+  for (const [key, timestamps] of rateLimitMap.entries()) {
+    const valid = timestamps.filter((t) => now - t < RATE_LIMIT_WINDOW_MS);
+    if (valid.length === 0) {
+      rateLimitMap.delete(key);
+    } else if (valid.length !== timestamps.length) {
+      rateLimitMap.set(key, valid);
+    }
+  }
+  while (rateLimitMap.size >= MAX_RATE_LIMIT_KEYS) {
+    const oldestKey = rateLimitMap.keys().next().value;
+    if (oldestKey === undefined) break;
+    rateLimitMap.delete(oldestKey);
+  }
+}
+
+function isRateLimited(rateKey: string): boolean {
   const now = Date.now();
-  const timestamps = rateLimitMap.get(tokenKey) || [];
+  pruneRateLimitMap(now);
+  const timestamps = rateLimitMap.get(rateKey) || [];
   const validTimestamps = timestamps.filter((t) => now - t < RATE_LIMIT_WINDOW_MS);
 
   if (validTimestamps.length >= MAX_REQUESTS_PER_TOKEN) {
@@ -60,14 +80,23 @@ function isRateLimited(tokenKey: string): boolean {
   }
 
   validTimestamps.push(now);
-  rateLimitMap.set(tokenKey, validTimestamps);
+  rateLimitMap.set(rateKey, validTimestamps);
   return false;
 }
 
 function recordInMemoryComment(key: string, comment: ProjectComment): void {
   if (!key) return;
+  if (!inMemoryDealRoomComments.has(key) && inMemoryDealRoomComments.size >= MAX_IN_MEMORY_KEYS) {
+    const oldestKey = inMemoryDealRoomComments.keys().next().value;
+    if (oldestKey !== undefined) {
+      inMemoryDealRoomComments.delete(oldestKey);
+    }
+  }
   const existing = inMemoryDealRoomComments.get(key) || [];
-  inMemoryDealRoomComments.set(key, mergeProjectComments(existing, [comment]));
+  inMemoryDealRoomComments.set(
+    key,
+    mergeProjectComments(existing, [comment]).slice(0, MAX_COMMENTS_PER_KEY)
+  );
 }
 
 function getServerSupabaseClient() {
@@ -126,7 +155,19 @@ export async function submitDevelopmentComment(
       };
     }
 
-    if (isRateLimited(cleanToken)) {
+    let clientIp = 'unknown-client';
+    try {
+      const { headers } = await import('next/headers');
+      const headerList = await headers();
+      clientIp =
+        headerList.get('x-forwarded-for')?.split(',')[0].trim() ||
+        headerList.get('x-real-ip') ||
+        'unknown-client';
+    } catch {
+      // Fallback when headers context is unavailable
+    }
+
+    if (isRateLimited(`${cleanToken}:${clientIp}`)) {
       return {
         success: false,
         error:

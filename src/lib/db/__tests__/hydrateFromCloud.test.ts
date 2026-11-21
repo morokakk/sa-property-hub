@@ -629,4 +629,34 @@ describe('hydrateFromCloud Execution Engine', () => {
     );
     expect(hydratedDevs.find((d) => d.id === 'dev-cloud-ledger-2')?.commentsLedger).toEqual([]);
   });
+
+  it('fails atomically when developments fetch returns an error', async () => {
+    (supabase.auth.getUser as any).mockResolvedValue({
+      data: { user: { id: TEST_USER_ID, email: 'investor@example.com' } },
+      error: null,
+    });
+
+    (supabase.from as any).mockImplementation((table: string) => {
+      if (table === 'developments') {
+        return {
+          select: vi.fn().mockReturnValue({
+            eq: vi.fn().mockResolvedValue({
+              data: null,
+              error: { message: 'Developments table read timeout' },
+            }),
+          }),
+        };
+      }
+      return {
+        select: vi.fn().mockReturnValue({
+          eq: vi.fn().mockResolvedValue({ data: [], error: null }),
+        }),
+      };
+    });
+
+    const res = await hydrateFromCloud();
+    expect(res.success).toBe(false);
+    expect(res.hydrated).toBe(false);
+    expect(res.error).toContain('Developments fetch failed: Developments table read timeout');
+  });
 });

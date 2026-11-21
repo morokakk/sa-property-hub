@@ -1204,11 +1204,14 @@ Output pure JSON matching the schema without markdown or commentary.`;
   if (provider === 'google') {
     // Google Gemini Generative Language API
     const effectiveModel = model && model.includes('gemini') ? model : 'gemini-1.5-flash';
-    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${effectiveModel}:generateContent?key=${apiKey.trim()}`;
+    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${effectiveModel}:generateContent`;
 
     const response = await fetch(endpoint, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'x-goog-api-key': apiKey.trim(),
+      },
       body: JSON.stringify({
         contents: [
           {

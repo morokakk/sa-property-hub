@@ -21,7 +21,6 @@ import { DevelopmentUnitInventoryTab } from '@/components/developments/Developme
 import { DevelopmentCostStackTab } from '@/components/developments/DevelopmentCostStackTab';
 import { DevelopmentApprovalsTab } from '@/components/developments/DevelopmentApprovalsTab';
 import { DevelopmentFinanceTab } from '@/components/developments/DevelopmentFinanceTab';
-import { DevelopmentProjectModal } from '@/components/developments/DevelopmentProjectModal';
 import CloudPublishModal from '@/components/rentals/CloudPublishModal';
 import { supabase } from '@/lib/supabaseClient';
 import { migrateToCloud } from '@/lib/db/migrateToCloud';
@@ -59,6 +58,14 @@ const ProjectCommentsLedgerModal = dynamic(
   { ssr: false }
 );
 
+const DevelopmentProjectModal = dynamic(
+  () =>
+    import('@/components/developments/DevelopmentProjectModal').then(
+      (m) => m.DevelopmentProjectModal
+    ),
+  { ssr: false }
+);
+
 type OperationalTab = 'units' | 'costs' | 'approvals' | 'finance';
 
 const DEVELOPMENT_PHASES: DevelopmentPhase[] = [
@@ -72,7 +79,6 @@ const DEVELOPMENT_PHASES: DevelopmentPhase[] = [
 ];
 
 export default function DevelopmentsPage() {
-  const store = usePortfolioStore();
   const storeDevelopments = usePortfolioStore((state) => state.developments);
   const developments = (typeof window === 'undefined' ? usePortfolioStore.getState().developments : storeDevelopments) ?? [];
   const storeInvestorProfile = usePortfolioStore((state) => state.investorProfile);
@@ -212,7 +218,7 @@ export default function DevelopmentsPage() {
 
   const handleDeleteProject = () => {
     if (!activeDev || !confirm(`Delete development "${activeDev.title}"?`)) return;
-    store.deleteDevelopment(activeDev.id);
+    usePortfolioStore.getState().deleteDevelopment(activeDev.id);
     const remaining = developments.filter((d) => d.id !== activeDev.id);
     if (remaining[0]) setSelectedDevId(remaining[0].id);
   };
@@ -220,18 +226,18 @@ export default function DevelopmentsPage() {
   const handleUpdateUnit = (unitId: string, updates: Partial<DevelopmentUnit>) => {
     if (!activeDev) return;
     const units = (activeDev.units || []).map((u) => (u.id === unitId ? { ...u, ...updates } : u));
-    store.updateDevelopment(activeDev.id, { units });
+    usePortfolioStore.getState().updateDevelopment(activeDev.id, { units });
   };
 
   const handleAddUnit = (unit: Omit<DevelopmentUnit, 'id'>) => {
     if (!activeDev) return;
     const newUnit = { ...unit, id: `dev-unit-${Date.now()}-${(activeDev.units?.length || 0) + 1}` };
-    store.updateDevelopment(activeDev.id, { units: [...(activeDev.units || []), newUnit] });
+    usePortfolioStore.getState().updateDevelopment(activeDev.id, { units: [...(activeDev.units || []), newUnit] });
   };
 
   const handleDeleteUnit = (unitId: string) => {
     if (!activeDev) return;
-    store.updateDevelopment(activeDev.id, {
+    usePortfolioStore.getState().updateDevelopment(activeDev.id, {
       units: (activeDev.units || []).filter((u) => u.id !== unitId),
     });
   };
@@ -255,7 +261,7 @@ export default function DevelopmentsPage() {
     if (!activeDev) return;
     const existing = activeDev.commentsLedger ?? [];
     if (existing.some((c) => c.id === comment.id)) return;
-    store.updateDevelopment(activeDev.id, {
+    usePortfolioStore.getState().updateDevelopment(activeDev.id, {
       commentsLedger: [comment, ...existing],
     });
   };
@@ -270,19 +276,19 @@ export default function DevelopmentsPage() {
       commentId,
       nextStatus
     );
-    store.updateDevelopment(activeDev.id, { commentsLedger: updated });
+    usePortfolioStore.getState().updateDevelopment(activeDev.id, { commentsLedger: updated });
   };
 
   const handleDeleteComment = (commentId: string) => {
     if (!activeDev) return;
     const updated = removeProjectComment(activeDev.commentsLedger, commentId);
-    store.updateDevelopment(activeDev.id, { commentsLedger: updated });
+    usePortfolioStore.getState().updateDevelopment(activeDev.id, { commentsLedger: updated });
   };
 
   const handleSyncCommentToTask = (comment: ProjectComment) => {
     if (!activeDev) return;
     const task = buildTaskFromProjectComment(activeDev, comment);
-    store.addTask(task);
+    usePortfolioStore.getState().addTask(task);
   };
 
   const resolveDealRoomToken = async (): Promise<string | null> => {
@@ -315,7 +321,7 @@ export default function DevelopmentsPage() {
       let token = activeDev.shareToken?.trim();
       if (!token) {
         token = crypto.randomUUID();
-        store.updateDevelopment(activeDev.id, { shareToken: token });
+        usePortfolioStore.getState().updateDevelopment(activeDev.id, { shareToken: token });
       }
 
       const res = await migrateToCloud({ state: usePortfolioStore.getState() });
@@ -497,7 +503,7 @@ export default function DevelopmentsPage() {
                   aria-label="Current Development Phase"
                   value={activeDev.currentPhase}
                   onChange={(e) =>
-                    store.updateDevelopment(activeDev.id, {
+                    usePortfolioStore.getState().updateDevelopment(activeDev.id, {
                       currentPhase: e.target.value as DevelopmentPhase,
                     })
                   }
@@ -731,10 +737,10 @@ export default function DevelopmentsPage() {
                   onAddUnit={handleAddUnit}
                   onDeleteUnit={handleDeleteUnit}
                   onMarkUnitSold={(unitId, buyer, price) =>
-                    store.sellDevelopmentUnit(activeDev.id, unitId, buyer, price)
+                    usePortfolioStore.getState().sellDevelopmentUnit(activeDev.id, unitId, buyer, price)
                   }
                   onGraduateRetainedUnits={() =>
-                    store.graduateRetainedUnitsToRental(activeDev.id)
+                    usePortfolioStore.getState().graduateRetainedUnitsToRental(activeDev.id)
                   }
                 />
               </div>
@@ -746,16 +752,16 @@ export default function DevelopmentsPage() {
                   development={activeDev}
                   financials={financials}
                   onUpdateSoftCosts={(sc) =>
-                    store.updateDevelopment(activeDev.id, {
+                    usePortfolioStore.getState().updateDevelopment(activeDev.id, {
                       softCosts: { ...activeDev.softCosts, ...sc },
                     })
                   }
                   onUpdateDevelopment={(updates) =>
-                    store.updateDevelopment(activeDev.id, updates)
+                    usePortfolioStore.getState().updateDevelopment(activeDev.id, updates)
                   }
-                  onAddBOQItem={(item) => store.addDevelopmentBOQItem(activeDev.id, item)}
-                  onUpdateBOQItem={(id, u) => store.updateDevelopmentBOQItem(activeDev.id, id, u)}
-                  onDeleteBOQItem={(id) => store.deleteDevelopmentBOQItem(activeDev.id, id)}
+                  onAddBOQItem={(item) => usePortfolioStore.getState().addDevelopmentBOQItem(activeDev.id, item)}
+                  onUpdateBOQItem={(id, u) => usePortfolioStore.getState().updateDevelopmentBOQItem(activeDev.id, id, u)}
+                  onDeleteBOQItem={(id) => usePortfolioStore.getState().deleteDevelopmentBOQItem(activeDev.id, id)}
                 />
               </div>
             )}
@@ -766,7 +772,7 @@ export default function DevelopmentsPage() {
                   development={activeDev}
                   financials={financials}
                   onUpdateApproval={(key, u) =>
-                    store.updateDevelopment(activeDev.id, {
+                    usePortfolioStore.getState().updateDevelopment(activeDev.id, {
                       approvals: {
                         ...activeDev.approvals,
                         [key]: { ...activeDev.approvals[key], ...u },
@@ -782,7 +788,7 @@ export default function DevelopmentsPage() {
                 <DevelopmentFinanceTab
                   development={activeDev}
                   financials={financials}
-                  onUpdateDevelopment={(u) => store.updateDevelopment(activeDev.id, u)}
+                  onUpdateDevelopment={(u) => usePortfolioStore.getState().updateDevelopment(activeDev.id, u)}
                 />
               </div>
             )}
@@ -810,10 +816,10 @@ export default function DevelopmentsPage() {
         onClose={() => setIsProjectModalOpen(false)}
         onSave={(project, isNew) => {
           if (isNew) {
-            store.addDevelopment(project as DevelopmentProject);
+            usePortfolioStore.getState().addDevelopment(project as DevelopmentProject);
             if (project.id) setSelectedDevId(project.id);
           } else if (activeDev) {
-            store.updateDevelopment(activeDev.id, project);
+            usePortfolioStore.getState().updateDevelopment(activeDev.id, project);
           }
         }}
       />

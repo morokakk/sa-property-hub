@@ -209,6 +209,40 @@ describe('submitDevelopmentComment & getExternalDevelopmentComments Server Actio
     expect(fourthRes.error).toContain('Too many team notes submitted recently');
   });
 
+  it('scopes rate limiting by token + client IP so one collaborator does not lock out another IP', async () => {
+    vi.doMock('next/headers', () => ({
+      headers: async () => new Headers({ 'x-forwarded-for': '203.0.113.10' }),
+    }));
+
+    for (let i = 1; i <= 3; i++) {
+      const okIp1 = await submitDevelopmentComment({
+        token: 'dev-1',
+        authorName: `IP1 Reviewer ${i}`,
+        message: `IP1 note ${i}`,
+      });
+      expect(okIp1.success).toBe(true);
+    }
+
+    const fourthIp1 = await submitDevelopmentComment({
+      token: 'dev-1',
+      authorName: 'IP1 Reviewer 4',
+      message: 'Rate limited for IP1',
+    });
+    expect(fourthIp1.success).toBe(false);
+
+    vi.doMock('next/headers', () => ({
+      headers: async () => new Headers({ 'x-forwarded-for': '203.0.113.20' }),
+    }));
+
+    const okIp2 = await submitDevelopmentComment({
+      token: 'dev-1',
+      authorName: 'IP2 Reviewer 1',
+      message: 'Different collaborator IP still permitted',
+    });
+    expect(okIp2.success).toBe(true);
+    vi.doUnmock('next/headers');
+  });
+
   it('sanitizes oversized strings cleanly', async () => {
     const longAuthor = 'A'.repeat(200);
     const longMsg = 'M'.repeat(1500);

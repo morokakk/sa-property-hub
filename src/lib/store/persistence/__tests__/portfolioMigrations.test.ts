@@ -7,6 +7,7 @@ import {
   mergePortfolioPersistedState,
   portfolioPersistConfig,
   registerStoreForMigration,
+  getSafeStorage,
 } from '../portfolioMigrations';
 import { RentalProperty, OpportunityDeal } from '@/types';
 
@@ -349,6 +350,39 @@ describe('Zustand Persistence & Schema Migrations Engine', () => {
     it('gracefully ignores rehydration when error occurs or state is undefined', () => {
       const postRehydrate = (portfolioPersistConfig.onRehydrateStorage as any)();
       expect(() => postRehydrate(undefined, new Error('Storage corrupted'))).not.toThrow();
+    });
+  });
+
+  describe('getSafeStorage quota & restriction shield (LS-01)', () => {
+    it('catches QuotaExceededError on setItem without crashing and logs a warning', () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const mockQuotaError = new DOMException('Quota exceeded', 'QuotaExceededError');
+
+      vi.stubGlobal('localStorage', {
+        length: 1,
+        clear: vi.fn(),
+        key: vi.fn(() => 'sa_property_portfolio_hub_v1'),
+        getItem: vi.fn(() => {
+          throw new DOMException('Access denied', 'SecurityError');
+        }),
+        setItem: vi.fn(() => {
+          throw mockQuotaError;
+        }),
+        removeItem: vi.fn(() => {
+          throw new DOMException('Access denied', 'SecurityError');
+        }),
+      });
+
+      try {
+        const storage = getSafeStorage();
+        expect(() => storage.setItem('sa_property_portfolio_hub_v1', '{}')).not.toThrow();
+        expect(storage.getItem('sa_property_portfolio_hub_v1')).toBeNull();
+        expect(() => storage.removeItem('sa_property_portfolio_hub_v1')).not.toThrow();
+        expect(warnSpy).toHaveBeenCalled();
+      } finally {
+        warnSpy.mockRestore();
+        vi.unstubAllGlobals();
+      }
     });
   });
 });

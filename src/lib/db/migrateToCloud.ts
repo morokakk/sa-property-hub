@@ -919,63 +919,72 @@ export async function migrateToCloud(options?: {
 
     // Step 4.2: Properties (Rentals)
     if (propertyRows.length > 0) {
-      const { error: propError } = await supabase.from('properties').upsert(propertyRows);
+      const { error: propError } = await supabase
+        .from('properties')
+        .upsert(propertyRows, { onConflict: 'user_id,id' });
       if (propError) throw new Error(`Rentals sync failed: ${propError.message}`);
       counts.properties = propertyRows.length;
     }
 
     // Step 4.3: Funding sources
     if (fundingRows.length > 0) {
-      const { error: fundingError } = await supabase.from('funding_sources').upsert(fundingRows);
+      const { error: fundingError } = await supabase
+        .from('funding_sources')
+        .upsert(fundingRows, { onConflict: 'user_id,id' });
       if (fundingError) throw new Error(`Funding sync failed: ${fundingError.message}`);
       counts.fundingSources = fundingRows.length;
     }
 
     // Step 4.4: Flips (Must precede boq_items due to foreign key)
     if (flipRows.length > 0) {
-      const { error: flipError } = await supabase.from('flips').upsert(flipRows);
+      const { error: flipError } = await supabase
+        .from('flips')
+        .upsert(flipRows, { onConflict: 'user_id,id' });
       if (flipError) throw new Error(`Flips sync failed: ${flipError.message}`);
       counts.flips = flipRows.length;
     }
 
     // Step 4.5: BOQ Items
     if (boqRows.length > 0) {
-      const { error: boqError } = await supabase.from('boq_items').upsert(boqRows);
+      const { error: boqError } = await supabase
+        .from('boq_items')
+        .upsert(boqRows, { onConflict: 'user_id,id' });
       if (boqError) throw new Error(`BOQ items sync failed: ${boqError.message}`);
       counts.boqItems = boqRows.length;
     }
 
     // Step 4.5b: Developments
     if (developmentRows.length > 0) {
-      try {
-        const { error: devError } = await supabase.from('developments').upsert(developmentRows);
-        if (devError) {
-          console.warn('Developments sync warning:', devError.message);
-        } else {
-          counts.developments = developmentRows.length;
-        }
-      } catch (devCatch) {
-        console.warn('Developments sync skipped or table pending migration:', devCatch);
-      }
+      const { error: devError } = await supabase
+        .from('developments')
+        .upsert(developmentRows, { onConflict: 'user_id,id' });
+      if (devError) throw new Error(`Developments sync failed: ${devError.message}`);
+      counts.developments = developmentRows.length;
     }
 
     // Step 4.6: Opportunities
     if (opportunityRows.length > 0) {
-      const { error: oppError } = await supabase.from('opportunities').upsert(opportunityRows);
+      const { error: oppError } = await supabase
+        .from('opportunities')
+        .upsert(opportunityRows, { onConflict: 'user_id,id' });
       if (oppError) throw new Error(`Opportunities sync failed: ${oppError.message}`);
       counts.opportunities = opportunityRows.length;
     }
 
     // Step 4.7: Tasks
     if (taskRows.length > 0) {
-      const { error: taskError } = await supabase.from('tasks').upsert(taskRows);
+      const { error: taskError } = await supabase
+        .from('tasks')
+        .upsert(taskRows, { onConflict: 'user_id,id' });
       if (taskError) throw new Error(`Tasks sync failed: ${taskError.message}`);
       counts.tasks = taskRows.length;
     }
 
     // Step 4.8: Suppliers
     if (supplierRows.length > 0) {
-      const { error: supplierError } = await supabase.from('suppliers').upsert(supplierRows);
+      const { error: supplierError } = await supabase
+        .from('suppliers')
+        .upsert(supplierRows, { onConflict: 'user_id,id' });
       if (supplierError) throw new Error(`Suppliers sync failed: ${supplierError.message}`);
       counts.suppliers = supplierRows.length;
     }

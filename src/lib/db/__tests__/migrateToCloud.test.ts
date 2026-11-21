@@ -1165,5 +1165,123 @@ describe('migrateToCloud Execution Engine', () => {
       expect(res.success).toBe(true);
       expect(supabase.from).toHaveBeenCalledWith('developments');
     });
+
+    it('passes onConflict user_id,id to upsert on composite-PK tables and propagates developments upsert errors', async () => {
+      (supabase.auth.getUser as any).mockResolvedValue({
+        data: { user: { id: TEST_USER_ID, email: 'investor@example.com' } },
+        error: null,
+      });
+
+      const localUpsert = vi.fn().mockResolvedValue({ error: null });
+      (supabase.from as any).mockImplementation(() => ({
+        upsert: localUpsert,
+        select: vi.fn().mockReturnValue({
+          eq: vi.fn().mockResolvedValue({ data: [], error: null }),
+        }),
+        delete: vi.fn().mockReturnValue({
+          eq: vi.fn().mockReturnValue({ in: vi.fn().mockResolvedValue({ error: null }) }),
+        }),
+      }));
+
+      const okRes = await migrateToCloud({
+        state: {
+          rentals: [INITIAL_RENTALS[0]],
+          developments: [
+            {
+              id: 'dev-custom-conflict-1',
+              title: 'Composite PK Dev',
+              address: '1 Main Rd',
+              city: 'Johannesburg',
+              developmentType: 'Subdivision & Cluster',
+              isVatRegisteredDeveloper: true,
+              currentPhase: 'Feasibility',
+              preApprovalMonths: 6,
+              constructionMonths: 10,
+              sellDownMonths: 4,
+              landPurchasePriceZAR: 1_000_000,
+              acquisitionCostsZAR: 50_000,
+              sec118ArrearsZAR: 0,
+              softCosts: {
+                townPlannerZAR: 0,
+                architectZAR: 0,
+                structuralCivilEngineerZAR: 0,
+                quantitySurveyorZAR: 0,
+                nhbrcEnrolmentFeeZAR: 0,
+                councilBulkContributionsZAR: 0,
+                planScrutinyAndSubdivisionFeesZAR: 0,
+                marketingAndShowUnitZAR: 0,
+              },
+              totalBuildableAreaSqm: 400,
+              budgetedHardCostPerSqmZAR: 9500,
+              contingencyPercent: 5,
+              boqItems: [],
+              monthlyPreApprovalHoldingBurnZAR: 10_000,
+              monthlyConstructionHoldingBurnZAR: 20_000,
+              developmentFacilityLimitZAR: 3_000_000,
+              developmentFacilityDrawnZAR: 0,
+              developmentFacilityRepaidZAR: 0,
+              preSalesHurdlePercent: 50,
+              approvals: {} as any,
+              units: [],
+            },
+          ],
+        },
+      });
+
+      expect(okRes.success).toBe(true);
+      expect(localUpsert).toHaveBeenCalledWith(expect.any(Array), { onConflict: 'user_id,id' });
+
+      // Developments error must fail migrateToCloud instead of being swallowed
+      localUpsert
+        .mockResolvedValueOnce({ error: null }) // profiles
+        .mockResolvedValueOnce({ error: { message: 'Developments constraint violation' } }); // developments
+
+      const errRes = await migrateToCloud({
+        state: {
+          developments: [
+            {
+              id: 'dev-err-1',
+              title: 'Failing Dev',
+              address: '2 Main Rd',
+              city: 'Johannesburg',
+              developmentType: 'Subdivision & Cluster',
+              isVatRegisteredDeveloper: true,
+              currentPhase: 'Feasibility',
+              preApprovalMonths: 6,
+              constructionMonths: 10,
+              sellDownMonths: 4,
+              landPurchasePriceZAR: 1_000_000,
+              acquisitionCostsZAR: 50_000,
+              sec118ArrearsZAR: 0,
+              softCosts: {
+                townPlannerZAR: 0,
+                architectZAR: 0,
+                structuralCivilEngineerZAR: 0,
+                quantitySurveyorZAR: 0,
+                nhbrcEnrolmentFeeZAR: 0,
+                councilBulkContributionsZAR: 0,
+                planScrutinyAndSubdivisionFeesZAR: 0,
+                marketingAndShowUnitZAR: 0,
+              },
+              totalBuildableAreaSqm: 400,
+              budgetedHardCostPerSqmZAR: 9500,
+              contingencyPercent: 5,
+              boqItems: [],
+              monthlyPreApprovalHoldingBurnZAR: 10_000,
+              monthlyConstructionHoldingBurnZAR: 20_000,
+              developmentFacilityLimitZAR: 3_000_000,
+              developmentFacilityDrawnZAR: 0,
+              developmentFacilityRepaidZAR: 0,
+              preSalesHurdlePercent: 50,
+              approvals: {} as any,
+              units: [],
+            },
+          ],
+        },
+      });
+
+      expect(errRes.success).toBe(false);
+      expect(errRes.error).toContain('Developments sync failed: Developments constraint violation');
+    });
   });
 });
