@@ -2,6 +2,29 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Conditional Multi-Unit Municipal Zoning in Rentals (`RentalFormModal` & `RentalCardHeader`)] - 2026-11-22
+
+### Added
+- **Rental Municipal Zoning & Multi-Let Consent Engine (`src/lib/calculations/rentalZoning.ts`)**:
+  - Added deterministic utilities for progressive disclosure visibility (`shouldShowRentalZoningAccordion`), save-time payload sanitization (`sanitizeRentalZoningForSave`), locale comma-decimal parsing (`parseLocaleDecimal`), South African preset application preserving custom stand erf sizes (`applyRentalZoningPreset`, `isRentalZoningPresetActive`, `createDefaultRentalZoningProfile`), tiered statutory density guardrail evaluation (`evaluateRentalDensityGuardrail`), accordion status chip formatting (`formatRentalZoningAccordionChip`), and compact header badge + tooltip formatting built on `formatZoningTransitionLabel` (`formatCompactRentalZoningPill`).
+- **Context-Aware Municipal Zoning Accordion in `RentalFormModal.tsx`**:
+  - Placed a collapsible, collapsed-by-default **Municipal Zoning & Multi-Let Consent Rights (Optional)** accordion at the top of Section 3 (`#rental-sec-leases`), displaying a live status chip (`Not Set`, `Res 1 • Consent: 2nd Dwelling`, `Res 3 • As-of-Right`, etc.).
+  - Revealed only when `propertyType !== 'Sectional Title Apartment'` and (`formLeases.length > 1` or an existing `zoningProfile` is populated); hidden on 1-unit rentals without zoning and strictly hidden on any `Sectional Title Apartment`.
+  - Includes 4 South African quick presets (`Res 1`, `Res 3`, `Res 4`, `Township Infill` with `bg-slate-900 text-white border-slate-900` active highlight), a `Clear Zoning` action, `MunicipalZoningCode` dropdown, 3 multi-let consent checkboxes (`2nd Dwelling / Cottage`, `Student Commune Consent`, `Backyard Micro-Units`), comma-safe `Erf Size (m²)` and `Max Density (du/ha)` inputs, and a non-blocking amber density warning when modeled unit count exceeds the statutory density cap without tiered consent coverage.
+  - Omits heavy redevelopment bulk inputs (`FAR`, `Coverage %`, `Max Height Storeys`, `Target Zoning`) while preserving inherited values on properties promoted from `/analyzer`, `/flips`, or `/developments`, and strips `zoningProfile` on save when saved as `Sectional Title Apartment` or cleared.
+- **Compact Multi-Unit Zoning Pill in `RentalCardHeader.tsx`**:
+  - Renders a compact amber zoning pill (`🏛️ Res 1 (As-of-Right)`, `🏛️ Res 1 ➔ Res 3`, etc.) next to `PropertyTypeBadge` when `property.zoningProfile` is defined and `property.propertyType !== 'Sectional Title Apartment'`, with 390px-safe mobile truncation and a `title` tooltip detailing full zoning transition status, Erf size, statutory density cap, and active consent uses.
+- **Unit & Component Regression Suite (`RentalZoningProgressiveDisclosure.test.tsx`)**:
+  - Added 16 unit and SSR component tests covering progressive disclosure visibility, preset application, inherited bulk-field preservation, comma-decimal parsing, tiered density guardrails, Zustand + Supabase `coc_checklist._zoningProfile` round-trip persistence, Sectional Title save scrubbing, and `RentalCardHeader` badge rendering.
+
+### Fixed
+- **New-Rental `zoningProfile` Persistence in `useRentalPortfolio.ts`**: Forwarded `zoningProfile: payload.zoningProfile` inside `handleAddRental` when creating a new rental property so newly onboarded multi-unit rentals persist zoning configuration to Zustand and Supabase cloud sync (`coc_checklist._zoningProfile`) without any new database columns.
+
+### Verified
+- Zero TypeScript compile errors (`tsc --noEmit`).
+- All 124 test files (1,428 tests) passing with 100% success rate (`vitest run`).
+- Production build compilation (`next build`) and built-in browser end-to-end verification across desktop and `390x844` mobile viewports completed with 0 console errors.
+
 ## [Context-Aware Progressive Disclosure for Municipal Zoning & Bulk Envelopes] - 2026-11-08
 
 ### Added
