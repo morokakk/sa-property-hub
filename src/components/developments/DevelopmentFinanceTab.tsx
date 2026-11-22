@@ -22,6 +22,47 @@ import {
   X,
 } from 'lucide-react';
 
+function QuickFillAmountChips({
+  presets,
+  value,
+  onSelect,
+  ariaLabel,
+  thresholdLabel,
+}: {
+  presets: Array<{ label: string; amount: number }>;
+  value: number;
+  onSelect: (amount: number) => void;
+  ariaLabel: string;
+  thresholdLabel: string;
+}) {
+  return (
+    <div className="flex flex-wrap gap-1.5 mb-2" role="group" aria-label={ariaLabel}>
+      {presets.map((preset) => {
+        const isDisabled = preset.label === thresholdLabel && preset.amount <= 0;
+        const isSelected = !isDisabled && value === preset.amount;
+        return (
+          <button
+            key={preset.label}
+            type="button"
+            disabled={isDisabled}
+            aria-pressed={isSelected}
+            onClick={() => onSelect(preset.amount)}
+            className={`px-2.5 py-1 rounded-md border text-[11px] font-semibold tabular-nums whitespace-nowrap ${
+              isDisabled
+                ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'
+                : isSelected
+                ? 'bg-slate-900 text-white border-slate-900 hover:bg-slate-800 shadow-2xs cursor-pointer'
+                : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100 cursor-pointer'
+            }`}
+          >
+            {preset.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 export interface DevelopmentFinanceTabProps {
   development: DevelopmentProject;
   financials: DevelopmentFinancialSummary;
@@ -117,7 +158,7 @@ export function DevelopmentFinanceTab({
       {/* Top 3 Scoreboard Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {/* Card 1: Facility Health Card */}
-        <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-2xs space-y-3">
+        <div className="bg-white rounded-xl border border-slate-200 p-4 sm:p-5 shadow-2xs space-y-3">
           <div className="flex items-center justify-between text-slate-500">
             <span className="text-xs font-semibold uppercase tracking-wider">
               Senior Bank Facility
@@ -127,7 +168,7 @@ export function DevelopmentFinanceTab({
 
           <div>
             <div className="text-xs text-slate-400">Outstanding Facility Debt:</div>
-            <div className="text-2xl font-bold text-slate-900 tracking-tight">
+            <div className="text-2xl font-bold text-slate-900 tracking-tight tabular-nums">
               {formatZAR(financials.outstandingDevFacilityZAR)}
             </div>
           </div>
@@ -135,21 +176,21 @@ export function DevelopmentFinanceTab({
           <div className="space-y-1.5 pt-2 border-t border-slate-100 text-xs">
             <div className="flex justify-between text-slate-600">
               <span>Facility Limit:</span>
-              <span className="font-semibold">{formatZAR(development.developmentFacilityLimitZAR)}</span>
+              <span className="font-semibold tabular-nums">{formatZAR(development.developmentFacilityLimitZAR)}</span>
             </div>
             <div className="flex justify-between text-slate-600">
               <span>Total Drawn:</span>
-              <span className="font-semibold">{formatZAR(development.developmentFacilityDrawnZAR)}</span>
+              <span className="font-semibold tabular-nums">{formatZAR(development.developmentFacilityDrawnZAR)}</span>
             </div>
             <div className="flex justify-between text-slate-600">
               <span>Total Repaid:</span>
-              <span className="font-semibold text-emerald-700">
+              <span className="font-semibold text-emerald-700 tabular-nums">
                 {formatZAR(development.developmentFacilityRepaidZAR)}
               </span>
             </div>
             <div className="flex justify-between text-slate-600">
               <span>Available Undrawn:</span>
-              <span className="font-semibold text-blue-700">{formatZAR(availableToDraw)}</span>
+              <span className="font-semibold text-blue-700 tabular-nums">{formatZAR(availableToDraw)}</span>
             </div>
           </div>
 
@@ -182,7 +223,7 @@ export function DevelopmentFinanceTab({
         </div>
 
         {/* Card 2: Pre-Sales Hurdle Meter */}
-        <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-2xs space-y-3">
+        <div className="bg-white rounded-xl border border-slate-200 p-4 sm:p-5 shadow-2xs space-y-3">
           <div className="flex items-center justify-between text-slate-500">
             <span className="text-xs font-semibold uppercase tracking-wider">
               Pre-Sales Bank Gate
@@ -196,7 +237,7 @@ export function DevelopmentFinanceTab({
 
           <div>
             <div className="text-xs text-slate-400">Current Pre-Sold GDV:</div>
-            <div className="text-2xl font-bold text-slate-900 tracking-tight">
+            <div className="text-2xl font-bold text-slate-900 tracking-tight tabular-nums">
               {formatPercent(financials.preSoldGdvPercent)}
             </div>
           </div>
@@ -211,7 +252,7 @@ export function DevelopmentFinanceTab({
                 style={{ width: `${hurdleRatio}%` }}
               />
             </div>
-            <div className="flex justify-between text-[11px] text-slate-500">
+            <div className="flex justify-between text-[11px] text-slate-500 tabular-nums">
               <span>Pre-Sold: {formatZAR(financials.preSoldGdvZAR)}</span>
               <span>Hurdle Target: {formatPercent(development.preSalesHurdlePercent)}</span>
             </div>
@@ -237,13 +278,13 @@ export function DevelopmentFinanceTab({
             )}
           </div>
 
-          <div className="text-[11px] text-slate-500">
+          <div className="text-[11px] text-slate-500 tabular-nums">
             {financials.preSoldUnitsCount} of {financials.totalUnitsCount} units contracted (Reserved, Bond Approved, or Sold).
           </div>
         </div>
 
         {/* Card 3: Debt Wipeout Breakeven */}
-        <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-2xs space-y-3">
+        <div className="bg-white rounded-xl border border-slate-200 p-4 sm:p-5 shadow-2xs space-y-3">
           <div className="flex items-center justify-between text-slate-500">
             <span className="text-xs font-semibold uppercase tracking-wider">
               Debt Wipeout Breakeven
@@ -253,7 +294,7 @@ export function DevelopmentFinanceTab({
 
           <div>
             <div className="text-xs text-slate-400">Units for 100% Debt Wipeout:</div>
-            <div className="text-2xl font-bold text-slate-900 tracking-tight">
+            <div className="text-2xl font-bold text-slate-900 tracking-tight tabular-nums">
               {wipeoutUnitsCount} Units
             </div>
           </div>
@@ -261,17 +302,17 @@ export function DevelopmentFinanceTab({
           <div className="space-y-1 text-xs text-slate-600">
             <div className="flex justify-between">
               <span>Avg Net List Price:</span>
-              <span className="font-semibold">{formatZAR(financials.avgUnitListPriceZAR)}</span>
+              <span className="font-semibold tabular-nums">{formatZAR(financials.avgUnitListPriceZAR)}</span>
             </div>
             <div className="flex justify-between">
               <span>Outstanding Debt:</span>
-              <span className="font-semibold text-rose-700">
+              <span className="font-semibold text-rose-700 tabular-nums">
                 {formatZAR(financials.outstandingDevFacilityZAR)}
               </span>
             </div>
             <div className="flex justify-between">
               <span>Unencumbered Surplus:</span>
-              <span className="font-semibold text-emerald-700">
+              <span className="font-semibold text-emerald-700 tabular-nums">
                 {financials.unencumberedUnitsCount} Units
               </span>
             </div>
@@ -332,7 +373,7 @@ export function DevelopmentFinanceTab({
                     </span>
                   </div>
                   <div className="text-[11px] text-slate-500 mt-0.5">{unit.configuration}</div>
-                  <div className="font-mono font-semibold text-slate-800 mt-1">
+                  <div className="font-mono font-semibold text-slate-800 mt-1 tabular-nums">
                     {formatZAR(unit.listPriceVatInclZAR)}
                   </div>
                 </div>
@@ -380,9 +421,21 @@ export function DevelopmentFinanceTab({
             </div>
             <form onSubmit={handleRecordRepayment} noValidate className="space-y-3 text-xs">
               <div>
-                <label className="block font-semibold text-slate-700 mb-1">
+                <label className="block font-semibold text-slate-700 mb-1.5">
                   Repayment Amount (ZAR)
                 </label>
+                <QuickFillAmountChips
+                  presets={[
+                    { label: 'R250k', amount: 250000 },
+                    { label: 'R500k', amount: 500000 },
+                    { label: 'R1M', amount: 1000000 },
+                    { label: 'Full Balance', amount: financials.outstandingDevFacilityZAR },
+                  ]}
+                  value={repayAmount}
+                  onSelect={setRepayAmount}
+                  ariaLabel="Quick-Fill Repayment Amounts"
+                  thresholdLabel="Full Balance"
+                />
                 <input
                   type="number"
                   required
@@ -390,9 +443,9 @@ export function DevelopmentFinanceTab({
                   step="any"
                   value={repayAmount}
                   onChange={(e) => setRepayAmount(Number(e.target.value))}
-                  className="w-full rounded border border-slate-300 px-3 py-1.5 focus:ring-1 focus:ring-emerald-500"
+                  className="w-full rounded border border-slate-300 px-3 py-1.5 font-semibold tabular-nums focus:ring-1 focus:ring-emerald-500"
                 />
-                <p className="text-[11px] text-slate-400 mt-0.5">
+                <p className="text-[11px] text-slate-400 mt-1 tabular-nums">
                   Outstanding debt: {formatZAR(financials.outstandingDevFacilityZAR)}.
                 </p>
               </div>
@@ -440,9 +493,21 @@ export function DevelopmentFinanceTab({
             </div>
             <form onSubmit={handleRecordDrawdown} noValidate className="space-y-3 text-xs">
               <div>
-                <label className="block font-semibold text-slate-700 mb-1">
+                <label className="block font-semibold text-slate-700 mb-1.5">
                   Drawdown Amount (ZAR)
                 </label>
+                <QuickFillAmountChips
+                  presets={[
+                    { label: 'R250k', amount: 250000 },
+                    { label: 'R500k', amount: 500000 },
+                    { label: 'R1M', amount: 1000000 },
+                    { label: 'Max Available', amount: availableToDraw },
+                  ]}
+                  value={drawAmount}
+                  onSelect={setDrawAmount}
+                  ariaLabel="Quick-Fill Drawdown Amounts"
+                  thresholdLabel="Max Available"
+                />
                 <input
                   type="number"
                   required
@@ -450,9 +515,9 @@ export function DevelopmentFinanceTab({
                   step="any"
                   value={drawAmount}
                   onChange={(e) => setDrawAmount(Number(e.target.value))}
-                  className="w-full rounded border border-slate-300 px-3 py-1.5 focus:ring-1 focus:ring-blue-500"
+                  className="w-full rounded border border-slate-300 px-3 py-1.5 font-semibold tabular-nums focus:ring-1 focus:ring-blue-500"
                 />
-                <p className="text-[11px] text-slate-400 mt-0.5">
+                <p className="text-[11px] text-slate-400 mt-1 tabular-nums">
                   Available undrawn: {formatZAR(availableToDraw)}.
                 </p>
               </div>

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { DevelopmentProject, DevelopmentUnit, DevUnitStatus } from '@/types';
 import { DevelopmentFinancialSummary } from '@/lib/calculations/developments';
 import { formatZAR } from '@/lib/formatters';
@@ -14,6 +14,9 @@ import {
   AlertCircle,
   ExternalLink,
   X,
+  Search,
+  LayoutGrid,
+  List,
 } from 'lucide-react';
 
 export interface DevelopmentUnitInventoryTabProps {
@@ -47,6 +50,11 @@ export function DevelopmentUnitInventoryTab({
 }: DevelopmentUnitInventoryTabProps) {
   const units = development.units || [];
 
+  // Filter, search & view mode state (local, non-persisted)
+  const [statusFilter, setStatusFilter] = useState<'All' | DevUnitStatus>('All');
+  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [viewMode, setViewMode] = useState<'table' | 'cards'>('table');
+
   // Sale modal state
   const [sellingUnit, setSellingUnit] = useState<DevelopmentUnit | null>(null);
   const [saleBuyerName, setSaleBuyerName] = useState('');
@@ -61,6 +69,18 @@ export function DevelopmentUnitInventoryTab({
   const [newListPrice, setNewListPrice] = useState<number>(850000);
   const [newEstRent, setNewEstRent] = useState<number>(7500);
   const [newCostBasis, setNewCostBasis] = useState<number>(600000);
+
+  const filteredUnits = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    return units
+      .filter((u) => (statusFilter === 'All' ? true : u.status === statusFilter))
+      .filter((u) => {
+        if (!q) return true;
+        return [u.unitNumber, u.configuration, u.buyerName, u.conveyancerRef, u.status]
+          .filter(Boolean)
+          .some((field) => String(field).toLowerCase().includes(q));
+      });
+  }, [units, statusFilter, searchQuery]);
 
   useEffect(() => {
     if (readOnly) {
@@ -153,15 +173,121 @@ export function DevelopmentUnitInventoryTab({
   const totalListGdv = financials.gdvInclVatZAR;
   const totalEstRent = financials.totalMonthlyEstimatedRentZAR;
 
+  const renderBuyerOrRetainedInfo = (
+    unit: DevelopmentUnit,
+    isSold: boolean,
+    isRetained: boolean
+  ) => {
+    if (isSold) {
+      return (
+        <div className="leading-tight">
+          <span className="font-semibold text-slate-900">{unit.buyerName || 'Private Buyer'}</span>
+          {unit.conveyancerRef && (
+            <div className="text-[10px] text-slate-400">{`Ref: ${unit.conveyancerRef}`}</div>
+          )}
+        </div>
+      );
+    }
+    if (isRetained) {
+      return unit.graduatedRentalId ? (
+        <span className="text-[11px] text-purple-700 font-medium inline-flex items-center gap-1">
+          <span>Graduated to /rentals</span>
+          <CheckCircle2 className="w-3.5 h-3.5 text-purple-600 inline" />
+        </span>
+      ) : (
+        <span className="text-[11px] text-purple-600 font-medium">Retained Asset</span>
+      );
+    }
+    return <span className="text-slate-400">—</span>;
+  };
+
+  const renderUnitStatusSelect = (
+    unit: DevelopmentUnit,
+    isSold: boolean,
+    isRetained: boolean
+  ) => (
+    <select
+      value={unit.status}
+      disabled={readOnly}
+      onChange={(e) =>
+        !readOnly &&
+        onUpdateUnit(unit.id, {
+          status: e.target.value as DevUnitStatus,
+        })
+      }
+      aria-label={`Status for ${unit.unitNumber}`}
+      className={`text-xs rounded border px-2 py-1 font-medium focus:ring-1 focus:ring-slate-400 outline-hidden ${
+        readOnly
+          ? 'bg-slate-100 text-slate-500 border-slate-200 cursor-not-allowed'
+          : isSold
+          ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
+          : isRetained
+          ? 'bg-purple-50 text-purple-800 border-purple-300'
+          : 'bg-white text-slate-800 border-slate-300'
+      }`}
+    >
+      {DEV_UNIT_STATUSES.map((st) => (
+        <option key={st} value={st}>
+          {st}
+        </option>
+      ))}
+    </select>
+  );
+
+  const renderUnitActions = (
+    unit: DevelopmentUnit,
+    isSold: boolean,
+    isRetained: boolean
+  ) => (
+    <div className="inline-flex items-center gap-1.5">
+      {!isSold && !isRetained && (
+        <button
+          type="button"
+          disabled={readOnly}
+          onClick={() => !readOnly && handleOpenSaleModal(unit)}
+          title={readOnly ? 'Locked in Read-Only View' : 'Record sale and pay down debt'}
+          className={`inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-1 rounded transition-colors ${
+            readOnly
+              ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
+              : 'bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer'
+          }`}
+        >
+          <DollarSign className="w-3 h-3" />
+          <span>Mark Sold</span>
+        </button>
+      )}
+      {onDeleteUnit && (
+        <button
+          type="button"
+          disabled={readOnly}
+          onClick={() => {
+            if (readOnly) return;
+            if (confirm(`Remove ${unit.unitNumber} from inventory?`)) {
+              onDeleteUnit(unit.id);
+            }
+          }}
+          title={readOnly ? 'Locked in Read-Only View' : 'Delete unit'}
+          className={`p-1 rounded transition-colors ${
+            readOnly
+              ? 'text-slate-300 cursor-not-allowed'
+              : 'text-slate-400 hover:text-rose-600 cursor-pointer'
+          }`}
+        >
+          <Trash2 className="w-3.5 h-3.5" />
+        </button>
+      )}
+    </div>
+  );
+
   return (
     <div data-testid="development-unit-inventory-tab" className="space-y-4">
       {/* Header bar with controls & Section 13sex callout */}
       <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-2xs space-y-3">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
-            <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+            <h3 className="text-base font-bold text-slate-900 flex items-center gap-2 flex-wrap">
               <span>Unit Inventory & Split-Exit Schedule</span>
-              <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200">
+              <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200 tabular-nums">
                 {units.length} Units
               </span>
             </h3>
@@ -171,6 +297,39 @@ export function DevelopmentUnitInventoryTab({
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
+            <div
+              className="inline-flex items-center bg-slate-100 p-0.5 rounded-lg border border-slate-200 shrink-0"
+              role="group"
+              aria-label="Unit Inventory View Mode"
+            >
+              <button
+                type="button"
+                onClick={() => setViewMode('table')}
+                aria-pressed={viewMode === 'table'}
+                className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-semibold cursor-pointer whitespace-nowrap ${
+                  viewMode === 'table'
+                    ? 'bg-slate-900 text-white shadow-2xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <List className="w-3.5 h-3.5" />
+                <span>Table</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode('cards')}
+                aria-pressed={viewMode === 'cards'}
+                className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-semibold cursor-pointer whitespace-nowrap ${
+                  viewMode === 'cards'
+                    ? 'bg-slate-900 text-white shadow-2xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <LayoutGrid className="w-3.5 h-3.5" />
+                <span>Cards</span>
+              </button>
+            </div>
+
             <button
               type="button"
               disabled={readOnly}
@@ -208,26 +367,68 @@ export function DevelopmentUnitInventoryTab({
           </div>
         </div>
 
-        {/* Status Breakdown Chips */}
-        <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-slate-100">
-          <span className="text-xs font-medium text-slate-400 mr-1">Status:</span>
-          {DEV_UNIT_STATUSES.map((status) => {
-            const count = statusCounts[status] || 0;
-            let badgeStyle = 'bg-slate-50 text-slate-600 border-slate-200';
-            if (status === 'Sold & Transferred') badgeStyle = 'bg-emerald-50 text-emerald-700 border-emerald-200 font-semibold';
-            if (status === 'Retained for Rental') badgeStyle = 'bg-purple-50 text-purple-700 border-purple-200 font-semibold';
-            if (status === 'Bond Approved / Guarantees Issued') badgeStyle = 'bg-blue-50 text-blue-700 border-blue-200';
-            if (status === 'Reserved (OTP Signed)') badgeStyle = 'bg-amber-50 text-amber-700 border-amber-200';
+        {/* Clickable Status Filter Chips & Search Bar */}
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-2.5 pt-2 border-t border-slate-100">
+          <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="Filter Units by Status">
+            <span className="text-xs font-medium text-slate-400 mr-1">Status:</span>
+            <button
+              type="button"
+              onClick={() => setStatusFilter('All')}
+              aria-pressed={statusFilter === 'All'}
+              className={`text-[11px] px-2.5 py-0.5 rounded-full border font-semibold cursor-pointer tabular-nums ${
+                statusFilter === 'All'
+                  ? 'bg-slate-900 text-white border-slate-900 shadow-2xs'
+                  : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+              }`}
+            >
+              {`All (${units.length})`}
+            </button>
+            {DEV_UNIT_STATUSES.map((status) => {
+              const count = statusCounts[status] || 0;
+              const isSelected = statusFilter === status;
+              let badgeStyle = 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100';
+              if (status === 'Sold & Transferred') badgeStyle = 'bg-emerald-50 text-emerald-700 border-emerald-200 font-semibold hover:bg-emerald-100/70';
+              if (status === 'Retained for Rental') badgeStyle = 'bg-purple-50 text-purple-700 border-purple-200 font-semibold hover:bg-purple-100/70';
+              if (status === 'Bond Approved / Guarantees Issued') badgeStyle = 'bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100/70';
+              if (status === 'Reserved (OTP Signed)') badgeStyle = 'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100/70';
 
-            return (
-              <span
-                key={status}
-                className={`text-[11px] px-2 py-0.5 rounded-full border ${badgeStyle}`}
+              return (
+                <button
+                  key={status}
+                  type="button"
+                  onClick={() => setStatusFilter(isSelected ? 'All' : status)}
+                  aria-pressed={isSelected}
+                  className={`text-[11px] px-2 py-0.5 rounded-full border cursor-pointer tabular-nums ${
+                    isSelected ? 'bg-slate-900 text-white border-slate-900 font-semibold shadow-2xs' : badgeStyle
+                  }`}
+                >
+                  {`${status}: ${count}`}
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="relative w-full lg:w-72 shrink-0">
+            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <input
+              type="search"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search unit #, config, buyer, or deeds ref..."
+              aria-label="Search development units"
+              className="w-full pl-8 pr-8 py-1.5 text-xs border border-slate-300 rounded-lg bg-slate-50 focus:bg-white text-slate-900 placeholder:text-slate-400 focus:outline-hidden focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-600"
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery('')}
+                aria-label="Clear unit search"
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 cursor-pointer"
               >
-                {`${status}: ${count}`}
-              </span>
-            );
-          })}
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Section 13sex Banner */}
@@ -239,178 +440,191 @@ export function DevelopmentUnitInventoryTab({
                 <strong>SARS Section 13sex Tax Shield Qualified:</strong> Holding ≥ 5 residential units unlocks a 55% tax deduction base written off at 5% per annum for 20 years in <code>/rentals</code>.
               </span>
             </div>
-            <span className="font-bold shrink-0 ml-2">
+            <span className="font-bold shrink-0 ml-2 tabular-nums">
               {formatZAR(financials.section13sexAnnualAllowanceZAR)} / year tax shield
             </span>
           </div>
         )}
       </div>
 
-      {/* Interactive Inventory Table */}
-      <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-xs">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs border-collapse">
-            <thead>
-              <tr className="bg-slate-50/90 border-b border-slate-200 text-slate-700 font-semibold sticky top-0 z-10">
-                <th className="py-2.5 px-3 whitespace-nowrap">Unit #</th>
-                <th className="py-2.5 px-3 whitespace-nowrap">Configuration</th>
-                <th className="py-2.5 px-3 text-right whitespace-nowrap">Floor (m²)</th>
-                <th className="py-2.5 px-3 text-right whitespace-nowrap">Cost Basis</th>
-                <th className="py-2.5 px-3 text-right whitespace-nowrap">List Price (incl. VAT)</th>
-                <th className="py-2.5 px-3 text-right whitespace-nowrap">Est. Rent</th>
-                <th className="py-2.5 px-3 whitespace-nowrap">Status</th>
-                <th className="py-2.5 px-3 whitespace-nowrap">Buyer / Ref</th>
-                <th className="py-2.5 px-3 text-right whitespace-nowrap">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 text-slate-700">
-              {units.length === 0 ? (
-                <tr>
-                  <td colSpan={9} className="py-8 text-center text-slate-400 text-xs">
-                    No units recorded for this development. Click &quot;+ Add Unit&quot; above to add inventory.
-                  </td>
+      {/* Interactive Inventory Table or Cards */}
+      {viewMode === 'table' ? (
+        <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-xs">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs border-collapse">
+              <thead>
+                <tr className="bg-slate-50/90 border-b border-slate-200 text-slate-700 font-semibold sticky top-0 z-10">
+                  <th className="py-2.5 px-3 whitespace-nowrap">Unit #</th>
+                  <th className="py-2.5 px-3 whitespace-nowrap">Configuration</th>
+                  <th className="py-2.5 px-3 text-right whitespace-nowrap">Floor (m²)</th>
+                  <th className="py-2.5 px-3 text-right whitespace-nowrap">Cost Basis</th>
+                  <th className="py-2.5 px-3 text-right whitespace-nowrap">List Price (incl. VAT)</th>
+                  <th className="py-2.5 px-3 text-right whitespace-nowrap">Est. Rent</th>
+                  <th className="py-2.5 px-3 whitespace-nowrap">Status</th>
+                  <th className="py-2.5 px-3 whitespace-nowrap">Buyer / Ref</th>
+                  <th className="py-2.5 px-3 text-right whitespace-nowrap">Actions</th>
                 </tr>
-              ) : (
-                units.map((unit) => {
-                  const isSold = unit.status === 'Sold & Transferred';
-                  const isRetained = unit.status === 'Retained for Rental';
+              </thead>
+              <tbody className="divide-y divide-slate-100 text-slate-700">
+                {units.length === 0 ? (
+                  <tr>
+                    <td colSpan={9} className="py-8 text-center text-slate-400 text-xs">
+                      No units recorded for this development. Click &quot;+ Add Unit&quot; above to add inventory.
+                    </td>
+                  </tr>
+                ) : filteredUnits.length === 0 ? (
+                  <tr>
+                    <td colSpan={9} className="py-8 text-center text-slate-500 text-xs space-y-2">
+                      <div>No units match your current filter.</div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setStatusFilter('All');
+                          setSearchQuery('');
+                        }}
+                        className="px-3 py-1.5 text-xs font-semibold text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-100 cursor-pointer"
+                      >
+                        Reset Filters
+                      </button>
+                    </td>
+                  </tr>
+                ) : (
+                  filteredUnits.map((unit) => {
+                    const isSold = unit.status === 'Sold & Transferred';
+                    const isRetained = unit.status === 'Retained for Rental';
 
-                  return (
-                    <tr
-                      key={unit.id}
-                      className={`hover:bg-slate-50/80 transition-colors ${
-                        isSold ? 'bg-emerald-50/20' : isRetained ? 'bg-purple-50/20' : ''
-                      }`}
-                    >
-                      <td className="py-2.5 px-3 font-semibold text-slate-900 whitespace-nowrap">
-                        {unit.unitNumber}
-                      </td>
-                      <td className="py-2.5 px-3 text-slate-600 whitespace-nowrap">
-                        {unit.configuration}
-                      </td>
-                      <td className="py-2.5 px-3 text-right font-mono whitespace-nowrap">
-                        {`${unit.floorAreaSqm} m²`}
-                      </td>
-                      <td className="py-2.5 px-3 text-right font-mono text-slate-600 whitespace-nowrap">
-                        {formatZAR(unit.allocatedCostBasisZAR)}
-                      </td>
-                      <td className="py-2.5 px-3 text-right font-mono font-semibold text-slate-900 whitespace-nowrap">
-                        {formatZAR(unit.listPriceVatInclZAR)}
-                      </td>
-                      <td className="py-2.5 px-3 text-right font-mono text-slate-600 whitespace-nowrap">
-                        {formatZAR(unit.estimatedMonthlyRentZAR)}/mo
-                      </td>
-                      <td className="py-2.5 px-3 whitespace-nowrap">
-                        <select
-                          value={unit.status}
-                          disabled={readOnly}
-                          onChange={(e) =>
-                            !readOnly &&
-                            onUpdateUnit(unit.id, {
-                              status: e.target.value as DevUnitStatus,
-                            })
-                          }
-                          aria-label={`Status for ${unit.unitNumber}`}
-                          className={`text-xs rounded border px-2 py-1 font-medium focus:ring-1 focus:ring-slate-400 outline-hidden ${
-                            readOnly
-                              ? 'bg-slate-100 text-slate-500 border-slate-200 cursor-not-allowed'
-                              : isSold
-                              ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
-                              : isRetained
-                              ? 'bg-purple-50 text-purple-800 border-purple-300'
-                              : 'bg-white text-slate-800 border-slate-300'
-                          }`}
-                        >
-                          {DEV_UNIT_STATUSES.map((st) => (
-                            <option key={st} value={st}>
-                              {st}
-                            </option>
-                          ))}
-                        </select>
-                      </td>
-                      <td className="py-2.5 px-3 text-slate-600 whitespace-nowrap">
-                        {isSold ? (
-                          <div className="leading-tight">
-                            <span className="font-semibold text-slate-900">{unit.buyerName || 'Private Buyer'}</span>
-                            {unit.conveyancerRef && (
-                              <div className="text-[10px] text-slate-400">{`Ref: ${unit.conveyancerRef}`}</div>
-                            )}
-                          </div>
-                        ) : isRetained ? (
-                          unit.graduatedRentalId ? (
-                            <span className="text-[11px] text-purple-700 font-medium inline-flex items-center gap-1">
-                              <span>Graduated to /rentals</span>
-                              <CheckCircle2 className="w-3.5 h-3.5 text-purple-600 inline" />
-                            </span>
-                          ) : (
-                            <span className="text-[11px] text-purple-600 font-medium">Retained Asset</span>
-                          )
-                        ) : (
-                          <span className="text-slate-400">—</span>
-                        )}
-                      </td>
-                      <td className="py-2.5 px-3 text-right space-x-1.5 whitespace-nowrap">
-                        {!isSold && !isRetained && (
-                          <button
-                            type="button"
-                            disabled={readOnly}
-                            onClick={() => !readOnly && handleOpenSaleModal(unit)}
-                            title={readOnly ? 'Locked in Read-Only View' : 'Record sale and pay down debt'}
-                            className={`inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-1 rounded transition-colors ${
-                              readOnly
-                                ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
-                                : 'bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer'
-                            }`}
-                          >
-                            <DollarSign className="w-3 h-3" />
-                            <span>Mark Sold</span>
-                          </button>
-                        )}
-                        {onDeleteUnit && (
-                          <button
-                            type="button"
-                            disabled={readOnly}
-                            onClick={() => {
-                              if (readOnly) return;
-                              if (confirm(`Remove ${unit.unitNumber} from inventory?`)) {
-                                onDeleteUnit(unit.id);
-                              }
-                            }}
-                            title={readOnly ? 'Locked in Read-Only View' : 'Delete unit'}
-                            className={`p-1 rounded transition-colors ${
-                              readOnly
-                                ? 'text-slate-300 cursor-not-allowed'
-                                : 'text-slate-400 hover:text-rose-600 cursor-pointer'
-                            }`}
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })
+                    return (
+                      <tr
+                        key={unit.id}
+                        className={`hover:bg-slate-50/80 transition-colors ${
+                          isSold ? 'bg-emerald-50/20' : isRetained ? 'bg-purple-50/20' : ''
+                        }`}
+                      >
+                        <td className="py-2.5 px-3 font-semibold text-slate-900 whitespace-nowrap">
+                          {unit.unitNumber}
+                        </td>
+                        <td className="py-2.5 px-3 text-slate-600 whitespace-nowrap">
+                          {unit.configuration}
+                        </td>
+                        <td className="py-2.5 px-3 text-right font-mono tabular-nums whitespace-nowrap">
+                          {`${unit.floorAreaSqm} m²`}
+                        </td>
+                        <td className="py-2.5 px-3 text-right font-mono tabular-nums text-slate-600 whitespace-nowrap">
+                          {formatZAR(unit.allocatedCostBasisZAR)}
+                        </td>
+                        <td className="py-2.5 px-3 text-right font-mono tabular-nums font-semibold text-slate-900 whitespace-nowrap">
+                          {formatZAR(unit.listPriceVatInclZAR)}
+                        </td>
+                        <td className="py-2.5 px-3 text-right font-mono tabular-nums text-slate-600 whitespace-nowrap">
+                          {formatZAR(unit.estimatedMonthlyRentZAR)}/mo
+                        </td>
+                        <td className="py-2.5 px-3 whitespace-nowrap">
+                          {renderUnitStatusSelect(unit, isSold, isRetained)}
+                        </td>
+                        <td className="py-2.5 px-3 text-slate-600 whitespace-nowrap">
+                          {renderBuyerOrRetainedInfo(unit, isSold, isRetained)}
+                        </td>
+                        <td className="py-2.5 px-3 text-right whitespace-nowrap">
+                          {renderUnitActions(unit, isSold, isRetained)}
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+              {/* Sticky Totals Footer */}
+              {filteredUnits.length > 0 && (
+                <tfoot className="bg-slate-100/95 font-semibold text-slate-900 border-t-2 border-slate-300 sticky bottom-0 z-10">
+                  <tr>
+                    <td className="py-2.5 px-3 whitespace-nowrap">Total / Portfolio</td>
+                    <td className="py-2.5 px-3 text-slate-500 font-normal whitespace-nowrap tabular-nums">{`${units.length} Units`}</td>
+                    <td className="py-2.5 px-3 text-right font-mono tabular-nums whitespace-nowrap">{`${totalFloorArea} m²`}</td>
+                    <td className="py-2.5 px-3 text-right font-mono tabular-nums whitespace-nowrap">{formatZAR(totalCostBasis)}</td>
+                    <td className="py-2.5 px-3 text-right font-mono tabular-nums text-emerald-800 whitespace-nowrap">{formatZAR(totalListGdv)}</td>
+                    <td className="py-2.5 px-3 text-right font-mono tabular-nums text-purple-800 whitespace-nowrap">{formatZAR(totalEstRent)}/mo</td>
+                    <td colSpan={3} className="py-2.5 px-3 text-right text-xs text-slate-500 font-normal whitespace-nowrap tabular-nums">
+                      {`${soldCount} Sold • ${contractedCount > 0 ? `${contractedCount} Contracted • ` : ''}${retainedCount} Retained • ${availableCount} Available`}
+                    </td>
+                  </tr>
+                </tfoot>
               )}
-            </tbody>
-            {/* Sticky Totals Footer */}
-            {units.length > 0 && (
-              <tfoot className="bg-slate-100/95 font-semibold text-slate-900 border-t-2 border-slate-300 sticky bottom-0 z-10">
-                <tr>
-                  <td className="py-2.5 px-3 whitespace-nowrap">Total / Portfolio</td>
-                  <td className="py-2.5 px-3 text-slate-500 font-normal whitespace-nowrap">{`${units.length} Units`}</td>
-                  <td className="py-2.5 px-3 text-right font-mono whitespace-nowrap">{`${totalFloorArea} m²`}</td>
-                  <td className="py-2.5 px-3 text-right font-mono whitespace-nowrap">{formatZAR(totalCostBasis)}</td>
-                  <td className="py-2.5 px-3 text-right font-mono text-emerald-800 whitespace-nowrap">{formatZAR(totalListGdv)}</td>
-                  <td className="py-2.5 px-3 text-right font-mono text-purple-800 whitespace-nowrap">{formatZAR(totalEstRent)}/mo</td>
-                  <td colSpan={3} className="py-2.5 px-3 text-right text-xs text-slate-500 font-normal whitespace-nowrap">
-                    {`${soldCount} Sold • ${contractedCount > 0 ? `${contractedCount} Contracted • ` : ''}${retainedCount} Retained • ${availableCount} Available`}
-                  </td>
-                </tr>
-              </tfoot>
-            )}
-          </table>
+            </table>
+          </div>
         </div>
-      </div>
+      ) : (
+        <div className="space-y-3">
+          {units.length === 0 ? (
+            <div className="bg-white rounded-xl border border-slate-200 p-8 text-center text-slate-400 text-xs shadow-2xs">
+              No units recorded for this development. Click &quot;+ Add Unit&quot; above to add inventory.
+            </div>
+          ) : filteredUnits.length === 0 ? (
+            <div className="bg-white rounded-xl border border-slate-200 p-8 text-center text-slate-500 text-xs shadow-2xs space-y-2">
+              <div>No units match your current filter.</div>
+              <button
+                type="button"
+                onClick={() => {
+                  setStatusFilter('All');
+                  setSearchQuery('');
+                }}
+                className="px-3 py-1.5 text-xs font-semibold text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-100 cursor-pointer"
+              >
+                Reset Filters
+              </button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {filteredUnits.map((unit) => {
+                const isSold = unit.status === 'Sold & Transferred';
+                const isRetained = unit.status === 'Retained for Rental';
+
+                return (
+                  <div
+                    key={unit.id}
+                    className={`rounded-xl border p-4 shadow-2xs space-y-3 ${
+                      isSold
+                        ? 'bg-emerald-50/20 border-emerald-200'
+                        : isRetained
+                        ? 'bg-purple-50/20 border-purple-200'
+                        : 'bg-white border-slate-200'
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="text-sm font-bold text-slate-900">{unit.unitNumber}</div>
+                        <div className="text-xs text-slate-500 mt-0.5">{unit.configuration}</div>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <div className="text-lg font-extrabold text-slate-900 tabular-nums leading-tight">
+                          {formatZAR(unit.listPriceVatInclZAR)}
+                        </div>
+                        <div className="text-[11px] font-semibold text-purple-700 tabular-nums mt-0.5">
+                          Est. Rent: {formatZAR(unit.estimatedMonthlyRentZAR)}/mo
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] bg-slate-50/90 border border-slate-200/70 rounded-lg px-3 py-2">
+                      <div className="flex flex-wrap items-center gap-2 text-slate-600 tabular-nums">
+                        <span className="font-semibold text-slate-800">{`${unit.floorAreaSqm} m²`}</span>
+                        <span>•</span>
+                        <span>Cost: {formatZAR(unit.allocatedCostBasisZAR)}</span>
+                      </div>
+                      <div>{renderBuyerOrRetainedInfo(unit, isSold, isRetained)}</div>
+                    </div>
+
+                    <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-100">
+                      <div className="min-w-0 flex-1">
+                        {renderUnitStatusSelect(unit, isSold, isRetained)}
+                      </div>
+                      <div className="shrink-0">{renderUnitActions(unit, isSold, isRetained)}</div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Mark Sold & Pay Down Debt Modal */}
       {sellingUnit && !readOnly && (

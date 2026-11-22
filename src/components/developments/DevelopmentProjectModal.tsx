@@ -83,6 +83,58 @@ const MUNICIPAL_ZONING_CODES: MunicipalZoningCode[] = [
   'Unzoned / Township Scheme',
 ];
 
+const CONTINGENCY_PRESETS = [5, 7.5, 10, 15] as const;
+const PRE_SALES_HURDLE_PRESETS = [40, 50, 60, 70] as const;
+const PRE_APPROVAL_MONTH_PRESETS = [3, 6, 9, 12] as const;
+const CONSTRUCTION_MONTH_PRESETS = [6, 10, 12, 18] as const;
+const SELL_DOWN_MONTH_PRESETS = [3, 4, 6] as const;
+const INITIAL_UNIT_COUNT_PRESETS = [4, 5, 6, 8, 12] as const;
+
+function NumericPresetChips({
+  presets,
+  value,
+  onSelect,
+  ariaLabel,
+  suffix = '',
+  highlightValue,
+  highlightLabel,
+}: {
+  presets: readonly number[];
+  value: number;
+  onSelect: (val: number) => void;
+  ariaLabel: string;
+  suffix?: string;
+  highlightValue?: number;
+  highlightLabel?: string;
+}) {
+  return (
+    <div className="flex flex-wrap gap-1 mt-1.5" role="group" aria-label={ariaLabel}>
+      {presets.map((preset) => {
+        const isSelected = value === preset;
+        const isHighlighted = highlightValue !== undefined && preset === highlightValue;
+        const chipClass = isHighlighted
+          ? isSelected
+            ? 'bg-emerald-700 text-white border-emerald-700 shadow-2xs'
+            : 'bg-emerald-100/80 text-emerald-900 border-emerald-400 hover:bg-emerald-100'
+          : isSelected
+          ? 'bg-slate-900 text-white border-slate-900 shadow-2xs'
+          : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100';
+        return (
+          <button
+            key={preset}
+            type="button"
+            aria-pressed={isSelected}
+            onClick={() => onSelect(preset)}
+            className={`px-2 py-0.5 rounded border text-[11px] font-semibold tabular-nums cursor-pointer whitespace-nowrap ${chipClass}`}
+          >
+            {isHighlighted && highlightLabel ? highlightLabel : `${preset}${suffix}`}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 export function DevelopmentProjectModal({
   isOpen,
   editingDevelopment,
@@ -429,7 +481,7 @@ export function DevelopmentProjectModal({
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="bg-white rounded-xl border border-slate-200 shadow-xl max-w-3xl w-full p-6 space-y-5 animate-in fade-in zoom-in-95 duration-150 my-8 max-h-[90vh] overflow-y-auto cursor-default"
+        className="bg-white rounded-xl border border-slate-200 shadow-xl max-w-3xl w-full p-4 sm:p-6 space-y-5 animate-in fade-in zoom-in-95 duration-150 my-8 max-h-[90vh] overflow-y-auto cursor-default"
       >
         <div className="flex items-center justify-between border-b border-slate-100 pb-3">
           <div className="flex items-center gap-2">
@@ -879,7 +931,14 @@ export function DevelopmentProjectModal({
                   step={0.5}
                   value={contingencyPercent}
                   onChange={(e) => setContingencyPercent(Number(e.target.value))}
-                  className="w-full rounded border border-slate-300 px-3 py-1.5"
+                  className="w-full rounded border border-slate-300 px-3 py-1.5 tabular-nums"
+                />
+                <NumericPresetChips
+                  presets={CONTINGENCY_PRESETS}
+                  value={contingencyPercent}
+                  onSelect={setContingencyPercent}
+                  ariaLabel="Contingency Presets"
+                  suffix="%"
                 />
               </div>
             </div>
@@ -890,7 +949,7 @@ export function DevelopmentProjectModal({
             <h4 className="font-bold text-slate-900 flex items-center gap-1.5 text-xs border-b border-slate-100 pb-1">
               <span>4. Project Timelines & Carrying Burn</span>
             </h4>
-            <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div>
                 <label className="block font-semibold text-slate-700 mb-1">Pre-Approval Mo.</label>
                 <input
@@ -898,7 +957,14 @@ export function DevelopmentProjectModal({
                   min={0}
                   value={preApprovalMonths}
                   onChange={(e) => setPreApprovalMonths(Number(e.target.value))}
-                  className="w-full rounded border border-slate-300 px-3 py-1.5"
+                  className="w-full rounded border border-slate-300 px-3 py-1.5 tabular-nums"
+                />
+                <NumericPresetChips
+                  presets={PRE_APPROVAL_MONTH_PRESETS}
+                  value={preApprovalMonths}
+                  onSelect={setPreApprovalMonths}
+                  ariaLabel="Pre-Approval Months Presets"
+                  suffix="m"
                 />
               </div>
               <div>
@@ -908,7 +974,14 @@ export function DevelopmentProjectModal({
                   min={1}
                   value={constructionMonths}
                   onChange={(e) => setConstructionMonths(Number(e.target.value))}
-                  className="w-full rounded border border-slate-300 px-3 py-1.5"
+                  className="w-full rounded border border-slate-300 px-3 py-1.5 tabular-nums"
+                />
+                <NumericPresetChips
+                  presets={CONSTRUCTION_MONTH_PRESETS}
+                  value={constructionMonths}
+                  onSelect={setConstructionMonths}
+                  ariaLabel="Construction Months Presets"
+                  suffix="m"
                 />
               </div>
               <div>
@@ -918,9 +991,19 @@ export function DevelopmentProjectModal({
                   min={0}
                   value={sellDownMonths}
                   onChange={(e) => setSellDownMonths(Number(e.target.value))}
-                  className="w-full rounded border border-slate-300 px-3 py-1.5"
+                  className="w-full rounded border border-slate-300 px-3 py-1.5 tabular-nums"
+                />
+                <NumericPresetChips
+                  presets={SELL_DOWN_MONTH_PRESETS}
+                  value={sellDownMonths}
+                  onSelect={setSellDownMonths}
+                  ariaLabel="Sell-Down Months Presets"
+                  suffix="m"
                 />
               </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="block font-semibold text-slate-700 mb-1">Pre-Approval (R/mo)</label>
                 <input
@@ -929,7 +1012,7 @@ export function DevelopmentProjectModal({
                   step="any"
                   value={monthlyPreApprovalHoldingBurnZAR}
                   onChange={(e) => setMonthlyPreApprovalHoldingBurnZAR(Number(e.target.value))}
-                  className="w-full rounded border border-slate-300 px-3 py-1.5"
+                  className="w-full rounded border border-slate-300 px-3 py-1.5 tabular-nums"
                 />
               </div>
               <div>
@@ -940,7 +1023,7 @@ export function DevelopmentProjectModal({
                   step="any"
                   value={monthlyConstructionHoldingBurnZAR}
                   onChange={(e) => setMonthlyConstructionHoldingBurnZAR(Number(e.target.value))}
-                  className="w-full rounded border border-slate-300 px-3 py-1.5"
+                  className="w-full rounded border border-slate-300 px-3 py-1.5 tabular-nums"
                 />
               </div>
             </div>
@@ -962,7 +1045,7 @@ export function DevelopmentProjectModal({
                   step="any"
                   value={developmentFacilityLimitZAR}
                   onChange={(e) => setDevelopmentFacilityLimitZAR(Number(e.target.value))}
-                  className="w-full rounded border border-slate-300 px-3 py-1.5"
+                  className="w-full rounded border border-slate-300 px-3 py-1.5 tabular-nums"
                 />
               </div>
 
@@ -977,9 +1060,16 @@ export function DevelopmentProjectModal({
                   step={5}
                   value={preSalesHurdlePercent}
                   onChange={(e) => setPreSalesHurdlePercent(Number(e.target.value))}
-                  className="w-full rounded border border-slate-300 px-3 py-1.5"
+                  className="w-full rounded border border-slate-300 px-3 py-1.5 tabular-nums"
                 />
-                <span className="text-[10px] text-slate-400 mt-0.5 block">
+                <NumericPresetChips
+                  presets={PRE_SALES_HURDLE_PRESETS}
+                  value={preSalesHurdlePercent}
+                  onSelect={setPreSalesHurdlePercent}
+                  ariaLabel="Pre-Sales Hurdle Presets"
+                  suffix="%"
+                />
+                <span className="text-[10px] text-slate-400 mt-1 block">
                   Commercial bank requirement before releasing tranche draws (typically 50-70%)
                 </span>
               </div>
@@ -1008,9 +1098,9 @@ export function DevelopmentProjectModal({
               <h4 className="font-bold text-slate-900 flex items-center gap-1.5 text-xs border-b border-emerald-100 pb-1">
                 <span>6. Initial Unit Schedule Generator</span>
               </h4>
-              <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 text-xs">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
                 <div>
-                  <label className="block font-semibold text-slate-700 mb-1 whitespace-nowrap">
+                  <label className="block font-semibold text-slate-700 mb-1">
                     Initial Unit Count
                   </label>
                   <input
@@ -1019,11 +1109,19 @@ export function DevelopmentProjectModal({
                     max={100}
                     value={initialUnitCount}
                     onChange={(e) => setInitialUnitCount(Number(e.target.value))}
-                    className="w-full rounded border border-slate-300 bg-white px-3 py-1.5"
+                    className="w-full rounded border border-slate-300 bg-white px-3 py-1.5 tabular-nums"
+                  />
+                  <NumericPresetChips
+                    presets={INITIAL_UNIT_COUNT_PRESETS}
+                    value={initialUnitCount}
+                    onSelect={setInitialUnitCount}
+                    ariaLabel="Initial Unit Count Presets"
+                    highlightValue={5}
+                    highlightLabel="5 · 13s"
                   />
                 </div>
                 <div>
-                  <label className="block font-semibold text-slate-700 mb-1 whitespace-nowrap">
+                  <label className="block font-semibold text-slate-700 mb-1">
                     Default Unit Configuration
                   </label>
                   <input
@@ -1034,7 +1132,7 @@ export function DevelopmentProjectModal({
                   />
                 </div>
                 <div>
-                  <label className="block font-semibold text-slate-700 mb-1 whitespace-nowrap">
+                  <label className="block font-semibold text-slate-700 mb-1">
                     Target List Price / Unit (ZAR)
                   </label>
                   <input
@@ -1043,11 +1141,11 @@ export function DevelopmentProjectModal({
                     step="any"
                     value={targetListPricePerUnitZAR}
                     onChange={(e) => setTargetListPricePerUnitZAR(Number(e.target.value))}
-                    className="w-full rounded border border-slate-300 bg-white px-3 py-1.5"
+                    className="w-full rounded border border-slate-300 bg-white px-3 py-1.5 tabular-nums"
                   />
                 </div>
                 <div>
-                  <label className="block font-semibold text-slate-700 mb-1 whitespace-nowrap">
+                  <label className="block font-semibold text-slate-700 mb-1">
                     Est. Rent / Unit (ZAR)
                   </label>
                   <input
@@ -1056,7 +1154,7 @@ export function DevelopmentProjectModal({
                     step="any"
                     value={estMonthlyRentPerUnitZAR}
                     onChange={(e) => setEstMonthlyRentPerUnitZAR(Number(e.target.value))}
-                    className="w-full rounded border border-slate-300 bg-white px-3 py-1.5"
+                    className="w-full rounded border border-slate-300 bg-white px-3 py-1.5 tabular-nums"
                   />
                 </div>
               </div>
