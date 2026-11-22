@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import TopHeader from '@/components/navigation/TopHeader';
 import AddFundingModal from '@/components/funding/AddFundingModal';
 import { usePortfolioStore, usePortfolioSummary } from '@/lib/store/usePortfolioStore';
@@ -31,9 +31,22 @@ import {
   Layers,
   ArrowRight,
   X,
+  Search,
+  LayoutGrid,
+  List,
 } from 'lucide-react';
 import { exportFundingCSV } from '@/lib/export/csvExport';
 import { formatPaymentStatement } from '@/lib/whatsappFormatter';
+
+type FundingStatusFilter = 'All' | 'Active' | 'Standby' | 'Settled';
+
+const PAYMENT_TYPE_OPTIONS: string[] = [
+  'Monthly Coupon / Interest',
+  'Principal Repayment',
+  'Partial Return',
+  'Full Settlement',
+  'Profit Share Distribution',
+];
 
 function getFundingDrawnAndUndrawn(f: FundingSource) {
   if (f.status === 'Standby') {
@@ -70,6 +83,11 @@ export default function FundingTrackerPage() {
 
   // Tranche expansion state in ledger table
   const [expandedTranchesId, setExpandedTranchesId] = useState<string | null>(null);
+
+  // Filter, search & view density state (local, non-persisted)
+  const [statusFilter, setStatusFilter] = useState<FundingStatusFilter>('All');
+  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [viewMode, setViewMode] = useState<'ledger' | 'cards'>('ledger');
 
   // Repayment Quick Action Modal State
   const [repaymentModalSource, setRepaymentModalSource] = useState<FundingSource | null>(null);
@@ -248,6 +266,344 @@ export default function FundingTrackerPage() {
     : 'LENDER';
   const suggestedPaymentReference = `EFT-${activeLenderSurname}-${(paymentDate || '').replace(/-/g, '')}`;
 
+  const statusCounts = useMemo(
+    () => ({
+      All: funding.length,
+      Active: funding.filter((f) => f.status === 'Active').length,
+      Standby: funding.filter((f) => f.status === 'Standby').length,
+      Settled: funding.filter((f) => f.status === 'Settled').length,
+    }),
+    [funding]
+  );
+
+  const enrichedFilteredFunding = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+
+    return funding
+      .filter((item) => (statusFilter === 'All' ? true : item.status === statusFilter))
+      .filter((item) => {
+        if (!query) return true;
+        return [
+          item.lenderName,
+          item.entityOrContact,
+          item.fundingType,
+          item.linkedDealName,
+          item.notes,
+          item.lastPaymentReference,
+        ]
+          .filter(Boolean)
+          .some((field) => String(field).toLowerCase().includes(query));
+      })
+      .map((item) => {
+        const { drawn, undrawn, drawnCount, totalTranches, hasTranches } = getFundingDrawnAndUndrawn(item);
+        const activeDrawnBalance = Math.max(0, drawn - (item.totalRepaidZAR || 0));
+        const monthlyInterest =
+          item.returnTermsType === 'Fixed Interest' || item.returnTermsType === 'Monthly Coupon'
+            ? Math.round((activeDrawnBalance * (item.returnRatePercent / 100)) / 12)
+            : 0;
+        const delayCarryingCost =
+          item.delayExtensionDays && item.delayExtensionDays > 0 && item.returnTermsType !== 'Equity Profit Split'
+            ? Math.round(((activeDrawnBalance * (item.returnRatePercent / 100)) / 365) * item.delayExtensionDays)
+            : 0;
+
+        const linkedDev = developments.find(
+          (d) => d.id === item.linkedDealId || d.linkedFundingSourceId === item.id
+        );
+        const linkedFlip = flips.find((f) => f.id === item.linkedDealId);
+        const linkedDeal =
+          linkedDev ||
+          linkedFlip ||
+          rentals.find((r) => r.id === item.linkedDealId);
+        const isLinkedFlipDelayed =
+          linkedDeal &&
+          ('municipalClearance' in linkedDeal
+            ? linkedDeal.status === 'Delayed' ||
+              linkedDeal.municipalClearance?.rccStatus === 'Disputed' ||
+              Boolean(linkedDeal.municipalClearance?.disputeNotes)
+            : false);
+        const blockedDevApproval = linkedDev
+          ? Object.entries(linkedDev.approvals || {}).find(
+              ([, app]) => app?.status === 'Blocked / Queried'
+            )
+          : undefined;
+        const isLinkedDealBlocked = Boolean(isLinkedFlipDelayed || blockedDevApproval);
+
+        return {
+          item,
+          drawn,
+          undrawn,
+          drawnCount,
+          totalTranches,
+          hasTranches,
+          activeDrawnBalance,
+          monthlyInterest,
+          delayCarryingCost,
+          linkedDev,
+          linkedFlip,
+          linkedDeal,
+          blockedDevApproval,
+          isLinkedDealBlocked,
+        };
+      });
+  }, [funding, statusFilter, searchQuery, developments, flips, rentals]);
+
+  const repaymentMetrics = useMemo(() => {
+    if (!repaymentModalSource) return null;
+    const { drawn } = getFundingDrawnAndUndrawn(repaymentModalSource);
+    const targetPrincipal =
+      repaymentModalSource.tranches && repaymentModalSource.tranches.length > 0
+        ? drawn
+        : repaymentModalSource.capitalAmountZAR;
+    const remainingPrincipal = Math.max(0, targetPrincipal - (repaymentModalSource.totalRepaidZAR || 0));
+    const oneMonthInterest =
+      repaymentModalSource.returnTermsType === 'Fixed Interest' ||
+      repaymentModalSource.returnTermsType === 'Monthly Coupon'
+        ? Math.round((remainingPrincipal * (repaymentModalSource.returnRatePercent / 100)) / 12)
+        : 0;
+    const halfBalance = Math.round(remainingPrincipal * 0.5);
+    return { remainingPrincipal, oneMonthInterest, halfBalance };
+  }, [repaymentModalSource]);
+
+  const openLogPaymentModal = (item: FundingSource) => {
+    setRepaymentModalSource(item);
+    setRepaymentAmount(0);
+    setPaymentReference('');
+    setPaymentType(
+      item.returnTermsType === 'Equity Profit Split'
+        ? 'Profit Share Distribution'
+        : item.paymentSchedule === 'At Exit (Maturity)'
+        ? 'Principal Repayment'
+        : 'Monthly Coupon / Interest'
+    );
+    setPaymentDate(new Date().toISOString().split('T')[0]);
+    setCopyReceiptOnSave(true);
+  };
+
+  const openSyncDelayModal = (entry: (typeof enrichedFilteredFunding)[number]) => {
+    const { item, linkedDev, linkedDeal, blockedDevApproval } = entry;
+    setSyncModalSource(item);
+    setSelectedDelayDays(30);
+    setDelayReason(
+      blockedDevApproval
+        ? `SPLUMA / Council approval query on ${linkedDev?.title}`
+        : linkedDev
+        ? `Development construction & municipal clearance queue: ${linkedDev.title}`
+        : linkedDeal && 'municipalClearance' in linkedDeal && linkedDeal.municipalClearance?.rccStatus === 'Disputed'
+        ? `Section 118 municipal rates dispute: ${linkedDeal.title}`
+        : 'Contractor snagging & conveyancing queue'
+    );
+  };
+
+  const renderStatusBadge = (status: FundingSource['status']) => {
+    const badgeClasses =
+      status === 'Active'
+        ? 'bg-emerald-100 text-emerald-800'
+        : status === 'Standby'
+        ? 'bg-amber-100 text-amber-900 border border-amber-300'
+        : status === 'Settled'
+        ? 'bg-slate-200 text-slate-700'
+        : 'bg-amber-100 text-amber-800';
+    return (
+      <span
+        title={status === 'Standby' ? 'Standby Facility (Undrawn War Chest)' : status}
+        className={`inline-block px-1.5 sm:px-2.5 py-0.5 rounded-full text-[9.5px] sm:text-[10px] font-bold leading-tight text-center sm:whitespace-nowrap ${badgeClasses}`}
+      >
+        {status === 'Standby' ? 'Standby (Undrawn)' : status}
+      </span>
+    );
+  };
+
+  const renderFacilityActions = (
+    entry: (typeof enrichedFilteredFunding)[number],
+    layout: 'ledger' | 'cards'
+  ) => {
+    const { item, hasTranches, linkedFlip } = entry;
+    const isExpanded = expandedTranchesId === item.id;
+    return (
+      <div
+        className={`flex flex-wrap items-center gap-1 ${
+          layout === 'ledger' ? 'justify-end' : 'justify-start'
+        }`}
+      >
+        {item.status === 'Standby' ? (
+          <button
+            type="button"
+            onClick={() => {
+              updateFunding(item.id, { status: 'Active' });
+              setToastMessage(`Facility "${item.lenderName}" activated`);
+            }}
+            className="px-1.5 sm:px-2 py-0.5 sm:py-1 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 rounded text-[10px] sm:text-[11px] font-semibold cursor-pointer whitespace-nowrap"
+            title="Activate and draw standby credit line"
+          >
+            Activate
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={() => openLogPaymentModal(item)}
+            className="px-1.5 sm:px-2 py-0.5 sm:py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded text-[10px] sm:text-[11px] font-semibold cursor-pointer whitespace-nowrap"
+          >
+            Log Payment
+          </button>
+        )}
+        {hasTranches && layout === 'ledger' && (
+          <button
+            type="button"
+            onClick={() => setExpandedTranchesId(isExpanded ? null : item.id)}
+            aria-expanded={isExpanded}
+            className="px-1.5 py-0.5 sm:py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded text-[10px] sm:text-[11px] font-semibold inline-flex items-center gap-0.5 cursor-pointer whitespace-nowrap"
+            title={isExpanded ? 'Hide Tranches' : 'View Tranches'}
+          >
+            {isExpanded ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+            <span>Tranches</span>
+          </button>
+        )}
+        {item.linkedDealId && (
+          <button
+            type="button"
+            onClick={() => openSyncDelayModal(entry)}
+            className="px-1.5 sm:px-2 py-0.5 sm:py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded text-[10px] sm:text-[11px] font-semibold cursor-pointer inline-flex items-center gap-1 whitespace-nowrap"
+            title="Sync maturity date with deal delay"
+          >
+            <Clock className="w-3 h-3 shrink-0" />
+            <span>Sync Delay</span>
+          </button>
+        )}
+        {!hasTranches && linkedFlip && item.status !== 'Standby' && (
+          <button
+            type="button"
+            onClick={() => handleMatchFacilityToBoq(item.id, linkedFlip)}
+            className="px-1.5 sm:px-2 py-0.5 sm:py-1 text-[10px] font-semibold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 rounded cursor-pointer sm:whitespace-nowrap"
+            title={`Split facility into 4 BOQ tranches (20/30/30/20) for ${linkedFlip.title}`}
+          >
+            Match 4-Phase BOQ
+          </button>
+        )}
+        <button
+          type="button"
+          onClick={() => {
+            if (confirm(`Delete funding source "${item.lenderName}"?`)) {
+              deleteFunding(item.id);
+            }
+          }}
+          className="p-1 text-slate-400 hover:text-rose-600 rounded cursor-pointer shrink-0"
+          title="Delete"
+        >
+          <Trash2 className="w-3.5 h-3.5" />
+        </button>
+      </div>
+    );
+  };
+
+  const renderTranchesDrawer = (entry: (typeof enrichedFilteredFunding)[number]) => {
+    const { item, drawn, linkedFlip } = entry;
+    if (!item.tranches || item.tranches.length === 0) return null;
+
+    return (
+      <div className="bg-white rounded-xl border border-slate-200 p-3.5 shadow-xs">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3 pb-2 border-b border-slate-100">
+          <div className="flex items-center gap-2 flex-wrap">
+            <Layers className="w-4 h-4 text-indigo-600" />
+            <span className="font-bold text-slate-900 text-xs">
+              Milestone Tranches: {item.lenderName}
+            </span>
+            {linkedFlip && (
+              <button
+                type="button"
+                onClick={() => handleMatchFacilityToBoq(item.id, linkedFlip)}
+                className="text-[10px] font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 px-2 py-0.5 rounded transition-colors cursor-pointer"
+                title={`Align tranches to ${linkedFlip.title}'s 4-phase BOQ (20/30/30/20)`}
+              >
+                Match 4-Phase BOQ (20/30/30/20)
+              </button>
+            )}
+          </div>
+          <span className="text-[11px] text-slate-500">
+            Interest accrues only on disbursed tranches ({formatZAR(drawn)} of {formatZAR(item.capitalAmountZAR)})
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+          {item.tranches.map((tr) => {
+            const showBoqStatus = Boolean(linkedFlip) || tr.verifiedPhysicalProgress !== undefined;
+            const boqStatus = showBoqStatus ? getTrancheBoqSignOffStatus(tr, linkedFlip) : null;
+
+            return (
+              <div
+                key={tr.id}
+                className={`p-3 rounded-lg border text-xs flex flex-col justify-between ${
+                  tr.isDisbursed
+                    ? 'bg-emerald-50/40 border-emerald-200 text-emerald-950'
+                    : 'bg-slate-50 border-slate-200 text-slate-600'
+                }`}
+              >
+                <div>
+                  <div className="flex items-center justify-between gap-1 mb-1">
+                    <span className="font-bold text-slate-900 truncate">{tr.name}</span>
+                    <span
+                      className={`text-[9px] font-bold px-1.5 py-0.2 rounded border shrink-0 ${
+                        tr.isDisbursed
+                          ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                          : 'bg-slate-200 text-slate-700 border-slate-300'
+                      }`}
+                    >
+                      {tr.isDisbursed ? 'Disbursed' : 'Undrawn'}
+                    </span>
+                  </div>
+                  <div className="text-base font-extrabold text-slate-900 tabular-nums mt-1">
+                    {formatZAR(tr.amountZAR)}
+                  </div>
+                  <div className="text-[10px] text-slate-500 mt-1">
+                    Milestone Phase: <strong className="text-slate-800">{tr.linkedMilestonePhase || 'Deposit'}</strong>
+                  </div>
+                  {boqStatus && (
+                    <div className="mt-1.5">
+                      <span
+                        className={`inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded border ${
+                          boqStatus.statusKey === 'signed_disbursed'
+                            ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                            : boqStatus.statusKey === 'signed_ready'
+                            ? 'bg-indigo-50 text-indigo-800 border-indigo-200'
+                            : boqStatus.statusKey === 'early_disbursed'
+                            ? 'bg-amber-100 text-amber-900 border-amber-300'
+                            : 'bg-slate-100 text-slate-600 border-slate-300'
+                        }`}
+                      >
+                        {boqStatus.label}
+                      </span>
+                    </div>
+                  )}
+                  {tr.disbursedDate && (
+                    <div className="text-[10px] text-slate-400 mt-1">
+                      Disbursed: {formatDate(tr.disbursedDate)}
+                    </div>
+                  )}
+                </div>
+
+                <div className="mt-2.5 pt-2 border-t border-slate-200/60 flex items-center justify-between">
+                  <span className="text-[10px] text-slate-400">
+                    {tr.isDisbursed ? 'Accruing interest' : 'No interest burn'}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => handleToggleTrancheDisburse(item.id, tr.id)}
+                    className={`text-[10px] font-semibold px-2 py-0.5 rounded transition-colors cursor-pointer ${
+                      tr.isDisbursed
+                        ? 'text-slate-600 hover:text-slate-900 hover:bg-slate-100 border border-slate-200'
+                        : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-2xs'
+                    }`}
+                  >
+                    {tr.isDisbursed ? 'Mark Undrawn' : 'Disburse Tranche'}
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="flex-1 flex flex-col">
       <TopHeader
@@ -394,425 +750,459 @@ export default function FundingTrackerPage() {
 
         {/* Funding Sources Table & Cards */}
         <div id="funding-ledger" className="scroll-mt-20 bg-white rounded-xl border border-slate-200 overflow-hidden shadow-xs">
-          <div className="p-5 border-b border-slate-200 flex items-center justify-between">
-            <div>
-              <h3 className="text-base font-bold text-slate-900">Capital Ledger & Terms</h3>
-              <p className="text-xs text-slate-500">
-                Track returns, phased tranches, deal delay sync, and maturity dates.
-              </p>
+          <div className="p-4 sm:p-5 border-b border-slate-200 space-y-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <h3 className="text-base font-bold text-slate-900">Capital Ledger & Terms</h3>
+                <p className="text-xs text-slate-500">
+                  Track returns, phased tranches, deal delay sync, and maturity dates.
+                </p>
+              </div>
+
+              <div
+                className="inline-flex items-center bg-slate-100 p-0.5 rounded-lg border border-slate-200 self-start sm:self-auto shrink-0"
+                role="group"
+                aria-label="Funding View Mode"
+              >
+                <button
+                  type="button"
+                  onClick={() => setViewMode('ledger')}
+                  aria-pressed={viewMode === 'ledger'}
+                  className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-semibold transition-colors cursor-pointer whitespace-nowrap ${
+                    viewMode === 'ledger'
+                      ? 'bg-slate-900 text-white shadow-2xs'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  <List className="w-3.5 h-3.5" />
+                  <span>Ledger</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setViewMode('cards')}
+                  aria-pressed={viewMode === 'cards'}
+                  className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-semibold transition-colors cursor-pointer whitespace-nowrap ${
+                    viewMode === 'cards'
+                      ? 'bg-slate-900 text-white shadow-2xs'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  <LayoutGrid className="w-3.5 h-3.5" />
+                  <span>Cards</span>
+                </button>
+              </div>
             </div>
-            <span className="text-xs font-semibold bg-slate-100 text-slate-700 px-3 py-1 rounded-full">
-              {funding.filter((f) => f.status === 'Active').length} Active • {funding.filter((f) => f.status === 'Standby').length} Standby
-            </span>
+
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-2.5">
+              <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="Filter by Facility Status">
+                {(['All', 'Active', 'Standby', 'Settled'] as const).map((status) => {
+                  const isActive = statusFilter === status;
+                  const count = statusCounts[status];
+                  return (
+                    <button
+                      key={status}
+                      type="button"
+                      onClick={() => setStatusFilter(status)}
+                      aria-pressed={isActive}
+                      className={`px-2.5 py-1 rounded-full text-[11px] font-semibold border transition-colors cursor-pointer whitespace-nowrap tabular-nums ${
+                        isActive
+                          ? 'bg-slate-900 text-white border-slate-900 shadow-2xs'
+                          : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                      }`}
+                    >
+                      {status} ({count})
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div className="relative w-full md:w-80">
+                <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <input
+                  type="search"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search lender, entity, facility type, or linked deal..."
+                  aria-label="Search funding sources"
+                  className="w-full pl-8 pr-8 py-1.5 text-xs border border-slate-300 rounded-lg bg-slate-50 focus:bg-white text-slate-900 placeholder:text-slate-400 focus:outline-hidden focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-600"
+                />
+                {searchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchQuery('')}
+                    aria-label="Clear funding search"
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 cursor-pointer"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+            </div>
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[760px] text-left text-xs border-collapse">
-              <thead>
-                <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase font-semibold text-[10px] tracking-wider">
-                  <th className="p-3.5 pl-5">Lender / Partner</th>
-                  <th className="p-3.5">Funding Type</th>
-                  <th className="p-3.5">Facility / Tranches</th>
-                  <th className="p-3.5">Return Terms</th>
-                  <th className="p-3.5">Schedule & Maturity</th>
-                  <th className="p-3.5">Linked Asset</th>
-                  <th className="p-3.5">Repaid / Bal</th>
-                  <th className="p-3.5">Status</th>
-                  <th className="p-3.5 pr-5 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 text-slate-700">
-                {funding.length === 0 ? (
-                  <tr>
-                    <td colSpan={9} className="p-8 text-center text-slate-400 bg-slate-50/50">
-                      <p className="text-xs font-semibold text-slate-700">No funding sources registered yet</p>
-                      <p className="text-[11px] text-slate-400 mt-0.5">Click &quot;Add Capital Source&quot; above to register private lenders, JV syndicate partners, or bank facilities.</p>
-                    </td>
+          {viewMode === 'ledger' ? (
+            <div className="overflow-x-auto">
+              <table className="w-full table-fixed sm:table-auto text-left text-xs border-collapse">
+                <thead>
+                  <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase font-semibold text-[10px] tracking-wider">
+                    <th className="w-[42%] sm:w-auto py-3 pl-2.5 pr-1 sm:pl-5 sm:pr-3">Lender / Linked Deal</th>
+                    <th className="w-[22%] sm:w-auto py-3 px-1 sm:px-3">Status</th>
+                    <th className="hidden sm:table-cell py-3 px-3">Return / Burn</th>
+                    <th className="hidden md:table-cell py-3 px-3">Maturity</th>
+                    <th className="w-[36%] sm:w-auto py-3 pl-1 pr-2.5 sm:pl-3 sm:pr-5 text-right">Remaining Bal + Actions</th>
                   </tr>
-                ) : (
-                  funding.map((item) => {
-                    const { drawn, undrawn, drawnCount, totalTranches, hasTranches } = getFundingDrawnAndUndrawn(item);
-                    const balance = Math.max(0, item.capitalAmountZAR - (item.totalRepaidZAR || 0));
-                    const activeDrawnBalance = Math.max(0, drawn - (item.totalRepaidZAR || 0));
-                    const monthlyInterest =
-                      item.returnTermsType === 'Fixed Interest' || item.returnTermsType === 'Monthly Coupon'
-                        ? Math.round((activeDrawnBalance * (item.returnRatePercent / 100)) / 12)
-                        : 0;
-                    const delayCarryingCost =
-                      item.delayExtensionDays && item.delayExtensionDays > 0 && item.returnTermsType !== 'Equity Profit Split'
-                        ? Math.round(((activeDrawnBalance * (item.returnRatePercent / 100)) / 365) * item.delayExtensionDays)
-                        : 0;
-
-                    const linkedDev = developments.find(
-                      (d) => d.id === item.linkedDealId || d.linkedFundingSourceId === item.id
-                    );
-                    const linkedFlip = flips.find((f) => f.id === item.linkedDealId);
-                    const linkedDeal =
-                      linkedDev ||
-                      linkedFlip ||
-                      rentals.find((r) => r.id === item.linkedDealId);
-                    const isLinkedFlipDelayed =
-                      linkedDeal &&
-                      ('municipalClearance' in linkedDeal
-                        ? linkedDeal.status === 'Delayed' ||
-                          linkedDeal.municipalClearance?.rccStatus === 'Disputed' ||
-                          Boolean(linkedDeal.municipalClearance?.disputeNotes)
-                        : false);
-                    const blockedDevApproval = linkedDev
-                      ? Object.entries(linkedDev.approvals || {}).find(
-                          ([, app]) => app?.status === 'Blocked / Queried'
-                        )
-                      : undefined;
-                    const isLinkedDealBlocked = Boolean(isLinkedFlipDelayed || blockedDevApproval);
-                    const isExpanded = expandedTranchesId === item.id;
-
-                  return (
-                    <React.Fragment key={item.id}>
-                    <tr className="hover:bg-slate-50/70 transition-colors">
-                      <td className="p-3.5 pl-5">
-                        <div className="font-bold text-slate-900">{item.lenderName}</div>
-                        <div className="text-[11px] text-slate-400">{item.entityOrContact || item.emailPhone}</div>
-                        {hasTranches && (
-                          <span className="inline-flex items-center gap-1 text-[9px] font-semibold text-indigo-700 bg-indigo-50 border border-indigo-200 px-1.5 py-0.2 rounded mt-1">
-                            <Layers className="w-2.5 h-2.5" /> {drawnCount}/{totalTranches} Tranches Drawn
-                          </span>
-                        )}
-                      </td>
-                      <td className="p-3.5">
-                        <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-100 text-slate-800">
-                          {item.fundingType}
-                        </span>
-                        {item.fundingType === 'Phased Own-Cash (Brick-by-Brick)' && (
-                          <span className="block mt-1 text-[9px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded w-fit">
-                            🧱 SELF-FUNDED (R 0 EXTERNAL DEBT)
-                          </span>
-                        )}
-                      </td>
-                      <td className="p-3.5">
-                        <div className="font-bold text-slate-900">{formatZAR(item.capitalAmountZAR)}</div>
-                        {hasTranches ? (
-                          <div className="mt-0.5 space-y-0.5">
-                            <div className="text-[11px] text-emerald-700 font-semibold">
-                              Drawn: {formatZAR(drawn)} / {formatZAR(drawn + undrawn)}
-                            </div>
-                            {undrawn > 0 && (
-                              <div className="text-[10px] text-slate-400">
-                                Undrawn: {formatZAR(undrawn)}
-                              </div>
-                            )}
-                            <div className="w-full bg-slate-200 rounded-full h-1.5 mt-1">
-                              <div
-                                className="bg-emerald-500 h-1.5 rounded-full transition-all"
-                                style={{ width: `${Math.round((drawn / (drawn + undrawn || 1)) * 100)}%` }}
-                              />
-                            </div>
-                            <button
-                              type="button"
-                              onClick={() => setExpandedTranchesId(isExpanded ? null : item.id)}
-                              className="text-[10px] text-indigo-600 hover:text-indigo-800 font-semibold inline-flex items-center gap-0.5 pt-0.5 cursor-pointer"
-                            >
-                              {isExpanded ? 'Hide Tranches ▲' : 'View Tranches ▼'}
-                            </button>
-                          </div>
-                        ) : item.status === 'Standby' ? (
-                          <div className="mt-0.5 space-y-0.5">
-                            <div className="text-[11px] text-amber-700 font-semibold">
-                              Undrawn: {formatZAR(undrawn)}
-                            </div>
-                            <div className="text-[10px] text-slate-400">Pre-approved standby capacity</div>
-                          </div>
-                        ) : (
-                          <div className="space-y-1">
-                            <div className="text-[10px] text-slate-400">Lump Sum Facility</div>
-                            {linkedFlip && (
-                              <button
-                                type="button"
-                                onClick={() => handleMatchFacilityToBoq(item.id, linkedFlip)}
-                                className="text-[10px] font-semibold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 px-1.5 py-0.5 rounded transition-colors cursor-pointer"
-                                title={`Split facility into 4 BOQ tranches (20/30/30/20) for ${linkedFlip.title}`}
-                              >
-                                Match 4-Phase BOQ
-                              </button>
-                            )}
-                          </div>
-                        )}
-                      </td>
-                      <td className="p-3.5">
-                        <div className="font-semibold text-slate-800">
-                          {item.returnTermsType}
-                        </div>
-                        <div className="text-[11px] text-emerald-700 font-bold">
-                          {item.returnRatePercent}% {item.returnTermsType === 'Equity Profit Split' ? 'profit split' : 'p.a.'}
-                        </div>
-                        {(item.returnTermsType === 'Fixed Interest' || item.returnTermsType === 'Monthly Coupon') && (
-                          <div className="text-[10px] text-slate-500 font-normal mt-0.5">
-                            {item.status === 'Standby'
-                              ? 'R 0/mo (Undrawn Standby)'
-                              : `${formatZAR(monthlyInterest)}/mo on drawn`}
-                          </div>
-                        )}
-                      </td>
-                      <td className="p-3.5 text-slate-600">
-                        <div>{item.paymentSchedule}</div>
-                        <div className="text-[10px] text-slate-400">Due {formatDate(item.maturityDate)}</div>
-                        {item.delayExtensionDays && item.delayExtensionDays > 0 ? (
-                          <div className="mt-1">
-                            <span
-                              className="inline-flex items-center gap-1 bg-amber-100 text-amber-900 border border-amber-300 text-[10px] font-bold px-1.5 py-0.5 rounded"
-                              title={item.delayNotes}
-                            >
-                              <Clock className="w-2.5 h-2.5" /> +{item.delayExtensionDays}d Extended
-                            </span>
-                            {delayCarryingCost > 0 && (
-                              <div className="text-[9px] text-rose-700 font-semibold mt-0.5">
-                                +{formatZAR(delayCarryingCost)} delay interest
-                              </div>
-                            )}
-                          </div>
-                        ) : null}
-                      </td>
-                      <td className="p-3.5">
-                        <span className="text-[11px] font-medium text-slate-700 bg-slate-100 px-2 py-0.5 rounded">
-                          {item.linkedDealName || 'General'}
-                        </span>
-                        {linkedDev && (
-                          <div className="mt-1">
-                            <span className="inline-flex items-center gap-1 text-[9px] font-bold bg-purple-50 text-purple-700 border border-purple-200 px-1.5 py-0.5 rounded">
-                              🏗️ {linkedDev.currentPhase} ({linkedDev.units?.length || 0} Units)
-                            </span>
-                          </div>
-                        )}
-                        {isLinkedDealBlocked && (
-                          <div className="mt-1">
-                            <span className="inline-flex items-center gap-1 text-[9px] font-bold bg-rose-50 text-rose-700 border border-rose-200 px-1.5 py-0.5 rounded">
-                              <AlertTriangle className="w-2.5 h-2.5" />{' '}
-                              {blockedDevApproval
-                                ? 'Approval Blocked / Queried'
-                                : 'Deal Blocked / Disputed'}
-                            </span>
-                          </div>
-                        )}
-                      </td>
-                      <td className="p-3.5">
-                        <div className="font-semibold text-slate-800">
-                          {item.status === 'Standby' ? 'R 0 (Undrawn)' : formatZAR(activeDrawnBalance)}
-                        </div>
-                        <div className="text-[10px] text-slate-400">
-                          Repaid: {formatZAR(item.totalRepaidZAR)}
-                          {item.totalInterestPaidZAR ? ` • Interest: ${formatZAR(item.totalInterestPaidZAR)}` : ''}
-                        </div>
-                        {item.lastPaymentReference && (
-                          <div
-                            className="text-[10px] text-slate-500 font-mono truncate max-w-[150px] mt-0.5"
-                            title={`Last Payment Reference: ${item.lastPaymentReference}`}
-                          >
-                            Ref: {item.lastPaymentReference}
-                          </div>
-                        )}
-                      </td>
-                      <td className="p-3.5">
-                        <span
-                          className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
-                            item.status === 'Active'
-                              ? 'bg-emerald-100 text-emerald-800'
-                              : item.status === 'Standby'
-                              ? 'bg-amber-100 text-amber-900 border border-amber-300'
-                              : item.status === 'Settled'
-                              ? 'bg-slate-200 text-slate-700'
-                              : 'bg-amber-100 text-amber-800'
-                          }`}
-                        >
-                          {item.status === 'Standby' ? 'Standby Facility (Undrawn War Chest)' : item.status}
-                        </span>
-                      </td>
-                      <td className="p-3.5 pr-5 text-right">
-                        <div className="flex items-center justify-end gap-1.5">
-                          {item.status === 'Standby' ? (
-                            <button
-                              onClick={() => {
-                                updateFunding(item.id, { status: 'Active' });
-                                setToastMessage(`Facility "${item.lenderName}" activated`);
-                              }}
-                              className="px-2 py-1 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 rounded text-[11px] font-semibold transition-colors cursor-pointer"
-                              title="Activate and draw standby credit line"
-                            >
-                              Activate
-                            </button>
-                          ) : (
-                            <button
-                              onClick={() => {
-                                setRepaymentModalSource(item);
-                                setRepaymentAmount(0);
-                                setPaymentReference('');
-                                setPaymentType(
-                                  item.returnTermsType === 'Equity Profit Split'
-                                    ? 'Profit Share Distribution'
-                                    : item.paymentSchedule === 'At Exit (Maturity)'
-                                    ? 'Principal Repayment'
-                                    : 'Monthly Coupon / Interest'
-                                );
-                                setPaymentDate(new Date().toISOString().split('T')[0]);
-                                setCopyReceiptOnSave(true);
-                              }}
-                              className="px-2 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded text-[11px] font-semibold transition-colors cursor-pointer"
-                            >
-                              Log Payment
-                            </button>
-                          )}
-                          {item.linkedDealId && (
-                          <button
-                            onClick={() => {
-                              setSyncModalSource(item);
-                              setSelectedDelayDays(30);
-                              setDelayReason(
-                                blockedDevApproval
-                                  ? `SPLUMA / Council approval query on ${linkedDev?.title}`
-                                  : linkedDev
-                                  ? `Development construction & municipal clearance queue: ${linkedDev.title}`
-                                  : linkedDeal && 'municipalClearance' in linkedDeal && linkedDeal.municipalClearance?.rccStatus === 'Disputed'
-                                  ? `Section 118 municipal rates dispute: ${linkedDeal.title}`
-                                  : 'Contractor snagging & conveyancing queue'
-                              );
-                            }}
-                            className="px-2 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded text-[11px] font-semibold transition-colors cursor-pointer inline-flex items-center gap-1"
-                            title="Sync maturity date with deal delay"
-                          >
-                            <Clock className="w-3 h-3" />
-                            <span>Sync Delay</span>
-                          </button>
-                          )}
-                          <button
-                            onClick={() => {
-                              if (confirm(`Delete funding source "${item.lenderName}"?`)) {
-                                deleteFunding(item.id);
-                              }
-                            }}
-                            className="p-1 text-slate-400 hover:text-rose-600 rounded"
-                            title="Delete"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
+                </thead>
+                <tbody className="divide-y divide-slate-100 text-slate-700">
+                  {funding.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="p-8 text-center text-slate-400 bg-slate-50/50">
+                        <p className="text-xs font-semibold text-slate-700">No funding sources registered yet</p>
+                        <p className="text-[11px] text-slate-400 mt-0.5">Click &quot;Add Capital Source&quot; above to register private lenders, JV syndicate partners, or bank facilities.</p>
                       </td>
                     </tr>
+                  ) : enrichedFilteredFunding.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="p-8 text-center text-slate-500 bg-slate-50/50 space-y-2">
+                        <p className="text-xs font-semibold text-slate-700">No funding sources match your current filter.</p>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setStatusFilter('All');
+                            setSearchQuery('');
+                          }}
+                          className="px-3 py-1.5 text-xs font-semibold text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-100 cursor-pointer"
+                        >
+                          Reset Filters
+                        </button>
+                      </td>
+                    </tr>
+                  ) : (
+                    enrichedFilteredFunding.map((entry) => {
+                      const {
+                        item,
+                        drawn,
+                        undrawn,
+                        drawnCount,
+                        totalTranches,
+                        hasTranches,
+                        activeDrawnBalance,
+                        monthlyInterest,
+                        delayCarryingCost,
+                        linkedDev,
+                        isLinkedDealBlocked,
+                        blockedDevApproval,
+                      } = entry;
+                      const isExpanded = expandedTranchesId === item.id;
 
-                    {/* Expandable Tranches Drawer */}
-                    {isExpanded && item.tranches && item.tranches.length > 0 && (
-                      <tr className="bg-slate-50/90 border-b border-slate-200">
-                        <td colSpan={9} className="p-4 pl-6 sm:pl-8">
-                          <div className="bg-white rounded-xl border border-slate-200 p-3.5 shadow-xs">
-                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3 pb-2 border-b border-slate-100">
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <Layers className="w-4 h-4 text-indigo-600" />
-                                <span className="font-bold text-slate-900 text-xs">
-                                  Milestone Tranches: {item.lenderName}
+                      return (
+                        <React.Fragment key={item.id}>
+                          <tr className="hover:bg-slate-50/70 transition-colors">
+                            <td className="py-2.5 pl-2.5 pr-1 sm:py-3 sm:pl-5 sm:pr-3 align-top min-w-0">
+                              <div className="font-bold text-slate-900 leading-tight break-words">{item.lenderName}</div>
+                              {(item.entityOrContact || item.emailPhone) && (
+                                <div className="text-[10px] sm:text-[11px] text-slate-400 truncate mt-0.5">
+                                  {item.entityOrContact || item.emailPhone}
+                                </div>
+                              )}
+                              <div className="flex flex-wrap items-center gap-1 mt-1 max-w-full">
+                                <span className="px-1.5 py-0.5 rounded text-[9px] sm:text-[10px] font-semibold bg-slate-100 text-slate-700 truncate max-w-full sm:max-w-none">
+                                  {item.linkedDealName || 'General'}
                                 </span>
-                                {linkedFlip && (
-                                  <button
-                                    type="button"
-                                    onClick={() => handleMatchFacilityToBoq(item.id, linkedFlip)}
-                                    className="text-[10px] font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 px-2 py-0.5 rounded transition-colors cursor-pointer"
-                                    title={`Align tranches to ${linkedFlip.title}'s 4-phase BOQ (20/30/30/20)`}
-                                  >
-                                    Match 4-Phase BOQ (20/30/30/20)
-                                  </button>
-                                )}
+                                <span className="hidden sm:inline-block px-1.5 py-0.5 rounded text-[10px] font-medium bg-slate-50 text-slate-600 border border-slate-200">
+                                  {item.fundingType}
+                                </span>
+                                <span className="sm:hidden text-[10px] font-bold text-emerald-700 tabular-nums">
+                                  {item.returnRatePercent}% {item.returnTermsType === 'Equity Profit Split' ? 'split' : 'p.a.'}
+                                </span>
                               </div>
-                              <span className="text-[11px] text-slate-500">
-                                Interest accrues only on disbursed tranches ({formatZAR(drawn)} of {formatZAR(item.capitalAmountZAR)})
+                              {item.fundingType === 'Phased Own-Cash (Brick-by-Brick)' && (
+                                <span className="inline-block mt-1 text-[9px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded max-w-full truncate">
+                                  🧱 SELF-FUNDED (R 0 EXTERNAL DEBT)
+                                </span>
+                              )}
+                              {hasTranches && (
+                                <div className="mt-1 space-y-1">
+                                  <span className="inline-flex items-center gap-1 text-[9px] font-semibold text-indigo-700 bg-indigo-50 border border-indigo-200 px-1.5 py-0.2 rounded">
+                                    <Layers className="w-2.5 h-2.5 shrink-0" />
+                                    <span>{drawnCount}/{totalTranches} Tranches</span>
+                                  </span>
+                                  <div className="hidden sm:block w-36 bg-slate-200 rounded-full h-1.5">
+                                    <div
+                                      className="bg-emerald-500 h-1.5 rounded-full transition-all"
+                                      style={{ width: `${Math.round((drawn / (drawn + undrawn || 1)) * 100)}%` }}
+                                    />
+                                  </div>
+                                </div>
+                              )}
+                              {linkedDev && (
+                                <div className="mt-1">
+                                  <span className="inline-flex items-center gap-1 text-[9px] font-bold bg-purple-50 text-purple-700 border border-purple-200 px-1.5 py-0.5 rounded max-w-full truncate">
+                                    🏗️ {linkedDev.currentPhase} ({linkedDev.units?.length || 0}u)
+                                  </span>
+                                </div>
+                              )}
+                              {isLinkedDealBlocked && (
+                                <div className="mt-1">
+                                  <span className="inline-flex items-center gap-1 text-[9px] font-bold bg-rose-50 text-rose-700 border border-rose-200 px-1.5 py-0.5 rounded">
+                                    <AlertTriangle className="w-2.5 h-2.5 shrink-0" />{' '}
+                                    {blockedDevApproval ? 'Approval Blocked' : 'Deal Blocked'}
+                                  </span>
+                                </div>
+                              )}
+                            </td>
+
+                            <td className="py-2.5 px-1 sm:py-3 sm:px-3 align-top sm:whitespace-nowrap">
+                              {renderStatusBadge(item.status)}
+                            </td>
+
+                            <td className="hidden sm:table-cell py-3 px-3 align-top">
+                              <div className="font-semibold text-slate-800">{item.returnTermsType}</div>
+                              <div className="text-[11px] text-emerald-700 font-bold tabular-nums">
+                                {item.returnRatePercent}% {item.returnTermsType === 'Equity Profit Split' ? 'profit split' : 'p.a.'}
+                              </div>
+                              {(item.returnTermsType === 'Fixed Interest' || item.returnTermsType === 'Monthly Coupon') && (
+                                <div className="text-[10px] text-slate-500 font-normal mt-0.5 tabular-nums">
+                                  {item.status === 'Standby'
+                                    ? 'R 0/mo (Undrawn Standby)'
+                                    : `${formatZAR(monthlyInterest)}/mo on drawn`}
+                                </div>
+                              )}
+                            </td>
+
+                            <td className="hidden md:table-cell py-3 px-3 align-top text-slate-600">
+                              <div>{item.paymentSchedule}</div>
+                              <div className="text-[10px] text-slate-400">Due {formatDate(item.maturityDate)}</div>
+                              {item.delayExtensionDays && item.delayExtensionDays > 0 ? (
+                                <div className="mt-1">
+                                  <span
+                                    className="inline-flex items-center gap-1 bg-amber-100 text-amber-900 border border-amber-300 text-[10px] font-bold px-1.5 py-0.5 rounded"
+                                    title={item.delayNotes}
+                                  >
+                                    <Clock className="w-2.5 h-2.5" /> +{item.delayExtensionDays}d Extended
+                                  </span>
+                                  {delayCarryingCost > 0 && (
+                                    <div className="text-[9px] text-rose-700 font-semibold mt-0.5 tabular-nums">
+                                      +{formatZAR(delayCarryingCost)} delay interest
+                                    </div>
+                                  )}
+                                </div>
+                              ) : null}
+                            </td>
+
+                            <td className="py-2.5 pl-1 pr-2.5 sm:py-3 sm:pl-3 sm:pr-5 align-top text-right">
+                              <div className="font-extrabold text-slate-900 text-[11px] sm:text-sm tabular-nums whitespace-nowrap">
+                                {item.status === 'Standby' ? 'R 0 (Undrawn)' : formatZAR(activeDrawnBalance)}
+                              </div>
+                              <div className="text-[9.5px] sm:text-[10px] text-slate-400 tabular-nums">
+                                Repaid: {formatZAR(item.totalRepaidZAR)}
+                                <span className="hidden sm:inline">
+                                  {item.totalInterestPaidZAR ? ` • Int: ${formatZAR(item.totalInterestPaidZAR)}` : ''}
+                                </span>
+                              </div>
+                              {item.lastPaymentReference && (
+                                <div
+                                  className="text-[10px] text-slate-500 font-mono truncate max-w-full sm:max-w-[160px] ml-auto mt-0.5"
+                                  title={`Last Payment Reference: ${item.lastPaymentReference}`}
+                                >
+                                  Ref: {item.lastPaymentReference}
+                                </div>
+                              )}
+                              <div className="mt-1.5">{renderFacilityActions(entry, 'ledger')}</div>
+                            </td>
+                          </tr>
+
+                          {isExpanded && item.tranches && item.tranches.length > 0 && (
+                            <tr className="bg-slate-50/90 border-b border-slate-200">
+                              <td colSpan={5} className="p-3 sm:p-4">
+                                {renderTranchesDrawer(entry)}
+                              </td>
+                            </tr>
+                          )}
+                        </React.Fragment>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="p-4 sm:p-5">
+              {funding.length === 0 ? (
+                <div className="p-8 text-center text-slate-400 bg-slate-50/50 rounded-xl border border-dashed border-slate-200">
+                  <p className="text-xs font-semibold text-slate-700">No funding sources registered yet</p>
+                  <p className="text-[11px] text-slate-400 mt-0.5">
+                    Click &quot;Add Capital Source&quot; above to register private lenders, JV syndicate partners, or bank facilities.
+                  </p>
+                </div>
+              ) : enrichedFilteredFunding.length === 0 ? (
+                <div className="p-8 text-center text-slate-500 bg-slate-50/50 rounded-xl border border-dashed border-slate-200 space-y-2">
+                  <p className="text-xs font-semibold text-slate-700">No funding sources match your current filter.</p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setStatusFilter('All');
+                      setSearchQuery('');
+                    }}
+                    className="px-3 py-1.5 text-xs font-semibold text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-100 cursor-pointer"
+                  >
+                    Reset Filters
+                  </button>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {enrichedFilteredFunding.map((entry) => {
+                    const {
+                      item,
+                      drawn,
+                      undrawn,
+                      drawnCount,
+                      totalTranches,
+                      hasTranches,
+                      activeDrawnBalance,
+                      monthlyInterest,
+                      delayCarryingCost,
+                      linkedDev,
+                      isLinkedDealBlocked,
+                      blockedDevApproval,
+                    } = entry;
+                    const isExpanded = expandedTranchesId === item.id;
+
+                    return (
+                      <div
+                        key={item.id}
+                        className="rounded-xl border border-slate-200 bg-white p-4 shadow-2xs flex flex-col justify-between gap-3"
+                      >
+                        <div className="space-y-3">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="min-w-0">
+                              <h4 className="text-sm font-bold text-slate-900 leading-snug truncate">
+                                {item.lenderName}
+                              </h4>
+                              {(item.entityOrContact || item.emailPhone) && (
+                                <p className="text-[11px] text-slate-400 truncate mt-0.5">
+                                  {item.entityOrContact || item.emailPhone}
+                                </p>
+                              )}
+                            </div>
+                            {renderStatusBadge(item.status)}
+                          </div>
+
+                          <div className="rounded-lg bg-slate-50 border border-slate-200/80 p-3 flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 block">
+                                {item.status === 'Standby' ? 'Standby Capacity' : 'Remaining Balance'}
                               </span>
+                              <div className="text-lg font-extrabold text-slate-900 tabular-nums leading-tight mt-0.5">
+                                {item.status === 'Standby'
+                                  ? formatZAR(item.capitalAmountZAR)
+                                  : formatZAR(activeDrawnBalance)}
+                              </div>
+                              <div className="text-[11px] text-slate-500 tabular-nums mt-0.5">
+                                Facility {formatZAR(item.capitalAmountZAR)} • Repaid {formatZAR(item.totalRepaidZAR)}
+                              </div>
                             </div>
 
-                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
-                              {item.tranches.map((tr) => {
-                                const showBoqStatus = Boolean(linkedFlip) || tr.verifiedPhysicalProgress !== undefined;
-                                const boqStatus = showBoqStatus
-                                  ? getTrancheBoqSignOffStatus(tr, linkedFlip)
-                                  : null;
-
-                                return (
-                                  <div
-                                    key={tr.id}
-                                    className={`p-3 rounded-lg border text-xs flex flex-col justify-between ${
-                                      tr.isDisbursed
-                                        ? 'bg-emerald-50/40 border-emerald-200 text-emerald-950'
-                                        : 'bg-slate-50 border-slate-200 text-slate-600'
-                                    }`}
-                                  >
-                                    <div>
-                                      <div className="flex items-center justify-between gap-1 mb-1">
-                                        <span className="font-bold text-slate-900 truncate">{tr.name}</span>
-                                        <span
-                                          className={`text-[9px] font-bold px-1.5 py-0.2 rounded border shrink-0 ${
-                                            tr.isDisbursed
-                                              ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
-                                              : 'bg-slate-200 text-slate-700 border-slate-300'
-                                          }`}
-                                        >
-                                          {tr.isDisbursed ? 'Disbursed' : 'Undrawn'}
-                                        </span>
-                                      </div>
-                                      <div className="text-base font-extrabold text-slate-900 mt-1">
-                                        {formatZAR(tr.amountZAR)}
-                                      </div>
-                                      <div className="text-[10px] text-slate-500 mt-1">
-                                        Milestone Phase: <strong className="text-slate-800">{tr.linkedMilestonePhase || 'Deposit'}</strong>
-                                      </div>
-                                      {boqStatus && (
-                                        <div className="mt-1.5">
-                                          <span
-                                            className={`inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded border ${
-                                              boqStatus.statusKey === 'signed_disbursed'
-                                                ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
-                                                : boqStatus.statusKey === 'signed_ready'
-                                                ? 'bg-indigo-50 text-indigo-800 border-indigo-200'
-                                                : boqStatus.statusKey === 'early_disbursed'
-                                                ? 'bg-amber-100 text-amber-900 border-amber-300'
-                                                : 'bg-slate-100 text-slate-600 border-slate-300'
-                                            }`}
-                                          >
-                                            {boqStatus.label}
-                                          </span>
-                                        </div>
-                                      )}
-                                      {tr.disbursedDate && (
-                                        <div className="text-[10px] text-slate-400 mt-1">
-                                          Disbursed: {formatDate(tr.disbursedDate)}
-                                        </div>
-                                      )}
-                                    </div>
-
-                                    <div className="mt-2.5 pt-2 border-t border-slate-200/60 flex items-center justify-between">
-                                      <span className="text-[10px] text-slate-400">
-                                        {tr.isDisbursed ? 'Accruing interest' : 'No interest burn'}
-                                      </span>
-                                      <button
-                                        type="button"
-                                        onClick={() => handleToggleTrancheDisburse(item.id, tr.id)}
-                                        className={`text-[10px] font-semibold px-2 py-0.5 rounded transition-colors cursor-pointer ${
-                                          tr.isDisbursed
-                                            ? 'text-slate-600 hover:text-slate-900 hover:bg-slate-100 border border-slate-200'
-                                            : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-2xs'
-                                        }`}
-                                      >
-                                        {tr.isDisbursed ? 'Mark Undrawn' : 'Disburse Tranche'}
-                                      </button>
-                                    </div>
-                                  </div>
-                                );
-                              })}
+                            <div className="text-right shrink-0">
+                              <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 block">
+                                Return / Burn
+                              </span>
+                              <div className="text-lg font-extrabold text-emerald-700 tabular-nums leading-tight mt-0.5">
+                                {item.returnRatePercent}%
+                              </div>
+                              <div
+                                className={`text-[11px] font-semibold tabular-nums mt-0.5 ${
+                                  item.status !== 'Standby' && monthlyInterest > 0
+                                    ? 'text-rose-600'
+                                    : 'text-slate-500'
+                                }`}
+                              >
+                                {item.returnTermsType === 'Fixed Interest' || item.returnTermsType === 'Monthly Coupon'
+                                  ? item.status === 'Standby'
+                                    ? 'R 0/mo (Undrawn)'
+                                    : `${formatZAR(monthlyInterest)}/mo`
+                                  : item.returnTermsType}
+                              </div>
                             </div>
                           </div>
-                        </td>
-                      </tr>
-                    )}
-                    </React.Fragment>
-                  );
-                })
+
+                          <div className="flex flex-wrap items-center gap-1.5 text-[10px]">
+                            <span className="px-2 py-0.5 rounded bg-slate-100 text-slate-700 font-semibold">
+                              {item.fundingType}
+                            </span>
+                            <span className="px-2 py-0.5 rounded bg-slate-100 text-slate-700 font-medium">
+                              {item.linkedDealName || 'General'}
+                            </span>
+                            <span className="px-2 py-0.5 rounded bg-slate-50 border border-slate-200 text-slate-600">
+                              {item.paymentSchedule} • Due {formatDate(item.maturityDate)}
+                            </span>
+                            {item.fundingType === 'Phased Own-Cash (Brick-by-Brick)' && (
+                              <span className="text-[9px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded">
+                                🧱 SELF-FUNDED
+                              </span>
+                            )}
+                            {linkedDev && (
+                              <span className="text-[9px] font-bold bg-purple-50 text-purple-700 border border-purple-200 px-1.5 py-0.5 rounded">
+                                🏗️ {linkedDev.currentPhase} ({linkedDev.units?.length || 0} Units)
+                              </span>
+                            )}
+                            {isLinkedDealBlocked && (
+                              <span className="inline-flex items-center gap-1 text-[9px] font-bold bg-rose-50 text-rose-700 border border-rose-200 px-1.5 py-0.5 rounded">
+                                <AlertTriangle className="w-2.5 h-2.5" />
+                                {blockedDevApproval ? 'Approval Blocked / Queried' : 'Deal Blocked / Disputed'}
+                              </span>
+                            )}
+                            {item.delayExtensionDays && item.delayExtensionDays > 0 ? (
+                              <span
+                                className="inline-flex items-center gap-1 bg-amber-100 text-amber-900 border border-amber-300 text-[10px] font-bold px-1.5 py-0.5 rounded"
+                                title={item.delayNotes}
+                              >
+                                <Clock className="w-2.5 h-2.5" /> +{item.delayExtensionDays}d Extended
+                                {delayCarryingCost > 0 ? ` (+${formatZAR(delayCarryingCost)})` : ''}
+                              </span>
+                            ) : null}
+                            {item.lastPaymentReference && (
+                              <span className="font-mono text-slate-500">Ref: {item.lastPaymentReference}</span>
+                            )}
+                          </div>
+
+                          {hasTranches && (
+                            <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-200/80 space-y-1.5">
+                              <div className="flex items-center justify-between text-[11px]">
+                                <span className="font-semibold text-indigo-700 inline-flex items-center gap-1">
+                                  <Layers className="w-3 h-3" />
+                                  {drawnCount}/{totalTranches} Tranches Drawn ({formatZAR(drawn)})
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => setExpandedTranchesId(isExpanded ? null : item.id)}
+                                  aria-expanded={isExpanded}
+                                  className="text-indigo-600 hover:text-indigo-800 font-semibold inline-flex items-center gap-0.5 cursor-pointer"
+                                >
+                                  {isExpanded ? 'Hide Tranches ▲' : 'View Tranches ▼'}
+                                </button>
+                              </div>
+                              <div className="w-full bg-slate-200 rounded-full h-1.5">
+                                <div
+                                  className="bg-emerald-500 h-1.5 rounded-full transition-all"
+                                  style={{ width: `${Math.round((drawn / (drawn + undrawn || 1)) * 100)}%` }}
+                                />
+                              </div>
+                            </div>
+                          )}
+
+                          {isExpanded && item.tranches && item.tranches.length > 0 && renderTranchesDrawer(entry)}
+                        </div>
+
+                        <div className="pt-2.5 border-t border-slate-100">
+                          {renderFacilityActions(entry, 'cards')}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
               )}
-              </tbody>
-            </table>
-          </div>
+            </div>
+          )}
         </div>
       </main>
 
@@ -1019,7 +1409,59 @@ export default function FundingTrackerPage() {
 
             <form onSubmit={handleProcessRepayment} noValidate className="space-y-4 text-xs">
               <div>
-                <label className="block font-semibold text-slate-700 mb-1">Payment Amount (ZAR) *</label>
+                <label className="block font-semibold text-slate-700 mb-1.5">Payment Amount (ZAR) *</label>
+                {repaymentMetrics && (
+                  <div
+                    className="flex flex-wrap gap-1.5 mb-2"
+                    role="group"
+                    aria-label="Quick-Fill Payment Amounts"
+                  >
+                    {[
+                      {
+                        label: '1m Interest',
+                        amount: repaymentMetrics.oneMonthInterest,
+                        targetType: 'Monthly Coupon / Interest',
+                      },
+                      {
+                        label: '50% Bal',
+                        amount: repaymentMetrics.halfBalance,
+                        targetType: 'Principal Repayment',
+                      },
+                      {
+                        label: 'Full Settlement',
+                        amount: repaymentMetrics.remainingPrincipal,
+                        targetType: 'Full Settlement',
+                      },
+                    ].map((preset) => {
+                      const isDisabled = preset.amount <= 0;
+                      const isSelected = !isDisabled && repaymentAmount === preset.amount;
+                      return (
+                        <button
+                          key={preset.label}
+                          type="button"
+                          disabled={isDisabled}
+                          aria-pressed={isSelected}
+                          onClick={() => {
+                            setRepaymentAmount(preset.amount);
+                            setPaymentType(preset.targetType);
+                          }}
+                          className={`px-2.5 py-1 rounded-md border text-[11px] font-semibold inline-flex items-center gap-1 tabular-nums whitespace-nowrap ${
+                            isDisabled
+                              ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'
+                              : isSelected
+                              ? 'bg-slate-900 text-white border-slate-900 hover:bg-slate-800 shadow-2xs cursor-pointer'
+                              : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100 cursor-pointer'
+                          }`}
+                        >
+                          <span>{preset.label}</span>
+                          {preset.amount > 0 && (
+                            <span className="text-[10px] opacity-80">({formatZAR(preset.amount)})</span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
                 <div className="relative">
                   <span className="absolute left-2.5 top-2 text-xs font-bold text-slate-400">R</span>
                   <input
@@ -1031,26 +1473,39 @@ export default function FundingTrackerPage() {
                     required
                     value={repaymentAmount || ''}
                     onChange={(e) => setRepaymentAmount(Number(e.target.value))}
-                    className="w-full pl-7 pr-3 py-2 border border-slate-300 rounded-lg font-bold text-slate-900"
+                    className="w-full pl-7 pr-3 py-2 border border-slate-300 rounded-lg font-bold text-slate-900 tabular-nums"
                     placeholder="Amount paid"
                   />
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-3">
                 <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Payment Type</label>
-                  <select
-                    value={paymentType}
-                    onChange={(e) => setPaymentType(e.target.value)}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white"
+                  <label className="block font-semibold text-slate-700 mb-1.5">Payment Type</label>
+                  <div
+                    className="flex flex-wrap gap-1.5"
+                    role="group"
+                    aria-label="Payment Type"
                   >
-                    <option value="Monthly Coupon / Interest">Monthly Coupon / Interest</option>
-                    <option value="Principal Repayment">Principal Repayment</option>
-                    <option value="Partial Return">Partial Return</option>
-                    <option value="Full Settlement">Full Settlement</option>
-                    <option value="Profit Share Distribution">Profit Share Distribution</option>
-                  </select>
+                    {PAYMENT_TYPE_OPTIONS.map((typeOption) => {
+                      const isSelected = paymentType === typeOption;
+                      return (
+                        <button
+                          key={typeOption}
+                          type="button"
+                          aria-pressed={isSelected}
+                          onClick={() => setPaymentType(typeOption)}
+                          className={`px-2.5 py-1.5 rounded-lg border text-[11px] font-semibold whitespace-nowrap cursor-pointer ${
+                            isSelected
+                              ? 'bg-slate-900 text-white border-slate-900 hover:bg-slate-800 shadow-2xs'
+                              : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
+                          }`}
+                        >
+                          {typeOption}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">Payment Date</label>
@@ -1093,20 +1548,16 @@ export default function FundingTrackerPage() {
               <div className="p-3 rounded-lg bg-slate-50 border border-slate-200 text-[11px] space-y-1">
                 <div className="flex justify-between">
                   <span>Current Principal Repaid:</span>
-                  <strong className="text-slate-800">{formatZAR(repaymentModalSource.totalRepaidZAR || 0)}</strong>
+                  <strong className="text-slate-800 tabular-nums">{formatZAR(repaymentModalSource.totalRepaidZAR || 0)}</strong>
                 </div>
                 <div className="flex justify-between">
                   <span>Interest / Coupons Serviced:</span>
-                  <strong className="text-amber-700">{formatZAR(repaymentModalSource.totalInterestPaidZAR || 0)}</strong>
+                  <strong className="text-amber-700 tabular-nums">{formatZAR(repaymentModalSource.totalInterestPaidZAR || 0)}</strong>
                 </div>
                 <div className="flex justify-between">
                   <span>Remaining Principal Liability:</span>
-                  <strong className="text-emerald-700">
-                    {(() => {
-                      const { drawn } = getFundingDrawnAndUndrawn(repaymentModalSource);
-                      const targetPrincipal = (repaymentModalSource.tranches && repaymentModalSource.tranches.length > 0) ? drawn : repaymentModalSource.capitalAmountZAR;
-                      return formatZAR(Math.max(0, targetPrincipal - (repaymentModalSource.totalRepaidZAR || 0)));
-                    })()}
+                  <strong className="text-emerald-700 tabular-nums">
+                    {formatZAR(repaymentMetrics?.remainingPrincipal ?? 0)}
                   </strong>
                 </div>
               </div>

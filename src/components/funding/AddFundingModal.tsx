@@ -7,6 +7,31 @@ import { formatZAR } from '@/lib/formatters';
 import { FundingSource, FundingTranche, FundingType, ReturnTermType } from '@/types';
 import { buildFourPhaseBoqTranches, BOQ_MILESTONE_PHASE_CONFIG } from '@/lib/calculations/flips';
 
+const TERM_MONTH_PRESETS = [6, 12, 18, 60, 180] as const;
+
+const PAYMENT_SCHEDULE_OPTIONS: Array<{
+  value: 'Monthly Interest' | 'Quarterly' | 'Bi-Annual' | 'At Exit (Maturity)';
+  label: string;
+}> = [
+  { value: 'Monthly Interest', label: 'Monthly' },
+  { value: 'Quarterly', label: 'Quarterly' },
+  { value: 'Bi-Annual', label: 'Bi-Annual' },
+  { value: 'At Exit (Maturity)', label: 'At Exit' },
+];
+
+function addMonthsToIsoDate(baseIsoDate: string, months: number): string {
+  const safeBase = /^\d{4}-\d{2}-\d{2}$/.test(baseIsoDate)
+    ? baseIsoDate
+    : new Date().toISOString().split('T')[0];
+  const date = new Date(`${safeBase}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return safeBase;
+  date.setMonth(date.getMonth() + months);
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
 export interface AddFundingModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -386,54 +411,89 @@ export default function AddFundingModal({
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <div>
-              <label className="block font-semibold text-slate-700 mb-1">Funding Category</label>
-              <select
-                value={fundingType}
-                onChange={(e) => {
-                  const nextType = e.target.value as FundingType;
-                  setFundingType(nextType);
-                  if (nextType === 'Phased Own-Cash (Brick-by-Brick)') {
-                    setReturnTermsType('Zero Interest');
-                    setReturnRatePercent(0);
-                  }
-                }}
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white"
-              >
-                <option value="Private Lender">Private Lender (Angel / HNW)</option>
-                <option value="Proposal-backed">Proposal-backed (Syndicate / JV)</option>
-                <option value="Ad-hoc Friends & Family">Ad-hoc Friends &amp; Family</option>
-                <option value="Equity Partner">Equity Partner</option>
-                <option value="Bank Bond">Bank Bond</option>
-                <option value="Phased Own-Cash (Brick-by-Brick)">Phased Own-Cash (Brick-by-Brick)</option>
-                <option value="Stokvel / Micro-Syndicate">Stokvel / Micro-Syndicate</option>
-                <option value="DFI / Commercial Facility">DFI / Commercial Facility (TUHF / uMaStandi)</option>
-              </select>
+          <div className="space-y-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">Funding Category</label>
+                <select
+                  value={fundingType}
+                  onChange={(e) => {
+                    const nextType = e.target.value as FundingType;
+                    setFundingType(nextType);
+                    if (nextType === 'Phased Own-Cash (Brick-by-Brick)') {
+                      setReturnTermsType('Zero Interest');
+                      setReturnRatePercent(0);
+                    }
+                  }}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white"
+                >
+                  <option value="Private Lender">Private Lender (Angel / HNW)</option>
+                  <option value="Proposal-backed">Proposal-backed (Syndicate / JV)</option>
+                  <option value="Ad-hoc Friends & Family">Ad-hoc Friends &amp; Family</option>
+                  <option value="Equity Partner">Equity Partner</option>
+                  <option value="Bank Bond">Bank Bond</option>
+                  <option value="Phased Own-Cash (Brick-by-Brick)">Phased Own-Cash (Brick-by-Brick)</option>
+                  <option value="Stokvel / Micro-Syndicate">Stokvel / Micro-Syndicate</option>
+                  <option value="DFI / Commercial Facility">DFI / Commercial Facility (TUHF / uMaStandi)</option>
+                </select>
+              </div>
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">Principal Amount (ZAR)</label>
+                <input
+                  type="number"
+                  name="capitalAmountZAR"
+                  autoComplete="off"
+                  min="0"
+                  step="any"
+                  value={capitalAmountZAR}
+                  onChange={(e) => setCapitalAmountZAR(Number(e.target.value))}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg font-bold tabular-nums"
+                />
+              </div>
             </div>
+
             <div>
               <label className="block font-semibold text-slate-700 mb-1">Facility Status</label>
-              <select
-                value={facilityStatus}
-                onChange={(e) => setFacilityStatus(e.target.value as 'Active' | 'Standby')}
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white font-medium"
-              >
-                <option value="Active">Active (Disbursed / Accruing)</option>
-                <option value="Standby">Standby (Pre-Approved / Undrawn)</option>
-              </select>
-            </div>
-            <div>
-              <label className="block font-semibold text-slate-700 mb-1">Principal Amount (ZAR)</label>
-              <input
-                type="number"
-                name="capitalAmountZAR"
-                autoComplete="off"
-                min="0"
-                step="any"
-                value={capitalAmountZAR}
-                onChange={(e) => setCapitalAmountZAR(Number(e.target.value))}
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg font-bold"
-              />
+              <div className="grid grid-cols-2 gap-2" role="group" aria-label="Facility Status">
+                <button
+                  type="button"
+                  onClick={() => setFacilityStatus('Active')}
+                  aria-pressed={facilityStatus === 'Active'}
+                  className={`px-3 py-2 rounded-lg border text-left transition-colors cursor-pointer ${
+                    facilityStatus === 'Active'
+                      ? 'bg-slate-900 text-white border-slate-900 shadow-2xs'
+                      : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
+                  }`}
+                >
+                  <div className="font-bold text-xs leading-tight">Active</div>
+                  <div
+                    className={`text-[10px] mt-0.5 ${
+                      facilityStatus === 'Active' ? 'text-emerald-300' : 'text-slate-400'
+                    }`}
+                  >
+                    Disbursed / Accruing
+                  </div>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFacilityStatus('Standby')}
+                  aria-pressed={facilityStatus === 'Standby'}
+                  className={`px-3 py-2 rounded-lg border text-left transition-colors cursor-pointer ${
+                    facilityStatus === 'Standby'
+                      ? 'bg-slate-900 text-white border-slate-900 shadow-2xs'
+                      : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
+                  }`}
+                >
+                  <div className="font-bold text-xs leading-tight">Standby</div>
+                  <div
+                    className={`text-[10px] mt-0.5 ${
+                      facilityStatus === 'Standby' ? 'text-amber-300' : 'text-slate-400'
+                    }`}
+                  >
+                    Pre-Approved / Undrawn
+                  </div>
+                </button>
+              </div>
             </div>
           </div>
 
@@ -495,21 +555,36 @@ export default function AddFundingModal({
                   </span>
                 )}
               </div>
-              <select
-                value={paymentSchedule}
-                onChange={(e) => setPaymentSchedule(e.target.value as any)}
-                disabled={returnTermsType === 'Equity Profit Split'}
-                className={`w-full px-3 py-2 border rounded-lg ${
-                  returnTermsType === 'Equity Profit Split'
-                    ? 'bg-slate-100 border-slate-200 text-slate-500 cursor-not-allowed'
-                    : 'bg-white border-slate-300'
-                }`}
+              <div
+                className="grid grid-cols-2 gap-1.5"
+                role="group"
+                aria-label="Payment Schedule"
               >
-                <option value="Monthly Interest">Monthly Interest</option>
-                <option value="Quarterly">Quarterly</option>
-                <option value="At Exit (Maturity)">At Exit (Maturity / Sale)</option>
-                <option value="Bi-Annual">Bi-Annual</option>
-              </select>
+                {PAYMENT_SCHEDULE_OPTIONS.map((opt) => {
+                  const isScheduleLocked = returnTermsType === 'Equity Profit Split';
+                  const isSelected = paymentSchedule === opt.value;
+                  return (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      disabled={isScheduleLocked}
+                      aria-pressed={isSelected}
+                      onClick={() => setPaymentSchedule(opt.value)}
+                      className={`px-2.5 py-2 rounded-lg border text-xs font-semibold transition-colors whitespace-nowrap ${
+                        isScheduleLocked
+                          ? isSelected
+                            ? 'bg-slate-200 text-slate-700 border-slate-300 cursor-not-allowed'
+                            : 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'
+                          : isSelected
+                          ? 'bg-slate-900 text-white border-slate-900 shadow-2xs cursor-pointer'
+                          : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50 cursor-pointer'
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  );
+                })}
+              </div>
               {returnTermsType === 'Equity Profit Split' && (
                 <p className="text-[11px] text-amber-700 mt-1">
                   Profit share is distributed upon deal exit &amp; deed transfer.
@@ -564,28 +639,53 @@ export default function AddFundingModal({
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label className="block font-semibold text-slate-700 mb-1">Disbursement Date</label>
-              <input
-                type="date"
-                name="disbursementDate"
-                autoComplete="off"
-                value={disbursementDate}
-                onChange={(e) => setDisbursementDate(e.target.value)}
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg"
-              />
+          <div className="space-y-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">Disbursement Date</label>
+                <input
+                  type="date"
+                  name="disbursementDate"
+                  autoComplete="off"
+                  value={disbursementDate}
+                  onChange={(e) => setDisbursementDate(e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg"
+                />
+              </div>
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">Maturity / Due Date</label>
+                <input
+                  type="date"
+                  name="maturityDate"
+                  autoComplete="off"
+                  value={maturityDate}
+                  onChange={(e) => setMaturityDate(e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg"
+                />
+              </div>
             </div>
-            <div>
-              <label className="block font-semibold text-slate-700 mb-1">Maturity / Due Date</label>
-              <input
-                type="date"
-                name="maturityDate"
-                autoComplete="off"
-                value={maturityDate}
-                onChange={(e) => setMaturityDate(e.target.value)}
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg"
-              />
+
+            <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="Quick Facility Term">
+              <span className="text-[11px] font-semibold text-slate-500 mr-1">Quick Term:</span>
+              {TERM_MONTH_PRESETS.map((months) => {
+                const targetMaturity = addMonthsToIsoDate(disbursementDate, months);
+                const isSelected = targetMaturity === maturityDate;
+                return (
+                  <button
+                    key={months}
+                    type="button"
+                    aria-pressed={isSelected}
+                    onClick={() => setMaturityDate(targetMaturity)}
+                    className={`px-2.5 py-1 rounded-md border text-[11px] font-semibold tabular-nums transition-colors whitespace-nowrap cursor-pointer ${
+                      isSelected
+                        ? 'bg-slate-900 text-white border-slate-900 shadow-2xs'
+                        : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                    }`}
+                  >
+                    {months}m
+                  </button>
+                );
+              })}
             </div>
           </div>
 
