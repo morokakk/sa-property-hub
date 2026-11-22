@@ -20,6 +20,7 @@ import {
   ExternalLink,
 } from 'lucide-react';
 import { usePortfolioStore } from '@/lib/store/usePortfolioStore';
+import { useModalBackdropDismiss } from '@/hooks/useModalBackdropDismiss';
 import {
   RentalProperty,
   MeterReading,
@@ -113,6 +114,9 @@ export default function DisputeLetterModal({
   const [copyToast, setCopyToast] = useState<string | null>(null);
   const [pdfGenerating, setPdfGenerating] = useState<boolean>(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const isBackdropDismissDisabled = photoProcessing || pdfGenerating;
+  const backdropDismiss = useModalBackdropDismiss(onClose, isBackdropDismissDisabled);
 
   // Initialize form whenever modal opens or props change
   useEffect(() => {
@@ -316,8 +320,16 @@ export default function DisputeLetterModal({
 
   return (
     <>
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-900/60 backdrop-blur-xs overflow-y-auto">
-        <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[94vh] flex flex-col border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95 duration-150 text-xs">
+      <div
+        {...backdropDismiss}
+        className={`fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-900/60 backdrop-blur-xs overflow-y-auto ${
+          isBackdropDismissDisabled ? 'cursor-wait' : 'cursor-pointer'
+        }`}
+      >
+        <div
+          onClick={(e) => e.stopPropagation()}
+          className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[94vh] flex flex-col border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95 duration-150 text-xs cursor-default"
+        >
           {/* Header */}
           <div className="px-5 py-3.5 border-b border-slate-200 flex items-center justify-between bg-slate-50/80">
             <div className="flex items-center gap-2.5 min-w-0">

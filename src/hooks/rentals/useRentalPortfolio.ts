@@ -197,6 +197,7 @@ export function useRentalPortfolio(): UseRentalPortfolioReturn {
           maintenanceHistory: payload.maintenanceHistory || [],
           status: payload.status || (payload.leases?.some((l) => l.status === 'Occupied') ? 'Occupied' : 'Vacant'),
           cocChecklist: payload.cocChecklist,
+          zoningProfile: payload.zoningProfile,
           driveVault: payload.driveVault,
           notes: payload.notes,
           taxEntityTypeOverride: payload.taxEntityTypeOverride,

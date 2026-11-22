@@ -31,6 +31,7 @@ import {
   ShieldCheck,
 } from 'lucide-react';
 import type { NoticeReplacementPrefill } from '@/hooks/rentals/useRentalModalState';
+import { useModalBackdropDismiss } from '@/hooks/useModalBackdropDismiss';
 import {
   calculateInspectionDepositSummary,
   ensureInspectionItems,
@@ -231,6 +232,8 @@ export function TenantNoticeModal({
     }
   }, [isOpen, property, initialLeaseId, prefillReplacement]);
 
+  const backdropDismiss = useModalBackdropDismiss(onClose);
+
   if (!isOpen || !property || !currentLease) return null;
 
   const handleLeaseChange = (leaseId: string) => {
@@ -376,8 +379,14 @@ export function TenantNoticeModal({
   const isNoticeGiven = currentLease.status === 'Notice Given';
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
-      <div className="bg-white rounded-2xl max-w-xl w-full border border-slate-200 shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 my-8">
+    <div
+      {...backdropDismiss}
+      className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto cursor-pointer"
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="bg-white rounded-2xl max-w-xl w-full border border-slate-200 shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 my-8 cursor-default"
+      >
         {/* Header */}
         <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
           <div className="flex items-center gap-2.5">

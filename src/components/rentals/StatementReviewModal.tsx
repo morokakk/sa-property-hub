@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { ExtractedRentalUnit, RentalProperty } from '@/types';
 import { usePortfolioStore } from '@/lib/store/usePortfolioStore';
+import { useModalBackdropDismiss } from '@/hooks/useModalBackdropDismiss';
 import { formatZAR } from '@/lib/formatters';
 import { checkAccountingVariance } from '@/lib/ai/statementValidation';
 
@@ -108,12 +109,18 @@ export default function StatementReviewModal({
     onConfirmSync(editableUnits);
   };
 
+  const backdropDismiss = useModalBackdropDismiss(onClose);
+
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-150">
+    <div
+      {...backdropDismiss}
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-150 cursor-pointer"
+    >
       <div
-        className="bg-white rounded-t-3xl sm:rounded-2xl shadow-2xl border border-slate-200 w-full max-w-5xl overflow-hidden flex flex-col max-h-[92vh] sm:max-h-[90vh] animate-in zoom-in-95 duration-200"
+        onClick={(e) => e.stopPropagation()}
+        className="bg-white rounded-t-3xl sm:rounded-2xl shadow-2xl border border-slate-200 w-full max-w-5xl overflow-hidden flex flex-col max-h-[92vh] sm:max-h-[90vh] animate-in zoom-in-95 duration-200 cursor-default"
         role="dialog"
         aria-modal="true"
       >

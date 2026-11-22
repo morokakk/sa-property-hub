@@ -20,6 +20,7 @@ import {
   Loader2,
 } from 'lucide-react';
 import { usePortfolioStore } from '@/lib/store/usePortfolioStore';
+import { useModalBackdropDismiss } from '@/hooks/useModalBackdropDismiss';
 import {
   RentalProperty,
   UtilityStatement,
@@ -86,6 +87,9 @@ export default function UnifiedPdfVerificationModal({
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [savedPropId, setSavedPropId] = useState<string>('');
+
+  const isBackdropDismissDisabled = isReparsing || isSaving;
+  const backdropDismiss = useModalBackdropDismiss(onClose, isBackdropDismissDisabled);
 
   // Reset index and statuses when modal opens
   useEffect(() => {
@@ -644,9 +648,15 @@ export default function UnifiedPdfVerificationModal({
 
   if (!data.success) {
     return (
-      <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-150">
+      <div
+        {...backdropDismiss}
+        className={`fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-150 ${
+          isBackdropDismissDisabled ? 'cursor-wait' : 'cursor-pointer'
+        }`}
+      >
         <div
-          className="bg-white rounded-t-3xl sm:rounded-2xl shadow-2xl border border-slate-200 w-full max-w-xl overflow-hidden flex flex-col animate-in zoom-in-95 duration-200"
+          onClick={(e) => e.stopPropagation()}
+          className="bg-white rounded-t-3xl sm:rounded-2xl shadow-2xl border border-slate-200 w-full max-w-xl overflow-hidden flex flex-col animate-in zoom-in-95 duration-200 cursor-default"
           role="dialog"
           aria-modal="true"
         >
@@ -713,9 +723,15 @@ export default function UnifiedPdfVerificationModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-150">
+    <div
+      {...backdropDismiss}
+      className={`fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-150 ${
+        isBackdropDismissDisabled ? 'cursor-wait' : 'cursor-pointer'
+      }`}
+    >
       <div
-        className="bg-white rounded-t-3xl sm:rounded-2xl shadow-2xl border border-slate-200 w-full max-w-2xl overflow-hidden flex flex-col max-h-[92vh] animate-in zoom-in-95 duration-200"
+        onClick={(e) => e.stopPropagation()}
+        className="bg-white rounded-t-3xl sm:rounded-2xl shadow-2xl border border-slate-200 w-full max-w-2xl overflow-hidden flex flex-col max-h-[92vh] animate-in zoom-in-95 duration-200 cursor-default"
         role="dialog"
         aria-modal="true"
       >

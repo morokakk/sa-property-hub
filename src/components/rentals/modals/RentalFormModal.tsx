@@ -8,12 +8,29 @@ import {
   TenantDepartureReason,
   AncillaryIncome,
   Province,
+  MunicipalZoningCode,
+  ZoningProfile,
+  ConsentUseFlags,
 } from '@/types';
 import { formatZAR } from '@/lib/formatters';
-import { Building2, ChevronDown, ChevronUp, AlertTriangle, ArrowRight, X } from 'lucide-react';
+import { Building2, ChevronDown, ChevronUp, AlertTriangle, ArrowRight, X, Landmark } from 'lucide-react';
 import { calculateMonthlyBondRepayment } from '@/lib/calculations/propertyMetrics';
 import { calculateAgencyCommission, reconcilePropertyStatus } from '@/lib/calculations/rentals';
+import { ZONING_PRESETS } from '@/lib/calculations/zoning';
+import {
+  MUNICIPAL_ZONING_CODES,
+  RENTAL_ZONING_PRESET_LABELS,
+  shouldShowRentalZoningAccordion,
+  sanitizeRentalZoningForSave,
+  parseLocaleDecimal,
+  applyRentalZoningPreset,
+  createDefaultRentalZoningProfile,
+  isRentalZoningPresetActive,
+  evaluateRentalDensityGuardrail,
+  formatRentalZoningAccordionChip,
+} from '@/lib/calculations/rentalZoning';
 import { usePortfolioStore } from '@/lib/store/usePortfolioStore';
+import { useModalBackdropDismiss } from '@/hooks/useModalBackdropDismiss';
 import { TenantVettingDrawer } from './TenantVettingDrawer';
 import { LeaseInspectionDrawer } from './LeaseInspectionDrawer';
 import InvestmentNodeSelect, { InvestmentNodeBanner } from '@/components/common/InvestmentNodeSelect';
@@ -105,6 +122,7 @@ export interface RentalFormModalProps {
   setRentalRatesBillUrl?: (v: string) => void;
   rentalTitleDeedUrl?: string;
   setRentalTitleDeedUrl?: (v: string) => void;
+  initialZoningExpanded?: boolean;
   onSubmit?: (e: React.FormEvent) => void;
 }
 
@@ -182,6 +200,7 @@ export const RentalFormModal: React.FC<RentalFormModalProps> = ({
   setRentalRatesBillUrl: propSetRentalRatesBillUrl,
   rentalTitleDeedUrl: propRentalTitleDeedUrl,
   setRentalTitleDeedUrl: propSetRentalTitleDeedUrl,
+  initialZoningExpanded = false,
   onSubmit: propOnSubmit,
 }) => {
   const investorProfile = usePortfolioStore((s) => s.investorProfile);
@@ -191,7 +210,9 @@ export const RentalFormModal: React.FC<RentalFormModalProps> = ({
   const [localAddress, setLocalAddress] = useState('');
   const [localCity, setLocalCity] = useState('Johannesburg CBD & Maboneng');
   const [localProvince, setLocalProvince] = useState<Province>('Gauteng');
-  const [localPropertyType, setLocalPropertyType] = useState<PropertyTitleType>('Sectional Title Apartment');
+  const [localPropertyType, setLocalPropertyType] = useState<PropertyTitleType>(
+    editingProperty?.propertyType || 'Sectional Title Apartment'
+  );
   const [localAgmDate, setLocalAgmDate] = useState('');
   const [localMarketValue, setLocalMarketValue] = useState(1800000);
   const [localPurchasePrice, setLocalPurchasePrice] = useState(1650000);
@@ -215,7 +236,9 @@ export const RentalFormModal: React.FC<RentalFormModalProps> = ({
   const [localAgencyCommissionPercent, setLocalAgencyCommissionPercent] = useState(8.0);
   const [localAgencyVatApplicable, setLocalAgencyVatApplicable] = useState(true);
   const [localAgencyContact, setLocalAgencyContact] = useState('+27 82 555 1234');
-  const [localFormLeases, setLocalFormLeases] = useState<Lease[]>([]);
+  const [localFormLeases, setLocalFormLeases] = useState<Lease[]>(
+    () => editingProperty?.leases?.map((l) => ({ ...l })) || []
+  );
   const [localUtilityType, setLocalUtilityType] = useState<'postpaid' | 'prepaid_submeter' | 'hybrid'>('postpaid');
   const [localPrepaidVendorName, setLocalPrepaidVendorName] = useState('');
   const [localMonthlyPrepaidVendingFee, setLocalMonthlyPrepaidVendingFee] = useState(0);
@@ -224,6 +247,25 @@ export const RentalFormModal: React.FC<RentalFormModalProps> = ({
   const [localFormAncillaryIncomes, setLocalFormAncillaryIncomes] = useState<AncillaryIncome[]>([]);
   const [expandedGuarantors, setExpandedGuarantors] = useState<Record<string, boolean>>({});
   const [isVaultExpanded, setIsVaultExpanded] = useState<boolean>(false);
+  const [localZoningProfile, setLocalZoningProfile] = useState<ZoningProfile | undefined>(() =>
+    editingProperty?.zoningProfile
+      ? {
+          ...editingProperty.zoningProfile,
+          consentUses: { ...editingProperty.zoningProfile.consentUses },
+        }
+      : undefined
+  );
+  const [isZoningExpanded, setIsZoningExpanded] = useState<boolean>(Boolean(initialZoningExpanded));
+  const [erfSizeInput, setErfSizeInput] = useState<string>(
+    editingProperty?.zoningProfile?.erfSizeSqm
+      ? String(editingProperty.zoningProfile.erfSizeSqm)
+      : ''
+  );
+  const [maxDensityInput, setMaxDensityInput] = useState<string>(
+    editingProperty?.zoningProfile?.maxDensityDuPerHa !== undefined
+      ? String(editingProperty.zoningProfile.maxDensityDuPerHa)
+      : ''
+  );
 
   useEffect(() => {
     if (isOpen && propTitle === undefined) {
@@ -277,6 +319,25 @@ export const RentalFormModal: React.FC<RentalFormModalProps> = ({
         setLocalMonthlyCommunalServices(editingProperty.monthlyCommunalServicesZAR || 0);
         setLocalTaxEntityOverride(editingProperty.taxEntityTypeOverride);
         setLocalFormAncillaryIncomes(editingProperty.ancillaryIncomes?.map(a => ({ ...a })) || []);
+        setLocalZoningProfile(
+          editingProperty.zoningProfile
+            ? {
+                ...editingProperty.zoningProfile,
+                consentUses: { ...editingProperty.zoningProfile.consentUses },
+              }
+            : undefined
+        );
+        setIsZoningExpanded(Boolean(initialZoningExpanded));
+        setErfSizeInput(
+          editingProperty.zoningProfile?.erfSizeSqm
+            ? String(editingProperty.zoningProfile.erfSizeSqm)
+            : ''
+        );
+        setMaxDensityInput(
+          editingProperty.zoningProfile?.maxDensityDuPerHa !== undefined
+            ? String(editingProperty.zoningProfile.maxDensityDuPerHa)
+            : ''
+        );
       } else {
         setLocalTitle('');
         setLocalAddress('');
@@ -327,9 +388,13 @@ export const RentalFormModal: React.FC<RentalFormModalProps> = ({
         setLocalTaxEntityOverride(undefined);
         setLocalFormAncillaryIncomes([]);
         setExpandedGuarantors({});
+        setLocalZoningProfile(undefined);
+        setIsZoningExpanded(Boolean(initialZoningExpanded));
+        setErfSizeInput('');
+        setMaxDensityInput('');
       }
     }
-  }, [isOpen, editingProperty, propTitle]);
+  }, [isOpen, editingProperty, propTitle, initialZoningExpanded]);
 
   const title = propTitle !== undefined ? propTitle : localTitle;
   const setTitle = propSetTitle || setLocalTitle;
@@ -424,6 +489,128 @@ export const RentalFormModal: React.FC<RentalFormModalProps> = ({
     rentalTitleDeedUrl,
   ].filter((url) => Boolean(url && url.trim())).length;
 
+  const showZoningAccordion = shouldShowRentalZoningAccordion(
+    propertyType,
+    formLeases.length,
+    localZoningProfile
+  );
+  const densityGuardrail = evaluateRentalDensityGuardrail(
+    localZoningProfile,
+    formLeases.length
+  );
+
+  const handleApplyZoningPreset = (presetId: string) => {
+    const next = applyRentalZoningPreset(presetId, localZoningProfile);
+    if (!next) return;
+    setLocalZoningProfile(next);
+    setErfSizeInput(next.erfSizeSqm > 0 ? String(next.erfSizeSqm) : '');
+    setMaxDensityInput(
+      next.maxDensityDuPerHa !== undefined ? String(next.maxDensityDuPerHa) : ''
+    );
+  };
+
+  const handleClearZoning = () => {
+    setLocalZoningProfile(undefined);
+    setErfSizeInput('');
+    setMaxDensityInput('');
+  };
+
+  const handleZoningCodeChange = (code: MunicipalZoningCode) => {
+    if (localZoningProfile) {
+      setLocalZoningProfile({
+        ...localZoningProfile,
+        currentZoning: code,
+      });
+      return;
+    }
+    const seeded = createDefaultRentalZoningProfile({ currentZoning: code });
+    setLocalZoningProfile(seeded);
+    setErfSizeInput(seeded.erfSizeSqm > 0 ? String(seeded.erfSizeSqm) : '');
+    setMaxDensityInput(
+      seeded.maxDensityDuPerHa !== undefined ? String(seeded.maxDensityDuPerHa) : ''
+    );
+  };
+
+  const handleToggleConsentUse = (key: keyof ConsentUseFlags) => {
+    if (localZoningProfile) {
+      setLocalZoningProfile({
+        ...localZoningProfile,
+        consentUses: {
+          ...localZoningProfile.consentUses,
+          [key]: !localZoningProfile.consentUses?.[key],
+        },
+      });
+      return;
+    }
+    const seeded = createDefaultRentalZoningProfile({
+      consentUses: {
+        secondDwellingPermitted: key === 'secondDwellingPermitted',
+        studentCommuneConsent: key === 'studentCommuneConsent',
+        backyardMicroUnitsPermitted: key === 'backyardMicroUnitsPermitted',
+        homeEnterprisePermitted: false,
+      },
+    });
+    setLocalZoningProfile(seeded);
+    setErfSizeInput(seeded.erfSizeSqm > 0 ? String(seeded.erfSizeSqm) : '');
+    setMaxDensityInput(
+      seeded.maxDensityDuPerHa !== undefined ? String(seeded.maxDensityDuPerHa) : ''
+    );
+  };
+
+  const handleErfSizeChange = (raw: string) => {
+    setErfSizeInput(raw);
+    const trimmed = raw.trim();
+    if (trimmed === '') {
+      if (localZoningProfile) {
+        setLocalZoningProfile({
+          ...localZoningProfile,
+          erfSizeSqm: 0,
+        });
+      }
+      return;
+    }
+    const parsed = parseLocaleDecimal(raw);
+    if (parsed === undefined) return;
+    if (localZoningProfile) {
+      setLocalZoningProfile({
+        ...localZoningProfile,
+        erfSizeSqm: parsed,
+      });
+      return;
+    }
+    const seeded = createDefaultRentalZoningProfile({ erfSizeSqm: parsed });
+    setLocalZoningProfile(seeded);
+    setMaxDensityInput(
+      seeded.maxDensityDuPerHa !== undefined ? String(seeded.maxDensityDuPerHa) : ''
+    );
+  };
+
+  const handleMaxDensityChange = (raw: string) => {
+    setMaxDensityInput(raw);
+    const trimmed = raw.trim();
+    if (trimmed === '') {
+      if (localZoningProfile) {
+        setLocalZoningProfile({
+          ...localZoningProfile,
+          maxDensityDuPerHa: undefined,
+        });
+      }
+      return;
+    }
+    const parsed = parseLocaleDecimal(raw);
+    if (parsed === undefined) return;
+    if (localZoningProfile) {
+      setLocalZoningProfile({
+        ...localZoningProfile,
+        maxDensityDuPerHa: parsed,
+      });
+      return;
+    }
+    const seeded = createDefaultRentalZoningProfile({ maxDensityDuPerHa: parsed });
+    setLocalZoningProfile(seeded);
+    setErfSizeInput(seeded.erfSizeSqm > 0 ? String(seeded.erfSizeSqm) : '');
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     if (propOnSubmit) {
       propOnSubmit(e);
@@ -456,6 +643,7 @@ export const RentalFormModal: React.FC<RentalFormModalProps> = ({
     }));
 
     const reconciledStatus = reconcilePropertyStatus(finalLeases);
+    const finalZoningProfile = sanitizeRentalZoningForSave(propertyType, localZoningProfile);
 
     const commonFields: Partial<RentalProperty> = {
       title,
@@ -464,6 +652,7 @@ export const RentalFormModal: React.FC<RentalFormModalProps> = ({
       province,
       status: reconciledStatus,
       cocChecklist: editingProperty?.cocChecklist || getNodeComplianceProfile(city, province).defaultCertificates,
+      zoningProfile: finalZoningProfile,
       propertyType,
       agmDate: finalAgmDate,
       marketValueZAR: marketValue,
@@ -504,11 +693,19 @@ export const RentalFormModal: React.FC<RentalFormModalProps> = ({
     onClose();
   };
 
+  const backdropDismiss = useModalBackdropDismiss(onClose);
+
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 z-50">
-      <div className="bg-white rounded-t-3xl sm:rounded-xl max-w-lg sm:max-w-2xl w-full shadow-xl border border-slate-200 max-h-[92vh] sm:max-h-[90vh] flex flex-col overflow-hidden">
+    <div
+      {...backdropDismiss}
+      className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 z-50 cursor-pointer"
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="bg-white rounded-t-3xl sm:rounded-xl max-w-lg sm:max-w-2xl w-full shadow-xl border border-slate-200 max-h-[92vh] sm:max-h-[90vh] flex flex-col overflow-hidden cursor-default"
+      >
         {/* Mobile Drag Handle */}
         <div className="w-12 h-1.5 bg-slate-300 rounded-full mx-auto mt-2.5 mb-1 sm:hidden shrink-0" />
 
@@ -1106,6 +1303,201 @@ export const RentalFormModal: React.FC<RentalFormModalProps> = ({
 
             {/* Section 3: Leases & Compliance */}
             <div id="rental-sec-leases" className="scroll-mt-4 p-3 bg-slate-50 rounded-lg border border-slate-200 space-y-3">
+              {showZoningAccordion && (
+                <div
+                  data-testid="rental-zoning-accordion"
+                  className="rounded-lg border border-amber-200/90 bg-amber-50/40 transition-all"
+                >
+                  <button
+                    type="button"
+                    data-testid="rental-zoning-toggle"
+                    aria-expanded={isZoningExpanded}
+                    onClick={() => setIsZoningExpanded((prev) => !prev)}
+                    className="w-full px-3 py-2 flex items-center justify-between gap-2 text-left cursor-pointer hover:bg-amber-50/80 rounded-lg transition-colors"
+                  >
+                    <div className="flex items-center gap-2 min-w-0 flex-wrap">
+                      <Landmark className="w-3.5 h-3.5 text-amber-700 shrink-0" />
+                      <span className="font-bold text-amber-950 text-[11px] uppercase tracking-wider">
+                        Municipal Zoning &amp; Multi-Let Consent Rights (Optional)
+                      </span>
+                      <span
+                        data-testid="rental-zoning-status-chip"
+                        className={`px-2 py-0.5 rounded-full text-[10px] font-semibold border ${
+                          localZoningProfile
+                            ? 'bg-amber-100 text-amber-900 border-amber-300'
+                            : 'bg-white text-slate-500 border-slate-200'
+                        }`}
+                      >
+                        {formatRentalZoningAccordionChip(localZoningProfile)}
+                      </span>
+                    </div>
+                    {isZoningExpanded ? (
+                      <ChevronUp className="w-4 h-4 text-amber-700 shrink-0" />
+                    ) : (
+                      <ChevronDown className="w-4 h-4 text-amber-700 shrink-0" />
+                    )}
+                  </button>
+
+                  {isZoningExpanded && (
+                    <div className="p-3 pt-2.5 border-t border-amber-200/70 space-y-3 text-xs">
+                      {/* Quick SA Zoning Presets + Clear */}
+                      <div>
+                        <div className="flex items-center justify-between mb-1.5 gap-2">
+                          <span className="block text-[11px] font-semibold text-slate-700">
+                            SA Municipal Zoning Presets
+                          </span>
+                          {localZoningProfile && (
+                            <button
+                              type="button"
+                              data-testid="rental-zoning-clear"
+                              onClick={handleClearZoning}
+                              className="text-[10px] font-semibold text-slate-500 hover:text-rose-600 underline cursor-pointer shrink-0"
+                            >
+                              Clear Zoning
+                            </button>
+                          )}
+                        </div>
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
+                          {ZONING_PRESETS.map((preset) => {
+                            const active = isRentalZoningPresetActive(preset.id, localZoningProfile);
+                            return (
+                              <button
+                                key={preset.id}
+                                type="button"
+                                data-testid={`rental-zoning-preset-${preset.id}`}
+                                onClick={() => handleApplyZoningPreset(preset.id)}
+                                className={`py-1.5 px-2 rounded-lg text-[11px] font-semibold transition-all text-center border cursor-pointer ${
+                                  active
+                                    ? 'bg-slate-900 text-white border-slate-900 shadow-2xs font-bold'
+                                    : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
+                                }`}
+                                title={preset.description}
+                              >
+                                {RENTAL_ZONING_PRESET_LABELS[preset.id] || preset.label}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      {/* Current Zoning Code */}
+                      <div>
+                        <label
+                          htmlFor="rental-zoning-code-select"
+                          className="block text-[11px] font-semibold text-slate-700 mb-1"
+                        >
+                          Current Zoning Code
+                        </label>
+                        <select
+                          id="rental-zoning-code-select"
+                          data-testid="rental-zoning-code-select"
+                          value={localZoningProfile?.currentZoning ?? ''}
+                          onChange={(e) => handleZoningCodeChange(e.target.value as MunicipalZoningCode)}
+                          className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg bg-white text-xs font-semibold text-slate-900"
+                        >
+                          <option value="" disabled>
+                            Select municipal zoning...
+                          </option>
+                          {MUNICIPAL_ZONING_CODES.map((code) => (
+                            <option key={code} value={code}>
+                              {code}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {/* Multi-Let Consent Use Checkboxes */}
+                      <div>
+                        <span className="block text-[11px] font-semibold text-slate-700 mb-1.5">
+                          Multi-Let Consent Uses
+                        </span>
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                          <label className="inline-flex items-center gap-2 p-2 rounded-lg bg-white border border-slate-200 hover:border-amber-300 cursor-pointer select-none text-xs">
+                            <input
+                              type="checkbox"
+                              checked={Boolean(localZoningProfile?.consentUses?.secondDwellingPermitted)}
+                              onChange={() => handleToggleConsentUse('secondDwellingPermitted')}
+                              className="w-3.5 h-3.5 rounded text-amber-600 focus:ring-amber-500 cursor-pointer"
+                            />
+                            <span className="font-medium text-slate-800">2nd Dwelling / Cottage</span>
+                          </label>
+                          <label className="inline-flex items-center gap-2 p-2 rounded-lg bg-white border border-slate-200 hover:border-amber-300 cursor-pointer select-none text-xs">
+                            <input
+                              type="checkbox"
+                              checked={Boolean(localZoningProfile?.consentUses?.studentCommuneConsent)}
+                              onChange={() => handleToggleConsentUse('studentCommuneConsent')}
+                              className="w-3.5 h-3.5 rounded text-amber-600 focus:ring-amber-500 cursor-pointer"
+                            />
+                            <span className="font-medium text-slate-800">Student Commune Consent</span>
+                          </label>
+                          <label className="inline-flex items-center gap-2 p-2 rounded-lg bg-white border border-slate-200 hover:border-amber-300 cursor-pointer select-none text-xs">
+                            <input
+                              type="checkbox"
+                              checked={Boolean(localZoningProfile?.consentUses?.backyardMicroUnitsPermitted)}
+                              onChange={() => handleToggleConsentUse('backyardMicroUnitsPermitted')}
+                              className="w-3.5 h-3.5 rounded text-amber-600 focus:ring-amber-500 cursor-pointer"
+                            />
+                            <span className="font-medium text-slate-800">Backyard Micro-Units</span>
+                          </label>
+                        </div>
+                      </div>
+
+                      {/* Optional Erf & Density Fields */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                          <label
+                            htmlFor="rental-zoning-erf-size"
+                            className="block text-[11px] font-semibold text-slate-700 mb-1"
+                          >
+                            Erf Size (m²)
+                          </label>
+                          <input
+                            id="rental-zoning-erf-size"
+                            data-testid="rental-zoning-erf-size"
+                            type="text"
+                            inputMode="decimal"
+                            placeholder="e.g. 1000"
+                            value={erfSizeInput}
+                            onChange={(e) => handleErfSizeChange(e.target.value)}
+                            className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg bg-white text-xs font-semibold text-slate-900"
+                          />
+                        </div>
+                        <div>
+                          <label
+                            htmlFor="rental-zoning-max-density"
+                            className="block text-[11px] font-semibold text-slate-700 mb-1"
+                          >
+                            Max Density (du/ha)
+                          </label>
+                          <input
+                            id="rental-zoning-max-density"
+                            data-testid="rental-zoning-max-density"
+                            type="text"
+                            inputMode="decimal"
+                            placeholder="e.g. 40"
+                            value={maxDensityInput}
+                            onChange={(e) => handleMaxDensityChange(e.target.value)}
+                            className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg bg-white text-xs font-semibold text-slate-900"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Non-Blocking Density Guardrail */}
+                      {densityGuardrail.showWarning && (
+                        <div
+                          role="status"
+                          data-testid="rental-zoning-density-warning"
+                          className="p-2.5 rounded-lg bg-amber-50 border border-amber-300 text-amber-900 text-[11px] flex items-start gap-2"
+                        >
+                          <span className="shrink-0" aria-hidden="true">⚠️</span>
+                          <span className="font-medium">{densityGuardrail.warningMessage}</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+
               <div className="flex items-center justify-between">
                 <span className="font-bold text-slate-800 block text-[11px] uppercase tracking-wider">
                   Lease Units ({formLeases.length})

@@ -33,6 +33,7 @@ import {
 import { formatTenantMaintenanceRequestForWhatsApp } from '@/lib/whatsappFormatter';
 import { submitTenantMaintenanceTicket } from '@/app/actions/submitTenantMaintenanceTicket';
 import { usePortfolioStore } from '@/lib/store/usePortfolioStore';
+import { useModalBackdropDismiss } from '@/hooks/useModalBackdropDismiss';
 import { PublicTenantStatementPayload } from '@/types/tenantStatement';
 import { RentalProperty, TenantPaymentRecord, ArrearsWriteOff, InspectionCondition } from '@/types';
 import { formatZAR, formatDate } from '@/lib/formatters';
@@ -198,6 +199,11 @@ export default function TenantStatementViewer({
   const handleCloseMaintenanceModal = () => {
     setIsMaintenanceModalOpen(false);
   };
+
+  const maintenanceBackdropDismiss = useModalBackdropDismiss(
+    handleCloseMaintenanceModal,
+    isSubmittingMaintenance
+  );
 
   const handleSubmitMaintenanceWhatsApp = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -632,10 +638,14 @@ export default function TenantStatementViewer({
         {isMaintenanceModalOpen && (
           <div
             data-testid="tenant-maintenance-modal"
-            className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in duration-150 print:hidden print-hidden-element"
+            {...maintenanceBackdropDismiss}
+            className={`fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in duration-150 print:hidden print-hidden-element ${
+              isSubmittingMaintenance ? 'cursor-wait' : 'cursor-pointer'
+            }`}
           >
             <div
-              className="bg-white rounded-2xl max-w-lg w-full p-5 sm:p-6 shadow-2xl border border-slate-200 space-y-4 max-h-[90vh] overflow-y-auto"
+              onClick={(e) => e.stopPropagation()}
+              className="bg-white rounded-2xl max-w-lg w-full p-5 sm:p-6 shadow-2xl border border-slate-200 space-y-4 max-h-[90vh] overflow-y-auto cursor-default"
               role="dialog"
               aria-modal="true"
               aria-labelledby="tenant-maintenance-modal-title"

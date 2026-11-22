@@ -3,6 +3,7 @@
 import React from 'react';
 import { AlertCircle, X, CheckCircle2, ShieldAlert } from 'lucide-react';
 import type { ValidationErrorItem } from '@/lib/import/excelImport';
+import { useModalBackdropDismiss } from '@/hooks/useModalBackdropDismiss';
 
 interface ValidationErrorModalProps {
   isOpen: boolean;
@@ -19,6 +20,8 @@ export default function ValidationErrorModal({
   templateType,
   errors,
 }: ValidationErrorModalProps) {
+  const backdropDismiss = useModalBackdropDismiss(onClose);
+
   if (!isOpen) return null;
 
   const templateLabel =
@@ -29,9 +32,13 @@ export default function ValidationErrorModal({
       : 'Buy-and-Flip (/flips)';
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-150">
+    <div
+      {...backdropDismiss}
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-150 cursor-pointer"
+    >
       <div
-        className="bg-white rounded-t-3xl sm:rounded-2xl shadow-2xl border border-red-200 w-full max-w-2xl overflow-hidden flex flex-col max-h-[92vh] sm:max-h-[85vh] animate-in zoom-in-95 duration-200"
+        onClick={(e) => e.stopPropagation()}
+        className="bg-white rounded-t-3xl sm:rounded-2xl shadow-2xl border border-red-200 w-full max-w-2xl overflow-hidden flex flex-col max-h-[92vh] sm:max-h-[85vh] animate-in zoom-in-95 duration-200 cursor-default"
         role="dialog"
         aria-modal="true"
       >

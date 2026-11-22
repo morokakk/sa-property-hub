@@ -9,6 +9,7 @@ import ActualVsBudgetKpiStrip from '@/components/dashboard/ActualVsBudgetKpiStri
 import ConsolidatedTaxCard from '@/components/dashboard/ConsolidatedTaxCard';
 import EquityExtractionCard from '@/components/dashboard/EquityExtractionCard';
 import { usePortfolioStore, usePortfolioSummary } from '@/lib/store/usePortfolioStore';
+import { useModalBackdropDismiss } from '@/hooks/useModalBackdropDismiss';
 import { formatZAR, formatPercent, formatDate } from '@/lib/formatters';
 import { calculateRentalCashflow } from '@/lib/calculations/propertyMetrics';
 import { calculatePropertyArrears } from '@/lib/calculations/arrears';
@@ -57,6 +58,7 @@ export default function GlobalDashboardPage() {
 
   const [showEditSeedModal, setShowEditSeedModal] = React.useState(false);
   const [seedAmount, setSeedAmount] = React.useState(summary.liquidCapitalReserve);
+  const seedModalBackdropDismiss = useModalBackdropDismiss(() => setShowEditSeedModal(false));
 
   const equityRatio = summary.totalGrossAssetValue > 0
     ? (summary.netEquity / summary.totalGrossAssetValue) * 100
@@ -689,8 +691,14 @@ export default function GlobalDashboardPage() {
 
         {/* Quick Edit Seed Capital Modal (Mobile Bottom-Sheet / Desktop Centered Dialog) */}
         {showEditSeedModal && (
-          <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/70 backdrop-blur-xs animate-in fade-in duration-150">
-            <div className="bg-white rounded-t-3xl sm:rounded-2xl max-w-md w-full p-5 sm:p-6 shadow-2xl border border-slate-200 max-h-[92vh] sm:max-h-none overflow-y-auto">
+          <div
+            {...seedModalBackdropDismiss}
+            className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/70 backdrop-blur-xs animate-in fade-in duration-150 cursor-pointer"
+          >
+            <div
+              onClick={(e) => e.stopPropagation()}
+              className="bg-white rounded-t-3xl sm:rounded-2xl max-w-md w-full p-5 sm:p-6 shadow-2xl border border-slate-200 max-h-[92vh] sm:max-h-none overflow-y-auto cursor-default"
+            >
               {/* Mobile Drag Indicator */}
               <div className="w-12 h-1.5 bg-slate-300 rounded-full mx-auto mb-3 sm:hidden" />
               <div className="flex items-center justify-between pb-3 sm:pb-4 border-b border-slate-100">

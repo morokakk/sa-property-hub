@@ -2,6 +2,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { useViewportDropdownPosition } from '@/hooks/useViewportDropdownPosition';
+import { useModalBackdropDismiss } from '@/hooks/useModalBackdropDismiss';
 import {
   X,
   Printer,
@@ -173,6 +174,9 @@ export default function TenantStatement({
   useEffect(() => {
     setIsBroughtForwardExpanded(false);
   }, [activePeriodMonth, selectedTargetId]);
+
+  const isBackdropDismissDisabled = isUploading || isPublishingLink || isSendingEmail;
+  const backdropDismiss = useModalBackdropDismiss(onClose, isBackdropDismissDisabled);
 
   if (!isOpen || !rental) return null;
 
@@ -856,12 +860,16 @@ export default function TenantStatement({
 
       <div
         id="tenant-statement-backdrop"
-        className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-5 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-150"
+        {...backdropDismiss}
+        className={`fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-5 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-150 ${
+          isBackdropDismissDisabled ? 'cursor-wait' : 'cursor-pointer'
+        }`}
       >
         <div
           id="tenant-statement-print-root"
           data-sensitive="true"
-          className="bg-white rounded-t-3xl sm:rounded-2xl shadow-2xl border border-slate-200 w-full max-w-4xl max-h-[92vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200"
+          onClick={(e) => e.stopPropagation()}
+          className="bg-white rounded-t-3xl sm:rounded-2xl shadow-2xl border border-slate-200 w-full max-w-4xl max-h-[92vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200 cursor-default"
           role="dialog"
           aria-modal="true"
         >

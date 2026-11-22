@@ -9,6 +9,7 @@ import {
 } from '@/types';
 import { formatZAR } from '@/lib/formatters';
 import { CreditCard, X } from 'lucide-react';
+import { useModalBackdropDismiss } from '@/hooks/useModalBackdropDismiss';
 import {
   getUnpaidLedgerMonths,
   allocateOldestFirst,
@@ -114,6 +115,8 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
       }
     }
   }, [isOpen, property, editingPayment, initialLeaseId, initialMonth, initialAmount, initialAllocations, propLeaseId]);
+
+  const backdropDismiss = useModalBackdropDismiss(onClose);
 
   if (!isOpen || !property) return null;
 
@@ -240,8 +243,14 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-lg max-h-[90vh] overflow-y-auto animate-in fade-in zoom-in-95 duration-150">
+    <div
+      {...backdropDismiss}
+      className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 cursor-pointer"
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-lg max-h-[90vh] overflow-y-auto animate-in fade-in zoom-in-95 duration-150 cursor-default"
+      >
         <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/80 sticky top-0 bg-white z-10">
           <div className="flex items-center gap-2">
             <div className="p-2 rounded-xl bg-emerald-100 text-emerald-800">

@@ -5,6 +5,7 @@ import { RentalProperty } from '@/types';
 import { formatZAR } from '@/lib/formatters';
 import { ArrowUpRight, X } from 'lucide-react';
 import { calculateMonthlyBondRepayment } from '@/lib/calculations/propertyMetrics';
+import { useModalBackdropDismiss } from '@/hooks/useModalBackdropDismiss';
 
 export interface RefinanceModalProps {
   isOpen: boolean;
@@ -79,6 +80,8 @@ export const RefinanceModal: React.FC<RefinanceModalProps> = ({
       setLocalNotes('');
     }
   }, [property, isOpen, propNewValuation]);
+
+  const backdropDismiss = useModalBackdropDismiss(onClose);
 
   if (!isOpen || !property) return null;
 
@@ -161,8 +164,14 @@ export const RefinanceModal: React.FC<RefinanceModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 z-50 overflow-y-auto">
-      <div className="bg-white rounded-t-3xl sm:rounded-xl max-w-lg w-full p-5 sm:p-6 shadow-xl border border-slate-200 animate-in fade-in sm:my-8 max-h-[92vh] sm:max-h-[90vh] overflow-y-auto">
+    <div
+      {...backdropDismiss}
+      className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 z-50 overflow-y-auto cursor-pointer"
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="bg-white rounded-t-3xl sm:rounded-xl max-w-lg w-full p-5 sm:p-6 shadow-xl border border-slate-200 animate-in fade-in sm:my-8 max-h-[92vh] sm:max-h-[90vh] overflow-y-auto cursor-default"
+      >
         <div className="w-12 h-1.5 bg-slate-300 rounded-full mx-auto mb-3 sm:hidden" />
         <div className="flex items-center justify-between pb-3 mb-4 border-b border-slate-100">
           <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">

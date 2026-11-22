@@ -26,6 +26,7 @@ import {
   Building,
 } from 'lucide-react';
 import { usePortfolioStore } from '@/lib/store/usePortfolioStore';
+import { useModalBackdropDismiss } from '@/hooks/useModalBackdropDismiss';
 import {
   MeterReading,
   MeterDisputeStatus,
@@ -362,6 +363,11 @@ export default function MeterReadingsModal({
     rental?.city,
   ]);
 
+  const backdropDismiss = useModalBackdropDismiss(onClose);
+  const disputeBackdropDismiss = useModalBackdropDismiss(() =>
+    setEditingDisputeReading(null)
+  );
+
   if (!isOpen || !rental) return null;
 
   const handleSaveReading = (e: React.FormEvent) => {
@@ -535,8 +541,14 @@ export default function MeterReadingsModal({
   const latestWater = allReadings.find((r) => r.utilityType === 'water');
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/60 backdrop-blur-xs overflow-y-auto">
-      <div className="bg-white rounded-t-3xl sm:rounded-2xl shadow-2xl max-w-4xl w-full max-h-[92vh] flex flex-col border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+    <div
+      {...backdropDismiss}
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/60 backdrop-blur-xs overflow-y-auto cursor-pointer"
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="bg-white rounded-t-3xl sm:rounded-2xl shadow-2xl max-w-4xl w-full max-h-[92vh] flex flex-col border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95 duration-150 cursor-default"
+      >
         <div className="w-12 h-1.5 bg-slate-300 rounded-full mx-auto my-2 sm:hidden shrink-0" />
         {/* Header */}
         <div className="px-4 py-3 sm:px-6 sm:py-4 border-b border-slate-200 flex items-center justify-between bg-slate-50/80">
@@ -2000,8 +2012,14 @@ export default function MeterReadingsModal({
 
       {/* Edit / Resolve Dispute Modal Popover */}
       {editingDisputeReading && (
-        <div className="fixed inset-0 z-60 flex items-center justify-center p-3 sm:p-4 bg-slate-950/60 backdrop-blur-xs animate-in fade-in overflow-y-auto">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-xl w-full border border-slate-200 overflow-hidden animate-in zoom-in-95 my-auto max-h-[92vh] flex flex-col">
+        <div
+          {...disputeBackdropDismiss}
+          className="fixed inset-0 z-60 flex items-center justify-center p-3 sm:p-4 bg-slate-950/60 backdrop-blur-xs animate-in fade-in overflow-y-auto cursor-pointer"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white rounded-2xl shadow-2xl max-w-xl w-full border border-slate-200 overflow-hidden animate-in zoom-in-95 my-auto max-h-[92vh] flex flex-col cursor-default"
+          >
             <div
               className={`px-5 py-3.5 border-b flex items-center justify-between shrink-0 ${
                 editDisputeStatus === 'Resolved'

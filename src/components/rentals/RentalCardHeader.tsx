@@ -7,6 +7,7 @@ import { PropertyTypeBadge, AgmDateChip } from '@/components/common/PropertyType
 import { calculatePropertyArrears } from '@/lib/calculations/arrears';
 import { calculateRentalCashflow } from '@/lib/calculations/propertyMetrics';
 import { calculateRentalTaxProvision } from '@/lib/calculations/rentals';
+import { formatCompactRentalZoningPill } from '@/lib/calculations/rentalZoning';
 import {
   Building2,
   ArrowRightLeft,
@@ -108,6 +109,20 @@ export function RentalCardHeader({
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-1.5 flex-wrap mb-1">
               <PropertyTypeBadge type={property.propertyType} />
+              {Boolean(property.zoningProfile) &&
+                property.propertyType !== 'Sectional Title Apartment' &&
+                (() => {
+                  const { label, tooltip } = formatCompactRentalZoningPill(property.zoningProfile!);
+                  return (
+                    <span
+                      data-testid="rental-card-zoning-pill"
+                      className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-300 max-w-[180px] sm:max-w-none"
+                      title={tooltip}
+                    >
+                      <span className="truncate">🏛️ {label}</span>
+                    </span>
+                  );
+                })()}
               {(() => {
                 const sqm = property.floorAreaSqm || (property.notes ? Number(property.notes.match(/(\d+)\s*m²/)?.[1]) : undefined);
                 if (!sqm || sqm <= 0) return null;

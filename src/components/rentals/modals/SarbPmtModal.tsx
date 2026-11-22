@@ -6,6 +6,7 @@ import { formatZAR } from '@/lib/formatters';
 import { Calculator, CheckCircle2, X, Lightbulb } from 'lucide-react';
 import { calculateMonthlyBondRepayment } from '@/lib/calculations/propertyMetrics';
 import { usePortfolioStore } from '@/lib/store/usePortfolioStore';
+import { useModalBackdropDismiss } from '@/hooks/useModalBackdropDismiss';
 
 export interface SarbPmtModalProps {
   isOpen: boolean;
@@ -64,6 +65,8 @@ export const SarbPmtModal: React.FC<SarbPmtModalProps> = ({
     }
   }, [property, isOpen, propInterestRate]);
 
+  const backdropDismiss = useModalBackdropDismiss(onClose);
+
   if (!isOpen || !property) return null;
 
   const interestRate = propInterestRate !== undefined ? propInterestRate : localInterestRate;
@@ -120,8 +123,14 @@ export const SarbPmtModal: React.FC<SarbPmtModalProps> = ({
   const savings = currentPmt - calculatedPmt;
 
   return (
-    <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 z-50 animate-in fade-in duration-150">
-      <div className="bg-white rounded-t-3xl sm:rounded-2xl max-w-lg w-full p-5 sm:p-6 shadow-2xl border border-slate-200 animate-in zoom-in-95 duration-200 max-h-[92vh] sm:max-h-none overflow-y-auto">
+    <div
+      {...backdropDismiss}
+      className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 z-50 animate-in fade-in duration-150 cursor-pointer"
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="bg-white rounded-t-3xl sm:rounded-2xl max-w-lg w-full p-5 sm:p-6 shadow-2xl border border-slate-200 animate-in zoom-in-95 duration-200 max-h-[92vh] sm:max-h-none overflow-y-auto cursor-default"
+      >
         <div className="w-12 h-1.5 bg-slate-300 rounded-full mx-auto mb-3 sm:hidden" />
         <div className="flex items-center justify-between pb-3 border-b border-slate-200 mb-4">
           <div className="flex items-center gap-2.5">

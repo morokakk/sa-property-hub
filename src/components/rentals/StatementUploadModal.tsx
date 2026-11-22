@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { usePortfolioStore } from '@/lib/store/usePortfolioStore';
+import { useModalBackdropDismiss } from '@/hooks/useModalBackdropDismiss';
 import { ExtractedRentalUnit, UtilityStatement, RentalProperty } from '@/types';
 import {
   parseStatementWithAnthropic,
@@ -75,6 +76,9 @@ export default function StatementUploadModal({
     onExtractionSuccess?.(units);
     onExtracted?.(units);
   };
+
+  const isBackdropDismissDisabled = isProcessingAgent || isProcessingUtility;
+  const backdropDismiss = useModalBackdropDismiss(onClose, isBackdropDismissDisabled);
 
   if (!isOpen) return null;
 
@@ -323,9 +327,15 @@ export default function StatementUploadModal({
       : activeRentals.find((r) => r.id === targetPropertyId);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-150">
+    <div
+      {...backdropDismiss}
+      className={`fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-150 ${
+        isBackdropDismissDisabled ? 'cursor-wait' : 'cursor-pointer'
+      }`}
+    >
       <div
-        className="bg-white rounded-t-3xl sm:rounded-2xl shadow-2xl border border-slate-200 w-full max-w-2xl overflow-hidden flex flex-col max-h-[92vh] animate-in zoom-in-95 duration-200"
+        onClick={(e) => e.stopPropagation()}
+        className="bg-white rounded-t-3xl sm:rounded-2xl shadow-2xl border border-slate-200 w-full max-w-2xl overflow-hidden flex flex-col max-h-[92vh] animate-in zoom-in-95 duration-200 cursor-default"
         role="dialog"
         aria-modal="true"
       >

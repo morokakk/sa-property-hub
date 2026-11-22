@@ -6,6 +6,7 @@ import { formatZAR, formatDate } from '@/lib/formatters';
 import { calculateDisposalMetrics } from '@/lib/calculations/rentals';
 import { CheckCircle2, X, AlertTriangle, ShieldCheck, FileText } from 'lucide-react';
 import { usePortfolioStore } from '@/lib/store/usePortfolioStore';
+import { useModalBackdropDismiss } from '@/hooks/useModalBackdropDismiss';
 
 export interface ExitSaleModalProps {
   isOpen: boolean;
@@ -104,6 +105,8 @@ export const ExitSaleModal: React.FC<ExitSaleModalProps> = ({
       }
     }
   }, [property, isOpen, propSalePrice, defaultComm, defaultBondCancel, hasActiveBond]);
+
+  const backdropDismiss = useModalBackdropDismiss(onClose);
 
   if (!isOpen || !property) return null;
 
@@ -205,8 +208,14 @@ export const ExitSaleModal: React.FC<ExitSaleModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 z-50">
-      <div className="bg-white rounded-t-3xl sm:rounded-xl max-w-lg w-full p-5 sm:p-6 shadow-xl border border-slate-200 animate-in fade-in max-h-[92vh] sm:max-h-none overflow-y-auto">
+    <div
+      {...backdropDismiss}
+      className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 z-50 cursor-pointer"
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="bg-white rounded-t-3xl sm:rounded-xl max-w-lg w-full p-5 sm:p-6 shadow-xl border border-slate-200 animate-in fade-in max-h-[92vh] sm:max-h-none overflow-y-auto cursor-default"
+      >
         <div className="w-12 h-1.5 bg-slate-300 rounded-full mx-auto mb-3 sm:hidden" />
         <div className="flex items-center justify-between pb-3 mb-4 border-b border-slate-100">
           <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">

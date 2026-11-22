@@ -3,6 +3,7 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import TopHeader from '@/components/navigation/TopHeader';
 import { usePortfolioStore } from '@/lib/store/usePortfolioStore';
+import { useModalBackdropDismiss } from '@/hooks/useModalBackdropDismiss';
 import { formatDate } from '@/lib/formatters';
 import { TaskItem, TaskPriority, TaskStatus, LinkedEntity, TaskRecurrence } from '@/types';
 import {
@@ -91,6 +92,7 @@ export default function TaskEnginePage() {
   const [filterStatus, setFilterStatus] = useState<string>('ALL');
   const [filterEntityType, setFilterEntityType] = useState<string>('ALL');
   const [filterRecurrence, setFilterRecurrence] = useState<string>('ALL');
+  const addTaskBackdropDismiss = useModalBackdropDismiss(() => setShowAddModal(false));
 
   // Per-task Calendar Quick Action Menu State
   const [openCalendarMenuTaskId, setOpenCalendarMenuTaskId] = useState<string | null>(null);
@@ -1108,8 +1110,14 @@ export default function TaskEnginePage() {
 
       {/* Create Task Modal (Mobile Bottom Sheet / Desktop Centered Dialog) */}
       {showAddModal && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 z-50">
-          <div className="bg-white rounded-t-3xl sm:rounded-xl max-w-md w-full p-5 sm:p-6 shadow-xl border border-slate-200 max-h-[92vh] sm:max-h-none overflow-y-auto">
+        <div
+          {...addTaskBackdropDismiss}
+          className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 z-50 cursor-pointer"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white rounded-t-3xl sm:rounded-xl max-w-md w-full p-5 sm:p-6 shadow-xl border border-slate-200 max-h-[92vh] sm:max-h-none overflow-y-auto cursor-default"
+          >
             <div className="w-12 h-1.5 bg-slate-300 rounded-full mx-auto mb-3 sm:hidden" />
             <h3 className="text-base font-bold text-slate-900 mb-4 flex items-center gap-2">
               <CheckSquare className="w-5 h-5 text-emerald-600" />
