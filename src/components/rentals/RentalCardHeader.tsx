@@ -231,33 +231,50 @@ export function RentalCardHeader({
       {/* Property Financial Highlights */}
       <div
         data-sensitive="true"
-        className="p-4 bg-slate-50/60 grid grid-cols-3 gap-2 text-center border-b border-slate-100 text-xs"
+        className="p-3.5 sm:p-4 bg-slate-50/60 border-b border-slate-100"
       >
-        <div>
-          <span className="text-[10px] text-slate-400 block">Market Value</span>
-          <strong className="text-slate-900 tabular-nums tracking-tight">{formatZAR(property.marketValueZAR, { compact: true })}</strong>
-          {(() => {
-            const sqm = property.floorAreaSqm || (property.notes ? Number(property.notes.match(/(\d+)\s*m²/)?.[1]) : undefined);
-            if (!sqm || sqm <= 0 || property.marketValueZAR <= 0) return null;
-            return (
-              <span className="text-[9px] text-slate-400 block font-normal tabular-nums">
-                R {Math.round(property.marketValueZAR / sqm).toLocaleString('en-ZA')}/m²
-              </span>
-            );
-          })()}
-        </div>
-        <div>
-          <span className="text-[10px] text-slate-400 block">Gross Yield</span>
-          <strong className="text-emerald-700 tabular-nums tracking-tight">{formatPercent(grossYieldPercent)}</strong>
-        </div>
-        <div>
-          <span className="text-[10px] text-slate-400 block">Net Cashflow</span>
-          <strong className={`${netCashflow >= 0 ? 'text-emerald-700' : 'text-rose-600'} tabular-nums tracking-tight`}>
+        {/* Hero Tier: #1 Decision Metric (Net Cashflow /m) */}
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block">
+              Net Cashflow
+            </span>
+            <span className="text-[10px] text-slate-500 block font-medium tabular-nums tracking-tight mt-0.5">
+              Post-tax: {formatZAR(postTaxCashflow)}/m
+            </span>
+          </div>
+          <strong
+            className={`text-lg sm:text-xl font-extrabold tabular-nums tracking-tight shrink-0 ${
+              netCashflow >= 0 ? 'text-emerald-700' : 'text-rose-600'
+            }`}
+          >
             {formatZAR(netCashflow)}/m
           </strong>
-          <span className="text-[9px] text-slate-400 block font-normal tabular-nums tracking-tight">
-            Post-tax: {formatZAR(postTaxCashflow)}/m
-          </span>
+        </div>
+
+        {/* Secondary Tier: Market Value & Gross Yield */}
+        <div className="border-t border-slate-200/70 pt-2.5 mt-2.5 grid grid-cols-2 gap-3 text-xs">
+          <div>
+            <span className="text-[10px] text-slate-400 block">Market Value</span>
+            <strong className="text-slate-900 font-bold tabular-nums tracking-tight">
+              {formatZAR(property.marketValueZAR, { compact: true })}
+            </strong>
+            {(() => {
+              const sqm = property.floorAreaSqm || (property.notes ? Number(property.notes.match(/(\d+)\s*m²/)?.[1]) : undefined);
+              if (!sqm || sqm <= 0 || property.marketValueZAR <= 0) return null;
+              return (
+                <span className="text-[9px] text-slate-400 block font-normal tabular-nums">
+                  R {Math.round(property.marketValueZAR / sqm).toLocaleString('en-ZA')}/m²
+                </span>
+              );
+            })()}
+          </div>
+          <div>
+            <span className="text-[10px] text-slate-400 block">Gross Yield</span>
+            <strong className="text-emerald-700 font-bold tabular-nums tracking-tight">
+              {formatPercent(grossYieldPercent)}
+            </strong>
+          </div>
         </div>
       </div>
     </div>

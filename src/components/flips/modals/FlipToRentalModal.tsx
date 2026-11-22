@@ -402,18 +402,40 @@ export const FlipToRentalModal: React.FC<FlipToRentalModalProps> = ({
                 <label className="block font-semibold text-slate-700 mb-1">
                   Facility Amortization Term
                 </label>
-                <select
-                  value={localLoanTermYears}
-                  onChange={(e) => setLocalLoanTermYears(Number(e.target.value))}
-                  className="w-full px-3 py-1.5 border border-slate-300 rounded-lg bg-white font-semibold text-slate-800"
+                <input type="hidden" name="loanTermYears" value={localLoanTermYears} />
+                <div
+                  role="group"
+                  aria-label="Facility Amortization Term"
+                  className="grid grid-cols-5 gap-1.5"
                 >
-                  <option value={5}>5 Years (Micro / Bridge)</option>
-                  <option value={10}>10 Years (Commercial Bank)</option>
-                  <option value={15}>15 Years (DFI: TUHF / uMaStandi)</option>
-                  <option value={20}>20 Years (Retail Home Loan)</option>
-                  <option value={30}>30 Years (Extended Retail)</option>
-                </select>
-                <span className="text-[10px] text-slate-500 mt-0.5 block">
+                  {[
+                    { years: 5, label: '5y', title: '5 Years — Micro / Bridge' },
+                    { years: 10, label: '10y', title: '10 Years — Commercial Bank' },
+                    { years: 15, label: '15y', title: '15 Years — DFI (TUHF / uMaStandi)' },
+                    { years: 20, label: '20y', title: '20 Years — Retail Home Loan' },
+                    { years: 30, label: '30y', title: '30 Years — Extended Retail' },
+                  ].map((opt) => {
+                    const isActive = localLoanTermYears === opt.years;
+                    return (
+                      <button
+                        key={opt.years}
+                        type="button"
+                        data-testid={`flip-convert-loan-term-${opt.years}y`}
+                        aria-pressed={isActive}
+                        title={opt.title}
+                        onClick={() => setLocalLoanTermYears(opt.years)}
+                        className={`py-1.5 px-1 rounded-lg text-xs font-bold border transition-colors cursor-pointer text-center ${
+                          isActive
+                            ? 'bg-slate-900 text-white border-slate-900 shadow-2xs'
+                            : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-100'
+                        }`}
+                      >
+                        {opt.label}
+                      </button>
+                    );
+                  })}
+                </div>
+                <span className="text-[10px] text-slate-500 mt-1 block">
                   Used to derive bond balance &amp; long-term payoff curve
                 </span>
               </div>

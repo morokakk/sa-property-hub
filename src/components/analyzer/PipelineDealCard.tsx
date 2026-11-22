@@ -395,19 +395,67 @@ function PipelineDealCard({
         </div>
       </div>
 
-      {/* 2. Signals & Buy Box Row (With Interactive Proximity Popover) */}
-      <div className="flex flex-wrap items-center gap-1.5">
-        <span
-          className={`text-[10px] font-bold px-2 py-0.5 rounded-md border flex items-center gap-1 ${
-            builtInEquity > 0
-              ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
-              : 'bg-slate-100 text-slate-700 border-slate-300'
-          }`}
-        >
-          <TrendingUp className="w-3 h-3 text-emerald-600" />
-          Built-in Equity: {formatZAR(builtInEquity)} ({builtInPercent >= 0 ? '+' : ''}{formatPercent(builtInPercent)} vs Val)
-        </span>
+      {/* 2. Primary Decision Metric Strip */}
+      <div
+        data-testid="pipeline-card-decision-strip"
+        className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 p-3 rounded-xl bg-slate-50 border border-slate-200/80"
+      >
+        <div className="min-w-0">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1">
+            <TrendingUp className="w-3 h-3 text-emerald-600 shrink-0" />
+            <span>Built-in Equity:</span>
+          </span>
+          <div
+            className={`text-base sm:text-lg font-extrabold tabular-nums tracking-tight mt-0.5 ${
+              builtInEquity > 0 ? 'text-emerald-700' : 'text-slate-800'
+            }`}
+          >
+            {formatZAR(builtInEquity)}
+            <span className="text-xs font-bold ml-1.5">
+              ({builtInPercent >= 0 ? '+' : ''}{formatPercent(builtInPercent)} vs Val)
+            </span>
+          </div>
+        </div>
 
+        <div className="min-w-0 sm:text-right border-t sm:border-t-0 pt-2 sm:pt-0 border-slate-200/70">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block">
+            {isDevelopmentStrategy
+              ? 'Net Dev Profit & POC'
+              : isFlipStrategy
+              ? 'Projected Flip Profit & ROI'
+              : 'Net Monthly Cashflow'}
+          </span>
+          {isDevelopmentStrategy ? (
+            <div className="text-base sm:text-lg font-extrabold tabular-nums tracking-tight text-indigo-700 mt-0.5">
+              {formatZAR(deal.projectedDevNetProfitZAR ?? deal.projectedFlipNetProfit)}
+              <span className="text-xs font-bold ml-1.5">
+                ({formatPercent(deal.projectedDevPocPercent ?? deal.projectedFlipRoi)} POC)
+              </span>
+            </div>
+          ) : isFlipStrategy ? (
+            <div className="text-base sm:text-lg font-extrabold tabular-nums tracking-tight text-indigo-700 mt-0.5">
+              {formatZAR(deal.projectedFlipNetProfit)}
+              <span className="text-xs font-bold ml-1.5">
+                ({formatPercent(deal.projectedFlipRoi)} ROI)
+              </span>
+            </div>
+          ) : (
+            <div
+              className={`text-base sm:text-lg font-extrabold tabular-nums tracking-tight mt-0.5 ${
+                deal.monthlyCashFlow >= 0 ? 'text-emerald-700' : 'text-rose-600'
+              }`}
+            >
+              {formatZAR(deal.monthlyCashFlow)}/m
+              <span className="text-xs font-bold text-slate-600 ml-1.5">
+                ({formatPercent(deal.grossYield)} Gross)
+              </span>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* 3. Signals & Buy Box Row (With Interactive Proximity Popover) */}
+      <div className="flex flex-wrap items-center gap-1.5">
         {/* Buy Box Match Badge */}
         <span
           className={`text-[10px] font-bold px-2 py-0.5 rounded-md border flex items-center gap-1 ${

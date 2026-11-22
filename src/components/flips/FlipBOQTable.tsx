@@ -1,9 +1,9 @@
 'use client';
 
-import React from 'react';
+import React, { useMemo, useState } from 'react';
 import { FlipProject, BOQItem } from '@/types';
 import { formatZAR } from '@/lib/formatters';
-import { FileSpreadsheet, PlusCircle, Gift, Trash2, CheckCircle2 } from 'lucide-react';
+import { FileSpreadsheet, PlusCircle, Gift, Trash2, CheckCircle2, Search, X } from 'lucide-react';
 
 export interface FlipBOQTableProps {
   flip: FlipProject;
@@ -22,9 +22,27 @@ export function FlipBOQTable({
   onDeleteBOQItem,
   onExportCSV,
 }: FlipBOQTableProps) {
+  const [searchQuery, setSearchQuery] = useState('');
   const boqItems = flip.boq || [];
 
-  // Table summary calculations
+  const filteredBoqItems = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return boqItems;
+    return boqItems.filter((item) =>
+      [
+        item.category,
+        item.itemDescription,
+        item.supplierOrContractor,
+        item.invoiceRef,
+        item.milestonePhase,
+        item.status,
+      ]
+        .filter(Boolean)
+        .some((field) => String(field).toLowerCase().includes(q))
+    );
+  }, [boqItems, searchQuery]);
+
+  // Table summary calculations (always across full BOQ items)
   const totalBaselineZAR = boqItems.reduce((acc, i) => acc + (i.baselineTotalZAR || 0), 0);
   const totalActualCostZAR = boqItems.reduce((acc, i) => acc + (i.actualCostZAR || 0), 0);
   const totalVarianceZAR = totalActualCostZAR - totalBaselineZAR;
@@ -81,6 +99,37 @@ export function FlipBOQTable({
         </div>
       </div>
 
+      {/* Search / Trade Filter Strip */}
+      <div className="px-4 sm:px-5 py-2.5 bg-slate-50/70 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+        <div className="relative flex-1 sm:max-w-md">
+          <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+          <input
+            type="search"
+            data-testid="boq-search-input"
+            aria-label="Filter BOQ line items"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Filter trades, scope, or supplier (e.g. Plumbing, Buco)..."
+            className="w-full text-xs pl-8 pr-8 py-1.5 border border-slate-300 rounded-lg bg-white text-slate-900 placeholder:text-slate-400 focus:outline-hidden focus:ring-1 focus:ring-emerald-600 focus:border-emerald-600"
+          />
+          {searchQuery && (
+            <button
+              type="button"
+              onClick={() => setSearchQuery('')}
+              aria-label="Clear BOQ filter"
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 p-0.5 cursor-pointer"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </div>
+        {searchQuery.trim() && (
+          <span className="text-[11px] font-semibold text-slate-600 shrink-0">
+            Showing {filteredBoqItems.length} of {boqItems.length} line items
+          </span>
+        )}
+      </div>
+
       <div className="overflow-x-auto relative w-full">
         <table className="w-full min-w-[850px] text-left text-xs border-collapse">
           <thead className="sticky top-0 z-10 bg-slate-50/95 backdrop-blur-xs">
@@ -98,7 +147,21 @@ export function FlipBOQTable({
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100 text-slate-700">
-            {boqItems.map((item) => (
+            {filteredBoqItems.length === 0 && searchQuery.trim() ? (
+              <tr>
+                <td colSpan={10} className="py-8 px-4 text-center text-xs text-slate-500">
+                  <span>No BOQ items match &ldquo;{searchQuery.trim()}&rdquo;.</span>{' '}
+                  <button
+                    type="button"
+                    onClick={() => setSearchQuery('')}
+                    className="font-bold text-emerald-700 hover:text-emerald-900 underline cursor-pointer ml-1"
+                  >
+                    Clear filter
+                  </button>
+                </td>
+              </tr>
+            ) : (
+              filteredBoqItems.map((item) => (
               <tr key={item.id} className="hover:bg-slate-50/70 transition-colors">
                 <td className="py-2.5 px-3 pl-4 font-semibold text-slate-900 whitespace-nowrap">
                   {item.category}
@@ -220,7 +283,8 @@ export function FlipBOQTable({
                   </button>
                 </td>
               </tr>
-            ))}
+              ))
+            )}
           </tbody>
           {/* Sticky Totals Summary Footer */}
           <tfoot className="sticky bottom-0 z-10 bg-slate-100/95 backdrop-blur-xs border-t-2 border-slate-300 font-bold text-slate-900 text-xs shadow-xs">

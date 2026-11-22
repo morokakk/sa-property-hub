@@ -3,7 +3,12 @@
 import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import TopHeader from '@/components/navigation/TopHeader';
 import { usePortfolioStore } from '@/lib/store/usePortfolioStore';
-import { computeAcquisitionCosts, calculateSection13sex } from '@/lib/calculations/sarsTax';
+import {
+  computeAcquisitionCosts,
+  calculateSection13sex,
+  countActivePortfolioUnits,
+  evaluateSection13sexUiState,
+} from '@/lib/calculations/sarsTax';
 import {
   calculateDealMetrics,
   calculateDealDscr,
@@ -98,6 +103,9 @@ import {
   Calendar,
   RefreshCw,
   HardHat,
+  Search,
+  LayoutGrid,
+  List,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -126,8 +134,17 @@ const MUNICIPAL_ZONING_CODES: MunicipalZoningCode[] = [
   'Unzoned / Township Scheme',
 ];
 
+const REGION_SHORT_LABELS: Record<string, string> = {
+  gauteng_jhb: 'JHB & Rand',
+  gauteng_tshwane: 'Tshwane / PTA',
+  western_cape: 'Western Cape',
+  kzn: 'KZN',
+  coastal_emerging: 'Coastal & Emerging',
+};
+
 export default function OpportunityAnalyzerPage() {
   const opportunities = usePortfolioStore((state) => state.opportunities);
+  const rentals = usePortfolioStore((state) => state.rentals);
   const addOpportunity = usePortfolioStore((state) => state.addOpportunity);
   const updateOpportunity = usePortfolioStore((state) => state.updateOpportunity);
   const deleteOpportunity = usePortfolioStore((state) => state.deleteOpportunity);
@@ -254,6 +271,8 @@ export default function OpportunityAnalyzerPage() {
   // Deal Triage & Filter State
   const [pipelineFilter, setPipelineFilter] = useState<'active' | 'passed'>('active');
   const [regionFilter, setRegionFilter] = useState<string>('all');
+  const [pipelineViewMode, setPipelineViewMode] = useState<'cards' | 'ledger'>('cards');
+  const [pipelineSearchQuery, setPipelineSearchQuery] = useState('');
   const [showPromoted, setShowPromoted] = useState(false);
   const [passingDealId, setPassingDealId] = useState<string | null>(null);
   const [passReason, setPassReason] = useState<PassReason>('Yield Too Low');
@@ -710,6 +729,17 @@ export default function OpportunityAnalyzerPage() {
   // Section 13sex Tax Incentive State
   const [isSection13Eligible, setIsSection13Eligible] = useState(false);
   const [section13TaxRate, setSection13TaxRate] = useState<number>(27);
+
+  const portfolioUnitCount = useMemo(() => countActivePortfolioUnits(rentals), [rentals]);
+  const section13UiState = useMemo(
+    () =>
+      evaluateSection13sexUiState({
+        dealUnits: numberOfUnits,
+        portfolioUnits: portfolioUnitCount,
+        isManuallyEligible: isSection13Eligible,
+      }),
+    [numberOfUnits, portfolioUnitCount, isSection13Eligible]
+  );
 
   // WhatsApp Copy Toast State
   const [copiedDealId, setCopiedDealId] = useState<string | null>(null);
@@ -1944,17 +1974,37 @@ export default function OpportunityAnalyzerPage() {
   );
   const displayedOpportunities = useMemo(() => {
     const base = pipelineFilter === 'passed' ? passedDeals : (showPromoted ? [...activeDeals, ...promotedDeals] : activeDeals);
-    if (regionFilter === 'all') return base;
-    return base.filter((deal) => {
-      const node = findInvestmentNode(deal.city);
-      if (node) return node.regionGroupId === regionFilter;
-      if (regionFilter === 'gauteng_jhb' || regionFilter === 'gauteng_tshwane') return deal.province === 'Gauteng';
-      if (regionFilter === 'western_cape') return deal.province === 'Western Cape';
-      if (regionFilter === 'kzn') return deal.province === 'KwaZulu-Natal';
-      if (regionFilter === 'coastal_emerging') return ['Eastern Cape', 'Free State', 'Limpopo'].includes(deal.province);
-      return false;
-    });
-  }, [pipelineFilter, activeDeals, passedDeals, promotedDeals, showPromoted, regionFilter]);
+    const regionFiltered =
+      regionFilter === 'all'
+        ? base
+        : base.filter((deal) => {
+            const node = findInvestmentNode(deal.city);
+            if (node) return node.regionGroupId === regionFilter;
+            if (regionFilter === 'gauteng_jhb' || regionFilter === 'gauteng_tshwane') return deal.province === 'Gauteng';
+            if (regionFilter === 'western_cape') return deal.province === 'Western Cape';
+            if (regionFilter === 'kzn') return deal.province === 'KwaZulu-Natal';
+            if (regionFilter === 'coastal_emerging') return ['Eastern Cape', 'Free State', 'Limpopo'].includes(deal.province);
+            return false;
+          });
+
+    const q = pipelineSearchQuery.trim().toLowerCase();
+    if (!q) return regionFiltered;
+
+    return regionFiltered.filter((deal) =>
+      [
+        deal.title,
+        deal.address,
+        deal.city,
+        deal.province,
+        deal.source,
+        deal.strategy,
+        deal.status,
+        deal.propertyType,
+      ]
+        .filter(Boolean)
+        .some((field) => String(field).toLowerCase().includes(q))
+    );
+  }, [pipelineFilter, activeDeals, passedDeals, promotedDeals, showPromoted, regionFilter, pipelineSearchQuery]);
 
   const renderModularSection = (sectionId: AnalyzerSectionId) => {
     switch (sectionId) {
@@ -2802,6 +2852,34 @@ export default function OpportunityAnalyzerPage() {
                         <span>9 Mo</span>
                         <span>12 Mo (Long Reno)</span>
                       </div>
+                      <div
+                        role="group"
+                        aria-label="Holding Period Presets"
+                        className="grid grid-cols-4 gap-1.5 mt-2"
+                      >
+                        {[3, 6, 9, 12].map((m) => {
+                          const isActive = holdingPeriodMonths === m;
+                          return (
+                            <button
+                              key={m}
+                              type="button"
+                              data-testid={`analyzer-holding-${m}m`}
+                              aria-pressed={isActive}
+                              onClick={() => {
+                                setHoldingPeriodMonths(m);
+                                updateAnalyzerDraft({ holdingPeriodMonths: m });
+                              }}
+                              className={`py-1 px-1.5 rounded-md text-[11px] font-bold border transition-colors cursor-pointer ${
+                                isActive
+                                  ? 'bg-slate-900 text-white border-slate-900 shadow-2xs'
+                                  : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-100'
+                              }`}
+                            >
+                              {m}m
+                            </button>
+                          );
+                        })}
+                      </div>
                     </div>
 
                     <div className="pt-2 border-t border-slate-200/80 flex items-center justify-between">
@@ -2927,6 +3005,34 @@ export default function OpportunityAnalyzerPage() {
                     <span>6 Mo (Standard)</span>
                     <span>9 Mo</span>
                     <span>12 Mo (Long Reno)</span>
+                  </div>
+                  <div
+                    role="group"
+                    aria-label="Holding Period Presets"
+                    className="grid grid-cols-4 gap-1.5 mt-2"
+                  >
+                    {[3, 6, 9, 12].map((m) => {
+                      const isActive = holdingPeriodMonths === m;
+                      return (
+                        <button
+                          key={m}
+                          type="button"
+                          data-testid={`analyzer-holding-${m}m`}
+                          aria-pressed={isActive}
+                          onClick={() => {
+                            setHoldingPeriodMonths(m);
+                            updateAnalyzerDraft({ holdingPeriodMonths: m });
+                          }}
+                          className={`py-1 px-1.5 rounded-md text-[11px] font-bold border transition-colors cursor-pointer ${
+                            isActive
+                              ? 'bg-slate-900 text-white border-slate-900 shadow-2xs'
+                              : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-100'
+                          }`}
+                        >
+                          {m}m
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
 
@@ -3868,6 +3974,32 @@ export default function OpportunityAnalyzerPage() {
                   </div>
                 </div>
 
+                <div
+                  role="group"
+                  aria-label="Loan Term Presets"
+                  className="grid grid-cols-4 gap-1.5"
+                >
+                  {[10, 15, 20, 30].map((yr) => {
+                    const isActive = loanTermYears === yr;
+                    return (
+                      <button
+                        key={yr}
+                        type="button"
+                        data-testid={`analyzer-loan-term-${yr}y`}
+                        aria-pressed={isActive}
+                        onClick={() => handleBondTermChange(yr)}
+                        className={`text-[10px] py-1 px-1.5 rounded-md font-bold border transition-colors cursor-pointer whitespace-nowrap ${
+                          isActive
+                            ? 'bg-slate-900 text-white border-slate-900 shadow-2xs'
+                            : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-100'
+                        }`}
+                      >
+                        {yr}y
+                      </button>
+                    );
+                  })}
+                </div>
+
                 {/* Prime Spread (±200 bps) Sensitivity Slider */}
                 <div className="pt-2 border-t border-slate-200">
                   <div className="flex items-center justify-between text-[10px] mb-1">
@@ -4164,7 +4296,14 @@ export default function OpportunityAnalyzerPage() {
           </div>
         );
 
-      case 'stressTaxOverrides':
+      case 'stressTaxOverrides': {
+        const sec13BadgeClasses =
+          section13UiState.badgeTone === 'emerald'
+            ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
+            : section13UiState.badgeTone === 'amber'
+            ? 'bg-amber-100 text-amber-900 border-amber-300'
+            : 'bg-slate-100 text-slate-700 border-slate-300';
+
         return (
           <div key="stressTaxOverrides" data-section-id="stressTaxOverrides" className="rounded-xl border border-slate-200 bg-slate-50/70 overflow-hidden shadow-2xs">
             <button
@@ -4184,11 +4323,12 @@ export default function OpportunityAnalyzerPage() {
                 </div>
               </div>
               <div className="flex items-center gap-2 flex-wrap">
-                {numberOfUnits >= 5 && (
-                  <span className="text-[10px] font-bold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full border border-emerald-300">
-                    ✓ Meets SARS ≥5-Unit Sec 13sex Threshold
-                  </span>
-                )}
+                <span
+                  data-testid="sec13-drawer-badge"
+                  className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${sec13BadgeClasses}`}
+                >
+                  {section13UiState.badgeLabel}
+                </span>
                 <span className="text-[11px] font-semibold text-slate-700 bg-white px-2.5 py-0.5 rounded border border-slate-200">
                   {overrideTax || overrideLegal ? 'Custom Overrides Active' : `Auto SARS: ${formatZAR(calculatedCosts.transferDuty)}`}
                   {isSection13Eligible ? ` • Sec 13sex (+${formatZAR(calculatedSection13.annualTaxSavingsZAR)}/yr)` : ''}
@@ -4264,18 +4404,29 @@ export default function OpportunityAnalyzerPage() {
                   </div>
 
                   {/* Section 13sex SARS Estimator Engine */}
-                  <div className="p-4 rounded-xl border border-emerald-200 bg-emerald-50/40">
-                    <div className="flex items-center justify-between mb-2">
+                  <div
+                    className={`p-4 rounded-xl border ${
+                      section13UiState.state === 'manual_override'
+                        ? 'border-amber-200 bg-amber-50/40'
+                        : 'border-emerald-200 bg-emerald-50/40'
+                    }`}
+                  >
+                    <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
                       <div className="flex items-center gap-1.5">
-                        <Sparkles className="w-4 h-4 text-emerald-700" />
+                        <Sparkles
+                          className={`w-4 h-4 ${
+                            section13UiState.state === 'manual_override' ? 'text-amber-700' : 'text-emerald-700'
+                          }`}
+                        />
                         <h4 className="text-xs font-bold text-slate-900">SARS Section 13sex Tax Shield</h4>
                       </div>
-                      <div className="flex items-center gap-1.5">
-                        {numberOfUnits >= 5 && (
-                          <span className="text-[10px] font-bold bg-emerald-200/80 text-emerald-900 px-2 py-0.5 rounded-full">
-                            ✓ ≥5 Units ({numberOfUnits})
-                          </span>
-                        )}
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span
+                          data-testid="sec13-card-badge"
+                          className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${sec13BadgeClasses}`}
+                        >
+                          {section13UiState.badgeLabel}
+                        </span>
                         <span className="text-[10px] font-semibold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full">
                           55% Base • 20 Yrs
                         </span>
@@ -4283,22 +4434,23 @@ export default function OpportunityAnalyzerPage() {
                     </div>
 
                     <div className="space-y-2.5 text-xs">
-                      <div className="flex items-center justify-between">
+                      <div className="flex items-center justify-between gap-2">
                         <label className="flex items-center gap-2 font-semibold text-slate-800 cursor-pointer">
                           <input
                             type="checkbox"
+                            data-testid="sec13-checkbox"
                             checked={isSection13Eligible}
                             onChange={(e) => setIsSection13Eligible(e.target.checked)}
                             className="w-4 h-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
                           />
-                          <span className="text-[11px]">Section 13sex Eligible (New / Off-plan)</span>
+                          <span className="text-[11px]">{section13UiState.checkboxLabel}</span>
                         </label>
 
                         {isSection13Eligible && (
                           <select
                             value={section13TaxRate}
                             onChange={(e) => setSection13TaxRate(Number(e.target.value))}
-                            className="text-[11px] font-semibold py-1 px-2 border border-emerald-300 rounded-md bg-white text-emerald-900"
+                            className="text-[11px] font-semibold py-1 px-2 border border-emerald-300 rounded-md bg-white text-emerald-900 shrink-0"
                           >
                             <option value={27}>27% (Company/Trust)</option>
                             <option value={31}>31% (Mid Individual)</option>
@@ -4307,7 +4459,7 @@ export default function OpportunityAnalyzerPage() {
                         )}
                       </div>
 
-                      {isSection13Eligible ? (
+                      {isSection13Eligible && (
                         <div className="grid grid-cols-2 gap-2 pt-1 border-t border-emerald-200/60">
                           <div className="bg-white p-2 rounded-lg border border-emerald-100 shadow-2xs">
                             <span className="text-[10px] text-slate-500 block">55% Building Base</span>
@@ -4338,11 +4490,18 @@ export default function OpportunityAnalyzerPage() {
                             </div>
                           </div>
                         </div>
-                      ) : (
-                        <p className="text-[11px] text-slate-500 leading-tight">
-                          For new residential units acquired for letting (min 5 units). SARS allows a 55% building deduction amortized at 5% annually for 20 years.
-                        </p>
                       )}
+
+                      <p
+                        data-testid="sec13-helper-copy"
+                        className={
+                          section13UiState.state === 'manual_override'
+                            ? 'text-[11px] text-amber-900 bg-amber-100/60 border border-amber-200 rounded-lg px-2.5 py-1.5 leading-snug'
+                            : 'text-[11px] text-slate-600 leading-snug'
+                        }
+                      >
+                        {section13UiState.helperCopy}
+                      </p>
                     </div>
                   </div>
                 </div>
@@ -4350,6 +4509,7 @@ export default function OpportunityAnalyzerPage() {
             )}
           </div>
         );
+      }
 
       default:
         return null;
@@ -4951,15 +5111,25 @@ export default function OpportunityAnalyzerPage() {
                 {/* Unit Count & Total Floor Area (m²) Inputs for Multi-Unit / Bulk SPVs */}
                 <div className="pt-2 border-t border-slate-200/80 grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <div className="flex items-center justify-between mb-1">
+                    <div className="flex items-center justify-between mb-1 gap-1.5 flex-wrap">
                       <label className="text-[11px] font-semibold text-slate-700">
                         {strategy === 'Development' ? 'Planned Units (Qty) *' : 'Units (Qty)'}
                       </label>
-                      {numberOfUnits >= 5 && (
-                        <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100 px-1.5 py-0.5 rounded">
+                      {section13UiState.dealUnitCount >= 5 ? (
+                        <span
+                          data-testid="units-sec13-hint"
+                          className="text-[10px] font-bold text-emerald-700 bg-emerald-100 px-1.5 py-0.5 rounded"
+                        >
                           ≥5 Units (Sec 13sex)
                         </span>
-                      )}
+                      ) : section13UiState.meetsTrackedFiveUnitThreshold ? (
+                        <span
+                          data-testid="units-sec13-hint"
+                          className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded"
+                        >
+                          ≥5 Units incl. Portfolio ({section13UiState.totalTrackedUnits} total)
+                        </span>
+                      ) : null}
                     </div>
                     <input
                       type="number"
@@ -4981,6 +5151,50 @@ export default function OpportunityAnalyzerPage() {
                       }}
                       className="w-full text-xs px-3 py-2 border border-slate-300 rounded-lg bg-white focus:ring-1 focus:ring-emerald-500 font-semibold text-slate-900"
                     />
+                    <div
+                      role="group"
+                      aria-label="Unit Count Presets"
+                      className="grid grid-cols-5 gap-1 mt-1.5"
+                    >
+                      {[1, 2, 4, 5, 8].map((qty) => {
+                        const isActive = numberOfUnits === qty;
+                        const isSec13Threshold = qty === 5;
+                        return (
+                          <button
+                            key={qty}
+                            type="button"
+                            data-testid={`analyzer-units-${qty}`}
+                            aria-pressed={isActive}
+                            title={
+                              isSec13Threshold
+                                ? '5 Units — SARS Section 13sex Tax Shield threshold'
+                                : `${qty} ${qty === 1 ? 'Unit' : 'Units'}`
+                            }
+                            onClick={() => {
+                              setNumberOfUnits(qty);
+                              if (strategy === 'Development' && floorAreaSqm / qty < 24) {
+                                const nextArea = qty * 65;
+                                setFloorAreaSqm(nextArea);
+                                updateAnalyzerDraft({ numberOfUnits: qty, floorAreaSqm: nextArea });
+                              } else {
+                                updateAnalyzerDraft({ numberOfUnits: qty });
+                              }
+                            }}
+                            className={`text-[10px] py-1 px-1 rounded-md font-bold border transition-colors cursor-pointer whitespace-nowrap ${
+                              isActive
+                                ? isSec13Threshold
+                                  ? 'bg-emerald-600 text-white border-emerald-600 shadow-2xs'
+                                  : 'bg-slate-900 text-white border-slate-900 shadow-2xs'
+                                : isSec13Threshold
+                                ? 'bg-emerald-100/80 text-emerald-900 border-emerald-400 hover:bg-emerald-200/80'
+                                : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-100'
+                            }`}
+                          >
+                            {isSec13Threshold ? '5 · 13s' : qty}
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
                   <div>
                     <div className="flex items-center justify-between mb-1">
@@ -5798,7 +6012,7 @@ export default function OpportunityAnalyzerPage() {
 
       {/* Opportunity Pipeline List */}
       {(activeWorkspaceTab === 'pipeline' || isStackedView) && (
-        <div id="analyzer-pipeline" className="scroll-mt-20 bg-white rounded-xl border border-slate-200 p-6 shadow-xs">
+        <div id="analyzer-pipeline" className="scroll-mt-20 bg-white rounded-xl border border-slate-200 p-4 sm:p-6 shadow-xs">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
             <div>
               <h3 className="text-base font-bold text-slate-900">Deal Sourcing Pipeline</h3>
@@ -5806,7 +6020,7 @@ export default function OpportunityAnalyzerPage() {
                 Triage candidates, solve max allowable bids, promote to live Flips or Rentals, or archive passed deals.
               </p>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <ImportDropdown type="pipeline" />
               {opportunities.length > 0 && (
                 <button
@@ -5824,127 +6038,368 @@ export default function OpportunityAnalyzerPage() {
             </div>
           </div>
 
-          {/* Pipeline Triage Filter Pills */}
-          <div className="flex flex-wrap items-center justify-between gap-3 mb-4 pb-3 border-b border-slate-100">
-            <div className="flex flex-wrap items-center gap-2">
-              <button
-                type="button"
-                onClick={() => setPipelineFilter('active')}
-                className={`px-3 py-1.5 text-xs font-bold rounded-lg border transition-all cursor-pointer ${
-                  pipelineFilter === 'active'
-                    ? 'bg-slate-900 text-white border-slate-900 shadow-2xs'
-                    : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-50'
-                }`}
-              >
-                Active Deals ({activeDeals.length})
-              </button>
-              <button
-                type="button"
-                onClick={() => setPipelineFilter('passed')}
-                className={`px-3 py-1.5 text-xs font-bold rounded-lg border transition-all cursor-pointer ${
-                  pipelineFilter === 'passed'
-                    ? 'bg-rose-600 text-white border-rose-600 shadow-2xs'
-                    : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-50'
-                }`}
-              >
-                Passed Deals ({passedDeals.length})
-              </button>
-
-              {/* Region Filter Dropdown */}
-              <div className="flex items-center gap-1.5 w-full sm:w-auto mt-1 sm:mt-0">
-                <span className="text-xs text-slate-500 font-medium whitespace-nowrap">Region:</span>
-                <select
-                  value={regionFilter}
-                  onChange={(e) => setRegionFilter(e.target.value)}
-                  className="text-xs px-2.5 py-1.5 border border-slate-300 rounded-lg bg-white text-slate-700 font-medium focus:ring-1 focus:ring-emerald-500 w-full sm:w-auto max-w-[240px]"
+          {/* Pipeline Triage Filter Pills, Search & View Mode */}
+          <div className="space-y-3 mb-4 pb-3 border-b border-slate-100">
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-2.5">
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setPipelineFilter('active')}
+                  className={`px-3 py-1.5 text-xs font-bold rounded-lg border transition-all cursor-pointer ${
+                    pipelineFilter === 'active'
+                      ? 'bg-slate-900 text-white border-slate-900 shadow-2xs'
+                      : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-50'
+                  }`}
                 >
-                  <option value="all">All Regions</option>
-                  {INVESTMENT_REGION_GROUPS.map((g) => (
-                    <option key={g.id} value={g.id}>
-                      {g.title}
-                    </option>
-                  ))}
-                </select>
+                  Active Deals ({activeDeals.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPipelineFilter('passed')}
+                  className={`px-3 py-1.5 text-xs font-bold rounded-lg border transition-all cursor-pointer ${
+                    pipelineFilter === 'passed'
+                      ? 'bg-rose-600 text-white border-rose-600 shadow-2xs'
+                      : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-50'
+                  }`}
+                >
+                  Passed Deals ({passedDeals.length})
+                </button>
+                {pipelineFilter === 'active' && promotedDeals.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setShowPromoted(!showPromoted)}
+                    className="text-xs text-slate-500 hover:text-slate-800 font-medium underline cursor-pointer"
+                  >
+                    {showPromoted ? 'Hide' : 'Show'} {promotedDeals.length} promoted deals
+                  </button>
+                )}
+              </div>
+
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 lg:justify-end flex-1">
+                <div className="relative flex-1 sm:max-w-xs">
+                  <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  <input
+                    type="search"
+                    data-testid="pipeline-search-input"
+                    aria-label="Search pipeline deals"
+                    value={pipelineSearchQuery}
+                    onChange={(e) => setPipelineSearchQuery(e.target.value)}
+                    placeholder="Search deals by suburb, street, or channel..."
+                    className="w-full text-xs pl-8 pr-8 py-1.5 border border-slate-300 rounded-xl bg-white text-slate-900 placeholder:text-slate-400 focus:outline-hidden focus:ring-1 focus:ring-emerald-600 focus:border-emerald-600 shadow-2xs"
+                  />
+                  {pipelineSearchQuery && (
+                    <button
+                      type="button"
+                      onClick={() => setPipelineSearchQuery('')}
+                      aria-label="Clear pipeline search"
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 p-0.5 cursor-pointer"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+
+                <div
+                  role="group"
+                  aria-label="Pipeline view mode"
+                  className="bg-slate-100 p-1 rounded-xl inline-flex items-center shrink-0 self-start sm:self-auto"
+                >
+                  <button
+                    type="button"
+                    data-testid="pipeline-view-cards"
+                    aria-pressed={pipelineViewMode === 'cards'}
+                    onClick={() => setPipelineViewMode('cards')}
+                    className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                      pipelineViewMode === 'cards'
+                        ? 'bg-slate-900 text-white shadow-xs'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    <LayoutGrid className="w-3.5 h-3.5" />
+                    <span>Cards</span>
+                  </button>
+                  <button
+                    type="button"
+                    data-testid="pipeline-view-ledger"
+                    aria-pressed={pipelineViewMode === 'ledger'}
+                    onClick={() => setPipelineViewMode('ledger')}
+                    className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                      pipelineViewMode === 'ledger'
+                        ? 'bg-slate-900 text-white shadow-xs'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    <List className="w-3.5 h-3.5" />
+                    <span>Ledger</span>
+                  </button>
+                </div>
               </div>
             </div>
 
-            {pipelineFilter === 'active' && promotedDeals.length > 0 && (
-              <button
-                type="button"
-                onClick={() => setShowPromoted(!showPromoted)}
-                className="text-xs text-slate-500 hover:text-slate-800 font-medium underline cursor-pointer"
+            {/* 1-Tap Scrollable Region Chips */}
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] text-slate-500 font-semibold whitespace-nowrap shrink-0">Region:</span>
+              <div
+                role="group"
+                aria-label="Filter deals by region"
+                className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-0.5 max-w-full"
               >
-                {showPromoted ? 'Hide' : 'Show'} {promotedDeals.length} promoted deals
-              </button>
-            )}
+                <button
+                  type="button"
+                  data-testid="pipeline-region-all"
+                  aria-pressed={regionFilter === 'all'}
+                  onClick={() => setRegionFilter('all')}
+                  className={`px-2.5 py-1 text-[11px] font-bold rounded-lg border transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+                    regionFilter === 'all'
+                      ? 'bg-slate-900 text-white border-slate-900 shadow-2xs'
+                      : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-50'
+                  }`}
+                >
+                  All
+                </button>
+                {INVESTMENT_REGION_GROUPS.map((g) => {
+                  const isActive = regionFilter === g.id;
+                  const shortLabel = REGION_SHORT_LABELS[g.id] || g.title.replace(/^\d+\.\s*/, '');
+                  return (
+                    <button
+                      key={g.id}
+                      type="button"
+                      data-testid={`pipeline-region-${g.id}`}
+                      aria-pressed={isActive}
+                      title={g.title}
+                      onClick={() => setRegionFilter(g.id)}
+                      className={`px-2.5 py-1 text-[11px] font-bold rounded-lg border transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+                        isActive
+                          ? 'bg-slate-900 text-white border-slate-900 shadow-2xs'
+                          : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-50'
+                      }`}
+                    >
+                      {shortLabel}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
           </div>
 
           <div className="space-y-4">
             {displayedOpportunities.length === 0 ? (
-              <div className="p-8 text-center rounded-xl border border-dashed border-slate-200 bg-slate-50/60">
-                <Calculator className="w-8 h-8 text-slate-400 mx-auto mb-2" />
-                <h4 className="text-sm font-bold text-slate-800">
-                  {pipelineFilter === 'passed' ? 'No passed deals in archive' : 'No active deals in sourcing pipeline'}
-                </h4>
-                <p className="text-xs text-slate-400 mt-1 max-w-md mx-auto">
-                  {pipelineFilter === 'passed'
-                    ? 'Deals that fail due diligence or exceed your MAO can be passed with rejection reasons and archived here for forensic record.'
-                    : 'Use the South African deal analyzer form above to model purchase price, bond leverage, transfer duty, and projected returns, then save candidates to your pipeline.'}
-                </p>
-              </div>
-            ) : (
-              displayedOpportunities.map((deal) => {
+              pipelineSearchQuery.trim() || regionFilter !== 'all' ? (
+                <div className="p-8 text-center rounded-xl border border-dashed border-slate-200 bg-slate-50/60 space-y-2">
+                  <h4 className="text-sm font-bold text-slate-800">
+                    No deals match your current search/region filter.
+                  </h4>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPipelineSearchQuery('');
+                      setRegionFilter('all');
+                    }}
+                    className="text-xs font-bold text-emerald-700 hover:text-emerald-900 underline cursor-pointer"
+                  >
+                    Clear filters
+                  </button>
+                </div>
+              ) : (
+                <div className="p-8 text-center rounded-xl border border-dashed border-slate-200 bg-slate-50/60">
+                  <Calculator className="w-8 h-8 text-slate-400 mx-auto mb-2" />
+                  <h4 className="text-sm font-bold text-slate-800">
+                    {pipelineFilter === 'passed' ? 'No passed deals in archive' : 'No active deals in sourcing pipeline'}
+                  </h4>
+                  <p className="text-xs text-slate-400 mt-1 max-w-md mx-auto">
+                    {pipelineFilter === 'passed'
+                      ? 'Deals that fail due diligence or exceed your MAO can be passed with rejection reasons and archived here for forensic record.'
+                      : 'Use the South African deal analyzer form above to model purchase price, bond leverage, transfer duty, and projected returns, then save candidates to your pipeline.'}
+                  </p>
+                </div>
+              )
+            ) : (() => {
+              const preparedPipelineDeals = displayedOpportunities.map((deal) => {
                 const openMarket = deal.openMarketValueZAR || Math.round(deal.purchasePrice * 1.2);
-              const builtInEquity = deal.builtInEquityZAR ?? (openMarket - deal.purchasePrice);
-              const builtInPercent = deal.builtInEquityPercent ?? Number(((builtInEquity / openMarket) * 100).toFixed(1));
-              const scorecard = deal.amenityScorecard ?? {
-                schools: '0-5km' as const,
-                policeStation: '0-5km' as const,
-                medicalClinic: '0-5km' as const,
-                shoppingMall: '0-5km' as const,
-                compositeGrade: 'A-Grade (Prime Hub)' as const,
-                compositeScore: 12,
-              };
-              // Strategy-aware DSCR & Buy Box Evaluation using shared helper
-              const dscrInfo = calculateDealDscr(deal, investorProfile?.defaultPrimeRatePercent);
-              const bondPayment = dscrInfo.monthlyBondPayment;
-              const holdingLevies = deal.propertyType === 'Freehold House' ? 0 : (deal.monthlyLevies ?? 0);
-              const holdingRates = deal.monthlyRatesTaxes ?? 0;
-              const holdingInsurance = deal.propertyType === 'Freehold House' ? Math.round((deal.annualInsurance ?? 0) / 12) : 0;
-              const holdingOther = deal.monthlyOtherHoldingCostZAR ?? 1500;
-              const holdingCost = deal.monthlyHoldingCostZAR ?? (bondPayment + holdingLevies + holdingRates + holdingInsurance + holdingOther);
-              const dealDscr = dscrInfo.dscr;
+                const builtInEquity = deal.builtInEquityZAR ?? (openMarket - deal.purchasePrice);
+                const builtInPercent = deal.builtInEquityPercent ?? Number(((builtInEquity / openMarket) * 100).toFixed(1));
+                const scorecard = deal.amenityScorecard ?? {
+                  schools: '0-5km' as const,
+                  policeStation: '0-5km' as const,
+                  medicalClinic: '0-5km' as const,
+                  shoppingMall: '0-5km' as const,
+                  compositeGrade: 'A-Grade (Prime Hub)' as const,
+                  compositeScore: 12,
+                };
+                const dscrInfo = calculateDealDscr(deal, investorProfile?.defaultPrimeRatePercent);
+                const bondPayment = dscrInfo.monthlyBondPayment;
+                const holdingLevies = deal.propertyType === 'Freehold House' ? 0 : (deal.monthlyLevies ?? 0);
+                const holdingRates = deal.monthlyRatesTaxes ?? 0;
+                const holdingInsurance = deal.propertyType === 'Freehold House' ? Math.round((deal.annualInsurance ?? 0) / 12) : 0;
+                const holdingOther = deal.monthlyOtherHoldingCostZAR ?? 1500;
+                const holdingCost = deal.monthlyHoldingCostZAR ?? (bondPayment + holdingLevies + holdingRates + holdingInsurance + holdingOther);
+                const dayOneCash =
+                  deal.initialCapitalRequired ??
+                  ((deal.depositZAR ?? Math.round(deal.purchasePrice * (1 - (deal.bondLTV ?? deal.loanToValuePercent) / 100))) +
+                    (deal.costs.totalAcquisitionCost - deal.purchasePrice) +
+                    deal.estimatedRehabCost +
+                    (deal.auctioneerCommissionZAR || 0) +
+                    (deal.municipalArrearsZAR || 0));
 
-              const buyBoxResult = evaluateDealCriteria(
-                {
-                  capRate: deal.capRate,
-                  grossYield: deal.grossYield,
-                  netRoi: deal.netRoi,
-                  monthlyCashFlow: deal.monthlyCashFlow,
-                  initialCapitalRequired: deal.initialCapitalRequired,
-                  projectedFlipRoi: deal.projectedFlipRoi,
-                  projectedFlipNetProfit: deal.projectedFlipNetProfit,
-                  dscr: dscrInfo.rawDscr,
-                  monthlyBondPayment: bondPayment,
-                },
-                investorProfile,
-                deal.strategy ?? 'Rental'
-              );
+                const displayDeal: OpportunityDeal = {
+                  ...deal,
+                  strategy: deal.strategy ?? 'Rental',
+                  holdingPeriodMonths: deal.holdingPeriodMonths ?? 6,
+                  monthlyBondPaymentZAR: bondPayment,
+                  monthlyHoldingCostZAR: holdingCost,
+                  monthlyOtherHoldingCostZAR: holdingOther,
+                  openMarketValueZAR: openMarket,
+                  builtInEquityZAR: builtInEquity,
+                  builtInEquityPercent: builtInPercent,
+                  amenityScorecard: scorecard,
+                };
 
-              const displayDeal: OpportunityDeal = {
-                ...deal,
-                strategy: deal.strategy ?? 'Rental',
-                holdingPeriodMonths: deal.holdingPeriodMonths ?? 6,
-                monthlyBondPaymentZAR: bondPayment,
-                monthlyHoldingCostZAR: holdingCost,
-                monthlyOtherHoldingCostZAR: holdingOther,
-                openMarketValueZAR: openMarket,
-                builtInEquityZAR: builtInEquity,
-                builtInEquityPercent: builtInPercent,
-                amenityScorecard: scorecard,
-              };
+                return { deal, displayDeal, builtInEquity, builtInPercent, dayOneCash };
+              });
 
-              return (
+              if (pipelineViewMode === 'ledger') {
+                return (
+                  <div
+                    data-testid="pipeline-compact-ledger"
+                    className="bg-white rounded-xl border border-slate-200 overflow-hidden"
+                  >
+                    <table className="w-full table-fixed sm:table-auto text-left text-xs border-collapse">
+                      <thead className="bg-slate-50 border-b border-slate-200 text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                        <tr>
+                          <th className="py-2.5 px-3 sm:px-4 w-[54%] sm:w-auto">Deal &amp; Node</th>
+                          <th className="py-2.5 px-3 text-right hidden sm:table-cell">Purchase Bid</th>
+                          <th className="py-2.5 px-3 text-right hidden md:table-cell">Day-1 Cash</th>
+                          <th className="py-2.5 px-3 sm:px-4 text-right w-[46%] sm:w-auto">Built-in Equity</th>
+                          <th className="py-2.5 px-3 sm:px-4 text-right hidden sm:table-cell">Yield / ROI</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {preparedPipelineDeals.map(({ deal, displayDeal, builtInEquity, builtInPercent, dayOneCash }) => {
+                          const isSelected = selectedDealIds.includes(deal.id);
+                          const isFlipOrDev = deal.strategy === 'Flip' || deal.strategy === 'Development';
+                          const secondaryRate = isFlipOrDev
+                            ? formatPercent(deal.projectedDevPocPercent ?? deal.projectedFlipRoi)
+                            : formatPercent(deal.grossYield);
+                          const secondaryLabel =
+                            deal.strategy === 'Development'
+                              ? 'POC'
+                              : deal.strategy === 'Flip'
+                              ? 'ROI'
+                              : 'Gross';
+
+                          return (
+                            <tr
+                              key={deal.id}
+                              data-testid={`pipeline-ledger-row-${deal.id}`}
+                              className="hover:bg-slate-50/80 transition-colors"
+                            >
+                              <td className="py-2.5 px-3 sm:px-4 min-w-0">
+                                <button
+                                  type="button"
+                                  onClick={() => handleEditDeal(displayDeal)}
+                                  className="font-bold text-slate-900 hover:text-emerald-700 truncate block max-w-full text-left cursor-pointer"
+                                >
+                                  {deal.title}
+                                </button>
+                                <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                                  <span className="text-[10px] text-slate-500 truncate max-w-[110px] sm:max-w-none">
+                                    {deal.city}
+                                  </span>
+                                  <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-slate-100 text-slate-700 border border-slate-200 whitespace-nowrap">
+                                    {deal.strategy === 'Development' ? 'Dev' : deal.strategy ?? 'Rental'}
+                                  </span>
+                                  <span className="text-[9px] font-semibold px-1.5 py-0.2 rounded bg-slate-50 text-slate-600 border border-slate-200 whitespace-nowrap hidden sm:inline">
+                                    {deal.status}
+                                  </span>
+                                </div>
+                              </td>
+                              <td className="py-2.5 px-3 text-right font-semibold text-slate-800 tabular-nums hidden sm:table-cell whitespace-nowrap">
+                                {formatZAR(deal.purchasePrice, { compact: true })}
+                              </td>
+                              <td className="py-2.5 px-3 text-right font-semibold text-emerald-800 tabular-nums hidden md:table-cell whitespace-nowrap">
+                                {formatZAR(dayOneCash, { compact: true })}
+                              </td>
+                              <td className="py-2.5 px-3 sm:px-4 text-right tabular-nums whitespace-nowrap">
+                                <div className="flex items-center justify-end gap-1.5">
+                                  <div>
+                                    <div
+                                      className={`font-extrabold ${
+                                        builtInEquity > 0 ? 'text-emerald-700' : 'text-slate-700'
+                                      }`}
+                                    >
+                                      {formatZAR(builtInEquity, { compact: true })}
+                                    </div>
+                                    <div className="text-[10px] text-slate-500 font-semibold">
+                                      {builtInPercent >= 0 ? '+' : ''}{formatPercent(builtInPercent)}
+                                    </div>
+                                  </div>
+                                  <div className="flex sm:hidden items-center gap-1 shrink-0">
+                                    <input
+                                      type="checkbox"
+                                      aria-label={`Compare ${deal.title}`}
+                                      checked={isSelected}
+                                      onChange={(e) => {
+                                        if (e.target.checked) {
+                                          setSelectedDealIds((prev) => [...prev, deal.id]);
+                                        } else {
+                                          setSelectedDealIds((prev) => prev.filter((id) => id !== deal.id));
+                                        }
+                                      }}
+                                      className="w-3.5 h-3.5 rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+                                    />
+                                    <button
+                                      type="button"
+                                      onClick={() => handleEditDeal(displayDeal)}
+                                      aria-label={`Edit ${deal.title}`}
+                                      title="Edit in Calculator"
+                                      className="p-1 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded border border-slate-200 bg-white cursor-pointer"
+                                    >
+                                      <Edit3 className="w-3 h-3" />
+                                    </button>
+                                  </div>
+                                </div>
+                              </td>
+                              <td className="py-2.5 px-3 sm:px-4 text-right tabular-nums hidden sm:table-cell whitespace-nowrap">
+                                <div className="inline-flex items-center justify-end gap-2">
+                                  <span className="font-bold text-indigo-700">
+                                    {secondaryRate} <span className="text-[10px] text-slate-500 font-medium">{secondaryLabel}</span>
+                                  </span>
+                                  <label className="inline-flex items-center gap-1 text-[10px] font-semibold text-slate-600 cursor-pointer">
+                                    <input
+                                      type="checkbox"
+                                      aria-label={`Compare ${deal.title}`}
+                                      checked={isSelected}
+                                      onChange={(e) => {
+                                        if (e.target.checked) {
+                                          setSelectedDealIds((prev) => [...prev, deal.id]);
+                                        } else {
+                                          setSelectedDealIds((prev) => prev.filter((id) => id !== deal.id));
+                                        }
+                                      }}
+                                      className="w-3.5 h-3.5 rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+                                    />
+                                  </label>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleEditDeal(displayDeal)}
+                                    aria-label={`Edit ${deal.title}`}
+                                    title="Edit in Calculator"
+                                    className="p-1 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded border border-slate-200 bg-white cursor-pointer"
+                                  >
+                                    <Edit3 className="w-3 h-3" />
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                );
+              }
+
+              return preparedPipelineDeals.map(({ deal, displayDeal }) => (
                 <PipelineDealCard
                   key={deal.id}
                   deal={deal}
@@ -5981,10 +6436,9 @@ export default function OpportunityAnalyzerPage() {
                   copiedDealId={copiedDealId}
                   onCopyWhatsApp={handleCopyOpportunityWhatsApp}
                 />
-              );
-          })
-        )}
-        </div>
+              ));
+            })()}
+          </div>
         </div>
       )}
 

@@ -231,3 +231,98 @@ export function calculateSection13sex(
     twentyYearCumulativeSavingsZAR,
   };
 }
+
+export interface PortfolioUnitSummaryLike {
+  status?: string;
+  numberOfUnits?: number;
+  leases?: ReadonlyArray<unknown>;
+}
+
+export type Section13sexUiTone = 'emerald' | 'slate' | 'amber';
+export type Section13sexUiStateCode = 'threshold_met' | 'below_threshold' | 'manual_override';
+
+export interface Section13sexUiState {
+  dealUnitCount: number;
+  portfolioUnitCount: number;
+  totalTrackedUnits: number;
+  meetsTrackedFiveUnitThreshold: boolean;
+  state: Section13sexUiStateCode;
+  badgeTone: Section13sexUiTone;
+  badgeLabel: string;
+  checkboxLabel: string;
+  helperCopy: string;
+}
+
+/**
+ * Counts active (non-sold) residential units across the user's rental portfolio
+ * for SARS Section 13sex 5-unit entity aggregation.
+ */
+export function countActivePortfolioUnits(rentals: ReadonlyArray<PortfolioUnitSummaryLike>): number {
+  if (!Array.isArray(rentals) || rentals.length === 0) return 0;
+  return rentals.reduce((sum, rental) => {
+    if (rental?.status === 'Sold') return sum;
+    const explicitUnits = Number(rental?.numberOfUnits) || 0;
+    const leaseCount = Array.isArray(rental?.leases) ? rental.leases.length : 0;
+    return sum + Math.max(1, explicitUnits, leaseCount);
+  }, 0);
+}
+
+/**
+ * Derives the 3 explicit Section 13sex eligibility / manual override UI states
+ * from the current deal units, active portfolio units, and manual checkbox state.
+ */
+export function evaluateSection13sexUiState(params: {
+  dealUnits: number;
+  portfolioUnits: number;
+  isManuallyEligible: boolean;
+}): Section13sexUiState {
+  const dealUnitCount = Math.max(1, Math.round(Number(params.dealUnits) || 1));
+  const portfolioUnitCount = Math.max(0, Math.round(Number(params.portfolioUnits) || 0));
+  const totalTrackedUnits = dealUnitCount + portfolioUnitCount;
+  const meetsTrackedFiveUnitThreshold = totalTrackedUnits >= 5;
+
+  if (meetsTrackedFiveUnitThreshold) {
+    return {
+      dealUnitCount,
+      portfolioUnitCount,
+      totalTrackedUnits,
+      meetsTrackedFiveUnitThreshold: true,
+      state: 'threshold_met',
+      badgeTone: 'emerald',
+      badgeLabel:
+        portfolioUnitCount === 0
+          ? `✓ ≥5 Units (${dealUnitCount} on deal)`
+          : `✓ ≥5 Units (${dealUnitCount} deal + ${portfolioUnitCount} portfolio)`,
+      checkboxLabel: 'Section 13sex Eligible — Manual Confirmation (New / Off-Plan)',
+      helperCopy:
+        'Requires brand-new, unused residential units used 100% for letting, with all ≥5 SA units held in the same tax entity. SARS allows 5% p.a. on 55% of cost over 20 years (subject to recoupment on sale).',
+    };
+  }
+
+  if (params.isManuallyEligible) {
+    return {
+      dealUnitCount,
+      portfolioUnitCount,
+      totalTrackedUnits,
+      meetsTrackedFiveUnitThreshold: false,
+      state: 'manual_override',
+      badgeTone: 'amber',
+      badgeLabel: `Manual Override Active (${totalTrackedUnits}/5 Tracked)`,
+      checkboxLabel: 'Manual Override: Apply Section 13sex Tax Shield',
+      helperCopy:
+        'Manual override applied: modeling 55% / 5% p.a. (20-yr) tax shield. Ensure you hold ≥5 SA rental units in the same entity and this unit is brand-new & unused.',
+    };
+  }
+
+  return {
+    dealUnitCount,
+    portfolioUnitCount,
+    totalTrackedUnits,
+    meetsTrackedFiveUnitThreshold: false,
+    state: 'below_threshold',
+    badgeTone: 'slate',
+    badgeLabel: `${totalTrackedUnits}/5 Units Tracked (Deal + Portfolio)`,
+    checkboxLabel: 'Manual Override: Apply Section 13sex Tax Shield',
+    helperCopy: `Platform currently sees ${totalTrackedUnits} of 5 required SA units. Tick to override if you own ≥5 total residential units in the same tax entity (including off-platform) and this unit is brand-new & unused.`,
+  };
+}

@@ -1201,7 +1201,7 @@ export const RentalFormModal: React.FC<RentalFormModalProps> = ({
 
               {/* Bank Bond Repayment & Extra Paydown & Effective Month Inputs */}
               <div className="p-3.5 bg-slate-50 rounded-lg border border-slate-200">
-                <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 items-start">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-start">
                   <div>
                     <label className="block font-semibold text-slate-700 mb-1 text-xs truncate">
                       Bond Debit Order (ZAR/m)
@@ -1244,18 +1244,39 @@ export const RentalFormModal: React.FC<RentalFormModalProps> = ({
                     <label className="block font-semibold text-slate-700 mb-1 text-xs truncate">
                       Loan Term (Years)
                     </label>
-                    <select
-                      name="loanTermYears"
-                      value={localLoanTermYears}
-                      onChange={(e) => setLocalLoanTermYears(Number(e.target.value))}
-                      className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg bg-white font-semibold text-slate-900 text-xs"
+                    <input type="hidden" name="loanTermYears" value={localLoanTermYears} />
+                    <div
+                      role="group"
+                      aria-label="Loan Term (Years)"
+                      className="grid grid-cols-5 gap-1"
                     >
-                      <option value={5}>5 Yrs (Micro)</option>
-                      <option value={10}>10 Yrs (Commercial)</option>
-                      <option value={15}>15 Yrs (DFI: TUHF/uMaStandi)</option>
-                      <option value={20}>20 Yrs (Retail Bank)</option>
-                      <option value={30}>30 Yrs (Extended)</option>
-                    </select>
+                      {[
+                        { years: 5, label: '5y', title: '5 Years — Micro / Bridge' },
+                        { years: 10, label: '10y', title: '10 Years — Commercial Bank' },
+                        { years: 15, label: '15y', title: '15 Years — DFI (TUHF / uMaStandi)' },
+                        { years: 20, label: '20y', title: '20 Years — Retail Home Loan' },
+                        { years: 30, label: '30y', title: '30 Years — Extended Retail' },
+                      ].map((opt) => {
+                        const isActive = localLoanTermYears === opt.years;
+                        return (
+                          <button
+                            key={opt.years}
+                            type="button"
+                            data-testid={`rental-loan-term-${opt.years}y`}
+                            aria-pressed={isActive}
+                            title={opt.title}
+                            onClick={() => setLocalLoanTermYears(opt.years)}
+                            className={`py-1.5 px-1 rounded-lg text-[11px] font-bold border transition-colors cursor-pointer text-center ${
+                              isActive
+                                ? 'bg-slate-900 text-white border-slate-900 shadow-2xs'
+                                : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-100'
+                            }`}
+                          >
+                            {opt.label}
+                          </button>
+                        );
+                      })}
+                    </div>
                     <span className="text-[10px] text-slate-400 block mt-1">Amortization horizon</span>
                   </div>
 
