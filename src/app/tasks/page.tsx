@@ -39,6 +39,8 @@ import {
   ChevronLeft,
   ChevronRight,
   ListTodo,
+  Search,
+  X,
 } from 'lucide-react';
 
 const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -57,9 +59,32 @@ const MONTH_NAMES = [
   'December',
 ];
 
+const DUE_DATE_PRESETS = [
+  { label: 'Today', days: 0 },
+  { label: '+3d', days: 3 },
+  { label: '+7d', days: 7 },
+  { label: '+30d', days: 30 },
+] as const;
+
+const PRIORITY_OPTIONS: TaskPriority[] = ['Low', 'Medium', 'High', 'Urgent'];
+
+const RECURRENCE_OPTIONS: Array<{ value: TaskRecurrence; label: string }> = [
+  { value: 'None', label: 'One-off' },
+  { value: 'Weekly', label: 'Weekly' },
+  { value: 'Monthly', label: 'Monthly' },
+  { value: 'Quarterly', label: 'Quarterly' },
+  { value: 'Annually', label: 'Annually' },
+];
+
 function getLocalTodayISO(): string {
   const now = new Date();
   return formatDateParts(now.getFullYear(), now.getMonth() + 1, now.getDate());
+}
+
+function addDaysLocalISO(daysFromToday: number): string {
+  const target = new Date();
+  target.setDate(target.getDate() + daysFromToday);
+  return formatDateParts(target.getFullYear(), target.getMonth() + 1, target.getDate());
 }
 
 export default function TaskEnginePage() {
@@ -92,6 +117,8 @@ export default function TaskEnginePage() {
   const [filterStatus, setFilterStatus] = useState<string>('ALL');
   const [filterEntityType, setFilterEntityType] = useState<string>('ALL');
   const [filterRecurrence, setFilterRecurrence] = useState<string>('ALL');
+  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [kpiFilter, setKpiFilter] = useState<'NONE' | 'PENDING' | 'URGENT' | 'COMPLETED'>('NONE');
   const addTaskBackdropDismiss = useModalBackdropDismiss(() => setShowAddModal(false));
 
   // Per-task Calendar Quick Action Menu State
@@ -137,9 +164,7 @@ export default function TaskEnginePage() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [dueDate, setDueDate] = useState(
-    new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
-  );
+  const [dueDate, setDueDate] = useState(() => addDaysLocalISO(3));
   const [priority, setPriority] = useState<TaskPriority>('High');
   const [recurrence, setRecurrence] = useState<TaskRecurrence>('None');
   const [recurrenceEndDate, setRecurrenceEndDate] = useState<string>('');
@@ -150,7 +175,7 @@ export default function TaskEnginePage() {
     if (prefillDate) {
       setDueDate(prefillDate);
     } else {
-      setDueDate(new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]);
+      setDueDate(addDaysLocalISO(3));
     }
     setShowAddModal(true);
   };
@@ -199,18 +224,65 @@ export default function TaskEnginePage() {
     setRecurrenceEndDate('');
   };
 
+  const handleToggleKpiFilter = (next: 'PENDING' | 'URGENT' | 'COMPLETED') => {
+    if (kpiFilter === next) {
+      setKpiFilter('NONE');
+      setFilterStatus('ALL');
+      setFilterPriority('ALL');
+      return;
+    }
+    setKpiFilter(next);
+    if (next === 'PENDING') {
+      setFilterStatus('ALL');
+      setFilterPriority('ALL');
+    } else if (next === 'URGENT') {
+      setFilterStatus('ALL');
+      setFilterPriority('Urgent');
+    } else {
+      setFilterStatus('Completed');
+      setFilterPriority('ALL');
+    }
+  };
+
+  const hasActiveFilters =
+    kpiFilter !== 'NONE' ||
+    searchQuery.trim().length > 0 ||
+    filterPriority !== 'ALL' ||
+    filterStatus !== 'ALL' ||
+    filterEntityType !== 'ALL' ||
+    filterRecurrence !== 'ALL';
+
+  const resetAllFilters = () => {
+    setKpiFilter('NONE');
+    setSearchQuery('');
+    setFilterPriority('ALL');
+    setFilterStatus('ALL');
+    setFilterEntityType('ALL');
+    setFilterRecurrence('ALL');
+  };
+
   // Filter logic + Strict Chronological Sorting
   const filteredTasks = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
     const matching = tasks.filter((t) => {
+      if (kpiFilter === 'PENDING' && t.status === 'Completed') return false;
+      if (kpiFilter === 'URGENT' && (t.priority !== 'Urgent' || t.status === 'Completed')) return false;
+      if (kpiFilter === 'COMPLETED' && t.status !== 'Completed') return false;
       if (filterPriority !== 'ALL' && t.priority !== filterPriority) return false;
       if (filterStatus !== 'ALL' && t.status !== filterStatus) return false;
       if (filterEntityType !== 'ALL' && t.linkedEntity.type !== filterEntityType) return false;
       if (filterRecurrence === 'RECURRING' && (!t.recurrence || t.recurrence === 'None')) return false;
       if (filterRecurrence === 'ONEOFF' && t.recurrence && t.recurrence !== 'None') return false;
+      if (q) {
+        const matchesSearch = [t.title, t.description, t.linkedEntity.name, t.linkedEntity.type]
+          .filter(Boolean)
+          .some((field) => String(field).toLowerCase().includes(q));
+        if (!matchesSearch) return false;
+      }
       return true;
     });
     return sortTasksChronologically(matching);
-  }, [tasks, filterPriority, filterStatus, filterEntityType, filterRecurrence]);
+  }, [tasks, kpiFilter, filterPriority, filterStatus, filterEntityType, filterRecurrence, searchQuery]);
 
   // Active (non-completed) filtered tasks for bulk .ics export
   const filteredActiveTasks = useMemo(
@@ -233,11 +305,11 @@ export default function TaskEnginePage() {
   const ghostTasksInGrid = useMemo(() => {
     if (calendarCells.length === 0) return [];
     // If user explicitly filters for Completed or One-off Only, do not project recurring pending ghosts
-    if (filterStatus === 'Completed' || filterRecurrence === 'ONEOFF') return [];
+    if (filterStatus === 'Completed' || kpiFilter === 'COMPLETED' || filterRecurrence === 'ONEOFF') return [];
     const rangeStart = calendarCells[0].dateISO;
     const rangeEnd = calendarCells[calendarCells.length - 1].dateISO;
     return projectRecurringGhostTasks(filteredTasks, rangeStart, rangeEnd);
-  }, [calendarCells, filteredTasks, filterStatus, filterRecurrence]);
+  }, [calendarCells, filteredTasks, filterStatus, kpiFilter, filterRecurrence]);
 
   // Group actual tasks and ghost previews by dateISO
   const itemsByDate = useMemo(() => {
@@ -417,14 +489,11 @@ export default function TaskEnginePage() {
               )}
 
               {task.recurrence && task.recurrence !== 'None' && task.recurrenceEndDate && (
-                <>
-                  <span>•</span>
-                  <span className="text-indigo-600 font-medium">
-                    Repeats until {formatDate(task.recurrenceEndDate)}
-                  </span>
-                </>
+                <span className="text-indigo-600 font-medium">
+                  Repeats until {formatDate(task.recurrenceEndDate)}
+                </span>
               )}
-              <span>•</span>
+
               <span className="bg-slate-100 px-2 py-0.5 rounded text-slate-700 font-semibold">
                 Linked: {task.linkedEntity.name} ({task.linkedEntity.type})
               </span>
@@ -433,10 +502,22 @@ export default function TaskEnginePage() {
         </div>
 
         <div
-          className={`flex items-center gap-2 ${
+          className={`flex flex-wrap items-center gap-2 ${
             compact ? 'justify-end pt-2 border-t border-slate-100' : 'self-end sm:self-center shrink-0'
           }`}
         >
+          {overdue && task.status !== 'Completed' && (
+            <button
+              type="button"
+              data-testid={`task-snooze-7d-${task.id}`}
+              onClick={() => updateTask(task.id, { dueDate: addDaysLocalISO(7) })}
+              title="Snooze due date +7 days from today"
+              className="inline-flex items-center px-2 py-1 rounded-lg border border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-800 text-xs font-semibold tabular-nums cursor-pointer whitespace-nowrap"
+            >
+              +7d
+            </button>
+          )}
+
           {/* Per-Task "Add to Calendar" Quick Action Popover */}
           <div className="relative" data-calendar-menu-container>
             <button
@@ -560,17 +641,29 @@ export default function TaskEnginePage() {
       />
 
       <main className="flex-1 p-4 sm:p-6 space-y-6 max-w-7xl w-full mx-auto">
-        {/* Metric Cards */}
+        {/* Metric Cards (1-Tap KPI Filters) */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-xs flex items-center justify-between">
+          <button
+            type="button"
+            data-testid="kpi-filter-pending"
+            aria-pressed={kpiFilter === 'PENDING'}
+            onClick={() => handleToggleKpiFilter('PENDING')}
+            className={`text-left bg-white rounded-xl p-4 border shadow-xs flex items-center justify-between cursor-pointer ${
+              kpiFilter === 'PENDING'
+                ? overdueCount > 0
+                  ? 'ring-2 ring-rose-500 border-rose-300'
+                  : 'ring-2 ring-emerald-500 border-emerald-300'
+                : 'border-slate-200 hover:border-slate-300'
+            }`}
+          >
             <div>
               <span className="text-[11px] font-semibold text-slate-500 uppercase">Pending Tasks</span>
               <div className="flex items-center gap-2 mt-1">
-                <span className="text-2xl font-bold text-slate-900">{pendingCount}</span>
+                <span className="text-2xl font-bold text-slate-900 tabular-nums">{pendingCount}</span>
                 {overdueCount > 0 && (
                   <span
                     data-testid="kpi-overdue-badge"
-                    className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-200"
+                    className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-200 tabular-nums"
                   >
                     {overdueCount} overdue
                   </span>
@@ -578,32 +671,52 @@ export default function TaskEnginePage() {
               </div>
               <p className="text-[11px] text-slate-400 mt-0.5">Active operational to-dos</p>
             </div>
-            <div className="p-3 bg-amber-50 text-amber-600 rounded-xl">
+            <div className="p-3 bg-amber-50 text-amber-600 rounded-xl shrink-0">
               <Clock className="w-6 h-6" />
             </div>
-          </div>
+          </button>
 
-          <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-xs flex items-center justify-between">
+          <button
+            type="button"
+            data-testid="kpi-filter-urgent"
+            aria-pressed={kpiFilter === 'URGENT'}
+            onClick={() => handleToggleKpiFilter('URGENT')}
+            className={`text-left bg-white rounded-xl p-4 border shadow-xs flex items-center justify-between cursor-pointer ${
+              kpiFilter === 'URGENT'
+                ? 'ring-2 ring-rose-500 border-rose-300'
+                : 'border-slate-200 hover:border-slate-300'
+            }`}
+          >
             <div>
               <span className="text-[11px] font-semibold text-slate-500 uppercase">Urgent Tasks</span>
-              <div className="text-2xl font-bold text-rose-600 mt-1">{urgentCount}</div>
+              <div className="text-2xl font-bold text-rose-600 tabular-nums mt-1">{urgentCount}</div>
               <p className="text-[11px] text-slate-400 mt-0.5">Requires immediate attention</p>
             </div>
-            <div className="p-3 bg-rose-50 text-rose-600 rounded-xl">
+            <div className="p-3 bg-rose-50 text-rose-600 rounded-xl shrink-0">
               <AlertTriangle className="w-6 h-6" />
             </div>
-          </div>
+          </button>
 
-          <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-xs flex items-center justify-between">
+          <button
+            type="button"
+            data-testid="kpi-filter-completed"
+            aria-pressed={kpiFilter === 'COMPLETED'}
+            onClick={() => handleToggleKpiFilter('COMPLETED')}
+            className={`text-left bg-white rounded-xl p-4 border shadow-xs flex items-center justify-between cursor-pointer ${
+              kpiFilter === 'COMPLETED'
+                ? 'ring-2 ring-emerald-500 border-emerald-300'
+                : 'border-slate-200 hover:border-slate-300'
+            }`}
+          >
             <div>
               <span className="text-[11px] font-semibold text-slate-500 uppercase">Completed</span>
-              <div className="text-2xl font-bold text-emerald-600 mt-1">{completedCount}</div>
+              <div className="text-2xl font-bold text-emerald-600 tabular-nums mt-1">{completedCount}</div>
               <p className="text-[11px] text-slate-400 mt-0.5">Successfully closed out</p>
             </div>
-            <div className="p-3 bg-emerald-50 text-emerald-600 rounded-xl">
+            <div className="p-3 bg-emerald-50 text-emerald-600 rounded-xl shrink-0">
               <CheckCircle2 className="w-6 h-6" />
             </div>
-          </div>
+          </button>
         </div>
 
         {/* Filter Controls Bar & Segmented View Switcher */}
@@ -611,15 +724,40 @@ export default function TaskEnginePage() {
           id="tasks-toolbar"
           className="scroll-mt-20 bg-white rounded-xl p-4 border border-slate-200 shadow-xs flex flex-wrap items-center justify-between gap-3 text-xs"
         >
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto">
             <span className="text-slate-500 font-semibold flex items-center gap-1">
               <Filter className="w-3.5 h-3.5" /> Filters:
             </span>
 
+            <div className="relative w-full sm:w-64">
+              <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <input
+                type="search"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search task, property, or attorney..."
+                aria-label="Search tasks"
+                className="w-full pl-8 pr-8 py-1.5 text-xs border border-slate-300 rounded-lg bg-slate-50 focus:bg-white text-slate-900 placeholder:text-slate-400 focus:outline-hidden focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-600"
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery('')}
+                  aria-label="Clear task search"
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 cursor-pointer"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+
             {/* Priority Filter */}
             <select
               value={filterPriority}
-              onChange={(e) => setFilterPriority(e.target.value)}
+              onChange={(e) => {
+                setKpiFilter('NONE');
+                setFilterPriority(e.target.value);
+              }}
               aria-label="Filter by Priority"
               className="px-2.5 py-1.5 border border-slate-300 rounded-lg bg-white text-slate-700 font-medium"
             >
@@ -633,7 +771,10 @@ export default function TaskEnginePage() {
             {/* Status Filter */}
             <select
               value={filterStatus}
-              onChange={(e) => setFilterStatus(e.target.value)}
+              onChange={(e) => {
+                setKpiFilter('NONE');
+                setFilterStatus(e.target.value);
+              }}
               aria-label="Filter by Status"
               className="px-2.5 py-1.5 border border-slate-300 rounded-lg bg-white text-slate-700 font-medium"
             >
@@ -672,7 +813,7 @@ export default function TaskEnginePage() {
           </div>
 
           <div className="flex flex-wrap items-center gap-3 ml-auto">
-            <span className="text-slate-400 font-medium">
+            <span className="text-slate-400 font-medium tabular-nums">
               Showing {filteredTasks.length} of {tasks.length} tasks
             </span>
 
@@ -733,8 +874,17 @@ export default function TaskEnginePage() {
         {activeView === 'ledger' && (
           <div id="tasks-list" className="scroll-mt-20 space-y-3">
             {filteredTasks.length === 0 ? (
-              <div className="bg-white rounded-xl p-8 text-center border border-slate-200">
+              <div className="bg-white rounded-xl p-8 text-center border border-slate-200 space-y-2">
                 <p className="text-xs text-slate-400">No tasks match your selected filter criteria.</p>
+                {hasActiveFilters && (
+                  <button
+                    type="button"
+                    onClick={resetAllFilters}
+                    className="px-3 py-1.5 text-xs font-semibold text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-100 cursor-pointer"
+                  >
+                    Reset Filters
+                  </button>
+                )}
               </div>
             ) : (
               filteredTasks.map((task) => renderTaskCard(task, false))
@@ -1152,7 +1302,7 @@ export default function TaskEnginePage() {
                 />
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-3">
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">Due Date</label>
                   <input
@@ -1163,36 +1313,104 @@ export default function TaskEnginePage() {
                     onChange={(e) => setDueDate(e.target.value)}
                     className="w-full px-3 py-2 border border-slate-300 rounded-lg min-h-[40px]"
                   />
+                  <div
+                    className="flex flex-wrap gap-1.5 mt-1.5"
+                    role="group"
+                    aria-label="Quick Due Date Presets"
+                  >
+                    {DUE_DATE_PRESETS.map((preset) => {
+                      const targetISO = addDaysLocalISO(preset.days);
+                      const isSelected = dueDate === targetISO;
+                      return (
+                        <button
+                          key={preset.label}
+                          type="button"
+                          aria-pressed={isSelected}
+                          onClick={() => setDueDate(targetISO)}
+                          className={`px-2.5 py-1 rounded-md border text-[11px] font-semibold tabular-nums whitespace-nowrap cursor-pointer ${
+                            isSelected
+                              ? 'bg-slate-900 text-white border-slate-900 shadow-2xs'
+                              : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                          }`}
+                        >
+                          {preset.label}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
+
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">Priority</label>
-                  <select
-                    value={priority}
-                    onChange={(e) => setPriority(e.target.value as TaskPriority)}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white font-semibold min-h-[40px]"
+                  <div
+                    className="grid grid-cols-4 gap-1.5"
+                    role="group"
+                    aria-label="Task Priority"
                   >
-                    <option value="Urgent">Urgent</option>
-                    <option value="High">High</option>
-                    <option value="Medium">Medium</option>
-                    <option value="Low">Low</option>
-                  </select>
+                    {PRIORITY_OPTIONS.map((opt) => {
+                      const isSelected = priority === opt;
+                      const styleMap: Record<TaskPriority, { base: string; active: string }> = {
+                        Low: {
+                          base: 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100',
+                          active: 'bg-slate-900 text-white border-slate-900 shadow-2xs',
+                        },
+                        Medium: {
+                          base: 'bg-sky-50 text-sky-800 border-sky-200 hover:bg-sky-100/70',
+                          active: 'bg-slate-900 text-white border-slate-900 shadow-2xs',
+                        },
+                        High: {
+                          base: 'bg-amber-50 text-amber-800 border-amber-200 hover:bg-amber-100/70',
+                          active: 'bg-amber-600 text-white border-amber-600 shadow-2xs',
+                        },
+                        Urgent: {
+                          base: 'bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100/70',
+                          active: 'bg-rose-600 text-white border-rose-600 shadow-2xs',
+                        },
+                      };
+                      const classes = isSelected ? styleMap[opt].active : styleMap[opt].base;
+                      return (
+                        <button
+                          key={opt}
+                          type="button"
+                          aria-pressed={isSelected}
+                          onClick={() => setPriority(opt)}
+                          className={`px-2 py-2 rounded-lg border text-xs font-semibold text-center whitespace-nowrap cursor-pointer ${classes}`}
+                        >
+                          {opt}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-3">
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">Recurrence Schedule</label>
-                  <select
-                    value={recurrence}
-                    onChange={(e) => setRecurrence(e.target.value as TaskRecurrence)}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white font-semibold min-h-[40px]"
+                  <div
+                    className="flex flex-wrap gap-1.5"
+                    role="group"
+                    aria-label="Recurrence Schedule"
                   >
-                    <option value="None">Does not repeat (One-off)</option>
-                    <option value="Weekly">Weekly</option>
-                    <option value="Monthly">Monthly</option>
-                    <option value="Quarterly">Quarterly</option>
-                    <option value="Annually">Annually</option>
-                  </select>
+                    {RECURRENCE_OPTIONS.map((opt) => {
+                      const isSelected = recurrence === opt.value;
+                      return (
+                        <button
+                          key={opt.value}
+                          type="button"
+                          aria-pressed={isSelected}
+                          onClick={() => setRecurrence(opt.value)}
+                          className={`px-2.5 py-1.5 rounded-lg border text-xs font-semibold whitespace-nowrap cursor-pointer ${
+                            isSelected
+                              ? 'bg-slate-900 text-white border-slate-900 shadow-2xs'
+                              : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                          }`}
+                        >
+                          {opt.label}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
                 {recurrence !== 'None' ? (
                   <div>
@@ -1209,8 +1427,8 @@ export default function TaskEnginePage() {
                   </div>
                 ) : (
                   <div>
-                    <span className="block font-semibold text-slate-400 mb-1">Repeat Cadence</span>
-                    <p className="text-slate-400 text-xs py-2 italic">Standard single-instance task</p>
+                    <span className="block font-semibold text-slate-400 mb-0.5">Repeat Cadence</span>
+                    <p className="text-slate-400 text-xs py-1 italic">Standard single-instance task</p>
                   </div>
                 )}
               </div>
