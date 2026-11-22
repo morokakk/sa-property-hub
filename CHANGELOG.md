@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## [Conditional Multi-Unit Municipal Zoning in Rentals (`RentalFormModal` & `RentalCardHeader`)] - 2026-11-22
+## [Conditional Multi-Unit Municipal Zoning in Rentals & Drag-Safe Modal Backdrop Dismissal] - 2026-11-22
 
 ### Added
 - **Rental Municipal Zoning & Multi-Let Consent Engine (`src/lib/calculations/rentalZoning.ts`)**:
@@ -14,8 +14,11 @@ All notable changes to this project will be documented in this file.
   - Omits heavy redevelopment bulk inputs (`FAR`, `Coverage %`, `Max Height Storeys`, `Target Zoning`) while preserving inherited values on properties promoted from `/analyzer`, `/flips`, or `/developments`, and strips `zoningProfile` on save when saved as `Sectional Title Apartment` or cleared.
 - **Compact Multi-Unit Zoning Pill in `RentalCardHeader.tsx`**:
   - Renders a compact amber zoning pill (`🏛️ Res 1 (As-of-Right)`, `🏛️ Res 1 ➔ Res 3`, etc.) next to `PropertyTypeBadge` when `property.zoningProfile` is defined and `property.propertyType !== 'Sectional Title Apartment'`, with 390px-safe mobile truncation and a `title` tooltip detailing full zoning transition status, Erf size, statutory density cap, and active consent uses.
-- **Unit & Component Regression Suite (`RentalZoningProgressiveDisclosure.test.tsx`)**:
-  - Added 16 unit and SSR component tests covering progressive disclosure visibility, preset application, inherited bulk-field preservation, comma-decimal parsing, tiered density guardrails, Zustand + Supabase `coc_checklist._zoningProfile` round-trip persistence, Sectional Title save scrubbing, and `RentalCardHeader` badge rendering.
+- **Drag-Safe Modal Backdrop Dismissal (`src/hooks/useModalBackdropDismiss.ts`)**:
+  - Added a shared pointer/click state-machine hook requiring `pointerdown`, `pointerup`, and `click` to all originate directly on the backdrop (`e.target === e.currentTarget`), preventing accidental modal closure when dragging text selections out of form inputs onto the overlay.
+  - Wired across all remaining `fixed inset-0` modals in Rentals, Dashboard, Tasks, Batch Import Validation, and the public Tenant Statement portal, with `stopPropagation()` isolation on nested `MeterReadingsModal` sub-modals and in-flight async guards (`cursor-wait`).
+- **Unit, AST & Component Regression Suites (`RentalZoningProgressiveDisclosure.test.tsx`, `useModalBackdropDismiss.test.ts`, `modalBackdropDismiss.test.ts`)**:
+  - Added 16 rental zoning unit/SSR tests, 6 pointer state-machine unit tests, and 3 AST audit tests covering every `fixed inset-0` modal overlay.
 
 ### Fixed
 - **New-Rental `zoningProfile` Persistence in `useRentalPortfolio.ts`**: Forwarded `zoningProfile: payload.zoningProfile` inside `handleAddRental` when creating a new rental property so newly onboarded multi-unit rentals persist zoning configuration to Zustand and Supabase cloud sync (`coc_checklist._zoningProfile`) without any new database columns.
@@ -24,6 +27,55 @@ All notable changes to this project will be documented in this file.
 - Zero TypeScript compile errors (`tsc --noEmit`).
 - All 124 test files (1,428 tests) passing with 100% success rate (`vitest run`).
 - Production build compilation (`next build`) and built-in browser end-to-end verification across desktop and `390x844` mobile viewports completed with 0 console errors.
+
+## [Production-Readiness Master Audit v2 (P0/P1 Remediation), SARS Section 11(a) Alignment & SEO Icons] - 2026-11-21
+
+### Added
+- **Production-Readiness Master Audit v2 (`PRODUCTION_READINESS_AUDIT_V2.md`)**:
+  - Completed full-surface delta audit across 4 pillars (Security & POPIA, Database & Cloud Sync Integrity, Bundle & SSR Optimization, Runtime & Storage Performance) and applied all P0 and P1 remediations (`6d73630`, `cdc82cc`).
+- **Database Schema Parity v2 & Composite Multi-Tenant Primary Keys (`20261121_schema_parity_v2.sql`, `20261121_composite_primary_keys.sql`)**:
+  - Added idempotent SQL migrations covering all missing columns across `profiles` (4 development hurdle/build-rate columns + recreated `public.investor_profiles` view with `WITH (security_invoker = true)`), `opportunities` (37 underwriting, syndication, Section 13sex, and pass-tracking columns), and `suppliers` (4 trade account/CoC columns) (`DB-01`).
+  - Migrated legacy portfolio collection tables (`properties`, `flips`, `boq_items`, `funding_sources`, `opportunities`, `tasks`, `suppliers`) to composite `(user_id, id)` primary keys (`onConflict: 'user_id,id'`) so seeded demo IDs (`rental-1`, `flip-1`, etc.) never collide across users (`DB-03`).
+  - Synced `src/types/supabase.ts` with all SQL migrations to eliminate schema drift (`DB-04`).
+- **Shared HTTP/HTTPS URL Sanitizer (`src/lib/utils/urlSanitizer.ts`)**:
+  - Added `sanitizeSafeHttpUrl` enforcing `^https?://` scheme validation across `CloudDriveLinkVault.tsx`, `TenantStatementViewer.tsx` photo vaults, `TenantNoticeModal.tsx`, and `statementEmailTemplate.ts` to block `javascript:`/`data:` stored XSS vectors (`SEC-08`).
+
+### Fixed
+- **Pillar 1 — Security Essentials & POPIA Hardening**:
+  - **Capability-Token Guarded Tenant Maintenance Intake (`SEC-V2-01`)**: Hardened `submitTenantMaintenanceTicket.ts` and `getTenantReportedMaintenance` to require either an authenticated landlord Supabase session (scoped to `.eq('user_id', user.id)`) or a verified lease capability `statementToken` (with demo fallback only when `statementToken` is unset), replaced full-table scans with targeted queries, stopped mutating `INITIAL_RENTALS` in place, added runtime `category`/`urgency` allowlists, guarded `JSON.parse` calls, and pruned rate-limit maps.
+  - **Gemini BYOK Header Transport (`SEC-05`)**: Removed `?key=` query parameter from Gemini requests in `pdfParser.ts`, transmitting keys via the `x-goog-api-key` HTTP header.
+  - **Schema Inspection View Hardening (`SEC-V2-02`)**: Enforced `WITH (security_invoker = true)` on `public.schema_columns_inspection` and revoked `anon` access to schema inspection views/RPCs.
+  - **Server Action Payload Caps, CRLF Guards & Composite Rate Limits (`SEC-03`, `SEC-V2-03`)**: Enforced a 10 MB PDF attachment cap and email/CRLF validation in `sendStatementEmail.ts`; added message/diagnostics caps and subject CRLF stripping in `sendFeedbackEmail.ts`; keyed `submitDevelopmentComment.ts` rate limits by `${cleanToken}:${clientIp}` with bounded Map eviction across all actions.
+  - **PostHog POPIA Telemetry Scrubbing (`SEC-V2-04`)**: Added `buyerName`, `buyer_name`, `propertyTitle`, `property_title`, and `title` to `SENSITIVE_PROPERTY_KEYS` in `posthogClient.ts`.
+- **Pillar 2 — Cloud Sync Single-Flight Mutex & Cross-Tab Consistency (`DB-02`, `DB-05`)**:
+  - Added an `isPushing` + `pendingRepush` single-flight mutex in `useAutoCloudSync.ts:pushNow()` to prevent overlapping `deleteRecordsNotInPayload` race conditions.
+  - Propagated `developments` upsert/fetch errors fail-closed in `migrateToCloud.ts` and `hydrateFromCloud.ts` instead of silently reporting green `'Synced'`.
+  - Added cross-tab `window` `storage` and 30s-idle `visibilitychange` rehydration listeners to prevent stale tabs from overwriting newer cloud state.
+- **Pillar 3 — Public Route SSR, Sidebar Hook Isolation & Modal Code-Splitting (`SSR-01`, `SSR-02`, `BND-01`)**:
+  - Updated `ClientOnly.tsx` to render public marketing/legal routes (`/`, `/welcome`, `/about`, `/privacy`) on the server alongside `/statement` and `/deal-room`.
+  - Split `Sidebar.tsx` into a route-guard wrapper and inner `SidebarContent` component so hooks execute unconditionally across public-to-workspace transitions.
+  - Converted `DevelopmentProjectModal` on `/developments` to `next/dynamic(..., { ssr: false })`.
+- **Pillar 4 — Runtime Render Memoization & `localStorage` Quota Shield (`LS-01`, `LS-02`, `PERF-V2-01`, `PERF-V2-02`)**:
+  - Wrapped `getSafeStorage()` in `portfolioMigrations.ts` (and `useAutoCloudSync.ts`) in a quota-safe `try/catch` adapter so browser `QuotaExceededError` exceptions never crash Zustand mutations, and capped fallback `logoBase64` uploads at 200 KB in `settings/page.tsx`.
+  - Replaced the blanket `usePortfolioStore()` subscription on `/developments` with atomic selectors and `usePortfolioStore.getState()` action calls, memoized `calculateDevelopmentFinancials` on `/dashboard` and inside `DevelopmentFeasibilitySection.tsx`, and forwarded precomputed `developmentFinancials` in `/proposal`.
+- **SARS Section 11(a) Tax Copy & ITR12/ITR14 Schedule Accuracy (`ba02beb`)**:
+  - Replaced erroneous `4216` source-code references (which represent Gross Foreign Dividends) across `ConsolidatedTaxCard.tsx`, `ActualVsBudgetKpiStrip.tsx`, and `excelExport.ts` with entity-neutral Section 11(a) deductible bond interest wording, restricting official rental codes `4210` (Profit) and `4211` (Loss) to net taxable rental income/loss.
+- **SEO Raster Favicons & JSON-LD Logo (`3ec644a`)**:
+  - Added multi-size `.ico` and raster PNG icons (`48x48`, `96x96`, `192x192`), deduplicated `<link rel="icon">` tags in `layout.tsx`, and pointed Organization JSON-LD `logo` to raster `icon-192.png` for Google Rich Results compliance.
+
+## [Open-Day Applicant Tracker, Funder Track Record, BOQ Tranche Sync & Developments Deal Room] - 2026-11-14 to 2026-11-20
+
+### Added
+- **Open-Day Rental Applicant & Waitlist Tracker (`a936b14`, `3b62d41`, `afd1968`)**:
+  - Added `RentalApplicantsModal.tsx`, contextual turnover/waitlist banners on `RentalCard.tsx`, budget-match scoring, 1-click lease promotion, and `properties.applicants` JSONB cloud sync migration.
+- **6-Month Verified Track Record & 20/30/30/20 BOQ Tranche Sync (`8496d09`)**:
+  - Added 6-month verified collection track record in `/proposal` and synchronized 20/30/30/20 construction draw schedule tranches with BOQ progress in `/flips` and `/funding`.
+- **Viewport-Aware Mobile Dropdown Positioning (`9a7526d`, `9dd7f5a`, `92761e7`)**:
+  - Added `useViewportDropdownPosition` across Rentals, Developments, Flips, Tasks, and Analyzer dropdowns to prevent horizontal viewport clipping on 390px mobile screens.
+- **Phased Multi-Unit Build-to-Rent (BTR) Graduation & Tembisa 8-Unit Seed (`86bdc02`)**:
+  - Added phased unit graduation from `/flips` into active `/rentals` properties with `graduatedUnitsCount` tracking and the Tembisa 8-Unit Backroom Conversion BTR seed project.
+- **Developments Public Deal Room, Comment Ledger, 5-Sheet Excel Export & Bankability Guardrails (`872b4dd`, `5ac2fc5`, `8b2da7e`, `eedb30e`)**:
+  - Added South African development bankability guardrails, external capability-token `/deal-room/[token]` portal with collaborator comment ledger (`submitDevelopmentComment.ts`), 5-sheet institutional Excel feasibility workbook export, OpenGraph/JSON-LD metadata, `/robots.txt`, `/sitemap.xml`, and root `/welcome` landing route architecture.
 
 ## [Context-Aware Progressive Disclosure for Municipal Zoning & Bulk Envelopes] - 2026-11-08
 
@@ -152,6 +204,24 @@ All notable changes to this project will be documented in this file.
     - **Deal Sourcing Pipeline Triage**: Located candidate deal in the pipeline view, validated Buy Box match badge, calculated built-in equity highlight (`+R 400,000 / +14.3%`), and promoted candidate to `Buy-and-Flip`.
     - **Executive Investor Pitch (`/proposal`)**: Verified active deal selection with strategy/source tags (`[RENTAL • Private Agent]`), configured target pitch terms (`R 600,000` facility, `15% p.a. Fixed Interest`, `Personal Suretyship + 2nd Bond`), and validated interactive `WhatsApp Pitch` generator reflecting holding burn, project outlay, and debt terms.
     - **Capital Funding Ledger (`/funding`)**: Verified `+ Add to Capital Ledger` modal auto-prefilling with exact pitch facility parameters (`R 600,000` at `15% p.a.`), locked facility under *Atlas Private Capital (Pty) Ltd*, and confirmed standby capacity tracking with exact drawn (`R 0`) and undrawn (`R 600,000`) amounts in the debt ledger.
+
+## [Production-Readiness & Performance Overhaul (v1 Audit Remediation)] - 2026-10-19
+
+### Added
+- **Database Schema Baseline, Parity & Indexing (`20261001_initial_schema.sql`, `20261020_security_and_popia_fixes.sql`, `20261021_schema_parity.sql`)**:
+  - Added B-Tree `user_id` indexes across all 8 core tables, `flip_id` index on `boq_items`, GIN indexes on `leases` and `archived_leases` JSONB columns, standardized `(select auth.uid()) = user_id` RLS policies, and added `province`, `number_of_units`, `floor_area_sqm`, and `meter_registry` columns (`DBSYNC-04`..`DBSYNC-10`).
+
+### Fixed
+- **Phase 1 — Security & POPIA Essentials (`836475c`)**:
+  - Enforced `WITH (security_invoker = true)` and `REVOKE ALL FROM anon` on `public.investor_profiles` (`SEC-01`).
+  - Tokenized `get_public_tenant_statement` (`statementToken` capability lookup with demo fallback), stripped internal vetting scorecards/guarantor contacts from public responses, and added `robots: { index: false, follow: false }` on `/statement/[lease_id]` (`SEC-02`, `SEC-06`, `DBSYNC-03`).
+  - Added IP rate limiting (5/hr) and `%PDF-` magic-byte inspection in `sendStatementEmail.ts` (`SEC-03`), HTML escaping in `statementEmailTemplate.ts` (`SEC-07`), and `x-goog-api-key` header transport in `aiClient.ts` (`SEC-05`).
+- **Phase 2 — Database & Cloud Sync Integrity (`836475c`)**:
+  - Stripped raw BYOK `apiKey` values before cloud upload in `migrateToCloud.ts` (`SEC-04`), added empty-array table-wipe guards (`DBSYNC-01`) and 50-ID chunked positive-set delete reconciliation (`DBSYNC-05`), and purged local Zustand state on `SIGNED_OUT` in `AuthHydrator.tsx` (`DBSYNC-02`).
+- **Phase 3 — Bundle & Asset Optimization (`1a97873`)**:
+  - Converted SheetJS (`xlsx`), `pdf-lib`, and the PDF statement parser to dynamic runtime imports (`F-01`, `F-02`, `F-03`, `F-06`), code-split 19 route modals across `/rentals` and `/flips` via `next/dynamic(..., { ssr: false })` (`F-05`), and bypassed the `ClientOnly.tsx` mount gate on `/statement/[lease_id]` (`F-04`).
+- **Phase 4 — Runtime Performance & Memory Shields (`9b8f783`, `91c048a`)**:
+  - Replaced whole-store subscriptions on `/rentals` and `/flips` with atomic selectors and `usePortfolioStore.getState()` calls, memoized `usePortfolioSummary`, stripped `UtilityStatement.rawText` in Zustand `partialize`, and fixed password-reset recovery routing.
 
 ## [Opportunity Analyzer & Cross-Module Syndication Underwriting] - 2026-10-16
 
