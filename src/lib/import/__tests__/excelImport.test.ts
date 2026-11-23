@@ -1,4 +1,5 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import * as XLSX from 'xlsx';
 import {
   normalizeHeader,
   parseNumber,
@@ -6,9 +7,29 @@ import {
   parsePipelineRows,
   parseRentalsRows,
   parseFlipsRows,
+  downloadPipelineTemplate,
+  downloadRentalsTemplate,
+  downloadFlipsTemplate,
 } from '../excelImport';
+import { buildOpportunitiesCSV, buildRentalsCSV } from '@/lib/export/csvExport';
+import { calculateMonthlyBondRepayment } from '@/lib/calculations/propertyMetrics';
+import { INITIAL_OPPORTUNITIES, INITIAL_RENTALS } from '@/lib/store/initialData';
+
+const writeFileMock = vi.fn();
+
+vi.mock('xlsx', async () => {
+  const actual = await vi.importActual<typeof import('xlsx')>('xlsx');
+  return {
+    ...actual,
+    writeFile: (...args: unknown[]) => writeFileMock(...args),
+  };
+});
 
 describe('Excel Import Engine Unit Tests', () => {
+  beforeEach(() => {
+    writeFileMock.mockClear();
+  });
+
   describe('Header Normalization & Value Parsers', () => {
     it('normalizes headers by trimming, lowercasing, and removing suffixes/asterisks', () => {
       expect(normalizeHeader('Deal Title *')).toBe('deal title');
@@ -16,6 +37,7 @@ describe('Excel Import Engine Unit Tests', () => {
       expect(normalizeHeader('  Monthly Gross Rent (ZAR)  ')).toBe('monthly gross rent');
       expect(normalizeHeader('Bond Interest Rate (%)')).toBe('bond interest rate');
       expect(normalizeHeader('Estimated Duration (Months)')).toBe('estimated duration');
+      expect(normalizeHeader('Loan Term (Years)')).toBe('loan term');
       expect(normalizeHeader('Floor Area (m²)')).toBe('floor area');
       expect(normalizeHeader('Floor Area (sqm)')).toBe('floor area');
       expect(normalizeHeader('Units')).toBe('units');
@@ -484,5 +506,324 @@ describe('Excel Import Engine Unit Tests', () => {
       expect(result.data[1].floorAreaSqm).toBeUndefined();
     });
   });
+
+  describe('9 SA Provinces, Optional Flat Fields & Multi-Unit Lease Scaffolding', () => {
+    it('preserves all 9 SA provinces in parsePipelineRows without coercing to Gauteng', () => {
+      const provinces = [
+        'Gauteng',
+        'Western Cape',
+        'KwaZulu-Natal',
+        'Eastern Cape',
+        'Free State',
+        'Limpopo',
+        'Mpumalanga',
+        'North West',
+        'Northern Cape',
+      ];
+      const headers = [
+        'Deal Title *',
+        'Address *',
+        'City *',
+        'Province',
+        'Target Purchase Price (ZAR) *',
+        'Open Market Value (ZAR) *',
+      ];
+      const rows = provinces.map((prov, idx) => [
+        `Deal ${prov}`,
+        `${idx + 1} Main St`,
+        'Town',
+        prov,
+        1_200_000,
+        1_500_000,
+      ]);
+      const result = parsePipelineRows([headers, ...rows]);
+      expect(result.success).toBe(true);
+      expect(result.data.map((d) => d.province)).toEqual(provinces);
+    });
+
+    it('parses new optional Pipeline underwriting fields and zeroes Transfer Duty for VAT-inclusive developer sales', () => {
+      const headers = [
+        'Deal Title *',
+        'Address *',
+        'City *',
+        'Province',
+        'Property Type',
+        'Strategy',
+        'Units',
+        'Floor Area (m²)',
+        'Target Purchase Price (ZAR) *',
+        'Open Market Value (ZAR) *',
+        'VAT-Inclusive Developer Sale',
+        'Refinance LTV (%)',
+        'Tenant Placement Fee (%)',
+        'Annual SPV Admin Fee (ZAR)',
+        'Loan Term (Years)',
+        'Extra Monthly Payment (ZAR)',
+        'Communal Services (ZAR)',
+      ];
+      const row = [
+        'Polokwane New-Build Block',
+        '18 Grobler St',
+        'Polokwane',
+        'Limpopo',
+        'Sectional Title Apartment',
+        'BRRRR',
+        6,
+        360,
+        3_000_000,
+        3_600_000,
+        'Yes',
+        75,
+        8,
+        12000,
+        15,
+        2500,
+        1800,
+      ];
+      const result = parsePipelineRows([headers, row]);
+      expect(result.success).toBe(true);
+      const deal = result.data[0];
+      expect(deal.province).toBe('Limpopo');
+      expect(deal.strategy).toBe('BRRRR');
+      expect(deal.numberOfUnits).toBe(6);
+      expect(deal.floorAreaSqm).toBe(360);
+      expect(deal.isVatInclusiveDeveloperSale).toBe(true);
+      expect(deal.costs.transferDuty).toBe(0);
+      expect(deal.refinanceLtvPercent).toBe(75);
+      expect(deal.tenantPlacementFeePercent).toBe(8);
+      expect(deal.annualSpvAdminAuditFeeZAR).toBe(12000);
+      expect(deal.loanTermYears).toBe(15);
+      expect(deal.extraMonthlyPaymentZAR).toBe(2500);
+      expect(deal.monthlyCommunalServicesZAR).toBe(1800);
+    });
+
+    it('supports Partially Vacant status, Loan Term PMT, new flat fields, and scaffolds multi-unit leases in parseRentalsRows', () => {
+      const headers = [
+        'Property Title *',
+        'Address *',
+        'City *',
+        'Province',
+        'Property Type',
+        'Units',
+        'Floor Area (m²)',
+        'Market Value (ZAR) *',
+        'Purchase Price (ZAR) *',
+        'Outstanding Bond (ZAR)',
+        'Bond Interest Rate (%)',
+        'Loan Term (Years)',
+        'Extra Monthly Bond Payment (ZAR)',
+        'Monthly Gross Rent (ZAR) *',
+        'Annual Building Insurance (ZAR)',
+        'Utility Type',
+        'Communal / Serviced OpEx (ZAR)',
+        'Prepaid Vending Fee (ZAR)',
+        'Section 13sex Annual Shield (ZAR)',
+        'Tenant Name',
+        'Deposit Held (ZAR)',
+        'Status',
+      ];
+      const row = [
+        'Rustenburg 3-Unit Courtyard',
+        '42 Nelson Mandela Dr',
+        'Rustenburg',
+        'North West',
+        'Freehold House',
+        3,
+        240,
+        2_200_000,
+        1_800_000,
+        1_200_000,
+        11.0,
+        15,
+        1_500,
+        20_000, // 20000 / 3 -> 6668, 6666, 6666
+        9_600,
+        'prepaid_submeter',
+        1_200,
+        250,
+        24_750,
+        'Kagiso Molefe',
+        25_000, // 25000 / 3 -> 8334, 8333, 8333
+        'Partially Vacant',
+      ];
+      const result = parseRentalsRows([headers, row]);
+      expect(result.success).toBe(true);
+      const r = result.data[0];
+
+      expect(r.province).toBe('North West');
+      expect(r.status).toBe('Partially Vacant');
+      expect(r.loanTermYears).toBe(15);
+      expect(r.monthlyBondPaymentZAR).toBe(calculateMonthlyBondRepayment(1_200_000, 11.0, 15));
+      expect(r.extraMonthlyPaymentZAR).toBe(1_500);
+      expect(r.annualBuildingInsuranceZAR).toBe(9_600);
+      expect(r.utilityType).toBe('prepaid_submeter');
+      expect(r.monthlyCommunalServicesZAR).toBe(1_200);
+      expect(r.monthlyPrepaidVendingFeeZAR).toBe(250);
+      expect(r.section13sexAnnualShieldZAR).toBe(24_750);
+      expect(r.section13SexEligible).toBe(true);
+
+      // Multi-unit lease scaffolding checks
+      expect(r.leases).toHaveLength(3);
+      expect(r.leases[0].unitName).toBe('Unit 1');
+      expect(r.leases[0].tenantName).toBe('Kagiso Molefe');
+      expect(r.leases[0].status).toBe('Occupied');
+      expect(r.leases[1].status).toBe('Vacant');
+      expect(r.leases[2].status).toBe('Vacant');
+      expect(r.leases.reduce((s, l) => s + l.monthlyRentZAR, 0)).toBe(20_000);
+      expect(r.leases.reduce((s, l) => s + l.depositHeldZAR, 0)).toBe(25_000);
+    });
+
+    it('parses new optional Flips fields (Province, Project Strategy, Tax Entity Type, Sec 118 Arrears)', () => {
+      const headers = [
+        'Project Title *',
+        'Address *',
+        'City *',
+        'Province',
+        'Property Type',
+        'Units',
+        'Floor Area (m²)',
+        'Project Strategy',
+        'Tax Entity Type',
+        'Section 118 Municipal Arrears (ZAR)',
+        'Purchase Price (ZAR) *',
+        'Renovation Budget (ZAR) *',
+        'Target Exit Price (ZAR) *',
+      ];
+      const row = [
+        'Nelspruit 4-Unit BTR Rehab',
+        '7 Ferreira St',
+        'Mbombela',
+        'Mpumalanga',
+        'Townhouse / Cluster',
+        4,
+        320,
+        'build_to_rent',
+        'Individual (45%)',
+        32_500,
+        1_600_000,
+        400_000,
+        2_600_000,
+      ];
+      const result = parseFlipsRows([headers, row]);
+      expect(result.success).toBe(true);
+      const flip = result.data[0];
+      expect(flip.province).toBe('Mpumalanga');
+      expect(flip.projectStrategy).toBe('build_to_rent');
+      expect(flip.taxEntityType).toBe('Individual (45%)');
+      expect(flip.municipalClearance?.sec118ArrearsZAR).toBe(32_500);
+    });
+
+    it('maintains 100% backward compatibility with legacy minimal headers', () => {
+      const pipe = parsePipelineRows([
+        ['Deal Title *', 'Address *', 'City *', 'Target Purchase Price (ZAR) *', 'Open Market Value (ZAR) *'],
+        ['Legacy Deal', '1 Old St', 'Pretoria', 1_000_000, 1_300_000],
+      ]);
+      expect(pipe.success).toBe(true);
+      expect(pipe.data[0].province).toBe('Gauteng');
+
+      const rent = parseRentalsRows([
+        ['Property Title *', 'Address *', 'City *', 'Market Value (ZAR) *', 'Purchase Price (ZAR) *', 'Monthly Gross Rent (ZAR) *'],
+        ['Legacy Rental', '2 Old St', 'Pretoria', 1_100_000, 950_000, 9_500],
+      ]);
+      expect(rent.success).toBe(true);
+      expect(rent.data[0].leases).toHaveLength(1);
+
+      const flip = parseFlipsRows([
+        ['Project Title *', 'Address *', 'City *', 'Purchase Price (ZAR) *', 'Renovation Budget (ZAR) *', 'Target Exit Price (ZAR) *'],
+        ['Legacy Flip', '3 Old St', 'Pretoria', 1_200_000, 250_000, 1_850_000],
+      ]);
+      expect(flip.success).toBe(true);
+    });
+  });
+
+  describe('Template Generation & CSV-to-Import Round-Trip Compatibility', () => {
+    it('generates Pipeline, Rentals, and Flips templates with Units, Floor Area (m²), and matching !cols lengths', async () => {
+      await downloadPipelineTemplate();
+      await downloadRentalsTemplate();
+      await downloadFlipsTemplate();
+
+      expect(writeFileMock).toHaveBeenCalledTimes(3);
+
+      for (const [wb] of writeFileMock.mock.calls as [XLSX.WorkBook, string][]) {
+        const sheetName = wb.SheetNames[0];
+        const ws = wb.Sheets[sheetName];
+        const rows = XLSX.utils.sheet_to_json<unknown[]>(ws, { header: 1 });
+        const headers = rows[0] as string[];
+        expect(headers).toContain('Units');
+        expect(headers).toContain('Floor Area (m²)');
+        expect(ws['!cols']?.length).toBe(headers.length);
+        for (const row of rows.slice(1)) {
+          expect(row.length).toBe(headers.length);
+        }
+      }
+    });
+
+    it('round-trips buildOpportunitiesCSV cleanly back into parsePipelineRows', () => {
+      const csv = buildOpportunitiesCSV(INITIAL_OPPORTUNITIES);
+      const wb = XLSX.read(csv, { type: 'string' });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rawRows = XLSX.utils.sheet_to_json<unknown[]>(ws, {
+        header: 1,
+        defval: '',
+        blankrows: false,
+      });
+
+      const parsed = parsePipelineRows(rawRows);
+      expect(parsed.success).toBe(true);
+      expect(parsed.errors).toHaveLength(0);
+      expect(parsed.data).toHaveLength(INITIAL_OPPORTUNITIES.length);
+      expect(parsed.data[0].title).toBe(INITIAL_OPPORTUNITIES[0].title);
+      expect(parsed.data[0].province).toBe(INITIAL_OPPORTUNITIES[0].province);
+      expect(parsed.data[0].propertyType).toBe(INITIAL_OPPORTUNITIES[0].propertyType);
+      expect(parsed.data[0].purchasePrice).toBe(INITIAL_OPPORTUNITIES[0].purchasePrice);
+    });
+
+    it('round-trips buildRentalsCSV cleanly into parseRentalsRows without Agency Commission (%) corruption', () => {
+      const multiUnitPartial = {
+        ...INITIAL_RENTALS[0],
+        id: 'rental-partial-rt',
+        title: 'Midrand Partially Vacant Block',
+        province: 'Limpopo' as const,
+        propertyType: 'Townhouse / Cluster' as const,
+        numberOfUnits: 4,
+        status: 'Partially Vacant' as const,
+        loanTermYears: 15,
+        extraMonthlyPaymentZAR: 1_200,
+        utilityType: 'prepaid_submeter' as const,
+        monthlyPrepaidVendingFeeZAR: 180,
+      };
+      const sourceRentals = [INITIAL_RENTALS[0], multiUnitPartial];
+      const csv = buildRentalsCSV(sourceRentals);
+      const wb = XLSX.read(csv, { type: 'string' });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rawRows = XLSX.utils.sheet_to_json<unknown[]>(ws, {
+        header: 1,
+        defval: '',
+        blankrows: false,
+      });
+
+      const parsed = parseRentalsRows(rawRows);
+      expect(parsed.success).toBe(true);
+      expect(parsed.errors).toHaveLength(0);
+      expect(parsed.data).toHaveLength(2);
+
+      // Verify Agency Commission (ZAR) did NOT overwrite agencyCommissionPercent (e.g. 1702%)
+      expect(parsed.data[0].monthlyAgentFeeZAR).toBe(INITIAL_RENTALS[0].monthlyAgentFeeZAR);
+      expect(parsed.data[0].agencyCommissionPercent).toBeUndefined();
+      expect(parsed.data[0].propertyType).toBe(INITIAL_RENTALS[0].propertyType);
+      expect(parsed.data[0].leases[0].leaseEndDate).toBe(INITIAL_RENTALS[0].leases[0].leaseEndDate);
+
+      // Verify Partially Vacant, Limpopo, Loan Term, Extra Payment, Utility Type preserved
+      expect(parsed.data[1].status).toBe('Partially Vacant');
+      expect(parsed.data[1].province).toBe('Limpopo');
+      expect(parsed.data[1].propertyType).toBe('Townhouse / Cluster');
+      expect(parsed.data[1].loanTermYears).toBe(15);
+      expect(parsed.data[1].extraMonthlyPaymentZAR).toBe(1_200);
+      expect(parsed.data[1].utilityType).toBe('prepaid_submeter');
+      expect(parsed.data[1].monthlyPrepaidVendingFeeZAR).toBe(180);
+      expect(parsed.data[1].leases).toHaveLength(4);
+    });
+  });
 });
+
 

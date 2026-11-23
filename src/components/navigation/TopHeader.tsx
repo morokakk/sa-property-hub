@@ -148,6 +148,7 @@ export default function TopHeader({ title, subtitle, actionButton }: TopHeaderPr
     await exportPortfolioToExcel({
       rentals: currentState.rentals,
       flips: currentState.flips,
+      developments: currentState.developments,
       opportunities: currentState.opportunities,
       funding: currentState.funding,
       summary: currentState.getSummary(),
@@ -180,6 +181,7 @@ export default function TopHeader({ title, subtitle, actionButton }: TopHeaderPr
         opportunities: currentState.opportunities,
         suppliers: currentState.suppliers,
         tasks: currentState.tasks,
+        municipalDirectory: currentState.municipalDirectory,
         liquidCapitalReserve: currentState.liquidCapitalReserve,
         investorProfile: currentState.investorProfile,
         exportedAt: new Date().toISOString(),

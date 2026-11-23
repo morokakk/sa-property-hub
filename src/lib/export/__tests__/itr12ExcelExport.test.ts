@@ -47,4 +47,84 @@ describe('SARS Rental Income & Expenses Tax Excel Export', () => {
       expect(cell).not.toMatch(FORBIDDEN_LINE_ITEM_CODES_RE);
     }
   });
+
+  it('includes Ancillary Income, Communal Services OpEx, and Prepaid Vending Fees in ITR12/ITR14 net taxable math', async () => {
+    const rental = {
+      ...structuredClone(INITIAL_RENTALS[0]),
+      propertyType: 'Sectional Title Apartment' as const,
+      managementType: 'Self-Managed' as const,
+      monthlyGrossRentZAR: 10_000,
+      monthlyRatesTaxesZAR: 1_000,
+      monthlyLeviesZAR: 1_500,
+      outstandingBondBalanceZAR: 500_000,
+      bondInterestRatePercent: 10.0,
+      monthlyMaintenanceReserveZAR: 500,
+      monthlyCommunalServicesZAR: 800,
+      monthlyPrepaidVendingFeeZAR: 150,
+      section13sexAnnualShieldZAR: 10_000,
+      arrearsWriteOffs: [],
+      transactions: [],
+      ancillaryIncomes: [
+        {
+          id: 'anc-1',
+          type: 'parking' as const,
+          tenantName: 'Parking Tenant',
+          monthlyRentZAR: 1_200,
+          annualEscalationPercent: 6,
+          contractStartDate: '2026-01-01',
+          contractEndDate: '2027-01-01',
+          vatApplicable: false,
+        },
+      ],
+    };
+
+    await exportITR12TaxReport([rental], 2026);
+    const [workbook] = writeFileMock.mock.calls[0] as [XLSX.WorkBook, string];
+    const ws = workbook.Sheets['ITR12 Tax 2026'];
+    const rows = XLSX.utils.sheet_to_json<(string | number)[]>(ws, { header: 1 });
+
+    const headerIdx = rows.findIndex(
+      (r) => Array.isArray(r) && r.includes('Gross Rental Income')
+    );
+    const headers = rows[headerIdx] as string[];
+    const dataRow = rows[headerIdx + 1];
+    const totalsRow = rows[headerIdx + 2];
+
+    expect(headers).toContain('Ancillary Income');
+    expect(headers).toContain('Communal Services OpEx');
+    expect(headers).toContain('Prepaid Vending Fees');
+
+    const gross = 120_000;
+    const ancillary = 14_400; // 1200 * 12
+    const rates = 12_000;
+    const levies = 18_000;
+    const bondInterest = 50_000; // 500,000 * 10%
+    const repairs = 6_000;
+    const communal = 9_600; // 800 * 12
+    const vending = 1_800; // 150 * 12
+    const sec13 = 10_000;
+    const expectedDeductions = rates + levies + bondInterest + repairs + communal + vending + sec13;
+    const expectedNetTaxable = gross + ancillary - expectedDeductions;
+
+    expect(dataRow[headers.indexOf('Ancillary Income')]).toBe(ancillary);
+    expect(dataRow[headers.indexOf('Communal Services OpEx')]).toBe(communal);
+    expect(dataRow[headers.indexOf('Prepaid Vending Fees')]).toBe(vending);
+    expect(dataRow[headers.indexOf('Total Allowable Deductions')]).toBe(expectedDeductions);
+    expect(
+      dataRow[headers.indexOf('Net Taxable Rental Income / Loss (Code 4210 Profit / 4211 Loss)')]
+    ).toBe(expectedNetTaxable);
+
+    expect(totalsRow[headers.indexOf('Ancillary Income')]).toBe(ancillary);
+    expect(totalsRow[headers.indexOf('Communal Services OpEx')]).toBe(communal);
+    expect(totalsRow[headers.indexOf('Prepaid Vending Fees')]).toBe(vending);
+    expect(totalsRow[headers.indexOf('Total Allowable Deductions')]).toBe(expectedDeductions);
+    expect(
+      totalsRow[headers.indexOf('Net Taxable Rental Income / Loss (Code 4210 Profit / 4211 Loss)')]
+    ).toBe(expectedNetTaxable);
+
+    const allCells = rows.flat().map((cell) => String(cell ?? ''));
+    for (const cell of allCells) {
+      expect(cell).not.toMatch(FORBIDDEN_LINE_ITEM_CODES_RE);
+    }
+  });
 });

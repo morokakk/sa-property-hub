@@ -1,5 +1,86 @@
-import { RentalProperty, FlipProject, OpportunityDeal, FundingSource, TransactionCategory, UtilityStatement } from '@/types';
+import {
+  RentalProperty,
+  FlipProject,
+  OpportunityDeal,
+  FundingSource,
+  TransactionCategory,
+  UtilityStatement,
+  ZoningProfile,
+} from '@/types';
 import { calculateRentalCashflow } from '@/lib/calculations/propertyMetrics';
+import { formatZoningTransitionLabel } from '@/lib/calculations/zoning';
+
+export function formatZoningSummary(zoning?: ZoningProfile): string {
+  if (!zoning) return '';
+  const label = formatZoningTransitionLabel(zoning);
+  return zoning.erfSizeSqm ? `${label} (${zoning.erfSizeSqm} m²)` : label;
+}
+
+export function formatOccupiedUnitsSummary(r: RentalProperty): string {
+  const leases = r.leases || [];
+  if (leases.length > 0) {
+    const occupied = leases.filter((l) => l.status !== 'Vacant').length;
+    const total = Math.max(leases.length, r.numberOfUnits ?? 1);
+    return `${occupied} / ${total}`;
+  }
+  const total = Math.max(1, r.numberOfUnits ?? 1);
+  const occupied = r.status === 'Vacant' ? 0 : total;
+  return `${occupied} / ${total}`;
+}
+
+export function getTotalDepositsHeldZAR(r: RentalProperty): number {
+  if (!r.leases || r.leases.length === 0) return 0;
+  return r.leases.reduce((sum, l) => sum + (l.depositHeldZAR || 0), 0);
+}
+
+export function computeFundingDrawnAndUndrawn(f: FundingSource): {
+  drawnAmountZAR: number;
+  outstandingBalanceZAR: number;
+  undrawnCapacityZAR: number;
+  tranchesProgress: string;
+} {
+  let drawnAmountZAR = 0;
+  if (f.status === 'Settled' || f.status === 'Standby') {
+    drawnAmountZAR = 0;
+  } else if (f.tranches && f.tranches.length > 0) {
+    drawnAmountZAR = f.tranches
+      .filter((t) => t.isDisbursed)
+      .reduce((s, t) => s + (t.amountZAR || 0), 0);
+  } else if (f.status === 'Active' || f.status === 'Accruing' || f.status === 'Matured') {
+    drawnAmountZAR = f.capitalAmountZAR || 0;
+  }
+
+  const outstandingBalanceZAR = Math.max(0, drawnAmountZAR - (f.totalRepaidZAR || 0));
+
+  let undrawnCapacityZAR = 0;
+  if (f.status === 'Settled') {
+    undrawnCapacityZAR = 0;
+  } else if (f.status === 'Standby') {
+    undrawnCapacityZAR = Math.max(0, (f.capitalAmountZAR || 0) - (f.totalRepaidZAR || 0));
+  } else if (f.tranches && f.tranches.length > 0) {
+    undrawnCapacityZAR = f.tranches
+      .filter((t) => !t.isDisbursed)
+      .reduce((s, t) => s + (t.amountZAR || 0), 0);
+  } else {
+    undrawnCapacityZAR = Math.max(0, (f.capitalAmountZAR || 0) - drawnAmountZAR);
+  }
+
+  let tranchesProgress = 'Single Facility';
+  if (f.tranches && f.tranches.length > 0) {
+    const disbursedCount = f.tranches.filter((t) => t.isDisbursed).length;
+    const verifiedCount = f.tranches.filter((t) => t.verifiedPhysicalProgress).length;
+    tranchesProgress = `${disbursedCount}/${f.tranches.length} Disbursed${
+      verifiedCount > 0 ? ` (${verifiedCount} Verified)` : ''
+    }`;
+  }
+
+  return {
+    drawnAmountZAR,
+    outstandingBalanceZAR,
+    undrawnCapacityZAR,
+    tranchesProgress,
+  };
+}
 
 function escapeCSV(val: string | number | undefined | null): string {
   if (val === undefined || val === null) return '';
@@ -22,21 +103,25 @@ function downloadCSV(csvContent: string, filename: string) {
 }
 
 /**
- * Exports Rental Properties Register to CSV
+ * Pure builder for Rental Properties Register CSV
  */
-export function exportRentalsCSV(rentals: RentalProperty[]) {
+export function buildRentalsCSV(rentals: RentalProperty[]): string {
   const headers = [
     'Property Title',
     'Address',
     'City',
+    'Province',
     'Title Type',
     'Units',
+    'Occupied Units',
     'Floor Area (m²)',
     'Status',
     'Market Value (ZAR)',
     'Purchase Price (ZAR)',
     'Outstanding Bond (ZAR)',
+    'Loan Term (Years)',
     'Monthly Bond Repayment (ZAR)',
+    'Extra Monthly Bond Payment (ZAR)',
     'Tenant Name',
     'Tenant Phone',
     'Tenant Email',
@@ -44,50 +129,76 @@ export function exportRentalsCSV(rentals: RentalProperty[]) {
     'Lease Expiry Date',
     'Deposit Held (ZAR)',
     'Monthly Gross Rent (ZAR)',
+    'Ancillary Income (ZAR)',
     'Monthly Levies (ZAR)',
     'Monthly Rates & Taxes (ZAR)',
+    'Annual Building Insurance (ZAR)',
+    'Utility Type',
     'Communal / Serviced OpEx (ZAR)',
+    'Prepaid Vending Fee (ZAR)',
     'Management Type',
     'Agency Commission (ZAR)',
     'Monthly Maintenance Reserve (ZAR)',
+    'Section 13sex Annual Shield (ZAR)',
     'Unpaid Tenant Utility Arrears (ZAR)',
     'Net Monthly Cashflow (ZAR)',
+    'Zoning Summary',
+    'Applicants Count',
   ];
 
   const rows = rentals.map((r) => {
     const cashflow = calculateRentalCashflow(r);
+    const totalDepositHeld = getTotalDepositsHeldZAR(r);
 
     return [
       escapeCSV(r.title),
       escapeCSV(r.address),
       escapeCSV(r.city),
+      escapeCSV(r.province || ''),
       escapeCSV(r.propertyType),
       r.numberOfUnits ?? 1,
+      escapeCSV(formatOccupiedUnitsSummary(r)),
       r.floorAreaSqm || '',
       escapeCSV(r.status),
       r.marketValueZAR || 0,
       r.purchasePriceZAR || 0,
       r.outstandingBondBalanceZAR || 0,
+      r.loanTermYears ?? 20,
       r.monthlyBondPaymentZAR || 0,
+      r.extraMonthlyPaymentZAR || 0,
       escapeCSV(r.leases?.[0]?.tenantName || ''),
       escapeCSV(r.leases?.[0]?.tenantPhone || ''),
       escapeCSV(r.leases?.[0]?.tenantEmail || ''),
       escapeCSV(r.leases?.[0]?.leaseStartDate || ''),
       escapeCSV(r.leases?.[0]?.leaseEndDate || ''),
-      r.leases?.[0]?.depositHeldZAR || 0,
-      r.monthlyGrossRentZAR || 0,
+      totalDepositHeld,
+      r.monthlyGrossRentZAR || cashflow.grossRentZAR || 0,
+      cashflow.ancillaryIncomeZAR || 0,
       r.monthlyLeviesZAR || 0,
       r.monthlyRatesTaxesZAR || 0,
+      r.annualBuildingInsuranceZAR || 0,
+      escapeCSV(r.utilityType || ''),
       r.monthlyCommunalServicesZAR || 0,
+      r.monthlyPrepaidVendingFeeZAR || 0,
       escapeCSV(r.managementType || 'Self-Managed'),
       cashflow.agencyCommissionZAR || 0,
       r.monthlyMaintenanceReserveZAR || 0,
+      r.section13sexAnnualShieldZAR || 0,
       r.unpaidUtilityArrearsZAR || 0,
       cashflow.netMonthlyCashflowZAR,
+      escapeCSV(formatZoningSummary(r.zoningProfile)),
+      (r.applicants || []).length,
     ].join(',');
   });
 
-  const csv = [headers.join(','), ...rows].join('\r\n');
+  return [headers.map((h) => escapeCSV(h)).join(','), ...rows].join('\r\n');
+}
+
+/**
+ * Exports Rental Properties Register to CSV
+ */
+export function exportRentalsCSV(rentals: RentalProperty[]) {
+  const csv = buildRentalsCSV(rentals);
   const dateStr = new Date().toISOString().split('T')[0];
   downloadCSV(csv, `sa-rentals-register-${dateStr}.csv`);
 }
@@ -145,9 +256,9 @@ export function exportFlipBOQCSV(flip: FlipProject) {
 }
 
 /**
- * Exports Shortlisted Deal Pipeline to CSV
+ * Pure builder for Shortlisted Deal Pipeline CSV
  */
-export function exportOpportunitiesCSV(deals: OpportunityDeal[]) {
+export function buildOpportunitiesCSV(deals: OpportunityDeal[]): string {
   const headers = [
     'Deal Title',
     'Address',
@@ -155,12 +266,27 @@ export function exportOpportunitiesCSV(deals: OpportunityDeal[]) {
     'Province',
     'Source Channel',
     'Property Type',
+    'Strategy',
+    'Units',
+    'Floor Area (m²)',
     'Pipeline Status',
+    'Pass Reason',
     'Open Market Value (ZAR)',
     'Purchase Price / Max Bid (ZAR)',
     'Built-In Equity (ZAR)',
     'Built-In Equity (%)',
     'Estimated Rehab Capex (ZAR)',
+    'Monthly Rental Estimate (ZAR)',
+    'Monthly Levies (ZAR)',
+    'Monthly Rates & Taxes (ZAR)',
+    'Annual Insurance (ZAR)',
+    'Communal Services (ZAR)',
+    'VAT-Inclusive Developer Sale',
+    'Loan Term (Years)',
+    'Extra Monthly Payment (ZAR)',
+    'Refinance LTV (%)',
+    'Tenant Placement Fee (%)',
+    'Annual SPV Admin Fee (ZAR)',
     'Transfer Duty (ZAR)',
     'Conveyancing Legal Fee (ZAR)',
     'Auctioneer Commission (ZAR)',
@@ -170,6 +296,11 @@ export function exportOpportunitiesCSV(deals: OpportunityDeal[]) {
     'Net Monthly Cashflow (ZAR)',
     'Projected Flip Net Profit (ZAR)',
     'Projected Flip ROI (%)',
+    'Projected Dev TDC (ZAR)',
+    'Projected Dev GDV (ZAR)',
+    'Projected Dev POC (%)',
+    'Zoning Summary',
+    'PIE Act Occupancy Status',
   ];
 
   const rows = deals.map((d) => {
@@ -184,12 +315,27 @@ export function exportOpportunitiesCSV(deals: OpportunityDeal[]) {
       escapeCSV(d.province),
       escapeCSV(d.source),
       escapeCSV(d.propertyType),
+      escapeCSV(d.strategy || ''),
+      d.numberOfUnits ?? 1,
+      d.floorAreaSqm || '',
       escapeCSV(d.status),
+      escapeCSV(d.passReason || ''),
       openMarket,
       d.purchasePrice,
       builtInZAR,
       builtInPct,
       d.estimatedRehabCost || 0,
+      d.monthlyRentalEstimate || 0,
+      d.monthlyLevies || 0,
+      d.monthlyRatesTaxes || 0,
+      d.annualInsurance || 0,
+      d.monthlyCommunalServicesZAR || 0,
+      d.isVatInclusiveDeveloperSale ? 'Yes' : 'No',
+      d.loanTermYears ?? 20,
+      d.extraMonthlyPaymentZAR || 0,
+      d.refinanceLtvPercent ?? '',
+      d.tenantPlacementFeePercent ?? '',
+      d.annualSpvAdminAuditFeeZAR ?? '',
       d.costs?.transferDuty || 0,
       d.costs?.conveyancingFee || 0,
       d.auctioneerCommissionZAR || 0,
@@ -199,28 +345,46 @@ export function exportOpportunitiesCSV(deals: OpportunityDeal[]) {
       d.monthlyCashFlow,
       d.projectedFlipNetProfit,
       d.projectedFlipRoi,
+      d.projectedDevTdcZAR ?? '',
+      d.projectedDevGdvZAR ?? '',
+      d.projectedDevPocPercent ?? '',
+      escapeCSV(formatZoningSummary(d.zoningProfile)),
+      escapeCSV(d.occupantRisk?.occupancyStatus || ''),
     ].join(',');
   });
 
-  const csv = [headers.join(','), ...rows].join('\r\n');
+  return [headers.map((h) => escapeCSV(h)).join(','), ...rows].join('\r\n');
+}
+
+/**
+ * Exports Shortlisted Deal Pipeline to CSV
+ */
+export function exportOpportunitiesCSV(deals: OpportunityDeal[]) {
+  const csv = buildOpportunitiesCSV(deals);
   const dateStr = new Date().toISOString().split('T')[0];
   downloadCSV(csv, `sa-opportunity-pipeline-${dateStr}.csv`);
 }
 
 /**
- * Exports Private Funding Ledger to CSV
+ * Pure builder for Private Funding Ledger CSV
  */
-export function exportFundingCSV(funding: FundingSource[]) {
+export function buildFundingCSV(funding: FundingSource[]): string {
   const headers = [
     'Funder / Investor Name',
     'Funding Category',
     'Entity / Contact Person',
     'Phone / Email',
     'Linked Project / Deal',
+    'Disbursement Date',
+    'Maturity Date',
+    'Delay Extension Days',
     'Principal Facility (ZAR)',
+    'Drawn Amount (ZAR)',
     'Total Repaid (ZAR)',
     'Total Interest Serviced (ZAR)',
     'Outstanding Balance (ZAR)',
+    'Undrawn Standby Capacity (ZAR)',
+    'Tranches Progress',
     'Last Payment Reference',
     'Return Terms Type',
     'Promised Return Rate (%)',
@@ -230,15 +394,7 @@ export function exportFundingCSV(funding: FundingSource[]) {
   ];
 
   const rows = funding.map((f) => {
-    let drawn = 0;
-    if (f.status === 'Settled' || f.status === 'Standby') {
-      drawn = 0;
-    } else if (f.tranches && f.tranches.length > 0) {
-      drawn = f.tranches.filter((t) => t.isDisbursed).reduce((s, t) => s + t.amountZAR, 0);
-    } else if (f.status === 'Active' || f.status === 'Accruing' || f.status === 'Matured') {
-      drawn = f.capitalAmountZAR || 0;
-    }
-    const outstanding = Math.max(0, drawn - (f.totalRepaidZAR || 0));
+    const metrics = computeFundingDrawnAndUndrawn(f);
 
     return [
       escapeCSV(f.lenderName),
@@ -246,10 +402,16 @@ export function exportFundingCSV(funding: FundingSource[]) {
       escapeCSV(f.entityOrContact || ''),
       escapeCSV(f.emailPhone || ''),
       escapeCSV(f.linkedDealName || f.linkedDealId || 'General Liquidity Pool'),
+      escapeCSV(f.disbursementDate || ''),
+      escapeCSV(f.maturityDate || ''),
+      f.delayExtensionDays || 0,
       f.capitalAmountZAR || 0,
+      metrics.drawnAmountZAR,
       f.totalRepaidZAR || 0,
       f.totalInterestPaidZAR || 0,
-      outstanding,
+      metrics.outstandingBalanceZAR,
+      metrics.undrawnCapacityZAR,
+      escapeCSV(metrics.tranchesProgress),
       escapeCSV(f.lastPaymentReference || ''),
       escapeCSV(f.returnTermsType),
       f.returnRatePercent || 0,
@@ -259,7 +421,14 @@ export function exportFundingCSV(funding: FundingSource[]) {
     ].join(',');
   });
 
-  const csv = [headers.join(','), ...rows].join('\r\n');
+  return [headers.map((h) => escapeCSV(h)).join(','), ...rows].join('\r\n');
+}
+
+/**
+ * Exports Private Funding Ledger to CSV
+ */
+export function exportFundingCSV(funding: FundingSource[]) {
+  const csv = buildFundingCSV(funding);
   const dateStr = new Date().toISOString().split('T')[0];
   downloadCSV(csv, `sa-private-funding-${dateStr}.csv`);
 }
@@ -424,6 +593,7 @@ function buildPropertyJournalLines(p: RentalProperty, months: string[]): Journal
 
   // --- Bond amortisation (rolled back from current balance, which is the opening balance of the asOf month) ---
   const P = p.monthlyBondPaymentZAR || 0;
+  const extraP = Math.max(0, p.extraMonthlyPaymentZAR || 0);
   const B0 = p.outstandingBondBalanceZAR || 0;
   const ratePct = p.bondInterestRatePercent || 0;
   const canSplitBond = P > 0 && B0 > 0 && ratePct > 0;
@@ -433,7 +603,7 @@ function buildPropertyJournalLines(p: RentalProperty, months: string[]): Journal
     let bal = B0;
     for (let idx = asOfIdx; idx >= 0; idx--) {
       openingBalances[idx] = bal;
-      bal = (bal + P) / (1 + monthlyRate);
+      bal = (bal + P + extraP) / (1 + monthlyRate);
     }
   }
 
@@ -540,14 +710,19 @@ function buildPropertyJournalLines(p: RentalProperty, months: string[]): Journal
     if (bondInterestTx.length > 0 || bondCapitalTx.length > 0) {
       bondInterestTx.forEach((t) => add('ACT', t.date, 'bond_interest', txDesc(t, `Bond interest – ${label}`), t.amountZAR, 'dr'));
       bondCapitalTx.forEach((t) => add('ACT', t.date, 'bond_capital', txDesc(t, `Bond principal – ${label}`), t.amountZAR, 'dr'));
-    } else if (bud && P > 0) {
-      if (canSplitBond) {
-        const interestC = Math.min(toCents(P), toCents(openingBalances[idx] * monthlyRate));
-        const principalC = toCents(P) - interestC;
-        add('BUD', budDate, 'bond_interest', `Bond interest – ${label}`, interestC / 100, 'dr');
-        add('BUD', budDate, 'bond_capital', `Bond principal reduction – ${label}`, principalC / 100, 'dr');
-      } else {
-        add('BUD', budDate, 'bond_combined', `Mortgage bond repayment – ${label}`, P, 'dr');
+    } else if (bud && (P > 0 || extraP > 0)) {
+      if (P > 0) {
+        if (canSplitBond) {
+          const interestC = Math.min(toCents(P), toCents(openingBalances[idx] * monthlyRate));
+          const principalC = toCents(P) - interestC;
+          add('BUD', budDate, 'bond_interest', `Bond interest – ${label}`, interestC / 100, 'dr');
+          add('BUD', budDate, 'bond_capital', `Bond principal reduction – ${label}`, principalC / 100, 'dr');
+        } else {
+          add('BUD', budDate, 'bond_combined', `Mortgage bond repayment – ${label}`, P, 'dr');
+        }
+      }
+      if (extraP > 0) {
+        add('BUD', budDate, 'bond_capital', `Voluntary extra bond principal – ${label}`, extraP, 'dr');
       }
     }
   });

@@ -300,5 +300,65 @@ describe('Accountant GL Journal export', () => {
       const bytes = new Uint8Array(await captured!.arrayBuffer());
       expect(Array.from(bytes.slice(0, 3))).toEqual([0xef, 0xbb, 0xbf]);
     });
+
+    it('emits dedicated Bond Principal Reduction (No VAT) line for extraMonthlyPaymentZAR in split-bond and combined-bond modes and balances every Reference to 0.00', () => {
+      // Case 1: Split-bond mode with extraMonthlyPaymentZAR
+      const splitExtra = makeRental({ extraMonthlyPaymentZAR: 2500 });
+      const splitRows = buildAccountantJournalRows([splitExtra], AS_OF);
+      const extraLinesSplit = splitRows.filter((r) =>
+        r.description.startsWith('Voluntary extra bond principal')
+      );
+      expect(extraLinesSplit).toHaveLength(3);
+      extraLinesSplit.forEach((line) => {
+        expect(line.account).toBe('Bond Principal Reduction');
+        expect(line.taxType).toBe('No VAT');
+        expect(line.amount).toBe(2500);
+      });
+
+      // Verify every Reference nets to exactly 0.00
+      const splitTotals = new Map<string, number>();
+      splitRows.forEach((r) =>
+        splitTotals.set(r.reference, (splitTotals.get(r.reference) || 0) + Math.round(r.amount * 100))
+      );
+      splitTotals.forEach((cents) => expect(cents).toBe(0));
+
+      // Verify rollback incorporates extraMonthlyPaymentZAR so March opening balance > rollback without extra
+      const splitNoExtraRows = buildAccountantJournalRows([makeRental()], AS_OF);
+      const marInterestWithExtra = splitRows.find(
+        (r) => r.date === '2026-03-31' && r.account === 'Bond Interest Expense'
+      )!.amount;
+      const marInterestNoExtra = splitNoExtraRows.find(
+        (r) => r.date === '2026-03-31' && r.account === 'Bond Interest Expense'
+      )!.amount;
+      expect(marInterestWithExtra).toBeGreaterThan(marInterestNoExtra);
+
+      // Case 2: Combined-bond fallback mode (outstanding balance/rate missing) with extraMonthlyPaymentZAR
+      const combinedExtra = makeRental({
+        outstandingBondBalanceZAR: 0,
+        bondInterestRatePercent: 0,
+        monthlyBondPaymentZAR: 7000,
+        extraMonthlyPaymentZAR: 1500,
+      });
+      const combinedRows = buildAccountantJournalRows([combinedExtra], AS_OF);
+      const extraLinesCombined = combinedRows.filter((r) =>
+        r.description.startsWith('Voluntary extra bond principal')
+      );
+      expect(extraLinesCombined).toHaveLength(3);
+      extraLinesCombined.forEach((line) => {
+        expect(line.account).toBe('Bond Principal Reduction');
+        expect(line.taxType).toBe('No VAT');
+        expect(line.amount).toBe(1500);
+      });
+      expect(combinedRows.filter((r) => r.account === 'Mortgage Bond Repayment')).toHaveLength(3);
+
+      const combinedTotals = new Map<string, number>();
+      combinedRows.forEach((r) =>
+        combinedTotals.set(
+          r.reference,
+          (combinedTotals.get(r.reference) || 0) + Math.round(r.amount * 100)
+        )
+      );
+      combinedTotals.forEach((cents) => expect(cents).toBe(0));
+    });
   });
 });

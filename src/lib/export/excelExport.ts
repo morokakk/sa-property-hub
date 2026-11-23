@@ -19,10 +19,17 @@ import {
 } from '@/lib/calculations/developments';
 import { calculateZoningEnvelope, formatZoningTransitionLabel } from '@/lib/calculations/zoning';
 import { filterProjectComments } from '@/lib/calculations/commentsLedger';
+import {
+  formatZoningSummary,
+  formatOccupiedUnitsSummary,
+  getTotalDepositsHeldZAR,
+  computeFundingDrawnAndUndrawn,
+} from '@/lib/export/csvExport';
 
-interface ExportPortfolioData {
+export interface ExportPortfolioData {
   rentals: RentalProperty[];
   flips: FlipProject[];
+  developments?: DevelopmentProject[];
   opportunities: OpportunityDeal[];
   funding: FundingSource[];
   summary: PortfolioSummary;
@@ -30,13 +37,29 @@ interface ExportPortfolioData {
 }
 
 /**
- * Builds and downloads a multi-tab Microsoft Excel (.xlsx) workbook
- * containing high-fidelity financial tables across the entire portfolio.
+ * Pure builder for the multi-tab Microsoft Excel (.xlsx) portfolio workbook.
  */
-export async function exportPortfolioToExcel(data: ExportPortfolioData) {
-  const XLSX = await import('xlsx');
-  const { rentals, flips, opportunities, funding, summary, investorProfile } = data;
+export function buildPortfolioWorkbook(
+  XLSX: typeof import('xlsx'),
+  data: ExportPortfolioData
+) {
+  const {
+    rentals,
+    flips,
+    developments = [],
+    opportunities,
+    funding,
+    summary,
+    investorProfile,
+  } = data;
   const wb = XLSX.utils.book_new();
+
+  const unlinkedDevDebt = Math.max(
+    0,
+    (summary.totalFundingLiabilities || 0) -
+      (summary.totalPrivateFundingLiability || 0) -
+      (summary.totalBondLiabilities || 0)
+  );
 
   // -------------------------------------------------------------
   // Sheet 1: Executive Summary
@@ -52,12 +75,18 @@ export async function exportPortfolioToExcel(data: ExportPortfolioData) {
     ['Total Gross Asset Value', summary.totalGrossAssetValue],
     ['Rental Portfolio Value', summary.totalRentalValue],
     ['Buy-and-Flip Portfolio Value', summary.totalFlipValue],
+    ['Development Portfolio Value', summary.totalDevelopmentValue ?? summary.developmentsValueZAR ?? 0],
     ['Liquid Capital Reserve', summary.liquidCapitalReserve],
     ['Unallocated Funding Reserve', summary.unallocatedFundingReserve],
     ['Total Purchasing Power', summary.totalAvailablePurchasingPower],
     ['Total Debt Liabilities', summary.totalFundingLiabilities],
     ['Private Funding Liabilities', summary.totalPrivateFundingLiability],
     ['Bank Mortgage Bond Liabilities', summary.totalBondLiabilities],
+    ['Development Debt Liabilities (Unlinked)', unlinkedDevDebt],
+    [
+      'Total Senior Development Debt (incl. Linked Facilities)',
+      summary.totalDevelopmentLiabilities ?? summary.totalDevelopmentDebtLiability ?? 0,
+    ],
     ['Monthly Net Rental Cashflow', summary.monthlyNetRentalCashflow],
     ['Projected Flip Profits (Active)', summary.totalProjectedFlipProfits],
     ['Realized Flip Profits (Completed)', summary.totalRealizedFlipProfits],
@@ -65,11 +94,12 @@ export async function exportPortfolioToExcel(data: ExportPortfolioData) {
     ['Sold / Exited Rental Units', summary.soldRentalsCount],
     ['Active Flip Projects', summary.activeFlipsCount],
     ['Completed Flip Projects', summary.completedFlipsCount],
+    ['Active Developments Count', summary.activeDevelopmentsCount ?? 0],
     ['Pipeline Sourcing Deals', summary.pendingOpportunitiesCount],
   ];
 
   const wsSummary = XLSX.utils.aoa_to_sheet(summaryRows);
-  wsSummary['!cols'] = [{ wch: 36 }, { wch: 24 }];
+  wsSummary['!cols'] = [{ wch: 52 }, { wch: 24 }];
   XLSX.utils.book_append_sheet(wb, wsSummary, 'Summary');
 
   // -------------------------------------------------------------
@@ -79,27 +109,39 @@ export async function exportPortfolioToExcel(data: ExportPortfolioData) {
     'Property Title',
     'Address',
     'City',
+    'Province',
     'Title Type',
     'Units',
+    'Occupied Units',
     'Floor Area (m²)',
     'Status',
     'Market Value (ZAR)',
     'Purchase Price (ZAR)',
     'Outstanding Bond (ZAR)',
+    'Loan Term (Years)',
     'Monthly Bond Repayment (ZAR)',
+    'Extra Monthly Bond Payment (ZAR)',
     'Bond Effective Month',
     'Tenant Name',
     'Tenant Phone',
     'Lease Expiry',
+    'Deposit Held (ZAR)',
     'Monthly Gross Rent (ZAR)',
+    'Ancillary Income (ZAR)',
     'Monthly Levies (ZAR)',
     'Monthly Rates & Taxes (ZAR)',
+    'Annual Building Insurance (ZAR)',
+    'Utility Type',
     'Communal / Serviced OpEx (ZAR)',
+    'Prepaid Vending Fee (ZAR)',
     'Management Type',
     'Agency Commission (ZAR)',
     'Monthly Maintenance Reserve (ZAR)',
+    'Section 13sex Annual Shield (ZAR)',
     'Unpaid Utility Arrears (ZAR)',
     'Net Monthly Cashflow (ZAR)',
+    'Zoning Summary',
+    'Applicants Count',
   ];
 
   const rentalsData = rentals.map((r) => {
@@ -109,56 +151,80 @@ export async function exportPortfolioToExcel(data: ExportPortfolioData) {
       r.title,
       r.address,
       r.city,
+      r.province || '',
       r.propertyType,
       r.numberOfUnits ?? 1,
+      formatOccupiedUnitsSummary(r),
       r.floorAreaSqm || 'N/A',
       r.status,
       r.marketValueZAR || 0,
       r.purchasePriceZAR || 0,
       r.outstandingBondBalanceZAR || 0,
+      r.loanTermYears ?? 20,
       r.monthlyBondPaymentZAR || 0,
+      r.extraMonthlyPaymentZAR || 0,
       r.bondPaymentEffectiveDate || 'Ongoing',
       r.leases?.[0]?.tenantName || 'Vacant',
       r.leases?.[0]?.tenantPhone || 'N/A',
       r.leases?.[0]?.leaseEndDate || 'N/A',
-      r.monthlyGrossRentZAR || 0,
+      getTotalDepositsHeldZAR(r),
+      r.monthlyGrossRentZAR || cashflow.grossRentZAR || 0,
+      cashflow.ancillaryIncomeZAR || 0,
       r.monthlyLeviesZAR || 0,
       r.monthlyRatesTaxesZAR || 0,
+      r.annualBuildingInsuranceZAR || 0,
+      r.utilityType || '',
       r.monthlyCommunalServicesZAR || 0,
+      r.monthlyPrepaidVendingFeeZAR || 0,
       r.managementType || 'Self-Managed',
       cashflow.agencyCommissionZAR || 0,
       r.monthlyMaintenanceReserveZAR || 0,
+      r.section13sexAnnualShieldZAR || 0,
       r.unpaidUtilityArrearsZAR || 0,
       cashflow.netMonthlyCashflowZAR,
+      formatZoningSummary(r.zoningProfile),
+      (r.applicants || []).length,
     ];
   });
 
   const wsRentals = XLSX.utils.aoa_to_sheet([rentalsHeaders, ...rentalsData]);
   wsRentals['!cols'] = [
-    { wch: 28 },
-    { wch: 30 },
-    { wch: 16 },
-    { wch: 24 },
-    { wch: 10 },
-    { wch: 16 },
-    { wch: 14 },
-    { wch: 18 },
-    { wch: 18 },
-    { wch: 20 },
-    { wch: 24 },
-    { wch: 20 },
-    { wch: 20 },
-    { wch: 16 },
-    { wch: 14 },
-    { wch: 20 },
-    { wch: 18 },
-    { wch: 22 },
-    { wch: 24 },
-    { wch: 16 },
-    { wch: 20 },
-    { wch: 26 },
-    { wch: 26 },
-    { wch: 22 },
+    { wch: 28 }, // Property Title
+    { wch: 30 }, // Address
+    { wch: 16 }, // City
+    { wch: 16 }, // Province
+    { wch: 24 }, // Title Type
+    { wch: 10 }, // Units
+    { wch: 16 }, // Occupied Units
+    { wch: 16 }, // Floor Area
+    { wch: 18 }, // Status
+    { wch: 18 }, // Market Value
+    { wch: 18 }, // Purchase Price
+    { wch: 20 }, // Outstanding Bond
+    { wch: 16 }, // Loan Term
+    { wch: 24 }, // Monthly Bond Repayment
+    { wch: 26 }, // Extra Monthly Bond Payment
+    { wch: 20 }, // Bond Effective Month
+    { wch: 20 }, // Tenant Name
+    { wch: 18 }, // Tenant Phone
+    { wch: 14 }, // Lease Expiry
+    { wch: 18 }, // Deposit Held
+    { wch: 22 }, // Monthly Gross Rent
+    { wch: 20 }, // Ancillary Income
+    { wch: 18 }, // Monthly Levies
+    { wch: 22 }, // Monthly Rates & Taxes
+    { wch: 24 }, // Annual Building Insurance
+    { wch: 18 }, // Utility Type
+    { wch: 24 }, // Communal / Serviced OpEx
+    { wch: 22 }, // Prepaid Vending Fee
+    { wch: 16 }, // Management Type
+    { wch: 20 }, // Agency Commission
+    { wch: 26 }, // Monthly Maintenance Reserve
+    { wch: 26 }, // Section 13sex Annual Shield
+    { wch: 24 }, // Unpaid Utility Arrears
+    { wch: 22 }, // Net Monthly Cashflow
+    { wch: 34 }, // Zoning Summary
+    { wch: 16 }, // Applicants Count
   ];
   XLSX.utils.book_append_sheet(wb, wsRentals, 'Rentals');
 
@@ -169,12 +235,18 @@ export async function exportPortfolioToExcel(data: ExportPortfolioData) {
     'Project Title',
     'Address',
     'City',
+    'Province',
     'Title Type',
     'Units',
     'Floor Area (m²)',
+    'Project Strategy',
+    'Graduated Units Count',
+    'Tax Entity Type',
     'Status',
     'Purchase Price (ZAR)',
     'Acquisition Costs (ZAR)',
+    'Section 118 Municipal Arrears (ZAR)',
+    'RCC Status',
     'Renovation Budget (ZAR)',
     'Duration (Months)',
     'Monthly Bond Payment (ZAR)',
@@ -187,6 +259,8 @@ export async function exportPortfolioToExcel(data: ExportPortfolioData) {
     'Projected Net Profit (ZAR)',
     'Actual Exit Price (ZAR)',
     'Realized Net Profit (ZAR)',
+    'Zoning Summary',
+    'PIE Act Occupancy Status',
   ];
 
   const flipsData = flips.map((f) => {
@@ -205,12 +279,18 @@ export async function exportPortfolioToExcel(data: ExportPortfolioData) {
       f.title,
       f.address,
       f.city,
-      f.propertyType,
+      f.province || '',
+      f.propertyType || 'Sectional Title Apartment',
       f.numberOfUnits ?? 1,
       f.floorAreaSqm || 'N/A',
+      f.projectStrategy || 'flip_for_sale',
+      f.graduatedUnitsCount || 0,
+      fin.taxEntityType,
       f.status,
       f.purchasePriceZAR || 0,
       f.acquisitionCostsZAR || 0,
+      fin.sec118ArrearsZAR,
+      fin.rccStatus,
       renoCost,
       durationMonths,
       f.monthlyBondPaymentZAR || 0,
@@ -223,41 +303,52 @@ export async function exportPortfolioToExcel(data: ExportPortfolioData) {
       projectedProfit,
       actualSale ?? 'In Progress',
       realizedProfit ?? 'In Progress',
+      formatZoningSummary(f.zoningProfile),
+      f.occupantRisk?.occupancyStatus || '',
     ];
   });
 
   const wsFlips = XLSX.utils.aoa_to_sheet([flipsHeaders, ...flipsData]);
   wsFlips['!cols'] = [
-    { wch: 28 },
-    { wch: 30 },
-    { wch: 16 },
-    { wch: 24 },
-    { wch: 10 },
-    { wch: 16 },
-    { wch: 14 },
-    { wch: 18 },
-    { wch: 20 },
-    { wch: 22 },
-    { wch: 18 },
-    { wch: 22 },
-    { wch: 22 },
-    { wch: 20 },
-    { wch: 22 },
-    { wch: 20 },
-    { wch: 22 },
-    { wch: 20 },
-    { wch: 22 },
-    { wch: 20 },
-    { wch: 22 },
+    { wch: 28 }, // Project Title
+    { wch: 30 }, // Address
+    { wch: 16 }, // City
+    { wch: 16 }, // Province
+    { wch: 24 }, // Title Type
+    { wch: 10 }, // Units
+    { wch: 16 }, // Floor Area
+    { wch: 16 }, // Project Strategy
+    { wch: 20 }, // Graduated Units Count
+    { wch: 18 }, // Tax Entity Type
+    { wch: 14 }, // Status
+    { wch: 18 }, // Purchase Price
+    { wch: 20 }, // Acquisition Costs
+    { wch: 28 }, // Section 118 Municipal Arrears
+    { wch: 22 }, // RCC Status
+    { wch: 22 }, // Renovation Budget
+    { wch: 18 }, // Duration
+    { wch: 22 }, // Monthly Bond Payment
+    { wch: 22 }, // Monthly Levies
+    { wch: 20 }, // Monthly Rates & Taxes
+    { wch: 22 }, // Other Holding Costs
+    { wch: 20 }, // Monthly Holding Cost
+    { wch: 22 }, // Total Holding Cost
+    { wch: 20 }, // Target Exit Price
+    { wch: 22 }, // Projected Net Profit
+    { wch: 20 }, // Actual Exit Price
+    { wch: 22 }, // Realized Net Profit
+    { wch: 34 }, // Zoning Summary
+    { wch: 22 }, // PIE Act Occupancy Status
   ];
   XLSX.utils.book_append_sheet(wb, wsFlips, 'Buy & Flips');
 
   // -------------------------------------------------------------
-  // Sheet 4: Flip Renovation BOQ
+  // Sheet 4: Flip Renovation BOQ (synced with exportFlipBOQCSV)
   // -------------------------------------------------------------
   const boqHeaders = [
     'Flip Project',
     'Category / Trade',
+    'Milestone Draw Phase',
     'Item Description',
     'Supplier / Contractor',
     'Quantity',
@@ -266,6 +357,10 @@ export async function exportPortfolioToExcel(data: ExportPortfolioData) {
     'Baseline Total (ZAR)',
     'Actual Cost (ZAR)',
     'Variance (ZAR)',
+    'Retention (%)',
+    'Is Sponsored / Barter',
+    'Commercial Retail Value (ZAR)',
+    'Actual Cash Outflow (ZAR)',
     'Status',
     'Invoice Ref',
   ];
@@ -276,6 +371,7 @@ export async function exportPortfolioToExcel(data: ExportPortfolioData) {
       boqData.push([
         f.title,
         b.category,
+        b.milestonePhase || 'First Fix / Wet Works',
         b.itemDescription,
         b.supplierOrContractor || 'Unassigned',
         b.quantity || 1,
@@ -284,6 +380,12 @@ export async function exportPortfolioToExcel(data: ExportPortfolioData) {
         b.baselineTotalZAR || 0,
         b.actualCostZAR || 0,
         b.varianceZAR || 0,
+        b.retentionPercent || 0,
+        b.isSponsoredOrBarter ? 'Yes' : 'No',
+        b.isSponsoredOrBarter ? (b.commercialRetailValueZAR || b.baselineTotalZAR || 0) : '',
+        b.isSponsoredOrBarter
+          ? (b.actualCashOutflowZAR !== undefined ? b.actualCashOutflowZAR : b.actualCostZAR || 0)
+          : '',
         b.status,
         b.invoiceRef || '',
       ]);
@@ -292,23 +394,143 @@ export async function exportPortfolioToExcel(data: ExportPortfolioData) {
 
   const wsBOQ = XLSX.utils.aoa_to_sheet([boqHeaders, ...boqData]);
   wsBOQ['!cols'] = [
-    { wch: 28 },
-    { wch: 20 },
-    { wch: 32 },
-    { wch: 24 },
-    { wch: 10 },
-    { wch: 10 },
-    { wch: 22 },
-    { wch: 18 },
-    { wch: 18 },
-    { wch: 16 },
-    { wch: 14 },
-    { wch: 16 },
+    { wch: 28 }, // Flip Project
+    { wch: 22 }, // Category / Trade
+    { wch: 22 }, // Milestone Draw Phase
+    { wch: 32 }, // Item Description
+    { wch: 24 }, // Supplier / Contractor
+    { wch: 10 }, // Quantity
+    { wch: 10 }, // Unit
+    { wch: 22 }, // Baseline Unit Cost
+    { wch: 18 }, // Baseline Total
+    { wch: 18 }, // Actual Cost
+    { wch: 16 }, // Variance
+    { wch: 14 }, // Retention (%)
+    { wch: 18 }, // Is Sponsored / Barter
+    { wch: 24 }, // Commercial Retail Value
+    { wch: 22 }, // Actual Cash Outflow
+    { wch: 14 }, // Status
+    { wch: 16 }, // Invoice Ref
   ];
   XLSX.utils.book_append_sheet(wb, wsBOQ, 'Renovation BOQ');
 
   // -------------------------------------------------------------
-  // Sheet 5: Opportunity Pipeline
+  // Sheet 5: Developments
+  // -------------------------------------------------------------
+  const devHeaders = [
+    'Project Title',
+    'Address',
+    'City',
+    'Province',
+    'Development Typology',
+    'Current Phase',
+    'VAT Registered',
+    'Tax Entity',
+    'LAA Deferred Land',
+    'Zoning Summary',
+    'Planned Units',
+    'Sold & Transferred Units',
+    'Retained Units',
+    'Graduated Rental Units',
+    'Total Buildable Area (m²)',
+    'Land Purchase Price (ZAR)',
+    'Total Soft Costs (ZAR)',
+    'Active Hard Build Cost (ZAR)',
+    'Total Development Cost / TDC (ZAR)',
+    'GDV incl. VAT (ZAR)',
+    'Unsold / Retained Asset Value (ZAR)',
+    'Net Profit Before Tax (ZAR)',
+    'Pre-Tax POC (%)',
+    'Senior Facility Limit (ZAR)',
+    'Senior Facility Drawn (ZAR)',
+    'Outstanding Senior Debt (ZAR)',
+    'Pre-Sold GDV (%)',
+    'Bank Readiness',
+    'Linked Funding Source',
+  ];
+
+  const devData = developments.map((dev) => {
+    const devSummary = calculateDevelopmentFinancials(dev);
+    const units = Array.isArray(dev.units) ? dev.units : [];
+    const soldCount = units.filter((u) => u && u.status === 'Sold & Transferred').length;
+    const retainedCount = units.filter((u) => u && u.status === 'Retained for Rental').length;
+    const graduatedCount = units.filter((u) => u && Boolean(u.graduatedRentalId)).length;
+    const unsoldPortfolioValueZAR =
+      dev.currentPhase === 'Completed'
+        ? 0
+        : units
+            .filter((u) => u && u.status !== 'Sold & Transferred' && !u.graduatedRentalId)
+            .reduce((s, u) => s + (u.listPriceVatInclZAR || u.allocatedCostBasisZAR || 0), 0);
+
+    return [
+      dev.title,
+      dev.address,
+      dev.city,
+      dev.province || '',
+      dev.developmentType,
+      dev.currentPhase,
+      dev.isVatRegisteredDeveloper ? 'Yes' : 'No',
+      devSummary.taxEntityType,
+      devSummary.isDeferredLandPaymentLAA ? 'Yes' : 'No',
+      formatZoningSummary(dev.zoningProfile),
+      devSummary.totalUnitsCount,
+      soldCount,
+      retainedCount,
+      graduatedCount,
+      Number(dev.totalBuildableAreaSqm) || 0,
+      Number(dev.landPurchasePriceZAR) || 0,
+      Number(devSummary.totalSoftCostsZAR) || 0,
+      Number(devSummary.activeHardBuildCostZAR) || 0,
+      Number(devSummary.tdcZAR) || 0,
+      Number(devSummary.gdvInclVatZAR) || 0,
+      unsoldPortfolioValueZAR,
+      Number(devSummary.netProfitBeforeTaxZAR) || 0,
+      Number(devSummary.pocPercent.toFixed(2)),
+      Number(dev.developmentFacilityLimitZAR) || 0,
+      Number(dev.developmentFacilityDrawnZAR) || 0,
+      Number(devSummary.outstandingDevFacilityZAR) || 0,
+      Number(devSummary.preSoldGdvPercent.toFixed(2)),
+      devSummary.bankReadiness.overallBankable ? 'Bankable' : 'Action Required',
+      dev.linkedFundingSourceId || '',
+    ];
+  });
+
+  const wsDevs = XLSX.utils.aoa_to_sheet([devHeaders, ...devData]);
+  wsDevs['!cols'] = [
+    { wch: 30 }, // Project Title
+    { wch: 30 }, // Address
+    { wch: 16 }, // City
+    { wch: 16 }, // Province
+    { wch: 28 }, // Development Typology
+    { wch: 24 }, // Current Phase
+    { wch: 14 }, // VAT Registered
+    { wch: 16 }, // Tax Entity
+    { wch: 16 }, // LAA Deferred Land
+    { wch: 34 }, // Zoning Summary
+    { wch: 14 }, // Planned Units
+    { wch: 22 }, // Sold & Transferred Units
+    { wch: 14 }, // Retained Units
+    { wch: 20 }, // Graduated Rental Units
+    { wch: 22 }, // Total Buildable Area
+    { wch: 22 }, // Land Purchase Price
+    { wch: 20 }, // Total Soft Costs
+    { wch: 24 }, // Active Hard Build Cost
+    { wch: 28 }, // Total Development Cost / TDC
+    { wch: 20 }, // GDV incl. VAT
+    { wch: 28 }, // Unsold / Retained Asset Value
+    { wch: 24 }, // Net Profit Before Tax
+    { wch: 16 }, // Pre-Tax POC
+    { wch: 22 }, // Senior Facility Limit
+    { wch: 22 }, // Senior Facility Drawn
+    { wch: 24 }, // Outstanding Senior Debt
+    { wch: 16 }, // Pre-Sold GDV
+    { wch: 18 }, // Bank Readiness
+    { wch: 22 }, // Linked Funding Source
+  ];
+  XLSX.utils.book_append_sheet(wb, wsDevs, 'Developments');
+
+  // -------------------------------------------------------------
+  // Sheet 6: Opportunity Pipeline
   // -------------------------------------------------------------
   const oppHeaders = [
     'Deal Title',
@@ -317,12 +539,23 @@ export async function exportPortfolioToExcel(data: ExportPortfolioData) {
     'Province',
     'Source Channel',
     'Property Type',
+    'Strategy',
+    'Units',
+    'Floor Area (m²)',
     'Status',
+    'Pass Reason',
     'Open Market Value (ZAR)',
     'Purchase Price / Max Bid (ZAR)',
     'Built-In Equity (ZAR)',
     'Built-In Equity (%)',
     'Rehab Capex (ZAR)',
+    'Communal Services (ZAR)',
+    'VAT-Inclusive Developer Sale',
+    'Loan Term (Years)',
+    'Extra Monthly Payment (ZAR)',
+    'Refinance LTV (%)',
+    'Tenant Placement Fee (%)',
+    'Annual SPV Admin Fee (ZAR)',
     'Transfer Duty (ZAR)',
     'Conveyancing Fee (ZAR)',
     'Auctioneer Fee (ZAR)',
@@ -332,6 +565,11 @@ export async function exportPortfolioToExcel(data: ExportPortfolioData) {
     'Net Monthly Cashflow (ZAR)',
     'Projected Flip Profit (ZAR)',
     'Projected Flip ROI (%)',
+    'Projected Dev TDC (ZAR)',
+    'Projected Dev GDV (ZAR)',
+    'Projected Dev POC (%)',
+    'Zoning Summary',
+    'PIE Act Occupancy Status',
   ];
 
   const oppData = opportunities.map((d) => {
@@ -345,13 +583,24 @@ export async function exportPortfolioToExcel(data: ExportPortfolioData) {
       d.city,
       d.province,
       d.source,
-      d.propertyType,
+      d.propertyType || 'Sectional Title Apartment',
+      d.strategy || '',
+      d.numberOfUnits ?? 1,
+      d.floorAreaSqm || '',
       d.status,
+      d.passReason || '',
       openMarket,
       d.purchasePrice,
       builtInZAR,
       builtInPct,
       d.estimatedRehabCost || 0,
+      d.monthlyCommunalServicesZAR || 0,
+      d.isVatInclusiveDeveloperSale ? 'Yes' : 'No',
+      d.loanTermYears ?? 20,
+      d.extraMonthlyPaymentZAR || 0,
+      d.refinanceLtvPercent ?? '',
+      d.tenantPlacementFeePercent ?? '',
+      d.annualSpvAdminAuditFeeZAR ?? '',
       d.costs?.transferDuty || 0,
       d.costs?.conveyancingFee || 0,
       d.auctioneerCommissionZAR || 0,
@@ -361,37 +610,58 @@ export async function exportPortfolioToExcel(data: ExportPortfolioData) {
       d.monthlyCashFlow,
       d.projectedFlipNetProfit,
       d.projectedFlipRoi,
+      d.projectedDevTdcZAR ?? '',
+      d.projectedDevGdvZAR ?? '',
+      d.projectedDevPocPercent ?? '',
+      formatZoningSummary(d.zoningProfile),
+      d.occupantRisk?.occupancyStatus || '',
     ];
   });
 
   const wsOpp = XLSX.utils.aoa_to_sheet([oppHeaders, ...oppData]);
   wsOpp['!cols'] = [
-    { wch: 28 },
-    { wch: 30 },
-    { wch: 16 },
-    { wch: 16 },
-    { wch: 20 },
-    { wch: 24 },
-    { wch: 18 },
-    { wch: 22 },
-    { wch: 24 },
-    { wch: 20 },
-    { wch: 18 },
-    { wch: 18 },
-    { wch: 18 },
-    { wch: 20 },
-    { wch: 18 },
-    { wch: 22 },
-    { wch: 24 },
-    { wch: 16 },
-    { wch: 22 },
-    { wch: 22 },
-    { wch: 18 },
+    { wch: 28 }, // Deal Title
+    { wch: 30 }, // Address
+    { wch: 16 }, // City
+    { wch: 16 }, // Province
+    { wch: 20 }, // Source Channel
+    { wch: 24 }, // Property Type
+    { wch: 14 }, // Strategy
+    { wch: 10 }, // Units
+    { wch: 16 }, // Floor Area
+    { wch: 18 }, // Status
+    { wch: 26 }, // Pass Reason
+    { wch: 22 }, // Open Market Value
+    { wch: 24 }, // Purchase Price
+    { wch: 20 }, // Built-In Equity
+    { wch: 18 }, // Built-In Equity %
+    { wch: 18 }, // Rehab Capex
+    { wch: 22 }, // Communal Services
+    { wch: 24 }, // VAT-Inclusive Developer Sale
+    { wch: 16 }, // Loan Term
+    { wch: 24 }, // Extra Monthly Payment
+    { wch: 16 }, // Refinance LTV
+    { wch: 22 }, // Tenant Placement Fee
+    { wch: 24 }, // Annual SPV Admin Fee
+    { wch: 18 }, // Transfer Duty
+    { wch: 20 }, // Conveyancing Fee
+    { wch: 18 }, // Auctioneer Fee
+    { wch: 22 }, // Municipal Arrears
+    { wch: 24 }, // Day-1 Capital Required
+    { wch: 16 }, // Gross Yield
+    { wch: 22 }, // Net Monthly Cashflow
+    { wch: 22 }, // Projected Flip Profit
+    { wch: 18 }, // Projected Flip ROI
+    { wch: 22 }, // Projected Dev TDC
+    { wch: 22 }, // Projected Dev GDV
+    { wch: 20 }, // Projected Dev POC
+    { wch: 34 }, // Zoning Summary
+    { wch: 22 }, // PIE Act Occupancy Status
   ];
   XLSX.utils.book_append_sheet(wb, wsOpp, 'Pipeline Deals');
 
   // -------------------------------------------------------------
-  // Sheet 6: Private Funding
+  // Sheet 7: Private Funding
   // -------------------------------------------------------------
   const fundingHeaders = [
     'Funder / Lender Name',
@@ -399,10 +669,16 @@ export async function exportPortfolioToExcel(data: ExportPortfolioData) {
     'Entity / Contact Person',
     'Phone / Email',
     'Linked Deal / Project',
+    'Disbursement Date',
+    'Maturity Date',
+    'Delay Extension Days',
     'Principal Facility (ZAR)',
+    'Drawn Amount (ZAR)',
     'Total Repaid (ZAR)',
     'Total Interest Serviced (ZAR)',
     'Outstanding Balance (ZAR)',
+    'Undrawn Standby Capacity (ZAR)',
+    'Tranches Progress',
     'Last Payment Reference',
     'Return Terms Type',
     'Promised Return Rate (%)',
@@ -412,25 +688,23 @@ export async function exportPortfolioToExcel(data: ExportPortfolioData) {
   ];
 
   const fundingData = funding.map((f) => {
-    let drawn = 0;
-    if (f.status === 'Settled' || f.status === 'Standby') {
-      drawn = 0;
-    } else if (f.tranches && f.tranches.length > 0) {
-      drawn = f.tranches.filter((t) => t.isDisbursed).reduce((s, t) => s + t.amountZAR, 0);
-    } else if (f.status === 'Active' || f.status === 'Accruing' || f.status === 'Matured') {
-      drawn = f.capitalAmountZAR || 0;
-    }
-    const outstanding = Math.max(0, drawn - (f.totalRepaidZAR || 0));
+    const metrics = computeFundingDrawnAndUndrawn(f);
     return [
       f.lenderName,
       f.fundingType,
       f.entityOrContact || 'N/A',
       f.emailPhone || 'N/A',
       f.linkedDealName || f.linkedDealId || 'General Liquidity Pool',
+      f.disbursementDate || '',
+      f.maturityDate || '',
+      f.delayExtensionDays || 0,
       f.capitalAmountZAR || 0,
+      metrics.drawnAmountZAR,
       f.totalRepaidZAR || 0,
       f.totalInterestPaidZAR || 0,
-      outstanding,
+      metrics.outstandingBalanceZAR,
+      metrics.undrawnCapacityZAR,
+      metrics.tranchesProgress,
       f.lastPaymentReference || 'N/A',
       f.returnTermsType,
       f.returnRatePercent || 0,
@@ -442,23 +716,40 @@ export async function exportPortfolioToExcel(data: ExportPortfolioData) {
 
   const wsFunding = XLSX.utils.aoa_to_sheet([fundingHeaders, ...fundingData]);
   wsFunding['!cols'] = [
-    { wch: 24 },
-    { wch: 22 },
-    { wch: 26 },
-    { wch: 24 },
-    { wch: 26 },
-    { wch: 22 },
-    { wch: 18 },
-    { wch: 24 },
-    { wch: 22 },
-    { wch: 24 },
-    { wch: 20 },
-    { wch: 22 },
-    { wch: 18 },
-    { wch: 14 },
-    { wch: 30 },
+    { wch: 24 }, // Funder / Lender Name
+    { wch: 22 }, // Funding Category
+    { wch: 26 }, // Entity / Contact Person
+    { wch: 24 }, // Phone / Email
+    { wch: 26 }, // Linked Deal / Project
+    { wch: 16 }, // Disbursement Date
+    { wch: 16 }, // Maturity Date
+    { wch: 18 }, // Delay Extension Days
+    { wch: 22 }, // Principal Facility
+    { wch: 20 }, // Drawn Amount
+    { wch: 18 }, // Total Repaid
+    { wch: 24 }, // Total Interest Serviced
+    { wch: 22 }, // Outstanding Balance
+    { wch: 26 }, // Undrawn Standby Capacity
+    { wch: 26 }, // Tranches Progress
+    { wch: 24 }, // Last Payment Reference
+    { wch: 20 }, // Return Terms Type
+    { wch: 22 }, // Promised Return Rate
+    { wch: 18 }, // Payment Schedule
+    { wch: 14 }, // Status
+    { wch: 30 }, // Notes
   ];
   XLSX.utils.book_append_sheet(wb, wsFunding, 'Private Funding');
+
+  return wb;
+}
+
+/**
+ * Builds and downloads a multi-tab Microsoft Excel (.xlsx) workbook
+ * containing high-fidelity financial tables across the entire portfolio.
+ */
+export async function exportPortfolioToExcel(data: ExportPortfolioData) {
+  const XLSX = await import('xlsx');
+  const wb = buildPortfolioWorkbook(XLSX, data);
 
   // -------------------------------------------------------------
   // Trigger Browser Download
@@ -470,13 +761,14 @@ export async function exportPortfolioToExcel(data: ExportPortfolioData) {
 /**
  * Builds and downloads an entity-neutral SARS Rental Income & Expenses Tax Report (.xlsx)
  * covering both Individual (ITR12) and Corporate (ITR14) schedules:
- * - Gross Rental Income
+ * - Gross Rental Income & Ancillary Income
  * - Rates & Taxes
  * - Body Corporate / HOA Levies
  * - Section 11(a) Bond Interest (Deductible Expense - excludes non-deductible capital repayments)
  * - Agent Commission / Management Fees
  * - Insurance Premiums
  * - Repairs & Maintenance
+ * - Communal Services OpEx & Prepaid Vending Fees
  * - Bad Debts Written Off
  * - Section 13sex Allowance
  * - Net Taxable Rental Income / Loss (official rental source codes 4210 Profit / 4211 Loss)
@@ -499,12 +791,15 @@ export async function exportITR12TaxReport(rentals: RentalProperty[], taxYear: n
     'Address',
     'City',
     'Gross Rental Income',
+    'Ancillary Income',
     'Rates & Taxes',
     'Body Corporate / HOA Levies',
     'Section 11(a) Bond Interest (Deductible Expense)',
     'Agent Commission / Management Fees',
     'Insurance Premiums',
     'Repairs & Maintenance',
+    'Communal Services OpEx',
+    'Prepaid Vending Fees',
     'Bad Debts Written Off',
     'Section 13sex Allowance',
     'Total Allowable Deductions',
@@ -512,12 +807,15 @@ export async function exportITR12TaxReport(rentals: RentalProperty[], taxYear: n
   ];
 
   let totalGross = 0;
+  let totalAncillary = 0;
   let totalRates = 0;
   let totalLevies = 0;
   let totalInterest = 0;
   let totalAgent = 0;
   let totalInsurance = 0;
   let totalRepairs = 0;
+  let totalCommunal = 0;
+  let totalVending = 0;
   let totalBadDebts = 0;
   let totalSec13 = 0;
   let totalDeductionsAll = 0;
@@ -531,6 +829,7 @@ export async function exportITR12TaxReport(rentals: RentalProperty[], taxYear: n
     const getTxAmount = (cat: string) => tx.filter((t) => t.category === cat).reduce((s, t) => s + (t.amountZAR || 0), 0);
 
     const grossRent = getTxAmount('gross_rent') || ((r.monthlyGrossRentZAR || 0) * 12);
+    const ancillaryIncome = (r.ancillaryIncomes || []).reduce((s, a) => s + (a.monthlyRentZAR || 0), 0) * 12;
     const rates = getTxAmount('rates_taxes') || ((r.monthlyRatesTaxesZAR || 0) * 12);
     const levies = isFreehold ? 0 : (getTxAmount('levies') || ((r.monthlyLeviesZAR || 0) * 12));
 
@@ -554,19 +853,34 @@ export async function exportITR12TaxReport(rentals: RentalProperty[], taxYear: n
 
     const insurance = isFreehold ? (getTxAmount('insurance') || (r.annualBuildingInsuranceZAR || 0)) : 0;
     const repairs = getTxAmount('repairs_maintenance') || ((r.monthlyMaintenanceReserveZAR || 0) * 12);
+    const communalServices = (r.monthlyCommunalServicesZAR || 0) * 12;
+    const prepaidVending = (r.monthlyPrepaidVendingFeeZAR || 0) * 12;
     const badDebts = (r.arrearsWriteOffs || []).reduce((sum, w) => sum + (w.amountZAR || 0), 0);
     const sec13 = r.section13sexAnnualShieldZAR || 0;
 
-    const deductions = rates + levies + bondInterest + (agentFee || 0) + insurance + repairs + badDebts + sec13;
-    const netTaxable = grossRent - deductions;
+    const deductions =
+      rates +
+      levies +
+      bondInterest +
+      (agentFee || 0) +
+      insurance +
+      repairs +
+      communalServices +
+      prepaidVending +
+      badDebts +
+      sec13;
+    const netTaxable = grossRent + ancillaryIncome - deductions;
 
     totalGross += grossRent;
+    totalAncillary += ancillaryIncome;
     totalRates += rates;
     totalLevies += levies;
     totalInterest += bondInterest;
     totalAgent += (agentFee || 0);
     totalInsurance += insurance;
     totalRepairs += repairs;
+    totalCommunal += communalServices;
+    totalVending += prepaidVending;
     totalBadDebts += badDebts;
     totalSec13 += sec13;
     totalDeductionsAll += deductions;
@@ -577,12 +891,15 @@ export async function exportITR12TaxReport(rentals: RentalProperty[], taxYear: n
       r.address,
       r.city,
       grossRent,
+      ancillaryIncome,
       rates,
       levies,
       bondInterest,
       agentFee || 0,
       insurance,
       repairs,
+      communalServices,
+      prepaidVending,
       badDebts,
       sec13,
       deductions,
@@ -595,12 +912,15 @@ export async function exportITR12TaxReport(rentals: RentalProperty[], taxYear: n
     '',
     '',
     totalGross,
+    totalAncillary,
     totalRates,
     totalLevies,
     totalInterest,
     totalAgent,
     totalInsurance,
     totalRepairs,
+    totalCommunal,
+    totalVending,
     totalBadDebts,
     totalSec13,
     totalDeductionsAll,
@@ -614,10 +934,13 @@ export async function exportITR12TaxReport(rentals: RentalProperty[], taxYear: n
     { wch: 16 },
     { wch: 22 },
     { wch: 20 },
+    { wch: 20 },
     { wch: 26 },
     { wch: 44 },
     { wch: 32 },
     { wch: 20 },
+    { wch: 22 },
+    { wch: 24 },
     { wch: 22 },
     { wch: 24 },
     { wch: 26 },

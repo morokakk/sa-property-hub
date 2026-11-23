@@ -6,6 +6,9 @@ import {
   DealSource,
   AmenityScorecard,
   UtilityStatement,
+  Province,
+  DealStrategy,
+  Lease,
 } from '@/types';
 import { computeAcquisitionCosts } from '@/lib/calculations/sarsTax';
 import { calculateDealMetrics, calculateMonthlyBondRepayment } from '@/lib/calculations/propertyMetrics';
@@ -25,6 +28,19 @@ export interface ParseResult<T> {
   warnings: string[];
 }
 
+export const ALL_SA_PROVINCES: readonly Province[] = [
+  'Gauteng',
+  'Western Cape',
+  'KwaZulu-Natal',
+  'Eastern Cape',
+  'Free State',
+  'Limpopo',
+  'Mpumalanga',
+  'North West',
+  'Northern Cape',
+  'Other',
+] as const;
+
 /**
  * Normalizes header string by trimming, converting to lower case,
  * and stripping asterisks, parentheses, and common unit suffixes.
@@ -40,6 +56,7 @@ export function normalizeHeader(header: string): string {
     .replace(/\(zar\)/g, '')
     .replace(/\(%\)/g, '')
     .replace(/\(months\)/g, '')
+    .replace(/\(years\)/g, '')
     .replace(/\(yyyy-mm-dd\)/g, '')
     .replace(/\(yyyy-mm\)/g, '')
     .replace(/\(m²\)/gi, '')
@@ -82,6 +99,114 @@ export function parsePropertyType(val: unknown): PropertyTitleType {
   return 'Sectional Title Apartment';
 }
 
+export function parseProvince(val: unknown): Province | undefined {
+  if (val === undefined || val === null) return undefined;
+  const str = val.toString().trim().toLowerCase();
+  if (!str || str === 'n/a') return undefined;
+  if (str === 'kzn' || str === 'kwazulu natal') return 'KwaZulu-Natal';
+  return ALL_SA_PROVINCES.find((p) => p.toLowerCase() === str);
+}
+
+export function parseBooleanFlag(val: unknown): boolean | undefined {
+  if (val === undefined || val === null) return undefined;
+  if (typeof val === 'boolean') return val;
+  if (typeof val === 'number') return val === 1 ? true : val === 0 ? false : undefined;
+  const str = val.toString().trim().toLowerCase();
+  if (!str) return undefined;
+  if (str === 'yes' || str === 'true' || str === '1' || str === 'y') return true;
+  if (str === 'no' || str === 'false' || str === '0' || str === 'n') return false;
+  return undefined;
+}
+
+export function parseDealStrategy(val: unknown): DealStrategy | undefined {
+  if (val === undefined || val === null) return undefined;
+  const str = val.toString().trim().toLowerCase();
+  if (!str) return undefined;
+  if (str === 'flip') return 'Flip';
+  if (str === 'rental') return 'Rental';
+  if (str === 'brrrr') return 'BRRRR';
+  if (str === 'development') return 'Development';
+  return undefined;
+}
+
+export function parseFlipProjectStrategy(val: unknown): 'flip_for_sale' | 'build_to_rent' | undefined {
+  if (val === undefined || val === null) return undefined;
+  const str = val.toString().trim().toLowerCase();
+  if (!str) return undefined;
+  if (str === 'build_to_rent' || str === 'build to rent' || str === 'build-to-rent' || str === 'btr') {
+    return 'build_to_rent';
+  }
+  if (str === 'flip_for_sale' || str === 'flip for sale' || str === 'flip-for-sale' || str === 'flip') {
+    return 'flip_for_sale';
+  }
+  return undefined;
+}
+
+export function parseTaxEntityType(val: unknown): 'Company (27%)' | 'Individual (45%)' | 'Pre-Tax' | undefined {
+  if (val === undefined || val === null) return undefined;
+  const str = val.toString().trim().toLowerCase();
+  if (!str) return undefined;
+  if (str.includes('company') || str.includes('27')) return 'Company (27%)';
+  if (str.includes('individual') || str.includes('45')) return 'Individual (45%)';
+  if (str.includes('pre-tax') || str.includes('pretax')) return 'Pre-Tax';
+  return undefined;
+}
+
+export function parseUtilityType(val: unknown): 'postpaid' | 'prepaid_submeter' | 'hybrid' | undefined {
+  if (val === undefined || val === null) return undefined;
+  const str = val.toString().trim().toLowerCase();
+  if (!str) return undefined;
+  if (str.includes('prepaid')) return 'prepaid_submeter';
+  if (str === 'hybrid') return 'hybrid';
+  if (str === 'postpaid') return 'postpaid';
+  return undefined;
+}
+
+function getFirstColVal(headerMap: Map<string, number>, row: unknown[], keys: string[]): unknown {
+  for (const key of keys) {
+    const idx = headerMap.get(key);
+    if (idx !== undefined) {
+      return row[idx];
+    }
+  }
+  return undefined;
+}
+
+export function parseDateString(val: unknown): string {
+  if (val === undefined || val === null) return '';
+  if (val instanceof Date && !isNaN(val.getTime())) {
+    return val.toISOString().split('T')[0];
+  }
+  const fromExcelSerial = (serial: number): string =>
+    new Date(Date.UTC(1899, 11, 30) + Math.floor(serial) * 86_400_000)
+      .toISOString()
+      .split('T')[0];
+
+  if (typeof val === 'number' && Number.isFinite(val) && val > 20_000 && val < 100_000) {
+    return fromExcelSerial(val);
+  }
+  const str = val.toString().trim();
+  if (!str || str.toLowerCase() === 'n/a' || str.toLowerCase() === 'ongoing') {
+    return '';
+  }
+  if (/^\d{5}$/.test(str)) {
+    const num = Number(str);
+    if (num > 20_000 && num < 100_000) {
+      return fromExcelSerial(num);
+    }
+  }
+  return str;
+}
+
+function parseMonthString(val: unknown): string {
+  const parsed = parseDateString(val);
+  if (!parsed) return '';
+  if (/^\d{4}-\d{2}-\d{2}$/.test(parsed)) {
+    return parsed.slice(0, 7);
+  }
+  return parsed;
+}
+
 // -------------------------------------------------------------
 // TEMPLATE DOWNLOAD GENERATORS
 // -------------------------------------------------------------
@@ -97,6 +222,9 @@ export async function downloadPipelineTemplate() {
     'Province',
     'Property Type',
     'Source',
+    'Strategy',
+    'Units',
+    'Floor Area (m²)',
     'Target Purchase Price (ZAR) *',
     'Open Market Value (ZAR) *',
     'Estimated Rehab Cost (ZAR)',
@@ -104,6 +232,13 @@ export async function downloadPipelineTemplate() {
     'Monthly Levies (ZAR)',
     'Monthly Rates & Taxes (ZAR)',
     'Annual Insurance (ZAR)',
+    'Communal Services (ZAR)',
+    'VAT-Inclusive Developer Sale',
+    'Loan Term (Years)',
+    'Extra Monthly Payment (ZAR)',
+    'Refinance LTV (%)',
+    'Tenant Placement Fee (%)',
+    'Annual SPV Admin Fee (ZAR)',
     'AGM Date (YYYY-MM-DD)',
     'Notes',
   ];
@@ -116,6 +251,9 @@ export async function downloadPipelineTemplate() {
       'Gauteng',
       'Freehold House',
       'Private Agent',
+      'Flip',
+      1,
+      280,
       2850000,
       3500000,
       150000,
@@ -123,6 +261,13 @@ export async function downloadPipelineTemplate() {
       0, // Freehold Levies strictly R0
       2100,
       12000,
+      0,
+      'No',
+      20,
+      0,
+      75,
+      0,
+      0,
       '',
       'Prime residential location, excellent candidate for cosmetic upgrade.',
     ],
@@ -133,6 +278,9 @@ export async function downloadPipelineTemplate() {
       'Western Cape',
       'Sectional Title Apartment',
       'Direct Owner',
+      'Rental',
+      1,
+      88,
       1950000,
       2400000,
       45000,
@@ -140,6 +288,13 @@ export async function downloadPipelineTemplate() {
       2450,
       1300,
       8500,
+      0,
+      'No',
+      20,
+      1500,
+      75,
+      0,
+      0,
       '2026-10-15',
       'High short-term and long-term rental demand in Atlantic Seaboard.',
     ],
@@ -150,6 +305,9 @@ export async function downloadPipelineTemplate() {
       'KwaZulu-Natal',
       'Townhouse / Cluster',
       'Distressed Sale / Repo',
+      'BRRRR',
+      2,
+      195,
       1650000,
       2100000,
       80000,
@@ -157,6 +315,13 @@ export async function downloadPipelineTemplate() {
       1800,
       1150,
       7200,
+      0,
+      'No',
+      20,
+      0,
+      75,
+      5,
+      6000,
       '',
       'Bank repo opportunity, priced significantly below market value.',
     ],
@@ -164,21 +329,31 @@ export async function downloadPipelineTemplate() {
 
   const ws = XLSX.utils.aoa_to_sheet([headers, ...sampleRows]);
   ws['!cols'] = [
-    { wch: 30 },
-    { wch: 32 },
-    { wch: 18 },
-    { wch: 16 },
-    { wch: 26 },
-    { wch: 22 },
-    { wch: 26 },
-    { wch: 24 },
-    { wch: 26 },
-    { wch: 28 },
-    { wch: 22 },
-    { wch: 24 },
-    { wch: 22 },
-    { wch: 22 },
-    { wch: 45 },
+    { wch: 30 }, // Deal Title
+    { wch: 32 }, // Address
+    { wch: 18 }, // City
+    { wch: 16 }, // Province
+    { wch: 26 }, // Property Type
+    { wch: 22 }, // Source
+    { wch: 14 }, // Strategy
+    { wch: 10 }, // Units
+    { wch: 16 }, // Floor Area
+    { wch: 26 }, // Target Purchase Price
+    { wch: 24 }, // Open Market Value
+    { wch: 26 }, // Estimated Rehab Cost
+    { wch: 28 }, // Monthly Rental Estimate
+    { wch: 22 }, // Monthly Levies
+    { wch: 24 }, // Monthly Rates & Taxes
+    { wch: 22 }, // Annual Insurance
+    { wch: 22 }, // Communal Services
+    { wch: 26 }, // VAT-Inclusive Developer Sale
+    { wch: 18 }, // Loan Term
+    { wch: 24 }, // Extra Monthly Payment
+    { wch: 18 }, // Refinance LTV
+    { wch: 22 }, // Tenant Placement Fee
+    { wch: 24 }, // Annual SPV Admin Fee
+    { wch: 22 }, // AGM Date
+    { wch: 45 }, // Notes
   ];
 
   XLSX.utils.book_append_sheet(wb, ws, 'Pipeline_Import');
@@ -193,17 +368,26 @@ export async function downloadRentalsTemplate() {
     'Property Title *',
     'Address *',
     'City *',
+    'Province',
     'Property Type',
+    'Units',
+    'Floor Area (m²)',
     'Source',
     'Market Value (ZAR) *',
     'Purchase Price (ZAR) *',
     'Purchase Date (YYYY-MM-DD)',
     'Outstanding Bond (ZAR)',
     'Bond Interest Rate (%)',
+    'Loan Term (Years)',
     'Monthly Bond Repayment (ZAR)',
+    'Extra Monthly Bond Payment (ZAR)',
     'Monthly Gross Rent (ZAR) *',
     'Monthly Levies (ZAR)',
     'Monthly Rates & Taxes (ZAR)',
+    'Annual Building Insurance (ZAR)',
+    'Utility Type',
+    'Communal / Serviced OpEx (ZAR)',
+    'Prepaid Vending Fee (ZAR)',
     'Municipal/Eskom Account No',
     'Management Type',
     'Agency Name',
@@ -212,6 +396,8 @@ export async function downloadRentalsTemplate() {
     'Monthly Agency Fee (ZAR)',
     'Agency Contact',
     'Monthly Maintenance Reserve (ZAR)',
+    'Section 13sex Annual Shield (ZAR)',
+    'Unpaid Utility Arrears (ZAR)',
     'Tenant Name',
     'Tenant Phone',
     'Tenant Email',
@@ -229,17 +415,26 @@ export async function downloadRentalsTemplate() {
       'Rosebank Urban Loft',
       '157 Jan Smuts Ave, Rosebank',
       'Johannesburg',
+      'Gauteng',
       'Sectional Title Apartment',
+      1,
+      78,
       'Private Agent',
       1650000,
       1450000,
       '2024-02-01',
       980000,
       11.75,
+      20,
       10580,
+      0,
       13500,
       1950,
       1100,
+      0,
+      'postpaid',
+      0,
+      0,
       '559235779',
       'Agency',
       'Pam Golding Rosebank',
@@ -248,6 +443,8 @@ export async function downloadRentalsTemplate() {
       1242,
       'agent@pamgolding.co.za',
       600,
+      0,
+      0,
       'Sipho Ndlovu',
       '+27 83 123 4567',
       'sipho.n@fintech.co.za',
@@ -263,17 +460,26 @@ export async function downloadRentalsTemplate() {
       'Claremont Garden Villa',
       '22 Herschel Road, Claremont',
       'Cape Town',
+      'Western Cape',
       'Freehold House',
+      1,
+      240,
       'Direct Owner',
       3200000,
       2850000,
       '2023-08-15',
       1800000,
       11.5,
+      20,
       19170,
+      2000,
       25000,
       0, // Freehold levies strictly R0
       2400,
+      14400,
+      'prepaid_submeter',
+      0,
+      150,
       '',
       'Self-Managed',
       '',
@@ -282,6 +488,8 @@ export async function downloadRentalsTemplate() {
       0,
       '',
       1000,
+      0,
+      0,
       'Claire van der Merwe',
       '+27 82 987 6543',
       'claire.vdm@designstudio.co.za',
@@ -297,17 +505,26 @@ export async function downloadRentalsTemplate() {
       'Clearwater Village 128',
       '128 Clearwater Village, Atlasville',
       'Boksburg',
+      'Gauteng',
       'Sectional Title Apartment',
+      1,
+      68,
       'iGrow Rentals',
       1150000,
       980000,
       '2024-06-10',
       750000,
       11.75,
+      20,
       8100,
+      0,
       9500,
       1450,
       850,
+      0,
+      'postpaid',
+      0,
+      0,
       '559235779',
       'Agency',
       'iGrow Rentals',
@@ -316,6 +533,8 @@ export async function downloadRentalsTemplate() {
       928,
       'rentals@igrow.co.za',
       500,
+      0,
+      0,
       'Bongani June Mwale',
       '+27 71 234 5678',
       'bongani.m@gmail.com',
@@ -334,17 +553,26 @@ export async function downloadRentalsTemplate() {
     { wch: 26 }, // Property Title
     { wch: 32 }, // Address
     { wch: 18 }, // City
+    { wch: 16 }, // Province
     { wch: 24 }, // Property Type
+    { wch: 10 }, // Units
+    { wch: 16 }, // Floor Area
     { wch: 20 }, // Source
     { wch: 20 }, // Market Value
     { wch: 20 }, // Purchase Price
     { wch: 24 }, // Purchase Date
     { wch: 22 }, // Outstanding Bond
     { wch: 20 }, // Bond Interest Rate
+    { wch: 18 }, // Loan Term
     { wch: 26 }, // Monthly Bond Repayment
+    { wch: 28 }, // Extra Monthly Bond Payment
     { wch: 24 }, // Monthly Gross Rent
     { wch: 20 }, // Monthly Levies
     { wch: 24 }, // Monthly Rates & Taxes
+    { wch: 26 }, // Annual Building Insurance
+    { wch: 18 }, // Utility Type
+    { wch: 26 }, // Communal / Serviced OpEx
+    { wch: 22 }, // Prepaid Vending Fee
     { wch: 26 }, // Municipal/Eskom Account No
     { wch: 18 }, // Management Type
     { wch: 24 }, // Agency Name
@@ -353,6 +581,8 @@ export async function downloadRentalsTemplate() {
     { wch: 26 }, // Monthly Agency Fee
     { wch: 28 }, // Agency Contact
     { wch: 24 }, // Monthly Maintenance Reserve
+    { wch: 28 }, // Section 13sex Annual Shield
+    { wch: 24 }, // Unpaid Utility Arrears
     { wch: 22 }, // Tenant Name
     { wch: 18 }, // Tenant Phone
     { wch: 28 }, // Tenant Email
@@ -362,7 +592,7 @@ export async function downloadRentalsTemplate() {
     { wch: 20 }, // Annual Escalation
     { wch: 22 }, // Bond Effective Month
     { wch: 22 }, // AGM Date
-    { wch: 14 }, // Status
+    { wch: 16 }, // Status
   ];
 
   XLSX.utils.book_append_sheet(wb, ws, 'Rentals_Import');
@@ -377,9 +607,15 @@ export async function downloadFlipsTemplate() {
     'Project Title *',
     'Address *',
     'City *',
+    'Province',
     'Property Type',
+    'Units',
+    'Floor Area (m²)',
+    'Project Strategy',
+    'Tax Entity Type',
     'Purchase Price (ZAR) *',
     'Acquisition Costs (ZAR)',
+    'Section 118 Municipal Arrears (ZAR)',
     'Renovation Budget (ZAR) *',
     'Target Exit Price (ZAR) *',
     'Estimated Duration (Months)',
@@ -400,9 +636,15 @@ export async function downloadFlipsTemplate() {
       'Parkhurst Mid-Century Modernization',
       '42 11th Street, Parkhurst',
       'Johannesburg',
+      'Gauteng',
       'Freehold House',
+      1,
+      220,
+      'flip_for_sale',
+      'Company (27%)',
       2100000,
       145000,
+      0,
       380000,
       3250000,
       5,
@@ -421,9 +663,15 @@ export async function downloadFlipsTemplate() {
       'Green Point Studio Flip',
       '18 Ocean View Drive, Green Point',
       'Cape Town',
+      'Western Cape',
       'Sectional Title Apartment',
+      1,
+      65,
+      'flip_for_sale',
+      'Individual (45%)',
       1400000,
       98000,
+      0,
       180000,
       2100000,
       4,
@@ -442,9 +690,15 @@ export async function downloadFlipsTemplate() {
       'Morningside Cluster Overhaul',
       '8 Rivonia Road, Sandton',
       'Johannesburg',
+      'Gauteng',
       'Townhouse / Cluster',
+      4,
+      240,
+      'build_to_rent',
+      'Company (27%)',
       1750000,
       115000,
+      18500,
       260000,
       2650000,
       6,
@@ -457,27 +711,37 @@ export async function downloadFlipsTemplate() {
       '2027-01-30',
       'Strip & Demolition',
       '',
-      'Complete bathroom and kitchen overhaul with exterior entertainment patio.',
+      'Multi-unit refurbishment with phased Build-to-Rent handover.',
     ],
   ];
 
   const ws = XLSX.utils.aoa_to_sheet([headers, ...sampleRows]);
   ws['!cols'] = [
-    { wch: 34 },
-    { wch: 32 },
-    { wch: 18 },
-    { wch: 24 },
-    { wch: 22 },
-    { wch: 24 },
-    { wch: 24 },
-    { wch: 22 },
-    { wch: 26 },
-    { wch: 26 },
-    { wch: 24 },
-    { wch: 32 },
-    { wch: 28 },
-    { wch: 22 },
-    { wch: 45 },
+    { wch: 34 }, // Project Title
+    { wch: 32 }, // Address
+    { wch: 18 }, // City
+    { wch: 16 }, // Province
+    { wch: 24 }, // Property Type
+    { wch: 10 }, // Units
+    { wch: 16 }, // Floor Area
+    { wch: 18 }, // Project Strategy
+    { wch: 18 }, // Tax Entity Type
+    { wch: 22 }, // Purchase Price
+    { wch: 24 }, // Acquisition Costs
+    { wch: 30 }, // Section 118 Municipal Arrears
+    { wch: 24 }, // Renovation Budget
+    { wch: 24 }, // Target Exit Price
+    { wch: 26 }, // Estimated Duration
+    { wch: 26 }, // Monthly Bond Payment
+    { wch: 22 }, // Monthly Levies
+    { wch: 26 }, // Monthly Rates & Taxes
+    { wch: 24 }, // Other Holding Costs
+    { wch: 26 }, // Monthly Holding Cost
+    { wch: 24 }, // Purchase Date
+    { wch: 32 }, // Target Completion Date
+    { wch: 28 }, // Current Phase
+    { wch: 22 }, // AGM Date
+    { wch: 45 }, // Notes
   ];
 
   XLSX.utils.book_append_sheet(wb, ws, 'Flips_Import');
@@ -544,17 +808,19 @@ export function parsePipelineRows(rawRows: unknown[][]): ParseResult<Opportunity
 
   const headerMap = buildHeaderIndexMap(rawRows[0]);
 
+  const hasAnyHeader = (keys: string[]) => keys.some((k) => headerMap.has(k));
+
   // Mandatory columns for pipeline deals
   const mandatoryCols = [
-    { key: 'deal title', label: 'Deal Title' },
-    { key: 'address', label: 'Address' },
-    { key: 'city', label: 'City' },
-    { key: 'target purchase price', label: 'Target Purchase Price (ZAR)' },
-    { key: 'open market value', label: 'Open Market Value (ZAR)' },
+    { keys: ['deal title'], label: 'Deal Title' },
+    { keys: ['address'], label: 'Address' },
+    { keys: ['city'], label: 'City' },
+    { keys: ['target purchase price', 'purchase price / max bid', 'purchase price'], label: 'Target Purchase Price (ZAR)' },
+    { keys: ['open market value'], label: 'Open Market Value (ZAR)' },
   ];
 
   for (const m of mandatoryCols) {
-    if (!headerMap.has(m.key)) {
+    if (!hasAnyHeader(m.keys)) {
       errors.push({
         row: 1,
         column: m.label,
@@ -586,17 +852,84 @@ export function parsePipelineRows(rawRows: unknown[][]): ParseResult<Opportunity
     const title = getColVal(row, 'deal title')?.toString().trim();
     const address = getColVal(row, 'address')?.toString().trim();
     const city = getColVal(row, 'city')?.toString().trim() || 'Johannesburg';
-    const provinceRaw = getColVal(row, 'province')?.toString().trim() || 'Gauteng';
-    const propertyTypeRaw = getColVal(row, 'property type');
-    const sourceRaw = getColVal(row, 'source')?.toString().trim() || 'Private Agent';
-    const rawPurchasePrice = getColVal(row, 'target purchase price');
+    const provinceRaw = getColVal(row, 'province');
+    const propertyTypeRaw = getFirstColVal(headerMap, row, ['property type', 'title type']);
+    const sourceRaw = getFirstColVal(headerMap, row, ['source', 'source channel'])?.toString().trim() || 'Private Agent';
+    const strategy = parseDealStrategy(getFirstColVal(headerMap, row, ['strategy', 'deal strategy']));
+    const rawUnits = getFirstColVal(headerMap, row, ['units', 'number of units']);
+    const rawFloorArea = getFirstColVal(headerMap, row, ['floor area', 'floor area sqm']);
+    const parsedUnits = parseNumber(rawUnits);
+    const numberOfUnits = parsedUnits !== null && parsedUnits > 0 ? Math.round(parsedUnits) : 1;
+    const parsedFloorArea = parseNumber(rawFloorArea);
+    const floorAreaSqm = parsedFloorArea !== null && parsedFloorArea > 0 ? parsedFloorArea : undefined;
+
+    const rawPurchasePrice = getFirstColVal(headerMap, row, [
+      'target purchase price',
+      'purchase price / max bid',
+      'purchase price',
+    ]);
     const rawOpenMarketValue = getColVal(row, 'open market value');
-    const rawRehabCost = getColVal(row, 'estimated rehab cost');
+    const rawRehabCost = getFirstColVal(headerMap, row, [
+      'estimated rehab cost',
+      'estimated rehab capex',
+      'rehab capex',
+    ]);
     const rawRentalEstimate = getColVal(row, 'monthly rental estimate');
     const rawLevies = getColVal(row, 'monthly levies');
-    const rawRates = getColVal(row, 'monthly rates & taxes') ?? getColVal(row, 'monthly rates');
+    const rawRates = getFirstColVal(headerMap, row, ['monthly rates & taxes', 'monthly rates']);
     const rawInsurance = getColVal(row, 'annual insurance');
-    const agmDateRaw = getColVal(row, 'agm date')?.toString().trim();
+    const rawCommunal = getFirstColVal(headerMap, row, [
+      'communal services',
+      'communal / serviced opex',
+      'monthly communal services',
+    ]);
+    const isVatInclusiveDeveloperSale = parseBooleanFlag(
+      getFirstColVal(headerMap, row, [
+        'vat-inclusive developer sale',
+        'vat inclusive developer sale',
+        'vat inclusive',
+      ])
+    );
+    const rawLoanTerm = getColVal(row, 'loan term');
+    const parsedLoanTerm = parseNumber(rawLoanTerm);
+    const loanTermYears = parsedLoanTerm !== null && parsedLoanTerm > 0 ? Math.round(parsedLoanTerm) : 20;
+    const rawExtraPayment = getFirstColVal(headerMap, row, [
+      'extra monthly payment',
+      'extra monthly bond payment',
+    ]);
+    const parsedExtraPayment = parseNumber(rawExtraPayment);
+    const extraMonthlyPaymentZAR =
+      parsedExtraPayment !== null && parsedExtraPayment > 0 ? parsedExtraPayment : undefined;
+    const rawRefinanceLtv = getColVal(row, 'refinance ltv');
+    const parsedRefinanceLtv = parseNumber(rawRefinanceLtv);
+    const refinanceLtvPercent =
+      parsedRefinanceLtv !== null && parsedRefinanceLtv > 0 ? parsedRefinanceLtv : undefined;
+    const rawPlacementFee = getColVal(row, 'tenant placement fee');
+    const parsedPlacementFee = parseNumber(rawPlacementFee);
+    const tenantPlacementFeePercent =
+      parsedPlacementFee !== null && parsedPlacementFee >= 0 ? parsedPlacementFee : undefined;
+    const rawSpvAdmin = getFirstColVal(headerMap, row, [
+      'annual spv admin fee',
+      'annual spv admin / audit fee',
+      'annual spv admin audit fee',
+    ]);
+    const parsedSpvAdmin = parseNumber(rawSpvAdmin);
+    const annualSpvAdminAuditFeeZAR =
+      parsedSpvAdmin !== null && parsedSpvAdmin >= 0 ? parsedSpvAdmin : undefined;
+    const rawAuctioneer = getFirstColVal(headerMap, row, ['auctioneer commission', 'auctioneer fee']);
+    const parsedAuctioneer = parseNumber(rawAuctioneer);
+    const auctioneerCommissionZAR =
+      parsedAuctioneer !== null && parsedAuctioneer > 0 ? parsedAuctioneer : undefined;
+    const rawMunicipalArrears = getFirstColVal(headerMap, row, [
+      'section 118 municipal arrears',
+      'municipal arrears',
+    ]);
+    const parsedMunicipalArrears = parseNumber(rawMunicipalArrears);
+    const municipalArrearsZAR =
+      parsedMunicipalArrears !== null && parsedMunicipalArrears > 0 ? parsedMunicipalArrears : undefined;
+
+    const statusRaw = getFirstColVal(headerMap, row, ['status', 'pipeline status'])?.toString().trim();
+    const agmDateRaw = parseDateString(getColVal(row, 'agm date'));
     const notes = getColVal(row, 'notes')?.toString().trim();
 
     if (!title) {
@@ -631,6 +964,9 @@ export function parsePipelineRows(rawRows: unknown[][]): ParseResult<Opportunity
     let levies = parseNumber(rawLevies) ?? 0;
     const rates = parseNumber(rawRates) ?? 0;
     const insurance = parseNumber(rawInsurance) ?? 0;
+    const parsedCommunal = parseNumber(rawCommunal);
+    const monthlyCommunalServicesZAR =
+      parsedCommunal !== null && parsedCommunal > 0 ? parsedCommunal : undefined;
 
     // SA Guardrail 1: Freehold property levies must strictly be R0
     const propertyType = parsePropertyType(propertyTypeRaw);
@@ -641,14 +977,25 @@ export function parsePipelineRows(rawRows: unknown[][]): ParseResult<Opportunity
 
     if (purchasePrice !== null && purchasePrice > 0 && openMarketValue !== null && openMarketValue > 0 && title && address) {
       // Calculate South African acquisition costs and deal metrics
-      const costs = computeAcquisitionCosts(purchasePrice, 80);
+      const costs = computeAcquisitionCosts(purchasePrice, 80, {
+        isVatInclusiveDeveloperSale: Boolean(isVatInclusiveDeveloperSale),
+      });
       const metrics = calculateDealMetrics({
+        strategy,
         purchasePrice,
+        openMarketValueZAR: openMarketValue,
+        numberOfUnits,
+        floorAreaSqm,
+        isVatInclusiveDeveloperSale,
+        tenantPlacementFeePercent,
+        annualSpvAdminAuditFeeZAR,
+        refinanceLtvPercent,
         estimatedRehabCost: rehabCost,
         monthlyRentalEstimate: rentalEstimate,
         monthlyLevies: levies,
         monthlyRatesTaxes: rates,
         annualInsurance: insurance,
+        monthlyCommunalServicesZAR,
         managementFeePercent: 8.0,
         agencyVatApplicable: true,
         vacancyRatePercent: 6.0,
@@ -657,7 +1004,10 @@ export function parsePipelineRows(rawRows: unknown[][]): ParseResult<Opportunity
         loanToValuePercent: 80,
         bondLTV: 80,
         interestRatePercent: 11.75,
-        loanTermYears: 20,
+        loanTermYears,
+        extraMonthlyPaymentZAR,
+        auctioneerCommissionZAR,
+        municipalArrearsZAR,
         costs,
       });
 
@@ -673,11 +1023,22 @@ export function parsePipelineRows(rawRows: unknown[][]): ParseResult<Opportunity
         compositeGrade: 'A-Grade (Prime Hub)',
       };
 
-      const validProvinces = ['Gauteng', 'Western Cape', 'KwaZulu-Natal', 'Eastern Cape', 'Free State', 'Other'] as const;
-      const province = validProvinces.includes(provinceRaw as any) ? (provinceRaw as any) : 'Gauteng';
+      const province = parseProvince(provinceRaw) ?? 'Gauteng';
 
       const validSources: DealSource[] = ['Private Agent', 'Direct Owner', 'High-Street Auction', 'Distressed Sale / Repo', 'iGrow Rentals'];
-      const source = validSources.includes(sourceRaw as any) ? (sourceRaw as DealSource) : 'Private Agent';
+      const source = validSources.find((s) => s.toLowerCase() === sourceRaw.toLowerCase()) ?? 'Private Agent';
+
+      const validStatuses: OpportunityDeal['status'][] = [
+        'Screening',
+        'Offer Submitted',
+        'Due Diligence',
+        'Promoted to Flip',
+        'Promoted to Rental',
+        'Promoted to Development',
+        'Passed',
+      ];
+      const status =
+        validStatuses.find((s) => s.toLowerCase() === statusRaw?.toLowerCase()) ?? 'Screening';
 
       deals.push({
         id: `opp-import-${Date.now()}-${r}`,
@@ -686,6 +1047,17 @@ export function parsePipelineRows(rawRows: unknown[][]): ParseResult<Opportunity
         city,
         province,
         propertyType,
+        ...(strategy ? { strategy } : {}),
+        numberOfUnits,
+        ...(floorAreaSqm !== undefined ? { floorAreaSqm } : {}),
+        ...(isVatInclusiveDeveloperSale !== undefined ? { isVatInclusiveDeveloperSale } : {}),
+        ...(refinanceLtvPercent !== undefined ? { refinanceLtvPercent } : {}),
+        ...(tenantPlacementFeePercent !== undefined ? { tenantPlacementFeePercent } : {}),
+        ...(annualSpvAdminAuditFeeZAR !== undefined ? { annualSpvAdminAuditFeeZAR } : {}),
+        ...(extraMonthlyPaymentZAR !== undefined ? { extraMonthlyPaymentZAR } : {}),
+        ...(monthlyCommunalServicesZAR !== undefined ? { monthlyCommunalServicesZAR } : {}),
+        ...(auctioneerCommissionZAR !== undefined ? { auctioneerCommissionZAR } : {}),
+        ...(municipalArrearsZAR !== undefined ? { municipalArrearsZAR } : {}),
         agmDate: agmDateRaw || undefined,
         source,
         openMarketValueZAR: openMarketValue,
@@ -707,7 +1079,7 @@ export function parsePipelineRows(rawRows: unknown[][]): ParseResult<Opportunity
         bondLTV: 80,
         depositZAR: Math.round(purchasePrice * 0.2),
         interestRatePercent: 11.75,
-        loanTermYears: 20,
+        loanTermYears,
         costs,
         grossYield: metrics.grossYield,
         capRate: metrics.capRate,
@@ -716,7 +1088,7 @@ export function parsePipelineRows(rawRows: unknown[][]): ParseResult<Opportunity
         initialCapitalRequired: metrics.initialCapitalRequired,
         projectedFlipNetProfit: metrics.projectedFlipNetProfit,
         projectedFlipRoi: metrics.projectedFlipRoi,
-        status: 'Screening',
+        status,
         notes: notes || 'Imported via Excel Batch Engine',
         createdAt: todayStr,
       });
@@ -747,6 +1119,22 @@ export function parseRentalsRows(rawRows: unknown[][]): ParseResult<RentalProper
 
   const headerMap = buildHeaderIndexMap(rawRows[0]);
 
+  // Distinguish 'Agency Commission (ZAR)' vs 'Agency Commission (%)' before normalization collisions
+  let agencyCommPercentIdx: number | undefined;
+  let agencyCommZarIdx: number | undefined;
+  rawRows[0].forEach((cell, idx) => {
+    if (cell !== undefined && cell !== null) {
+      const rawStr = cell.toString().trim().toLowerCase();
+      if (normalizeHeader(rawStr) === 'agency commission') {
+        if (rawStr.includes('(zar)') && !rawStr.includes('%')) {
+          agencyCommZarIdx = idx;
+        } else {
+          agencyCommPercentIdx = idx;
+        }
+      }
+    }
+  });
+
   // Mandatory columns for rentals
   const mandatoryCols = [
     { key: 'property title', label: 'Property Title' },
@@ -776,6 +1164,14 @@ export function parseRentalsRows(rawRows: unknown[][]): ParseResult<RentalProper
     return idx !== undefined ? row[idx] : undefined;
   };
 
+  const cleanPlaceholder = (val: unknown): string => {
+    const str = val?.toString().trim() ?? '';
+    if (!str || str.toLowerCase() === 'n/a' || str.toLowerCase() === 'ongoing') {
+      return '';
+    }
+    return str;
+  };
+
   const todayStr = new Date().toISOString().split('T')[0];
 
   for (let r = 1; r < rawRows.length; r++) {
@@ -789,9 +1185,10 @@ export function parseRentalsRows(rawRows: unknown[][]): ParseResult<RentalProper
     const title = getColVal(row, 'property title')?.toString().trim();
     const address = getColVal(row, 'address')?.toString().trim();
     const city = getColVal(row, 'city')?.toString().trim() || 'Johannesburg';
-    const propertyTypeRaw = getColVal(row, 'property type');
-    const rawUnits = getColVal(row, 'units') ?? getColVal(row, 'number of units');
-    const rawFloorArea = getColVal(row, 'floor area') ?? getColVal(row, 'floor area sqm');
+    const province = parseProvince(getColVal(row, 'province'));
+    const propertyTypeRaw = getFirstColVal(headerMap, row, ['property type', 'title type']);
+    const rawUnits = getFirstColVal(headerMap, row, ['units', 'number of units']);
+    const rawFloorArea = getFirstColVal(headerMap, row, ['floor area', 'floor area sqm']);
     const parsedUnits = parseNumber(rawUnits);
     const numberOfUnits = parsedUnits !== null && parsedUnits > 0 ? Math.round(parsedUnits) : 1;
     const parsedFloorArea = parseNumber(rawFloorArea);
@@ -799,13 +1196,54 @@ export function parseRentalsRows(rawRows: unknown[][]): ParseResult<RentalProper
     const sourceRaw = getColVal(row, 'source')?.toString().trim();
     const rawMarketValue = getColVal(row, 'market value');
     const rawPurchasePrice = getColVal(row, 'purchase price');
-    const purchaseDate = getColVal(row, 'purchase date')?.toString().trim() || todayStr;
+    const purchaseDate = parseDateString(getColVal(row, 'purchase date')) || todayStr;
     const rawOutstandingBond = getColVal(row, 'outstanding bond');
     const rawBondInterestRate = getColVal(row, 'bond interest rate');
-    const rawMonthlyBondPayment = getColVal(row, 'monthly bond repayment') ?? getColVal(row, 'monthly bond payment');
+    const rawLoanTerm = getColVal(row, 'loan term');
+    const parsedLoanTerm = parseNumber(rawLoanTerm);
+    const loanTermYears = parsedLoanTerm !== null && parsedLoanTerm > 0 ? Math.round(parsedLoanTerm) : undefined;
+    const rawMonthlyBondPayment = getFirstColVal(headerMap, row, ['monthly bond repayment', 'monthly bond payment']);
+    const rawExtraMonthlyPayment = getFirstColVal(headerMap, row, ['extra monthly bond payment', 'extra monthly payment']);
+    const parsedExtraMonthlyPayment = parseNumber(rawExtraMonthlyPayment);
+    const extraMonthlyPaymentZAR =
+      parsedExtraMonthlyPayment !== null && parsedExtraMonthlyPayment > 0 ? parsedExtraMonthlyPayment : undefined;
     const rawGrossRent = getColVal(row, 'monthly gross rent');
     const rawLevies = getColVal(row, 'monthly levies');
-    const rawRates = getColVal(row, 'monthly rates & taxes') ?? getColVal(row, 'monthly rates');
+    const rawRates = getFirstColVal(headerMap, row, ['monthly rates & taxes', 'monthly rates']);
+    const rawBuildingInsurance = getFirstColVal(headerMap, row, [
+      'annual building insurance',
+      'annual insurance',
+      'building insurance',
+    ]);
+    const parsedBuildingInsurance = parseNumber(rawBuildingInsurance);
+    const annualBuildingInsuranceZAR =
+      parsedBuildingInsurance !== null && parsedBuildingInsurance > 0 ? parsedBuildingInsurance : undefined;
+    const utilityType = parseUtilityType(getColVal(row, 'utility type'));
+    const rawCommunal = getFirstColVal(headerMap, row, [
+      'communal / serviced opex',
+      'communal services',
+      'monthly communal services',
+    ]);
+    const parsedCommunal = parseNumber(rawCommunal);
+    const monthlyCommunalServicesZAR =
+      parsedCommunal !== null && parsedCommunal > 0 ? parsedCommunal : undefined;
+    const rawVendingFee = getFirstColVal(headerMap, row, ['prepaid vending fee', 'monthly prepaid vending fee']);
+    const parsedVendingFee = parseNumber(rawVendingFee);
+    const monthlyPrepaidVendingFeeZAR =
+      parsedVendingFee !== null && parsedVendingFee > 0 ? parsedVendingFee : undefined;
+    const rawSec13Shield = getFirstColVal(headerMap, row, [
+      'section 13sex annual shield',
+      'section 13sex allowance',
+    ]);
+    const parsedSec13Shield = parseNumber(rawSec13Shield);
+    const section13sexAnnualShieldZAR =
+      parsedSec13Shield !== null && parsedSec13Shield > 0 ? parsedSec13Shield : undefined;
+    const rawUnpaidArrears = getFirstColVal(headerMap, row, [
+      'unpaid tenant utility arrears',
+      'unpaid utility arrears',
+    ]);
+    const unpaidUtilityArrearsZAR = Math.max(0, parseNumber(rawUnpaidArrears) ?? 0);
+
     const municipalAccountNo = (
       getColVal(row, 'municipal/eskom account no') ??
       getColVal(row, 'municipal account no') ??
@@ -815,18 +1253,21 @@ export function parseRentalsRows(rawRows: unknown[][]): ParseResult<RentalProper
     )?.toString().trim();
     const managementTypeRaw = getColVal(row, 'management type')?.toString().trim();
     const agencyName = getColVal(row, 'agency name')?.toString().trim() || '';
-    const rawAgencyComm = getColVal(row, 'agency commission');
+    const rawAgencyComm = agencyCommPercentIdx !== undefined ? row[agencyCommPercentIdx] : undefined;
     const agencyVatRaw = getColVal(row, 'agency vat applicable')?.toString().trim().toLowerCase();
     const agencyContact = getColVal(row, 'agency contact')?.toString().trim() || '';
     const rawMaintenanceReserve = getColVal(row, 'monthly maintenance reserve');
-    const tenantName = getColVal(row, 'tenant name')?.toString().trim() || 'Tenant Unassigned';
-    const tenantPhone = getColVal(row, 'tenant phone')?.toString().trim() || '+27 —';
-    const tenantEmail = getColVal(row, 'tenant email')?.toString().trim() || 'pending@tenant.co.za';
-    const leaseStartDate = getColVal(row, 'lease start date')?.toString().trim() || todayStr;
-    const leaseEndDate = getColVal(row, 'lease end date')?.toString().trim() || new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+    const tenantName = cleanPlaceholder(getColVal(row, 'tenant name')) || 'Tenant Unassigned';
+    const tenantPhone = cleanPlaceholder(getColVal(row, 'tenant phone')) || '+27 —';
+    const tenantEmail = cleanPlaceholder(getColVal(row, 'tenant email')) || 'pending@tenant.co.za';
+    const leaseStartDate = parseDateString(getColVal(row, 'lease start date')) || todayStr;
+    const leaseEndDate =
+      parseDateString(
+        getFirstColVal(headerMap, row, ['lease end date', 'lease expiry date', 'lease expiry'])
+      ) || new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
     const rawDepositHeld = getColVal(row, 'deposit held');
     const rawEscalation = getColVal(row, 'annual escalation');
-    const agmDate = getColVal(row, 'agm date')?.toString().trim() || undefined;
+    const agmDate = parseDateString(getColVal(row, 'agm date')) || undefined;
     const statusRaw = getColVal(row, 'status')?.toString().trim();
 
     if (!title) {
@@ -870,8 +1311,11 @@ export function parseRentalsRows(rawRows: unknown[][]): ParseResult<RentalProper
     const bondInterestRate = parseNumber(rawBondInterestRate) ?? 11.75;
     let monthlyBondPayment = parseNumber(rawMonthlyBondPayment);
     if (monthlyBondPayment === null) {
-      // Estimate PMT bond repayment if bond exists
-      monthlyBondPayment = outstandingBond > 0 ? calculateMonthlyBondRepayment(outstandingBond, bondInterestRate, 20) : 0;
+      // Estimate PMT bond repayment if bond exists, honoring optional Loan Term (Years)
+      monthlyBondPayment =
+        outstandingBond > 0
+          ? calculateMonthlyBondRepayment(outstandingBond, bondInterestRate, loanTermYears ?? 20)
+          : 0;
     }
 
     let levies = parseNumber(rawLevies) ?? 0;
@@ -889,27 +1333,32 @@ export function parseRentalsRows(rawRows: unknown[][]): ParseResult<RentalProper
 
     const isAgency = managementTypeRaw?.toLowerCase().includes('agency') || !!agencyName;
     const managementType: 'Self-Managed' | 'Agency' = isAgency ? 'Agency' : 'Self-Managed';
-    const agencyCommissionPercent = isAgency ? parseNumber(rawAgencyComm) ?? 8.0 : 0;
-    const agencyVatApplicable = isAgency ? (agencyVatRaw === 'no' || agencyVatRaw === 'false' ? false : true) : false;
-
-    const rawExplicitAgencyFee = getColVal(row, 'monthly agency fee') ?? getColVal(row, 'agency fee');
+    const rawExplicitAgencyFee =
+      (agencyCommZarIdx !== undefined ? row[agencyCommZarIdx] : undefined) ??
+      getFirstColVal(headerMap, row, ['monthly agency fee', 'agency fee']);
     const explicitAgentFee = parseNumber(rawExplicitAgencyFee);
+    const parsedAgencyCommPct = parseNumber(rawAgencyComm);
+    const agencyCommissionPercent = isAgency
+      ? (parsedAgencyCommPct ?? (explicitAgentFee !== null && explicitAgentFee >= 0 ? undefined : 8.0))
+      : 0;
+    const agencyVatApplicable = isAgency ? (agencyVatRaw === 'no' || agencyVatRaw === 'false' ? false : true) : false;
 
     let monthlyAgentFeeZAR = 0;
     if (explicitAgentFee !== null && explicitAgentFee >= 0) {
       monthlyAgentFeeZAR = Math.round(explicitAgentFee);
     } else if (isAgency && grossRent) {
-      const baseFee = grossRent * (agencyCommissionPercent / 100);
+      const baseFee = grossRent * ((agencyCommissionPercent ?? 8.0) / 100);
       const vatMultiplier = agencyVatApplicable ? 1.15 : 1.0;
       monthlyAgentFeeZAR = Math.round(baseFee * vatMultiplier);
     }
 
     const rawBondEffectiveMonth =
       getColVal(row, 'bond effective month') ?? getColVal(row, 'bond payment effective date');
-    const bondPaymentEffectiveDate = rawBondEffectiveMonth?.toString().trim();
+    const bondPaymentEffectiveDate = parseMonthString(rawBondEffectiveMonth) || undefined;
 
-    const validStatuses = ['Occupied', 'Vacant', 'Notice Given', 'Sold'] as const;
-    const status = validStatuses.includes(statusRaw as any) ? (statusRaw as any) : 'Occupied';
+    const validStatuses = ['Occupied', 'Vacant', 'Notice Given', 'Partially Vacant', 'Sold'] as const;
+    const status =
+      validStatuses.find((s) => s.toLowerCase() === statusRaw?.toLowerCase()) ?? 'Occupied';
 
     const validSources: DealSource[] = [
       'iGrow Rentals',
@@ -960,11 +1409,64 @@ export function parseRentalsRows(rawRows: unknown[][]): ParseResult<RentalProper
     }
 
     if (title && address && marketValue && purchasePrice && grossRent) {
+      let leases: Lease[];
+      if (numberOfUnits <= 1) {
+        const singleLeaseStatus: Lease['status'] =
+          status === 'Vacant' ? 'Vacant' : status === 'Notice Given' ? 'Notice Given' : 'Occupied';
+        leases = [
+          {
+            id: crypto.randomUUID(),
+            unitName: 'Main Unit',
+            tenantName,
+            tenantPhone,
+            tenantEmail,
+            leaseStartDate,
+            leaseEndDate,
+            depositHeldZAR: depositHeld,
+            annualEscalationPercent: annualEscalation,
+            monthlyRentZAR: grossRent,
+            status: singleLeaseStatus,
+            ...(utilityType ? { utilityType } : {}),
+          },
+        ];
+      } else {
+        const baseRent = Math.floor(grossRent / numberOfUnits);
+        const rentRem = grossRent - baseRent * numberOfUnits;
+        const baseDep = Math.floor(depositHeld / numberOfUnits);
+        const depRem = depositHeld - baseDep * numberOfUnits;
+        leases = Array.from({ length: numberOfUnits }, (_, idx) => {
+          const isFirst = idx === 0;
+          let unitStatus: Lease['status'] = 'Occupied';
+          if (status === 'Vacant') {
+            unitStatus = 'Vacant';
+          } else if (status === 'Partially Vacant') {
+            unitStatus = isFirst ? 'Occupied' : 'Vacant';
+          } else if (status === 'Notice Given') {
+            unitStatus = isFirst ? 'Notice Given' : 'Occupied';
+          }
+          return {
+            id: crypto.randomUUID(),
+            unitName: `Unit ${idx + 1}`,
+            tenantName: isFirst ? tenantName : 'Tenant Unassigned',
+            tenantPhone: isFirst ? tenantPhone : '+27 —',
+            tenantEmail: isFirst ? tenantEmail : 'pending@tenant.co.za',
+            leaseStartDate,
+            leaseEndDate,
+            depositHeldZAR: isFirst ? baseDep + depRem : baseDep,
+            annualEscalationPercent: annualEscalation,
+            monthlyRentZAR: isFirst ? baseRent + rentRem : baseRent,
+            status: unitStatus,
+            ...(utilityType ? { utilityType } : {}),
+          };
+        });
+      }
+
       rentals.push({
         id: `rental-import-${Date.now()}-${r}`,
         title,
         address,
         city,
+        ...(province ? { province } : {}),
         propertyType,
         numberOfUnits,
         floorAreaSqm,
@@ -975,21 +1477,11 @@ export function parseRentalsRows(rawRows: unknown[][]): ParseResult<RentalProper
         purchaseDate,
         outstandingBondBalanceZAR: outstandingBond,
         bondInterestRatePercent: bondInterestRate,
+        ...(loanTermYears !== undefined ? { loanTermYears } : {}),
         monthlyBondPaymentZAR: monthlyBondPayment,
-        bondPaymentEffectiveDate: bondPaymentEffectiveDate || undefined,
-        leases: [{
-          id: crypto.randomUUID(),
-          unitName: 'Main Unit',
-          tenantName,
-          tenantPhone,
-          tenantEmail,
-          leaseStartDate,
-          leaseEndDate,
-          depositHeldZAR: depositHeld,
-          annualEscalationPercent: annualEscalation,
-          monthlyRentZAR: grossRent,
-          status: 'Occupied'
-        }],
+        ...(extraMonthlyPaymentZAR !== undefined ? { extraMonthlyPaymentZAR } : {}),
+        bondPaymentEffectiveDate,
+        leases,
         managementType,
         agencyName: isAgency ? agencyName : undefined,
         agencyCommissionPercent: isAgency ? agencyCommissionPercent : undefined,
@@ -998,9 +1490,16 @@ export function parseRentalsRows(rawRows: unknown[][]): ParseResult<RentalProper
         monthlyGrossRentZAR: grossRent,
         monthlyLeviesZAR: levies,
         monthlyRatesTaxesZAR: rates,
+        ...(annualBuildingInsuranceZAR !== undefined ? { annualBuildingInsuranceZAR } : {}),
+        ...(utilityType ? { utilityType } : {}),
+        ...(monthlyCommunalServicesZAR !== undefined ? { monthlyCommunalServicesZAR } : {}),
+        ...(monthlyPrepaidVendingFeeZAR !== undefined ? { monthlyPrepaidVendingFeeZAR } : {}),
+        ...(section13sexAnnualShieldZAR !== undefined
+          ? { section13sexAnnualShieldZAR, section13SexEligible: true }
+          : {}),
         monthlyAgentFeeZAR,
         monthlyMaintenanceReserveZAR: maintenanceReserve,
-        unpaidUtilityArrearsZAR: 0,
+        unpaidUtilityArrearsZAR,
         maintenanceHistory: [],
         status,
         utilityStatements: initialUtilityStatements,
@@ -1074,13 +1573,25 @@ export function parseFlipsRows(rawRows: unknown[][]): ParseResult<FlipProject> {
     const title = getColVal(row, 'project title')?.toString().trim();
     const address = getColVal(row, 'address')?.toString().trim();
     const city = getColVal(row, 'city')?.toString().trim() || 'Johannesburg';
-    const propertyTypeRaw = getColVal(row, 'property type');
-    const rawUnits = getColVal(row, 'units') ?? getColVal(row, 'number of units');
-    const rawFloorArea = getColVal(row, 'floor area') ?? getColVal(row, 'floor area sqm');
+    const province = parseProvince(getColVal(row, 'province'));
+    const propertyTypeRaw = getFirstColVal(headerMap, row, ['property type', 'title type']);
+    const rawUnits = getFirstColVal(headerMap, row, ['units', 'number of units']);
+    const rawFloorArea = getFirstColVal(headerMap, row, ['floor area', 'floor area sqm']);
     const parsedUnits = parseNumber(rawUnits);
     const numberOfUnits = parsedUnits !== null && parsedUnits > 0 ? Math.round(parsedUnits) : 1;
     const parsedFloorArea = parseNumber(rawFloorArea);
     const floorAreaSqm = parsedFloorArea !== null && parsedFloorArea > 0 ? parsedFloorArea : undefined;
+    const projectStrategy = parseFlipProjectStrategy(
+      getFirstColVal(headerMap, row, ['project strategy', 'flip strategy', 'strategy'])
+    );
+    const taxEntityType = parseTaxEntityType(getColVal(row, 'tax entity type'));
+    const rawSec118Arrears = getFirstColVal(headerMap, row, [
+      'section 118 municipal arrears',
+      'sec 118 arrears',
+      'section 118 arrears',
+      'municipal arrears',
+    ]);
+    const parsedSec118Arrears = parseNumber(rawSec118Arrears);
     const rawPurchasePrice = getColVal(row, 'purchase price');
     const rawAcqCosts = getColVal(row, 'acquisition costs');
     const rawRenoBudget = getColVal(row, 'renovation budget');
@@ -1094,10 +1605,10 @@ export function parseFlipsRows(rawRows: unknown[][]): ParseResult<FlipProject> {
       getColVal(row, 'other holding costs') ??
       getColVal(row, 'monthly other holding cost') ??
       getColVal(row, 'other holding cost');
-    const purchaseDate = getColVal(row, 'purchase date')?.toString().trim() || todayStr;
-    const rawCompletionDate = getColVal(row, 'target completion date')?.toString().trim();
+    const purchaseDate = parseDateString(getColVal(row, 'purchase date')) || todayStr;
+    const rawCompletionDate = parseDateString(getColVal(row, 'target completion date'));
     const currentPhaseRaw = getColVal(row, 'current phase')?.toString().trim();
-    const agmDate = getColVal(row, 'agm date')?.toString().trim() || undefined;
+    const agmDate = parseDateString(getColVal(row, 'agm date')) || undefined;
     const notes = getColVal(row, 'notes')?.toString().trim();
 
     if (!title) {
@@ -1217,9 +1728,21 @@ export function parseFlipsRows(rawRows: unknown[][]): ParseResult<FlipProject> {
         title,
         address,
         city,
+        ...(province ? { province } : {}),
         propertyType,
         numberOfUnits,
         floorAreaSqm,
+        ...(projectStrategy ? { projectStrategy } : {}),
+        ...(taxEntityType ? { taxEntityType } : {}),
+        ...(parsedSec118Arrears !== null && parsedSec118Arrears > 0
+          ? {
+              municipalClearance: {
+                sec118ArrearsZAR: parsedSec118Arrears,
+                advanceCouncilDepositZAR: 0,
+                rccStatus: 'Pending Application' as const,
+              },
+            }
+          : {}),
         agmDate,
         purchaseDate,
         purchasePriceZAR: purchasePrice,
