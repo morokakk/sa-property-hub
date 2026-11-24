@@ -309,20 +309,28 @@ export const SupplierDirectoryModal: React.FC<SupplierDirectoryModalProps> = ({
         {/* Sticky Modal Header */}
         <div className="sticky top-0 z-10 bg-white border-b border-slate-200 px-4 sm:px-6 pt-3 pb-3.5 shrink-0">
           <div className="w-12 h-1.5 bg-slate-300 rounded-full mx-auto mb-3 sm:hidden" />
-          <div className="flex items-start sm:items-center justify-between gap-2">
+          <div className="grid grid-cols-[1fr_auto] sm:grid-cols-[1fr_auto_auto] items-center gap-x-2 gap-y-2.5 sm:gap-y-0">
             <div className="min-w-0">
-              <h3 className="text-sm sm:text-base font-bold text-slate-900 flex items-center gap-2 flex-wrap">
+              <h3 className="text-sm sm:text-base font-bold text-slate-900 flex items-center gap-2 min-w-0">
                 <Store className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-600 shrink-0" />
-                <span className="truncate">SA Supplier &amp; Contractor Book</span>
-                <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200 tabular-nums">
+                <span className="whitespace-nowrap">SA Supplier &amp; Contractor Book</span>
+                <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200 tabular-nums shrink-0">
                   {suppliers.length}
                 </span>
               </h3>
-              <p className="text-[11px] sm:text-xs text-slate-500 mt-0.5 line-clamp-1">
+              <p className="hidden sm:block text-xs text-slate-500 mt-0.5 line-clamp-1">
                 Vetted building merchants, maintenance handymen, and CoC / NHBRC trades.
               </p>
             </div>
-            <div className="flex items-center gap-1.5 shrink-0">
+            <button
+              type="button"
+              onClick={onClose}
+              className="sm:order-3 justify-self-end text-slate-400 hover:text-slate-700 p-1.5 rounded-md transition-colors cursor-pointer shrink-0"
+              aria-label="Close dialog"
+            >
+              <X className="w-4 h-4" />
+            </button>
+            <div className="col-span-2 sm:col-span-1 sm:order-2 flex items-center gap-2 shrink-0">
               <button
                 type="button"
                 data-testid="supplier-export-csv-btn"
@@ -330,16 +338,16 @@ export const SupplierDirectoryModal: React.FC<SupplierDirectoryModalProps> = ({
                 onClick={() => exportSuppliersCSV(suppliers)}
                 title="Export suppliers to CSV"
                 aria-label="Export suppliers to CSV"
-                className="inline-flex items-center gap-1 text-xs font-semibold px-2 sm:px-2.5 py-1.5 rounded-lg border border-slate-300 bg-slate-100 hover:bg-slate-200 text-slate-800 transition-colors cursor-pointer whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 text-xs font-semibold px-2.5 py-1.5 rounded-lg border border-slate-300 bg-slate-100 hover:bg-slate-200 text-slate-800 transition-colors cursor-pointer whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <Download className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Export CSV</span>
+                <Download className="w-3.5 h-3.5 shrink-0" />
+                <span>Export CSV</span>
               </button>
               <button
                 type="button"
                 data-testid="supplier-add-toggle-btn"
                 onClick={handleToggleAddForm}
-                className={`inline-flex items-center gap-1 text-xs font-semibold px-2.5 sm:px-3 py-1.5 rounded-lg transition-colors cursor-pointer whitespace-nowrap ${
+                className={`flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors cursor-pointer whitespace-nowrap ${
                   isFormOpen
                     ? 'bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-300'
                     : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-2xs'
@@ -347,23 +355,15 @@ export const SupplierDirectoryModal: React.FC<SupplierDirectoryModalProps> = ({
               >
                 {isFormOpen ? (
                   <>
-                    <X className="w-3.5 h-3.5" />
+                    <X className="w-3.5 h-3.5 shrink-0" />
                     <span>Close Form</span>
                   </>
                 ) : (
                   <>
-                    <Plus className="w-3.5 h-3.5" />
+                    <Plus className="w-3.5 h-3.5 shrink-0" />
                     <span>Add Supplier</span>
                   </>
                 )}
-              </button>
-              <button
-                type="button"
-                onClick={onClose}
-                className="text-slate-400 hover:text-slate-700 p-1.5 rounded-md transition-colors cursor-pointer"
-                aria-label="Close dialog"
-              >
-                <X className="w-4 h-4" />
               </button>
             </div>
           </div>
