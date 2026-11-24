@@ -6,6 +6,7 @@ import { DevelopmentFinancialSummary, calculateBOQItemTotals } from '@/lib/calcu
 import { formatZAR, formatPercent } from '@/lib/formatters';
 import { FlipBOQTable } from '@/components/flips/FlipBOQTable';
 import { exportFlipBOQCSV } from '@/lib/export/csvExport';
+import { usePortfolioStore } from '@/lib/store/usePortfolioStore';
 import {
   Coins,
   Building,
@@ -51,6 +52,11 @@ export function DevelopmentCostStackTab({
     planScrutinyAndSubdivisionFeesZAR: 0,
     marketingAndShowUnitZAR: 0,
   };
+
+  const storeSuppliers = usePortfolioStore((s) => s.suppliers);
+  const suppliers =
+    (typeof window === 'undefined' ? usePortfolioStore.getState().suppliers : storeSuppliers) ??
+    [];
 
   // Add BOQ Item Modal State
   const [isAddBOQOpen, setIsAddBOQOpen] = useState(false);
@@ -577,11 +583,17 @@ export function DevelopmentCostStackTab({
                   <label className="block font-semibold text-slate-700 mb-1">Supplier / Trade</label>
                   <input
                     type="text"
+                    list="dev-boq-supplier-list"
                     placeholder="e.g. Builders Warehouse"
                     value={boqSupplier}
                     onChange={(e) => setBoqSupplier(e.target.value)}
                     className="w-full rounded border border-slate-300 px-3 py-1.5"
                   />
+                  <datalist id="dev-boq-supplier-list">
+                    {suppliers.map((s) => (
+                      <option key={s.id} value={s.name} />
+                    ))}
+                  </datalist>
                 </div>
               </div>
 

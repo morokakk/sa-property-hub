@@ -43,6 +43,7 @@ import {
   ExternalLink,
   Loader2,
   AlertCircle,
+  Store,
 } from 'lucide-react';
 import {
   DevelopmentProject,
@@ -62,6 +63,14 @@ const DevelopmentProjectModal = dynamic(
   () =>
     import('@/components/developments/DevelopmentProjectModal').then(
       (m) => m.DevelopmentProjectModal
+    ),
+  { ssr: false }
+);
+
+const SupplierDirectoryModal = dynamic(
+  () =>
+    import('@/components/common/SupplierDirectoryModal').then(
+      (m) => m.SupplierDirectoryModal
     ),
   { ssr: false }
 );
@@ -103,6 +112,7 @@ export default function DevelopmentsPage() {
   const [shareMenuStyle, setShareMenuStyle] = useState<React.CSSProperties | undefined>(undefined);
   const [isPublishingDealRoom, setIsPublishingDealRoom] = useState(false);
   const [showCloudPublishModal, setShowCloudPublishModal] = useState(false);
+  const [isSuppliersOpen, setIsSuppliersOpen] = useState(false);
   const shareMenuRef = useRef<HTMLDivElement>(null);
 
   const updateShareMenuPosition = useCallback(() => {
@@ -416,17 +426,28 @@ export default function DevelopmentsPage() {
         title="Developments Manager"
         subtitle="Township infill, sectional title clusters, statutory approvals, and hybrid split-exit models"
         actionButton={
-          <button
-            type="button"
-            onClick={() => {
-              setIsEditing(false);
-              setIsProjectModalOpen(true);
-            }}
-            className="inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold px-3 py-2 rounded-lg shadow-2xs hover:shadow-xs transition-colors cursor-pointer"
-          >
-            <PlusCircle className="w-3.5 h-3.5" />
-            <span>+ New Development Project</span>
-          </button>
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setIsEditing(false);
+                setIsProjectModalOpen(true);
+              }}
+              className="inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold px-3 py-2 rounded-lg shadow-2xs hover:shadow-xs transition-colors cursor-pointer"
+            >
+              <PlusCircle className="w-3.5 h-3.5" />
+              <span>+ New Development Project</span>
+            </button>
+            <button
+              type="button"
+              data-testid="developments-suppliers-btn"
+              onClick={() => setIsSuppliersOpen(true)}
+              className="inline-flex items-center gap-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-semibold px-3 py-2 rounded-lg border border-slate-300 transition-colors shrink-0 cursor-pointer"
+            >
+              <Store className="w-3.5 h-3.5" />
+              <span>Suppliers</span>
+            </button>
+          </div>
         }
       />
 
@@ -835,6 +856,10 @@ export default function DevelopmentsPage() {
           handleCopyWhatsApp();
           setExportToast('WhatsApp deal summary copied to clipboard!');
         }}
+      />
+      <SupplierDirectoryModal
+        isOpen={isSuppliersOpen}
+        onClose={() => setIsSuppliersOpen(false)}
       />
     </div>
   );

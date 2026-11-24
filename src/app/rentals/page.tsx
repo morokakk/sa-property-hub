@@ -30,7 +30,8 @@ const PaymentModal = dynamic(() => import('@/components/rentals/modals/PaymentMo
 const WriteOffModal = dynamic(() => import('@/components/rentals/modals/WriteOffModal').then((m) => m.WriteOffModal), { ssr: false });
 const TenantNoticeModal = dynamic(() => import('@/components/rentals/modals/TenantNoticeModal').then((m) => m.TenantNoticeModal), { ssr: false });
 const RentalApplicantsModal = dynamic(() => import('@/components/rentals/modals/RentalApplicantsModal').then((m) => m.RentalApplicantsModal), { ssr: false });
-import { Sparkles, PlusCircle, CheckCircle2, Building2, Archive, Loader2, Check, X, Edit3, RotateCcw } from 'lucide-react';
+const SupplierDirectoryModal = dynamic(() => import('@/components/common/SupplierDirectoryModal').then((m) => m.SupplierDirectoryModal), { ssr: false });
+import { Sparkles, PlusCircle, CheckCircle2, Building2, Archive, Loader2, Check, X, Edit3, RotateCcw, Store } from 'lucide-react';
 import { usePortfolioStore } from '@/lib/store/usePortfolioStore';
 import { formatZAR, formatPercent, formatDate } from '@/lib/formatters';
 
@@ -62,6 +63,7 @@ export default function RentalPortfolioPage() {
   const [uploadedFileName, setUploadedFileName] = useState('');
   const [viewMode, setViewMode] = useState<'cards' | 'ledger'>('cards');
   const [searchQuery, setSearchQuery] = useState('');
+  const [isSuppliersOpen, setIsSuppliersOpen] = useState(false);
   const bulkAddRentals = usePortfolioStore((s) => s.bulkAddRentals);
 
   const filteredActiveRentals = useMemo(
@@ -171,6 +173,17 @@ export default function RentalPortfolioPage() {
               onExportAccountantJournal={handleExportAccountantJournal}
               onExportItr12={() => handleExportItr12(2026)}
             />
+
+            {/* 4. Trade & Contractor Directory */}
+            <button
+              type="button"
+              data-testid="rentals-suppliers-btn"
+              onClick={() => setIsSuppliersOpen(true)}
+              className="inline-flex items-center gap-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-semibold px-3 py-2 rounded-lg border border-slate-300 transition-colors shrink-0 cursor-pointer"
+            >
+              <Store className="w-3.5 h-3.5" />
+              <span>Suppliers</span>
+            </button>
           </div>
         }
       />
@@ -444,7 +457,16 @@ export default function RentalPortfolioPage() {
       <ExitSaleModal isOpen={modals.isExitOpen} property={modals.exitProperty} onClose={modals.closeExit} onComplete={() => { modals.closeExit(); setViewTab('archive'); }} />
       <RefinanceModal isOpen={modals.isRefinanceOpen} property={modals.refinanceProperty} currentLiquidReserve={summary.liquidCapitalReserve} onClose={modals.closeRefinance} onSave={(p) => { usePortfolioStore.getState().refinanceRental(p); modals.setRefinanceSuccessBanner({ amount: p.cashEquityPulledOutZAR, propertyTitle: modals.refinanceProperty?.title || 'Rental Property' }); modals.closeRefinance(); }} />
       <RefinanceAuditModal isOpen={modals.isAuditHistoryOpen} property={modals.auditProperty} onClose={modals.closeAuditHistory} />
-      <MaintenanceModal isOpen={modals.isMaintenanceOpen} property={modals.maintenanceProperty} onClose={modals.closeMaintenance} />
+      <MaintenanceModal
+        isOpen={modals.isMaintenanceOpen}
+        property={modals.maintenanceProperty}
+        onClose={modals.closeMaintenance}
+        onOpenSuppliers={() => setIsSuppliersOpen(true)}
+      />
+      <SupplierDirectoryModal
+        isOpen={isSuppliersOpen}
+        onClose={() => setIsSuppliersOpen(false)}
+      />
       <RentalFormModal isOpen={modals.isRentalFormOpen} editingProperty={modals.editingProperty} onClose={modals.closeRentalForm} onOpenNoticeModal={modals.openNoticeModal} onSave={(p, isNew) => { handleAddRental(p, isNew, modals.editingProperty?.id); modals.closeRentalForm(); }} />
       <SarbPmtModal isOpen={modals.isPmtOpen} property={modals.pmtProperty} onClose={modals.closePmtCalculator} />
       <UnifiedPdfVerificationModal isOpen={directPdf.queue.length > 0} queue={directPdf.queue} onClose={directPdf.clearQueue} onOpenTenantStatement={(id) => { directPdf.clearQueue(); modals.openStatementModal(id); }} />

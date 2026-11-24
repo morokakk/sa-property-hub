@@ -384,7 +384,16 @@ export interface BOQItem {
 export interface LocalSupplier {
   id: string;
   name: string;
-  category: 'Hardware & Timber' | 'Plumbing Supplies' | 'Electrical Supplies' | 'Tiles & Sanitary' | 'Paint & Finishes' | 'General Building Merchant' | 'Specialist Contractor';
+  category:
+    | 'Hardware & Timber'
+    | 'Plumbing Supplies'
+    | 'Electrical Supplies'
+    | 'Tiles & Sanitary'
+    | 'Paint & Finishes'
+    | 'General Building Merchant'
+    | 'Specialist Contractor'
+    | 'Maintenance & Handyman'
+    | 'Professional / Consultant';
   branchLocation: string; // e.g., Sandton, Cape Town Foreshore, Umhlanga, Menlyn
   contactPerson?: string;
   phone: string;

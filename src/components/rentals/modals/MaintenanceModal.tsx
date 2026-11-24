@@ -47,6 +47,7 @@ export interface MaintenanceModalProps {
   maintCost?: number;
   setMaintCost?: (v: number) => void;
   onAddMaintenance?: (e: React.FormEvent) => void;
+  onOpenSuppliers?: () => void;
 }
 
 export const MaintenanceModal: React.FC<MaintenanceModalProps> = ({
@@ -62,6 +63,7 @@ export const MaintenanceModal: React.FC<MaintenanceModalProps> = ({
   maintCost: propMaintCost,
   setMaintCost: propSetMaintCost,
   onAddMaintenance: propOnAddMaintenance,
+  onOpenSuppliers,
 }) => {
   const addMaintenanceLog = usePortfolioStore((s) => s.addMaintenanceLog);
   const updateMaintenanceLog = usePortfolioStore((s) => s.updateMaintenanceLog);
@@ -491,7 +493,19 @@ export const MaintenanceModal: React.FC<MaintenanceModalProps> = ({
               </select>
             </div>
             <div>
-              <label className="block text-[11px] font-semibold text-slate-600 mb-1">Contractor</label>
+              <div className="flex items-center justify-between gap-1 mb-1">
+                <label className="block text-[11px] font-semibold text-slate-600">Contractor</label>
+                {onOpenSuppliers && (
+                  <button
+                    type="button"
+                    data-testid="maintenance-manage-suppliers-btn"
+                    onClick={onOpenSuppliers}
+                    className="text-[10px] font-semibold text-emerald-700 hover:text-emerald-900 underline cursor-pointer whitespace-nowrap"
+                  >
+                    Manage Suppliers
+                  </button>
+                )}
+              </div>
               <input
                 type="text"
                 name="contractorName"

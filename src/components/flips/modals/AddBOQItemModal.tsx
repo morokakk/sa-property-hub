@@ -372,21 +372,40 @@ export const AddBOQItemModal: React.FC<AddBOQItemModalProps> = ({
             </div>
             <div>
               <label className="block font-semibold text-slate-700 mb-1">Supplier / Contractor</label>
-              <select
+              <input
+                type="text"
+                list="flip-boq-supplier-list"
+                placeholder="Select or type supplier / contractor"
                 value={supplier}
                 onChange={(e) => setSupplier(e.target.value)}
                 className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white"
-              >
-                {suppliers.map((s) => (
-                  <option key={s.id} value={s.name}>
-                    {s.name} ({s.branchLocation})
-                  </option>
-                ))}
-                <option value="Builders Warehouse Sandton">Builders Warehouse Sandton</option>
-                <option value="Saint-Gobain Gyproc">Saint-Gobain Gyproc</option>
-                <option value="Sonae Arauco Panels">Sonae Arauco Panels</option>
-                <option value="Independent Contractor">Independent Contractor</option>
-              </select>
+              />
+              <datalist id="flip-boq-supplier-list">
+                {(() => {
+                  const seen = new Set<string>();
+                  const options: { key: string; value: string }[] = [];
+                  for (const s of suppliers) {
+                    const key = s.name.trim().toLowerCase();
+                    if (key && !seen.has(key)) {
+                      seen.add(key);
+                      options.push({ key: s.id, value: s.name });
+                    }
+                  }
+                  for (const fallback of [
+                    'Builders Warehouse Sandton',
+                    'Saint-Gobain Gyproc',
+                    'Sonae Arauco Panels',
+                    'Independent Contractor',
+                  ]) {
+                    const key = fallback.toLowerCase();
+                    if (!seen.has(key)) {
+                      seen.add(key);
+                      options.push({ key: `fallback-${key}`, value: fallback });
+                    }
+                  }
+                  return options.map((opt) => <option key={opt.key} value={opt.value} />);
+                })()}
+              </datalist>
             </div>
           </div>
 

@@ -13,7 +13,7 @@ const AddBOQItemModal = dynamic(() => import('@/components/flips/modals/AddBOQIt
 const FlipExitModal = dynamic(() => import('@/components/flips/modals/FlipExitModal').then((m) => m.FlipExitModal), { ssr: false });
 const FlipToRentalModal = dynamic(() => import('@/components/flips/modals/FlipToRentalModal').then((m) => m.FlipToRentalModal), { ssr: false });
 const FlipFundingModal = dynamic(() => import('@/components/flips/modals/FlipFundingModal').then((m) => m.FlipFundingModal), { ssr: false });
-const SupplierDirectoryModal = dynamic(() => import('@/components/flips/modals/SupplierDirectoryModal').then((m) => m.SupplierDirectoryModal), { ssr: false });
+const SupplierDirectoryModal = dynamic(() => import('@/components/common/SupplierDirectoryModal').then((m) => m.SupplierDirectoryModal), { ssr: false });
 const DelayMatrixModal = dynamic(() => import('@/components/flips/DelayMatrixModal'), { ssr: false });
 import ImportDropdown from '@/components/common/ImportDropdown';
 import { PlusCircle, Store } from 'lucide-react';
@@ -43,6 +43,8 @@ export default function FlipsManagerPage() {
               <span>+ New Flip Project</span>
             </button>
             <button
+              type="button"
+              data-testid="flips-suppliers-btn"
               onClick={() => modals.openModal('supplier')}
               className="inline-flex items-center gap-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-semibold px-3 py-2 rounded-lg border border-slate-300 transition-colors shrink-0 cursor-pointer"
             >
