@@ -6,6 +6,7 @@ import {
   TransactionCategory,
   UtilityStatement,
   ZoningProfile,
+  LocalSupplier,
 } from '@/types';
 import { calculateRentalCashflow } from '@/lib/calculations/propertyMetrics';
 import { formatZoningTransitionLabel } from '@/lib/calculations/zoning';
@@ -431,6 +432,50 @@ export function exportFundingCSV(funding: FundingSource[]) {
   const csv = buildFundingCSV(funding);
   const dateStr = new Date().toISOString().split('T')[0];
   downloadCSV(csv, `sa-private-funding-${dateStr}.csv`);
+}
+
+/**
+ * Pure builder for Supplier & Contractor Directory CSV (RFC 4180 escaped)
+ */
+export function buildSuppliersCSV(suppliers: LocalSupplier[]): string {
+  const headers = [
+    'Name',
+    'Category',
+    'Branch / Location',
+    'Contact Person',
+    'Phone',
+    'Email',
+    'Account No.',
+    'Discount Terms',
+    'CoC / NHBRC Accredited',
+    'Rating (1-5)',
+  ];
+
+  const rows = suppliers.map((s) =>
+    [
+      escapeCSV(s.name || ''),
+      escapeCSV(s.category || ''),
+      escapeCSV(s.branchLocation || ''),
+      escapeCSV(s.contactPerson || ''),
+      escapeCSV(s.phone || ''),
+      escapeCSV(s.email || ''),
+      escapeCSV(s.accountNumber || ''),
+      escapeCSV(s.discountTerms || ''),
+      escapeCSV(s.hasCoC ? 'Yes' : 'No'),
+      s.rating != null ? s.rating : '',
+    ].join(',')
+  );
+
+  return [headers.map((h) => escapeCSV(h)).join(','), ...rows].join('\r\n');
+}
+
+/**
+ * Exports Local Suppliers & Contractors Directory to CSV
+ */
+export function exportSuppliersCSV(suppliers: LocalSupplier[]) {
+  const csv = buildSuppliersCSV(suppliers);
+  const dateStr = new Date().toISOString().split('T')[0];
+  downloadCSV(csv, `sa-property-suppliers-${dateStr}.csv`);
 }
 
 // ---------------------------------------------------------------------------

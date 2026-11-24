@@ -547,6 +547,21 @@ describe('migrateToCloud Payload Mappers', () => {
       const mapped = mapSuppliers(suppliers, TEST_USER_ID);
       expect(mapped[0].rating).toBe(5);
     });
+
+    it('preserves blank branchLocation as empty string instead of coercing to Johannesburg', () => {
+      const suppliers: LocalSupplier[] = [
+        {
+          id: 'sup-blank-branch',
+          name: 'Mobile Plumber',
+          category: 'Maintenance & Handyman',
+          branchLocation: '',
+          phone: '082 111 2222',
+          rating: 4,
+        },
+      ];
+      const mapped = mapSuppliers(suppliers, TEST_USER_ID);
+      expect(mapped[0].branch_location).toBe('');
+    });
   });
 
   describe('toDateOnly Date Sanitization', () => {

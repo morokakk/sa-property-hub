@@ -113,6 +113,7 @@ function SidebarContent({ pathname }: { pathname: string | null }) {
       developments: currentState.developments,
       opportunities: currentState.opportunities,
       funding: currentState.funding,
+      suppliers: currentState.suppliers,
       summary: currentState.getSummary(),
       investorProfile: currentState.investorProfile,
     });

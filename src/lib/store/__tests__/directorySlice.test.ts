@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { usePortfolioStore } from '../usePortfolioStore';
+import { INITIAL_SUPPLIERS } from '../initialData';
 import { LocalSupplier } from '@/types';
 
 describe('DirectorySlice - Suppliers Actions', () => {
@@ -52,5 +53,27 @@ describe('DirectorySlice - Suppliers Actions', () => {
     usePortfolioStore.getState().deleteSupplier('test-sup-1');
     currentSuppliers = usePortfolioStore.getState().suppliers;
     expect(currentSuppliers.find((s) => s.id === 'test-sup-1')).toBeUndefined();
+  });
+
+  it('importPortfolioJSON preserves INITIAL_SUPPLIERS on legacy backups omitting suppliers and restores explicit suppliers arrays', () => {
+    const legacyOk = usePortfolioStore
+      .getState()
+      .importPortfolioJSON(JSON.stringify({ rentals: [] }));
+    expect(legacyOk).toBe(true);
+    expect(usePortfolioStore.getState().suppliers).toEqual(INITIAL_SUPPLIERS);
+
+    const customSupplier: LocalSupplier = {
+      id: 'sup-json-1',
+      name: 'Cape Paint Depot',
+      category: 'Paint & Finishes',
+      branchLocation: 'Woodstock',
+      phone: '021 444 0000',
+      rating: 4,
+    };
+    const explicitOk = usePortfolioStore
+      .getState()
+      .importPortfolioJSON(JSON.stringify({ rentals: [], suppliers: [customSupplier] }));
+    expect(explicitOk).toBe(true);
+    expect(usePortfolioStore.getState().suppliers).toEqual([customSupplier]);
   });
 });

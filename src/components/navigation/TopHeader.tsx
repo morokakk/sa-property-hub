@@ -151,6 +151,7 @@ export default function TopHeader({ title, subtitle, actionButton }: TopHeaderPr
       developments: currentState.developments,
       opportunities: currentState.opportunities,
       funding: currentState.funding,
+      suppliers: currentState.suppliers,
       summary: currentState.getSummary(),
       investorProfile: currentState.investorProfile,
     });

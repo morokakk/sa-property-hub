@@ -787,7 +787,7 @@ export function mapSuppliers(suppliers: LocalSupplier[] = [], userId: string): S
     user_id: userId,
     name: s.name || 'Supplier',
     category: s.category || 'General Building Merchant',
-    branch_location: s.branchLocation || 'Johannesburg',
+    branch_location: s.branchLocation ?? '',
     contact_person: s.contactPerson || null,
     phone: s.phone || '',
     email: s.email || null,

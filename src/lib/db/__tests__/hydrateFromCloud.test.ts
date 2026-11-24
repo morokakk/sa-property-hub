@@ -659,4 +659,46 @@ describe('hydrateFromCloud Execution Engine', () => {
     expect(res.hydrated).toBe(false);
     expect(res.error).toContain('Developments fetch failed: Developments table read timeout');
   });
+
+  it('unmapSuppliers preserves blank or null branch_location as empty string', () => {
+    const unmapped = unmapSuppliers([
+      {
+        id: 'sup-blank-1',
+        user_id: TEST_USER_ID,
+        name: 'Mobile Handyman',
+        category: 'Maintenance & Handyman',
+        branch_location: '',
+        contact_person: null,
+        phone: '082 111 2222',
+        email: null,
+        account_number: null,
+        discount_terms: null,
+        has_coc: false,
+        rating: 4,
+        created_at: '2026-11-24T00:00:00Z',
+        updated_at: '2026-11-24T00:00:00Z',
+      },
+      {
+        id: 'sup-null-1',
+        user_id: TEST_USER_ID,
+        name: 'Null Branch Electrician',
+        category: 'Specialist Contractor',
+        branch_location: null as any,
+        contact_person: 'Liam',
+        phone: '082 990 1122',
+        email: 'liam@test.co.za',
+        account_number: 'EL-1',
+        discount_terms: '5%',
+        has_coc: true,
+        rating: 5,
+        created_at: '2026-11-24T00:00:00Z',
+        updated_at: '2026-11-24T00:00:00Z',
+      },
+    ]);
+
+    expect(unmapped[0].branchLocation).toBe('');
+    expect(unmapped[1].branchLocation).toBe('');
+    expect(unmapped[1].hasCoC).toBe(true);
+    expect(unmapped[1].rating).toBe(5);
+  });
 });

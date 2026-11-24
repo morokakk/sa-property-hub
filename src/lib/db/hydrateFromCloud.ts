@@ -642,7 +642,7 @@ export function unmapSuppliers(
     id: s.id,
     name: s.name,
     category: (s.category as any) || 'General Building Merchant',
-    branchLocation: s.branch_location,
+    branchLocation: s.branch_location || '',
     contactPerson: s.contact_person || undefined,
     phone: s.phone,
     email: s.email || undefined,

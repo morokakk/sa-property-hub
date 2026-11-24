@@ -5,11 +5,16 @@ import {
   exportPortfolioToExcel,
 } from '@/lib/export/excelExport';
 import {
+  buildSuppliersCSV,
+  exportSuppliersCSV,
+} from '@/lib/export/csvExport';
+import {
   INITIAL_RENTALS,
   INITIAL_FLIPS,
   INITIAL_DEVELOPMENTS,
   INITIAL_OPPORTUNITIES,
   INITIAL_FUNDING,
+  INITIAL_SUPPLIERS,
   INITIAL_INVESTOR_PROFILE,
 } from '@/lib/store/initialData';
 import { computePortfolioSummary } from '@/lib/store/selectors/portfolioSummarySelector';
@@ -83,6 +88,7 @@ describe('Portfolio Multi-Tab Excel Workbook Export', () => {
       developments,
       opportunities: INITIAL_OPPORTUNITIES,
       funding: INITIAL_FUNDING,
+      suppliers: INITIAL_SUPPLIERS,
       summary,
       investorProfile: INITIAL_INVESTOR_PROFILE,
     });
@@ -101,6 +107,7 @@ describe('Portfolio Multi-Tab Excel Workbook Export', () => {
       'Developments',
       'Pipeline Deals',
       'Private Funding',
+      'Suppliers',
     ]);
 
     // --- Sheet 1: Summary Reconciliation ---
@@ -195,6 +202,7 @@ describe('Portfolio Multi-Tab Excel Workbook Export', () => {
       developments: INITIAL_DEVELOPMENTS,
       opportunities: INITIAL_OPPORTUNITIES,
       funding: INITIAL_FUNDING,
+      suppliers: INITIAL_SUPPLIERS,
       summary,
       investorProfile: INITIAL_INVESTOR_PROFILE,
     });
@@ -246,5 +254,84 @@ describe('Portfolio Multi-Tab Excel Workbook Export', () => {
     expect(fnHeaders).toContain('Drawn Amount (ZAR)');
     expect(fnHeaders).toContain('Undrawn Standby Capacity (ZAR)');
     expect(fnHeaders).toContain('Tranches Progress');
+
+    // Sheet 8: Suppliers
+    const supRows = XLSX.utils.sheet_to_json<(string | number)[]>(wb.Sheets['Suppliers'], { header: 1 });
+    expect(supRows[0]).toEqual([
+      'Name',
+      'Category',
+      'Branch / Location',
+      'Contact Person',
+      'Phone',
+      'Email',
+      'Account No.',
+      'Discount Terms',
+      'CoC / NHBRC Accredited',
+      'Rating (1-5)',
+    ]);
+    expect(supRows.length).toBe(1 + INITIAL_SUPPLIERS.length);
+    const cocSupplierRow = supRows.find((r) => r[0] === 'Master Electricians SA');
+    expect(cocSupplierRow).toBeDefined();
+    expect(cocSupplierRow![8]).toBe('Yes');
+    expect(cocSupplierRow![9]).toBe(5);
+  });
+
+  it('builds RFC 4180 escaped Suppliers CSV and triggers UTF-8 BOM download', () => {
+    const csv = buildSuppliersCSV([
+      {
+        id: 's-csv-1',
+        name: 'Ace "Plumbing", Co.',
+        category: 'Maintenance & Handyman',
+        branchLocation: 'Rivonia, Sandton',
+        contactPerson: 'Sipho Dlamini',
+        phone: '+27 82 555 1234',
+        email: 'sipho@ace.co.za',
+        accountNumber: 'AC-01',
+        discountTerms: '5% Cash, Net 7',
+        hasCoC: true,
+        rating: 4,
+      },
+    ]);
+
+    const lines = csv.split('\r\n');
+    expect(lines).toHaveLength(2);
+    expect(lines[0]).toBe(
+      'Name,Category,Branch / Location,Contact Person,Phone,Email,Account No.,Discount Terms,CoC / NHBRC Accredited,Rating (1-5)'
+    );
+    expect(lines[1]).toBe(
+      '"Ace ""Plumbing"", Co.",Maintenance & Handyman,"Rivonia, Sandton",Sipho Dlamini,+27 82 555 1234,sipho@ace.co.za,AC-01,"5% Cash, Net 7",Yes,4'
+    );
+
+    const originalCreateObjectURL = URL.createObjectURL;
+    const originalRevokeObjectURL = URL.revokeObjectURL;
+
+    const blobParts: BlobPart[][] = [];
+    const OriginalBlob = globalThis.Blob;
+    class MockBlob extends OriginalBlob {
+      constructor(parts?: BlobPart[], opts?: BlobPropertyBag) {
+        super(parts, opts);
+        if (parts) blobParts.push(parts);
+      }
+    }
+    vi.stubGlobal('Blob', MockBlob);
+    URL.createObjectURL = vi.fn(() => 'blob:mock-suppliers');
+    URL.revokeObjectURL = vi.fn();
+
+    const linkClick = vi.fn();
+    const mockLink = { href: '', download: '', click: linkClick } as unknown as HTMLAnchorElement;
+    vi.stubGlobal('document', { createElement: vi.fn(() => mockLink) });
+
+    try {
+      exportSuppliersCSV(INITIAL_SUPPLIERS);
+      expect(blobParts).toHaveLength(1);
+      expect(String(blobParts[0][0]).startsWith('\uFEFF')).toBe(true);
+      expect(mockLink.download).toMatch(/^sa-property-suppliers-\d{4}-\d{2}-\d{2}\.csv$/);
+      expect(linkClick).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.unstubAllGlobals();
+      vi.restoreAllMocks();
+      URL.createObjectURL = originalCreateObjectURL;
+      URL.revokeObjectURL = originalRevokeObjectURL;
+    }
   });
 });

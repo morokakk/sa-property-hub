@@ -7,6 +7,7 @@ import {
   InvestorProfile,
   DevelopmentProject,
   CustomNodeBenchmarksMap,
+  LocalSupplier,
 } from '@/types';
 import { calculateRentalCashflow } from '@/lib/calculations/propertyMetrics';
 import { calculateFlipFinancials, calculateArchivedFlipFinancials } from '@/lib/calculations/flips';
@@ -32,6 +33,7 @@ export interface ExportPortfolioData {
   developments?: DevelopmentProject[];
   opportunities: OpportunityDeal[];
   funding: FundingSource[];
+  suppliers?: LocalSupplier[];
   summary: PortfolioSummary;
   investorProfile: InvestorProfile;
 }
@@ -49,6 +51,7 @@ export function buildPortfolioWorkbook(
     developments = [],
     opportunities,
     funding,
+    suppliers = [],
     summary,
     investorProfile,
   } = data;
@@ -739,6 +742,48 @@ export function buildPortfolioWorkbook(
     { wch: 30 }, // Notes
   ];
   XLSX.utils.book_append_sheet(wb, wsFunding, 'Private Funding');
+
+  // Sheet 8: Suppliers & Contractors
+  const supplierHeaders = [
+    'Name',
+    'Category',
+    'Branch / Location',
+    'Contact Person',
+    'Phone',
+    'Email',
+    'Account No.',
+    'Discount Terms',
+    'CoC / NHBRC Accredited',
+    'Rating (1-5)',
+  ];
+
+  const supplierData = suppliers.map((s) => [
+    s.name || '',
+    s.category || '',
+    s.branchLocation || '',
+    s.contactPerson || '',
+    s.phone || '',
+    s.email || '',
+    s.accountNumber || '',
+    s.discountTerms || '',
+    s.hasCoC ? 'Yes' : 'No',
+    s.rating != null ? s.rating : '',
+  ]);
+
+  const wsSuppliers = XLSX.utils.aoa_to_sheet([supplierHeaders, ...supplierData]);
+  wsSuppliers['!cols'] = [
+    { wch: 28 }, // Name
+    { wch: 26 }, // Category
+    { wch: 28 }, // Branch / Location
+    { wch: 24 }, // Contact Person
+    { wch: 18 }, // Phone
+    { wch: 26 }, // Email
+    { wch: 16 }, // Account No.
+    { wch: 28 }, // Discount Terms
+    { wch: 22 }, // CoC / NHBRC Accredited
+    { wch: 14 }, // Rating (1-5)
+  ];
+  XLSX.utils.book_append_sheet(wb, wsSuppliers, 'Suppliers');
 
   return wb;
 }

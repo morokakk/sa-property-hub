@@ -113,7 +113,7 @@ export const createSystemSlice: StateCreator<
           funding: parsed.funding || [],
           opportunities: parsed.opportunities || [],
           developments: sanitizePersistedDevelopments(parsed.developments),
-          suppliers: parsed.suppliers || [],
+          suppliers: Array.isArray(parsed.suppliers) ? parsed.suppliers : INITIAL_SUPPLIERS,
           tasks: parsed.tasks || [],
           municipalDirectory: parsed.municipalDirectory || INITIAL_MUNICIPAL_DIRECTORY,
           liquidCapitalReserve: parsed.liquidCapitalReserve || 0,

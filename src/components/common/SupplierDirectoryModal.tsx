@@ -13,10 +13,12 @@ import {
   MessageCircle,
   Star,
   ShieldCheck,
+  Download,
 } from 'lucide-react';
 import { usePortfolioStore } from '@/lib/store/usePortfolioStore';
 import { useModalBackdropDismiss } from '@/hooks/useModalBackdropDismiss';
 import { normalizeWhatsAppPhone } from '@/lib/calculations/inspections';
+import { exportSuppliersCSV } from '@/lib/export/csvExport';
 
 export const SUPPLIER_CATEGORIES: readonly LocalSupplier['category'][] = [
   'General Building Merchant',
@@ -323,6 +325,18 @@ export const SupplierDirectoryModal: React.FC<SupplierDirectoryModalProps> = ({
             <div className="flex items-center gap-1.5 shrink-0">
               <button
                 type="button"
+                data-testid="supplier-export-csv-btn"
+                disabled={suppliers.length === 0}
+                onClick={() => exportSuppliersCSV(suppliers)}
+                title="Export suppliers to CSV"
+                aria-label="Export suppliers to CSV"
+                className="inline-flex items-center gap-1 text-xs font-semibold px-2 sm:px-2.5 py-1.5 rounded-lg border border-slate-300 bg-slate-100 hover:bg-slate-200 text-slate-800 transition-colors cursor-pointer whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Export CSV</span>
+              </button>
+              <button
+                type="button"
                 data-testid="supplier-add-toggle-btn"
                 onClick={handleToggleAddForm}
                 className={`inline-flex items-center gap-1 text-xs font-semibold px-2.5 sm:px-3 py-1.5 rounded-lg transition-colors cursor-pointer whitespace-nowrap ${
@@ -339,7 +353,7 @@ export const SupplierDirectoryModal: React.FC<SupplierDirectoryModalProps> = ({
                 ) : (
                   <>
                     <Plus className="w-3.5 h-3.5" />
-                    <span>+ Add Supplier</span>
+                    <span>Add Supplier</span>
                   </>
                 )}
               </button>
