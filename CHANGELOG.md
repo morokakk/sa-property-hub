@@ -2,6 +2,35 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Developments Atomic Unit Sales, Shared Supplier Book & Full Import/Export Parity] - 2026-11-24
+
+### Added
+- **Shared Mobile-First Supplier & Contractor Book (`src/components/common/SupplierDirectoryModal.tsx`)**:
+  - Hoisted `SupplierDirectoryModal` to `src/components/common/` (with a backward-compatible re-export at `src/components/flips/modals/SupplierDirectoryModal.tsx`) and standardized on the `slate-900` / `slate-50` / `emerald-600` palette (`c68b55d`, `9fdb671`, `30a53ea`).
+  - Added `'Maintenance & Handyman'` and `'Professional / Consultant'` to `LocalSupplier['category']` (9 total categories), plus optional `email`, `accountNumber`, and interactive `1–5` star `rating` controls (preserved on edit).
+  - Added a 2-row mobile-first sticky header (`Export CSV` + `Add Supplier` toggle collapsing inline on `sm+`), collapsible top Add/Edit form with 1-tap wrapped category chips, search input, horizontally scrollable `All` / `CoC / NHBRC` / active category filter chips, and `390px`-safe `Call` (`tel:`) and `WhatsApp` (`https://wa.me/...`) links.
+  - Lazily wired `SupplierDirectoryModal` (`next/dynamic(..., { ssr: false })`) across `/flips`, `/rentals` (plus inline `"Manage Suppliers"` trigger inside `MaintenanceModal.tsx`), and `/developments` (plus `#dev-boq-supplier-list` datalist inside `DevelopmentCostStackTab.tsx`).
+- **Unified Add / Edit Sectional Title Unit Modal (`DevelopmentUnitInventoryTab.tsx`)**:
+  - Added an **Edit** action per unit row/card (hidden in read-only Deal Room view) supporting `buyerName`, `conveyancerRef`, and `depositHeldZAR` edits without re-triggering senior debt paydown, plus `resolveUnitStatusOnSave` to auto-promote `'Available'` units to `'Reserved (OTP Signed)'` when a buyer or conveyancer ref is saved (`a28f382`).
+- **Full Import/Export & Portfolio Excel / CSV Parity (`597fc22`, `9fdb671`)**:
+  - Added an 8th `Suppliers` worksheet to `buildPortfolioWorkbook` (passed from `TopHeader.tsx` and `Sidebar.tsx`) and standalone RFC 4180 + UTF-8 BOM `buildSuppliersCSV` / `exportSuppliersCSV` (`sa-property-suppliers-YYYY-MM-DD.csv`).
+  - Expanded CSV/Excel templates, workbook parsers, ITR12 tax schedule, and Universal Accountant GL journal parity across Rentals, Flips/BOQ, Developments, Pipeline Deals, and Private Funding (`597fc22`), plus PostHog dependency lockfile sync (`7c82b7a`).
+
+### Fixed
+- **Developments Atomic Unit Sale & Debt-Wipeout Guardrails (`a28f382`)**:
+  - Extended `sellDevelopmentUnit` with optional `conveyancerRef` and added atomic `updateDevelopmentUnit` in `developmentSlice.ts`, eliminating the stale React closure overwrite in `src/app/developments/page.tsx` when saving a Conveyancer Ref during `Mark Sold`.
+  - Intercepted Status dropdown transitions into `'Sold & Transferred'` to open the pre-populated **Mark Sold** modal (closing the debt-wipeout bypass) and locked the status `<select>` post-transfer.
+  - Surfaced `buyerName`, `conveyancerRef`, and `depositHeldZAR` on `'Reserved (OTP Signed)'` and `'Bond Approved / Guarantees Issued'` units with verified POPIA redaction across all committed statuses in `DealRoomViewer`.
+- **Supplier Book Parity, Sync & Mobile Polish (`c68b55d`, `9fdb671`, `30a53ea`)**:
+  - Added missing `'Paint & Finishes'` category, replaced `AddBOQItemModal.tsx`'s duplicated supplier `<select>` with a deduplicated free-text `<datalist>`, preserved blank `branchLocation` in `mapSuppliers`/`unmapSuppliers`, guarded legacy JSON restores in `importPortfolioJSON` against wiping `INITIAL_SUPPLIERS`, and fixed `390px` mobile modal header title truncation.
+
+## [Portfolio-Wide UXpeak 1-Tap Presets, Compact Ledgers, Search Filters & Section 13sex Eligibility] - 2026-11-22
+
+### Added
+- **Cross-Module 1-Tap Presets, Search & Mobile-Safe Ledgers (`fcedf2f`, `233ce24`, `9fb062f`, `9803462`)**:
+  - Added 1-tap presets, clickable status KPI filter chips, search bars, and compact Table/Cards view toggles across Opportunity Analyzer (`/analyzer`), Rental Portfolio (`/rentals`), Funding & Capital (`/funding`), Developments (`/developments`), and Tasks (`/tasks`, including `+7d` overdue rollover).
+  - Added portfolio-wide SARS Section 13sex 5-unit eligibility aggregation (`src/lib/calculations/sarsTax.ts`).
+
 ## [Conditional Multi-Unit Municipal Zoning in Rentals & Drag-Safe Modal Backdrop Dismissal] - 2026-11-22
 
 ### Added
