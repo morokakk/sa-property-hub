@@ -102,15 +102,23 @@ export const createDevelopmentSlice: StateCreator<
       ),
     })),
 
-  sellDevelopmentUnit: (devId, unitId, buyerName, salePriceZAR) =>
+  sellDevelopmentUnit: (devId, unitId, buyerName, salePriceZAR, conveyancerRef) =>
     set((state) => {
       const dev = state.developments.find((d) => d.id === devId);
       if (!dev) return state;
 
       const unit = (dev.units || []).find((u) => u.id === unitId);
       if (!unit) return state;
+
+      const trimmedBuyer = buyerName?.trim();
+      const trimmedRef = conveyancerRef?.trim();
+
       // Guard against duplicate sale processing on already sold units (idempotent double-click protection)
-      if (unit.status === 'Sold & Transferred' && (!buyerName || unit.buyerName === buyerName)) {
+      if (
+        unit.status === 'Sold & Transferred' &&
+        (!trimmedBuyer || unit.buyerName === trimmedBuyer) &&
+        (!trimmedRef || unit.conveyancerRef === trimmedRef)
+      ) {
         return state;
       }
 
@@ -137,7 +145,8 @@ export const createDevelopmentSlice: StateCreator<
           ? {
               ...u,
               status: 'Sold & Transferred' as const,
-              buyerName: buyerName || u.buyerName || 'Private Buyer',
+              buyerName: trimmedBuyer || u.buyerName || 'Private Buyer',
+              conveyancerRef: trimmedRef || u.conveyancerRef,
               soldDate: new Date().toISOString().split('T')[0],
               listPriceVatInclZAR: effectivePrice,
             }
@@ -175,6 +184,27 @@ export const createDevelopmentSlice: StateCreator<
         ),
         funding: updatedFunding,
         liquidCapitalReserve: state.liquidCapitalReserve + surplusCash,
+      };
+    }),
+
+  updateDevelopmentUnit: (devId, unitId, updates) =>
+    set((state) => {
+      const dev = state.developments.find((d) => d.id === devId);
+      if (!dev) return state;
+      const hasUnit = (dev.units || []).some((u) => u.id === unitId);
+      if (!hasUnit) return state;
+
+      return {
+        developments: state.developments.map((d) =>
+          d.id === devId
+            ? {
+                ...d,
+                units: (d.units || []).map((u) =>
+                  u.id === unitId ? { ...u, ...updates } : u
+                ),
+              }
+            : d
+        ),
       };
     }),
 

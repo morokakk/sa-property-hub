@@ -2,7 +2,10 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import React from 'react';
 import { renderToString } from 'react-dom/server';
 import { DevelopmentKpiBanner } from '../DevelopmentKpiBanner';
-import { DevelopmentUnitInventoryTab } from '../DevelopmentUnitInventoryTab';
+import {
+  DevelopmentUnitInventoryTab,
+  resolveUnitStatusOnSave,
+} from '../DevelopmentUnitInventoryTab';
 import { DevelopmentCostStackTab } from '../DevelopmentCostStackTab';
 import { DevelopmentApprovalsTab } from '../DevelopmentApprovalsTab';
 import { DevelopmentFinanceTab } from '../DevelopmentFinanceTab';
@@ -400,6 +403,190 @@ describe('Development Module UI Components & Navigation (Milestone 3)', () => {
       expect(html).toContain('Total / Portfolio');
       expect(html).toContain('6 Units');
       expect(html).toContain('430 m²');
+    });
+
+    it('displays Buyer, Conveyancer Ref, and Deposit Held for Reserved & Bond Approved units, renders Edit buttons when writable, and locks Sold status without cursor-not-allowed', () => {
+      const dev = createSampleDevelopment({
+        units: [
+          {
+            id: 'u-sold-1',
+            unitNumber: 'Unit 1',
+            configuration: '2 Bed 1 Bath',
+            floorAreaSqm: 65,
+            allocatedCostBasisZAR: 620000,
+            listPriceVatInclZAR: 950000,
+            estimatedMonthlyRentZAR: 8500,
+            status: 'Sold & Transferred',
+            buyerName: 'Thabo Mokoena',
+            conveyancerRef: 'ST-2026/011',
+          },
+          {
+            id: 'u-bond-1',
+            unitNumber: 'Unit 2',
+            configuration: '2 Bed 1 Bath',
+            floorAreaSqm: 65,
+            allocatedCostBasisZAR: 620000,
+            listPriceVatInclZAR: 950000,
+            estimatedMonthlyRentZAR: 8500,
+            status: 'Bond Approved / Guarantees Issued',
+            buyerName: 'David Nkosi',
+            conveyancerRef: 'CV/2026/112',
+            depositHeldZAR: 140000,
+          },
+          {
+            id: 'u-res-1',
+            unitNumber: 'Unit 3',
+            configuration: '2 Bed 1 Bath',
+            floorAreaSqm: 65,
+            allocatedCostBasisZAR: 620000,
+            listPriceVatInclZAR: 950000,
+            estimatedMonthlyRentZAR: 8500,
+            status: 'Reserved (OTP Signed)',
+            buyerName: 'Zanele Khumalo',
+            depositHeldZAR: 50000,
+          },
+          {
+            id: 'u-avail-1',
+            unitNumber: 'Unit 4',
+            configuration: '2 Bed 1 Bath',
+            floorAreaSqm: 65,
+            allocatedCostBasisZAR: 620000,
+            listPriceVatInclZAR: 950000,
+            estimatedMonthlyRentZAR: 8500,
+            status: 'Available',
+          },
+        ],
+      });
+      const financials = calculateDevelopmentFinancials(dev);
+
+      const html = renderToString(
+        <DevelopmentUnitInventoryTab
+          development={dev}
+          financials={financials}
+          onUpdateUnit={vi.fn()}
+          onMarkUnitSold={vi.fn()}
+          onGraduateRetainedUnits={vi.fn()}
+        />
+      );
+
+      // Reserved and Bond Approved buyers, refs, and deposits display
+      expect(html).toContain('David Nkosi');
+      expect(html).toContain('Ref: CV/2026/112');
+      expect(html).toContain('Deposit:');
+      expect(html).toContain('140');
+      expect(html).toContain('Zanele Khumalo');
+      expect(html).toContain('50');
+      // Available unit shows dash
+      expect(html).toContain('—');
+
+      // Edit buttons rendered for all units when writable
+      expect(html).toContain('data-testid="edit-unit-btn-u-sold-1"');
+      expect(html).toContain('data-testid="edit-unit-btn-u-bond-1"');
+      expect(html).toContain('data-testid="edit-unit-btn-u-res-1"');
+      expect(html).toContain('data-testid="edit-unit-btn-u-avail-1"');
+
+      // Sold unit select is disabled, without cursor-not-allowed
+      const unit1SelectMatch = html.match(/<select[^>]*aria-label="Status for Unit 1"[^>]*>/);
+      expect(unit1SelectMatch?.[0]).toContain('disabled=""');
+      expect(unit1SelectMatch?.[0]).not.toContain('cursor-not-allowed');
+      expect(html).toContain('Sale settled — use Edit to update buyer or conveyancer details');
+    });
+
+    it('hides Edit buttons in readOnly mode and masks Reserved/Bond Approved buyer and ref in DealRoomViewer (POPIA)', () => {
+      const rawDev = createSampleDevelopment({
+        units: [
+          {
+            id: 'u-popia-sold',
+            unitNumber: 'Unit 1',
+            configuration: '2 Bed 1 Bath',
+            floorAreaSqm: 65,
+            allocatedCostBasisZAR: 620000,
+            listPriceVatInclZAR: 950000,
+            estimatedMonthlyRentZAR: 8500,
+            status: 'Sold & Transferred',
+            buyerName: 'Kagiso Sithole',
+            conveyancerRef: 'CV/2026/091',
+          },
+          {
+            id: 'u-popia-bond',
+            unitNumber: 'Unit 2',
+            configuration: '2 Bed 1 Bath',
+            floorAreaSqm: 65,
+            allocatedCostBasisZAR: 620000,
+            listPriceVatInclZAR: 950000,
+            estimatedMonthlyRentZAR: 8500,
+            status: 'Bond Approved / Guarantees Issued',
+            buyerName: 'David Nkosi',
+            conveyancerRef: 'CV/2026/112',
+            depositHeldZAR: 140000,
+          },
+          {
+            id: 'u-popia-res',
+            unitNumber: 'Unit 3',
+            configuration: '2 Bed 1 Bath',
+            floorAreaSqm: 65,
+            allocatedCostBasisZAR: 620000,
+            listPriceVatInclZAR: 950000,
+            estimatedMonthlyRentZAR: 8500,
+            status: 'Reserved (OTP Signed)',
+            buyerName: 'Zanele Khumalo',
+            conveyancerRef: 'CV/2026/118',
+          },
+        ],
+      });
+
+      const masked = maskDevelopmentForPublicDealRoom(rawDev);
+      for (const u of masked.units) {
+        expect(u.buyerName).toBe('Private Buyer (Masked)');
+        expect(u.conveyancerRef).toBeUndefined();
+      }
+
+      const viewerHtml = renderToString(
+        <DealRoomViewer
+          token="dev-1"
+          dealRoomData={{
+            development: rawDev,
+            sponsor: {
+              entityName: 'L&M Property Investments (Pty) Ltd',
+              registrationNumber: '2026/123456/07',
+            },
+            isDemo: true,
+          }}
+        />
+      );
+
+      expect(viewerHtml).toContain('Private Buyer (Masked)');
+      expect(viewerHtml).not.toContain('Kagiso Sithole');
+      expect(viewerHtml).not.toContain('David Nkosi');
+      expect(viewerHtml).not.toContain('Zanele Khumalo');
+      expect(viewerHtml).not.toContain('CV/2026/091');
+      expect(viewerHtml).not.toContain('CV/2026/112');
+      expect(viewerHtml).not.toContain('CV/2026/118');
+      expect(viewerHtml).not.toContain('edit-unit-btn-');
+    });
+
+    it('resolveUnitStatusOnSave auto-promotes Available units when buyerName or conveyancerRef is provided without altering other statuses', () => {
+      // Add mode
+      expect(resolveUnitStatusOnSave(undefined, '', '')).toBe('Available');
+      expect(resolveUnitStatusOnSave(undefined, 'Buyer One', '')).toBe('Reserved (OTP Signed)');
+      expect(resolveUnitStatusOnSave(undefined, '', 'CV/2026/001')).toBe('Reserved (OTP Signed)');
+
+      // Edit mode on Available
+      expect(resolveUnitStatusOnSave('Available', 'Buyer One', '')).toBe('Reserved (OTP Signed)');
+      expect(resolveUnitStatusOnSave('Available', '', 'CV/2026/002')).toBe('Reserved (OTP Signed)');
+      expect(resolveUnitStatusOnSave('Available', '   ', '   ')).toBe('Available');
+
+      // Edit mode on non-Available statuses leaves status untouched
+      expect(resolveUnitStatusOnSave('Reserved (OTP Signed)', '', '')).toBe('Reserved (OTP Signed)');
+      expect(resolveUnitStatusOnSave('Bond Approved / Guarantees Issued', 'Buyer Two', 'CV/2026/003')).toBe(
+        'Bond Approved / Guarantees Issued'
+      );
+      expect(resolveUnitStatusOnSave('Sold & Transferred', 'Buyer Three', 'CV/2026/004')).toBe(
+        'Sold & Transferred'
+      );
+      expect(resolveUnitStatusOnSave('Retained for Rental', 'Buyer Four', '')).toBe(
+        'Retained for Rental'
+      );
     });
   });
 

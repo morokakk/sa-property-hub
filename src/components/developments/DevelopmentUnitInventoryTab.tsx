@@ -17,6 +17,7 @@ import {
   Search,
   LayoutGrid,
   List,
+  Pencil,
 } from 'lucide-react';
 
 export interface DevelopmentUnitInventoryTabProps {
@@ -26,7 +27,12 @@ export interface DevelopmentUnitInventoryTabProps {
   onUpdateUnit: (unitId: string, updates: Partial<DevelopmentUnit>) => void;
   onAddUnit?: (unit: Omit<DevelopmentUnit, 'id'>) => void;
   onDeleteUnit?: (unitId: string) => void;
-  onMarkUnitSold: (unitId: string, buyerName?: string, salePriceZAR?: number) => void;
+  onMarkUnitSold: (
+    unitId: string,
+    buyerName?: string,
+    salePriceZAR?: number,
+    conveyancerRef?: string
+  ) => void;
   onGraduateRetainedUnits: () => void;
 }
 
@@ -37,6 +43,21 @@ const DEV_UNIT_STATUSES: DevUnitStatus[] = [
   'Sold & Transferred',
   'Retained for Rental',
 ];
+
+export function resolveUnitStatusOnSave(
+  currentStatus: DevUnitStatus | undefined,
+  buyerName?: string,
+  conveyancerRef?: string
+): DevUnitStatus {
+  const hasBuyerOrRef = Boolean(buyerName?.trim() || conveyancerRef?.trim());
+  if (!currentStatus) {
+    return hasBuyerOrRef ? 'Reserved (OTP Signed)' : 'Available';
+  }
+  if (currentStatus === 'Available' && hasBuyerOrRef) {
+    return 'Reserved (OTP Signed)';
+  }
+  return currentStatus;
+}
 
 export function DevelopmentUnitInventoryTab({
   development,
@@ -61,14 +82,18 @@ export function DevelopmentUnitInventoryTab({
   const [salePriceZAR, setSalePriceZAR] = useState<number>(0);
   const [conveyancerRef, setConveyancerRef] = useState('');
 
-  // Add Unit modal state
-  const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
-  const [newUnitNumber, setNewUnitNumber] = useState('');
-  const [newConfig, setNewConfig] = useState('2 Bed 1 Bath');
-  const [newFloorArea, setNewFloorArea] = useState<number>(65);
-  const [newListPrice, setNewListPrice] = useState<number>(850000);
-  const [newEstRent, setNewEstRent] = useState<number>(7500);
-  const [newCostBasis, setNewCostBasis] = useState<number>(600000);
+  // Unified Add / Edit Unit modal state
+  const [isUnitModalOpen, setIsUnitModalOpen] = useState(false);
+  const [editingUnit, setEditingUnit] = useState<DevelopmentUnit | null>(null);
+  const [unitNumber, setUnitNumber] = useState('');
+  const [unitConfig, setUnitConfig] = useState('2 Bed 1 Bath');
+  const [unitFloorArea, setUnitFloorArea] = useState<number>(65);
+  const [unitListPrice, setUnitListPrice] = useState<number>(850000);
+  const [unitEstRent, setUnitEstRent] = useState<number>(7500);
+  const [unitCostBasis, setUnitCostBasis] = useState<number>(600000);
+  const [unitBuyerName, setUnitBuyerName] = useState('');
+  const [unitDepositHeld, setUnitDepositHeld] = useState('');
+  const [unitConveyancerRef, setUnitConveyancerRef] = useState('');
 
   const filteredUnits = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
@@ -85,21 +110,23 @@ export function DevelopmentUnitInventoryTab({
   useEffect(() => {
     if (readOnly) {
       setSellingUnit(null);
-      setIsAddUnitOpen(false);
+      setIsUnitModalOpen(false);
+      setEditingUnit(null);
     }
   }, [readOnly]);
 
   useEffect(() => {
-    if (!sellingUnit && !isAddUnitOpen) return;
+    if (!sellingUnit && !isUnitModalOpen) return;
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         setSellingUnit(null);
-        setIsAddUnitOpen(false);
+        setIsUnitModalOpen(false);
+        setEditingUnit(null);
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [sellingUnit, isAddUnitOpen]);
+  }, [sellingUnit, isUnitModalOpen]);
 
   // Ungraduated retained units
   const ungraduatedRetainedUnits = units.filter(
@@ -120,38 +147,94 @@ export function DevelopmentUnitInventoryTab({
   const handleConfirmSale = (e: React.FormEvent) => {
     e.preventDefault();
     if (readOnly || !sellingUnit) return;
-    onMarkUnitSold(sellingUnit.id, saleBuyerName || 'Private Buyer', salePriceZAR);
-    if (conveyancerRef) {
-      onUpdateUnit(sellingUnit.id, { conveyancerRef });
-    }
+    onMarkUnitSold(
+      sellingUnit.id,
+      saleBuyerName.trim() || sellingUnit.buyerName || 'Private Buyer',
+      salePriceZAR,
+      conveyancerRef.trim() || undefined
+    );
     setSellingUnit(null);
   };
 
-  const handleCreateUnit = (e: React.FormEvent) => {
+  const handleSaveUnit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (readOnly || !newUnitNumber) return;
+    const trimmedNumber = unitNumber.trim();
+    if (readOnly || !trimmedNumber) return;
 
-    if (onAddUnit) {
+    const trimmedBuyer = unitBuyerName.trim() || undefined;
+    const trimmedRef = unitConveyancerRef.trim() || undefined;
+    const parsedDeposit = unitDepositHeld.trim() === '' ? NaN : Number(unitDepositHeld);
+    const normalizedDeposit =
+      Number.isFinite(parsedDeposit) && parsedDeposit > 0 ? parsedDeposit : undefined;
+
+    if (editingUnit) {
+      const nextStatus = resolveUnitStatusOnSave(
+        editingUnit.status,
+        trimmedBuyer,
+        trimmedRef
+      );
+      onUpdateUnit(editingUnit.id, {
+        unitNumber: trimmedNumber,
+        configuration: unitConfig.trim(),
+        floorAreaSqm: Number(unitFloorArea) || 0,
+        allocatedCostBasisZAR: Number(unitCostBasis) || 0,
+        listPriceVatInclZAR: Number(unitListPrice) || 0,
+        estimatedMonthlyRentZAR: Number(unitEstRent) || 0,
+        ...(nextStatus !== editingUnit.status ? { status: nextStatus } : {}),
+        buyerName: trimmedBuyer,
+        depositHeldZAR: normalizedDeposit,
+        conveyancerRef: trimmedRef,
+      });
+    } else if (onAddUnit) {
+      const initialStatus = resolveUnitStatusOnSave(undefined, trimmedBuyer, trimmedRef);
       onAddUnit({
-        unitNumber: newUnitNumber,
-        configuration: newConfig,
-        floorAreaSqm: Number(newFloorArea) || 0,
-        allocatedCostBasisZAR: Number(newCostBasis) || 0,
-        listPriceVatInclZAR: Number(newListPrice) || 0,
-        estimatedMonthlyRentZAR: Number(newEstRent) || 0,
-        status: 'Available',
+        unitNumber: trimmedNumber,
+        configuration: unitConfig.trim(),
+        floorAreaSqm: Number(unitFloorArea) || 0,
+        allocatedCostBasisZAR: Number(unitCostBasis) || 0,
+        listPriceVatInclZAR: Number(unitListPrice) || 0,
+        estimatedMonthlyRentZAR: Number(unitEstRent) || 0,
+        status: initialStatus,
+        buyerName: trimmedBuyer,
+        depositHeldZAR: normalizedDeposit,
+        conveyancerRef: trimmedRef,
       });
     }
 
-    setIsAddUnitOpen(false);
-    setNewUnitNumber('');
+    setIsUnitModalOpen(false);
+    setEditingUnit(null);
+    setUnitNumber('');
   };
 
   const handleOpenAddUnitModal = () => {
     if (readOnly) return;
     const nextIndex = units.length + 1;
-    setNewUnitNumber(`Unit ${nextIndex}`);
-    setIsAddUnitOpen(true);
+    setEditingUnit(null);
+    setUnitNumber(`Unit ${nextIndex}`);
+    setUnitConfig('2 Bed 1 Bath');
+    setUnitFloorArea(65);
+    setUnitCostBasis(600000);
+    setUnitListPrice(850000);
+    setUnitEstRent(7500);
+    setUnitBuyerName('');
+    setUnitDepositHeld('');
+    setUnitConveyancerRef('');
+    setIsUnitModalOpen(true);
+  };
+
+  const handleOpenEditUnitModal = (unit: DevelopmentUnit) => {
+    if (readOnly) return;
+    setEditingUnit(unit);
+    setUnitNumber(unit.unitNumber);
+    setUnitConfig(unit.configuration);
+    setUnitFloorArea(unit.floorAreaSqm);
+    setUnitCostBasis(unit.allocatedCostBasisZAR);
+    setUnitListPrice(unit.listPriceVatInclZAR);
+    setUnitEstRent(unit.estimatedMonthlyRentZAR);
+    setUnitBuyerName(unit.buyerName || '');
+    setUnitDepositHeld(unit.depositHeldZAR && unit.depositHeldZAR > 0 ? String(unit.depositHeldZAR) : '');
+    setUnitConveyancerRef(unit.conveyancerRef || '');
+    setIsUnitModalOpen(true);
   };
 
   // Status counters
@@ -179,12 +262,13 @@ export function DevelopmentUnitInventoryTab({
     isRetained: boolean
   ) => {
     if (isSold) {
+      const ref = unit.conveyancerRef?.trim();
       return (
         <div className="leading-tight">
-          <span className="font-semibold text-slate-900">{unit.buyerName || 'Private Buyer'}</span>
-          {unit.conveyancerRef && (
-            <div className="text-[10px] text-slate-400">{`Ref: ${unit.conveyancerRef}`}</div>
-          )}
+          <span className="font-semibold text-slate-900">
+            {unit.buyerName?.trim() || 'Private Buyer'}
+          </span>
+          {ref && <div className="text-[10px] text-slate-400">{`Ref: ${ref}`}</div>}
         </div>
       );
     }
@@ -198,6 +282,27 @@ export function DevelopmentUnitInventoryTab({
         <span className="text-[11px] text-purple-600 font-medium">Retained Asset</span>
       );
     }
+    if (
+      unit.status === 'Reserved (OTP Signed)' ||
+      unit.status === 'Bond Approved / Guarantees Issued'
+    ) {
+      const buyer = unit.buyerName?.trim();
+      const ref = unit.conveyancerRef?.trim();
+      const hasDeposit = typeof unit.depositHeldZAR === 'number' && unit.depositHeldZAR > 0;
+      if (buyer || ref || hasDeposit) {
+        return (
+          <div className="leading-tight">
+            {buyer && <span className="font-semibold text-slate-900">{buyer}</span>}
+            {ref && <div className="text-[10px] text-slate-400">{`Ref: ${ref}`}</div>}
+            {hasDeposit && (
+              <div className="text-[10px] text-amber-700 font-medium tabular-nums">
+                {`Deposit: ${formatZAR(unit.depositHeldZAR!)}`}
+              </div>
+            )}
+          </div>
+        );
+      }
+    }
     return <span className="text-slate-400">—</span>;
   };
 
@@ -208,19 +313,29 @@ export function DevelopmentUnitInventoryTab({
   ) => (
     <select
       value={unit.status}
-      disabled={readOnly}
-      onChange={(e) =>
-        !readOnly &&
-        onUpdateUnit(unit.id, {
-          status: e.target.value as DevUnitStatus,
-        })
+      disabled={readOnly || isSold}
+      title={
+        readOnly
+          ? 'Locked in Read-Only View'
+          : isSold
+          ? 'Sale settled — use Edit to update buyer or conveyancer details'
+          : undefined
       }
+      onChange={(e) => {
+        if (readOnly || isSold) return;
+        const nextStatus = e.target.value as DevUnitStatus;
+        if (nextStatus === 'Sold & Transferred') {
+          handleOpenSaleModal(unit);
+          return;
+        }
+        onUpdateUnit(unit.id, { status: nextStatus });
+      }}
       aria-label={`Status for ${unit.unitNumber}`}
       className={`text-xs rounded border px-2 py-1 font-medium focus:ring-1 focus:ring-slate-400 outline-hidden ${
         readOnly
           ? 'bg-slate-100 text-slate-500 border-slate-200 cursor-not-allowed'
           : isSold
-          ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
+          ? 'bg-emerald-50 text-emerald-800 border-emerald-300 cursor-default'
           : isRetained
           ? 'bg-purple-50 text-purple-800 border-purple-300'
           : 'bg-white text-slate-800 border-slate-300'
@@ -240,6 +355,18 @@ export function DevelopmentUnitInventoryTab({
     isRetained: boolean
   ) => (
     <div className="inline-flex items-center gap-1.5">
+      {!readOnly && (
+        <button
+          type="button"
+          onClick={() => handleOpenEditUnitModal(unit)}
+          aria-label={`Edit ${unit.unitNumber}`}
+          data-testid={`edit-unit-btn-${unit.id}`}
+          title="Edit unit & buyer details"
+          className="p-1 rounded text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
+        >
+          <Pencil className="w-3.5 h-3.5" />
+        </button>
+      )}
       {!isSold && !isRetained && (
         <button
           type="button"
@@ -733,33 +860,47 @@ export function DevelopmentUnitInventoryTab({
         </div>
       )}
 
-      {/* Add Unit Modal */}
-      {isAddUnitOpen && !readOnly && (
+      {/* Unified Add / Edit Unit Modal */}
+      {isUnitModalOpen && !readOnly && (
         <div
           role="dialog"
           aria-modal="true"
-          onClick={() => setIsAddUnitOpen(false)}
+          onClick={() => {
+            setIsUnitModalOpen(false);
+            setEditingUnit(null);
+          }}
           className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4 cursor-pointer"
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            className="bg-white rounded-xl border border-slate-200 shadow-xl max-w-md w-full p-5 space-y-4 animate-in fade-in zoom-in-95 duration-150 cursor-default"
+            className="bg-white rounded-xl border border-slate-200 shadow-xl max-w-md w-full p-5 space-y-4 animate-in fade-in zoom-in-95 duration-150 cursor-default max-h-[90vh] overflow-y-auto"
           >
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <div>
-                <h4 className="text-base font-bold text-slate-900">Add Sectional Title Unit</h4>
-                <p className="text-xs text-slate-500">Record a new unit in the development schedule.</p>
+                <h4 className="text-base font-bold text-slate-900">
+                  {editingUnit
+                    ? `Edit ${editingUnit.unitNumber}`
+                    : 'Add Sectional Title Unit'}
+                </h4>
+                <p className="text-xs text-slate-500">
+                  {editingUnit
+                    ? 'Update unit specification, buyer details, or conveyancing reference.'
+                    : 'Record a new unit in the development schedule.'}
+                </p>
               </div>
               <button
                 type="button"
-                onClick={() => setIsAddUnitOpen(false)}
+                onClick={() => {
+                  setIsUnitModalOpen(false);
+                  setEditingUnit(null);
+                }}
                 className="text-slate-400 hover:text-slate-600 cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <form onSubmit={handleCreateUnit} noValidate className="space-y-3 text-xs">
+            <form onSubmit={handleSaveUnit} noValidate className="space-y-3 text-xs">
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">Unit Number</label>
@@ -767,8 +908,8 @@ export function DevelopmentUnitInventoryTab({
                     type="text"
                     required
                     placeholder="e.g. Unit 4B"
-                    value={newUnitNumber}
-                    onChange={(e) => setNewUnitNumber(e.target.value)}
+                    value={unitNumber}
+                    onChange={(e) => setUnitNumber(e.target.value)}
                     className="w-full rounded border border-slate-300 px-3 py-1.5"
                   />
                 </div>
@@ -778,8 +919,8 @@ export function DevelopmentUnitInventoryTab({
                     type="text"
                     required
                     placeholder="e.g. 2 Bed 1 Bath"
-                    value={newConfig}
-                    onChange={(e) => setNewConfig(e.target.value)}
+                    value={unitConfig}
+                    onChange={(e) => setUnitConfig(e.target.value)}
                     className="w-full rounded border border-slate-300 px-3 py-1.5"
                   />
                 </div>
@@ -792,8 +933,8 @@ export function DevelopmentUnitInventoryTab({
                     type="number"
                     required
                     min={1}
-                    value={newFloorArea}
-                    onChange={(e) => setNewFloorArea(Number(e.target.value))}
+                    value={unitFloorArea}
+                    onChange={(e) => setUnitFloorArea(Number(e.target.value))}
                     className="w-full rounded border border-slate-300 px-3 py-1.5"
                   />
                 </div>
@@ -804,8 +945,8 @@ export function DevelopmentUnitInventoryTab({
                     required
                     min={0}
                     step="any"
-                    value={newCostBasis}
-                    onChange={(e) => setNewCostBasis(Number(e.target.value))}
+                    value={unitCostBasis}
+                    onChange={(e) => setUnitCostBasis(Number(e.target.value))}
                     className="w-full rounded border border-slate-300 px-3 py-1.5"
                   />
                 </div>
@@ -819,8 +960,8 @@ export function DevelopmentUnitInventoryTab({
                     required
                     min={0}
                     step="any"
-                    value={newListPrice}
-                    onChange={(e) => setNewListPrice(Number(e.target.value))}
+                    value={unitListPrice}
+                    onChange={(e) => setUnitListPrice(Number(e.target.value))}
                     className="w-full rounded border border-slate-300 px-3 py-1.5"
                   />
                 </div>
@@ -831,17 +972,82 @@ export function DevelopmentUnitInventoryTab({
                     required
                     min={0}
                     step="any"
-                    value={newEstRent}
-                    onChange={(e) => setNewEstRent(Number(e.target.value))}
+                    value={unitEstRent}
+                    onChange={(e) => setUnitEstRent(Number(e.target.value))}
                     className="w-full rounded border border-slate-300 px-3 py-1.5"
                   />
                 </div>
               </div>
 
+              <div className="pt-2 border-t border-slate-100 space-y-3">
+                <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                  Buyer &amp; Conveyancing (Optional)
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">
+                    Buyer Name / Purchasing SPV
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. John Doe / Blue Sky Trust"
+                    value={unitBuyerName}
+                    onChange={(e) => setUnitBuyerName(e.target.value)}
+                    className="w-full rounded border border-slate-300 px-3 py-1.5"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block font-semibold text-slate-700 mb-1">
+                      Conveyancer / Deeds Ref
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. CV/2026/112"
+                      value={unitConveyancerRef}
+                      onChange={(e) => setUnitConveyancerRef(e.target.value)}
+                      className="w-full rounded border border-slate-300 px-3 py-1.5"
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-semibold text-slate-700 mb-1">
+                      Deposit Held (ZAR)
+                    </label>
+                    <input
+                      type="number"
+                      min={0}
+                      step="any"
+                      placeholder="e.g. 50000"
+                      value={unitDepositHeld}
+                      onChange={(e) => setUnitDepositHeld(e.target.value)}
+                      className="w-full rounded border border-slate-300 px-3 py-1.5"
+                    />
+                  </div>
+                </div>
+
+                {!editingUnit ? (
+                  <p className="text-[11px] text-slate-400">
+                    Entering a Buyer Name or Conveyancer Ref sets initial status to Reserved (OTP Signed); otherwise Available.
+                  </p>
+                ) : editingUnit.status === 'Available' ? (
+                  <p className="text-[11px] text-slate-400">
+                    Entering a Buyer Name or Conveyancer Ref automatically promotes this Available unit to Reserved (OTP Signed).
+                  </p>
+                ) : editingUnit.status === 'Sold & Transferred' ? (
+                  <p className="text-[11px] text-emerald-700 bg-emerald-50 border border-emerald-200 rounded px-2.5 py-1.5">
+                    Editing a settled unit updates metadata only and will not re-trigger senior debt paydown.
+                  </p>
+                ) : null}
+              </div>
+
               <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
                 <button
                   type="button"
-                  onClick={() => setIsAddUnitOpen(false)}
+                  onClick={() => {
+                    setIsUnitModalOpen(false);
+                    setEditingUnit(null);
+                  }}
                   className="px-3 py-1.5 rounded border border-slate-300 text-slate-700 hover:bg-slate-50 cursor-pointer"
                 >
                   Cancel
@@ -850,7 +1056,7 @@ export function DevelopmentUnitInventoryTab({
                   type="submit"
                   className="px-4 py-1.5 rounded bg-emerald-600 hover:bg-emerald-700 text-white font-semibold cursor-pointer"
                 >
-                  Save Unit
+                  {editingUnit ? 'Save Changes' : 'Save Unit'}
                 </button>
               </div>
             </form>

@@ -225,8 +225,7 @@ export default function DevelopmentsPage() {
 
   const handleUpdateUnit = (unitId: string, updates: Partial<DevelopmentUnit>) => {
     if (!activeDev) return;
-    const units = (activeDev.units || []).map((u) => (u.id === unitId ? { ...u, ...updates } : u));
-    usePortfolioStore.getState().updateDevelopment(activeDev.id, { units });
+    usePortfolioStore.getState().updateDevelopmentUnit(activeDev.id, unitId, updates);
   };
 
   const handleAddUnit = (unit: Omit<DevelopmentUnit, 'id'>) => {
@@ -736,8 +735,10 @@ export default function DevelopmentsPage() {
                   onUpdateUnit={handleUpdateUnit}
                   onAddUnit={handleAddUnit}
                   onDeleteUnit={handleDeleteUnit}
-                  onMarkUnitSold={(unitId, buyer, price) =>
-                    usePortfolioStore.getState().sellDevelopmentUnit(activeDev.id, unitId, buyer, price)
+                  onMarkUnitSold={(unitId, buyer, price, conveyancerRef) =>
+                    usePortfolioStore
+                      .getState()
+                      .sellDevelopmentUnit(activeDev.id, unitId, buyer, price, conveyancerRef)
                   }
                   onGraduateRetainedUnits={() =>
                     usePortfolioStore.getState().graduateRetainedUnitsToRental(activeDev.id)

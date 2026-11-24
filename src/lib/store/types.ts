@@ -272,7 +272,13 @@ export interface DevelopmentSliceActions {
     devId: string,
     unitId: string,
     buyerName?: string,
-    salePriceZAR?: number
+    salePriceZAR?: number,
+    conveyancerRef?: string
+  ) => void;
+  updateDevelopmentUnit: (
+    devId: string,
+    unitId: string,
+    updates: Partial<DevelopmentUnit>
   ) => void;
   graduateRetainedUnitsToRental: (devId: string) => RentalProperty;
   promoteOpportunityToDevelopment: (oppId: string) => string;

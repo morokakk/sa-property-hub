@@ -263,6 +263,67 @@ describe('Milestone 2: Development Slice & Cross-Module Bridges Test Suite', () 
       const fundDev2 = state.funding.find((f) => f.id === 'fund-tuhf-kempton')!;
       expect(fundDev2.totalRepaidZAR).toBe(500_000);
     });
+
+    it('atomically persists conveyancerRef alongside Sold & Transferred, buyerName, and debt paydown, and preserves existing buyer/ref when omitted', () => {
+      usePortfolioStore
+        .getState()
+        .sellDevelopmentUnit('dev-1', 'dev1-u3', '  David Nkosi  ', 1_395_000, '  CV/2026/888  ');
+
+      const dev1After = usePortfolioStore.getState().developments.find((d) => d.id === 'dev-1')!;
+      const unit3 = dev1After.units.find((u) => u.id === 'dev1-u3')!;
+
+      expect(unit3.status).toBe('Sold & Transferred');
+      expect(unit3.buyerName).toBe('David Nkosi');
+      expect(unit3.conveyancerRef).toBe('CV/2026/888');
+      expect(unit3.soldDate).toBeDefined();
+      expect(dev1After.developmentFacilityRepaidZAR).toBe(2_750_000 + Math.round(1_395_000 / 1.15));
+
+      // Calling sellDevelopmentUnit on unit4 without buyerName/conveyancerRef preserves existing buyerName ('Zanele Khumalo')
+      usePortfolioStore.getState().sellDevelopmentUnit('dev-1', 'dev1-u4', undefined, 1_395_000);
+      const unit4 = usePortfolioStore
+        .getState()
+        .developments.find((d) => d.id === 'dev-1')!
+        .units.find((u) => u.id === 'dev1-u4')!;
+      expect(unit4.status).toBe('Sold & Transferred');
+      expect(unit4.buyerName).toBe('Zanele Khumalo');
+    });
+
+    it('updateDevelopmentUnit reads fresh store state so updating one unit never clobbers a prior sellDevelopmentUnit', () => {
+      const repaidBefore = usePortfolioStore
+        .getState()
+        .developments.find((d) => d.id === 'dev-1')!.developmentFacilityRepaidZAR;
+
+      // 1. Sell unit 3
+      usePortfolioStore
+        .getState()
+        .sellDevelopmentUnit('dev-1', 'dev1-u3', 'David Nkosi', 1_395_000, 'CV/2026/112');
+
+      // 2. Immediately update unit 4 and also update unit 3 metadata via atomic updateDevelopmentUnit
+      usePortfolioStore.getState().updateDevelopmentUnit('dev-1', 'dev1-u4', {
+        buyerName: 'Updated Buyer',
+        conveyancerRef: 'CV/2026/200',
+        depositHeldZAR: 75_000,
+      });
+      usePortfolioStore.getState().updateDevelopmentUnit('dev-1', 'dev1-u3', {
+        conveyancerRef: 'CV/2026/112-REV',
+      });
+
+      const dev1 = usePortfolioStore.getState().developments.find((d) => d.id === 'dev-1')!;
+      const unit3 = dev1.units.find((u) => u.id === 'dev1-u3')!;
+      const unit4 = dev1.units.find((u) => u.id === 'dev1-u4')!;
+
+      // Unit 3 remains Sold & Transferred with debt paydown intact (no double paydown, no revert)
+      expect(unit3.status).toBe('Sold & Transferred');
+      expect(unit3.buyerName).toBe('David Nkosi');
+      expect(unit3.conveyancerRef).toBe('CV/2026/112-REV');
+      expect(unit3.soldDate).toBeDefined();
+      expect(dev1.developmentFacilityRepaidZAR).toBe(repaidBefore + Math.round(1_395_000 / 1.15));
+
+      // Unit 4 retains its updated metadata
+      expect(unit4.buyerName).toBe('Updated Buyer');
+      expect(unit4.conveyancerRef).toBe('CV/2026/200');
+      expect(unit4.depositHeldZAR).toBe(75_000);
+    });
   });
 
   describe('4. Hybrid Split-Exit to Rentals (graduateRetainedUnitsToRental)', () => {
