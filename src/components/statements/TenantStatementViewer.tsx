@@ -558,16 +558,17 @@ export default function TenantStatementViewer({
 
       <div className="max-w-4xl mx-auto space-y-4">
         {/* Interactive Screen Controls (Print-Hidden) */}
-        <div className="bg-white border border-slate-200/80 rounded-2xl p-4 sm:p-5 shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-3.5 print-hidden-element">
-          <div className="min-w-0 shrink">
-            <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+        <div className="bg-white border border-slate-200/80 rounded-2xl p-4 sm:p-5 shadow-sm flex flex-col gap-3 print:hidden print-hidden-element">
+          {/* Row 1: Statement Title, Verified Portal Badge & Property Subtitle */}
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
               <span className="p-1.5 rounded-lg bg-emerald-100 text-emerald-800 shrink-0">
                 <FileText className="w-5 h-5" />
               </span>
-              <h1 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight whitespace-nowrap">
+              <h1 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight">
                 Official Tenant Statement
               </h1>
-              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 shrink-0">
+              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 whitespace-nowrap shrink-0">
                 Verified Portal
               </span>
             </div>
@@ -576,10 +577,11 @@ export default function TenantStatementViewer({
             </p>
           </div>
 
-          <div className="flex items-center gap-2 w-full md:w-auto flex-wrap sm:flex-nowrap justify-start md:justify-end shrink-0">
+          {/* Row 2: Billing Period Selector & Primary Actions */}
+          <div className="flex flex-wrap items-center justify-between gap-2 pt-3 border-t border-slate-100">
             {/* Historical Month Selector */}
             {periodOptions.length > 0 && (
-              <div className="relative shrink min-w-[140px] max-w-[210px] sm:max-w-[220px]">
+              <div className="relative w-full sm:w-auto max-w-[230px] min-w-[180px]">
                 <select
                   data-testid="month-selector-dropdown"
                   value={activeMonth}
@@ -587,11 +589,27 @@ export default function TenantStatementViewer({
                   className="w-full appearance-none bg-slate-50 border border-slate-300 hover:border-slate-400 text-slate-800 text-xs font-semibold py-2 pl-3 pr-8 rounded-xl focus:outline-hidden focus:ring-2 focus:ring-emerald-500 transition-colors cursor-pointer truncate"
                   title="Select billing period"
                 >
-                  {periodOptions.map((opt) => (
-                    <option key={opt.month} value={opt.month}>
-                      {opt.label}
-                    </option>
-                  ))}
+                  {periodOptions.map((opt) => {
+                    const compactLabel = opt.isCurrent
+                      ? `${opt.monthLabel} (Current)`
+                      : opt.label.includes('(Upcoming)')
+                      ? `${opt.monthLabel} (Upcoming)`
+                      : opt.status === 'Paid in Full'
+                      ? `${opt.monthLabel} (Paid)`
+                      : opt.status === 'Unpaid'
+                      ? `${opt.monthLabel} (Unpaid)`
+                      : opt.status === 'Partial'
+                      ? `${opt.monthLabel} (Partial)`
+                      : opt.status === 'Overpaid'
+                      ? `${opt.monthLabel} (Overpaid)`
+                      : opt.monthLabel;
+
+                    return (
+                      <option key={opt.month} value={opt.month}>
+                        {compactLabel}
+                      </option>
+                    );
+                  })}
                 </select>
                 <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-slate-500">
                   <Calendar className="w-3.5 h-3.5" />
@@ -599,37 +617,39 @@ export default function TenantStatementViewer({
               </div>
             )}
 
-            {/* Print & Download Button */}
-            <button
-              type="button"
-              data-testid="download-pdf-btn"
-              onClick={handlePrint}
-              className="inline-flex items-center justify-center gap-1.5 bg-emerald-700 hover:bg-emerald-800 active:bg-emerald-900 text-white text-xs font-semibold px-3 sm:px-3.5 py-2 rounded-xl shadow-xs transition-colors cursor-pointer shrink-0 whitespace-nowrap"
-              title="Download statement PDF"
-            >
-              <Download className="w-4 h-4 shrink-0" />
-              <span>Download (PDF)</span>
-            </button>
-
-            {/* Tenant Maintenance Request via WhatsApp */}
-            <div className="relative inline-block shrink-0">
+            <div className="flex flex-wrap items-center gap-2">
+              {/* Print & Download Button */}
               <button
                 type="button"
-                data-testid="report-maintenance-whatsapp-btn"
-                onClick={handleReportMaintenanceWhatsApp}
-                className="inline-flex items-center justify-center gap-1.5 bg-white hover:bg-emerald-50 text-emerald-800 border border-emerald-300 text-xs font-semibold px-3 sm:px-3.5 py-2 rounded-xl shadow-xs transition-colors cursor-pointer shrink-0 whitespace-nowrap"
-                title="Report Maintenance Issue via WhatsApp"
-                aria-label="Report Maintenance Issue via WhatsApp"
+                data-testid="download-pdf-btn"
+                onClick={handlePrint}
+                className="inline-flex items-center justify-center gap-1.5 bg-emerald-700 hover:bg-emerald-800 active:bg-emerald-900 text-white text-xs font-semibold px-3 sm:px-3.5 py-2 rounded-xl shadow-xs transition-colors cursor-pointer shrink-0 whitespace-nowrap"
+                title="Download statement PDF"
               >
-                <Wrench className="w-4 h-4 text-emerald-600 shrink-0" />
-                <span>Report Maintenance</span>
+                <Download className="w-4 h-4 shrink-0" />
+                <span>Download (PDF)</span>
               </button>
-              {maintenanceCopiedFeedback && (
-                <div className="absolute top-full mt-1.5 right-0 z-20 bg-emerald-900 text-white text-[11px] font-medium px-3 py-1.5 rounded-lg shadow-lg flex items-center gap-1.5 animate-in fade-in slide-in-from-top-1 whitespace-nowrap">
-                  <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                  <span>{maintenanceFeedbackMessage || 'Request copied & opened in WhatsApp'}</span>
-                </div>
-              )}
+
+              {/* Tenant Maintenance Request via WhatsApp */}
+              <div className="relative inline-block shrink-0">
+                <button
+                  type="button"
+                  data-testid="report-maintenance-whatsapp-btn"
+                  onClick={handleReportMaintenanceWhatsApp}
+                  className="inline-flex items-center justify-center gap-1.5 bg-white hover:bg-emerald-50 text-emerald-800 border border-emerald-300 text-xs font-semibold px-3 sm:px-3.5 py-2 rounded-xl shadow-xs transition-colors cursor-pointer shrink-0 whitespace-nowrap"
+                  title="Report Maintenance Issue via WhatsApp"
+                  aria-label="Report Maintenance Issue via WhatsApp"
+                >
+                  <Wrench className="w-4 h-4 text-emerald-600 shrink-0" />
+                  <span>Report Maintenance</span>
+                </button>
+                {maintenanceCopiedFeedback && (
+                  <div className="absolute top-full mt-1.5 right-0 z-20 bg-emerald-900 text-white text-[11px] font-medium px-3 py-1.5 rounded-lg shadow-lg flex items-center gap-1.5 animate-in fade-in slide-in-from-top-1 whitespace-nowrap">
+                    <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                    <span>{maintenanceFeedbackMessage || 'Request copied & opened in WhatsApp'}</span>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>
