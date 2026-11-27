@@ -88,7 +88,8 @@ export default function PrivacyNoticePage() {
           {/* Institutional Badge, Title & Subtitle */}
           <div className="space-y-3">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-950/80 text-[#10B981] border border-[#10B981]/40 print:bg-emerald-50 print:text-emerald-900 print:border-emerald-300">
-              <span>🛡️ POPIA &amp; Statutory Compliance Framework</span>
+              <ShieldCheck className="w-3.5 h-3.5 shrink-0" />
+              <span>POPIA &amp; Statutory Compliance Framework</span>
             </div>
 
             <h1 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold tracking-tight text-white print:text-slate-950">
@@ -118,7 +119,7 @@ export default function PrivacyNoticePage() {
             </div>
             <div className="space-y-1">
               <h2 className="text-base sm:text-lg font-extrabold text-slate-900 tracking-tight">
-                ⚠️ Proof of Concept (POC) Pilot &amp; Financial / Statutory Estimate Disclaimer
+                Proof of Concept (POC) Pilot &amp; Financial / Statutory Estimate Disclaimer
               </h2>
               <p className="text-xs font-semibold text-amber-900">
                 Mandatory Statutory Disclosure — South African Real Estate Underwriting &amp; Portfolio Hub

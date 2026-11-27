@@ -3,7 +3,7 @@
 import React, { useMemo, useState } from 'react';
 import { FlipProject, BOQItem } from '@/types';
 import { formatZAR } from '@/lib/formatters';
-import { FileSpreadsheet, PlusCircle, Gift, Trash2, CheckCircle2, Search, X } from 'lucide-react';
+import { FileSpreadsheet, Plus, Gift, Trash2, CheckCircle2, Search, X } from 'lucide-react';
 
 export interface FlipBOQTableProps {
   flip: FlipProject;
@@ -93,7 +93,7 @@ export function FlipBOQTable({
                 : 'bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer'
             }`}
           >
-            <PlusCircle className="w-3.5 h-3.5" />
+            <Plus className="w-3.5 h-3.5" />
             <span>Add BOQ Item</span>
           </button>
         </div>

@@ -6,9 +6,9 @@ import {
   Gauge,
   Zap,
   Droplets,
-  PlusCircle,
+  Plus,
   Trash2,
-  Edit3,
+  Pencil,
   CheckCircle2,
   AlertCircle,
   Building2,
@@ -195,7 +195,7 @@ export default function PropertyMeterRegistryModal({
                 }}
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-cyan-600 hover:bg-cyan-700 text-white font-bold rounded-lg transition-colors cursor-pointer shadow-xs"
               >
-                <PlusCircle className="w-3.5 h-3.5" />
+                <Plus className="w-3.5 h-3.5" />
                 <span>Register Meter</span>
               </button>
             )}
@@ -447,7 +447,7 @@ export default function PropertyMeterRegistryModal({
                           className="p-1 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded transition-colors"
                           title="Edit meter"
                         >
-                          <Edit3 className="w-3.5 h-3.5" />
+                          <Pencil className="w-3.5 h-3.5" />
                         </button>
                         <button
                           type="button"

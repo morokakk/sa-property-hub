@@ -248,11 +248,11 @@ describe('submitFeedback Service & Formatter', () => {
       const formatted = formatFeedbackForWhatsApp(samplePayload);
 
       expect(formatted).toContain('*SA PROP HUB — USER FEEDBACK*');
-      expect(formatted).toContain('📌 *Category:* SA Tax / Municipal Math');
-      expect(formatted).toContain('📍 *Module:* /rentals');
+      expect(formatted).toContain('*Category:* SA Tax / Municipal Math');
+      expect(formatted).toContain('*Module:* /rentals');
       expect(formatted).toContain('Municipal rates calculation is missing indigent rebate support.');
       expect(formatted).toContain('investor@moremela.co.za');
-      expect(formatted).toContain('⚙️ *Diagnostics:* 1280x800 (Desktop) | Local-First (Browser) | Demo Dataset Loaded');
+      expect(formatted).toContain('*Diagnostics:* 1280x800 (Desktop) | Local-First (Browser) | Demo Dataset Loaded');
     });
 
     it('builds universal WhatsApp link when founder number is unconfigured', () => {

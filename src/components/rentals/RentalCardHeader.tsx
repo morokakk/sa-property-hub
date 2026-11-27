@@ -10,8 +10,6 @@ import { calculateRentalTaxProvision } from '@/lib/calculations/rentals';
 import { formatCompactRentalZoningPill } from '@/lib/calculations/rentalZoning';
 import {
   Building2,
-  ArrowRightLeft,
-  Sparkles,
   Phone,
   MessageCircle,
   Mail,
@@ -119,7 +117,7 @@ export function RentalCardHeader({
                       className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-300 max-w-[180px] sm:max-w-none"
                       title={tooltip}
                     >
-                      <span className="truncate">🏛️ {label}</span>
+                      <span className="truncate">{label}</span>
                     </span>
                   );
                 })()}
@@ -133,7 +131,7 @@ export function RentalCardHeader({
                     className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200"
                     title={`Total Floor Area: ${sqm} m² • Purchase Rate: R ${purchasePerSqm.toLocaleString('en-ZA')}/m²${valuationPerSqm > 0 ? ` • Current Valuation: R ${valuationPerSqm.toLocaleString('en-ZA')}/m²` : ''}`}
                   >
-                    <span>📐 {sqm} m²</span>
+                    <span>{sqm} m²</span>
                     {valuationPerSqm > 0 && (
                       <span className="text-slate-400 font-normal text-[9px]">
                         (R {valuationPerSqm.toLocaleString('en-ZA')}/m²)
@@ -144,17 +142,15 @@ export function RentalCardHeader({
               })()}
               <AgmDateChip agmDate={property.agmDate} />
               {property.isBrrrrProperty && (
-                <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-800 border border-indigo-200">
-                  <ArrowRightLeft className="w-2.5 h-2.5 text-indigo-600" />
+                <span className="inline-flex items-center text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-800 border border-indigo-200">
                   <span>BRRRR Asset</span>
                 </span>
               )}
               {isRefinanceReady && (
                 <span
-                  className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300 shadow-2xs"
+                  className="inline-flex items-center text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300 shadow-2xs"
                   title={`Current LTV is ${currentLtv.toFixed(0)}% (below 70% threshold). Ready for cash equity extraction!`}
                 >
-                  <Sparkles className="w-2.5 h-2.5 text-emerald-600" />
                   <span>Refinance Ready ({currentLtv.toFixed(0)}% LTV)</span>
                 </span>
               )}
@@ -162,10 +158,9 @@ export function RentalCardHeader({
                 <button
                   type="button"
                   onClick={onOpenAuditHistory}
-                  className="inline-flex items-center gap-1 text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-purple-100 text-purple-900 border border-purple-200 hover:bg-purple-200 transition-colors cursor-pointer"
+                  className="inline-flex items-center text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-purple-100 text-purple-900 border border-purple-200 hover:bg-purple-200 transition-colors cursor-pointer"
                   title="View timestamped refinance and equity extraction history"
                 >
-                  <Sparkles className="w-2.5 h-2.5 text-purple-600" />
                   <span>Equity Recycled: {formatZAR(property.totalEquityExtractedZAR || 0, { compact: true })}</span>
                 </button>
               )}

@@ -4,7 +4,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import {
   X,
   CheckCircle2,
-  Building,
+  Building2,
   Sparkles,
   Zap,
   Droplets,
@@ -847,14 +847,14 @@ export default function UnifiedPdfVerificationModal({
             {/* Status text */}
             <div className="flex items-start gap-2.5">
               {isNewProperty ? (
-                <Sparkles className="w-4 h-4 text-amber-600 mt-0.5 shrink-0" />
+                <Building2 className="w-4 h-4 text-amber-600 mt-0.5 shrink-0" />
               ) : (
                 <CheckCircle2 className="w-4 h-4 text-emerald-600 mt-0.5 shrink-0" />
               )}
               <div>
                 <span className="text-xs font-bold block">
                   {isNewProperty
-                    ? '✨ New Rental Property Will Be Created'
+                    ? 'New Rental Property Will Be Created'
                     : `✓ Matches Existing Property: ${matchedRental?.title}`}
                 </span>
                 <p className="text-[11px] opacity-80 mt-0.5">
@@ -878,7 +878,7 @@ export default function UnifiedPdfVerificationModal({
                   className="w-full text-xs font-bold px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-slate-900 focus:ring-1 focus:ring-purple-500 focus:outline-none"
                 >
                   <option value="__NEW__" className="text-purple-700 font-bold">
-                    ✨ + Create New Rental Property
+                    Create New Rental Property
                   </option>
                   {activeRentals.map((r) => (
                     <option key={r.id} value={r.id}>
@@ -906,7 +906,7 @@ export default function UnifiedPdfVerificationModal({
                             : 'bg-white text-slate-600 border-slate-300 hover:border-purple-400'
                         }`}
                       >
-                        {pt === 'Freehold House' ? '🏠 Freehold' : pt === 'Sectional Title Apartment' ? '🏢 Sectional' : '🏘️ Townhouse'}
+                        {pt === 'Freehold House' ? 'Freehold' : pt === 'Sectional Title Apartment' ? 'Sectional' : 'Townhouse'}
                       </button>
                     ))}
                   </div>

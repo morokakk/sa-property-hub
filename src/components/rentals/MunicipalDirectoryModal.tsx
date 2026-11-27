@@ -3,13 +3,13 @@
 import React, { useState, useMemo } from 'react';
 import {
   X,
-  Building,
+  Landmark,
   Mail,
   Phone,
   Search,
-  PlusCircle,
+  Plus,
   Trash2,
-  Edit3,
+  Pencil,
   RotateCcw,
   Check,
   AlertCircle,
@@ -148,7 +148,7 @@ export default function MunicipalDirectoryModal({
         <div className="px-5 py-4 border-b border-slate-200 flex items-center justify-between bg-slate-50/80">
           <div className="flex items-center gap-2.5 min-w-0">
             <div className="p-2 rounded-xl bg-amber-100 text-amber-800 shrink-0">
-              <Building className="w-5 h-5" />
+              <Landmark className="w-5 h-5" />
             </div>
             <div className="min-w-0">
               <div className="flex items-center gap-2">
@@ -213,7 +213,7 @@ export default function MunicipalDirectoryModal({
                   }}
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-lg transition-colors cursor-pointer shadow-xs"
                 >
-                  <PlusCircle className="w-3.5 h-3.5" />
+                  <Plus className="w-3.5 h-3.5" />
                   <span>Add Authority</span>
                 </button>
               )}
@@ -236,7 +236,7 @@ export default function MunicipalDirectoryModal({
             >
               <div className="flex items-center justify-between border-b border-amber-200 pb-2">
                 <h4 className="font-bold text-amber-950 flex items-center gap-1.5">
-                  <Building className="w-4 h-4 text-amber-600" />
+                  <Landmark className="w-4 h-4 text-amber-600" />
                   <span>{editingId ? 'Edit Municipal Contact' : 'Add New Municipal Authority'}</span>
                 </h4>
                 <button
@@ -411,7 +411,7 @@ export default function MunicipalDirectoryModal({
                       className="p-1 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded transition-colors"
                       title="Edit contact details"
                     >
-                      <Edit3 className="w-3.5 h-3.5" />
+                      <Pencil className="w-3.5 h-3.5" />
                     </button>
                     {contact.isCustom && (
                       <button

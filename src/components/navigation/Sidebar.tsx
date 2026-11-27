@@ -25,7 +25,7 @@ import {
   Compass,
   BookOpen,
   MessageSquarePlus,
-  Sparkles,
+  Home,
   HardHat,
 } from 'lucide-react';
 import { usePortfolioStore } from '@/lib/store/usePortfolioStore';
@@ -256,7 +256,7 @@ function SidebarContent({ pathname }: { pathname: string | null }) {
     {
       name: 'Welcome & Overview',
       href: '/',
-      icon: Sparkles,
+      icon: Home,
     },
     {
       name: 'Get Started Guide',

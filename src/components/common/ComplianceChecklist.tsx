@@ -9,7 +9,7 @@ import {
   Fence,
   Droplet,
   Bug,
-  Edit2,
+  Pencil,
   Check,
   FileCheck,
   ChevronDown,
@@ -338,7 +338,7 @@ export default function ComplianceChecklist({
                       }}
                       className="text-slate-400 hover:text-slate-700 ml-1 cursor-pointer shrink-0"
                     >
-                      <Edit2 className="w-2.5 h-2.5" />
+                      <Pencil className="w-2.5 h-2.5" />
                     </button>
                   )}
                 </>

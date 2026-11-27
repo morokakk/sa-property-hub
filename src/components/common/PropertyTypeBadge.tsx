@@ -26,7 +26,7 @@ export function PropertyTypeBadge({ type, className = '' }: PropertyTypeBadgePro
           className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 shadow-2xs ${className}`}
           title="Freehold Standalone Title (STSMA levies not applicable)"
         >
-          <span>🏡 Freehold House</span>
+          <span>Freehold House</span>
         </span>
       );
     case 'Townhouse / Cluster':
@@ -35,7 +35,7 @@ export function PropertyTypeBadge({ type, className = '' }: PropertyTypeBadgePro
           className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-200 shadow-2xs ${className}`}
           title="Townhouse / Cluster Scheme (HOA / Body Corporate)"
         >
-          <span>🏘️ Townhouse / Cluster</span>
+          <span>Townhouse / Cluster</span>
         </span>
       );
     case 'Multi-unit Commercial':
@@ -44,7 +44,7 @@ export function PropertyTypeBadge({ type, className = '' }: PropertyTypeBadgePro
           className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-purple-50 text-purple-700 border border-purple-200 shadow-2xs ${className}`}
           title="Multi-unit Commercial Asset"
         >
-          <span>🏬 Commercial</span>
+          <span>Commercial</span>
         </span>
       );
     case 'Sectional Title Apartment':
@@ -54,7 +54,7 @@ export function PropertyTypeBadge({ type, className = '' }: PropertyTypeBadgePro
           className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200 shadow-2xs ${className}`}
           title="Sectional Title Scheme (Body Corporate STSMA)"
         >
-          <span>🏢 Sectional Title</span>
+          <span>Sectional Title</span>
         </span>
       );
   }
@@ -77,11 +77,11 @@ export function AgmDateChip({ agmDate, className = '' }: AgmDateChipProps) {
       } ${className}`}
       title={
         upcoming
-          ? '⚠️ Body Corporate AGM scheduled within 30 days! Check quorum and budget proxy.'
+          ? 'Body Corporate AGM scheduled within 30 days. Check quorum and budget proxy.'
           : 'Scheduled Body Corporate Annual General Meeting (AGM)'
       }
     >
-      <Calendar className={`w-2.5 h-2.5 ${upcoming ? 'text-amber-700' : 'text-slate-500'}`} />
+      <Calendar className={`w-3.5 h-3.5 shrink-0 ${upcoming ? 'text-amber-700' : 'text-slate-500'}`} />
       <span>
         AGM: {formatDate(agmDate)}
         {upcoming ? ' (Upcoming)' : ''}

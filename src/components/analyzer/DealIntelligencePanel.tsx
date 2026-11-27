@@ -8,7 +8,7 @@ import {
   DealRepairLever,
 } from '@/lib/calculations/dealIntelligence';
 import {
-  Sparkles,
+  Scale,
   CheckCircle2,
   AlertTriangle,
   ArrowRight,
@@ -72,7 +72,7 @@ export function DealIntelligencePanel({
       >
         <div className="flex items-center gap-2.5 min-w-0">
           <div className="w-7 h-7 rounded-lg bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center shrink-0">
-            <Sparkles className="w-4 h-4 text-emerald-400" />
+            <Scale className="w-4 h-4 text-emerald-400" />
           </div>
           <div className="min-w-0">
             <div className="flex items-center gap-1.5 flex-wrap">

@@ -685,7 +685,7 @@ describe('Development Module UI Components & Navigation (Milestone 3)', () => {
       expect(html).toContain('Senior Bank Facility');
       expect(html).toContain('Outstanding Facility Debt:');
       expect(html).toContain('Record Repayment');
-      expect(html).toContain('+ Record Drawdown');
+      expect(html).toContain('Record Drawdown');
 
       // Pre-sales Hurdle
       expect(html).toContain('Pre-Sales Bank Gate');
@@ -771,7 +771,7 @@ describe('Development Module UI Components & Navigation (Milestone 3)', () => {
       const html = renderToString(<DevelopmentsPage />);
 
       expect(html).toContain('Developments Manager');
-      expect(html).toContain('+ New Development Project');
+      expect(html).toContain('New Development Project');
       expect(html).toContain('Parkview Infill Clusters');
       expect(html).toContain('Unit Inventory &amp; Split-Exit');
       expect(html).toContain('Cost Stack &amp; Hard Build BOQ');
@@ -1013,7 +1013,7 @@ describe('Development Module UI Components & Navigation (Milestone 3)', () => {
           onUpdateDevelopment={() => {}}
         />
       );
-      expect(financeHtml).toContain('+ Record Drawdown');
+      expect(financeHtml).toContain('Record Drawdown');
       expect(financeHtml).toContain('disabled=""');
     });
 

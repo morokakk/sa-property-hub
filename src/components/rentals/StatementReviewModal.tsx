@@ -10,7 +10,7 @@ import {
   Calculator,
   RotateCcw,
   Info,
-  Edit3,
+  Pencil,
 } from 'lucide-react';
 import { ExtractedRentalUnit, RentalProperty } from '@/types';
 import { usePortfolioStore } from '@/lib/store/usePortfolioStore';
@@ -195,8 +195,7 @@ export default function StatementReviewModal({
                         Update Existing Property: &ldquo;{matched.title}&rdquo;
                       </span>
                     ) : (
-                      <span className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-900 border border-emerald-300 flex items-center gap-1.5">
-                        <Sparkles className="w-3.5 h-3.5 text-emerald-700" />
+                      <span className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-900 border border-emerald-300 inline-flex items-center">
                         New Property Detected (Will be added to portfolio)
                       </span>
                     )}

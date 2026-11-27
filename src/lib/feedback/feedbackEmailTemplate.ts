@@ -82,12 +82,12 @@ export function generateFeedbackEmailHtml(payload: SendFeedbackEmailPayload): st
     const buttons: string[] = [];
     if (email) {
       buttons.push(
-        `<a href="mailto:${escapeHtml(email)}?subject=Re:%20[SA%20Prop%20Hub]%20Feedback%20Response" style="display:inline-block;padding:8px 14px;background-color:#0284c7;color:#ffffff;text-decoration:none;border-radius:6px;font-size:12px;font-weight:600;margin-right:8px;">📧 Reply via Email (${escapeHtml(email)})</a>`
+        `<a href="mailto:${escapeHtml(email)}?subject=Re:%20[SA%20Prop%20Hub]%20Feedback%20Response" style="display:inline-block;padding:8px 14px;background-color:#0284c7;color:#ffffff;text-decoration:none;border-radius:6px;font-size:12px;font-weight:600;margin-right:8px;">Reply via Email (${escapeHtml(email)})</a>`
       );
     }
     if (waDigits) {
       buttons.push(
-        `<a href="https://wa.me/${escapeHtml(waDigits)}" style="display:inline-block;padding:8px 14px;background-color:#16a34a;color:#ffffff;text-decoration:none;border-radius:6px;font-size:12px;font-weight:600;">💬 Reply via WhatsApp</a>`
+        `<a href="https://wa.me/${escapeHtml(waDigits)}" style="display:inline-block;padding:8px 14px;background-color:#16a34a;color:#ffffff;text-decoration:none;border-radius:6px;font-size:12px;font-weight:600;">Reply via WhatsApp</a>`
       );
     }
     quickReplyHtml = `

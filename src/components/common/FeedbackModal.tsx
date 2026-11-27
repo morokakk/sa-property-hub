@@ -6,7 +6,7 @@ import {
   X,
   MessageSquarePlus,
   Bug,
-  Sparkles,
+  Lightbulb,
   Calculator,
   Smile,
   Send,
@@ -50,7 +50,7 @@ const CATEGORIES: {
   {
     id: 'feature',
     label: 'Feature Request',
-    icon: Sparkles,
+    icon: Lightbulb,
     description: 'New workflow, export, or compliance idea',
     placeholder: 'What feature or South African workflow would help your property portfolio?',
   },

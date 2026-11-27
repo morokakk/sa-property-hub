@@ -3,7 +3,7 @@
 import React, { useMemo, useState } from 'react';
 import Link from 'next/link';
 import {
-  Building,
+  Building2,
   CheckCircle2,
   Coins,
   Download,
@@ -332,7 +332,7 @@ export default function DealRoomViewer({ dealRoomData, token }: DealRoomViewerPr
               {
                 id: 'units',
                 label: `Unit Inventory & Split-Exit (${effectiveDevelopment.units?.length || 0})`,
-                icon: Building,
+                icon: Building2,
               },
               { id: 'costs', label: 'Cost Stack & Hard Build BOQ', icon: FileSpreadsheet },
               { id: 'approvals', label: 'Paper Rights & Approvals (6)', icon: FileCheck },

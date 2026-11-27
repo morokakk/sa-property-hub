@@ -5,7 +5,7 @@ import { RentalProperty } from '@/types';
 import { generateRentalLongTermProjection, calculatePaydownImpact } from '@/lib/calculations/propertyMetrics';
 import { formatZAR } from '@/lib/formatters';
 import LongTermProjectionChart from '@/components/analytics/LongTermProjectionChart';
-import { TrendingUp, DollarSign, ChevronDown, ChevronUp, Zap } from 'lucide-react';
+import { TrendingUp, DollarSign, ChevronDown, ChevronUp, TrendingDown } from 'lucide-react';
 
 export interface RentalForecastSectionProps {
   property: RentalProperty;
@@ -124,7 +124,7 @@ export function RentalForecastSection({
             <div className="p-3 rounded-lg border border-indigo-200 bg-indigo-50/60 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
               <div className="space-y-0.5">
                 <div className="flex items-center gap-1.5 font-bold text-indigo-950">
-                  <Zap className="w-3.5 h-3.5 text-indigo-600" />
+                  <TrendingDown className="w-3.5 h-3.5 text-indigo-600" />
                   <span>Accelerated Paydown Impact (+{formatZAR(property.extraMonthlyPaymentZAR || 0)}/m)</span>
                 </div>
                 <p className="text-[11px] text-indigo-700">

@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Building2, Archive, FileSpreadsheet, PlusCircle, Search, LayoutGrid, List, X } from 'lucide-react';
+import { Building2, Archive, FileSpreadsheet, Plus, Search, LayoutGrid, List, X } from 'lucide-react';
 
 export interface RentalViewTabsProps {
   id?: string;
@@ -166,7 +166,7 @@ export function RentalViewTabs({
               onClick={onOpenAddRental}
               className="inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold px-3 py-2 rounded-lg shadow-sm transition-colors cursor-pointer shrink-0"
             >
-              <PlusCircle className="w-3.5 h-3.5" />
+              <Plus className="w-3.5 h-3.5" />
               <span>Add Rental Property</span>
             </button>
           )}

@@ -436,7 +436,7 @@ describe('whatsappFormatter - Strategy Adaptive Formatting', () => {
     // Output 12-month collection metrics
     expect(output).toContain(`• 12-Mo Collection Rate: 85.2% (${formatZAR(170_000)} of ${formatZAR(200_000)})`);
     expect(output).toContain(`• Tenant Arrears Receivable: ${formatZAR(30_000)} (Excluded from project outlay)`);
-    expect(output).toContain('⚠️ Diligence Note: Tenant Collection Risk flagged (<90% collection).');
+    expect(output).toContain('Diligence Note: Tenant Collection Risk flagged (<90% collection).');
 
     // Must not leak tenant personal details
     expect(output).not.toContain('Dr. Thabo Mokoena');
@@ -601,7 +601,7 @@ describe('whatsappFormatter - Strategy Adaptive Formatting', () => {
     it('formatPieActWhatsAppBlock renders formatted statutory risk block for Magistrate Court', () => {
       const output = formatPieActWhatsAppBlock(unlawfulRiskMagistrate);
 
-      expect(output).toContain('*⚠️ SITE POSSESSION & STATUTORY RISK (PIE ACT)*');
+      expect(output).toContain('*SITE POSSESSION & STATUTORY RISK (PIE ACT)*');
       expect(output).toContain('• Occupancy Status: *Unlawful Occupants Present*');
       expect(output).toContain("• Legal Jurisdiction: *Magistrate's Court (Unopposed Proceedings)*");
       expect(output).toContain('• Estimated Eviction Delay: *~120 Days*');
@@ -615,7 +615,7 @@ describe('whatsappFormatter - Strategy Adaptive Formatting', () => {
     it('formatPieActWhatsAppBlock renders formatted statutory risk block for High Court', () => {
       const output = formatPieActWhatsAppBlock(unlawfulRiskHighCourt);
 
-      expect(output).toContain('*⚠️ SITE POSSESSION & STATUTORY RISK (PIE ACT)*');
+      expect(output).toContain('*SITE POSSESSION & STATUTORY RISK (PIE ACT)*');
       expect(output).toContain('• Legal Jurisdiction: *High Court (Opposed / Complex Proceedings)*');
       expect(output).toContain('• Estimated Eviction Delay: *~240 Days*');
       expect(output).toContain(`• Budgeted Legal Eviction Reserve: *${formatZAR(85_000)}*`);
@@ -630,7 +630,7 @@ describe('whatsappFormatter - Strategy Adaptive Formatting', () => {
 
       const output = formatOpportunityForWhatsApp(oppWithEviction, mockInvestorProfile);
 
-      expect(output).toContain('⚠️ SITE POSSESSION & STATUTORY RISK (PIE ACT)');
+      expect(output).toContain('SITE POSSESSION & STATUTORY RISK (PIE ACT)');
       expect(output).toContain('Contractor Protection Gate: *Active*');
       expect(output).toContain(`• PIE Act Legal Eviction Reserve: *${formatZAR(40_000)}*`);
       expect(output).toContain('6m works + ~120d legal');
@@ -671,7 +671,7 @@ describe('whatsappFormatter - Strategy Adaptive Formatting', () => {
 
       const output = formatFlipForWhatsApp(flipWithEviction, mockInvestorProfile);
 
-      expect(output).toContain('⚠️ SITE POSSESSION & STATUTORY RISK (PIE ACT)');
+      expect(output).toContain('SITE POSSESSION & STATUTORY RISK (PIE ACT)');
       expect(output).toContain('High Court (Opposed / Complex Proceedings)');
       expect(output).toContain(formatZAR(85_000));
       expect(output).toContain('Contractor Protection Gate: *Active*');
@@ -706,7 +706,7 @@ describe('whatsappFormatter - Strategy Adaptive Formatting', () => {
         investorProfile: mockInvestorProfile,
       });
 
-      expect(output).toContain('⚠️ SITE POSSESSION & STATUTORY RISK (PIE ACT)');
+      expect(output).toContain('SITE POSSESSION & STATUTORY RISK (PIE ACT)');
       expect(output).toContain("Magistrate's Court (Unopposed Proceedings)");
       expect(output).toContain(`• Budgeted Legal Eviction Reserve: *${formatZAR(40_000)}*`);
       expect(output).toContain('• Contractor Protection Gate: *Active*');

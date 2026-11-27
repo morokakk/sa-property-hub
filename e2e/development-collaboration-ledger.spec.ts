@@ -196,7 +196,7 @@ test.describe('Tier 1 Development Collaboration: Team Ledger, 5-Sheet Excel Expo
     expect(viewerText).toContain('Private Buyer (Masked)');
 
     // Tab 1: Units locked
-    await expect(page.getByRole('button', { name: /\+ Add Unit/i })).toBeDisabled();
+    await expect(page.getByRole('button', { name: /Add Unit/i })).toBeDisabled();
     await expect(page.getByRole('button', { name: /Mark Sold/i }).first()).toBeDisabled();
 
     // Tab 2: Cost Stack locked except CSV
@@ -214,7 +214,7 @@ test.describe('Tier 1 Development Collaboration: Team Ledger, 5-Sheet Excel Expo
 
     // Tab 4: Finance locked
     await page.getByTestId('deal-room-tab-finance').click();
-    await expect(page.getByRole('button', { name: /\+ Record Drawdown/i })).toBeDisabled();
+    await expect(page.getByRole('button', { name: /Record Drawdown/i })).toBeDisabled();
     await expect(page.getByRole('button', { name: /Record Repayment/i })).toBeDisabled();
 
     // Public Excel Export contains POPIA-masked buyers and zero conveyancer refs

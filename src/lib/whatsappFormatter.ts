@@ -84,7 +84,7 @@ export function formatPieActWhatsAppBlock(risk?: OccupantRiskProfile | null): st
       ? "High Court (Opposed / Complex Proceedings)"
       : "Magistrate's Court (Unopposed Proceedings)";
 
-  let text = `*⚠️ SITE POSSESSION & STATUTORY RISK (PIE ACT)*\n`;
+  let text = `*SITE POSSESSION & STATUTORY RISK (PIE ACT)*\n`;
   text += `• Occupancy Status: *Unlawful Occupants Present*\n`;
   text += `• Legal Jurisdiction: *${courtLabel}*\n`;
   text += `• Estimated Eviction Delay: *~${risk.estimatedEvictionDelayDays} Days*\n`;
@@ -671,7 +671,7 @@ export function formatProposalPitchForWhatsApp(
       text += `• Tenant Arrears Receivable: ${formatZAR(tArrears)} (Excluded from project outlay)\n`;
     }
     if (colRate < 90) {
-      text += `⚠️ Diligence Note: Tenant Collection Risk flagged (<90% collection).\n`;
+      text += `Diligence Note: Tenant Collection Risk flagged (<90% collection).\n`;
     }
   }
   text += `\n`;

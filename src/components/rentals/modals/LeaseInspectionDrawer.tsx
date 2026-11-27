@@ -14,7 +14,6 @@ import {
   Check,
   Camera,
   Calendar,
-  Sparkles,
 } from 'lucide-react';
 import {
   InspectionCategory,
@@ -212,7 +211,7 @@ export function LeaseInspectionDrawer({
                 className="inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-md transition-colors cursor-pointer"
                 title="Sets all 8 categories to Good condition with 1 click"
               >
-                <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
                 <span>Mark All 8 as Good (1-Tap)</span>
               </button>
             </div>
@@ -343,7 +342,7 @@ export function LeaseInspectionDrawer({
 
             {showSaveReminder && (
               <div className="p-2 rounded bg-amber-50 border border-amber-300 text-[11px] text-amber-900 font-medium animate-in fade-in">
-                💡 Inspection copied & opened in WhatsApp — remember to click <strong>Save Property</strong> at the bottom of the modal to persist your inspection records.
+                Inspection copied &amp; opened in WhatsApp — remember to click <strong>Save Property</strong> at the bottom of the modal to persist your inspection records.
               </div>
             )}
 

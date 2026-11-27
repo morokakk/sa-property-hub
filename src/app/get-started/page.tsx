@@ -19,7 +19,6 @@ import {
   ChevronDown,
   ArrowRight,
   RotateCcw,
-  Sparkles,
   Rocket,
   CheckCircle2,
 } from 'lucide-react';
@@ -274,7 +273,7 @@ export default function GetStartedPage() {
           </div>
 
           <div className="flex items-start gap-2 text-xs text-teal-950 bg-teal-50 border border-teal-200 rounded-lg px-3 py-2.5">
-            <Sparkles className="w-4 h-4 shrink-0 text-teal-600 mt-0.5" aria-hidden="true" />
+            <Lightbulb className="w-4 h-4 shrink-0 text-teal-600 mt-0.5" aria-hidden="true" />
             <p className="leading-relaxed">{DEMO_DATA_TIP}</p>
           </div>
         </section>

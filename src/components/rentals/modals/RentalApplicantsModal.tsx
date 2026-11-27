@@ -645,7 +645,7 @@ export function RentalApplicantsModal({
               ) : (
                 <ChevronDown className="w-3.5 h-3.5" />
               )}
-              <span>{showOptional ? 'Hide Optional Details' : '+ Optional Details'}</span>
+              <span>{showOptional ? 'Hide Optional Details' : 'Optional Details'}</span>
             </button>
 
             <button

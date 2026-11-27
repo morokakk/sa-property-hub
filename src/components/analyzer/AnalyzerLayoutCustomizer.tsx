@@ -19,12 +19,11 @@ import {
   ArrowUp,
   ArrowDown,
   RotateCcw,
-  Zap,
   AlertTriangle,
   X,
   Check,
   Layers,
-  Building,
+  Building2,
   Sliders,
   Scale,
   MapPin,
@@ -64,7 +63,7 @@ export const ANALYZER_SECTION_METADATA: Record<AnalyzerSectionId, SectionMeta> =
     id: 'vacancyAgent',
     label: 'Vacancy & Managing Agent Fees',
     description: 'Credit loss buffer % & agency commission with 15% VAT',
-    icon: Building,
+    icon: Building2,
   },
   opexReserves: {
     id: 'opexReserves',
@@ -368,8 +367,8 @@ export default function AnalyzerLayoutCustomizer({
                   onClick={() => onApplyPreset('napkin')}
                   className="py-2 px-3 rounded-xl border border-amber-200 bg-amber-50/70 hover:bg-amber-100 text-amber-950 text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
                 >
-                  <Zap className="w-3.5 h-3.5 text-amber-600" />
-                  <span>⚡ Quick Napkin Screen</span>
+                  <SlidersHorizontal className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                  <span>Quick Napkin Screen</span>
                 </button>
                 <button
                   type="button"
@@ -377,8 +376,8 @@ export default function AnalyzerLayoutCustomizer({
                   onClick={() => onApplyPreset('full')}
                   className="py-2 px-3 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-800 text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
                 >
-                  <RotateCcw className="w-3.5 h-3.5 text-slate-600" />
-                  <span>🏦 Full Institutional (Reset)</span>
+                  <RotateCcw className="w-3.5 h-3.5 text-slate-600 shrink-0" />
+                  <span>Full Institutional (Reset)</span>
                 </button>
               </div>
             </div>

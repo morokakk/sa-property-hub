@@ -28,11 +28,10 @@ import {
   TrendingDown,
   Layers,
   MapPin,
-  Building,
+  Building2,
   Calendar,
   X,
   Scale,
-  Sparkles,
 } from 'lucide-react';
 
 export interface DevelopmentApprovalsTabProps {

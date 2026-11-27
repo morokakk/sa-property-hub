@@ -23,7 +23,7 @@ import {
   Hammer,
   Archive,
   Layers,
-  Building2,
+  Landmark,
   Briefcase,
   ExternalLink,
   ShieldCheck,
@@ -180,7 +180,7 @@ export function FlipActivePipeline({
           title="Click to view Section 118 RCC & CoC Compliance Checklist"
         >
           <span className="p-1 rounded bg-slate-800 text-indigo-400 group-hover:bg-slate-700">
-            <Building2 className="w-3.5 h-3.5" />
+            <Landmark className="w-3.5 h-3.5 shrink-0" />
           </span>
           <span className="text-slate-300">
             Transfer Readiness:{' '}
@@ -206,8 +206,8 @@ export function FlipActivePipeline({
               : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
           }`}
         >
-          <Hammer className={`w-4 h-4 ${activeWorkspaceTab === 'boq' ? 'text-amber-400' : 'text-slate-500'}`} />
-          <span>🔨 BOQ & Contractor Draws</span>
+          <Hammer className={`w-4 h-4 shrink-0 ${activeWorkspaceTab === 'boq' ? 'text-amber-400' : 'text-slate-500'}`} />
+          <span>BOQ &amp; Contractor Draws</span>
           <span
             className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
               activeWorkspaceTab === 'boq' ? 'bg-slate-800 text-amber-300' : 'bg-slate-100 text-slate-600'
@@ -228,8 +228,8 @@ export function FlipActivePipeline({
               : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
           }`}
         >
-          <Building2 className={`w-4 h-4 ${activeWorkspaceTab === 'compliance' ? 'text-indigo-400' : 'text-slate-500'}`} />
-          <span>🏛️ Transfer & Compliance</span>
+          <Landmark className={`w-4 h-4 shrink-0 ${activeWorkspaceTab === 'compliance' ? 'text-indigo-400' : 'text-slate-500'}`} />
+          <span>Transfer &amp; Compliance</span>
           <span
             className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
               activeWorkspaceTab === 'compliance' ? 'bg-slate-800 text-indigo-300' : 'bg-slate-100 text-slate-600'
@@ -250,8 +250,8 @@ export function FlipActivePipeline({
               : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
           }`}
         >
-          <Briefcase className={`w-4 h-4 ${activeWorkspaceTab === 'funding' ? 'text-emerald-400' : 'text-slate-500'}`} />
-          <span>💼 Funding & Syndicate</span>
+          <Briefcase className={`w-4 h-4 shrink-0 ${activeWorkspaceTab === 'funding' ? 'text-emerald-400' : 'text-slate-500'}`} />
+          <span>Funding &amp; Syndicate</span>
           <span
             className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
               activeWorkspaceTab === 'funding' ? 'bg-slate-800 text-emerald-300' : 'bg-slate-100 text-slate-600'

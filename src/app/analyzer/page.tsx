@@ -62,9 +62,7 @@ import {
 import DealIntelligencePanel from '@/components/analyzer/DealIntelligencePanel';
 import {
   Calculator,
-  Zap,
-  PlusCircle,
-  Building,
+  Plus,
   Hammer,
   FileText,
   Trash2,
@@ -78,7 +76,6 @@ import {
   Copy,
   Check,
   Share2,
-  Sparkles,
   ShieldCheck,
   GraduationCap,
   ShieldAlert,
@@ -86,7 +83,8 @@ import {
   ShoppingBag,
   MapPin,
   TrendingUp,
-  Edit3,
+  TrendingDown,
+  Pencil,
   FileSpreadsheet,
   ArrowRight,
   XCircle,
@@ -4259,7 +4257,7 @@ export default function OpportunityAnalyzerPage() {
                   <div className="p-3.5 rounded-xl border border-indigo-200 bg-indigo-50/50 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
                     <div className="space-y-0.5">
                       <div className="flex items-center gap-1.5 font-bold text-indigo-950">
-                        <Zap className="w-4 h-4 text-indigo-600" />
+                        <TrendingDown className="w-4 h-4 text-indigo-600 shrink-0" />
                         <span>Accelerated Paydown Impact (+{formatZAR(extraMonthlyPayment)}/m)</span>
                       </div>
                       <p className="text-[11px] text-indigo-700">
@@ -4413,8 +4411,8 @@ export default function OpportunityAnalyzerPage() {
                   >
                     <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
                       <div className="flex items-center gap-1.5">
-                        <Sparkles
-                          className={`w-4 h-4 ${
+                        <ShieldCheck
+                          className={`w-4 h-4 shrink-0 ${
                             section13UiState.state === 'manual_override' ? 'text-amber-700' : 'text-emerald-700'
                           }`}
                         />
@@ -4822,7 +4820,7 @@ export default function OpportunityAnalyzerPage() {
                     : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50 font-medium'
                 }`}
               >
-                <span>⚡ Quick Napkin</span>
+                <span>Quick Napkin</span>
               </button>
 
               {/* Customize Layout Popover Button */}
@@ -4852,7 +4850,7 @@ export default function OpportunityAnalyzerPage() {
           {editingDealId && (
             <div className="bg-amber-50 border border-amber-300 rounded-xl p-3.5 mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-amber-950 text-xs shadow-2xs animate-fadeIn">
               <div className="flex items-center gap-2">
-                <Edit3 className="w-4 h-4 text-amber-700 shrink-0" />
+                <Pencil className="w-4 h-4 text-amber-700 shrink-0" />
                 <span>
                   Editing active pipeline deal: <strong>&ldquo;{title || 'Selected Deal'}&rdquo;</strong>. Modify any prices, quotes, yields, or amenities below.
                 </span>
@@ -5030,7 +5028,7 @@ export default function OpportunityAnalyzerPage() {
                         [
                           { id: 'Subdivision & Cluster' as const, label: 'Subdivision Cluster', icon: Home },
                           { id: 'Sectional Title Apartments' as const, label: 'Sectional Title', icon: Building2 },
-                          { id: 'Township Micro-Units (Infill)' as const, label: 'Township Infill', icon: Building },
+                          { id: 'Township Micro-Units (Infill)' as const, label: 'Township Infill', icon: Building2 },
                           { id: 'Commercial-to-Residential Conversion' as const, label: 'Comm-to-Resi', icon: Warehouse },
                         ] as const
                       ).map((dt) => {
@@ -5060,7 +5058,7 @@ export default function OpportunityAnalyzerPage() {
                   <div>
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center gap-1.5">
-                        <Building className="w-4 h-4 text-emerald-600" />
+                        <Building2 className="w-4 h-4 text-emerald-600" />
                         <label className="text-xs font-bold text-slate-900 uppercase tracking-wider">
                           Property Title Type &amp; Governance
                         </label>
@@ -5227,8 +5225,11 @@ export default function OpportunityAnalyzerPage() {
                     </div>
                     {strategy === 'Development' && numberOfUnits > 0 && floorAreaSqm / numberOfUnits < 24 && (
                       <div className="mt-1.5 px-2.5 py-1.5 rounded-lg bg-amber-50 border border-amber-300 text-[11px] text-amber-900 flex flex-wrap items-center justify-between gap-1.5">
-                        <span>
-                          ⚠️ Avg {Math.round(floorAreaSqm / numberOfUnits)} m²/unit is below SA 24 m² micro-unit minimum —{' '}
+                        <span className="inline-flex items-center gap-1.5 flex-wrap">
+                          <AlertTriangle className="w-3.5 h-3.5 shrink-0 text-amber-700" />
+                          <span>
+                            Avg {Math.round(floorAreaSqm / numberOfUnits)} m²/unit is below SA 24 m² micro-unit minimum —{' '}
+                          </span>
                           <button
                             type="button"
                             onClick={() => {
@@ -5535,7 +5536,7 @@ export default function OpportunityAnalyzerPage() {
               <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-2.5 shadow-2xs">
                 <div className="flex items-center justify-between border-b border-slate-200 pb-2">
                   <div className="flex items-center gap-2">
-                    <Building className="w-4 h-4 text-emerald-600" />
+                    <Building2 className="w-4 h-4 text-emerald-600" />
                     <span className="text-xs font-bold text-slate-900 uppercase tracking-wider">
                       Baseline Operational Cash Flow (Rent, Levies &amp; Municipal Rates)
                     </span>
@@ -5674,7 +5675,7 @@ export default function OpportunityAnalyzerPage() {
               <div className="p-4 rounded-xl bg-purple-50/70 border border-purple-200 space-y-3 shadow-2xs">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-purple-200/80 pb-2">
                   <div className="flex items-center gap-2">
-                    <Sparkles className="w-4 h-4 text-purple-700 shrink-0" />
+                    <RefreshCw className="w-4 h-4 text-purple-700 shrink-0" />
                     <div>
                       <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
                         Hybrid BRRRR Post-Rehab Refinance Engine
@@ -5765,8 +5766,8 @@ export default function OpportunityAnalyzerPage() {
                 </div>
                 <div className="flex items-center gap-2">
                   {isSection13Eligible && (
-                    <span className="text-[10px] font-semibold bg-emerald-500/10 text-emerald-300 border border-emerald-500/30 px-2 py-0.5 rounded-md flex items-center gap-1 tabular-nums">
-                      <Sparkles className="w-3 h-3" /> Sec 13sex Active: +{formatZAR(calculatedSection13.annualTaxSavingsZAR)}/yr Shield
+                    <span className="text-[10px] font-semibold bg-emerald-500/10 text-emerald-300 border border-emerald-500/30 px-2 py-0.5 rounded-md inline-flex items-center tabular-nums">
+                      Sec 13sex Active: +{formatZAR(calculatedSection13.annualTaxSavingsZAR)}/yr Shield
                     </span>
                   )}
                 </div>
@@ -6001,7 +6002,7 @@ export default function OpportunityAnalyzerPage() {
                   </>
                 ) : (
                   <>
-                    <PlusCircle className="w-4 h-4" /> Save Deal to Sourcing Pipeline
+                    <Plus className="w-4 h-4 shrink-0" /> Save Deal to Sourcing Pipeline
                   </>
                 )}
               </button>
@@ -6354,7 +6355,7 @@ export default function OpportunityAnalyzerPage() {
                                       title="Edit in Calculator"
                                       className="p-1 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded border border-slate-200 bg-white cursor-pointer"
                                     >
-                                      <Edit3 className="w-3 h-3" />
+                                      <Pencil className="w-3 h-3" />
                                     </button>
                                   </div>
                                 </div>
@@ -6386,7 +6387,7 @@ export default function OpportunityAnalyzerPage() {
                                     title="Edit in Calculator"
                                     className="p-1 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded border border-slate-200 bg-white cursor-pointer"
                                   >
-                                    <Edit3 className="w-3 h-3" />
+                                    <Pencil className="w-3 h-3" />
                                   </button>
                                 </div>
                               </td>
@@ -6678,8 +6679,7 @@ export default function OpportunityAnalyzerPage() {
                         .map((deal) => (
                           <td key={deal.id} className="p-3 text-slate-700 border-l border-slate-100 text-[11px]">
                             {deal.section13sex?.isEligible ? (
-                              <span className="font-bold text-emerald-700 flex items-center gap-1">
-                                <Sparkles className="w-3 h-3" />
+                              <span className="font-bold text-emerald-700 tabular-nums">
                                 +{formatZAR(deal.section13sex.annualTaxSavingsZAR)}/yr
                               </span>
                             ) : (

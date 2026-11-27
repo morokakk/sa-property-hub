@@ -159,7 +159,7 @@ export function generateStatementEmailHtml(params: GenerateEmailHtmlParams): str
                 <tr>
                   <td>
                     <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: #0f172a; margin-bottom: 12px; border-bottom: 1px solid #e2e8f0; padding-bottom: 6px;">
-                      🏦 Remittance Banking Details (EFT)
+                      Remittance Banking Details (EFT)
                     </div>
                     <table role="presentation" width="100%" border="0" cellpadding="0" cellspacing="0" style="font-size: 12px; border-collapse: collapse;">
                       <tr>

@@ -3,7 +3,7 @@
 import React from 'react';
 import { usePortfolioStore } from '@/lib/store/usePortfolioStore';
 import { formatDate, formatZAR } from '@/lib/formatters';
-import { Calendar, Clock, AlertTriangle, Building, Coins, Hammer, ShieldAlert } from 'lucide-react';
+import { Calendar, Clock, AlertTriangle, Building2, Coins, Hammer, ShieldAlert } from 'lucide-react';
 import Link from 'next/link';
 
 export default function UpcomingDeadlines() {
@@ -35,7 +35,7 @@ export default function UpcomingDeadlines() {
       if (mc.rccStatus === 'Disputed') {
         deadlines.push({
           id: `rcc-dispute-${f.id}`,
-          title: `⚠️ Sec 118 Dispute: ${f.title}`,
+          title: `Sec 118 Dispute: ${f.title}`,
           date: mc.rccApplicationDate || new Date().toISOString().split('T')[0],
           type: 'conveyancing',
           badge: 'Municipal Dispute',
@@ -183,7 +183,12 @@ export default function UpcomingDeadlines() {
                       {formatDate(item.date)}
                     </span>
                   </div>
-                  <p className="text-xs font-semibold text-slate-900 truncate">{item.title}</p>
+                  <p className="text-xs font-semibold text-slate-900 truncate flex items-center gap-1.5">
+                    {item.isUrgentDispute && (
+                      <AlertTriangle className="w-3.5 h-3.5 text-rose-600 shrink-0" />
+                    )}
+                    <span className="truncate">{item.title}</span>
+                  </p>
                   <p className="text-[11px] text-slate-500 truncate mt-0.5">{item.detail}</p>
                 </div>
               </div>

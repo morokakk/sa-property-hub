@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Coins, X } from 'lucide-react';
+import { Coins, Plus, X } from 'lucide-react';
 import { usePortfolioStore } from '@/lib/store/usePortfolioStore';
 import { formatZAR } from '@/lib/formatters';
 import { FundingSource, FundingTranche, FundingType, ReturnTermType } from '@/types';
@@ -331,7 +331,7 @@ export default function AddFundingModal({
                     : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
                 }`}
               >
-                <div className="font-bold">🧱 Brick-by-Brick Cash</div>
+                <div className="font-bold">Brick-by-Brick Cash</div>
                 <div className={`text-[9px] ${fundingType === 'Phased Own-Cash (Brick-by-Brick)' ? 'text-emerald-100' : 'text-slate-400'}`}>
                   0% Interest • R 0 External Debt
                 </div>
@@ -353,7 +353,7 @@ export default function AddFundingModal({
                     : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
                 }`}
               >
-                <div className="font-bold">🤝 Stokvel / Syndicate</div>
+                <div className="font-bold">Stokvel / Syndicate</div>
                 <div className={`text-[9px] ${fundingType === 'Stokvel / Micro-Syndicate' ? 'text-indigo-100' : 'text-slate-400'}`}>
                   Phased Draws • Pooled Return
                 </div>
@@ -375,7 +375,7 @@ export default function AddFundingModal({
                     : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
                 }`}
               >
-                <div className="font-bold">🏗️ DFI (TUHF / uMaStandi)</div>
+                <div className="font-bold">DFI (TUHF / uMaStandi)</div>
                 <div className={`text-[9px] ${fundingType === 'DFI / Commercial Facility' ? 'text-slate-300' : 'text-slate-400'}`}>
                   Prime + 2.5% • 4-Stage Draws
                 </div>
@@ -740,9 +740,10 @@ export default function AddFundingModal({
                         },
                       ])
                     }
-                    className="text-xs font-semibold text-emerald-600 hover:text-emerald-700 cursor-pointer"
+                    className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-600 hover:text-emerald-700 cursor-pointer"
                   >
-                    + Add Tranche
+                    <Plus className="w-3.5 h-3.5 shrink-0" />
+                    <span>Add Tranche</span>
                   </button>
                 )}
               </div>

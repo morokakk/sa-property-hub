@@ -35,6 +35,11 @@ table, th, td, .tabular-nums, [data-metric], [data-currency] {
   font-variant-numeric: tabular-nums;
 }
 
+/* Uniform Lucide icon stroke weight across the design system */
+svg.lucide {
+  stroke-width: 1.75;
+}
+
 /* Native modal dialog scroll-chain containment */
 dialog:modal {
   overscroll-behavior: contain;

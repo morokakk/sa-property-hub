@@ -26,7 +26,6 @@ import {
   Clock,
   Lock,
   Unlock,
-  Sparkles,
   ShieldCheck,
   Scale,
   FileCheck2,
@@ -815,7 +814,7 @@ export function DevelopmentFeasibilitySection({
         <div className="rounded-lg border border-purple-200 bg-purple-50/70 p-4 print:border-purple-300 print:bg-purple-50 space-y-3">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-purple-200 pb-2">
             <div className="flex items-center gap-2">
-              <Sparkles className="w-5 h-5 text-purple-700" />
+              <ShieldCheck className="w-5 h-5 text-purple-700 shrink-0" />
               <span className="font-bold text-sm text-purple-900">
                 Hybrid Split-Exit & SARS Section 13sex Tax Shield
               </span>

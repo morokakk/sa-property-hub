@@ -14,13 +14,13 @@ import {
   CheckCircle2,
   AlertTriangle,
   AlertCircle,
-  PlusCircle,
+  Plus,
   Coins,
   MinusCircle,
   History,
   MessageCircle,
   FileText,
-  Edit3,
+  Pencil,
   Trash2,
   Check,
 } from 'lucide-react';
@@ -214,8 +214,8 @@ export function RentalPaymentsTab({
               className="inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-bold bg-white border border-slate-300 hover:bg-slate-50 text-slate-800 rounded shadow-2xs transition-colors cursor-pointer"
               title="Log a tenant payment for this property"
             >
-              <PlusCircle className="w-3 h-3 text-emerald-600" />
-              <span>+ Log Payment</span>
+              <Plus className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+              <span>Log Payment</span>
             </button>
           </div>
         </div>
@@ -599,7 +599,7 @@ export function RentalPaymentsTab({
                               className="p-1 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded transition-colors cursor-pointer"
                               title="Edit payment"
                             >
-                              <Edit3 className="w-3.5 h-3.5" />
+                              <Pencil className="w-3.5 h-3.5" />
                             </button>
                             <button
                               type="button"
@@ -698,9 +698,10 @@ export function RentalPaymentsTab({
                       activeTenantLease?.id
                     )
                   }
-                  className="text-emerald-700 hover:text-emerald-900 font-bold hover:underline text-[10px] cursor-pointer"
+                  className="inline-flex items-center gap-0.5 text-emerald-700 hover:text-emerald-900 font-bold hover:underline text-[10px] cursor-pointer"
                 >
-                  + Add Payment
+                  <Plus className="w-3 h-3 shrink-0" />
+                  <span>Add Payment</span>
                 </button>
               </div>
             </div>

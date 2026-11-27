@@ -206,7 +206,8 @@ describe('RentalApplicantsModal, TenantVettingDrawer & RentalCard Turnover UI', 
       />
     ).replace(/<!-- -->/g, '');
     expect(vacantHtml).toContain('1 of 2 Units Vacant');
-    expect(vacantHtml).toContain('+ Log Lead');
+    expect(vacantHtml).toContain('Log Lead');
+    expect(vacantHtml).not.toContain('+ Log Lead');
 
     // 3. Occupied with waitlist leads
     const waitlistHtml = renderToString(
@@ -238,7 +239,7 @@ describe('RentalApplicantsModal, TenantVettingDrawer & RentalCard Turnover UI', 
       />
     ).replace(/<!-- -->/g, '');
     expect(cleanOccupiedHtml).not.toContain('Waitlist Lead');
-    expect(cleanOccupiedHtml).not.toContain('+ Log Lead');
+    expect(cleanOccupiedHtml).not.toContain('Log Lead');
     expect(cleanOccupiedHtml).not.toContain('Vacant Unit');
   });
 });
