@@ -944,7 +944,7 @@ describe('Empirical Adversarial Stress Testing — /developments UI Components (
   // Challenge 7: Numerical Stress Testing & Deep Boundary States
   // =========================================================================
   describe('Challenge 7: Numerical Stress Testing & Deep Boundary States', () => {
-    it('Deep loss project (POC < 0%) renders rose alert styling and R 0 tax provision', () => {
+    it('Deep loss project (POC < 0%) renders rose headline polarity on neutral card and R 0 tax provision', () => {
       // TDC = 10m, GDV = 3m -> Massive loss
       const lossDev = createAdversarialDevelopment({
         landPurchasePriceZAR: 5000000,
@@ -973,12 +973,14 @@ describe('Empirical Adversarial Stress Testing — /developments UI Components (
       );
       const html = normalizeHtml(rawHtml);
 
-      // Rose styling classes applied
-      expect(html).toContain('border-rose-200');
-      expect(html).toContain('text-rose-700 bg-rose-50 border-rose-200');
+      // Neutral slate shell + rose headline strictly for negative POC
+      expect(html).toContain('bg-white rounded-xl border border-slate-200');
+      expect(html).toContain('text-rose-600');
+      expect(html).toContain('bg-slate-100 text-slate-600 border-slate-200');
+      expect(html).not.toContain('border-rose-200');
     });
 
-    it('Super-profitable project (POC >= 20%) renders emerald styling', () => {
+    it('Super-profitable project (POC >= 20%) renders uniform neutral slate card styling', () => {
       // Land 500k, Build 500k (TDC ~1.5m), GDV 4.5m -> POC ~150%
       const profitDev = createAdversarialDevelopment({
         landPurchasePriceZAR: 500000,
@@ -1006,8 +1008,10 @@ describe('Empirical Adversarial Stress Testing — /developments UI Components (
       );
       const html = normalizeHtml(rawHtml);
 
-      expect(html).toContain('border-emerald-200');
-      expect(html).toContain('text-emerald-700 bg-emerald-50 border-emerald-200');
+      expect(html).toContain('bg-white rounded-xl border border-slate-200');
+      expect(html).toContain('text-slate-900');
+      expect(html).toContain('bg-slate-100 text-slate-600 border-slate-200');
+      expect(html).not.toContain('text-rose-600');
     });
 
     it('Zero buildable area (totalBuildableAreaSqm: 0) does not cause division by zero', () => {

@@ -240,7 +240,7 @@ export function FlipProjectHeader({
         {/* 3. Pitch Deck Link */}
         <Link
           href={`/proposal?dealId=${flip.id}`}
-          className="inline-flex items-center gap-1 text-xs text-indigo-700 hover:text-indigo-900 font-semibold bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 px-2.5 py-1.5 rounded-lg transition-colors shadow-2xs"
+          className="inline-flex items-center gap-1 text-xs text-slate-700 hover:text-slate-900 font-semibold bg-white hover:bg-slate-50 border border-slate-200 px-2.5 py-1.5 rounded-lg transition-colors shadow-2xs"
           title="View syndicate presentation deck"
         >
           <span>Pitch Deck</span>
@@ -301,9 +301,9 @@ export function FlipProjectHeader({
                   setIsExitMenuOpen(false);
                   onOpenConvert();
                 }}
-                className="w-full text-left px-3.5 py-2 text-xs font-semibold text-indigo-800 hover:bg-indigo-50 flex items-center gap-2.5 transition-colors cursor-pointer"
+                className="w-full text-left px-3.5 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-2.5 transition-colors cursor-pointer"
               >
-                <ArrowRightLeft className="w-4 h-4 text-indigo-600 shrink-0" />
+                <ArrowRightLeft className="w-4 h-4 text-slate-500 shrink-0" />
                 <div>
                   <div className="font-bold text-slate-900">
                     {hasPartialGraduation ? `Graduate Remaining (${remainingUnits}) Units` : 'Convert to Rental (BRRRR)'}

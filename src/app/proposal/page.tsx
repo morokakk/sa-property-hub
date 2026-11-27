@@ -1405,12 +1405,18 @@ function ProposalGeneratorContent() {
                   </span>
                 </div>
 
-                <div className="p-2.5 rounded-lg bg-indigo-50/60 border border-indigo-200">
-                  <span className="text-[10px] font-bold uppercase text-indigo-800 block">Principal Break-Even Exit</span>
-                  <span className="text-sm font-extrabold text-indigo-950 font-mono block mt-0.5">
+                <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-200">
+                  <span className="text-[10px] font-bold uppercase text-slate-600 block">Principal Break-Even Exit</span>
+                  <span className="text-sm font-extrabold text-slate-900 font-mono block mt-0.5">
                     {stressMatrix ? formatZAR(stressMatrix.principalBreakEvenExitZAR) : '—'}
                   </span>
-                  <span className="text-[10px] text-indigo-700">
+                  <span
+                    className={`text-[10px] ${
+                      stressMatrix && stressMatrix.principalSafetyMarginPercent > 0
+                        ? 'text-emerald-700 font-medium'
+                        : 'text-slate-500'
+                    }`}
+                  >
                     {stressMatrix && stressMatrix.principalSafetyMarginPercent > 0
                       ? `${formatPercent(stressMatrix.principalSafetyMarginPercent)} below target ARV`
                       : 'Requires upside exit to clear'}
@@ -1467,7 +1473,7 @@ function ProposalGeneratorContent() {
                       : 'text-slate-600 hover:text-slate-900'
                   }`}
                 >
-                  <Hammer className="w-3.5 h-3.5 text-emerald-700 shrink-0" />
+                  <Hammer className={`w-3.5 h-3.5 shrink-0 ${pitchStrategy === 'Flip' ? 'text-emerald-700' : 'text-slate-400'}`} />
                   <span className="truncate">Buy &amp; Flip</span>
                   {pitchStrategy === 'Flip' && <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0"></span>}
                 </button>
@@ -1476,39 +1482,39 @@ function ProposalGeneratorContent() {
                   onClick={() => setPitchStrategy('Rental')}
                   className={`px-2 sm:px-3 py-1.5 rounded-md text-xs font-semibold transition-all flex items-center justify-center gap-1.5 text-center min-w-0 ${
                     pitchStrategy === 'Rental'
-                      ? 'bg-white text-indigo-800 shadow-xs border border-slate-200/60 font-bold'
+                      ? 'bg-white text-emerald-800 shadow-xs border border-slate-200/60 font-bold'
                       : 'text-slate-600 hover:text-slate-900'
                   }`}
                 >
-                  <Building2 className="w-3.5 h-3.5 text-indigo-700 shrink-0" />
+                  <Building2 className={`w-3.5 h-3.5 shrink-0 ${pitchStrategy === 'Rental' ? 'text-emerald-700' : 'text-slate-400'}`} />
                   <span className="truncate">Buy &amp; Hold</span>
-                  {pitchStrategy === 'Rental' && <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 shrink-0"></span>}
+                  {pitchStrategy === 'Rental' && <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0"></span>}
                 </button>
                 <button
                   type="button"
                   onClick={() => setPitchStrategy('BRRRR')}
                   className={`px-2 sm:px-3 py-1.5 rounded-md text-xs font-semibold transition-all flex items-center justify-center gap-1.5 text-center min-w-0 ${
                     pitchStrategy === 'BRRRR'
-                      ? 'bg-white text-purple-800 shadow-xs border border-slate-200/60 font-bold'
+                      ? 'bg-white text-emerald-800 shadow-xs border border-slate-200/60 font-bold'
                       : 'text-slate-600 hover:text-slate-900'
                   }`}
                 >
-                  <RefreshCw className="w-3.5 h-3.5 text-purple-700 shrink-0" />
+                  <RefreshCw className={`w-3.5 h-3.5 shrink-0 ${pitchStrategy === 'BRRRR' ? 'text-emerald-700' : 'text-slate-400'}`} />
                   <span className="truncate">BRRRR</span>
-                  {pitchStrategy === 'BRRRR' && <span className="w-1.5 h-1.5 rounded-full bg-purple-500 shrink-0"></span>}
+                  {pitchStrategy === 'BRRRR' && <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0"></span>}
                 </button>
                 <button
                   type="button"
                   onClick={() => setPitchStrategy('Development')}
                   className={`px-2 sm:px-3 py-1.5 rounded-md text-xs font-semibold transition-all flex items-center justify-center gap-1.5 text-center min-w-0 ${
                     pitchStrategy === 'Development'
-                      ? 'bg-white text-amber-900 shadow-xs border border-slate-200/60 font-bold'
+                      ? 'bg-white text-emerald-800 shadow-xs border border-slate-200/60 font-bold'
                       : 'text-slate-600 hover:text-slate-900'
                   }`}
                 >
-                  <Layers className="w-3.5 h-3.5 text-amber-700 shrink-0" />
+                  <Layers className={`w-3.5 h-3.5 shrink-0 ${pitchStrategy === 'Development' ? 'text-emerald-700' : 'text-slate-400'}`} />
                   <span className="truncate">Development</span>
-                  {pitchStrategy === 'Development' && <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0"></span>}
+                  {pitchStrategy === 'Development' && <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0"></span>}
                 </button>
               </div>
             </div>
@@ -1581,33 +1587,25 @@ function ProposalGeneratorContent() {
                   <span className="text-[10px] bg-slate-100 text-slate-700 font-bold px-2 py-0.5 rounded">
                     South Africa (ZAR)
                   </span>
-                  <span className={`text-[10px] font-semibold px-2 py-0.5 rounded border flex items-center gap-1 ${
-                    isDevelopment
-                      ? 'bg-amber-50 text-amber-900 border-amber-300'
-                      : isFlip 
-                      ? 'bg-slate-100 text-slate-800 border-slate-200' 
-                      : pitchStrategy === 'BRRRR'
-                      ? 'bg-slate-100 text-slate-800 border-slate-200'
-                      : 'bg-slate-100 text-slate-800 border-slate-200'
-                  }`}>
+                  <span className="text-[10px] font-semibold px-2 py-0.5 rounded border flex items-center gap-1 bg-slate-100 text-slate-800 border-slate-200">
                     {isDevelopment && activeDevelopment ? (
                       <>
-                        <Building2 className="w-3 h-3 text-amber-700" />
+                        <Building2 className="w-3 h-3 text-slate-500" />
                         <span>Development Mandate • {activeDevelopment.developmentType}</span>
                       </>
                     ) : isFlip ? (
                       <>
-                        <Hammer className="w-3 h-3 text-emerald-700" />
+                        <Hammer className="w-3 h-3 text-slate-500" />
                         <span>Buy &amp; Flip Mandate</span>
                       </>
                     ) : pitchStrategy === 'BRRRR' ? (
                       <>
-                        <RefreshCw className="w-3 h-3 text-purple-700" />
+                        <RefreshCw className="w-3 h-3 text-slate-500" />
                         <span>Hybrid BRRRR Strategy</span>
                       </>
                     ) : (
                       <>
-                        <Building2 className="w-3 h-3 text-indigo-700" />
+                        <Building2 className="w-3 h-3 text-slate-500" />
                         <span>Buy &amp; Hold Rental</span>
                       </>
                     )}
@@ -1664,7 +1662,7 @@ function ProposalGeneratorContent() {
                   {investorProfile.email}
                 </div>
                 {investorProfile.website && (
-                  <div className="text-[10px] text-indigo-600">
+                  <div className="text-[10px] text-slate-600">
                     {investorProfile.website}
                   </div>
                 )}
@@ -1705,12 +1703,12 @@ function ProposalGeneratorContent() {
                   </span>
                 </div>
 
-                <div className="p-3 rounded-lg bg-amber-50/70 border border-amber-200 min-h-[6.5rem] h-auto">
-                  <span className="text-[10px] uppercase font-bold text-amber-800 block whitespace-nowrap">TOTAL DEV COST (TDC)</span>
+                <div className="p-3 rounded-lg bg-slate-50 border border-slate-200 min-h-[6.5rem] h-auto">
+                  <span className="text-[10px] uppercase font-bold text-slate-400 block whitespace-nowrap">TOTAL DEV COST (TDC)</span>
                   <span className="text-sm font-extrabold text-slate-900 block mt-0.5 font-mono">
                     {formatZAR(devFin.tdcZAR)}
                   </span>
-                  <span className="text-[9px] text-amber-700 font-semibold">
+                  <span className="text-[9px] text-slate-500">
                     {formatZAR(devFin.tdcPerUnitZAR)} / unit
                   </span>
                 </div>
@@ -1834,29 +1832,29 @@ function ProposalGeneratorContent() {
                     </span>
                   )}
                   {deal.source === 'Direct Owner' && (
-                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-slate-100 text-slate-800 border border-slate-200/80 flex items-center gap-1.5">
-                      <Handshake className="w-3 h-3 text-indigo-700 shrink-0" />
+                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200 flex items-center gap-1.5">
+                      <Handshake className="w-3 h-3 text-slate-500 shrink-0" />
                       <span>Off-Market Sourcing • Zero Agent Commission</span>
                     </span>
                   )}
                   {deal.source === 'Private Agent' && (
-                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-slate-100 text-slate-800 border border-slate-200/80 flex items-center gap-1.5">
-                      <FileText className="w-3 h-3 text-blue-700 shrink-0" />
+                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200 flex items-center gap-1.5">
+                      <FileText className="w-3 h-3 text-slate-500 shrink-0" />
                       <span>Compliant OTP • Verified Deeds Office CMA Comps</span>
                     </span>
                   )}
                   {deal.type === 'rental' && (
-                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-slate-100 text-slate-800 border border-slate-200/80 flex items-center gap-1.5">
-                      <Briefcase className="w-3 h-3 text-teal-700 shrink-0" />
+                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200 flex items-center gap-1.5">
+                      <Briefcase className="w-3 h-3 text-slate-500 shrink-0" />
                       <span>Stabilized Portfolio Asset • In-Place Paying Tenancy</span>
                     </span>
                   )}
                   {(deal as any).numberOfUnits != null && (deal as any).numberOfUnits > 1 && (
                     <span
                       data-testid="proposal-badge-units"
-                      className="text-[10px] font-bold px-2 py-0.5 rounded bg-indigo-50 text-indigo-800 border border-indigo-200 flex items-center gap-1"
+                      className="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200 flex items-center gap-1"
                     >
-                      <Users className="w-3 h-3 text-indigo-700 shrink-0" />
+                      <Users className="w-3 h-3 text-slate-500 shrink-0" />
                       <span>
                         {(deal as any).numberOfUnits} Units • {formatZAR(Math.round(deal.purchasePrice / (deal as any).numberOfUnits))}/unit
                       </span>
@@ -1885,9 +1883,9 @@ function ProposalGeneratorContent() {
                   {(deal as any).annualSpvAdminAuditFeeZAR != null && (deal as any).annualSpvAdminAuditFeeZAR > 0 && (
                     <span
                       data-testid="proposal-badge-spv-admin"
-                      className="text-[10px] font-bold px-2 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-200 flex items-center gap-1"
+                      className="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200 flex items-center gap-1"
                     >
-                      <Coins className="w-3 h-3 text-amber-700 shrink-0" />
+                      <Coins className="w-3 h-3 text-slate-500 shrink-0" />
                       <span>
                         SPV Admin/Audit: {formatZAR((deal as any).annualSpvAdminAuditFeeZAR)}/yr ({formatZAR(Math.round((deal as any).annualSpvAdminAuditFeeZAR / 12))}/mo)
                       </span>
@@ -1896,9 +1894,9 @@ function ProposalGeneratorContent() {
                   {pitchStrategy === 'BRRRR' && (deal as any).refinanceLtvPercent != null && (
                     <span
                       data-testid="proposal-badge-refi-ltv"
-                      className="text-[10px] font-bold px-2 py-0.5 rounded bg-purple-50 text-purple-800 border border-purple-200 flex items-center gap-1"
+                      className="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200 flex items-center gap-1"
                     >
-                      <RefreshCw className="w-3 h-3 text-purple-700 shrink-0" />
+                      <RefreshCw className="w-3 h-3 text-slate-500 shrink-0" />
                       <span>{(deal as any).refinanceLtvPercent}% Refi LTV</span>
                     </span>
                   )}
@@ -1935,28 +1933,28 @@ function ProposalGeneratorContent() {
                   </div>
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
                     <div className="bg-white p-2.5 rounded-lg border border-slate-200 flex items-center gap-2">
-                      <GraduationCap className="w-4 h-4 text-indigo-600 shrink-0" />
+                      <GraduationCap className="w-4 h-4 text-slate-400 shrink-0" />
                       <div>
                         <span className="text-[10px] text-slate-400 block font-medium">Schools</span>
                         <span className="font-bold text-slate-800 text-xs">{deal.amenityScorecard.schools}</span>
                       </div>
                     </div>
                     <div className="bg-white p-2.5 rounded-lg border border-slate-200 flex items-center gap-2">
-                      <ShieldAlert className="w-4 h-4 text-rose-600 shrink-0" />
+                      <ShieldAlert className="w-4 h-4 text-slate-400 shrink-0" />
                       <div>
                         <span className="text-[10px] text-slate-400 block font-medium">Police (SAPS)</span>
                         <span className="font-bold text-slate-800 text-xs">{deal.amenityScorecard.policeStation}</span>
                       </div>
                     </div>
                     <div className="bg-white p-2.5 rounded-lg border border-slate-200 flex items-center gap-2">
-                      <Stethoscope className="w-4 h-4 text-teal-600 shrink-0" />
+                      <Stethoscope className="w-4 h-4 text-slate-400 shrink-0" />
                       <div>
                         <span className="text-[10px] text-slate-400 block font-medium">Hospital / Clinic</span>
                         <span className="font-bold text-slate-800 text-xs">{deal.amenityScorecard.medicalClinic}</span>
                       </div>
                     </div>
                     <div className="bg-white p-2.5 rounded-lg border border-slate-200 flex items-center gap-2">
-                      <ShoppingBag className="w-4 h-4 text-amber-600 shrink-0" />
+                      <ShoppingBag className="w-4 h-4 text-slate-400 shrink-0" />
                       <div>
                         <span className="text-[10px] text-slate-400 block font-medium">Shopping Mall</span>
                         <span className="font-bold text-slate-800 text-xs">{deal.amenityScorecard.shoppingMall}</span>
@@ -2074,8 +2072,8 @@ function ProposalGeneratorContent() {
                     <h2 className="text-sm uppercase tracking-wider font-extrabold text-slate-900">
                       Rent Roll &amp; Collection Track Record
                     </h2>
-                    <span className="text-[10px] bg-teal-100 text-teal-800 font-bold px-2 py-0.5 rounded border border-teal-300 inline-flex items-center gap-1">
-                      <Briefcase className="w-3 h-3 text-teal-700" />
+                    <span className="text-[10px] bg-slate-100 text-slate-700 font-semibold px-2 py-0.5 rounded border border-slate-200 inline-flex items-center gap-1">
+                      <Briefcase className="w-3 h-3 text-slate-500" />
                       {deal.rawRental?.isBrrrrProperty || pitchStrategy === 'BRRRR' || deal.type === 'flip'
                         ? 'BRRRR Stabilized Track Record'
                         : 'Stabilized Portfolio Asset'}
@@ -2449,16 +2447,16 @@ function ProposalGeneratorContent() {
                       </td>
                     </tr>
                     {isFlip && (
-                      <tr className="bg-amber-50/50">
-                        <td className="p-2.5 font-medium text-amber-950 flex items-center gap-1.5 flex-wrap">
+                      <tr>
+                        <td className="p-2.5 font-medium text-slate-800 flex items-center gap-1.5 flex-wrap">
                           <span>Holding Period Carrying Costs & Operational Burn Reserve</span>
-                          <span className="text-[10px] bg-amber-100 text-amber-900 font-bold px-1.5 py-0.2 rounded border border-amber-200">
+                          <span className="text-[10px] bg-slate-100 text-slate-600 font-semibold px-1.5 py-0.2 rounded border border-slate-200">
                             {isEviction ? `${totalHoldingDurationMonths} Months (Compounded)` : `${holdingDuration} Months`}
                           </span>
                         </td>
-                        <td className="p-2.5 font-bold text-amber-900">{formatZAR(totalHoldingReserve)}</td>
-                        <td className="p-2.5 text-amber-900">{totalProjectCost > 0 ? formatPercent((totalHoldingReserve / totalProjectCost) * 100) : '0%'}</td>
-                        <td className="p-2.5 text-slate-600 font-medium">
+                        <td className="p-2.5 font-bold text-slate-900">{formatZAR(totalHoldingReserve)}</td>
+                        <td className="p-2.5 text-slate-700">{totalProjectCost > 0 ? formatPercent((totalHoldingReserve / totalProjectCost) * 100) : '0%'}</td>
+                        <td className="p-2.5 text-slate-500 font-medium">
                           Escrow buffer ({formatZAR(monthlyBurnRate)}/mo{isEviction ? ` + R${Math.round(deal.occupantRisk?.monthlySiteSecurityZAR || 0).toLocaleString('en-ZA')}/mo sec` : ''})
                         </td>
                       </tr>
@@ -2767,7 +2765,7 @@ function ProposalGeneratorContent() {
                         ? `3. Two-Stage Holding & Carrying Burn Schedule (${totalHoldingDurationMonths}-Month Horizon)`
                         : `4. Holding Period Carrying Costs & Renovation Burn Rate (${isEviction ? `${totalHoldingDurationMonths}-Month Compounded Horizon` : `${holdingDuration}-Month Horizon`})`}
                     </h2>
-                    <span className="text-[10px] bg-amber-100 text-amber-800 font-bold px-2 py-0.5 rounded border border-amber-300">
+                    <span className="text-[10px] bg-slate-100 text-slate-700 font-semibold px-2 py-0.5 rounded border border-slate-200">
                       {isDevelopment ? '2-Stage Development Burn Reserve' : 'Flip Liquidity Reserve'}
                     </span>
                   </div>
@@ -2815,12 +2813,12 @@ function ProposalGeneratorContent() {
                         : 'All standing carrying lines'}
                     </span>
                   </div>
-                  <div className="p-3 rounded-lg bg-amber-50/80 border border-amber-300">
-                    <span className="text-[10px] uppercase font-bold text-amber-800 block">Total Holding Reserve</span>
-                    <span className="text-sm font-extrabold text-amber-900 block mt-0.5 font-mono">
+                  <div className="p-3 rounded-lg bg-slate-50 border border-slate-200">
+                    <span className="text-[10px] uppercase font-bold text-slate-500 block">Total Holding Reserve</span>
+                    <span className="text-sm font-extrabold text-slate-900 block mt-0.5 font-mono">
                       {formatZAR(totalHoldingReserve)}
                     </span>
-                    <span className="text-[9px] text-amber-700 font-semibold">
+                    <span className="text-[9px] text-slate-500 font-medium">
                       {isDevelopment || isEviction
                         ? `${totalHoldingDurationMonths}-month compounded buffer`
                         : `${holdingDuration}-month pre-funded buffer`}
@@ -2872,7 +2870,7 @@ function ProposalGeneratorContent() {
                           <tr>
                             <td className="p-2.5 font-medium flex items-center gap-1.5 flex-wrap">
                               <span className="font-bold text-slate-900">Stage 1: Pre-Approval &amp; Rezoning Carrying Burn</span>
-                              <span className="text-[10px] bg-amber-100 text-amber-900 font-bold px-1.5 py-0.2 rounded border border-amber-200">
+                              <span className="text-[10px] bg-slate-100 text-slate-600 font-semibold px-1.5 py-0.2 rounded border border-slate-200">
                                 {activeDevelopment.preApprovalMonths} Months @ {formatZAR(activeDevelopment.monthlyPreApprovalHoldingBurnZAR)}/mo
                               </span>
                             </td>
@@ -2890,7 +2888,7 @@ function ProposalGeneratorContent() {
                           <tr>
                             <td className="p-2.5 font-medium flex items-center gap-1.5 flex-wrap">
                               <span className="font-bold text-slate-900">Stage 2: Wet Works Construction Carrying Burn</span>
-                              <span className="text-[10px] bg-emerald-100 text-emerald-900 font-bold px-1.5 py-0.2 rounded border border-emerald-200">
+                              <span className="text-[10px] bg-slate-100 text-slate-600 font-semibold px-1.5 py-0.2 rounded border border-slate-200">
                                 {activeDevelopment.constructionMonths} Months @ {formatZAR(activeDevelopment.monthlyConstructionHoldingBurnZAR)}/mo
                               </span>
                             </td>
@@ -2905,12 +2903,12 @@ function ProposalGeneratorContent() {
                               Capitalized construction facility interest, builder&apos;s risk insurance &amp; site security
                             </td>
                           </tr>
-                          <tr className="bg-amber-50/70 font-bold">
-                            <td className="p-2.5 text-amber-950">Total Carrying Cost Reserve (Escrow Tranche)</td>
-                            <td className="p-2.5 text-amber-950 font-mono">{totalHoldingDurationMonths} Months (Stages 1 &amp; 2)</td>
-                            <td className="p-2.5 text-amber-950 font-mono">{formatZAR(devFin.totalCarryingCostZAR)}</td>
-                            <td className="p-2.5 text-amber-950">100.0%</td>
-                            <td className="p-2.5 text-amber-900 font-semibold">
+                          <tr className="bg-slate-50 font-bold">
+                            <td className="p-2.5 text-slate-900">Total Carrying Cost Reserve (Escrow Tranche)</td>
+                            <td className="p-2.5 text-slate-900 font-mono">{totalHoldingDurationMonths} Months (Stages 1 &amp; 2)</td>
+                            <td className="p-2.5 text-slate-900 font-mono">{formatZAR(devFin.totalCarryingCostZAR)}</td>
+                            <td className="p-2.5 text-slate-900">100.0%</td>
+                            <td className="p-2.5 text-slate-600 font-medium">
                               Pre-funded and capitalized into Total Development Cost (TDC)
                             </td>
                           </tr>
@@ -2963,14 +2961,14 @@ function ProposalGeneratorContent() {
                             <td className="p-2.5">{totalHoldingReserve > 0 ? formatPercent(((monthlyOther * holdingDuration) / totalHoldingReserve) * 100) : '0%'}</td>
                             <td className="p-2.5 text-slate-500">Active perimeter security, contractor insurance, and utilities</td>
                           </tr>
-                          <tr className="bg-amber-50/70 font-bold">
-                            <td className="p-2.5 text-amber-950">Total Carrying Cost Reserve (Escrow Tranche)</td>
-                            <td className="p-2.5 text-amber-950 font-mono">
+                          <tr className="bg-slate-50 font-bold">
+                            <td className="p-2.5 text-slate-900">Total Carrying Cost Reserve (Escrow Tranche)</td>
+                            <td className="p-2.5 text-slate-900 font-mono">
                               {isEviction ? `${formatZAR(monthlyBurnRate)}/mo (Stage 2)` : `${formatZAR(monthlyBurnRate)}/mo`}
                             </td>
-                            <td className="p-2.5 text-amber-950 font-mono">{formatZAR(totalHoldingReserve)}</td>
-                            <td className="p-2.5 text-amber-950">100.0%</td>
-                            <td className="p-2.5 text-amber-900 font-semibold">
+                            <td className="p-2.5 text-slate-900 font-mono">{formatZAR(totalHoldingReserve)}</td>
+                            <td className="p-2.5 text-slate-900">100.0%</td>
+                            <td className="p-2.5 text-slate-600 font-medium">
                               {isEviction ? 'Pre-funded and capitalized into Total Project Outlay (Stages 1 & 2)' : 'Pre-funded and capitalized into Total Project Outlay'}
                             </td>
                           </tr>
@@ -2987,8 +2985,8 @@ function ProposalGeneratorContent() {
                     <h2 className="text-sm uppercase tracking-wider font-extrabold text-slate-900">
                       {isDevelopment ? '3.' : '4.'} Hybrid BRRRR Strategy: 2-Phase Refinance & Capital Recycling Model
                     </h2>
-                    <span className="text-[10px] bg-purple-100 text-purple-800 font-bold px-2 py-0.5 rounded border border-purple-300 inline-flex items-center gap-1">
-                      <RefreshCw className="w-3 h-3 text-purple-700 shrink-0" />
+                    <span className="text-[10px] bg-slate-100 text-slate-700 font-semibold px-2 py-0.5 rounded border border-slate-200 inline-flex items-center gap-1">
+                      <RefreshCw className="w-3 h-3 text-slate-500 shrink-0" />
                       BRRRR Lifecycle
                     </span>
                   </div>
@@ -3008,15 +3006,15 @@ function ProposalGeneratorContent() {
                     <div className="font-extrabold text-slate-900 text-xs mt-0.5">{formatZAR(deal.purchasePrice)}</div>
                     <div className="text-[9px] text-slate-500">Agreed contract price</div>
                   </div>
-                  <div className="p-2.5 rounded-lg bg-amber-50 border border-amber-200">
-                    <div className="text-[10px] uppercase font-bold text-amber-700">2. Rehab (Value-Add)</div>
-                    <div className="font-extrabold text-amber-900 text-xs mt-0.5">{formatZAR(deal.renovationBudget)}</div>
-                    <div className="text-[9px] text-amber-700">Modernize to high-spec</div>
+                  <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-200">
+                    <div className="text-[10px] uppercase font-bold text-slate-500">2. Rehab (Value-Add)</div>
+                    <div className="font-extrabold text-slate-900 text-xs mt-0.5">{formatZAR(deal.renovationBudget)}</div>
+                    <div className="text-[9px] text-slate-500">Modernize to high-spec</div>
                   </div>
-                  <div className="p-2.5 rounded-lg bg-indigo-50 border border-indigo-200">
-                    <div className="text-[10px] uppercase font-bold text-indigo-700">3. Rent (Stabilize)</div>
-                    <div className="font-extrabold text-indigo-900 text-xs mt-0.5">{formatZAR(deal.monthlyRent || Math.round(deal.purchasePrice * 0.009))}/mo</div>
-                    <div className="text-[9px] text-indigo-700">Vetted tenant placed</div>
+                  <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-200">
+                    <div className="text-[10px] uppercase font-bold text-slate-500">3. Rent (Stabilize)</div>
+                    <div className="font-extrabold text-slate-900 text-xs mt-0.5">{formatZAR(deal.monthlyRent || Math.round(deal.purchasePrice * 0.009))}/mo</div>
+                    <div className="text-[9px] text-slate-500">Vetted tenant placed</div>
                   </div>
                   <div className="p-2.5 rounded-lg bg-emerald-50 border border-emerald-300">
                     <div className="text-[10px] uppercase font-bold text-emerald-800">4. Refi & Return</div>
@@ -3048,12 +3046,12 @@ function ProposalGeneratorContent() {
                           </span>
                           <span className="text-[9px] text-slate-400">All acquisition + capex</span>
                         </div>
-                        <div className="p-3 rounded-lg bg-purple-50 border border-purple-200">
-                          <span className="text-[10px] uppercase font-bold text-purple-800 block">Post-Rehab Bank ARV</span>
-                          <span className="text-sm font-extrabold text-purple-900 block mt-0.5 font-mono">
+                        <div className="p-3 rounded-lg bg-slate-50 border border-slate-200">
+                          <span className="text-[10px] uppercase font-bold text-slate-500 block">Post-Rehab Bank ARV</span>
+                          <span className="text-sm font-extrabold text-slate-900 block mt-0.5 font-mono">
                             {formatZAR(postRehabArv)}
                           </span>
-                          <span className="text-[9px] text-purple-700 font-semibold">Re-appraised valuation</span>
+                          <span className="text-[9px] text-slate-500 font-medium">Re-appraised valuation</span>
                         </div>
                         <div className="p-3 rounded-lg bg-emerald-50 border border-emerald-300">
                           <span className="text-[10px] uppercase font-bold text-emerald-800 block">Bank Refinance Facility</span>
@@ -3091,10 +3089,10 @@ function ProposalGeneratorContent() {
                               <td className="p-2.5 text-slate-600">Private Lender Facility + Sponsor Equity</td>
                               <td className="p-2.5 text-slate-600">Fund acquisition, BOQ renovation, and carrying buffer</td>
                             </tr>
-                            <tr className="bg-purple-50/40">
-                              <td className="p-2.5 font-semibold text-purple-950">Phase 2: Post-Rehab Bank Mortgage Refinance</td>
-                              <td className="p-2.5 font-bold font-mono text-purple-900">{formatZAR(newBankMortgage)}</td>
-                              <td className="p-2.5 text-purple-900 font-medium">Tier-1 Commercial Bank ({refiLtvPercent}% LTV)</td>
+                            <tr>
+                              <td className="p-2.5 font-semibold text-slate-900">Phase 2: Post-Rehab Bank Mortgage Refinance</td>
+                              <td className="p-2.5 font-bold font-mono text-slate-900">{formatZAR(newBankMortgage)}</td>
+                              <td className="p-2.5 text-slate-700 font-medium">Tier-1 Commercial Bank ({refiLtvPercent}% LTV)</td>
                               <td className="p-2.5 text-slate-600">Replaces short-term private bridge facility with 20-year term debt</td>
                             </tr>
                             <tr className="bg-emerald-50/70 font-bold">
@@ -3129,8 +3127,8 @@ function ProposalGeneratorContent() {
                     <h2 className="text-sm uppercase tracking-wider font-extrabold text-slate-900">
                       {isDevelopment ? '3.' : '4.'} Long-Term Wealth & Equity Projections ({projectionData.length}-Year Horizon)
                     </h2>
-                    <span className="text-[10px] bg-indigo-100 text-indigo-800 font-bold px-2 py-0.5 rounded border border-indigo-200 inline-flex items-center gap-1">
-                      <Building2 className="w-3 h-3 text-indigo-700" />
+                    <span className="text-[10px] bg-slate-100 text-slate-700 font-semibold px-2 py-0.5 rounded border border-slate-200 inline-flex items-center gap-1">
+                      <Building2 className="w-3 h-3 text-slate-500" />
                       Buy & Hold Rental
                     </span>
                   </div>
@@ -3148,15 +3146,15 @@ function ProposalGeneratorContent() {
                 </div>
 
                 {proposalPaydownImpact && proposalPaydownImpact.monthsSaved > 0 && (
-                  <div className="text-[11px] text-indigo-900 bg-indigo-50/90 border border-indigo-200 rounded-lg p-2.5 flex items-center justify-between gap-2">
+                  <div className="text-[11px] text-emerald-900 bg-emerald-50/80 border border-emerald-200 rounded-lg p-2.5 flex items-center justify-between gap-2">
                     <div className="flex items-center gap-2">
-                      <TrendingDown className="w-4 h-4 text-indigo-600 shrink-0" />
+                      <TrendingDown className="w-4 h-4 text-emerald-600 shrink-0" />
                       <span>
                         <strong>Accelerated paydown:</strong> +{formatZAR((deal as any).extraMonthlyPaymentZAR)}/m &rarr; bond settled {proposalPaydownImpact.monthsSaved} months early, {formatZAR(proposalPaydownImpact.interestSaved)} interest saved ({Math.floor(proposalPaydownImpact.acceleratedMonths / 12)} yrs {proposalPaydownImpact.acceleratedMonths % 12} mos total).
                       </span>
                     </div>
                     {proposalPaydownImpact.refiReadyYearAccelerated !== null && (
-                      <span className="shrink-0 text-[10px] font-bold text-indigo-700 bg-white px-2 py-0.5 rounded border border-indigo-200">
+                      <span className="shrink-0 text-[10px] font-bold text-emerald-700 bg-white px-2 py-0.5 rounded border border-emerald-200">
                         Refi Year {proposalPaydownImpact.refiReadyYearAccelerated}
                       </span>
                     )}
@@ -3272,7 +3270,7 @@ function ProposalGeneratorContent() {
                             row.id === 'base'
                               ? 'bg-emerald-50/40'
                               : row.id === 'optimistic'
-                              ? 'bg-teal-50/40'
+                              ? 'bg-emerald-50/50'
                               : row.id === 'severe_downside'
                               ? 'bg-rose-50/50'
                               : 'bg-amber-50/30';
@@ -3280,7 +3278,7 @@ function ProposalGeneratorContent() {
                             row.id === 'base'
                               ? 'font-bold text-emerald-900'
                               : row.id === 'optimistic'
-                              ? 'font-bold text-teal-900'
+                              ? 'font-bold text-emerald-900'
                               : row.id === 'severe_downside'
                               ? 'font-bold text-rose-900'
                               : 'font-bold text-amber-900';

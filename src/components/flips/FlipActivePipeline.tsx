@@ -176,10 +176,10 @@ export function FlipActivePipeline({
         <button
           type="button"
           onClick={() => setActiveWorkspaceTab('compliance')}
-          className="flex items-center gap-2 hover:text-indigo-300 transition-colors cursor-pointer text-left group"
+          className="flex items-center gap-2 hover:text-white transition-colors cursor-pointer text-left group"
           title="Click to view Section 118 RCC & CoC Compliance Checklist"
         >
-          <span className="p-1 rounded bg-slate-800 text-indigo-400 group-hover:bg-slate-700">
+          <span className="p-1 rounded bg-slate-800 text-slate-300 group-hover:bg-slate-700">
             <Landmark className="w-3.5 h-3.5 shrink-0" />
           </span>
           <span className="text-slate-300">

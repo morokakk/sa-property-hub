@@ -32,14 +32,9 @@ export function DevelopmentKpiBanner({
   const isAfterTax = propShowAfterTax !== undefined ? propShowAfterTax : internalAfterTax;
   const toggleAfterTax = propOnToggleAfterTax || (() => setInternalAfterTax((prev) => !prev));
 
-  // Profit on Cost color threshold
+  // Profit on Cost headline polarity (strictly Rose when negative; neutral slate otherwise)
   const activePoc = isAfterTax ? financials.afterTaxPocPercent : financials.pocPercent;
-  let pocColorClasses = 'text-rose-700 bg-rose-50 border-rose-200';
-  if (activePoc >= 20) {
-    pocColorClasses = 'text-emerald-700 bg-emerald-50 border-emerald-200';
-  } else if (activePoc >= 12) {
-    pocColorClasses = 'text-amber-700 bg-amber-50 border-amber-200';
-  }
+  const isNegativePoc = activePoc < 0;
 
   // Hard Build Rate actual spend per m2
   const actualSpendPerSqm = financials.actualBoqSpendPerSqmZAR;
@@ -80,7 +75,7 @@ export function DevelopmentKpiBanner({
       <div className="bg-white rounded-xl border border-slate-200 p-3 sm:p-4 shadow-2xs hover:shadow-xs transition-shadow flex flex-col justify-between min-w-0">
         <div className="flex items-center justify-between text-slate-500 mb-1 gap-1">
           <span className="text-[11px] sm:text-xs font-semibold uppercase tracking-wider leading-tight">GDV (Gross Value)</span>
-          <Building2 className="w-4 h-4 text-blue-500 shrink-0" />
+          <Building2 className="w-4 h-4 text-slate-400 shrink-0" />
         </div>
         <div>
           <div className="text-lg sm:text-xl font-extrabold text-slate-900 tracking-tight tabular-nums leading-tight">
@@ -102,27 +97,21 @@ export function DevelopmentKpiBanner({
       </div>
 
       {/* 3. Profit on Cost (POC %) */}
-      <div
-        className={`bg-white rounded-xl border p-3 sm:p-4 shadow-2xs hover:shadow-xs transition-shadow flex flex-col justify-between min-w-0 ${
-          activePoc >= 20
-            ? 'border-emerald-200'
-            : activePoc >= 12
-            ? 'border-amber-200'
-            : 'border-rose-200'
-        }`}
-      >
+      <div className="bg-white rounded-xl border border-slate-200 p-3 sm:p-4 shadow-2xs hover:shadow-xs transition-shadow flex flex-col justify-between min-w-0">
         <div className="flex items-center justify-between text-slate-500 mb-1 gap-1">
           <span className="text-[11px] sm:text-xs font-semibold uppercase tracking-wider leading-tight">Profit on Cost</span>
-          <TrendingUp className="w-4 h-4 text-emerald-600 shrink-0" />
+          <TrendingUp className="w-4 h-4 text-slate-400 shrink-0" />
         </div>
         <div>
           <div className="flex flex-wrap items-baseline justify-between gap-1">
-            <span className="text-lg sm:text-xl font-extrabold text-slate-900 tracking-tight tabular-nums leading-tight">
+            <span
+              className={`text-lg sm:text-xl font-extrabold tracking-tight tabular-nums leading-tight ${
+                isNegativePoc ? 'text-rose-600' : 'text-slate-900'
+              }`}
+            >
               {formatPercent(activePoc)}
             </span>
-            <span
-              className={`text-[11px] sm:text-xs font-bold px-1.5 py-0.5 rounded border whitespace-nowrap ${pocColorClasses}`}
-            >
+            <span className="text-[11px] sm:text-xs font-semibold px-1.5 py-0.5 rounded border bg-slate-100 text-slate-600 border-slate-200 whitespace-nowrap">
               {isAfterTax ? 'After Tax' : 'Pre-Tax'}
             </span>
           </div>
@@ -148,7 +137,7 @@ export function DevelopmentKpiBanner({
       <div className="bg-white rounded-xl border border-slate-200 p-3 sm:p-4 shadow-2xs hover:shadow-xs transition-shadow flex flex-col justify-between min-w-0">
         <div className="flex items-center justify-between text-slate-500 mb-1 gap-1">
           <span className="text-[11px] sm:text-xs font-semibold uppercase tracking-wider leading-tight">Hard Build Rate</span>
-          <Hammer className="w-4 h-4 text-amber-500 shrink-0" />
+          <Hammer className="w-4 h-4 text-slate-400 shrink-0" />
         </div>
         <div>
           <div className="text-sm sm:text-base font-bold text-slate-900 tabular-nums leading-tight">
@@ -221,7 +210,7 @@ export function DevelopmentKpiBanner({
       <div className="bg-white rounded-xl border border-slate-200 p-3 sm:p-4 shadow-2xs hover:shadow-xs transition-shadow flex flex-col justify-between min-w-0">
         <div className="flex items-center justify-between text-slate-500 mb-1 gap-1">
           <span className="text-[11px] sm:text-xs font-semibold uppercase tracking-wider leading-tight">Hybrid Split-Exit</span>
-          <Scale className="w-4 h-4 text-slate-500 shrink-0" />
+          <Scale className="w-4 h-4 text-slate-400 shrink-0" />
         </div>
         <div>
           <div className="text-xs font-bold text-slate-900 tabular-nums">

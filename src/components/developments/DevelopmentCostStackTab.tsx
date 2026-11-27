@@ -154,7 +154,7 @@ export function DevelopmentCostStackTab({
         <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-2xs">
           <div className="flex items-center justify-between text-slate-500 mb-1">
             <span className="text-xs font-semibold uppercase tracking-wider">Soft Costs & SPLUMA</span>
-            <Coins className="w-4 h-4 text-blue-500" />
+            <Coins className="w-4 h-4 text-slate-400" />
           </div>
           <div className="text-lg font-bold text-slate-900">
             {formatZAR(financials.totalSoftCostsZAR)}
@@ -169,7 +169,7 @@ export function DevelopmentCostStackTab({
         <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-2xs">
           <div className="flex items-center justify-between text-slate-500 mb-1">
             <span className="text-xs font-semibold uppercase tracking-wider">Hard Build BOQ</span>
-            <HardHat className="w-4 h-4 text-amber-500" />
+            <HardHat className="w-4 h-4 text-slate-400" />
           </div>
           <div className="text-lg font-bold text-slate-900">
             {formatZAR(financials.activeHardBuildCostZAR)}
@@ -186,7 +186,7 @@ export function DevelopmentCostStackTab({
         <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-2xs">
           <div className="flex items-center justify-between text-slate-500 mb-1">
             <span className="text-xs font-semibold uppercase tracking-wider">Holding & Buffer</span>
-            <Clock className="w-4 h-4 text-purple-500" />
+            <Clock className="w-4 h-4 text-slate-400" />
           </div>
           <div className="text-lg font-bold text-slate-900">
             {formatZAR(financials.totalHoldingAndContingencyZAR)}
@@ -203,7 +203,7 @@ export function DevelopmentCostStackTab({
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
           <div>
             <h4 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-              <FileCheck className="w-4 h-4 text-blue-600" />
+              <FileCheck className="w-4 h-4 text-slate-500" />
               <span>Professional Team Soft Costs & Municipal Bulk Contributions</span>
             </h4>
             <p className="text-xs text-slate-500 mt-0.5">
@@ -212,7 +212,7 @@ export function DevelopmentCostStackTab({
           </div>
           <div className="text-right">
             <span className="text-xs text-slate-400">Total Soft Costs:</span>
-            <div className="text-base font-bold text-blue-900">{formatZAR(financials.totalSoftCostsZAR)}</div>
+            <div className="text-base font-bold text-slate-900">{formatZAR(financials.totalSoftCostsZAR)}</div>
           </div>
         </div>
 
@@ -228,7 +228,7 @@ export function DevelopmentCostStackTab({
               disabled={readOnly}
               value={softCosts.townPlannerZAR || 0}
               onChange={(e) => !readOnly && handleSoftCostChange('townPlannerZAR', Number(e.target.value))}
-              className="w-full rounded border border-slate-300 px-3 py-1.5 focus:ring-1 focus:ring-blue-500 disabled:bg-slate-100 disabled:text-slate-500"
+              className="w-full rounded border border-slate-300 px-3 py-1.5 focus:ring-1 focus:ring-slate-400 disabled:bg-slate-100 disabled:text-slate-500"
             />
             <span className="text-[10px] text-slate-400 mt-0.5 block">Rezoning, SDP & subdivision</span>
           </div>
@@ -244,7 +244,7 @@ export function DevelopmentCostStackTab({
               disabled={readOnly}
               value={softCosts.architectZAR || 0}
               onChange={(e) => !readOnly && handleSoftCostChange('architectZAR', Number(e.target.value))}
-              className="w-full rounded border border-slate-300 px-3 py-1.5 focus:ring-1 focus:ring-blue-500 disabled:bg-slate-100 disabled:text-slate-500"
+              className="w-full rounded border border-slate-300 px-3 py-1.5 focus:ring-1 focus:ring-slate-400 disabled:bg-slate-100 disabled:text-slate-500"
             />
             <span className="text-[10px] text-slate-400 mt-0.5 block">Working drawings & council</span>
           </div>
@@ -260,7 +260,7 @@ export function DevelopmentCostStackTab({
               disabled={readOnly}
               value={softCosts.structuralCivilEngineerZAR || 0}
               onChange={(e) => !readOnly && handleSoftCostChange('structuralCivilEngineerZAR', Number(e.target.value))}
-              className="w-full rounded border border-slate-300 px-3 py-1.5 focus:ring-1 focus:ring-blue-500 disabled:bg-slate-100 disabled:text-slate-500"
+              className="w-full rounded border border-slate-300 px-3 py-1.5 focus:ring-1 focus:ring-slate-400 disabled:bg-slate-100 disabled:text-slate-500"
             />
             <span className="text-[10px] text-slate-400 mt-0.5 block">Slabs, raft foundations, stormwater</span>
           </div>
@@ -276,7 +276,7 @@ export function DevelopmentCostStackTab({
               disabled={readOnly}
               value={softCosts.quantitySurveyorZAR || 0}
               onChange={(e) => !readOnly && handleSoftCostChange('quantitySurveyorZAR', Number(e.target.value))}
-              className="w-full rounded border border-slate-300 px-3 py-1.5 focus:ring-1 focus:ring-blue-500 disabled:bg-slate-100 disabled:text-slate-500"
+              className="w-full rounded border border-slate-300 px-3 py-1.5 focus:ring-1 focus:ring-slate-400 disabled:bg-slate-100 disabled:text-slate-500"
             />
             <span className="text-[10px] text-slate-400 mt-0.5 block">Bank drawdown verification</span>
           </div>
@@ -292,7 +292,7 @@ export function DevelopmentCostStackTab({
               disabled={readOnly}
               value={softCosts.councilBulkContributionsZAR || 0}
               onChange={(e) => !readOnly && handleSoftCostChange('councilBulkContributionsZAR', Number(e.target.value))}
-              className="w-full rounded border border-slate-300 px-3 py-1.5 focus:ring-1 focus:ring-blue-500 disabled:bg-slate-100 disabled:text-slate-500"
+              className="w-full rounded border border-slate-300 px-3 py-1.5 focus:ring-1 focus:ring-slate-400 disabled:bg-slate-100 disabled:text-slate-500"
             />
             <span className="text-[10px] text-slate-400 mt-0.5 block">SPLUMA Section 42 bulk services</span>
           </div>
@@ -308,7 +308,7 @@ export function DevelopmentCostStackTab({
               disabled={readOnly}
               value={softCosts.nhbrcEnrolmentFeeZAR || 0}
               onChange={(e) => !readOnly && handleSoftCostChange('nhbrcEnrolmentFeeZAR', Number(e.target.value))}
-              className="w-full rounded border border-slate-300 px-3 py-1.5 focus:ring-1 focus:ring-blue-500 disabled:bg-slate-100 disabled:text-slate-500"
+              className="w-full rounded border border-slate-300 px-3 py-1.5 focus:ring-1 focus:ring-slate-400 disabled:bg-slate-100 disabled:text-slate-500"
             />
             <span className="text-[10px] text-slate-400 mt-0.5 block">Housing warranty certificate</span>
           </div>
@@ -324,7 +324,7 @@ export function DevelopmentCostStackTab({
               disabled={readOnly}
               value={softCosts.planScrutinyAndSubdivisionFeesZAR || 0}
               onChange={(e) => !readOnly && handleSoftCostChange('planScrutinyAndSubdivisionFeesZAR', Number(e.target.value))}
-              className="w-full rounded border border-slate-300 px-3 py-1.5 focus:ring-1 focus:ring-blue-500 disabled:bg-slate-100 disabled:text-slate-500"
+              className="w-full rounded border border-slate-300 px-3 py-1.5 focus:ring-1 focus:ring-slate-400 disabled:bg-slate-100 disabled:text-slate-500"
             />
             <span className="text-[10px] text-slate-400 mt-0.5 block">Municipal submission & approvals</span>
           </div>
@@ -340,7 +340,7 @@ export function DevelopmentCostStackTab({
               disabled={readOnly}
               value={softCosts.marketingAndShowUnitZAR || 0}
               onChange={(e) => !readOnly && handleSoftCostChange('marketingAndShowUnitZAR', Number(e.target.value))}
-              className="w-full rounded border border-slate-300 px-3 py-1.5 focus:ring-1 focus:ring-blue-500 disabled:bg-slate-100 disabled:text-slate-500"
+              className="w-full rounded border border-slate-300 px-3 py-1.5 focus:ring-1 focus:ring-slate-400 disabled:bg-slate-100 disabled:text-slate-500"
             />
             <span className="text-[10px] text-slate-400 mt-0.5 block">CGI renders, hoarding & brochures</span>
           </div>
@@ -351,7 +351,7 @@ export function DevelopmentCostStackTab({
       <div className="space-y-2">
         <div className="flex items-center justify-between">
           <h4 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-            <HardHat className="w-4 h-4 text-amber-600" />
+            <HardHat className="w-4 h-4 text-slate-500" />
             <span>Hard Construction Bill of Quantities (BOQ)</span>
           </h4>
         </div>
@@ -374,7 +374,7 @@ export function DevelopmentCostStackTab({
       {/* Section C: Holding Burn & Contingency Parameters */}
       <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-2xs space-y-4">
         <h4 className="text-sm font-bold text-slate-900 flex items-center gap-2 border-b border-slate-100 pb-3">
-          <Clock className="w-4 h-4 text-purple-600" />
+          <Clock className="w-4 h-4 text-slate-500" />
           <span>Timeline, Holding Burn & Contingency Reserves</span>
         </h4>
 

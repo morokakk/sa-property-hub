@@ -202,7 +202,7 @@ export function DevelopmentFeasibilitySection({
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="space-y-1">
             <div className="flex items-center gap-2">
-              <Building2 className="w-5 h-5 text-amber-600 print:text-amber-700" />
+              <Building2 className="w-5 h-5 text-slate-500 print:text-slate-600" />
               <h3 className="text-lg font-bold text-slate-900">
                 Development Feasibility & Institutional Capital Stack
               </h3>
@@ -212,15 +212,15 @@ export function DevelopmentFeasibilitySection({
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2 text-xs font-semibold">
-            <span className="px-2.5 py-1 rounded-md bg-amber-50 text-amber-800 border border-amber-200 print:bg-amber-100 print:text-amber-800 print:border-amber-300">
+            <span className="px-2.5 py-1 rounded-md bg-slate-100 text-slate-700 border border-slate-200 print:bg-slate-100 print:text-slate-800 print:border-slate-300">
               {development.developmentType || 'Sectional Title Apartments'}
             </span>
-            <span className="px-2.5 py-1 rounded-md bg-sky-50 text-sky-800 border border-sky-200 print:bg-sky-100 print:text-sky-800 print:border-sky-300">
+            <span className="px-2.5 py-1 rounded-md bg-slate-100 text-slate-700 border border-slate-200 print:bg-slate-100 print:text-slate-800 print:border-slate-300">
               {capitalStack.isVatRegisteredDeveloper
                 ? '15% VAT Registered Developer (R0 Buyer Duty)'
                 : 'Non-VAT Developer'}
             </span>
-            <span className="px-2.5 py-1 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200 print:bg-emerald-100 print:text-emerald-800 print:border-emerald-300">
+            <span className="px-2.5 py-1 rounded-md bg-slate-100 text-slate-700 border border-slate-200 print:bg-slate-100 print:text-slate-800 print:border-slate-300">
               {fin.taxEntityType} ({fin.effectiveTaxRatePercent}% CIT)
             </span>
           </div>
@@ -362,7 +362,7 @@ export function DevelopmentFeasibilitySection({
       {/* PART 1: INSTITUTIONAL TDC VS GDV CAPITAL STACK */}
       <div className="rounded-xl border border-slate-200 bg-white p-6 text-slate-900 shadow-sm print:border-slate-300 print:bg-white print:text-slate-900 break-inside-avoid print:break-inside-avoid space-y-6">
         <div className="flex items-center gap-2 border-b border-slate-200 pb-3">
-          <Coins className="w-5 h-5 text-amber-600 print:text-amber-700" />
+          <Coins className="w-5 h-5 text-slate-500 print:text-slate-600" />
           <h4 className="text-sm font-bold uppercase tracking-wider text-slate-800">
             Part 1: Institutional TDC vs GDV Capital Stack
           </h4>
@@ -524,7 +524,7 @@ export function DevelopmentFeasibilitySection({
       {/* PART 2: 2-STAGE RISK GATE CALLOUT */}
       <div className="rounded-xl border border-slate-200 bg-white p-6 text-slate-900 shadow-sm print:border-slate-300 print:bg-white print:text-slate-900 break-inside-avoid print:break-inside-avoid space-y-4">
         <div className="flex items-center gap-2 border-b border-slate-200 pb-3">
-          <Scale className="w-5 h-5 text-amber-600 print:text-amber-700" />
+          <Scale className="w-5 h-5 text-slate-500 print:text-slate-600" />
           <h4 className="text-sm font-bold uppercase tracking-wider text-slate-800">
             Part 2: 2-Stage Risk Gate Callout (Senior Lender Tranche Controls)
           </h4>
@@ -535,12 +535,18 @@ export function DevelopmentFeasibilitySection({
           <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 print:border-slate-200 print:bg-slate-50 space-y-3">
             <div className="flex items-center justify-between gap-2">
               <div className="flex items-center gap-2">
-                <FileCheck2 className="w-4 h-4 text-sky-600" />
+                <FileCheck2 className="w-4 h-4 text-slate-500" />
                 <span className="font-bold text-xs uppercase text-slate-800">
                   Stage 1: Paper Rights & Statutory Approvals
                 </span>
               </div>
-              <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-amber-50 text-amber-800 border border-amber-200 print:bg-amber-100 print:text-amber-800 print:border-amber-300 flex items-center gap-1">
+              <span
+                className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider border flex items-center gap-1 ${
+                  riskGate.isStage1Approved
+                    ? 'bg-emerald-50 text-emerald-800 border-emerald-200 print:bg-emerald-100 print:text-emerald-800 print:border-emerald-300'
+                    : 'bg-amber-50 text-amber-800 border-amber-200 print:bg-amber-100 print:text-amber-800 print:border-amber-300'
+                }`}
+              >
                 {riskGate.isStage1Approved ? (
                   <Unlock className="w-3 h-3 text-emerald-600" />
                 ) : (
@@ -595,12 +601,18 @@ export function DevelopmentFeasibilitySection({
           <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 print:border-slate-200 print:bg-slate-50 space-y-3">
             <div className="flex items-center justify-between gap-2">
               <div className="flex items-center gap-2">
-                <Hammer className="w-4 h-4 text-amber-600" />
+                <Hammer className="w-4 h-4 text-slate-500" />
                 <span className="font-bold text-xs uppercase text-slate-800">
                   Stage 2: Wet Works Draws & Facility
                 </span>
               </div>
-              <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-sky-50 text-sky-800 border border-sky-200 print:bg-sky-100 print:text-sky-800 print:border-sky-300 flex items-center gap-1">
+              <span
+                className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider border flex items-center gap-1 ${
+                  riskGate.isStage2Unlocked
+                    ? 'bg-emerald-50 text-emerald-800 border-emerald-200 print:bg-emerald-100 print:text-emerald-800 print:border-emerald-300'
+                    : 'bg-amber-50 text-amber-800 border-amber-200 print:bg-amber-100 print:text-amber-800 print:border-amber-300'
+                }`}
+              >
                 {riskGate.isStage2Unlocked ? (
                   <Unlock className="w-3 h-3 text-emerald-600" />
                 ) : (
@@ -684,7 +696,7 @@ export function DevelopmentFeasibilitySection({
       {/* PART 3: DEBT WIPEOUT & PRE-SALES BREAKEVEN MATRIX */}
       <div className="rounded-xl border border-slate-200 bg-white p-6 text-slate-900 shadow-sm print:border-slate-300 print:bg-white print:text-slate-900 break-inside-avoid print:break-inside-avoid space-y-6">
         <div className="flex items-center gap-2 border-b border-slate-200 pb-3">
-          <Layers className="w-5 h-5 text-amber-600 print:text-amber-700" />
+          <Layers className="w-5 h-5 text-slate-500 print:text-slate-600" />
           <h4 className="text-sm font-bold uppercase tracking-wider text-slate-800">
             Part 3: Debt Wipeout & Pre-Sales Breakeven Matrix
           </h4>
@@ -711,7 +723,7 @@ export function DevelopmentFeasibilitySection({
             <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-600 block">
               Units for 100% Debt Wipeout
             </span>
-            <span className="text-lg font-bold font-mono text-sky-700 block mt-1">
+            <span className="text-lg font-bold font-mono text-slate-900 block mt-1">
               {wipeoutMatrix.unitsRequiredForDebtWipeout} of {wipeoutMatrix.totalUnitsCount} Units
             </span>
             <span
@@ -738,7 +750,7 @@ export function DevelopmentFeasibilitySection({
             <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-600 block">
               Pre-Sales Bank Hurdle
             </span>
-            <span className="text-lg font-bold font-mono text-amber-700 block mt-1">
+            <span className={`text-lg font-bold font-mono block mt-1 ${wipeoutMatrix.isPreSalesHurdleMet ? 'text-emerald-700' : 'text-amber-700'}`}>
               {wipeoutMatrix.preSoldGdvPercent.toFixed(1)}% Pre-Sold
             </span>
             <span className="text-[11px] text-slate-600 block mt-0.5">
@@ -783,11 +795,9 @@ export function DevelopmentFeasibilitySection({
                   </span>
                   <span
                     className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
-                      unit.roleBadgeColor === 'blue'
-                        ? 'bg-blue-50 text-blue-800 border border-blue-200 print:bg-blue-100 print:text-blue-800'
-                        : unit.roleBadgeColor === 'emerald'
+                      unit.roleBadgeColor === 'emerald'
                         ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 print:bg-emerald-100 print:text-emerald-800'
-                        : 'bg-purple-50 text-purple-800 border border-purple-200 print:bg-purple-100 print:text-purple-800'
+                        : 'bg-slate-100 text-slate-700 border border-slate-200 print:bg-slate-100 print:text-slate-800'
                     }`}
                   >
                     {unit.roleBadgeText}
@@ -811,22 +821,22 @@ export function DevelopmentFeasibilitySection({
         </div>
 
         {/* Hybrid Split-Exit & SARS Section 13sex 55% Tax Shield Callout */}
-        <div className="rounded-lg border border-purple-200 bg-purple-50/70 p-4 print:border-purple-300 print:bg-purple-50 space-y-3">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-purple-200 pb-2">
+        <div className="rounded-lg border border-slate-200 bg-slate-50/70 p-4 print:border-slate-300 print:bg-slate-50 space-y-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-200 pb-2">
             <div className="flex items-center gap-2">
-              <ShieldCheck className="w-5 h-5 text-purple-700 shrink-0" />
-              <span className="font-bold text-sm text-purple-900">
+              <ShieldCheck className="w-5 h-5 text-slate-500 shrink-0" />
+              <span className="font-bold text-sm text-slate-900">
                 Hybrid Split-Exit & SARS Section 13sex Tax Shield
               </span>
             </div>
-            <span className="text-xs font-semibold text-purple-800">
+            <span className="text-xs font-semibold text-slate-600">
               {wipeoutMatrix.unitsForSaleCount} for Sale &bull; {wipeoutMatrix.unitsRetainedCount} Retained for Rental
             </span>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
-            <div className="bg-white p-2.5 rounded border border-purple-200">
-              <span className="text-purple-700 block text-[10px] font-semibold uppercase">
+            <div className="bg-white p-2.5 rounded border border-slate-200">
+              <span className="text-slate-500 block text-[10px] font-semibold uppercase">
                 Net Proceeds After Debt
               </span>
               <span
@@ -835,13 +845,13 @@ export function DevelopmentFeasibilitySection({
               >
                 {formatZAR(wipeoutMatrix.netCashProceedsAfterDebtZAR)}
               </span>
-              <span className="text-[10px] text-purple-600 block mt-0.5">
+              <span className="text-[10px] text-slate-500 block mt-0.5">
                 Surplus cash credited to reserve
               </span>
             </div>
 
-            <div className="bg-white p-2.5 rounded border border-purple-200">
-              <span className="text-purple-700 block text-[10px] font-semibold uppercase">
+            <div className="bg-white p-2.5 rounded border border-slate-200">
+              <span className="text-slate-500 block text-[10px] font-semibold uppercase">
                 Free-Carry Retained Debt
               </span>
               <span
@@ -850,15 +860,15 @@ export function DevelopmentFeasibilitySection({
               >
                 {formatZAR(wipeoutMatrix.remainingDebtOnRetainedUnitsZAR)}
               </span>
-              <span className="text-[10px] text-purple-600 block mt-0.5">
+              <span className="text-[10px] text-slate-500 block mt-0.5">
                 {wipeoutMatrix.isFreeCarryAchieved
                   ? '100% Free-Carry (Debt-Free)'
                   : 'Partial Debt Remaining'}
               </span>
             </div>
 
-            <div className="bg-white p-2.5 rounded border border-purple-200">
-              <span className="text-purple-700 block text-[10px] font-semibold uppercase">
+            <div className="bg-white p-2.5 rounded border border-slate-200">
+              <span className="text-slate-500 block text-[10px] font-semibold uppercase">
                 Retained Gross Rent
               </span>
               <span
@@ -869,7 +879,7 @@ export function DevelopmentFeasibilitySection({
               </span>
               <span
                 data-sensitive="true"
-                className="text-[10px] text-purple-600 block mt-0.5"
+                className="text-[10px] text-slate-500 block mt-0.5"
               >
                 {formatZAR(wipeoutMatrix.retainedAnnualGrossRentZAR)}/yr gross income
               </span>
@@ -877,32 +887,32 @@ export function DevelopmentFeasibilitySection({
           </div>
 
           {wipeoutMatrix.isSection13SexEligible ? (
-            <div className="rounded-md bg-purple-100/60 p-3 border border-purple-300 space-y-2">
+            <div className="rounded-md bg-emerald-50/70 p-3 border border-emerald-200 space-y-2">
               <div className="flex items-center gap-2">
-                <ShieldCheck className="w-4 h-4 text-purple-700" />
-                <span className="text-xs font-bold text-purple-900">
+                <ShieldCheck className="w-4 h-4 text-emerald-700" />
+                <span className="text-xs font-bold text-emerald-900">
                   SARS Section 13sex 55% Residential Building Tax Shield (Active & Unlocked)
                 </span>
               </div>
-              <p className="text-[11px] text-purple-800 leading-relaxed">
+              <p className="text-[11px] text-emerald-800 leading-relaxed">
                 Portfolio qualifies with 5 or more new residential units retained for rental. Under Section 13sex of the Income Tax Act 58 of 1962, 55% of the acquisition/build cost basis is deductible at 5% straight-line per annum over 20 years against taxable income.
               </p>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-[11px] pt-1">
-                <div className="bg-white p-2 rounded border border-purple-200">
-                  <span className="text-purple-600 block text-[10px]">55% Cost Basis Base</span>
-                  <span data-sensitive="true" className="font-bold font-mono text-purple-900">
+                <div className="bg-white p-2 rounded border border-emerald-200">
+                  <span className="text-slate-500 block text-[10px]">55% Cost Basis Base</span>
+                  <span data-sensitive="true" className="font-bold font-mono text-slate-900">
                     {formatZAR(wipeoutMatrix.section13sexDeductionBaseZAR)}
                   </span>
                 </div>
-                <div className="bg-white p-2 rounded border border-purple-200">
-                  <span className="text-purple-600 block text-[10px]">Annual Tax Allowance (5%)</span>
+                <div className="bg-white p-2 rounded border border-emerald-200">
+                  <span className="text-slate-500 block text-[10px]">Annual Tax Allowance (5%)</span>
                   <span data-sensitive="true" className="font-bold font-mono text-emerald-700">
                     {formatZAR(wipeoutMatrix.section13sexAnnualAllowanceZAR)}/yr
                   </span>
                 </div>
-                <div className="bg-white p-2 rounded border border-purple-200">
-                  <span className="text-purple-600 block text-[10px]">20-Year Cumulative Shield</span>
-                  <span data-sensitive="true" className="font-bold font-mono text-purple-900">
+                <div className="bg-white p-2 rounded border border-emerald-200">
+                  <span className="text-slate-500 block text-[10px]">20-Year Cumulative Shield</span>
+                  <span data-sensitive="true" className="font-bold font-mono text-slate-900">
                     {formatZAR(wipeoutMatrix.section13sexTwentyYearSavingsZAR)}
                   </span>
                 </div>

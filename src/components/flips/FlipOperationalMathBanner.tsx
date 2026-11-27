@@ -4,7 +4,7 @@ import React from 'react';
 import { FlipProject } from '@/types';
 import { FlipFinancialSummary } from '@/lib/calculations/flips';
 import { formatZAR, formatPercent } from '@/lib/formatters';
-import { AlertCircle, Gift, Clock } from 'lucide-react';
+import { Clock } from 'lucide-react';
 
 export interface FlipOperationalMathBannerProps {
   flip: FlipProject;
@@ -42,15 +42,14 @@ export function FlipOperationalMathBanner({
   } = financials;
 
   const preTaxProfit = projectedNetProfit;
+  const isAfterTaxPositive = netProfitAfterTax >= 0;
+  const isPreTaxPositive = projectedNetProfit >= 0;
 
   return (
-    <div className="bg-amber-50/60 border border-amber-200/90 rounded-xl p-3.5 px-4 space-y-2.5 text-xs shadow-2xs">
+    <div className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 px-4 space-y-2.5 text-xs shadow-2xs">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
         <div className="flex items-center gap-2 flex-wrap text-slate-700">
-          <span className="font-bold text-slate-900 flex items-center gap-1.5">
-            <AlertCircle className="w-4 h-4 text-amber-600" />
-            <span>Operational Math:</span>
-          </span>
+          <span className="font-bold text-slate-900">Operational Math:</span>
           <span>Exit {formatZAR(flip.targetExitPriceZAR)}</span>
           <span className="text-slate-400">−</span>
           <span>Acquisition ({formatZAR(flip.purchasePriceZAR + flip.acquisitionCostsZAR)})</span>
@@ -59,13 +58,13 @@ export function FlipOperationalMathBanner({
           {totalMunicipalClearanceOutlay > 0 && (
             <>
               <span className="text-slate-400">−</span>
-              <span className="font-semibold text-blue-900 bg-blue-100 border border-blue-300 px-2 py-0.5 rounded">
+              <span className="font-semibold bg-white border border-slate-200 text-slate-700 px-2 py-0.5 rounded">
                 Sec 118 Clearance ({formatZAR(totalMunicipalClearanceOutlay)})
               </span>
             </>
           )}
           <span className="text-slate-400">−</span>
-          <span className="inline-flex items-center gap-1.5 font-bold text-amber-900 bg-amber-100 border border-amber-300 px-2 py-0.5 rounded flex-wrap">
+          <span className="inline-flex items-center gap-1.5 font-semibold bg-white border border-slate-200 text-slate-700 px-2 py-0.5 rounded flex-wrap">
             <span>
               Holding ({flipHoldingMonths} mos × {formatZAR(flipMonthlyHoldingCost)}/mo = {formatZAR(totalHoldingCost)})
             </span>
@@ -73,10 +72,10 @@ export function FlipOperationalMathBanner({
               <button
                 type="button"
                 onClick={onOpenDelayMatrix}
-                className="inline-flex items-center gap-1 text-[10px] font-extrabold bg-amber-200/90 hover:bg-amber-300 text-amber-950 px-2 py-0.5 rounded transition-colors cursor-pointer shadow-2xs"
+                className="inline-flex items-center gap-1 text-[10px] font-semibold bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-200 px-2 py-0.5 rounded transition-colors cursor-pointer shadow-2xs"
                 title="Simulate Council / Transfer Delay Matrix (+30, +60, +90, +120 Days)"
               >
-                <Clock className="w-3 h-3 text-amber-800" />
+                <Clock className="w-3.5 h-3.5 shrink-0 text-slate-500" />
                 <span>Simulate Delay Matrix (+30–120d)</span>
               </button>
             )}
@@ -84,7 +83,7 @@ export function FlipOperationalMathBanner({
           {exitCommissionZAR > 0 && (
             <>
               <span className="text-slate-400">−</span>
-              <span className="font-semibold text-rose-900 bg-rose-100 border border-rose-300 px-2 py-0.5 rounded">
+              <span className="font-semibold bg-white border border-slate-200 text-slate-700 px-2 py-0.5 rounded">
                 Exit Comm {exitCommissionPercent}% ({formatZAR(exitCommissionZAR)})
               </span>
             </>
@@ -93,7 +92,7 @@ export function FlipOperationalMathBanner({
 
         {/* Entity Tax Toggle (Pre-Tax / 27% Company / 45% Individual) */}
         {onUpdateTaxMode && (
-          <div className="flex items-center gap-1.5 shrink-0 bg-white p-1 rounded-lg border border-amber-200 shadow-2xs">
+          <div className="flex items-center gap-1.5 shrink-0 bg-white p-1 rounded-lg border border-slate-200 shadow-2xs">
             <span className="text-[10px] font-bold text-slate-500 uppercase px-1">Entity Tax:</span>
             {(['Company (27%)', 'Individual (45%)', 'Pre-Tax'] as const).map((mode) => (
               <button
@@ -102,7 +101,7 @@ export function FlipOperationalMathBanner({
                 onClick={() => onUpdateTaxMode(mode)}
                 className={`px-2 py-0.5 text-[10px] font-bold rounded-md transition-all cursor-pointer ${
                   currentTaxMode === mode
-                    ? 'bg-amber-600 text-white shadow-xs'
+                    ? 'bg-slate-900 text-white shadow-xs'
                     : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
                 }`}
               >
@@ -117,21 +116,20 @@ export function FlipOperationalMathBanner({
         )}
       </div>
 
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between pt-2 border-t border-amber-200/60 gap-2">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between pt-2 border-t border-slate-200 gap-2">
         {/* Sponsor / Barter Summary pill */}
         <div className="flex items-center gap-2 flex-wrap text-[11px]">
           {totalSponsorItemsCount > 0 ? (
-            <div className="inline-flex items-center gap-1.5 bg-purple-50 text-purple-900 border border-purple-200 px-2.5 py-0.5 rounded-lg font-semibold">
-              <Gift className="w-3.5 h-3.5 text-purple-600" />
+            <div className="inline-flex items-center gap-1.5 bg-white border border-slate-200 text-slate-700 px-2.5 py-0.5 rounded-lg font-medium">
               <span>
-                Commercial Retail Value: <strong>{formatZAR(totalRetailBOQ)}</strong>
+                Commercial Retail Value: <strong className="text-slate-900">{formatZAR(totalRetailBOQ)}</strong>
               </span>
-              <span>•</span>
+              <span className="text-slate-400">•</span>
               <span>
-                Cash Outlay: <strong>{formatZAR(totalActualCashBOQ)}</strong>
+                Cash Outlay: <strong className="text-slate-900">{formatZAR(totalActualCashBOQ)}</strong>
               </span>
-              <span>•</span>
-              <span className="text-emerald-700 font-bold">
+              <span className="text-slate-400">•</span>
+              <span className="text-emerald-700 font-semibold">
                 Saved {formatZAR(totalSponsorSavings)} (
                 {totalRetailBOQ > 0 ? ((totalSponsorSavings / totalRetailBOQ) * 100).toFixed(0) : 0}%)
               </span>
@@ -152,7 +150,7 @@ export function FlipOperationalMathBanner({
                 <span>
                   Pre-Tax: <strong>{formatZAR(preTaxProfit)}</strong>
                 </span>
-                <span className="text-rose-600 font-medium ml-1.5">
+                <span className="text-slate-500 font-medium ml-1.5">
                   (-{formatZAR(estimatedTaxProvision)} tax)
                 </span>
               </div>
@@ -160,10 +158,16 @@ export function FlipOperationalMathBanner({
                 <span className="text-slate-500 font-medium mr-1.5 text-xs">
                   = Net Cash After {effectiveTaxRate}% Tax:
                 </span>
-                <strong className="text-emerald-700 font-black text-sm">
+                <strong className={`${isAfterTaxPositive ? 'text-emerald-700' : 'text-rose-700'} font-black text-sm`}>
                   {formatZAR(netProfitAfterTax)}
                 </strong>
-                <span className="ml-1 text-[10px] font-bold text-emerald-800 bg-emerald-100 px-1.5 py-0.2 rounded">
+                <span
+                  className={`ml-1 text-[10px] font-bold px-1.5 py-0.2 rounded border ${
+                    isAfterTaxPositive
+                      ? 'text-emerald-800 bg-emerald-100 border-emerald-200'
+                      : 'text-rose-800 bg-rose-100 border-rose-200'
+                  }`}
+                >
                   {formatPercent(afterTaxROI)} After-Tax
                 </span>
               </div>
@@ -173,10 +177,16 @@ export function FlipOperationalMathBanner({
               <span className="text-slate-500 font-medium mr-1.5 text-xs">
                 {isBuildToRent ? '= Post-Build Equity Created (ARV − All-In Cost):' : '= Pre-Tax Net Profit:'}
               </span>
-              <strong className="text-emerald-700 font-black text-sm">
+              <strong className={`${isPreTaxPositive ? 'text-emerald-700' : 'text-rose-700'} font-black text-sm`}>
                 {formatZAR(projectedNetProfit)}
               </strong>
-              <span className="ml-1 text-[10px] font-bold text-emerald-800 bg-emerald-100 px-1.5 py-0.2 rounded">
+              <span
+                className={`ml-1 text-[10px] font-bold px-1.5 py-0.2 rounded border ${
+                  isPreTaxPositive
+                    ? 'text-emerald-800 bg-emerald-100 border-emerald-200'
+                    : 'text-rose-800 bg-rose-100 border-rose-200'
+                }`}
+              >
                 {isBuildToRent ? `${formatPercent(projectedROI)} Equity Gain (0% Sale Tax)` : `${formatPercent(projectedROI)} Pre-Tax`}
               </span>
             </div>

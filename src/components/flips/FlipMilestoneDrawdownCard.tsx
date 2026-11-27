@@ -89,13 +89,13 @@ export function FlipMilestoneDrawdownCard({
               ? 'bg-emerald-50/70 border-emerald-300 text-emerald-950'
               : evictionActive
               ? 'bg-rose-50/50 border-rose-300 text-rose-950'
-              : 'bg-slate-50 border-slate-200 text-slate-700'
+              : 'bg-white border-slate-200 text-slate-700'
           }`}
         >
           <div>
             <div className="flex items-center justify-between mb-1">
               <span className="font-bold text-xs uppercase tracking-wide">Phase 1: Deposit</span>
-              <span className="text-[10px] font-bold bg-white px-1.5 py-0.5 rounded border border-slate-200">
+              <span className="text-[10px] font-semibold bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded border border-slate-200">
                 20% Target
               </span>
             </div>
@@ -152,7 +152,7 @@ export function FlipMilestoneDrawdownCard({
                 onChange={() => onToggleDrawPhase('depositPaid')}
                 className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
               />
-              <span>{currentDrawSchedule.depositPaid ? '✓ Deposit Paid' : 'Mark Deposit Paid'}</span>
+              <span>{currentDrawSchedule.depositPaid ? 'Deposit Paid' : 'Mark Deposit Paid'}</span>
             </label>
           </div>
         </div>
@@ -162,13 +162,13 @@ export function FlipMilestoneDrawdownCard({
           className={`p-3.5 rounded-xl border transition-all text-xs flex flex-col justify-between ${
             currentDrawSchedule.firstFixApproved
               ? 'bg-emerald-50/70 border-emerald-300 text-emerald-950'
-              : 'bg-slate-50 border-slate-200 text-slate-700'
+              : 'bg-white border-slate-200 text-slate-700'
           }`}
         >
           <div>
             <div className="flex items-center justify-between mb-1">
               <span className="font-bold text-xs uppercase tracking-wide">Phase 2: First Fix</span>
-              <span className="text-[10px] font-bold bg-white px-1.5 py-0.5 rounded border border-slate-200">
+              <span className="text-[10px] font-semibold bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded border border-slate-200">
                 30% Target
               </span>
             </div>
@@ -187,7 +187,7 @@ export function FlipMilestoneDrawdownCard({
                 onChange={() => onToggleDrawPhase('firstFixApproved')}
                 className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
               />
-              <span>{currentDrawSchedule.firstFixApproved ? '✓ Inspected & Approved' : 'Sign Off First Fix'}</span>
+              <span>{currentDrawSchedule.firstFixApproved ? 'Inspected & Approved' : 'Sign Off First Fix'}</span>
             </label>
           </div>
         </div>
@@ -197,13 +197,13 @@ export function FlipMilestoneDrawdownCard({
           className={`p-3.5 rounded-xl border transition-all text-xs flex flex-col justify-between ${
             currentDrawSchedule.finishesApproved
               ? 'bg-emerald-50/70 border-emerald-300 text-emerald-950'
-              : 'bg-slate-50 border-slate-200 text-slate-700'
+              : 'bg-white border-slate-200 text-slate-700'
           }`}
         >
           <div>
             <div className="flex items-center justify-between mb-1">
               <span className="font-bold text-xs uppercase tracking-wide">Phase 3: Finishes</span>
-              <span className="text-[10px] font-bold bg-white px-1.5 py-0.5 rounded border border-slate-200">
+              <span className="text-[10px] font-semibold bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded border border-slate-200">
                 30% Target
               </span>
             </div>
@@ -222,7 +222,7 @@ export function FlipMilestoneDrawdownCard({
                 onChange={() => onToggleDrawPhase('finishesApproved')}
                 className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
               />
-              <span>{currentDrawSchedule.finishesApproved ? '✓ Finishes Approved' : 'Sign Off Finishes'}</span>
+              <span>{currentDrawSchedule.finishesApproved ? 'Finishes Approved' : 'Sign Off Finishes'}</span>
             </label>
           </div>
         </div>
@@ -257,7 +257,7 @@ export function FlipMilestoneDrawdownCard({
                 onChange={() => onToggleDrawPhase('retentionReleased')}
                 className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
               />
-              <span>{currentDrawSchedule.retentionReleased ? '✓ Retention Released' : 'Release Retention'}</span>
+              <span>{currentDrawSchedule.retentionReleased ? 'Retention Released' : 'Release Retention'}</span>
             </label>
           </div>
         </div>

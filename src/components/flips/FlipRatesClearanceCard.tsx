@@ -32,7 +32,7 @@ export function FlipRatesClearanceCard({
     <div className="bg-white rounded-xl border border-slate-200 p-4 sm:p-5 shadow-xs space-y-3">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-slate-200 gap-2">
         <div className="flex items-center gap-2.5">
-          <div className="p-2 rounded-xl bg-blue-500/10 text-blue-700 border border-blue-500/20">
+          <div className="p-2 rounded-xl bg-slate-100 text-slate-700 border border-slate-200">
             <Landmark className="w-5 h-5" />
           </div>
           <div>
@@ -47,7 +47,7 @@ export function FlipRatesClearanceCard({
                     : rccStatusVal === 'Disputed'
                     ? 'bg-rose-50 text-rose-800 border-rose-300'
                     : rccStatusVal === 'Paid & Awaiting Certificate'
-                    ? 'bg-blue-50 text-blue-800 border-blue-300'
+                    ? 'bg-slate-100 text-slate-700 border-slate-200'
                     : 'bg-amber-50 text-amber-800 border-amber-300'
                 }`}
               >
@@ -95,7 +95,7 @@ export function FlipRatesClearanceCard({
 
         <div className="bg-slate-50 p-3 rounded-xl border border-slate-200">
           <span className="text-[10px] uppercase font-bold text-slate-400 block">Advance Council Deposit</span>
-          <div className="text-base font-extrabold text-blue-700 mt-0.5">
+          <div className="text-base font-extrabold text-slate-900 mt-0.5">
             {formatZAR(advanceCouncilDepositVal)}
           </div>
           <span className="text-[9px] text-slate-400">4–6 months rates required upfront</span>

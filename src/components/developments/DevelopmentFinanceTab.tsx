@@ -13,7 +13,6 @@ import {
   Clock,
   ShieldCheck,
   TrendingUp,
-  DollarSign,
   AlertCircle,
   Building2,
   ArrowRight,
@@ -163,7 +162,7 @@ export function DevelopmentFinanceTab({
             <span className="text-xs font-semibold uppercase tracking-wider">
               Senior Bank Facility
             </span>
-            <Coins className="w-4 h-4 text-blue-600" />
+            <Coins className="w-4 h-4 text-slate-400" />
           </div>
 
           <div>
@@ -190,7 +189,7 @@ export function DevelopmentFinanceTab({
             </div>
             <div className="flex justify-between text-slate-600">
               <span>Available Undrawn:</span>
-              <span className="font-semibold text-blue-700 tabular-nums">{formatZAR(availableToDraw)}</span>
+              <span className="font-semibold text-slate-900 tabular-nums">{formatZAR(availableToDraw)}</span>
             </div>
           </div>
 
@@ -290,7 +289,7 @@ export function DevelopmentFinanceTab({
             <span className="text-xs font-semibold uppercase tracking-wider">
               Debt Wipeout Breakeven
             </span>
-            <TrendingUp className="w-4 h-4 text-purple-600" />
+            <TrendingUp className="w-4 h-4 text-slate-400" />
           </div>
 
           <div>
@@ -319,7 +318,7 @@ export function DevelopmentFinanceTab({
             </div>
           </div>
 
-          <div className="p-2.5 rounded-lg bg-purple-50 border border-purple-200 text-xs text-purple-800">
+          <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-200 text-xs text-slate-700">
             Once {wipeoutUnitsCount} units are transferred, senior facility is fully settled (R 0 debt balance). All remaining units become unencumbered sponsor profit or free-carry rental equity.
           </div>
         </div>
@@ -330,7 +329,7 @@ export function DevelopmentFinanceTab({
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
           <div>
             <h4 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-              <Layers className="w-4 h-4 text-purple-600" />
+              <Layers className="w-4 h-4 text-slate-500" />
               <span>Unit-by-Unit Waterfall: Debt Extinguishment vs Unencumbered Equity</span>
             </h4>
             <p className="text-xs text-slate-500 mt-0.5">
@@ -338,8 +337,8 @@ export function DevelopmentFinanceTab({
             </p>
           </div>
           <div className="flex items-center gap-3 text-xs">
-            <span className="inline-flex items-center gap-1.5 text-blue-700">
-              <span className="w-3 h-3 rounded-xs bg-blue-500 inline-block" />
+            <span className="inline-flex items-center gap-1.5 text-slate-700">
+              <span className="w-3 h-3 rounded-xs bg-slate-600 inline-block" />
               Senior Debt Repayment
             </span>
             <span className="inline-flex items-center gap-1.5 text-emerald-700 font-medium">
@@ -356,7 +355,7 @@ export function DevelopmentFinanceTab({
               key={unit.id}
                 className={`rounded-lg border p-3 flex flex-col justify-between text-xs space-y-2 transition-all ${
                   isDebtExtinguisher
-                    ? 'border-blue-200 bg-blue-50/40 hover:bg-blue-50/70'
+                    ? 'border-slate-200 bg-slate-50/70 hover:bg-slate-100/70'
                     : 'border-emerald-200 bg-emerald-50/40 hover:bg-emerald-50/70'
                 }`}
               >
@@ -366,7 +365,7 @@ export function DevelopmentFinanceTab({
                     <span
                       className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${
                         isDebtExtinguisher
-                          ? 'bg-blue-100 text-blue-800'
+                          ? 'bg-slate-200/80 text-slate-700'
                           : 'bg-emerald-100 text-emerald-800'
                       }`}
                     >
@@ -516,7 +515,7 @@ export function DevelopmentFinanceTab({
                   step="any"
                   value={drawAmount}
                   onChange={(e) => setDrawAmount(Number(e.target.value))}
-                  className="w-full rounded border border-slate-300 px-3 py-1.5 font-semibold tabular-nums focus:ring-1 focus:ring-blue-500"
+                  className="w-full rounded border border-slate-300 px-3 py-1.5 font-semibold tabular-nums focus:ring-1 focus:ring-slate-400"
                 />
                 <p className="text-[11px] text-slate-400 mt-1 tabular-nums">
                   Available undrawn: {formatZAR(availableToDraw)}.
@@ -532,7 +531,7 @@ export function DevelopmentFinanceTab({
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-1.5 rounded bg-blue-600 hover:bg-blue-700 text-white font-semibold cursor-pointer"
+                  className="px-4 py-1.5 rounded bg-slate-900 hover:bg-slate-800 text-white font-semibold cursor-pointer"
                 >
                   Save Drawdown
                 </button>

@@ -9,7 +9,6 @@ import {
   Building2,
   ShieldCheck,
   Trash2,
-  DollarSign,
   CheckCircle2,
   AlertCircle,
   ExternalLink,
@@ -379,7 +378,7 @@ export function DevelopmentUnitInventoryTab({
               : 'bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer'
           }`}
         >
-          <DollarSign className="w-3 h-3" />
+          <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
           <span>Mark Sold</span>
         </button>
       )}
@@ -541,7 +540,7 @@ export function DevelopmentUnitInventoryTab({
               type="search"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search unit #, config, buyer, or deeds ref..."
+              placeholder="Search unit, config, buyer, or ref..."
               aria-label="Search development units"
               className="w-full pl-8 pr-8 py-1.5 text-xs border border-slate-300 rounded-lg bg-slate-50 focus:bg-white text-slate-900 placeholder:text-slate-400 focus:outline-hidden focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-600"
             />
@@ -668,7 +667,7 @@ export function DevelopmentUnitInventoryTab({
                     <td className="py-2.5 px-3 text-right font-mono tabular-nums whitespace-nowrap">{`${totalFloorArea} m²`}</td>
                     <td className="py-2.5 px-3 text-right font-mono tabular-nums whitespace-nowrap">{formatZAR(totalCostBasis)}</td>
                     <td className="py-2.5 px-3 text-right font-mono tabular-nums text-emerald-800 whitespace-nowrap">{formatZAR(totalListGdv)}</td>
-                    <td className="py-2.5 px-3 text-right font-mono tabular-nums text-purple-800 whitespace-nowrap">{formatZAR(totalEstRent)}/mo</td>
+                    <td className="py-2.5 px-3 text-right font-mono tabular-nums text-emerald-700 font-semibold whitespace-nowrap">{formatZAR(totalEstRent)}/mo</td>
                     <td colSpan={3} className="py-2.5 px-3 text-right text-xs text-slate-500 font-normal whitespace-nowrap tabular-nums">
                       {`${soldCount} Sold • ${contractedCount > 0 ? `${contractedCount} Contracted • ` : ''}${retainedCount} Retained • ${availableCount} Available`}
                     </td>
@@ -724,7 +723,7 @@ export function DevelopmentUnitInventoryTab({
                         <div className="text-lg font-extrabold text-slate-900 tabular-nums leading-tight">
                           {formatZAR(unit.listPriceVatInclZAR)}
                         </div>
-                        <div className="text-[11px] font-semibold text-purple-700 tabular-nums mt-0.5">
+                        <div className="text-[11px] font-semibold text-slate-600 tabular-nums mt-0.5">
                           Est. Rent: {formatZAR(unit.estimatedMonthlyRentZAR)}/mo
                         </div>
                       </div>

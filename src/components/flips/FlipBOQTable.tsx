@@ -3,7 +3,7 @@
 import React, { useMemo, useState } from 'react';
 import { FlipProject, BOQItem } from '@/types';
 import { formatZAR } from '@/lib/formatters';
-import { FileSpreadsheet, Plus, Gift, Trash2, CheckCircle2, Search, X } from 'lucide-react';
+import { FileSpreadsheet, Plus, Trash2, CheckCircle2, Search, X } from 'lucide-react';
 
 export interface FlipBOQTableProps {
   flip: FlipProject;
@@ -203,8 +203,7 @@ export function FlipBOQTable({
                       </span>
                     )}
                     {item.isSponsoredOrBarter && (
-                      <span className="inline-flex items-center gap-1 text-[9px] bg-purple-100 text-purple-800 font-bold px-1.5 py-0.5 rounded border border-purple-200">
-                        <Gift className="w-2.5 h-2.5 text-purple-600" />
+                      <span className="inline-flex items-center gap-1 text-[9px] bg-slate-100 text-slate-600 font-semibold px-1.5 py-0.5 rounded border border-slate-200">
                         <span>Sponsor Barter • Retail {formatZAR(item.commercialRetailValueZAR || item.baselineTotalZAR)}</span>
                       </span>
                     )}
@@ -219,7 +218,7 @@ export function FlipBOQTable({
                 <td className="py-2.5 px-3 font-bold text-slate-900 whitespace-nowrap">
                   <div className="leading-snug">{formatZAR(item.actualCostZAR)}</div>
                   {item.isSponsoredOrBarter && (
-                    <div className="text-[9px] text-purple-700 font-normal">
+                    <div className="text-[9px] text-slate-500 font-normal">
                       Retail: {formatZAR(item.commercialRetailValueZAR || item.baselineTotalZAR)}
                     </div>
                   )}
@@ -246,14 +245,12 @@ export function FlipBOQTable({
                         status: e.target.value as BOQItem['status'],
                       })
                     }
-                    className={`text-[11px] font-semibold px-2 py-0.5 rounded-md border border-slate-200 ${
+                    className={`text-[11px] font-semibold px-2 py-0.5 rounded-md border ${
                       readOnly
-                        ? 'bg-slate-100 text-slate-500 cursor-not-allowed'
+                        ? 'bg-slate-100 text-slate-500 border-slate-200 cursor-not-allowed'
                         : item.status === 'Completed'
-                        ? 'bg-emerald-50 text-emerald-800 cursor-pointer'
-                        : item.status === 'In Progress'
-                        ? 'bg-indigo-50 text-indigo-800 cursor-pointer'
-                        : 'bg-slate-100 text-slate-700 cursor-pointer'
+                        ? 'bg-emerald-50 text-emerald-800 border-emerald-200 cursor-pointer'
+                        : 'bg-slate-100 text-slate-700 border-slate-200 cursor-pointer'
                     }`}
                   >
                     <option value="Not Started">Not Started</option>
@@ -305,10 +302,10 @@ export function FlipBOQTable({
               <td className="py-2.5 px-3 font-bold text-slate-900 whitespace-nowrap">
                 {formatZAR(totalBaselineZAR)}
               </td>
-              <td className="py-2.5 px-3 font-bold text-indigo-900 whitespace-nowrap">
+              <td className="py-2.5 px-3 font-bold text-slate-900 whitespace-nowrap">
                 <div>{formatZAR(totalActualCostZAR)}</div>
                 {(flip.numberOfUnits || 1) > 1 && (
-                  <div className="text-[10px] font-semibold text-indigo-600">
+                  <div className="text-[10px] font-semibold text-slate-500">
                     {formatZAR(Math.round((totalActualCostZAR || flip.baselineRenovationBudgetZAR || 0) / Math.max(1, flip.numberOfUnits || 1)), { compact: true })} / unit
                   </div>
                 )}
@@ -320,8 +317,7 @@ export function FlipBOQTable({
               </td>
               <td className="py-2.5 px-3 text-[11px] whitespace-nowrap">
                 {totalSponsorSavingsZAR > 0 ? (
-                  <span className="inline-flex items-center gap-1 text-[10px] font-bold text-purple-800 bg-purple-100 border border-purple-200 px-2 py-0.5 rounded-full">
-                    <Gift className="w-3 h-3 text-purple-600" />
+                  <span className="inline-flex items-center gap-1 text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded-full">
                     <span>Saved {formatZAR(totalSponsorSavingsZAR)}</span>
                   </span>
                 ) : (

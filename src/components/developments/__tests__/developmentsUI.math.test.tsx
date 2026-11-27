@@ -384,8 +384,8 @@ describe('Empirical Financial Presentation & Calculation Fidelity Challenge', ()
   // =========================================================================
   // CHALLENGE 2: Profit on Cost (POC %) Styling & Boundary Conditions
   // =========================================================================
-  describe('2. Profit on Cost (POC %) Dynamic Styling & Boundary Conditions', () => {
-    it('renders Emerald badge and border when POC >= 20.0%', () => {
+  describe('2. Profit on Cost (POC %) Neutral Slate Shell & Negative Polarity', () => {
+    it('renders uniform neutral slate card and text-slate-900 headline when POC >= 20.0%', () => {
       const devHighMargin = createFixtureDevelopment();
       const financialsHigh = calculateDevelopmentFinancials(devHighMargin);
 
@@ -401,8 +401,12 @@ describe('Empirical Financial Presentation & Calculation Fidelity Challenge', ()
         )
       );
 
-      expect(html20).toContain('text-emerald-700 bg-emerald-50 border-emerald-200');
-      expect(html20).toContain('border-emerald-200');
+      expect(html20).toContain('bg-white rounded-xl border border-slate-200');
+      expect(html20).toContain('bg-slate-100 text-slate-600 border-slate-200');
+      expect(html20).toContain('text-slate-900');
+      expect(html20).not.toContain('text-rose-600');
+      expect(html20).not.toContain('border-amber-200');
+      expect(html20).not.toContain('border-rose-200');
       expect(html20).toContain('20.0%');
 
       // 32.5% margin
@@ -415,12 +419,13 @@ describe('Empirical Financial Presentation & Calculation Fidelity Challenge', ()
           <DevelopmentKpiBanner development={devHighMargin} financials={boundary32Financials} />
         )
       );
-      expect(html32).toContain('text-emerald-700 bg-emerald-50 border-emerald-200');
-      expect(html32).toContain('border-emerald-200');
+      expect(html32).toContain('bg-slate-100 text-slate-600 border-slate-200');
+      expect(html32).toContain('text-slate-900');
+      expect(html32).not.toContain('text-rose-600');
       expect(html32).toContain('32.5%');
     });
 
-    it('renders Amber badge and border when POC is between 12.0% and 19.9%', () => {
+    it('renders uniform neutral slate card and text-slate-900 headline when POC is between 12.0% and 19.9%', () => {
       const dev = createFixtureDevelopment();
       const baseFinancials = calculateDevelopmentFinancials(dev);
 
@@ -434,8 +439,11 @@ describe('Empirical Financial Presentation & Calculation Fidelity Challenge', ()
           <DevelopmentKpiBanner development={dev} financials={upperAmberFinancials} />
         )
       );
-      expect(htmlUpper).toContain('text-amber-700 bg-amber-50 border-amber-200');
-      expect(htmlUpper).toContain('border-amber-200');
+      expect(htmlUpper).toContain('bg-white rounded-xl border border-slate-200');
+      expect(htmlUpper).toContain('bg-slate-100 text-slate-600 border-slate-200');
+      expect(htmlUpper).toContain('text-slate-900');
+      expect(htmlUpper).not.toContain('border-amber-200');
+      expect(htmlUpper).not.toContain('text-rose-600');
       expect(htmlUpper).toContain('19.9%');
 
       // Mid-range: 15.0%
@@ -448,8 +456,8 @@ describe('Empirical Financial Presentation & Calculation Fidelity Challenge', ()
           <DevelopmentKpiBanner development={dev} financials={midAmberFinancials} />
         )
       );
-      expect(htmlMid).toContain('text-amber-700 bg-amber-50 border-amber-200');
-      expect(htmlMid).toContain('border-amber-200');
+      expect(htmlMid).toContain('bg-slate-100 text-slate-600 border-slate-200');
+      expect(htmlMid).not.toContain('border-amber-200');
       expect(htmlMid).toContain('15.0%');
 
       // Lower boundary: 12.0%
@@ -462,16 +470,16 @@ describe('Empirical Financial Presentation & Calculation Fidelity Challenge', ()
           <DevelopmentKpiBanner development={dev} financials={lowerAmberFinancials} />
         )
       );
-      expect(htmlLower).toContain('text-amber-700 bg-amber-50 border-amber-200');
-      expect(htmlLower).toContain('border-amber-200');
+      expect(htmlLower).toContain('bg-slate-100 text-slate-600 border-slate-200');
+      expect(htmlLower).not.toContain('border-amber-200');
       expect(htmlLower).toContain('12.0%');
     });
 
-    it('renders Rose badge and border when POC < 12.0%, including zero and negative margins', () => {
+    it('renders text-slate-900 for non-negative sub-12% POC and text-rose-600 strictly when POC < 0%', () => {
       const dev = createFixtureDevelopment();
       const baseFinancials = calculateDevelopmentFinancials(dev);
 
-      // Upper boundary of Rose: 11.9%
+      // Positive sub-12% POC: 11.9% -> neutral slate
       const sub12Financials: DevelopmentFinancialSummary = {
         ...baseFinancials,
         pocPercent: 11.9,
@@ -481,11 +489,13 @@ describe('Empirical Financial Presentation & Calculation Fidelity Challenge', ()
           <DevelopmentKpiBanner development={dev} financials={sub12Financials} />
         )
       );
-      expect(html119).toContain('text-rose-700 bg-rose-50 border-rose-200');
-      expect(html119).toContain('border-rose-200');
+      expect(html119).toContain('bg-slate-100 text-slate-600 border-slate-200');
+      expect(html119).toContain('text-slate-900');
+      expect(html119).not.toContain('text-rose-600');
+      expect(html119).not.toContain('border-rose-200');
       expect(html119).toContain('11.9%');
 
-      // Breakeven / Zero POC: 0.0%
+      // Breakeven / Zero POC: 0.0% -> neutral slate
       const zeroFinancials: DevelopmentFinancialSummary = {
         ...baseFinancials,
         pocPercent: 0.0,
@@ -496,11 +506,12 @@ describe('Empirical Financial Presentation & Calculation Fidelity Challenge', ()
           <DevelopmentKpiBanner development={dev} financials={zeroFinancials} />
         )
       );
-      expect(htmlZero).toContain('text-rose-700 bg-rose-50 border-rose-200');
-      expect(htmlZero).toContain('border-rose-200');
+      expect(htmlZero).toContain('bg-slate-100 text-slate-600 border-slate-200');
+      expect(htmlZero).not.toContain('text-rose-600');
+      expect(htmlZero).not.toContain('border-rose-200');
       expect(htmlZero).toContain('0.0%');
 
-      // Loss-making / Negative margin: -15.4%
+      // Loss-making / Negative margin: -15.4% -> text-rose-600 headline on uniform slate card
       const lossFinancials: DevelopmentFinancialSummary = {
         ...baseFinancials,
         pocPercent: -15.4,
@@ -511,15 +522,15 @@ describe('Empirical Financial Presentation & Calculation Fidelity Challenge', ()
           <DevelopmentKpiBanner development={dev} financials={lossFinancials} />
         )
       );
-      expect(htmlLoss).toContain('text-rose-700 bg-rose-50 border-rose-200');
-      expect(htmlLoss).toContain('border-rose-200');
+      expect(htmlLoss).toContain('bg-white rounded-xl border border-slate-200');
+      expect(htmlLoss).toContain('bg-slate-100 text-slate-600 border-slate-200');
+      expect(htmlLoss).toContain('text-rose-600');
+      expect(htmlLoss).not.toContain('border-rose-200');
       expect(htmlLoss).toContain('-15.4%');
       expect(htmlLoss).toContain(formatZAR(-850000));
     });
 
-    it('dynamically switches color styling across boundaries when after-tax provision is applied', () => {
-      // Scenario where Pre-Tax POC is 23.5% (Emerald >= 20%),
-      // but After-Tax POC is 17.155% (Amber 12-19.9%)
+    it('keeps uniform neutral slate styling across pre-tax and after-tax modes', () => {
       const dev = createFixtureDevelopment();
       const baseFinancials = calculateDevelopmentFinancials(dev);
 
@@ -529,7 +540,7 @@ describe('Empirical Financial Presentation & Calculation Fidelity Challenge', ()
         afterTaxPocPercent: 17.155,
       };
 
-      // In Pre-Tax mode (showAfterTax = false) -> Emerald
+      // In Pre-Tax mode (showAfterTax = false)
       const htmlPreTax = cleanHtml(
         renderToString(
           <DevelopmentKpiBanner
@@ -539,12 +550,13 @@ describe('Empirical Financial Presentation & Calculation Fidelity Challenge', ()
           />
         )
       );
-      expect(htmlPreTax).toContain('border-emerald-200');
-      expect(htmlPreTax).toContain('text-emerald-700 bg-emerald-50 border-emerald-200');
+      expect(htmlPreTax).toContain('bg-white rounded-xl border border-slate-200');
+      expect(htmlPreTax).toContain('bg-slate-100 text-slate-600 border-slate-200');
+      expect(htmlPreTax).toContain('text-slate-900');
       expect(htmlPreTax).toContain('23.5%');
       expect(htmlPreTax).toContain('Pre-Tax');
 
-      // In After-Tax mode (showAfterTax = true) -> Amber
+      // In After-Tax mode (showAfterTax = true)
       const htmlAfterTax = cleanHtml(
         renderToString(
           <DevelopmentKpiBanner
@@ -554,8 +566,9 @@ describe('Empirical Financial Presentation & Calculation Fidelity Challenge', ()
           />
         )
       );
-      expect(htmlAfterTax).toContain('border-amber-200');
-      expect(htmlAfterTax).toContain('text-amber-700 bg-amber-50 border-amber-200');
+      expect(htmlAfterTax).toContain('bg-white rounded-xl border border-slate-200');
+      expect(htmlAfterTax).toContain('bg-slate-100 text-slate-600 border-slate-200');
+      expect(htmlAfterTax).toContain('text-slate-900');
       expect(htmlAfterTax).toContain('17.2%');
       expect(htmlAfterTax).toContain('After Tax');
     });

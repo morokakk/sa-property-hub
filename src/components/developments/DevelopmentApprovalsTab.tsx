@@ -271,7 +271,7 @@ export function DevelopmentApprovalsTab({
               approvedCount === totalItems
                 ? 'bg-emerald-500'
                 : approvedCount >= 4
-                ? 'bg-blue-500'
+                ? 'bg-slate-700'
                 : 'bg-amber-500'
             }`}
             style={{ width: `${progressPercent}%` }}
@@ -393,7 +393,7 @@ export function DevelopmentApprovalsTab({
 
                 {/* 14-day statutory lead reminder badge */}
                 <div className="flex items-center gap-1.5 text-[10px] text-slate-400 pt-1">
-                  <ShieldCheck className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+                  <ShieldCheck className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                   <span>Synced to /tasks with 14-day statutory reminder</span>
                 </div>
               </div>

@@ -539,7 +539,11 @@ export default function DevelopmentsPage() {
                   type="button"
                   data-testid="open-team-ledger-btn"
                   onClick={() => setIsLedgerOpen(true)}
-                  className="inline-flex items-center gap-1.5 text-amber-800 hover:text-amber-950 bg-amber-50 hover:bg-amber-100 text-xs font-semibold px-2.5 py-1 rounded border border-amber-300 cursor-pointer whitespace-nowrap"
+                  className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded border cursor-pointer whitespace-nowrap transition-colors ${
+                    openCommentsCount > 0
+                      ? 'text-amber-800 hover:text-amber-950 bg-amber-50 hover:bg-amber-100 border-amber-300'
+                      : 'text-slate-700 hover:text-slate-900 bg-white hover:bg-slate-50 border-slate-200'
+                  }`}
                 >
                   <MessageSquare className="w-3.5 h-3.5" />
                   <span>{`Team Ledger (${openCommentsCount} Open)`}</span>
@@ -548,7 +552,7 @@ export default function DevelopmentsPage() {
                   type="button"
                   data-testid="export-team-excel-btn"
                   onClick={handleExportTeamExcel}
-                  className="inline-flex items-center gap-1.5 text-blue-700 hover:text-blue-900 bg-blue-50 hover:bg-blue-100 text-xs font-semibold px-2.5 py-1 rounded border border-blue-200 cursor-pointer whitespace-nowrap"
+                  className="inline-flex items-center gap-1.5 bg-white hover:bg-slate-50 text-slate-700 hover:text-slate-900 text-xs font-semibold px-2.5 py-1 rounded border border-slate-200 transition-colors cursor-pointer whitespace-nowrap"
                 >
                   <Download className="w-3.5 h-3.5" />
                   <span>Export Team Excel (.xlsx)</span>
@@ -617,7 +621,7 @@ export default function DevelopmentsPage() {
                         onClick={() => void handleShareDealRoom('preview')}
                         className="w-full px-3.5 py-2 text-left text-xs hover:bg-slate-50 flex items-start gap-2.5 cursor-pointer"
                       >
-                        <ExternalLink className="w-4 h-4 text-sky-600 shrink-0 mt-0.5" />
+                        <ExternalLink className="w-4 h-4 text-slate-500 shrink-0 mt-0.5" />
                         <div>
                           <div className="font-semibold text-slate-900">Open External Preview</div>
                           <div className="text-[11px] text-slate-500">
@@ -639,7 +643,7 @@ export default function DevelopmentsPage() {
                 </button>
                 <Link
                   href={`/proposal?dealId=${activeDev.id}`}
-                  className="inline-flex items-center gap-1 text-emerald-700 hover:text-emerald-900 bg-emerald-50 hover:bg-emerald-100 text-xs font-semibold px-2.5 py-1 rounded border border-emerald-200 whitespace-nowrap"
+                  className="inline-flex items-center gap-1 bg-white hover:bg-slate-50 text-slate-700 hover:text-slate-900 text-xs font-semibold px-2.5 py-1 rounded border border-slate-200 transition-colors whitespace-nowrap"
                 >
                   <FileText className="w-3 h-3" />
                   <span>Pitch Deck</span>
