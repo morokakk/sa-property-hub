@@ -260,7 +260,8 @@ export default function DelayMatrixModal({
               Total Monthly Delay Burn
             </span>
             <div className="text-xl font-black text-amber-900 mt-0.5">
-              {formatZAR(totalMonthlyDelayBurnZAR)}/mo
+              <span>{formatZAR(totalMonthlyDelayBurnZAR)}</span>
+              <span className="ml-0.5 text-xs font-normal text-amber-700/80">/mo</span>
             </div>
             <div className="text-[11px] text-amber-800/90 mt-1 space-y-0.5">
               <div>• Holding Burn: <strong>{formatZAR(matrixInput.monthlyHoldingBurnZAR)}/m</strong></div>

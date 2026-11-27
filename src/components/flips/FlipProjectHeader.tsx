@@ -74,7 +74,7 @@ export function FlipProjectHeader({
           <PropertyTypeBadge type={flip.propertyType} />
           {flip.projectStrategy === 'build_to_rent' && (
             <span
-              className="inline-flex items-center gap-1 text-[10px] font-bold bg-indigo-100 text-indigo-800 border border-indigo-300 px-2 py-0.5 rounded-full"
+              className="inline-flex items-center gap-1 text-[10px] font-semibold bg-slate-100 text-slate-700 border border-slate-200 px-2 py-0.5 rounded-full"
               title="Build-to-Rent / Multi-Let Hold: R 0 sale commission & R 0 flip tax reserve during construction"
             >
               Build-to-Rent{flip.numberOfUnits && flip.numberOfUnits > 1 ? ` • ${flip.numberOfUnits} Units` : ''}
@@ -82,7 +82,7 @@ export function FlipProjectHeader({
           )}
           {flip.projectStrategy !== 'build_to_rent' && flip.numberOfUnits && flip.numberOfUnits > 1 && (
             <span
-              className="inline-flex items-center gap-1 text-[10px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200 px-2 py-0.5 rounded-full"
+              className="inline-flex items-center gap-1 text-[10px] font-semibold bg-slate-100 text-slate-700 border border-slate-200 px-2 py-0.5 rounded-full"
               title={`Multi-Unit Project (${flip.numberOfUnits} Units)`}
             >
               {flip.numberOfUnits} Units
@@ -118,7 +118,7 @@ export function FlipProjectHeader({
               (flip.numberOfUnits ?? 1) > 1 ||
               flip.propertyType !== 'Sectional Title Apartment') && (
               <span
-                className="inline-flex items-center gap-1 text-[10px] font-semibold bg-amber-50 text-amber-800 border border-amber-300 px-2 py-0.5 rounded-full"
+                className="inline-flex items-center gap-1 text-[10px] font-semibold bg-slate-100 text-slate-700 border border-slate-200 px-2 py-0.5 rounded-full"
                 title={`Municipal Zoning: ${flip.zoningProfile!.currentZoning} • FAR: ${flip.zoningProfile!.farRatio} • Coverage: ${flip.zoningProfile!.coveragePercent}% • Max Storeys: ${flip.zoningProfile!.maxHeightStoreys}${
                   [
                     flip.zoningProfile!.consentUses?.secondDwellingPermitted ? '2nd Dwelling' : null,

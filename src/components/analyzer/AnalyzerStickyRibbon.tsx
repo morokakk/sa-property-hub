@@ -167,7 +167,8 @@ export function AnalyzerStickyRibbon({
               <div className="bg-slate-800/90 border border-slate-700 px-2.5 py-1 rounded-lg shrink-0">
                 <span className="text-[10px] text-slate-400 block uppercase font-medium">Net Cashflow / CoC</span>
                 <span className={`font-bold font-mono ${monthlyNetCashFlow >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-                  {formatZAR(monthlyNetCashFlow)}/m ({formatPercent(netRoi)})
+                  <span>{formatZAR(monthlyNetCashFlow)}</span>
+                  <span className="ml-0.5 font-normal text-slate-400">/mo</span> ({formatPercent(netRoi)})
                 </span>
               </div>
               <div className="bg-slate-800/90 border border-slate-700 px-2.5 py-1 rounded-lg shrink-0">
@@ -186,7 +187,8 @@ export function AnalyzerStickyRibbon({
               <div className="bg-slate-800/90 border border-slate-700 px-2.5 py-1 rounded-lg shrink-0">
                 <span className="text-[10px] text-slate-400 block uppercase font-medium">Monthly Burn</span>
                 <span className="font-bold text-rose-400 font-mono">
-                  -{formatZAR(monthlyHoldingBurnZAR)}/m
+                  <span>-{formatZAR(monthlyHoldingBurnZAR)}</span>
+                  <span className="ml-0.5 font-normal text-slate-400">/mo</span>
                 </span>
               </div>
               <div className="bg-slate-800/90 border border-slate-700 px-2.5 py-1 rounded-lg shrink-0">
@@ -203,7 +205,8 @@ export function AnalyzerStickyRibbon({
               <div className="bg-slate-800/90 border border-slate-700 px-2.5 py-1 rounded-lg shrink-0">
                 <span className="text-[10px] text-slate-400 block uppercase font-medium">Post-Refi Cashflow</span>
                 <span className={`font-bold font-mono ${brrrrPostRefiCashflowZAR >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-                  {formatZAR(brrrrPostRefiCashflowZAR)}/m
+                  <span>{formatZAR(brrrrPostRefiCashflowZAR)}</span>
+                  <span className="ml-0.5 font-normal text-slate-400">/mo</span>
                 </span>
               </div>
               <div className="bg-slate-800/90 border border-slate-700 px-2.5 py-1 rounded-lg shrink-0">

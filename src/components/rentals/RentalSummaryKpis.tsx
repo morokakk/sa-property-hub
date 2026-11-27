@@ -33,14 +33,18 @@ export function RentalSummaryKpis({
 
       <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-xs">
         <span className="text-[11px] font-semibold text-slate-500 uppercase">Gross Monthly Rent</span>
-        <div className="text-xl font-bold text-slate-900 mt-1">{formatZAR(totalGrossMonthlyRent)}/m</div>
+        <div className="text-xl font-bold text-slate-900 mt-1">
+          <span>{formatZAR(totalGrossMonthlyRent)}</span>
+          <span className="ml-0.5 text-xs font-normal text-slate-400">/mo</span>
+        </div>
         <p className="text-[11px] text-slate-400 mt-0.5">Annual: {formatZAR(totalGrossMonthlyRent * 12)}</p>
       </div>
 
       <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-xs">
         <span className="text-[11px] font-semibold text-slate-500 uppercase">Net Monthly Cash Flow</span>
         <div className={`text-xl font-bold mt-1 ${netMonthlyCashflow >= 0 ? 'text-emerald-700' : 'text-rose-600'}`}>
-          {formatZAR(netMonthlyCashflow)}/m
+          <span>{formatZAR(netMonthlyCashflow)}</span>
+          <span className="ml-0.5 text-xs font-normal text-slate-400">/mo</span>
         </div>
         <p className="text-[11px] text-slate-400 mt-0.5">Operational pre-tax cash flow</p>
       </div>
@@ -57,8 +61,8 @@ export function RentalSummaryKpis({
           <AlertTriangle className="w-4 h-4 text-amber-600" />
         </div>
         <div className="text-xl font-bold text-amber-900 mt-1">
-          {formatZAR(annualRentalTaxReserve)}
-          <span className="text-xs font-normal text-amber-600">/yr</span>
+          <span>{formatZAR(annualRentalTaxReserve)}</span>
+          <span className="ml-0.5 text-xs font-normal text-amber-600">/yr</span>
         </div>
         <p className="text-[11px] text-amber-700 mt-0.5">
           {formatZAR(monthlyRentalTaxReserve)}/m • SARS Liability Reserve

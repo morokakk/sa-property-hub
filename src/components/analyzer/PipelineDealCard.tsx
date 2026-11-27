@@ -168,17 +168,7 @@ function PipelineDealCard({
             >
               {deal.status}
             </span>
-            <span
-              className={`text-[10px] font-bold px-2 py-0.5 rounded border ${
-                deal.strategy === 'Flip'
-                  ? 'bg-amber-100 text-amber-900 border-amber-300'
-                  : deal.strategy === 'BRRRR'
-                  ? 'bg-purple-100 text-purple-900 border-purple-300'
-                  : deal.strategy === 'Development'
-                  ? 'bg-orange-100 text-orange-900 border-orange-300'
-                  : 'bg-indigo-100 text-indigo-900 border-indigo-300'
-              }`}
-            >
+            <span className="text-[10px] font-semibold px-2 py-0.5 rounded border bg-slate-100 text-slate-700 border-slate-200">
               {deal.strategy === 'Flip'
                 ? 'Flip'
                 : deal.strategy === 'BRRRR'
@@ -446,7 +436,8 @@ function PipelineDealCard({
                 deal.monthlyCashFlow >= 0 ? 'text-emerald-700' : 'text-rose-600'
               }`}
             >
-              {formatZAR(deal.monthlyCashFlow)}/m
+              <span>{formatZAR(deal.monthlyCashFlow)}</span>
+              <span className="ml-0.5 text-xs font-normal text-slate-400">/mo</span>
               <span className="text-xs font-bold text-slate-600 ml-1.5">
                 ({formatPercent(deal.grossYield)} Gross)
               </span>

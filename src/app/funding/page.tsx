@@ -729,8 +729,8 @@ export default function FundingTrackerPage() {
           <div className="bg-white rounded-xl p-4 border border-slate-200/90 shadow-2xs">
             <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Monthly Interest Expense</span>
             <div className="text-xl font-bold text-rose-600 tabular-nums tracking-tight mt-1">
-              {formatZAR(totalMonthlyInterestExpense)}
-              <span className="text-xs font-normal text-slate-400">/mo</span>
+              <span>{formatZAR(totalMonthlyInterestExpense)}</span>
+              <span className="ml-0.5 text-xs font-normal text-slate-400">/mo</span>
             </div>
             <p className="text-[11px] text-emerald-600 font-medium mt-0.5">Accrues strictly on drawn tranches</p>
           </div>
@@ -922,7 +922,7 @@ export default function FundingTrackerPage() {
                               )}
                               {hasTranches && (
                                 <div className="mt-1 space-y-1">
-                                  <span className="inline-flex items-center gap-1 text-[9px] font-semibold text-indigo-700 bg-indigo-50 border border-indigo-200 px-1.5 py-0.2 rounded">
+                                  <span className="inline-flex items-center gap-1 text-[9px] font-semibold text-slate-700 bg-slate-100 border border-slate-200 px-1.5 py-0.2 rounded">
                                     <Layers className="w-2.5 h-2.5 shrink-0" />
                                     <span>{drawnCount}/{totalTranches} Tranches</span>
                                   </span>
@@ -936,7 +936,7 @@ export default function FundingTrackerPage() {
                               )}
                               {linkedDev && (
                                 <div className="mt-1">
-                                  <span className="inline-flex items-center gap-1 text-[9px] font-bold bg-purple-50 text-purple-700 border border-purple-200 px-1.5 py-0.5 rounded max-w-full truncate">
+                                  <span className="inline-flex items-center gap-1 text-[9px] font-semibold bg-slate-100 text-slate-700 border border-slate-200 px-1.5 py-0.5 rounded max-w-full truncate">
                                     {linkedDev.currentPhase} ({linkedDev.units?.length || 0}u)
                                   </span>
                                 </div>
@@ -1141,7 +1141,7 @@ export default function FundingTrackerPage() {
                               </span>
                             )}
                             {linkedDev && (
-                              <span className="text-[9px] font-bold bg-purple-50 text-purple-700 border border-purple-200 px-1.5 py-0.5 rounded">
+                              <span className="text-[9px] font-semibold bg-slate-100 text-slate-700 border border-slate-200 px-1.5 py-0.5 rounded">
                                 {linkedDev.currentPhase} ({linkedDev.units?.length || 0} Units)
                               </span>
                             )}

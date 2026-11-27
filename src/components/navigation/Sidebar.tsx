@@ -215,33 +215,32 @@ function SidebarContent({ pathname }: { pathname: string | null }) {
       name: 'Buy-and-Flip Manager',
       href: '/flips',
       icon: Hammer,
-      badge: isMounted && activeFlipsCount > 0 ? `${activeFlipsCount} Active` : null,
+      badge: isMounted && activeFlipsCount > 0 ? `${activeFlipsCount}` : null,
     },
     {
       name: 'Developments',
       href: '/developments',
       icon: HardHat,
-      badge: isMounted && activeDevelopmentsCount > 0 ? `${activeDevelopmentsCount} Active` : null,
+      badge: isMounted && activeDevelopmentsCount > 0 ? `${activeDevelopmentsCount}` : null,
     },
     {
       name: 'Rental Portfolio',
       href: '/rentals',
       icon: Building2,
-      badge: isMounted && activeRentalsCount > 0 ? `${activeRentalsCount} Units` : null,
+      badge: isMounted && activeRentalsCount > 0 ? `${activeRentalsCount}` : null,
     },
     {
       name: 'Tasks & Reminders',
       href: '/tasks',
       icon: CheckSquare,
       badge: isMounted && pendingTasksCount > 0 ? `${pendingTasksCount}` : null,
-      badgeColor: 'bg-amber-100 text-amber-800',
+      badgeColor: 'bg-amber-500/20 text-amber-300 border border-amber-500/30',
     },
     {
       name: 'Proposal Generator',
       href: '/proposal',
       icon: FileText,
-      badge: 'Pitch Deck',
-      badgeColor: 'bg-emerald-100 text-emerald-800',
+      badge: null,
     },
     {
       name: 'Investor Profile & Settings',
@@ -307,7 +306,7 @@ function SidebarContent({ pathname }: { pathname: string | null }) {
 
         {/* Navigation Links */}
         <nav className="flex-1 p-3 space-y-1">
-          <div className="px-3 py-2 text-[10px] uppercase tracking-wider font-semibold text-slate-400">
+          <div className="px-2.5 py-2 text-[10px] uppercase tracking-wider font-semibold text-slate-400">
             Core Modules
           </div>
           {navItems.map((item) => {
@@ -317,20 +316,22 @@ function SidebarContent({ pathname }: { pathname: string | null }) {
               <Link
                 key={item.href}
                 href={item.href}
-                className={`flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
+                className={`flex items-center justify-between gap-2 px-2.5 py-2.5 rounded-lg text-sm font-medium transition-all ${
                   isActive
                     ? 'bg-emerald-600 text-white shadow-xs font-semibold'
                     : 'text-slate-300 hover:bg-slate-800/80 hover:text-white'
                 }`}
               >
-                <div className="flex items-center gap-3">
-                  <Icon className={`w-4 h-4 ${isActive ? 'text-white' : 'text-slate-400'}`} />
-                  <span>{item.name}</span>
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-white' : 'text-slate-400'}`} />
+                  <span className="whitespace-nowrap truncate">{item.name}</span>
                 </div>
                 {item.badge && (
                   <span
-                    className={`text-[11px] px-2 py-0.5 rounded-full font-semibold ${
-                      item.badgeColor || (isActive ? 'bg-emerald-700 text-white' : 'bg-slate-800 text-slate-300')
+                    className={`text-[11px] px-2 py-0.5 rounded-full font-semibold whitespace-nowrap shrink-0 tabular-nums ${
+                      isActive
+                        ? 'bg-emerald-700 text-white'
+                        : item.badgeColor || 'bg-slate-800 text-slate-300'
                     }`}
                   >
                     {item.badge}
@@ -340,7 +341,7 @@ function SidebarContent({ pathname }: { pathname: string | null }) {
             );
           })}
 
-          <div className="px-3 pt-4 pb-2 text-[10px] uppercase tracking-wider font-semibold text-slate-400">
+          <div className="px-2.5 pt-4 pb-2 text-[10px] uppercase tracking-wider font-semibold text-slate-400">
             Help &amp; Reference
           </div>
           {utilityNavItems.map((item) => {
@@ -350,14 +351,14 @@ function SidebarContent({ pathname }: { pathname: string | null }) {
               <Link
                 key={item.href}
                 href={item.href}
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
+                className={`flex items-center gap-2.5 px-2.5 py-2.5 rounded-lg text-sm font-medium transition-all ${
                   isActive
                     ? 'bg-emerald-600 text-white shadow-xs font-semibold'
                     : 'text-slate-300 hover:bg-slate-800/80 hover:text-white'
                 }`}
               >
-                <Icon className={`w-4 h-4 ${isActive ? 'text-white' : 'text-emerald-400'}`} />
-                <span>{item.name}</span>
+                <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-white' : 'text-emerald-400'}`} />
+                <span className="whitespace-nowrap truncate">{item.name}</span>
               </Link>
             );
           })}
@@ -365,10 +366,10 @@ function SidebarContent({ pathname }: { pathname: string | null }) {
             type="button"
             onClick={() => setIsFeedbackModalOpen(true)}
             data-testid="sidebar-feedback-trigger"
-            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-300 hover:bg-slate-800/80 hover:text-white transition-all cursor-pointer text-left"
+            className="w-full flex items-center gap-2.5 px-2.5 py-2.5 rounded-lg text-sm font-medium text-slate-300 hover:bg-slate-800/80 hover:text-white transition-all cursor-pointer text-left"
           >
             <MessageSquarePlus className="w-4 h-4 text-emerald-400 shrink-0" />
-            <span>Feedback &amp; Ideas</span>
+            <span className="whitespace-nowrap truncate">Feedback &amp; Ideas</span>
           </button>
         </nav>
 
@@ -461,7 +462,7 @@ function SidebarContent({ pathname }: { pathname: string | null }) {
 
               {/* Drawer Navigation Links */}
               <nav className="p-3 space-y-1">
-                <div className="px-3 py-1.5 text-[10px] uppercase tracking-wider font-semibold text-slate-400">
+                <div className="px-2.5 py-1.5 text-[10px] uppercase tracking-wider font-semibold text-slate-400">
                   Navigation
                 </div>
                 {navItems.map((item) => {
@@ -472,20 +473,22 @@ function SidebarContent({ pathname }: { pathname: string | null }) {
                       key={item.href}
                       href={item.href}
                       onClick={() => setIsMobileDrawerOpen(false)}
-                      className={`flex items-center justify-between px-3 py-2.5 rounded-lg text-xs font-medium transition-all ${
+                      className={`flex items-center justify-between gap-2 px-2.5 py-2.5 rounded-lg text-xs font-medium transition-all ${
                         isActive
                           ? 'bg-emerald-600 text-white font-semibold shadow-xs'
                           : 'text-slate-300 hover:bg-slate-800 hover:text-white'
                       }`}
                     >
-                      <div className="flex items-center gap-2.5">
-                        <Icon className={`w-4 h-4 ${isActive ? 'text-white' : 'text-slate-400'}`} />
-                        <span>{item.name}</span>
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-white' : 'text-slate-400'}`} />
+                        <span className="whitespace-nowrap truncate">{item.name}</span>
                       </div>
                       {item.badge && (
                         <span
-                          className={`text-[10px] px-1.5 py-0.2 rounded-full font-semibold ${
-                            item.badgeColor || (isActive ? 'bg-emerald-700 text-white' : 'bg-slate-800 text-slate-300')
+                          className={`text-[10px] px-1.5 py-0.5 rounded-full font-semibold whitespace-nowrap shrink-0 tabular-nums ${
+                            isActive
+                              ? 'bg-emerald-700 text-white'
+                              : item.badgeColor || 'bg-slate-800 text-slate-300'
                           }`}
                         >
                           {item.badge}
@@ -495,7 +498,7 @@ function SidebarContent({ pathname }: { pathname: string | null }) {
                   );
                 })}
 
-                <div className="px-3 pt-3 pb-1.5 text-[10px] uppercase tracking-wider font-semibold text-slate-400">
+                <div className="px-2.5 pt-3 pb-1.5 text-[10px] uppercase tracking-wider font-semibold text-slate-400">
                   Help &amp; Reference
                 </div>
                 {utilityNavItems.map((item) => {
@@ -506,14 +509,14 @@ function SidebarContent({ pathname }: { pathname: string | null }) {
                       key={item.href}
                       href={item.href}
                       onClick={() => setIsMobileDrawerOpen(false)}
-                      className={`flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-xs font-medium transition-all ${
+                      className={`flex items-center gap-2.5 px-2.5 py-2.5 rounded-lg text-xs font-medium transition-all ${
                         isActive
                           ? 'bg-emerald-600 text-white font-semibold shadow-xs'
                           : 'text-slate-300 hover:bg-slate-800 hover:text-white'
                       }`}
                     >
-                      <Icon className={`w-4 h-4 ${isActive ? 'text-white' : 'text-emerald-400'}`} />
-                      <span>{item.name}</span>
+                      <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-white' : 'text-emerald-400'}`} />
+                      <span className="whitespace-nowrap truncate">{item.name}</span>
                     </Link>
                   );
                 })}
@@ -524,10 +527,10 @@ function SidebarContent({ pathname }: { pathname: string | null }) {
                     setIsFeedbackModalOpen(true);
                   }}
                   data-testid="sidebar-mobile-feedback-trigger"
-                  className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-xs font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition-all cursor-pointer text-left"
+                  className="w-full flex items-center gap-2.5 px-2.5 py-2.5 rounded-lg text-xs font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition-all cursor-pointer text-left"
                 >
                   <MessageSquarePlus className="w-4 h-4 text-emerald-400 shrink-0" />
-                  <span>Feedback &amp; Ideas</span>
+                  <span className="whitespace-nowrap truncate">Feedback &amp; Ideas</span>
                 </button>
               </nav>
 

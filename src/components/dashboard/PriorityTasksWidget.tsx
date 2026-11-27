@@ -64,7 +64,7 @@ export default function PriorityTasksWidget() {
                     </span>
                     {task.recurrence && task.recurrence !== 'None' && (
                       <span
-                        className="inline-flex items-center gap-0.5 text-[10px] font-semibold px-1.5 py-0.2 rounded bg-indigo-50 text-indigo-700 border border-indigo-200"
+                        className="inline-flex items-center gap-0.5 text-[10px] font-semibold px-1.5 py-0.2 rounded bg-slate-100 text-slate-700 border border-slate-200"
                         title={`Repeats ${task.recurrence}`}
                       >
                         <Repeat className="w-2.5 h-2.5" />

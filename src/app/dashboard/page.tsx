@@ -340,8 +340,8 @@ export default function GlobalDashboardPage() {
               <TrendingUp className="w-4 h-4 text-teal-600" />
             </div>
             <div className={`text-xl font-bold tabular-nums tracking-tight mt-1 ${summary.monthlyNetRentalCashflow >= 0 ? 'text-slate-900' : 'text-rose-600'}`}>
-              {formatZAR(summary.monthlyNetRentalCashflow)}
-              <span className="text-xs font-normal text-slate-400">/mo</span>
+              <span>{formatZAR(summary.monthlyNetRentalCashflow)}</span>
+              <span className="ml-0.5 text-xs font-normal text-slate-400">/mo</span>
             </div>
             <div className="text-[11px] text-slate-500 mt-1 flex items-center justify-between">
               <span>Rentals Net Cash</span>
@@ -357,13 +357,13 @@ export default function GlobalDashboardPage() {
             <div>
               <div className="flex items-center justify-between text-slate-500 mb-1">
                 <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Projected Flip Profits</span>
-                <Hammer className="w-4 h-4 text-indigo-600" />
+                <Hammer className="w-4 h-4 text-slate-500" />
               </div>
               <div className="flex items-baseline justify-between mt-1">
                 <div className="text-xl font-bold text-slate-900 tabular-nums tracking-tight">
                   {formatZAR(summary.totalGrossProjectedFlipProfits)}
                 </div>
-                <span className="text-[10px] font-semibold bg-indigo-50 text-indigo-700 px-1.5 py-0.5 rounded border border-indigo-100 tabular-nums">
+                <span className="text-[10px] font-semibold bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded border border-slate-200 tabular-nums">
                   Gross Pre-Tax
                 </span>
               </div>
@@ -380,9 +380,9 @@ export default function GlobalDashboardPage() {
             </div>
             <div className="text-[10px] text-slate-400 mt-2 flex items-center justify-between gap-1">
               <span className="truncate" title="Projected Flip Profits & Build-to-Rent Equity">
-                Projected Flip Profits &amp; Build-to-Rent Equity
+                Active Flips &amp; Builds
               </span>
-              <span className="text-indigo-600 font-medium shrink-0">{summary.activeFlipsCount} in progress</span>
+              <span className="text-slate-600 font-medium shrink-0">{summary.activeFlipsCount} in progress</span>
             </div>
           </div>
         </div>
@@ -456,7 +456,7 @@ export default function GlobalDashboardPage() {
                           <h4 className="text-xs font-bold text-slate-900">{flip.title}</h4>
                           <p className="text-[11px] text-slate-500">{flip.address}, {flip.city}</p>
                         </div>
-                        <span className="text-[10px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200 px-2 py-0.5 rounded-full">
+                        <span className="text-[10px] font-semibold bg-slate-100 text-slate-700 border border-slate-200 px-2 py-0.5 rounded-full">
                           {flip.currentPhase}
                         </span>
                       </div>
@@ -537,7 +537,7 @@ export default function GlobalDashboardPage() {
                           <h4 className="text-xs font-bold text-slate-900">{dev.title}</h4>
                           <p className="text-[11px] text-slate-500">{dev.address}, {dev.city}</p>
                         </div>
-                        <span className="text-[10px] font-semibold bg-amber-50 text-amber-700 border border-amber-200 px-2 py-0.5 rounded-full">
+                        <span className="text-[10px] font-semibold bg-slate-100 text-slate-700 border border-slate-200 px-2 py-0.5 rounded-full">
                           {dev.currentPhase}
                         </span>
                       </div>
