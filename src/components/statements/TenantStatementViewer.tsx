@@ -5,7 +5,7 @@ import Link from 'next/link';
 import {
   Printer,
   Calendar,
-  Building,
+  Building2,
   Mail,
   Phone,
   MapPin,
@@ -869,7 +869,7 @@ export default function TenantStatementViewer({
                       />
                     ) : (
                       <div className="w-10 h-10 rounded-xl bg-indigo-50 border border-indigo-200 flex items-center justify-center text-indigo-700">
-                        <Building className="w-5 h-5" />
+                        <Building2 className="w-5 h-5" />
                       </div>
                     )}
                     <div>
@@ -1230,7 +1230,7 @@ export default function TenantStatementViewer({
                   />
                 ) : (
                   <div className="w-10 h-10 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-700">
-                    <Building className="w-5 h-5" />
+                    <Building2 className="w-5 h-5" />
                   </div>
                 )}
                 <div>
@@ -1384,7 +1384,8 @@ export default function TenantStatementViewer({
                             className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-800 bg-amber-50 hover:bg-amber-100 border border-amber-200 px-2 py-0.5 rounded-full transition-colors cursor-pointer"
                             title="Toggle overdue months breakdown"
                           >
-                            <span>⚠️ {priorUnpaidMonths.length} Unpaid {priorUnpaidMonths.length === 1 ? 'Month' : 'Months'}</span>
+                            <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                            <span>{priorUnpaidMonths.length} Unpaid {priorUnpaidMonths.length === 1 ? 'Month' : 'Months'}</span>
                             <ChevronDown className={`w-3 h-3 transition-transform ${isBroughtForwardExpanded ? 'rotate-180' : ''}`} />
                           </button>
                         )}
@@ -1468,7 +1469,7 @@ export default function TenantStatementViewer({
                     <tr className="hover:bg-slate-50/60 transition-colors">
                       <td className="p-3 pl-4">
                         <div className="font-semibold text-slate-800 flex items-center gap-1.5">
-                          <Building className="w-3.5 h-3.5 text-teal-600 shrink-0" />
+                          <Building2 className="w-3.5 h-3.5 text-teal-600 shrink-0" />
                           <span>{activeStatement?.bundledUtilityLabel || 'Body Corporate Utilities & Recoveries'}</span>
                         </div>
                         <div className="text-[10px] text-slate-500 mt-0.5">
@@ -1702,8 +1703,9 @@ export default function TenantStatementViewer({
                           4. TOTAL AMOUNT DUE / OUTSTANDING BALANCE
                         </span>
                         {grandTotalDue > 0 ? (
-                          <span className="text-rose-700 font-bold bg-rose-100/90 px-2 py-0.5 rounded text-[11px] border border-rose-200">
-                            ⚠️ In Arrears
+                          <span className="inline-flex items-center gap-1 text-rose-700 font-bold bg-rose-100/90 px-2 py-0.5 rounded text-[11px] border border-rose-200">
+                            <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                            <span>In Arrears</span>
                           </span>
                         ) : (
                           <span className="text-emerald-700 font-bold bg-emerald-100/90 px-2 py-0.5 rounded text-[11px] border border-emerald-200">

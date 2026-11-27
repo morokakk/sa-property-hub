@@ -885,9 +885,12 @@ export function TenantNoticeModal({
                     )}
 
                     {inspectionSummary.excessDamageShortfallZAR > 0 && (
-                      <div className="p-2 rounded bg-rose-100/70 border border-rose-300 text-[11px] text-rose-900 font-semibold">
-                        ⚠️ Excess Damage Shortfall: Repairs exceed deposit held by{' '}
-                        <strong>{formatZAR(inspectionSummary.excessDamageShortfallZAR)}</strong>. The tenant owes this balance.
+                      <div className="p-2 rounded bg-rose-100/70 border border-rose-300 text-[11px] text-rose-900 font-semibold flex items-start gap-1.5">
+                        <AlertTriangle className="w-3.5 h-3.5 shrink-0 text-rose-700 mt-0.5" />
+                        <span>
+                          Excess Damage Shortfall: Repairs exceed deposit held by{' '}
+                          <strong>{formatZAR(inspectionSummary.excessDamageShortfallZAR)}</strong>. The tenant owes this balance.
+                        </span>
                       </div>
                     )}
                   </div>

@@ -5,9 +5,9 @@ import { DevelopmentProject, DevelopmentUnit, DevUnitStatus } from '@/types';
 import { DevelopmentFinancialSummary } from '@/lib/calculations/developments';
 import { formatZAR } from '@/lib/formatters';
 import {
-  PlusCircle,
+  Plus,
   Building2,
-  Sparkles,
+  ShieldCheck,
   Trash2,
   DollarSign,
   CheckCircle2,
@@ -467,8 +467,8 @@ export function DevelopmentUnitInventoryTab({
                   : 'bg-white hover:bg-slate-50 text-slate-700 border-slate-300 cursor-pointer'
               }`}
             >
-              <PlusCircle className={`w-3.5 h-3.5 ${readOnly ? 'text-slate-400' : 'text-slate-600'}`} />
-              <span>+ Add Unit</span>
+              <Plus className={`w-3.5 h-3.5 shrink-0 ${readOnly ? 'text-slate-400' : 'text-slate-600'}`} />
+              <span>Add Unit</span>
             </button>
 
             <button
@@ -562,7 +562,7 @@ export function DevelopmentUnitInventoryTab({
         {isSection13Eligible && (
           <div className="bg-purple-50 border border-purple-200 rounded-lg p-2.5 flex items-center justify-between text-xs text-purple-800">
             <div className="flex items-center gap-2">
-              <Sparkles className="w-4 h-4 text-purple-600 shrink-0" />
+              <ShieldCheck className="w-4 h-4 text-purple-600 shrink-0" />
               <span>
                 <strong>SARS Section 13sex Tax Shield Qualified:</strong> Holding ≥ 5 residential units unlocks a 55% tax deduction base written off at 5% per annum for 20 years in <code>/rentals</code>.
               </span>
@@ -596,7 +596,7 @@ export function DevelopmentUnitInventoryTab({
                 {units.length === 0 ? (
                   <tr>
                     <td colSpan={9} className="py-8 text-center text-slate-400 text-xs">
-                      No units recorded for this development. Click &quot;+ Add Unit&quot; above to add inventory.
+                      No units recorded for this development. Click &quot;Add Unit&quot; above to add inventory.
                     </td>
                   </tr>
                 ) : filteredUnits.length === 0 ? (
@@ -682,7 +682,7 @@ export function DevelopmentUnitInventoryTab({
         <div className="space-y-3">
           {units.length === 0 ? (
             <div className="bg-white rounded-xl border border-slate-200 p-8 text-center text-slate-400 text-xs shadow-2xs">
-              No units recorded for this development. Click &quot;+ Add Unit&quot; above to add inventory.
+              No units recorded for this development. Click &quot;Add Unit&quot; above to add inventory.
             </div>
           ) : filteredUnits.length === 0 ? (
             <div className="bg-white rounded-xl border border-slate-200 p-8 text-center text-slate-500 text-xs shadow-2xs space-y-2">

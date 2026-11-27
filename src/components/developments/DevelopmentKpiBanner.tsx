@@ -7,11 +7,10 @@ import { formatZAR, formatPercent } from '@/lib/formatters';
 import {
   Coins,
   TrendingUp,
-  Building,
+  Building2,
   Hammer,
   CheckCircle2,
   Clock,
-  Sparkles,
   ShieldCheck,
   Scale,
 } from 'lucide-react';
@@ -81,7 +80,7 @@ export function DevelopmentKpiBanner({
       <div className="bg-white rounded-xl border border-slate-200 p-3 sm:p-4 shadow-2xs hover:shadow-xs transition-shadow flex flex-col justify-between min-w-0">
         <div className="flex items-center justify-between text-slate-500 mb-1 gap-1">
           <span className="text-[11px] sm:text-xs font-semibold uppercase tracking-wider leading-tight">GDV (Gross Value)</span>
-          <Building className="w-4 h-4 text-blue-500 shrink-0" />
+          <Building2 className="w-4 h-4 text-blue-500 shrink-0" />
         </div>
         <div>
           <div className="text-lg sm:text-xl font-extrabold text-slate-900 tracking-tight tabular-nums leading-tight">
@@ -233,8 +232,7 @@ export function DevelopmentKpiBanner({
           </div>
           <div className="mt-2">
             {financials.isSection13SexEligible ? (
-              <span className="text-[10px] font-bold bg-purple-50 text-purple-700 border border-purple-200 px-1.5 py-0.5 rounded-full inline-flex items-center gap-1">
-                <Sparkles className="w-3 h-3 text-purple-600 shrink-0" />
+              <span className="text-[10px] font-bold bg-purple-50 text-purple-700 border border-purple-200 px-1.5 py-0.5 rounded-full inline-flex items-center">
                 <span>Section 13sex Active</span>
               </span>
             ) : (

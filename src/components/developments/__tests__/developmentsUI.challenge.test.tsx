@@ -221,7 +221,7 @@ describe('Empirical Adversarial Stress Testing — /developments UI Components (
       const html = normalizeHtml(rawHtml);
 
       // Empty inventory message
-      expect(html).toContain('No units recorded for this development. Click &quot;+ Add Unit&quot; above to add inventory.');
+      expect(html).toContain('No units recorded for this development. Click &quot;Add Unit&quot; above to add inventory.');
 
       // Zero units badge in header
       expect(html).toContain('0 Units');

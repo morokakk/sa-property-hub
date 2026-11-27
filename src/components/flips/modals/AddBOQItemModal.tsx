@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { BOQItem, LocalSupplier } from '@/types';
 import { formatZAR } from '@/lib/formatters';
-import { PlusCircle, Gift } from 'lucide-react';
+import { Plus, Gift } from 'lucide-react';
 import { usePortfolioStore } from '@/lib/store/usePortfolioStore';
 
 export interface AddBOQItemModalProps {
@@ -183,7 +183,7 @@ export const AddBOQItemModal: React.FC<AddBOQItemModalProps> = ({
       >
         <div className="w-12 h-1.5 bg-slate-300 rounded-full mx-auto mb-3 sm:hidden" />
         <h3 className="text-base font-bold text-slate-900 mb-4 flex items-center gap-2">
-          <PlusCircle className="w-5 h-5 text-emerald-600" />
+          <Plus className="w-5 h-5 text-emerald-600" />
           Add Bill of Quantities (BOQ) Line Item
         </h3>
 

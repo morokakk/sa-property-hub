@@ -11,7 +11,7 @@ import {
   Key,
   ShieldCheck,
   CheckCircle2,
-  Building,
+  Building2,
   Zap,
   Droplets,
   ArrowRight,
@@ -374,7 +374,7 @@ export default function StatementUploadModal({
                 : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
             }`}
           >
-            <Building className="w-3.5 h-3.5 text-purple-600" />
+            <Building2 className="w-3.5 h-3.5 text-purple-600" />
             <span>Managing Agent Payout</span>
           </button>
           <button
@@ -779,7 +779,7 @@ export default function StatementUploadModal({
                             r.title.toLowerCase().trim() === parsedUtility.propertyName?.toLowerCase().trim()
                         ) && (
                           <option value="__NEW__" className="text-teal-700 font-bold">
-                            ✨ + Create New Rental Property: &quot;{parsedUtility.propertyName}&quot;
+                            Create New Rental Property: &quot;{parsedUtility.propertyName}&quot;
                           </option>
                         )}
                       {activeRentals.map((r) => (

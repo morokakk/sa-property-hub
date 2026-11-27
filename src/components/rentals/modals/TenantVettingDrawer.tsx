@@ -480,8 +480,9 @@ export const TenantVettingDrawer: React.FC<TenantVettingDrawerProps> = ({
           <div className="pt-2 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 border-t border-slate-100">
             <div className="text-[10px] text-slate-500">
               {evaluation.riskGrade === 'Grade D (Decline)' ? (
-                <span className="text-rose-600 font-semibold">
-                  ⚠️ Deposit application disabled: Prospective tenant does not meet PIE Act risk thresholds.
+                <span className="inline-flex items-start gap-1.5 text-rose-600 font-semibold">
+                  <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                  <span>Deposit application disabled: Prospective tenant does not meet PIE Act risk thresholds.</span>
                 </span>
               ) : (
                 <span>

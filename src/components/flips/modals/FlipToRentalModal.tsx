@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { FlipProject } from '@/types';
 import { formatZAR } from '@/lib/formatters';
-import { ArrowRightLeft, Sparkles, X } from 'lucide-react';
+import { ArrowRightLeft, RefreshCw, X } from 'lucide-react';
 import { calculateGrossYield } from '@/lib/calculations/rentals';
 
 export interface FlipToRentalModalProps {
@@ -564,7 +564,7 @@ export const FlipToRentalModal: React.FC<FlipToRentalModalProps> = ({
           </div>
 
           <div className="p-3 bg-amber-50 rounded-lg border border-amber-200 text-amber-900 text-[11px] flex items-start gap-2">
-            <Sparkles className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+            <RefreshCw className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
             <div>
               <span className="font-bold">Next BRRRR Step: Refinance &amp; Repeat</span>
               <p className="text-amber-800 mt-0.5">

@@ -95,7 +95,7 @@ test.describe('Golden Thread Development Lifecycle: Analyzer -> Developments -> 
     const financeTab = page.getByTestId('development-finance-tab');
     await expect(financeTab).toBeVisible();
 
-    await financeTab.locator('button:has-text("+ Record Drawdown")').click();
+    await financeTab.locator('button:has-text("Record Drawdown")').click();
     const drawdownModal = page.locator('[role="dialog"]');
     await expect(drawdownModal).toBeVisible();
     await drawdownModal.locator('input[type="number"]').fill('1500000');

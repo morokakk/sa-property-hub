@@ -15,13 +15,14 @@ import {
   Scale,
   ShieldAlert,
   AlertTriangle,
-  Building,
+  Building2,
   Users,
   CheckCircle2,
   XCircle,
   Clock,
   Shield,
   Gavel,
+  TrendingDown,
 } from 'lucide-react';
 
 export interface OccupancyRiskCardProps {
@@ -331,7 +332,7 @@ export const OccupancyRiskCard: React.FC<OccupancyRiskCardProps> = ({
             <div className="p-3 rounded-xl bg-white border border-rose-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
               <div className="space-y-0.5">
                 <div className="text-xs font-bold text-rose-900 flex items-center gap-1.5">
-                  <span>📉</span>
+                  <TrendingDown className="w-3.5 h-3.5 text-rose-600 shrink-0" />
                   <span>
                     −{formatZAR(maoReductionZAR)} {maoMode} MAO Bid Ceiling Reduction
                   </span>

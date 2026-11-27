@@ -10,13 +10,13 @@ import {
   Check,
   Camera,
   AlertCircle,
-  Building,
+  Landmark,
   Gauge,
   Calendar,
   Layers,
   ArrowRight,
   Eye,
-  Edit3,
+  Pencil,
   ExternalLink,
 } from 'lucide-react';
 import { usePortfolioStore } from '@/lib/store/usePortfolioStore';
@@ -372,7 +372,7 @@ export default function DisputeLetterModal({
                     : 'text-slate-500 hover:text-slate-800'
                 }`}
               >
-                <Edit3 className="w-3.5 h-3.5" />
+                <Pencil className="w-3.5 h-3.5" />
                 <span>Dispute Parameters & Photo</span>
               </button>
 
@@ -418,7 +418,7 @@ export default function DisputeLetterModal({
                 <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-3">
                   <div className="flex items-center justify-between flex-wrap gap-2">
                     <h4 className="font-bold text-slate-900 flex items-center gap-1.5 text-xs">
-                      <Building className="w-4 h-4 text-amber-600" />
+                      <Landmark className="w-4 h-4 text-amber-600" />
                       <span>Municipal Authority & Account Information</span>
                     </h4>
                     <button

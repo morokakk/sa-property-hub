@@ -8,7 +8,7 @@ import {
   PaymentMethod,
 } from '@/types';
 import { formatZAR } from '@/lib/formatters';
-import { CreditCard, X } from 'lucide-react';
+import { AlertTriangle, CreditCard, Plus, X } from 'lucide-react';
 import { useModalBackdropDismiss } from '@/hooks/useModalBackdropDismiss';
 import {
   getUnpaidLedgerMonths,
@@ -384,13 +384,15 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
               <p className="text-[11px] mt-1 leading-relaxed opacity-90">
                 Applying this deposit directly settles rent/utility arrears and permanently deducts the amount from the tenant's held security deposit balance.
                 {!targetLease && (
-                  <span className="block text-rose-600 font-bold mt-1">
-                    ⚠️ Please select a specific tenant / lease above to apply the deposit from.
+                  <span className="flex items-start gap-1 text-rose-600 font-bold mt-1">
+                    <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                    <span>Please select a specific tenant / lease above to apply the deposit from.</span>
                   </span>
                 )}
                 {targetLease && (targetLease.depositHeldZAR || 0) < amount && (
-                  <span className="block text-rose-600 font-bold mt-1">
-                    ⚠️ Requested payment amount ({formatZAR(amount)}) exceeds available held deposit ({formatZAR(targetLease.depositHeldZAR || 0)}).
+                  <span className="flex items-start gap-1 text-rose-600 font-bold mt-1">
+                    <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                    <span>Requested payment amount ({formatZAR(amount)}) exceeds available held deposit ({formatZAR(targetLease.depositHeldZAR || 0)}).</span>
                   </span>
                 )}
               </p>
@@ -488,9 +490,10 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                       const lastMonth = paymentAllocations[paymentAllocations.length - 1]?.periodMonth || periodMonth;
                       setAllocations([...paymentAllocations, { periodMonth: getNextMonthKey(lastMonth), amountZAR: 0 }]);
                     }}
-                    className="text-[11px] font-semibold text-slate-600 hover:text-slate-900 cursor-pointer"
+                    className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-600 hover:text-slate-900 cursor-pointer"
                   >
-                    + Add Month Row
+                    <Plus className="w-3.5 h-3.5 shrink-0" />
+                    <span>Add Month Row</span>
                   </button>
                   {(() => {
                     const allocatedSum = paymentAllocations.reduce((s, a) => s + (a.amountZAR || 0), 0);

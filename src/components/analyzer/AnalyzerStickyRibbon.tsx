@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { formatZAR, formatPercent } from '@/lib/formatters';
-import { PlusCircle, Check, ArrowDownCircle, ChevronUp, Sparkles, X } from 'lucide-react';
+import { Plus, Check, ArrowDownCircle, ChevronUp, Coins, X } from 'lucide-react';
 import { DealStrategy } from '@/types';
 import { useViewportDropdownPosition } from '@/hooks/useViewportDropdownPosition';
 
@@ -226,7 +226,7 @@ export function AnalyzerStickyRibbon({
             >
               <div className="flex items-center justify-between pb-2.5 mb-2.5 border-b border-slate-700">
                 <div className="flex items-center gap-1.5">
-                  <Sparkles className="w-4 h-4 text-emerald-400" />
+                  <Coins className="w-4 h-4 text-emerald-400 shrink-0" />
                   <span className="text-xs font-bold text-slate-100 uppercase tracking-wider">
                     Day-1 Capital Breakdown
                   </span>
@@ -336,7 +336,7 @@ export function AnalyzerStickyRibbon({
               </>
             ) : (
               <>
-                <PlusCircle className="w-3.5 h-3.5" />
+                <Plus className="w-3.5 h-3.5" />
                 <span>Save Deal</span>
               </>
             )}

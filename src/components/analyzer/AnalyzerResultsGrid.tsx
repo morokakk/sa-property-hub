@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { formatZAR, formatPercent } from '@/lib/formatters';
-import { Sparkles } from 'lucide-react';
+import { ShieldCheck } from 'lucide-react';
 import { DealStrategy } from '@/types';
 
 export interface AnalyzerResultsGridProps {
@@ -506,7 +506,7 @@ export function AnalyzerResultsGrid({
         <div className="bg-emerald-950/70 p-2.5 rounded-xl border border-emerald-500/40 flex items-center justify-between text-xs">
           <div className="flex items-center gap-2">
             <span className="text-emerald-400 text-xs font-semibold flex items-center gap-1.5">
-              <Sparkles className="w-4 h-4 text-emerald-400" />
+              <ShieldCheck className="w-4 h-4 text-emerald-400" />
               <span>SARS Section 13sex Tax Shield Active</span>
             </span>
             <span className="text-[11px] text-emerald-300/90 font-medium hidden sm:inline">

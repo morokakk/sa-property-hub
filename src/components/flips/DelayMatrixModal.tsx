@@ -13,7 +13,7 @@ import {
   TrendingDown,
   ShieldAlert,
   Coins,
-  Building,
+  Building2,
   RotateCcw,
   Landmark,
   Scale,

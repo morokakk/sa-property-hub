@@ -23,7 +23,7 @@ import {
   FileText,
   ArrowUpRight,
   Coins,
-  Edit3,
+  Pencil,
   Trash2,
   Clock,
   MoreHorizontal,
@@ -249,8 +249,8 @@ function RentalCard({
                   </>
                 ) : (
                   <>
-                    <UserPlus className="w-3 h-3" />
-                    <span>+ Log Lead</span>
+                    <UserPlus className="w-3.5 h-3.5 shrink-0" />
+                    <span>Log Lead</span>
                   </>
                 )}
               </button>
@@ -486,7 +486,7 @@ function RentalCard({
                   }}
                   className="w-full text-left px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 hover:text-indigo-700 flex items-center gap-2 transition-colors cursor-pointer"
                 >
-                  <Edit3 className="w-3.5 h-3.5 text-indigo-500" />
+                  <Pencil className="w-3.5 h-3.5 text-indigo-500" />
                   <span>Edit Property</span>
                 </button>
                 {onOpenApplicantsModal && (

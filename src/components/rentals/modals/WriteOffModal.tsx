@@ -8,7 +8,7 @@ import {
   PaymentAllocation,
 } from '@/types';
 import { formatZAR } from '@/lib/formatters';
-import { Archive, AlertCircle, X } from 'lucide-react';
+import { Archive, AlertCircle, Plus, X } from 'lucide-react';
 import { useModalBackdropDismiss } from '@/hooks/useModalBackdropDismiss';
 import {
   calculatePropertyArrears,
@@ -387,9 +387,10 @@ export const WriteOffModal: React.FC<WriteOffModalProps> = ({
                   const lastMonth = allocations[allocations.length - 1]?.periodMonth || getMonthKey(writeOffDate);
                   setAllocations([...allocations, { periodMonth: getNextMonthKey(lastMonth), amountZAR: 0 }]);
                 }}
-                className="text-[11px] font-semibold text-slate-600 hover:text-slate-900 cursor-pointer"
+                className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-600 hover:text-slate-900 cursor-pointer"
               >
-                + Add Month Row
+                <Plus className="w-3.5 h-3.5 shrink-0" />
+                <span>Add Month Row</span>
               </button>
               {(() => {
                 const totalAlloc = allocations.reduce((s, a) => s + (a.amountZAR || 0), 0);

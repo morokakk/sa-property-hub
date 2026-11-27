@@ -6,7 +6,7 @@ import { FlipProject } from '@/types';
 import { formatDate } from '@/lib/formatters';
 import { PropertyTypeBadge, AgmDateChip } from '@/components/common/PropertyTypeBadge';
 import {
-  Edit3,
+  Pencil,
   CheckCircle2,
   ArrowRightLeft,
   ShieldAlert,
@@ -77,7 +77,7 @@ export function FlipProjectHeader({
               className="inline-flex items-center gap-1 text-[10px] font-bold bg-indigo-100 text-indigo-800 border border-indigo-300 px-2 py-0.5 rounded-full"
               title="Build-to-Rent / Multi-Let Hold: R 0 sale commission & R 0 flip tax reserve during construction"
             >
-              🏘️ Build-to-Rent{flip.numberOfUnits && flip.numberOfUnits > 1 ? ` • ${flip.numberOfUnits} Units` : ''}
+              Build-to-Rent{flip.numberOfUnits && flip.numberOfUnits > 1 ? ` • ${flip.numberOfUnits} Units` : ''}
             </span>
           )}
           {flip.projectStrategy !== 'build_to_rent' && flip.numberOfUnits && flip.numberOfUnits > 1 && (
@@ -85,7 +85,7 @@ export function FlipProjectHeader({
               className="inline-flex items-center gap-1 text-[10px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200 px-2 py-0.5 rounded-full"
               title={`Multi-Unit Project (${flip.numberOfUnits} Units)`}
             >
-              🏢 {flip.numberOfUnits} Units
+              {flip.numberOfUnits} Units
             </span>
           )}
           {hasPartialGraduation && (
@@ -106,7 +106,7 @@ export function FlipProjectHeader({
                 className="inline-flex items-center gap-1 text-[10px] font-semibold bg-slate-100 text-slate-700 border border-slate-200 px-2 py-0.5 rounded-full"
                 title={`Total Floor Area: ${sqm} m² • Purchase Rate: R ${ratePerSqm.toLocaleString('en-ZA')}/m²`}
               >
-                <span>📐 {sqm} m²</span>
+                <span>{sqm} m²</span>
                 <span className="text-slate-400 font-normal text-[9px]">
                   (R {ratePerSqm.toLocaleString('en-ZA')}/m²)
                 </span>
@@ -137,7 +137,7 @@ export function FlipProjectHeader({
                     : ''
                 }`}
               >
-                <span>🏛️ {formatZoningTransitionLabel(flip.zoningProfile!)}</span>
+                <span>{formatZoningTransitionLabel(flip.zoningProfile!)}</span>
               </span>
             )}
           <AgmDateChip agmDate={flip.agmDate} />
@@ -166,8 +166,8 @@ export function FlipProjectHeader({
                 flip.occupantRisk.evictionJurisdiction === 'high_court' ? 'High Court' : "Magistrate's Court"
               }`}
             >
-              <ShieldAlert className="w-3 h-3 text-rose-600" />
-              <span>⛔ Unlawful Occupant • PIE Act Eviction Pending</span>
+              <ShieldAlert className="w-3.5 h-3.5 text-rose-600 shrink-0" />
+              <span>Unlawful Occupant • PIE Act Eviction Pending</span>
               <span className="text-[9px] opacity-80">
                 ({flip.occupantRisk.evictionJurisdiction === 'high_court' ? 'High Court' : "Magistrate's Court"} •{' '}
                 {flip.occupantRisk.estimatedEvictionDelayDays}d)
@@ -203,7 +203,7 @@ export function FlipProjectHeader({
           className="inline-flex items-center gap-1.5 bg-white hover:bg-slate-50 text-slate-700 font-semibold text-xs px-2.5 py-1.5 rounded-lg border border-slate-300 shadow-2xs transition-colors cursor-pointer"
           title="Edit project duration, holding costs, budget & exit targets"
         >
-          <Edit3 className="w-3.5 h-3.5 text-slate-500" />
+          <Pencil className="w-3.5 h-3.5 text-slate-500" />
           <span>Edit Flip</span>
         </button>
 

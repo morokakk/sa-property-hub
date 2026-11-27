@@ -25,7 +25,7 @@ import {
   FileSpreadsheet,
   FileCode,
   ShieldCheck,
-  Edit3,
+  Pencil,
 } from 'lucide-react';
 
 const SA_PROVINCES: (SouthAfricanProvince | 'All')[] = [

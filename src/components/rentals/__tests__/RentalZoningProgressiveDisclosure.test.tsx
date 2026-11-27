@@ -497,7 +497,8 @@ describe('Conditional Multi-Unit Municipal Zoning in RentalFormModal & RentalCar
       ).replace(/<!-- -->/g, '');
 
       expect(html).toContain('data-testid="rental-card-zoning-pill"');
-      expect(html).toContain('🏛️ Res 1 ➔ Res 3');
+      expect(html).toContain('Res 1 ➔ Res 3');
+      expect(html).not.toContain('🏛️');
       expect(html).toContain('Density Cap: ~1 unit (10 du/ha)');
     });
 
@@ -512,7 +513,8 @@ describe('Conditional Multi-Unit Municipal Zoning in RentalFormModal & RentalCar
       ).replace(/<!-- -->/g, '');
 
       expect(html).toContain('data-testid="rental-card-zoning-pill"');
-      expect(html).toContain('🏛️ Res 1 (As-of-Right)');
+      expect(html).toContain('Res 1 (As-of-Right)');
+      expect(html).not.toContain('🏛️');
     });
 
     it('hides compact zoning pill when zoningProfile is undefined or propertyType is Sectional Title Apartment', () => {

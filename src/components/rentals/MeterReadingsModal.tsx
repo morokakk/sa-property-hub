@@ -6,7 +6,7 @@ import {
   Gauge,
   Zap,
   Droplets,
-  PlusCircle,
+  Plus,
   Trash2,
   ExternalLink,
   Camera,
@@ -18,12 +18,12 @@ import {
   ArrowRight,
   FileWarning,
   ShieldAlert,
-  Edit3,
+  Pencil,
   Scale,
   Receipt,
   Check,
   Ban,
-  Building,
+  Landmark,
 } from 'lucide-react';
 import { usePortfolioStore } from '@/lib/store/usePortfolioStore';
 import { useModalBackdropDismiss } from '@/hooks/useModalBackdropDismiss';
@@ -594,7 +594,7 @@ export default function MeterReadingsModal({
               className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1.5 text-[11px] font-bold text-amber-900 bg-amber-50 hover:bg-amber-100 rounded-lg border border-amber-200 transition-colors cursor-pointer"
               title="View central municipal directory contacts"
             >
-              <Building className="w-3.5 h-3.5 text-amber-600" />
+              <Landmark className="w-3.5 h-3.5 text-amber-600" />
               <span>Directory</span>
             </button>
 
@@ -739,7 +739,7 @@ export default function MeterReadingsModal({
               <>
                 <div className="flex items-center justify-between">
                   <h4 className="font-bold text-slate-800 flex items-center gap-2 text-xs uppercase tracking-wider">
-                    <PlusCircle className="w-4 h-4 text-cyan-600" />
+                    <Plus className="w-4 h-4 text-cyan-600" />
                     <span>Log New Field / On-Site Meter Reading</span>
                   </h4>
                   <span className="text-[11px] text-slate-400">
@@ -775,9 +775,13 @@ export default function MeterReadingsModal({
                                 ? 'bg-cyan-50/70 text-cyan-900 border-cyan-300 hover:border-cyan-500 hover:bg-cyan-100'
                                 : 'bg-slate-50 text-slate-500 border-slate-200 hover:border-slate-300'
                             }`}
-                            title={`${m.utilityType === 'electricity' ? '⚡ Electricity' : '💧 Water'} • ${m.meterType}${m.location ? ` (${m.location})` : ''}${m.unitName ? ` [Unit ${m.unitName}]` : ''}`}
+                            title={`${m.utilityType === 'electricity' ? 'Electricity' : 'Water'} • ${m.meterType}${m.location ? ` (${m.location})` : ''}${m.unitName ? ` [Unit ${m.unitName}]` : ''}`}
                           >
-                            <span>{m.utilityType === 'electricity' ? '⚡' : '💧'}</span>
+                            {m.utilityType === 'electricity' ? (
+                              <Zap className="w-3 h-3 shrink-0" />
+                            ) : (
+                              <Droplets className="w-3 h-3 shrink-0" />
+                            )}
                             <span className="font-bold">#{m.meterNumber}</span>
                             {m.unitName && <span className="opacity-75">U:{m.unitName}</span>}
                             {m.location && <span className="opacity-75 text-[9px] font-sans">({m.location})</span>}
@@ -879,8 +883,8 @@ export default function MeterReadingsModal({
                           className="mt-1 text-[10px] font-bold text-cyan-700 hover:text-cyan-900 bg-cyan-50 hover:bg-cyan-100 border border-cyan-200 px-1.5 py-0.5 rounded flex items-center gap-1 transition-colors cursor-pointer w-full justify-center"
                           title="Save this serial number to the property's meter registry"
                         >
-                          <PlusCircle className="w-2.5 h-2.5 shrink-0" />
-                          <span className="truncate">+ Save #{meterNumber.trim()} to Registry</span>
+                          <Plus className="w-2.5 h-2.5 shrink-0" />
+                          <span className="truncate">Save #{meterNumber.trim()} to Registry</span>
                         </button>
                       )}
                     </div>
@@ -1174,9 +1178,13 @@ export default function MeterReadingsModal({
                                     ? 'bg-white text-emerald-950 border-emerald-300 hover:border-emerald-500 hover:bg-emerald-100/50'
                                     : 'bg-white/70 text-slate-500 border-slate-200 hover:border-slate-300'
                                 }`}
-                                title={`${m.utilityType === 'electricity' ? '⚡ Electricity' : '💧 Water'} • ${m.meterType}${m.location ? ` (${m.location})` : ''}${m.unitName ? ` [Unit ${m.unitName}]` : ''}`}
+                                title={`${m.utilityType === 'electricity' ? 'Electricity' : 'Water'} • ${m.meterType}${m.location ? ` (${m.location})` : ''}${m.unitName ? ` [Unit ${m.unitName}]` : ''}`}
                               >
-                                <span>{m.utilityType === 'electricity' ? '⚡' : '💧'}</span>
+                                {m.utilityType === 'electricity' ? (
+                                  <Zap className="w-3 h-3 shrink-0" />
+                                ) : (
+                                  <Droplets className="w-3 h-3 shrink-0" />
+                                )}
                                 <span className="font-bold">#{m.meterNumber}</span>
                                 {m.unitName && <span className="opacity-75">U:{m.unitName}</span>}
                                 {m.location && <span className="opacity-75 text-[9px] font-sans">({m.location})</span>}
@@ -1228,8 +1236,8 @@ export default function MeterReadingsModal({
                             className="mt-1 text-[10px] font-bold text-emerald-800 hover:text-emerald-950 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 px-1.5 py-0.5 rounded flex items-center gap-1 transition-colors cursor-pointer w-full justify-center"
                             title="Save this serial number to the property's meter registry"
                           >
-                            <PlusCircle className="w-2.5 h-2.5 shrink-0" />
-                            <span className="truncate">+ Save #{meterNumber.trim()} to Registry</span>
+                            <Plus className="w-2.5 h-2.5 shrink-0" />
+                            <span className="truncate">Save #{meterNumber.trim()} to Registry</span>
                           </button>
                         )}
                       </div>
@@ -1965,7 +1973,7 @@ export default function MeterReadingsModal({
                                       className="p-1 text-slate-400 hover:text-amber-600 transition-colors rounded hover:bg-amber-50 cursor-pointer"
                                       title="Update dispute details / settlement"
                                     >
-                                      <Edit3 className="w-3.5 h-3.5" />
+                                      <Pencil className="w-3.5 h-3.5" />
                                     </button>
                                   </>
                                 )}

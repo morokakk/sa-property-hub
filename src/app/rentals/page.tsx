@@ -31,7 +31,7 @@ const WriteOffModal = dynamic(() => import('@/components/rentals/modals/WriteOff
 const TenantNoticeModal = dynamic(() => import('@/components/rentals/modals/TenantNoticeModal').then((m) => m.TenantNoticeModal), { ssr: false });
 const RentalApplicantsModal = dynamic(() => import('@/components/rentals/modals/RentalApplicantsModal').then((m) => m.RentalApplicantsModal), { ssr: false });
 const SupplierDirectoryModal = dynamic(() => import('@/components/common/SupplierDirectoryModal').then((m) => m.SupplierDirectoryModal), { ssr: false });
-import { Sparkles, PlusCircle, CheckCircle2, Building2, Archive, Loader2, Check, X, Edit3, RotateCcw, Store } from 'lucide-react';
+import { Sparkles, Plus, CheckCircle2, Building2, Archive, Loader2, Check, X, Pencil, RotateCcw, Store } from 'lucide-react';
 import { usePortfolioStore } from '@/lib/store/usePortfolioStore';
 import { formatZAR, formatPercent, formatDate } from '@/lib/formatters';
 
@@ -140,15 +140,15 @@ export default function RentalPortfolioPage() {
               onChange={handleExcelUpload}
             />
 
-            {/* 1. Primary CTA: + Add Rental Property (Emerald solid button) */}
+            {/* 1. Primary CTA: Add Rental Property (Emerald solid button) */}
             <button
               id="rentals-add-property-btn"
               data-testid="add-rental-btn"
               onClick={modals.openAddRental}
               className="inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold px-3 py-2 rounded-lg cursor-pointer shrink-0 transition-colors shadow-xs"
             >
-              <PlusCircle className="w-3.5 h-3.5" />
-              <span>+ Add Rental Property</span>
+              <Plus className="w-4 h-4 shrink-0" />
+              <span>Add Rental Property</span>
             </button>
 
             {/* 2. AI Action: Smart Document Import (Indigo subtle button) */}
@@ -159,7 +159,7 @@ export default function RentalPortfolioPage() {
               className="inline-flex items-center gap-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-xs font-semibold px-3 py-2 rounded-lg cursor-pointer shrink-0 transition-colors shadow-xs"
               title="Upload utility bills, municipal rates or lease agreements via OCR"
             >
-              <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
+              <Sparkles className="w-4 h-4 text-indigo-600 shrink-0" />
               <span>Smart Document Import</span>
             </button>
 
@@ -332,7 +332,7 @@ export default function RentalPortfolioPage() {
                                 title="Edit property"
                                 className="p-1 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded border border-slate-200 bg-white cursor-pointer transition-colors"
                               >
-                                <Edit3 className="w-3 h-3" />
+                                <Pencil className="w-3 h-3" />
                               </button>
                             </div>
                           </td>

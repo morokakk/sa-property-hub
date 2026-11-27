@@ -233,12 +233,12 @@ export function formatFeedbackForWhatsApp(payload: FeedbackSubmissionPayload): s
 
   return [
     `*SA PROP HUB — USER FEEDBACK*`,
-    `📌 *Category:* ${categoryLabel}`,
-    `📍 *Module:* ${payload.moduleRoute || '/'}`,
-    `💬 *Message:*`,
+    `*Category:* ${categoryLabel}`,
+    `*Module:* ${payload.moduleRoute || '/'}`,
+    `*Message:*`,
     `${(payload.message || '').trim()}`,
-    `📞 *Contact:* ${payload.contactOptional?.trim() || 'Not provided'}`,
-    `⚙️ *Diagnostics:* ${diagSummary}`,
+    `*Contact:* ${payload.contactOptional?.trim() || 'Not provided'}`,
+    `*Diagnostics:* ${diagSummary}`,
   ].join('\n');
 }
 

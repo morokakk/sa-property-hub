@@ -5,7 +5,7 @@ import { FlipProject, PropertyTitleType, CloudDriveVault, Province, ZoningProfil
 import { formatZAR } from '@/lib/formatters';
 import { parseRentalPdfStatement } from '@/lib/utilities/pdfParser';
 import {
-  Edit3,
+  Pencil,
   Hammer,
   FileText,
   CheckCircle2,
@@ -14,6 +14,8 @@ import {
   X,
   ChevronDown,
   ChevronRight,
+  Calendar,
+  Cloud,
 } from 'lucide-react';
 import { usePortfolioStore } from '@/lib/store/usePortfolioStore';
 import InvestmentNodeSelect, { InvestmentNodeBanner } from '@/components/common/InvestmentNodeSelect';
@@ -655,7 +657,7 @@ export const FlipProjectModal: React.FC<FlipProjectModalProps> = ({
           <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
             {isEditing ? (
               <>
-                <Edit3 className="w-5 h-5 text-indigo-600" />
+                <Pencil className="w-5 h-5 text-indigo-600" />
                 <span>Edit Buy-and-Flip Parameters</span>
               </>
             ) : (
@@ -747,7 +749,7 @@ export const FlipProjectModal: React.FC<FlipProjectModalProps> = ({
                     : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
-                🔨 Flip for Sale
+                Flip for Sale
               </button>
               <button
                 type="button"
@@ -758,7 +760,7 @@ export const FlipProjectModal: React.FC<FlipProjectModalProps> = ({
                     : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
-                🏘️ Build-to-Rent
+                Build-to-Rent
               </button>
             </div>
           </div>
@@ -836,10 +838,10 @@ export const FlipProjectModal: React.FC<FlipProjectModalProps> = ({
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
                 {(
                   [
-                    { id: 'Freehold House', label: '🏡 Freehold House' },
-                    { id: 'Townhouse / Cluster', label: '🏘️ Townhouse / Cluster' },
-                    { id: 'Sectional Title Apartment', label: '🏢 Sectional Title' },
-                    { id: 'Multi-unit Commercial', label: '🏬 Commercial' },
+                    { id: 'Freehold House', label: 'Freehold House' },
+                    { id: 'Townhouse / Cluster', label: 'Townhouse / Cluster' },
+                    { id: 'Sectional Title Apartment', label: 'Sectional Title' },
+                    { id: 'Multi-unit Commercial', label: 'Commercial' },
                   ] as const
                 ).map((pt) => (
                   <button
@@ -861,8 +863,9 @@ export const FlipProjectModal: React.FC<FlipProjectModalProps> = ({
             {(flipPropertyType === 'Sectional Title Apartment' || flipPropertyType === 'Townhouse / Cluster') && (
               <div className="pt-2 border-t border-slate-200">
                 <div className="flex items-center justify-between mb-1">
-                  <label className="block font-semibold text-slate-700 text-xs">
-                    📅 Scheduled Body Corporate AGM Date
+                  <label className="inline-flex items-center gap-1.5 font-semibold text-slate-700 text-xs">
+                    <Calendar className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                    <span>Scheduled Body Corporate AGM Date</span>
                   </label>
                   <span className="text-[10px] text-indigo-600 font-medium">
                     Auto-schedules reminder task 14 days prior
@@ -888,18 +891,18 @@ export const FlipProjectModal: React.FC<FlipProjectModalProps> = ({
                     onClick={() => setIsZoningDrawerOpen(!isZoningDrawerOpen)}
                     className="flex items-center gap-1.5 text-left text-[11px] font-bold text-amber-950 uppercase tracking-wider hover:text-amber-800 transition-colors cursor-pointer select-none"
                   >
-                    <Landmark className="w-3.5 h-3.5 text-amber-700" />
+                    <Landmark className="w-3.5 h-3.5 text-amber-700 shrink-0" />
                     <span>Municipal Zoning &amp; Multi-Let Consent Rights (Optional)</span>
                     {isZoningDrawerOpen ? (
-                      <ChevronDown className="w-3.5 h-3.5 text-amber-700" />
+                      <ChevronDown className="w-3.5 h-3.5 text-amber-700 shrink-0" />
                     ) : (
-                      <ChevronRight className="w-3.5 h-3.5 text-amber-700" />
+                      <ChevronRight className="w-3.5 h-3.5 text-amber-700 shrink-0" />
                     )}
                   </button>
                   {localZoningProfile && (
                     <div className="flex items-center gap-1.5">
                       <span className="text-[10px] font-semibold text-amber-800 bg-amber-100/90 px-2 py-0.5 rounded border border-amber-300">
-                        🏛️ {formatZoningTransitionLabel(localZoningProfile)}
+                        {formatZoningTransitionLabel(localZoningProfile)}
                       </span>
                       <button
                         type="button"
@@ -1302,7 +1305,8 @@ export const FlipProjectModal: React.FC<FlipProjectModalProps> = ({
           <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 space-y-2.5">
             <div className="flex items-center justify-between">
               <span className="font-bold text-[11px] text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
-                <span>☁️ Cloud & Web Document Vault</span>
+                <Cloud className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+                <span>Cloud &amp; Web Document Vault</span>
               </span>
               <span className="text-[10px] text-slate-500">OneDrive • GDrive • Dropbox</span>
             </div>

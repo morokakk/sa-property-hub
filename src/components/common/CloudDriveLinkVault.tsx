@@ -10,9 +10,13 @@ import {
   FileSpreadsheet,
   FileCheck,
   Plus,
-  Edit2,
+  Pencil,
   Trash2,
   Cloud,
+  Folder,
+  Globe,
+  Link2,
+  Package,
 } from 'lucide-react';
 
 export type CloudProviderType = 'onedrive' | 'sharepoint' | 'gdrive' | 'dropbox' | 'box' | 'icloud' | 'web';
@@ -23,7 +27,7 @@ export interface CloudProviderInfo {
   badgeBg: string;
   badgeText: string;
   badgeBorder: string;
-  iconText: string;
+  icon: React.ComponentType<{ className?: string }>;
 }
 
 export function detectCloudProvider(url?: string): CloudProviderInfo {
@@ -34,7 +38,7 @@ export function detectCloudProvider(url?: string): CloudProviderInfo {
       badgeBg: 'bg-slate-100',
       badgeText: 'text-slate-700',
       badgeBorder: 'border-slate-200',
-      iconText: '🌐',
+      icon: Globe,
     };
   }
 
@@ -46,7 +50,7 @@ export function detectCloudProvider(url?: string): CloudProviderInfo {
       badgeBg: 'bg-teal-50',
       badgeText: 'text-teal-800',
       badgeBorder: 'border-teal-200',
-      iconText: '📊',
+      icon: FileSpreadsheet,
     };
   }
   if (clean.includes('onedrive') || clean.includes('1drv.ms') || clean.includes('live.com')) {
@@ -56,7 +60,7 @@ export function detectCloudProvider(url?: string): CloudProviderInfo {
       badgeBg: 'bg-blue-50',
       badgeText: 'text-blue-800',
       badgeBorder: 'border-blue-200',
-      iconText: '☁️',
+      icon: Cloud,
     };
   }
   if (clean.includes('drive.google.com') || clean.includes('docs.google.com')) {
@@ -66,7 +70,7 @@ export function detectCloudProvider(url?: string): CloudProviderInfo {
       badgeBg: 'bg-emerald-50',
       badgeText: 'text-emerald-800',
       badgeBorder: 'border-emerald-200',
-      iconText: '📁',
+      icon: Folder,
     };
   }
   if (clean.includes('dropbox.com') || clean.includes('db.tt')) {
@@ -76,7 +80,7 @@ export function detectCloudProvider(url?: string): CloudProviderInfo {
       badgeBg: 'bg-indigo-50',
       badgeText: 'text-indigo-800',
       badgeBorder: 'border-indigo-200',
-      iconText: '📦',
+      icon: Package,
     };
   }
   if (clean.includes('box.com')) {
@@ -86,7 +90,7 @@ export function detectCloudProvider(url?: string): CloudProviderInfo {
       badgeBg: 'bg-sky-50',
       badgeText: 'text-sky-800',
       badgeBorder: 'border-sky-200',
-      iconText: '🗳️',
+      icon: Package,
     };
   }
   if (clean.includes('icloud.com')) {
@@ -96,7 +100,7 @@ export function detectCloudProvider(url?: string): CloudProviderInfo {
       badgeBg: 'bg-purple-50',
       badgeText: 'text-purple-800',
       badgeBorder: 'border-purple-200',
-      iconText: '☁️',
+      icon: Cloud,
     };
   }
   return {
@@ -105,7 +109,7 @@ export function detectCloudProvider(url?: string): CloudProviderInfo {
     badgeBg: 'bg-slate-100',
     badgeText: 'text-slate-700',
     badgeBorder: 'border-slate-200',
-    iconText: '🔗',
+    icon: Link2,
   };
 }
 
@@ -252,15 +256,18 @@ export default function CloudDriveLinkVault({
                       {label}
                     </span>
                   </div>
-                  {provider && (
-                    <span
-                      className={`shrink-0 inline-flex items-center justify-center text-[10px] px-1 py-0.5 rounded border ${provider.badgeBg} ${provider.badgeText} ${provider.badgeBorder}`}
-                      title={`Stored on ${provider.name}`}
-                    >
-                      <span>{provider.iconText}</span>
-                      {!compact && <span className="ml-1 truncate max-w-[48px]">{provider.name}</span>}
-                    </span>
-                  )}
+                  {provider && (() => {
+                    const ProviderIcon = provider.icon;
+                    return (
+                      <span
+                        className={`shrink-0 inline-flex items-center justify-center gap-1 text-[10px] px-1.5 py-0.5 rounded border ${provider.badgeBg} ${provider.badgeText} ${provider.badgeBorder}`}
+                        title={`Stored on ${provider.name}`}
+                      >
+                        <ProviderIcon className="w-3 h-3 shrink-0" />
+                        {!compact && <span className="truncate max-w-[52px]">{provider.name}</span>}
+                      </span>
+                    );
+                  })()}
                 </div>
                 <p className="text-[10px] text-slate-500 leading-tight line-clamp-1 mb-2" title={sub}>{sub}</p>
               </div>
@@ -373,7 +380,7 @@ export default function CloudDriveLinkVault({
                         className="text-slate-400 hover:text-indigo-600 p-1 rounded hover:bg-slate-100 transition-colors cursor-pointer"
                         title="Edit URL"
                       >
-                        <Edit2 className="w-3 h-3" />
+                        <Pencil className="w-3.5 h-3.5 shrink-0" />
                       </button>
                       <button
                         type="button"

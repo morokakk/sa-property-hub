@@ -25,7 +25,7 @@ import {
 } from '@/hooks/useViewportDropdownPosition';
 import {
   CheckSquare,
-  PlusCircle,
+  Plus,
   Calendar,
   CalendarPlus,
   Download,
@@ -38,6 +38,7 @@ import {
   Repeat,
   ChevronLeft,
   ChevronRight,
+  List,
   ListTodo,
   Search,
   X,
@@ -480,11 +481,12 @@ export default function TaskEnginePage() {
                   data-testid={`overdue-pill-${task.id}`}
                   className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-rose-50 text-rose-700 border border-rose-200 font-semibold"
                 >
-                  ⚠️ Overdue: {formatDate(task.dueDate)}
+                  <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                  <span>Overdue: {formatDate(task.dueDate)}</span>
                 </span>
               ) : (
                 <span className="flex items-center gap-1 font-medium text-slate-500">
-                  <Calendar className="w-3 h-3" /> Due {formatDate(task.dueDate)}
+                  <Calendar className="w-3.5 h-3.5 shrink-0" /> Due {formatDate(task.dueDate)}
                 </span>
               )}
 
@@ -543,7 +545,7 @@ export default function TaskEnginePage() {
                   : 'border-slate-300 bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-900'
               }`}
             >
-              <CalendarPlus className="w-3.5 h-3.5 text-emerald-600" />
+              <CalendarPlus className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
               <span className="hidden xl:inline">Sync</span>
             </button>
 
@@ -568,7 +570,7 @@ export default function TaskEnginePage() {
                   }}
                   className="w-full text-left px-3 py-2 hover:bg-slate-50 text-slate-700 font-medium flex items-center justify-between gap-2 transition-colors"
                 >
-                  <span>📥 Download .ics (Outlook Desktop / Apple / Mobile)</span>
+                  <span>Download .ics (Outlook Desktop / Apple / Mobile)</span>
                   <Download className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                 </button>
 
@@ -581,7 +583,7 @@ export default function TaskEnginePage() {
                   onClick={() => setOpenCalendarMenuTaskId(null)}
                   className="w-full text-left px-3 py-2 hover:bg-slate-50 text-slate-700 font-medium flex items-center justify-between gap-2 transition-colors"
                 >
-                  <span>🌐 Add to Google Calendar</span>
+                  <span>Add to Google Calendar</span>
                   <ExternalLink className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                 </a>
 
@@ -594,7 +596,7 @@ export default function TaskEnginePage() {
                   onClick={() => setOpenCalendarMenuTaskId(null)}
                   className="w-full text-left px-3 py-2 hover:bg-slate-50 text-slate-700 font-medium flex items-center justify-between gap-2 transition-colors"
                 >
-                  <span>📧 Add to Outlook 365 / Web</span>
+                  <span>Add to Outlook 365 / Web</span>
                   <ExternalLink className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                 </a>
               </div>
@@ -617,7 +619,7 @@ export default function TaskEnginePage() {
             className="p-1.5 text-slate-400 hover:text-rose-600 rounded-lg transition-colors"
             title="Delete task"
           >
-            <Trash2 className="w-4 h-4" />
+            <Trash2 className="w-4 h-4 shrink-0" />
           </button>
         </div>
       </div>
@@ -634,8 +636,8 @@ export default function TaskEnginePage() {
             onClick={() => handleOpenAddModalWithDate()}
             className="inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold px-3 py-2 rounded-lg shadow-sm transition-colors"
           >
-            <PlusCircle className="w-3.5 h-3.5" />
-            Create Task
+            <Plus className="w-4 h-4 shrink-0" />
+            <span>Create Task</span>
           </button>
         }
       />
@@ -826,7 +828,7 @@ export default function TaskEnginePage() {
               title="Export filtered active tasks to an RFC 5545 .ics calendar file (Outlook, Apple Calendar, Google Calendar)"
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-2xs"
             >
-              <span aria-hidden="true">📅</span>
+              <Download className="w-4 h-4 shrink-0 text-slate-500" aria-hidden="true" />
               <span>Export .ics ({filteredActiveTasks.length})</span>
             </button>
 
@@ -848,7 +850,7 @@ export default function TaskEnginePage() {
                     : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
-                <span aria-hidden="true">📋</span>
+                <List className="w-4 h-4 shrink-0" aria-hidden="true" />
                 <span>Task Ledger</span>
               </button>
               <button
@@ -863,7 +865,7 @@ export default function TaskEnginePage() {
                     : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
-                <span aria-hidden="true">📅</span>
+                <Calendar className="w-4 h-4 shrink-0" aria-hidden="true" />
                 <span>Calendar View</span>
               </button>
             </div>
@@ -1133,8 +1135,8 @@ export default function TaskEnginePage() {
                     onClick={() => handleOpenAddModalWithDate(selectedDateISO)}
                     className="inline-flex items-center gap-1 bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-semibold px-2.5 py-1.5 rounded-lg shadow-xs transition-colors shrink-0"
                   >
-                    <PlusCircle className="w-3.5 h-3.5" />
-                    + Add Task on Selected Date
+                    <Plus className="w-3.5 h-3.5 shrink-0" />
+                    <span>Add Task on Selected Date</span>
                   </button>
                 </div>
 

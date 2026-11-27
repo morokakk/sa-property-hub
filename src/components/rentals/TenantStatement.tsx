@@ -17,7 +17,7 @@ import {
   Trash2,
   Gauge,
   ShieldCheck,
-  Building,
+  Building2,
   AlertTriangle,
   Radio,
   Tv,
@@ -1206,7 +1206,7 @@ export default function TenantStatement({
                     className="w-full text-xs font-bold text-slate-800 bg-white border border-slate-300 rounded-xl px-3 py-2 shadow-2xs cursor-pointer focus:ring-2 focus:ring-emerald-500 focus:outline-hidden"
                   >
                     {(rental.leases?.length || 0) > 0 && (
-                      <optgroup label="🏠 Residential Units">
+                      <optgroup label="Residential Units">
                         {rental.leases?.map((lease) => (
                           <option key={lease.id} value={`lease-${lease.id}`}>
                             {lease.unitName}: {lease.tenantName || 'Vacant'} ({formatZAR(lease.monthlyRentZAR)}/m • {lease.status})
@@ -1216,7 +1216,7 @@ export default function TenantStatement({
                     )}
 
                     {(rental.ancillaryIncomes?.length || 0) > 0 && (
-                      <optgroup label="🏢 Commercial Ancillary Contracts (15% VAT)">
+                      <optgroup label="Commercial Ancillary Contracts (15% VAT)">
                         {rental.ancillaryIncomes?.map((anc) => (
                           <option key={anc.id} value={`ancillary-${anc.id}`}>
                             {anc.tenantName} ({anc.type.replace('_', ' ')}) — {formatZAR(anc.monthlyRentZAR)}/m {anc.vatApplicable ? '+15% VAT' : ''}
@@ -1225,9 +1225,9 @@ export default function TenantStatement({
                       </optgroup>
                     )}
 
-                    <optgroup label="📊 Landlord Accounting">
+                    <optgroup label="Landlord Accounting">
                       <option value="consolidated">
-                        📊 Consolidated Master Statement (All Units + Commercial Income)
+                        Consolidated Master Statement (All Units + Commercial Income)
                       </option>
                     </optgroup>
                   </select>
@@ -1766,7 +1766,8 @@ export default function TenantStatement({
                               className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-800 bg-amber-50 hover:bg-amber-100 border border-amber-200 px-2 py-0.5 rounded-full transition-colors cursor-pointer"
                               title="Toggle overdue months breakdown"
                             >
-                              <span>⚠️ {priorUnpaidMonths.length} Unpaid {priorUnpaidMonths.length === 1 ? 'Month' : 'Months'}</span>
+                              <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                              <span>{priorUnpaidMonths.length} Unpaid {priorUnpaidMonths.length === 1 ? 'Month' : 'Months'}</span>
                               <ChevronDown className={`w-3 h-3 transition-transform ${isBroughtForwardExpanded ? 'rotate-180' : ''}`} />
                             </button>
                           )}
@@ -1850,7 +1851,7 @@ export default function TenantStatement({
                       <tr className="hover:bg-slate-50/60 transition-colors">
                         <td className="p-3 pl-4">
                           <div className="font-semibold text-slate-800 flex items-center gap-1.5">
-                            <Building className="w-3.5 h-3.5 text-teal-600" />
+                            <Building2 className="w-3.5 h-3.5 text-teal-600" />
                             <span>{currentStatement?.bundledUtilityLabel || 'Water, Sewerage, Refuse & Common'}</span>
                           </div>
                           <div className="text-[10px] text-slate-500 mt-0.5">
@@ -2248,8 +2249,9 @@ export default function TenantStatement({
                         <div className="flex items-center gap-2 flex-wrap">
                           <span>TOTAL AMOUNT DUE / OUTSTANDING BALANCE</span>
                           {periodNetOutstanding > 0 ? (
-                            <span className="text-rose-700 font-bold bg-rose-100/90 px-2 py-0.5 rounded text-xs border border-rose-200">
-                              ⚠️ In Arrears
+                            <span className="inline-flex items-center gap-1 text-rose-700 font-bold bg-rose-100/90 px-2 py-0.5 rounded text-xs border border-rose-200">
+                              <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                              <span>In Arrears</span>
                             </span>
                           ) : (
                             <span className="text-emerald-700 font-bold bg-emerald-100/90 px-2 py-0.5 rounded text-xs border border-emerald-200">

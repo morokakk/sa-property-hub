@@ -13,7 +13,7 @@ import {
 } from '@/lib/constants/investmentNodes';
 import { Province, SouthAfricanProvince, DealStrategy, CustomNodeBenchmarkOverride } from '@/types';
 import { usePortfolioStore } from '@/lib/store/usePortfolioStore';
-import { ShieldCheck, MapPin, Target, Sparkles, Building2, AlertTriangle, CheckCircle2, Sliders } from 'lucide-react';
+import { ShieldCheck, MapPin, Target, Building2, AlertTriangle, CheckCircle2, Sliders } from 'lucide-react';
 
 const SA_PROVINCES: SouthAfricanProvince[] = [
   'Gauteng',
@@ -362,11 +362,9 @@ export function InvestmentNodeBanner({
                 }`}
               >
                 {isOptimistic ? (
-                  <AlertTriangle className="w-3 h-3 text-amber-600 shrink-0" />
-                ) : isConservative ? (
-                  <Sparkles className="w-3 h-3 text-sky-600 shrink-0" />
-                ) : (
-                  <CheckCircle2 className="w-3 h-3 text-emerald-600 shrink-0" />
+                  <AlertTriangle className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                ) : isConservative ? null : (
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
                 )}
                 <span>{item.message}</span>
               </span>

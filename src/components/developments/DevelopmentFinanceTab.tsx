@@ -15,10 +15,10 @@ import {
   TrendingUp,
   DollarSign,
   AlertCircle,
-  Building,
+  Building2,
   ArrowRight,
   Layers,
-  Sparkles,
+  Plus,
   X,
 } from 'lucide-react';
 
@@ -199,13 +199,14 @@ export function DevelopmentFinanceTab({
               type="button"
               disabled={readOnly}
               onClick={() => !readOnly && setIsDrawModalOpen(true)}
-              className={`flex-1 text-center text-xs font-semibold px-2.5 py-1.5 rounded border transition-colors ${
+              className={`flex-1 inline-flex items-center justify-center gap-1 text-center text-xs font-semibold px-2.5 py-1.5 rounded border transition-colors ${
                 readOnly
                   ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'
                   : 'border-slate-300 hover:bg-slate-50 text-slate-700 cursor-pointer'
               }`}
             >
-              + Record Drawdown
+              <Plus className="w-3.5 h-3.5 shrink-0" />
+              <span>Record Drawdown</span>
             </button>
             <button
               type="button"

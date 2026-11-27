@@ -12,13 +12,13 @@ import {
 } from '@/lib/calculations/flips';
 import {
   Coins,
-  PlusCircle,
+  Plus,
   Users,
   Calendar,
   Percent,
   CreditCard,
   ShieldCheck,
-  Building,
+  Building2,
   CheckCircle,
   CheckCircle2,
   Clock,
@@ -625,7 +625,7 @@ export default function FundingTrackerPage() {
               onClick={() => setShowAddModal(true)}
               className="inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold px-3 py-2 rounded-lg shadow-sm transition-colors cursor-pointer shrink-0 whitespace-nowrap"
             >
-              <PlusCircle className="w-3.5 h-3.5" />
+              <Plus className="w-4 h-4 shrink-0" />
               <span>Add Capital Source</span>
             </button>
           </div>
@@ -917,7 +917,7 @@ export default function FundingTrackerPage() {
                               </div>
                               {item.fundingType === 'Phased Own-Cash (Brick-by-Brick)' && (
                                 <span className="inline-block mt-1 text-[9px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded max-w-full truncate">
-                                  🧱 SELF-FUNDED (R 0 EXTERNAL DEBT)
+                                  SELF-FUNDED (R 0 EXTERNAL DEBT)
                                 </span>
                               )}
                               {hasTranches && (
@@ -937,7 +937,7 @@ export default function FundingTrackerPage() {
                               {linkedDev && (
                                 <div className="mt-1">
                                   <span className="inline-flex items-center gap-1 text-[9px] font-bold bg-purple-50 text-purple-700 border border-purple-200 px-1.5 py-0.5 rounded max-w-full truncate">
-                                    🏗️ {linkedDev.currentPhase} ({linkedDev.units?.length || 0}u)
+                                    {linkedDev.currentPhase} ({linkedDev.units?.length || 0}u)
                                   </span>
                                 </div>
                               )}
@@ -1137,12 +1137,12 @@ export default function FundingTrackerPage() {
                             </span>
                             {item.fundingType === 'Phased Own-Cash (Brick-by-Brick)' && (
                               <span className="text-[9px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded">
-                                🧱 SELF-FUNDED
+                                SELF-FUNDED
                               </span>
                             )}
                             {linkedDev && (
                               <span className="text-[9px] font-bold bg-purple-50 text-purple-700 border border-purple-200 px-1.5 py-0.5 rounded">
-                                🏗️ {linkedDev.currentPhase} ({linkedDev.units?.length || 0} Units)
+                                {linkedDev.currentPhase} ({linkedDev.units?.length || 0} Units)
                               </span>
                             )}
                             {isLinkedDealBlocked && (

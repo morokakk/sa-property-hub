@@ -277,7 +277,7 @@ export const GET_STARTED_STAGES: readonly JourneyStage[] = [
             summary: 'Record private loans, JV partners, stokvel syndicates, DFI facilities and phased "brick-by-brick" cash builds.',
             howTo: [
               'Click Add Capital Source in the Funding header.',
-              'Enter the lender or partner, or click a 1-click 4-Phase BOQ Template (🧱 Brick-by-Brick Cash, 🤝 Stokvel / Syndicate, or 🏗️ DFI) to scaffold Foundation, Roof, 1st Fix and Practical Completion tranches.',
+              'Enter the lender or partner, or click a 1-click 4-Phase BOQ Template (Brick-by-Brick Cash, Stokvel / Syndicate, or DFI) to scaffold Foundation, Roof, 1st Fix and Practical Completion tranches.',
               'Use Log Payment to Lender as you repay external facilities, while self-funded Brick-by-Brick rows are badged as R 0 External Debt.',
             ],
             proTip:
@@ -326,7 +326,7 @@ export const GET_STARTED_STAGES: readonly JourneyStage[] = [
             summary: 'Turn an Analyzer deal into a live flip or multi-let Build-to-Rent project with its numbers carried over.',
             howTo: [
               'In the Analyzer pipeline, advance the deal with Submit Offer → and Begin DD →, then click Promote to Flip.',
-              'In the project modal, choose 🔄 Flip for Sale (Resale Exit) or 🏘️ Build-to-Rent (Hold for Multi-Let Cashflow) and set Units / Rooms.',
+              'In the project modal, choose Flip for Sale (Resale Exit) or Build-to-Rent (Hold for Multi-Let Cashflow) and set Units / Rooms.',
               'When a Build-to-Rent project finishes construction, click Graduate to Rental to auto-scaffold Unit 1..N leases and prepaid sub-meters in Rental Portfolio.',
             ],
             proTip:
@@ -686,8 +686,8 @@ export const GET_STARTED_STAGES: readonly JourneyStage[] = [
             title: 'Calendar View & .ics Sync',
             summary: 'Monthly grid with recurring ghost previews, bulk RFC 5545 .ics export, and per-task Google/Outlook calendar links.',
             howTo: [
-              'Toggle [ 📅 Calendar View ] in the toolbar to inspect monthly to-dos and projected recurring ghost commitments.',
-              'Click [ 📅 Export .ics ] to bulk-download active to-dos with RFC 5545 recurrence rules and 9:00 AM reminders.',
+              'Toggle Calendar View in the toolbar to inspect monthly to-dos and projected recurring ghost commitments.',
+              'Click Export .ics to bulk-download active to-dos with RFC 5545 recurrence rules and 9:00 AM reminders.',
               'Click Sync on any task card to download a single .ics or open direct Google Calendar and Outlook 365 compose links.',
             ],
             proTip:

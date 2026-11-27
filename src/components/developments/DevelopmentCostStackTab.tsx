@@ -9,11 +9,10 @@ import { exportFlipBOQCSV } from '@/lib/export/csvExport';
 import { usePortfolioStore } from '@/lib/store/usePortfolioStore';
 import {
   Coins,
-  Building,
+  Building2,
   HardHat,
   Clock,
   ShieldAlert,
-  PlusCircle,
   FileSpreadsheet,
   X,
   FileCheck,
@@ -137,7 +136,7 @@ export function DevelopmentCostStackTab({
         <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-2xs">
           <div className="flex items-center justify-between text-slate-500 mb-1">
             <span className="text-xs font-semibold uppercase tracking-wider">Land & Acquisition</span>
-            <Building className="w-4 h-4 text-slate-400" />
+            <Building2 className="w-4 h-4 text-slate-400" />
           </div>
           <div className="text-lg font-bold text-slate-900">
             {formatZAR(financials.totalLandAndAcquisitionZAR)}

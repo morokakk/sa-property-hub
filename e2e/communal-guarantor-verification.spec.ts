@@ -38,7 +38,7 @@ test.describe('Communal OpEx, Room Classification & Third-Party Guarantors', () 
     await communalInput.fill('3000');
 
     // 4. Add a lease with roomType: "Executive Studio" and guarantorName: "Acme Corp SA"
-    const addUnitBtn = page.locator('button:has-text("+ Add Unit")');
+    const addUnitBtn = page.locator('button:has-text("Add Unit")');
     await addUnitBtn.click();
 
     // Find the newly added lease (the last lease form block)

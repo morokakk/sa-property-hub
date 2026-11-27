@@ -16,7 +16,7 @@ const FlipFundingModal = dynamic(() => import('@/components/flips/modals/FlipFun
 const SupplierDirectoryModal = dynamic(() => import('@/components/common/SupplierDirectoryModal').then((m) => m.SupplierDirectoryModal), { ssr: false });
 const DelayMatrixModal = dynamic(() => import('@/components/flips/DelayMatrixModal'), { ssr: false });
 import ImportDropdown from '@/components/common/ImportDropdown';
-import { PlusCircle, Store } from 'lucide-react';
+import { Plus, Store } from 'lucide-react';
 import { usePortfolioStore } from '@/lib/store/usePortfolioStore';
 import { exportFlipBOQCSV } from '@/lib/export/csvExport';
 
@@ -39,8 +39,8 @@ export default function FlipsManagerPage() {
               onClick={() => modals.openModal('addFlip')}
               className="inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold px-3 py-2 rounded-lg shadow-2xs hover:shadow-xs transition-colors shrink-0 cursor-pointer"
             >
-              <PlusCircle className="w-3.5 h-3.5" />
-              <span>+ New Flip Project</span>
+              <Plus className="w-4 h-4 shrink-0" />
+              <span>New Flip Project</span>
             </button>
             <button
               type="button"
@@ -48,7 +48,7 @@ export default function FlipsManagerPage() {
               onClick={() => modals.openModal('supplier')}
               className="inline-flex items-center gap-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-semibold px-3 py-2 rounded-lg border border-slate-300 transition-colors shrink-0 cursor-pointer"
             >
-              <Store className="w-3.5 h-3.5" />
+              <Store className="w-4 h-4 shrink-0" />
               <span>Supplier Directory</span>
             </button>
             <ImportDropdown

@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { formatZAR } from '@/lib/formatters';
-import { Edit3 } from 'lucide-react';
+import { Pencil } from 'lucide-react';
 
 export interface InlineEditableAmountProps {
   valueZAR?: number;
@@ -89,7 +89,7 @@ export function InlineEditableAmount({
         {prefix}
         {formattedAmount}
       </span>
-      <Edit3 className="w-3 h-3 text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity" />
+      <Pencil className="w-3.5 h-3.5 shrink-0 text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity" />
     </button>
   );
 }

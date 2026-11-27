@@ -18,18 +18,18 @@ import {
   Check,
   Copy,
   Share2,
-  Edit3,
+  Pencil,
   Trash2,
   MoreVertical,
   ArrowRight,
   XCircle,
   RotateCcw,
   Hammer,
-  Building,
+  Building2,
   HardHat,
   FileText,
   ShieldCheck,
-  Sparkles,
+  AlertTriangle,
   ChevronDown,
   X,
 } from 'lucide-react';
@@ -180,16 +180,17 @@ function PipelineDealCard({
               }`}
             >
               {deal.strategy === 'Flip'
-                ? '🔄 Flip'
+                ? 'Flip'
                 : deal.strategy === 'BRRRR'
-                ? '⚡ BRRRR'
+                ? 'BRRRR'
                 : deal.strategy === 'Development'
-                ? '🏗️ Development'
-                : '🏠 Rental'}
+                ? 'Development'
+                : 'Rental'}
             </span>
             {deal.occupantRisk && isEvictionActive(deal.occupantRisk) && (
               <span className="text-[10px] font-bold px-2 py-0.5 rounded border bg-rose-100 text-rose-800 border-rose-300 flex items-center gap-1">
-                <span>⛔ Eviction Pending</span>
+                <AlertTriangle className="w-3.5 h-3.5 shrink-0 text-rose-700" />
+                <span>Eviction Pending</span>
                 <span className="text-[9px] opacity-80">({deal.occupantRisk.estimatedEvictionDelayDays}d)</span>
               </span>
             )}
@@ -298,7 +299,7 @@ function PipelineDealCard({
                   }}
                   className="w-full px-3 py-2 text-left text-slate-700 hover:bg-slate-50 flex items-center gap-2 cursor-pointer font-medium"
                 >
-                  <Edit3 className="w-3.5 h-3.5 text-blue-600" />
+                  <Pencil className="w-3.5 h-3.5 text-blue-600" />
                   <span>Edit in Calculator</span>
                 </button>
 
@@ -337,7 +338,7 @@ function PipelineDealCard({
                     }}
                     className="w-full px-3 py-2 text-left text-teal-800 hover:bg-teal-50 flex items-center gap-2 cursor-pointer font-medium border-t border-slate-100"
                   >
-                    <Building className="w-3.5 h-3.5 text-teal-600" />
+                    <Building2 className="w-3.5 h-3.5 text-teal-600" />
                     <span>Promote to Rental</span>
                   </button>
                 ) : (
@@ -517,19 +518,19 @@ function PipelineDealCard({
               </div>
               <div className="space-y-1 text-[11px] text-slate-700">
                 <div className="flex justify-between">
-                  <span>🏫 Schools &amp; Education:</span>
+                  <span>Schools &amp; Education:</span>
                   <strong className="text-slate-900">{scorecard.schools}</strong>
                 </div>
                 <div className="flex justify-between">
-                  <span>👮 Police Station (SAPS):</span>
+                  <span>Police Station (SAPS):</span>
                   <strong className="text-slate-900">{scorecard.policeStation}</strong>
                 </div>
                 <div className="flex justify-between">
-                  <span>🏥 Hospital / Clinic:</span>
+                  <span>Hospital / Clinic:</span>
                   <strong className="text-slate-900">{scorecard.medicalClinic}</strong>
                 </div>
                 <div className="flex justify-between">
-                  <span>🛍️ Shopping Mall:</span>
+                  <span>Shopping Mall:</span>
                   <strong className="text-slate-900">{scorecard.shoppingMall}</strong>
                 </div>
               </div>
@@ -603,8 +604,7 @@ function PipelineDealCard({
         )}
         <span>Net Monthly Cashflow: <strong className={deal.monthlyCashFlow >= 0 ? 'text-emerald-700' : 'text-rose-600'}>{formatZAR(deal.monthlyCashFlow)}</strong></span>
         {deal.section13sex?.isEligible && (
-          <span className="text-emerald-800 bg-emerald-100/80 px-2 py-0.5 rounded font-semibold flex items-center gap-1 border border-emerald-200">
-            <Sparkles className="w-3 h-3 text-emerald-700" />
+          <span className="text-emerald-800 bg-emerald-100/80 px-2 py-0.5 rounded font-semibold inline-flex items-center border border-emerald-200">
             SARS Sec 13sex: +{formatZAR(deal.section13sex.annualTaxSavingsZAR)}/yr Shield
           </span>
         )}
@@ -688,7 +688,7 @@ function PipelineDealCard({
                     : 'bg-teal-50 text-teal-700 hover:bg-teal-100 border border-teal-200'
                 }`}
               >
-                <Building className="w-3.5 h-3.5" />
+                <Building2 className="w-3.5 h-3.5" />
                 <span>Promote to Rental</span>
               </button>
             )
