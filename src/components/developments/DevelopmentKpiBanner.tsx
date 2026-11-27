@@ -88,8 +88,8 @@ export function DevelopmentKpiBanner({
           </div>
           <div className="mt-2">
             {development.isVatRegisteredDeveloper ? (
-              <span className="text-[11px] font-medium bg-blue-50 text-blue-700 border border-blue-200 px-2 py-0.5 rounded-full inline-flex items-center gap-1">
-                <ShieldCheck className="w-3 h-3 text-blue-600 shrink-0" />
+              <span className="text-[11px] font-medium bg-slate-100 text-slate-700 border border-slate-200 px-2 py-0.5 rounded-full inline-flex items-center gap-1">
+                <ShieldCheck className="w-3 h-3 text-slate-500 shrink-0" />
                 <span>15% VAT • R0 Buyer Duty</span>
               </span>
             ) : (
@@ -221,18 +221,22 @@ export function DevelopmentKpiBanner({
       <div className="bg-white rounded-xl border border-slate-200 p-3 sm:p-4 shadow-2xs hover:shadow-xs transition-shadow flex flex-col justify-between min-w-0">
         <div className="flex items-center justify-between text-slate-500 mb-1 gap-1">
           <span className="text-[11px] sm:text-xs font-semibold uppercase tracking-wider leading-tight">Hybrid Split-Exit</span>
-          <Scale className="w-4 h-4 text-purple-600 shrink-0" />
+          <Scale className="w-4 h-4 text-slate-500 shrink-0" />
         </div>
         <div>
           <div className="text-xs font-bold text-slate-900 tabular-nums">
             {`${financials.unitsSoldAndTransferredCount} Sold • ${financials.unitsRetainedCount} Retained`}
           </div>
           <div className="text-[11px] text-slate-500 mt-1 tabular-nums">
-            Rent: <span className="font-semibold text-slate-800">{formatZAR(financials.retainedMonthlyGrossRentZAR)}/mo</span>
+            Rent:{' '}
+            <span className="font-semibold text-slate-800">
+              <span>{formatZAR(financials.retainedMonthlyGrossRentZAR)}</span>
+              <span className="ml-0.5 font-normal text-slate-400">/mo</span>
+            </span>
           </div>
           <div className="mt-2">
             {financials.isSection13SexEligible ? (
-              <span className="text-[10px] font-bold bg-purple-50 text-purple-700 border border-purple-200 px-1.5 py-0.5 rounded-full inline-flex items-center">
+              <span className="text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200 px-1.5 py-0.5 rounded-full inline-flex items-center">
                 <span>Section 13sex Active</span>
               </span>
             ) : (

@@ -62,7 +62,7 @@ export default function ConsolidatedTaxCard({ summary, rentals }: ConsolidatedTa
           <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-100 flex flex-col justify-between">
             <div className="flex items-center justify-between text-[11px] text-slate-500 mb-1">
               <span className="font-medium text-slate-600">Flips 27% Corporate Tax</span>
-              <span className="text-[10px] font-semibold text-indigo-700 bg-indigo-50 px-1.5 py-0.2 rounded border border-indigo-100">
+              <span className="text-[10px] font-semibold text-slate-700 bg-slate-100 px-1.5 py-0.2 rounded border border-slate-200">
                 {summary.activeFlipsCount} Active
               </span>
             </div>
@@ -83,8 +83,8 @@ export default function ConsolidatedTaxCard({ summary, rentals }: ConsolidatedTa
               </span>
             </div>
             <div className="text-sm font-bold text-amber-900">
-              {formatZAR(summary.annualRentalTaxReserve)}
-              <span className="text-xs font-normal text-amber-700">/yr</span>
+              <span>{formatZAR(summary.annualRentalTaxReserve)}</span>
+              <span className="ml-0.5 text-xs font-normal text-amber-700">/yr</span>
             </div>
             <p className="text-[10px] text-amber-700/80 mt-0.5">
               Net taxable rental cashflow reserve

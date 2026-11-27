@@ -109,7 +109,8 @@ export function FlipMetricsCards({
 
         <div className="mt-1 pt-1.5 border-t border-amber-100 flex items-center justify-between">
           <div className="text-[10px] text-slate-600 font-medium" title={`${formatZAR(flipMonthlyHoldingCost)}/mo carrying burn`}>
-            {formatZAR(flipMonthlyHoldingCost, { compact: true })}/mo burn
+            <span>{formatZAR(flipMonthlyHoldingCost, { compact: true })}</span>
+            <span className="ml-0.5 text-slate-400 font-normal">/mo</span> burn
           </div>
           <button
             type="button"

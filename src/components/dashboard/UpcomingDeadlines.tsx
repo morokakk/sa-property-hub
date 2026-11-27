@@ -70,7 +70,7 @@ export default function UpcomingDeadlines() {
         date: f.targetCompletionDate,
         type: 'flip',
         badge: 'Flip Handover',
-        badgeColor: 'bg-indigo-100 text-indigo-800 border-indigo-200',
+        badgeColor: 'bg-slate-100 text-slate-700 border-slate-200',
         detail: `${f.city} • Phase: ${f.currentPhase}`,
       });
     });
@@ -109,7 +109,7 @@ export default function UpcomingDeadlines() {
           badge: isExpired ? 'Lease Overdue' : 'Lease Renewal',
           badgeColor: isExpired
             ? 'bg-rose-100 text-rose-800 border-rose-300 font-bold'
-            : 'bg-purple-100 text-purple-800 border-purple-200 font-medium',
+            : 'bg-amber-100 text-amber-800 border-amber-200 font-medium',
           detail: `${r.title} (${l.unitName}) • ${formatZAR(l.monthlyRentZAR)}/mo`,
           isUrgentDispute: isExpired,
         });
@@ -131,7 +131,7 @@ export default function UpcomingDeadlines() {
         date: r.agmDate,
         type: 'conveyancing',
         badge: 'Sectional Title AGM',
-        badgeColor: 'bg-teal-100 text-teal-800 border-teal-200 font-medium',
+        badgeColor: 'bg-slate-100 text-slate-700 border-slate-200 font-medium',
         detail: 'Review scheme maintenance plan, CSOS compliance & levy budget',
       });
     }

@@ -23,7 +23,7 @@ export function PropertyTypeBadge({ type, className = '' }: PropertyTypeBadgePro
     case 'Freehold House':
       return (
         <span
-          className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 shadow-2xs ${className}`}
+          className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200 shadow-2xs ${className}`}
           title="Freehold Standalone Title (STSMA levies not applicable)"
         >
           <span>Freehold House</span>
@@ -32,7 +32,7 @@ export function PropertyTypeBadge({ type, className = '' }: PropertyTypeBadgePro
     case 'Townhouse / Cluster':
       return (
         <span
-          className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-200 shadow-2xs ${className}`}
+          className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200 shadow-2xs ${className}`}
           title="Townhouse / Cluster Scheme (HOA / Body Corporate)"
         >
           <span>Townhouse / Cluster</span>
@@ -41,7 +41,7 @@ export function PropertyTypeBadge({ type, className = '' }: PropertyTypeBadgePro
     case 'Multi-unit Commercial':
       return (
         <span
-          className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-purple-50 text-purple-700 border border-purple-200 shadow-2xs ${className}`}
+          className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200 shadow-2xs ${className}`}
           title="Multi-unit Commercial Asset"
         >
           <span>Commercial</span>
@@ -51,7 +51,7 @@ export function PropertyTypeBadge({ type, className = '' }: PropertyTypeBadgePro
     default:
       return (
         <span
-          className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200 shadow-2xs ${className}`}
+          className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200 shadow-2xs ${className}`}
           title="Sectional Title Scheme (Body Corporate STSMA)"
         >
           <span>Sectional Title</span>
