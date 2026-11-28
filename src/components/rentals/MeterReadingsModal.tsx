@@ -680,8 +680,8 @@ export default function MeterReadingsModal({
 
           {/* Active Municipal Dispute Alert Banner */}
           {activeDisputes.length > 0 && (
-            <div className="p-3.5 bg-amber-500/10 border border-amber-300 rounded-xl flex items-center justify-between gap-3 text-amber-950 animate-in fade-in">
-              <div className="flex items-center gap-2.5 min-w-0">
+            <div className="p-3.5 bg-amber-500/10 border border-amber-300 rounded-xl flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 text-amber-950 animate-in fade-in">
+              <div className="flex items-start sm:items-center gap-2.5 min-w-0">
                 <div className="p-2 rounded-lg bg-amber-500 text-white shrink-0">
                   <AlertCircle className="w-4 h-4" />
                 </div>
@@ -692,12 +692,12 @@ export default function MeterReadingsModal({
                       Action Required
                     </span>
                   </div>
-                  <p className="text-[11px] text-amber-800 mt-0.5 truncate">
+                  <p className="text-[11px] text-amber-800 mt-0.5 leading-relaxed sm:truncate">
                     Independent on-site meter readings contest municipal estimates. Track council reference tickets and verify credit note resolution.
                   </p>
                 </div>
               </div>
-              <div className="flex items-center gap-2 shrink-0 flex-wrap">
+              <div className="flex items-center gap-2 shrink-0 flex-wrap w-full sm:w-auto">
                 <button
                   type="button"
                   onClick={() => {
@@ -705,7 +705,7 @@ export default function MeterReadingsModal({
                     setDisputeLetterReading(firstDispute || null);
                     setIsDisputeLetterModalOpen(true);
                   }}
-                  className="text-[11px] font-bold text-white bg-amber-600 hover:bg-amber-700 px-3 py-1.5 rounded-lg transition-colors shrink-0 cursor-pointer flex items-center gap-1 shadow-2xs"
+                  className="text-[11px] font-bold text-white bg-amber-600 hover:bg-amber-700 px-3 py-1.5 rounded-lg transition-colors shrink-0 cursor-pointer flex items-center justify-center gap-1 shadow-2xs flex-1 sm:flex-none whitespace-nowrap"
                   title="Generate official dispute letter & download PDF"
                 >
                   <FileText className="w-3.5 h-3.5" />
@@ -714,7 +714,7 @@ export default function MeterReadingsModal({
                 <button
                   type="button"
                   onClick={() => setActiveTab('disputes')}
-                  className="text-[11px] font-bold text-amber-900 hover:text-amber-950 bg-amber-200/80 hover:bg-amber-200 px-3 py-1.5 rounded-lg border border-amber-300 transition-colors shrink-0 cursor-pointer"
+                  className="text-[11px] font-bold text-amber-900 hover:text-amber-950 bg-amber-200/80 hover:bg-amber-200 px-3 py-1.5 rounded-lg border border-amber-300 transition-colors shrink-0 cursor-pointer flex items-center justify-center flex-1 sm:flex-none whitespace-nowrap"
                 >
                   View Disputes →
                 </button>
