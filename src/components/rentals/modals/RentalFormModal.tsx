@@ -708,7 +708,7 @@ export const RentalFormModal: React.FC<RentalFormModalProps> = ({
       <div
         onClick={(e) => e.stopPropagation()}
         style={sheetStyle}
-        className="bg-white rounded-t-3xl sm:rounded-xl max-w-lg sm:max-w-2xl w-full shadow-xl border border-slate-200 max-h-[92vh] sm:max-h-[90vh] flex flex-col overflow-hidden cursor-default"
+        className="bg-white rounded-t-3xl sm:rounded-xl max-w-lg sm:max-w-2xl w-full shadow-xl border border-slate-200 max-h-[88svh] sm:max-h-[90vh] flex flex-col overflow-hidden cursor-default"
       >
         {/* Mobile Drag Handle */}
         <BottomSheetHandle {...dragHandleProps} />

@@ -1230,7 +1230,7 @@ export default function FundingTrackerPage() {
           <div
             onClick={(e) => e.stopPropagation()}
             style={syncSheetDrag.sheetStyle}
-            className="bg-white rounded-t-3xl sm:rounded-2xl max-w-lg w-full p-5 sm:p-6 shadow-xl border border-slate-200 max-h-[92vh] sm:max-h-none overflow-y-auto cursor-default"
+            className="bg-white rounded-t-3xl sm:rounded-2xl max-w-lg w-full p-5 sm:p-6 shadow-xl border border-slate-200 max-h-[88svh] sm:max-h-none overflow-y-auto cursor-default"
           >
             <BottomSheetHandle className="-mt-2.5 mb-1.5" {...syncSheetDrag.dragHandleProps} />
             <div
@@ -1412,7 +1412,7 @@ export default function FundingTrackerPage() {
           <div
             onClick={(e) => e.stopPropagation()}
             style={repaymentSheetDrag.sheetStyle}
-            className="bg-white rounded-t-3xl sm:rounded-xl max-w-md w-full p-5 sm:p-6 shadow-xl border border-slate-200 max-h-[92vh] sm:max-h-none overflow-y-auto cursor-default"
+            className="bg-white rounded-t-3xl sm:rounded-xl max-w-md w-full p-5 sm:p-6 shadow-xl border border-slate-200 max-h-[88svh] sm:max-h-none overflow-y-auto cursor-default"
           >
             <BottomSheetHandle className="-mt-2.5 mb-1.5" {...repaymentSheetDrag.dragHandleProps} />
             <div {...repaymentSheetDrag.dragHandleProps} className="touch-none sm:touch-auto select-none sm:select-auto">

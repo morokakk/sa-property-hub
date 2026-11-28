@@ -335,7 +335,7 @@ export default function DisputeLetterModal({
         <div
           onClick={(e) => e.stopPropagation()}
           style={sheetStyle}
-          className="bg-white rounded-t-3xl sm:rounded-2xl shadow-2xl max-w-4xl w-full max-h-[94vh] flex flex-col border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95 duration-150 text-xs cursor-default"
+          className="bg-white rounded-t-3xl sm:rounded-2xl shadow-2xl max-w-4xl w-full max-h-[88svh] sm:max-h-[90vh] flex flex-col border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95 duration-150 text-xs cursor-default"
         >
           <BottomSheetHandle className="bg-slate-50/80" {...dragHandleProps} />
           {/* Header */}

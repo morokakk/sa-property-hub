@@ -734,7 +734,7 @@ function PipelineDealCard({
           <div className="fixed inset-0" onClick={() => setIsPassModalOpen(false)} />
           <div
             style={passSheetDrag.sheetStyle}
-            className="relative bg-white rounded-t-3xl sm:rounded-2xl max-w-sm w-full p-5 sm:p-6 shadow-2xl border border-slate-200 max-h-[90vh] overflow-y-auto z-10 animate-in slide-in-from-bottom duration-200 text-left"
+            className="relative bg-white rounded-t-3xl sm:rounded-2xl max-w-sm w-full p-5 sm:p-6 shadow-2xl border border-slate-200 max-h-[88svh] sm:max-h-[90vh] overflow-y-auto z-10 animate-in slide-in-from-bottom duration-200 text-left"
           >
             <BottomSheetHandle className="-mt-2.5 mb-1.5" {...passSheetDrag.dragHandleProps} />
             <div

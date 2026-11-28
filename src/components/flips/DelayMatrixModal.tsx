@@ -127,7 +127,7 @@ export default function DelayMatrixModal({
       <div
         onClick={(e) => e.stopPropagation()}
         style={sheetStyle}
-        className="bg-white rounded-t-3xl sm:rounded-2xl max-w-4xl w-full p-5 sm:p-6 shadow-2xl border border-slate-200 animate-in fade-in max-h-[92vh] sm:max-h-[90vh] overflow-y-auto cursor-default"
+        className="bg-white rounded-t-3xl sm:rounded-2xl max-w-4xl w-full p-5 sm:p-6 shadow-2xl border border-slate-200 animate-in fade-in max-h-[88svh] sm:max-h-[90vh] overflow-y-auto cursor-default"
       >
         <BottomSheetHandle className="-mt-2.5 mb-1.5" {...dragHandleProps} />
 

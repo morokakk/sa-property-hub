@@ -702,7 +702,7 @@ export default function GlobalDashboardPage() {
             <div
               onClick={(e) => e.stopPropagation()}
               style={seedSheetDrag.sheetStyle}
-              className="bg-white rounded-t-3xl sm:rounded-2xl max-w-md w-full p-5 sm:p-6 shadow-2xl border border-slate-200 max-h-[92vh] sm:max-h-none overflow-y-auto cursor-default"
+              className="bg-white rounded-t-3xl sm:rounded-2xl max-w-md w-full p-5 sm:p-6 shadow-2xl border border-slate-200 max-h-[88svh] sm:max-h-none overflow-y-auto cursor-default"
             >
               {/* Mobile Drag Indicator */}
               <BottomSheetHandle className="-mt-2.5 mb-1.5" {...seedSheetDrag.dragHandleProps} />

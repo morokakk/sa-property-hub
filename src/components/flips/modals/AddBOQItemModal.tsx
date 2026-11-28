@@ -184,7 +184,7 @@ export const AddBOQItemModal: React.FC<AddBOQItemModalProps> = ({
       <div
         onClick={(e) => e.stopPropagation()}
         style={sheetStyle}
-        className="bg-white rounded-t-3xl sm:rounded-xl max-w-lg w-full p-5 sm:p-6 shadow-xl border border-slate-200 max-h-[92vh] sm:max-h-none overflow-y-auto cursor-default"
+        className="bg-white rounded-t-3xl sm:rounded-xl max-w-lg w-full p-5 sm:p-6 shadow-xl border border-slate-200 max-h-[88svh] sm:max-h-none overflow-y-auto cursor-default"
       >
         <BottomSheetHandle className="-mt-2.5 mb-1.5" {...dragHandleProps} />
         <h3

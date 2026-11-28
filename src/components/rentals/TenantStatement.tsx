@@ -876,7 +876,7 @@ export default function TenantStatement({
           data-sensitive="true"
           onClick={(e) => e.stopPropagation()}
           style={sheetStyle}
-          className="bg-white rounded-t-3xl sm:rounded-2xl shadow-2xl border border-slate-200 w-full max-w-4xl max-h-[92vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200 cursor-default"
+          className="bg-white rounded-t-3xl sm:rounded-2xl shadow-2xl border border-slate-200 w-full max-w-4xl max-h-[88svh] sm:max-h-[90vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200 cursor-default"
           role="dialog"
           aria-modal="true"
         >

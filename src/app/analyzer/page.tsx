@@ -4621,7 +4621,7 @@ export default function OpportunityAnalyzerPage() {
                     <div
                       ref={maoSolverRef}
                       style={maoSheetDrag.sheetStyle}
-                      className="relative bg-white rounded-t-3xl sm:rounded-2xl max-w-md w-full p-5 sm:p-6 shadow-2xl border border-slate-200 max-h-[90vh] overflow-y-auto z-10 animate-in slide-in-from-bottom duration-200 sm:duration-150 sm:zoom-in-95 text-slate-900"
+                      className="relative bg-white rounded-t-3xl sm:rounded-2xl max-w-md w-full p-5 sm:p-6 shadow-2xl border border-slate-200 max-h-[88svh] sm:max-h-[90vh] overflow-y-auto z-10 animate-in slide-in-from-bottom duration-200 sm:duration-150 sm:zoom-in-95 text-slate-900"
                     >
                       {/* Mobile Drag Indicator */}
                       <BottomSheetHandle className="-mt-2.5 mb-1.5" {...maoSheetDrag.dragHandleProps} />

@@ -270,7 +270,7 @@ export const MaintenanceModal: React.FC<MaintenanceModalProps> = ({
       <div
         onClick={(e) => e.stopPropagation()}
         style={sheetStyle}
-        className="bg-white rounded-t-3xl sm:rounded-xl max-w-xl w-full p-5 sm:p-6 shadow-xl border border-slate-200 max-h-[92vh] sm:max-h-[85vh] overflow-y-auto cursor-default"
+        className="bg-white rounded-t-3xl sm:rounded-xl max-w-xl w-full p-5 sm:p-6 shadow-xl border border-slate-200 max-h-[88svh] sm:max-h-[85vh] overflow-y-auto cursor-default"
       >
         <BottomSheetHandle className="-mt-2.5 mb-1.5" {...dragHandleProps} />
         <div

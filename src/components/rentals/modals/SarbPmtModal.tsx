@@ -133,7 +133,7 @@ export const SarbPmtModal: React.FC<SarbPmtModalProps> = ({
       <div
         onClick={(e) => e.stopPropagation()}
         style={sheetStyle}
-        className="bg-white rounded-t-3xl sm:rounded-2xl max-w-lg w-full p-5 sm:p-6 shadow-2xl border border-slate-200 animate-in zoom-in-95 duration-200 max-h-[92vh] sm:max-h-none overflow-y-auto cursor-default"
+        className="bg-white rounded-t-3xl sm:rounded-2xl max-w-lg w-full p-5 sm:p-6 shadow-2xl border border-slate-200 animate-in zoom-in-95 duration-200 max-h-[88svh] sm:max-h-none overflow-y-auto cursor-default"
       >
         <BottomSheetHandle className="-mt-2.5 mb-1.5" {...dragHandleProps} />
         <div

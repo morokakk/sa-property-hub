@@ -663,7 +663,7 @@ export default function UnifiedPdfVerificationModal({
         <div
           onClick={(e) => e.stopPropagation()}
           style={sheetStyle}
-          className="bg-white rounded-t-3xl sm:rounded-2xl shadow-2xl border border-slate-200 w-full max-w-xl overflow-hidden flex flex-col animate-in zoom-in-95 duration-200 cursor-default"
+          className="bg-white rounded-t-3xl sm:rounded-2xl shadow-2xl border border-slate-200 w-full max-w-xl max-h-[88svh] sm:max-h-[90vh] overflow-hidden flex flex-col animate-in zoom-in-95 duration-200 cursor-default"
           role="dialog"
           aria-modal="true"
         >
@@ -692,7 +692,7 @@ export default function UnifiedPdfVerificationModal({
             </button>
           </div>
 
-          <div className="p-4 sm:p-6 space-y-4">
+          <div className="p-4 sm:p-6 space-y-4 overflow-y-auto flex-1">
             <div className="p-3.5 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-950 space-y-1.5">
               <span className="font-bold block">Document Parsing Notice</span>
               <p className="text-amber-800 leading-relaxed text-[11px]">
@@ -743,7 +743,7 @@ export default function UnifiedPdfVerificationModal({
       <div
         onClick={(e) => e.stopPropagation()}
         style={sheetStyle}
-        className="bg-white rounded-t-3xl sm:rounded-2xl shadow-2xl border border-slate-200 w-full max-w-2xl overflow-hidden flex flex-col max-h-[92vh] animate-in zoom-in-95 duration-200 cursor-default"
+        className="bg-white rounded-t-3xl sm:rounded-2xl shadow-2xl border border-slate-200 w-full max-w-2xl overflow-hidden flex flex-col max-h-[88svh] sm:max-h-[90vh] animate-in zoom-in-95 duration-200 cursor-default"
         role="dialog"
         aria-modal="true"
       >

@@ -42,7 +42,7 @@ export default function ValidationErrorModal({
       <div
         onClick={(e) => e.stopPropagation()}
         style={sheetStyle}
-        className="bg-white rounded-t-3xl sm:rounded-2xl shadow-2xl border border-red-200 w-full max-w-2xl overflow-hidden flex flex-col max-h-[92vh] sm:max-h-[85vh] animate-in zoom-in-95 duration-200 cursor-default"
+        className="bg-white rounded-t-3xl sm:rounded-2xl shadow-2xl border border-red-200 w-full max-w-2xl overflow-hidden flex flex-col max-h-[88svh] sm:max-h-[85vh] animate-in zoom-in-95 duration-200 cursor-default"
         role="dialog"
         aria-modal="true"
       >

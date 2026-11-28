@@ -672,7 +672,7 @@ export default function TenantStatementViewer({
             <div
               onClick={(e) => e.stopPropagation()}
               style={maintenanceSheetDrag.sheetStyle}
-              className="bg-white rounded-t-3xl sm:rounded-2xl max-w-lg w-full p-5 sm:p-6 shadow-2xl border border-slate-200 space-y-4 max-h-[90vh] overflow-y-auto cursor-default"
+              className="bg-white rounded-t-3xl sm:rounded-2xl max-w-lg w-full p-5 sm:p-6 shadow-2xl border border-slate-200 space-y-4 max-h-[88svh] sm:max-h-[90vh] overflow-y-auto cursor-default"
               role="dialog"
               aria-modal="true"
               aria-labelledby="tenant-maintenance-modal-title"

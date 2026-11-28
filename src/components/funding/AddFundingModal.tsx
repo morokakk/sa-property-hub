@@ -293,7 +293,7 @@ export default function AddFundingModal({
       <div
         onClick={(e) => e.stopPropagation()}
         style={sheetStyle}
-        className="bg-white rounded-t-3xl sm:rounded-xl max-w-xl w-full p-5 sm:p-6 shadow-xl border border-slate-200 max-h-[92vh] overflow-y-auto cursor-default"
+        className="bg-white rounded-t-3xl sm:rounded-xl max-w-xl w-full p-5 sm:p-6 shadow-xl border border-slate-200 max-h-[88svh] sm:max-h-[90vh] overflow-y-auto cursor-default"
       >
         <BottomSheetHandle className="-mt-2.5 mb-1.5" {...dragHandleProps} />
         <div

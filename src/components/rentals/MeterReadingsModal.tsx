@@ -554,7 +554,7 @@ export default function MeterReadingsModal({
       <div
         onClick={(e) => e.stopPropagation()}
         style={sheetDrag.sheetStyle}
-        className="bg-white rounded-t-3xl sm:rounded-2xl shadow-2xl max-w-4xl w-full max-h-[92vh] flex flex-col border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95 duration-150 cursor-default"
+        className="bg-white rounded-t-3xl sm:rounded-2xl shadow-2xl max-w-4xl w-full max-h-[88svh] sm:max-h-[90vh] flex flex-col border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95 duration-150 cursor-default"
       >
         <BottomSheetHandle className="bg-slate-50/80" {...sheetDrag.dragHandleProps} />
         {/* Header */}
@@ -2037,7 +2037,7 @@ export default function MeterReadingsModal({
           <div
             onClick={(e) => e.stopPropagation()}
             style={disputeSheetDrag.sheetStyle}
-            className="bg-white rounded-t-3xl sm:rounded-2xl shadow-2xl max-w-xl w-full border border-slate-200 overflow-hidden animate-in zoom-in-95 sm:my-auto max-h-[92vh] flex flex-col cursor-default"
+            className="bg-white rounded-t-3xl sm:rounded-2xl shadow-2xl max-w-xl w-full border border-slate-200 overflow-hidden animate-in zoom-in-95 sm:my-auto max-h-[88svh] sm:max-h-[90vh] flex flex-col cursor-default"
           >
             <BottomSheetHandle
               className={editDisputeStatus === 'Resolved' ? 'bg-emerald-50' : 'bg-amber-50'}

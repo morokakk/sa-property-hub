@@ -244,7 +244,7 @@ export default function FeedbackModal({
       <div
         data-testid="feedback-modal-container"
         style={sheetStyle}
-        className="bg-slate-900 border-t sm:border border-slate-800 rounded-t-2xl sm:rounded-2xl shadow-2xl w-full max-w-lg max-h-[92vh] sm:max-h-[85vh] flex flex-col overflow-hidden text-slate-100 animate-in slide-in-from-bottom sm:zoom-in-95 duration-200"
+        className="bg-slate-900 border-t sm:border border-slate-800 rounded-t-2xl sm:rounded-2xl shadow-2xl w-full max-w-lg max-h-[88svh] sm:max-h-[85vh] flex flex-col overflow-hidden text-slate-100 animate-in slide-in-from-bottom sm:zoom-in-95 duration-200"
       >
         <BottomSheetHandle tone="dark" {...dragHandleProps} />
         {/* Header */}
