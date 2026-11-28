@@ -20,6 +20,8 @@ import {
   X,
 } from 'lucide-react';
 import { getFlipEvictionOffsetMonths } from '@/lib/calculations/occupantRisk';
+import { useBottomSheetDragToDismiss } from '@/hooks/useBottomSheetDragToDismiss';
+import BottomSheetHandle from '@/components/common/BottomSheetHandle';
 
 interface DelayMatrixModalProps {
   isOpen: boolean;
@@ -72,6 +74,8 @@ export default function DelayMatrixModal({
     }
   }, [isOpen, flip.id]);
 
+  const { sheetStyle, dragHandleProps } = useBottomSheetDragToDismiss({ onClose });
+
   if (!isOpen) return null;
 
   const taxRate = taxEntity === 'Company (27%)' ? 27 : taxEntity === 'Individual (45%)' ? 45 : 0;
@@ -122,12 +126,16 @@ export default function DelayMatrixModal({
     >
       <div
         onClick={(e) => e.stopPropagation()}
+        style={sheetStyle}
         className="bg-white rounded-t-3xl sm:rounded-2xl max-w-4xl w-full p-5 sm:p-6 shadow-2xl border border-slate-200 animate-in fade-in max-h-[92vh] sm:max-h-[90vh] overflow-y-auto cursor-default"
       >
-        <div className="w-12 h-1.5 bg-slate-300 rounded-full mx-auto mb-3 sm:hidden" />
+        <BottomSheetHandle className="-mt-2.5 mb-1.5" {...dragHandleProps} />
 
         {/* Modal Header */}
-        <div className="flex items-center justify-between pb-3 mb-4 border-b border-slate-200">
+        <div
+          {...dragHandleProps}
+          className="flex items-center justify-between pb-3 mb-4 border-b border-slate-200 touch-none sm:touch-auto select-none sm:select-auto"
+        >
           <div className="flex items-center gap-2.5">
             <div className="p-2 rounded-xl bg-amber-500/10 text-amber-600 border border-amber-500/20">
               <Clock className="w-5 h-5" />

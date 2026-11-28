@@ -3,6 +3,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useViewportDropdownPosition } from '@/hooks/useViewportDropdownPosition';
 import { useModalBackdropDismiss } from '@/hooks/useModalBackdropDismiss';
+import { useBottomSheetDragToDismiss } from '@/hooks/useBottomSheetDragToDismiss';
+import BottomSheetHandle from '@/components/common/BottomSheetHandle';
 import {
   X,
   Printer,
@@ -177,6 +179,10 @@ export default function TenantStatement({
 
   const isBackdropDismissDisabled = isUploading || isPublishingLink || isSendingEmail;
   const backdropDismiss = useModalBackdropDismiss(onClose, isBackdropDismissDisabled);
+  const { sheetStyle, dragHandleProps } = useBottomSheetDragToDismiss({
+    onClose,
+    disabled: isBackdropDismissDisabled,
+  });
 
   if (!isOpen || !rental) return null;
 
@@ -869,12 +875,21 @@ export default function TenantStatement({
           id="tenant-statement-print-root"
           data-sensitive="true"
           onClick={(e) => e.stopPropagation()}
+          style={sheetStyle}
           className="bg-white rounded-t-3xl sm:rounded-2xl shadow-2xl border border-slate-200 w-full max-w-4xl max-h-[92vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200 cursor-default"
           role="dialog"
           aria-modal="true"
         >
+          <BottomSheetHandle
+            tone="dark"
+            className="print-hidden-element"
+            {...dragHandleProps}
+          />
           {/* Header Tier 1: Title & Close Button (Print-Hidden) */}
-          <div className="bg-slate-900 text-white px-4 py-3 sm:px-6 sm:py-3.5 flex items-center justify-between gap-3 print-hidden-element border-b border-slate-800">
+          <div
+            {...dragHandleProps}
+            className="bg-slate-900 text-white px-4 py-3 sm:px-6 sm:py-3.5 flex items-center justify-between gap-3 print-hidden-element border-b border-slate-800 touch-none sm:touch-auto select-none sm:select-auto"
+          >
             <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
               <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center border border-emerald-500/30 shrink-0">
                 <FileText className="w-4 h-4 sm:w-5 sm:h-5" />

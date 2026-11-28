@@ -4,6 +4,8 @@ import React, { useState, useMemo, useRef, useEffect } from 'react';
 import TopHeader from '@/components/navigation/TopHeader';
 import { usePortfolioStore } from '@/lib/store/usePortfolioStore';
 import { useModalBackdropDismiss } from '@/hooks/useModalBackdropDismiss';
+import { useBottomSheetDragToDismiss } from '@/hooks/useBottomSheetDragToDismiss';
+import BottomSheetHandle from '@/components/common/BottomSheetHandle';
 import { formatDate } from '@/lib/formatters';
 import { TaskItem, TaskPriority, TaskStatus, LinkedEntity, TaskRecurrence } from '@/types';
 import {
@@ -121,6 +123,9 @@ export default function TaskEnginePage() {
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [kpiFilter, setKpiFilter] = useState<'NONE' | 'PENDING' | 'URGENT' | 'COMPLETED'>('NONE');
   const addTaskBackdropDismiss = useModalBackdropDismiss(() => setShowAddModal(false));
+  const addTaskSheetDrag = useBottomSheetDragToDismiss({
+    onClose: () => setShowAddModal(false),
+  });
 
   // Per-task Calendar Quick Action Menu State
   const [openCalendarMenuTaskId, setOpenCalendarMenuTaskId] = useState<string | null>(null);
@@ -1268,10 +1273,14 @@ export default function TaskEnginePage() {
         >
           <div
             onClick={(e) => e.stopPropagation()}
+            style={addTaskSheetDrag.sheetStyle}
             className="bg-white rounded-t-3xl sm:rounded-xl max-w-md w-full p-5 sm:p-6 shadow-xl border border-slate-200 max-h-[92vh] sm:max-h-none overflow-y-auto cursor-default"
           >
-            <div className="w-12 h-1.5 bg-slate-300 rounded-full mx-auto mb-3 sm:hidden" />
-            <h3 className="text-base font-bold text-slate-900 mb-4 flex items-center gap-2">
+            <BottomSheetHandle className="-mt-2.5 mb-1.5" {...addTaskSheetDrag.dragHandleProps} />
+            <h3
+              {...addTaskSheetDrag.dragHandleProps}
+              className="text-base font-bold text-slate-900 mb-4 flex items-center gap-2 touch-none sm:touch-auto select-none sm:select-auto"
+            >
               <CheckSquare className="w-5 h-5 text-emerald-600" />
               Create Operational Task & Reminder
             </h3>

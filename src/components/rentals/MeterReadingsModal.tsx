@@ -27,6 +27,8 @@ import {
 } from 'lucide-react';
 import { usePortfolioStore } from '@/lib/store/usePortfolioStore';
 import { useModalBackdropDismiss } from '@/hooks/useModalBackdropDismiss';
+import { useBottomSheetDragToDismiss } from '@/hooks/useBottomSheetDragToDismiss';
+import BottomSheetHandle from '@/components/common/BottomSheetHandle';
 import {
   MeterReading,
   MeterDisputeStatus,
@@ -367,6 +369,10 @@ export default function MeterReadingsModal({
   const disputeBackdropDismiss = useModalBackdropDismiss(() =>
     setEditingDisputeReading(null)
   );
+  const sheetDrag = useBottomSheetDragToDismiss({ onClose });
+  const disputeSheetDrag = useBottomSheetDragToDismiss({
+    onClose: () => setEditingDisputeReading(null),
+  });
 
   if (!isOpen || !rental) return null;
 
@@ -547,11 +553,15 @@ export default function MeterReadingsModal({
     >
       <div
         onClick={(e) => e.stopPropagation()}
+        style={sheetDrag.sheetStyle}
         className="bg-white rounded-t-3xl sm:rounded-2xl shadow-2xl max-w-4xl w-full max-h-[92vh] flex flex-col border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95 duration-150 cursor-default"
       >
-        <div className="w-12 h-1.5 bg-slate-300 rounded-full mx-auto my-2 sm:hidden shrink-0" />
+        <BottomSheetHandle className="bg-slate-50/80" {...sheetDrag.dragHandleProps} />
         {/* Header */}
-        <div className="px-4 py-3 sm:px-6 sm:py-4 border-b border-slate-200 flex items-center justify-between bg-slate-50/80">
+        <div
+          {...sheetDrag.dragHandleProps}
+          className="px-4 py-3 sm:px-6 sm:py-4 border-b border-slate-200 flex items-center justify-between bg-slate-50/80 touch-none sm:touch-auto select-none sm:select-auto"
+        >
           <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
             <div className="p-2 sm:p-2.5 rounded-xl bg-cyan-100 text-cyan-700 shrink-0">
               <Gauge className="w-4 h-4 sm:w-5 sm:h-5" />
@@ -2022,14 +2032,20 @@ export default function MeterReadingsModal({
       {editingDisputeReading && (
         <div
           {...disputeBackdropDismiss}
-          className="fixed inset-0 z-60 flex items-center justify-center p-3 sm:p-4 bg-slate-950/60 backdrop-blur-xs animate-in fade-in overflow-y-auto cursor-pointer"
+          className="fixed inset-0 z-60 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-950/60 backdrop-blur-xs animate-in fade-in overflow-y-auto cursor-pointer"
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            className="bg-white rounded-2xl shadow-2xl max-w-xl w-full border border-slate-200 overflow-hidden animate-in zoom-in-95 my-auto max-h-[92vh] flex flex-col cursor-default"
+            style={disputeSheetDrag.sheetStyle}
+            className="bg-white rounded-t-3xl sm:rounded-2xl shadow-2xl max-w-xl w-full border border-slate-200 overflow-hidden animate-in zoom-in-95 sm:my-auto max-h-[92vh] flex flex-col cursor-default"
           >
+            <BottomSheetHandle
+              className={editDisputeStatus === 'Resolved' ? 'bg-emerald-50' : 'bg-amber-50'}
+              {...disputeSheetDrag.dragHandleProps}
+            />
             <div
-              className={`px-5 py-3.5 border-b flex items-center justify-between shrink-0 ${
+              {...disputeSheetDrag.dragHandleProps}
+              className={`px-5 py-3.5 border-b flex items-center justify-between shrink-0 touch-none sm:touch-auto select-none sm:select-auto ${
                 editDisputeStatus === 'Resolved'
                   ? 'bg-emerald-50 border-emerald-200'
                   : 'bg-amber-50 border-amber-200'

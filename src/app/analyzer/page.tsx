@@ -107,6 +107,8 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { useBottomSheetDragToDismiss } from '@/hooks/useBottomSheetDragToDismiss';
+import BottomSheetHandle from '@/components/common/BottomSheetHandle';
 import { exportOpportunitiesCSV } from '@/lib/export/csvExport';
 import ImportDropdown from '@/components/common/ImportDropdown';
 import AnalyzerModeSwitcher from '@/components/analyzer/AnalyzerModeSwitcher';
@@ -237,6 +239,9 @@ export default function OpportunityAnalyzerPage() {
 
   // MAO Quick Solver State
   const [showMaoSolver, setShowMaoSolver] = useState(false);
+  const maoSheetDrag = useBottomSheetDragToDismiss({
+    onClose: () => setShowMaoSolver(false),
+  });
   const [maoSolverMode, setMaoSolverMode] = useState<'Flip' | 'Rental'>(analyzerDraft?.strategy === 'Flip' ? 'Flip' : 'Rental');
   const [maoTargetExitPrice, setMaoTargetExitPrice] = useState<number>(analyzerDraft?.targetExitPrice ?? 2_450_000);
   const [maoDesiredRoi, setMaoDesiredRoi] = useState<number>(15);
@@ -4615,12 +4620,16 @@ export default function OpportunityAnalyzerPage() {
                     <div className="fixed inset-0" onClick={() => setShowMaoSolver(false)} />
                     <div
                       ref={maoSolverRef}
+                      style={maoSheetDrag.sheetStyle}
                       className="relative bg-white rounded-t-3xl sm:rounded-2xl max-w-md w-full p-5 sm:p-6 shadow-2xl border border-slate-200 max-h-[90vh] overflow-y-auto z-10 animate-in slide-in-from-bottom duration-200 sm:duration-150 sm:zoom-in-95 text-slate-900"
                     >
                       {/* Mobile Drag Indicator */}
-                      <div className="w-12 h-1.5 bg-slate-300 rounded-full mx-auto mb-3 sm:hidden" />
+                      <BottomSheetHandle className="-mt-2.5 mb-1.5" {...maoSheetDrag.dragHandleProps} />
 
-                      <div className="flex items-center justify-between pb-3 mb-4 border-b border-slate-100">
+                      <div
+                        {...maoSheetDrag.dragHandleProps}
+                        className="flex items-center justify-between pb-3 mb-4 border-b border-slate-100 touch-none sm:touch-auto select-none sm:select-auto"
+                      >
                         <div className="flex items-center gap-2.5">
                           <div className="p-2 bg-violet-100 text-violet-700 rounded-xl">
                             <Target className="w-4 h-4" />

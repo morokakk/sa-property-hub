@@ -34,6 +34,8 @@ import { formatTenantMaintenanceRequestForWhatsApp } from '@/lib/whatsappFormatt
 import { submitTenantMaintenanceTicket } from '@/app/actions/submitTenantMaintenanceTicket';
 import { usePortfolioStore } from '@/lib/store/usePortfolioStore';
 import { useModalBackdropDismiss } from '@/hooks/useModalBackdropDismiss';
+import { useBottomSheetDragToDismiss } from '@/hooks/useBottomSheetDragToDismiss';
+import BottomSheetHandle from '@/components/common/BottomSheetHandle';
 import { PublicTenantStatementPayload } from '@/types/tenantStatement';
 import { RentalProperty, TenantPaymentRecord, ArrearsWriteOff, InspectionCondition } from '@/types';
 import { formatZAR, formatDate } from '@/lib/formatters';
@@ -204,6 +206,10 @@ export default function TenantStatementViewer({
     handleCloseMaintenanceModal,
     isSubmittingMaintenance
   );
+  const maintenanceSheetDrag = useBottomSheetDragToDismiss({
+    onClose: handleCloseMaintenanceModal,
+    disabled: isSubmittingMaintenance,
+  });
 
   const handleSubmitMaintenanceWhatsApp = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -659,18 +665,23 @@ export default function TenantStatementViewer({
           <div
             data-testid="tenant-maintenance-modal"
             {...maintenanceBackdropDismiss}
-            className={`fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in duration-150 print:hidden print-hidden-element ${
+            className={`fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 z-50 animate-in fade-in duration-150 print:hidden print-hidden-element ${
               isSubmittingMaintenance ? 'cursor-wait' : 'cursor-pointer'
             }`}
           >
             <div
               onClick={(e) => e.stopPropagation()}
-              className="bg-white rounded-2xl max-w-lg w-full p-5 sm:p-6 shadow-2xl border border-slate-200 space-y-4 max-h-[90vh] overflow-y-auto cursor-default"
+              style={maintenanceSheetDrag.sheetStyle}
+              className="bg-white rounded-t-3xl sm:rounded-2xl max-w-lg w-full p-5 sm:p-6 shadow-2xl border border-slate-200 space-y-4 max-h-[90vh] overflow-y-auto cursor-default"
               role="dialog"
               aria-modal="true"
               aria-labelledby="tenant-maintenance-modal-title"
             >
-              <div className="flex items-start justify-between gap-3 pb-3 border-b border-slate-100">
+              <BottomSheetHandle className="-mt-2.5 mb-1.5" {...maintenanceSheetDrag.dragHandleProps} />
+              <div
+                {...maintenanceSheetDrag.dragHandleProps}
+                className="flex items-start justify-between gap-3 pb-3 border-b border-slate-100 touch-none sm:touch-auto select-none sm:select-auto"
+              >
                 <div className="flex items-center gap-2.5">
                   <div className="w-9 h-9 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-600 shrink-0">
                     <Wrench className="w-5 h-5" />

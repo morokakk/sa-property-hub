@@ -25,6 +25,8 @@ import {
   submitFeedback,
   buildFeedbackWhatsAppUrl,
 } from '@/lib/feedback/submitFeedback';
+import { useBottomSheetDragToDismiss } from '@/hooks/useBottomSheetDragToDismiss';
+import BottomSheetHandle from '@/components/common/BottomSheetHandle';
 
 interface FeedbackModalProps {
   isOpen: boolean;
@@ -115,6 +117,11 @@ export default function FeedbackModal({
     }
     onClose();
   };
+
+  const { sheetStyle, dragHandleProps } = useBottomSheetDragToDismiss({
+    onClose: handleClose,
+    disabled: isSubmitting,
+  });
 
   // Initialize diagnostics, route, category, and reset state on open
   useEffect(() => {
@@ -221,7 +228,7 @@ export default function FeedbackModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end md:items-center justify-center p-0 md:p-4 bg-slate-950/75 backdrop-blur-xs animate-in fade-in duration-200"
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-950/75 backdrop-blur-xs animate-in fade-in duration-200"
       role="dialog"
       aria-modal="true"
       aria-labelledby={titleId}
@@ -236,10 +243,15 @@ export default function FeedbackModal({
 
       <div
         data-testid="feedback-modal-container"
-        className="bg-slate-900 border-t md:border border-slate-800 rounded-t-2xl md:rounded-2xl shadow-2xl w-full max-w-lg max-h-[92vh] md:max-h-[85vh] flex flex-col overflow-hidden text-slate-100 animate-in slide-in-from-bottom md:zoom-in-95 duration-200"
+        style={sheetStyle}
+        className="bg-slate-900 border-t sm:border border-slate-800 rounded-t-2xl sm:rounded-2xl shadow-2xl w-full max-w-lg max-h-[92vh] sm:max-h-[85vh] flex flex-col overflow-hidden text-slate-100 animate-in slide-in-from-bottom sm:zoom-in-95 duration-200"
       >
+        <BottomSheetHandle tone="dark" {...dragHandleProps} />
         {/* Header */}
-        <div className="p-4 md:p-5 border-b border-slate-800 flex items-center justify-between shrink-0 bg-slate-900/90 backdrop-blur-xs">
+        <div
+          {...dragHandleProps}
+          className="p-4 md:p-5 border-b border-slate-800 flex items-center justify-between shrink-0 bg-slate-900/90 backdrop-blur-xs touch-none sm:touch-auto select-none sm:select-auto"
+        >
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 shrink-0">
               <MessageSquarePlus className="w-5 h-5" />

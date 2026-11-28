@@ -6,6 +6,8 @@ import { usePortfolioStore } from '@/lib/store/usePortfolioStore';
 import { formatZAR } from '@/lib/formatters';
 import { FundingSource, FundingTranche, FundingType, ReturnTermType } from '@/types';
 import { buildFourPhaseBoqTranches, BOQ_MILESTONE_PHASE_CONFIG } from '@/lib/calculations/flips';
+import { useBottomSheetDragToDismiss } from '@/hooks/useBottomSheetDragToDismiss';
+import BottomSheetHandle from '@/components/common/BottomSheetHandle';
 
 const TERM_MONTH_PRESETS = [6, 12, 18, 60, 180] as const;
 
@@ -279,6 +281,8 @@ export default function AddFundingModal({
     onClose();
   };
 
+  const { sheetStyle, dragHandleProps } = useBottomSheetDragToDismiss({ onClose });
+
   if (!isOpen) return null;
 
   return (
@@ -288,10 +292,14 @@ export default function AddFundingModal({
     >
       <div
         onClick={(e) => e.stopPropagation()}
+        style={sheetStyle}
         className="bg-white rounded-t-3xl sm:rounded-xl max-w-xl w-full p-5 sm:p-6 shadow-xl border border-slate-200 max-h-[92vh] overflow-y-auto cursor-default"
       >
-        <div className="w-12 h-1.5 bg-slate-300 rounded-full mx-auto mb-3 sm:hidden" />
-        <div className="flex items-center justify-between mb-4">
+        <BottomSheetHandle className="-mt-2.5 mb-1.5" {...dragHandleProps} />
+        <div
+          {...dragHandleProps}
+          className="flex items-center justify-between mb-4 touch-none sm:touch-auto select-none sm:select-auto"
+        >
           <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
             <Coins className="w-5 h-5 text-emerald-600" />
             Add Financing / Capital Source

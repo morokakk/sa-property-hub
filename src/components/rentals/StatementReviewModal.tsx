@@ -15,6 +15,8 @@ import {
 import { ExtractedRentalUnit, RentalProperty } from '@/types';
 import { usePortfolioStore } from '@/lib/store/usePortfolioStore';
 import { useModalBackdropDismiss } from '@/hooks/useModalBackdropDismiss';
+import { useBottomSheetDragToDismiss } from '@/hooks/useBottomSheetDragToDismiss';
+import BottomSheetHandle from '@/components/common/BottomSheetHandle';
 import { formatZAR } from '@/lib/formatters';
 import { checkAccountingVariance } from '@/lib/ai/statementValidation';
 
@@ -110,6 +112,7 @@ export default function StatementReviewModal({
   };
 
   const backdropDismiss = useModalBackdropDismiss(onClose);
+  const { sheetStyle, dragHandleProps } = useBottomSheetDragToDismiss({ onClose });
 
   if (!isOpen) return null;
 
@@ -120,12 +123,17 @@ export default function StatementReviewModal({
     >
       <div
         onClick={(e) => e.stopPropagation()}
+        style={sheetStyle}
         className="bg-white rounded-t-3xl sm:rounded-2xl shadow-2xl border border-slate-200 w-full max-w-5xl overflow-hidden flex flex-col max-h-[92vh] sm:max-h-[90vh] animate-in zoom-in-95 duration-200 cursor-default"
         role="dialog"
         aria-modal="true"
       >
+        <BottomSheetHandle tone="dark" {...dragHandleProps} />
         {/* Modal Header */}
-        <div className="bg-slate-900 text-white px-6 py-4 flex items-center justify-between">
+        <div
+          {...dragHandleProps}
+          className="bg-slate-900 text-white px-6 py-4 flex items-center justify-between touch-none sm:touch-auto select-none sm:select-auto"
+        >
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-indigo-500/20 text-indigo-400 flex items-center justify-center border border-indigo-500/30 shrink-0">
               <Sparkles className="w-5 h-5" />

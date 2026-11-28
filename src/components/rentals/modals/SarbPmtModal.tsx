@@ -7,6 +7,8 @@ import { Calculator, CheckCircle2, X, Lightbulb } from 'lucide-react';
 import { calculateMonthlyBondRepayment } from '@/lib/calculations/propertyMetrics';
 import { usePortfolioStore } from '@/lib/store/usePortfolioStore';
 import { useModalBackdropDismiss } from '@/hooks/useModalBackdropDismiss';
+import { useBottomSheetDragToDismiss } from '@/hooks/useBottomSheetDragToDismiss';
+import BottomSheetHandle from '@/components/common/BottomSheetHandle';
 
 export interface SarbPmtModalProps {
   isOpen: boolean;
@@ -66,6 +68,7 @@ export const SarbPmtModal: React.FC<SarbPmtModalProps> = ({
   }, [property, isOpen, propInterestRate]);
 
   const backdropDismiss = useModalBackdropDismiss(onClose);
+  const { sheetStyle, dragHandleProps } = useBottomSheetDragToDismiss({ onClose });
 
   if (!isOpen || !property) return null;
 
@@ -129,10 +132,14 @@ export const SarbPmtModal: React.FC<SarbPmtModalProps> = ({
     >
       <div
         onClick={(e) => e.stopPropagation()}
+        style={sheetStyle}
         className="bg-white rounded-t-3xl sm:rounded-2xl max-w-lg w-full p-5 sm:p-6 shadow-2xl border border-slate-200 animate-in zoom-in-95 duration-200 max-h-[92vh] sm:max-h-none overflow-y-auto cursor-default"
       >
-        <div className="w-12 h-1.5 bg-slate-300 rounded-full mx-auto mb-3 sm:hidden" />
-        <div className="flex items-center justify-between pb-3 border-b border-slate-200 mb-4">
+        <BottomSheetHandle className="-mt-2.5 mb-1.5" {...dragHandleProps} />
+        <div
+          {...dragHandleProps}
+          className="flex items-center justify-between pb-3 border-b border-slate-200 mb-4 touch-none sm:touch-auto select-none sm:select-auto"
+        >
           <div className="flex items-center gap-2.5">
             <div className="w-9 h-9 rounded-xl bg-indigo-50 text-indigo-600 border border-indigo-200 flex items-center justify-center font-bold">
               <Calculator className="w-5 h-5" />

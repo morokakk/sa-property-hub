@@ -1,6 +1,8 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
+import BottomSheetHandle from '@/components/common/BottomSheetHandle';
+import { useBottomSheetDragToDismiss } from '@/hooks/useBottomSheetDragToDismiss';
 import {
   AnalyzerSectionId,
   AnalyzerLayoutPreset,
@@ -229,6 +231,9 @@ export default function AnalyzerLayoutCustomizer({
 }: AnalyzerLayoutCustomizerProps) {
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const { sheetStyle, dragHandleProps } = useBottomSheetDragToDismiss({
+    onClose: () => setIsOpen(false),
+  });
 
   // Close on outside click or Escape
   useEffect(() => {
@@ -309,13 +314,17 @@ export default function AnalyzerLayoutCustomizer({
             aria-modal="true"
             aria-labelledby="layout-customizer-title"
             data-testid="analyzer-layout-customizer-panel"
+            style={sheetStyle}
             className="relative bg-white rounded-t-3xl sm:rounded-2xl max-w-lg w-full p-5 sm:p-6 shadow-2xl border border-slate-200 max-h-[90vh] overflow-y-auto z-10 animate-in slide-in-from-bottom duration-200 sm:duration-150 sm:zoom-in-95 text-slate-900"
           >
             {/* Mobile Drag Indicator */}
-            <div className="w-12 h-1.5 bg-slate-300 rounded-full mx-auto mb-3 sm:hidden" />
+            <BottomSheetHandle className="-mt-2.5 mb-1.5" {...dragHandleProps} />
 
             {/* Header */}
-            <div className="flex items-center justify-between pb-3 mb-4 border-b border-slate-100">
+            <div
+              {...dragHandleProps}
+              className="flex items-center justify-between pb-3 mb-4 border-b border-slate-100 touch-none sm:touch-auto select-none sm:select-auto"
+            >
               <div className="flex items-center gap-2.5">
                 <div className="p-2 bg-indigo-100 text-indigo-700 rounded-xl">
                   <SlidersHorizontal className="w-4 h-4" />

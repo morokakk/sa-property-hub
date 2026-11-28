@@ -4,6 +4,8 @@ import React from 'react';
 import { AlertCircle, X, CheckCircle2, ShieldAlert } from 'lucide-react';
 import type { ValidationErrorItem } from '@/lib/import/excelImport';
 import { useModalBackdropDismiss } from '@/hooks/useModalBackdropDismiss';
+import { useBottomSheetDragToDismiss } from '@/hooks/useBottomSheetDragToDismiss';
+import BottomSheetHandle from '@/components/common/BottomSheetHandle';
 
 interface ValidationErrorModalProps {
   isOpen: boolean;
@@ -21,6 +23,7 @@ export default function ValidationErrorModal({
   errors,
 }: ValidationErrorModalProps) {
   const backdropDismiss = useModalBackdropDismiss(onClose);
+  const { sheetStyle, dragHandleProps } = useBottomSheetDragToDismiss({ onClose });
 
   if (!isOpen) return null;
 
@@ -38,12 +41,17 @@ export default function ValidationErrorModal({
     >
       <div
         onClick={(e) => e.stopPropagation()}
+        style={sheetStyle}
         className="bg-white rounded-t-3xl sm:rounded-2xl shadow-2xl border border-red-200 w-full max-w-2xl overflow-hidden flex flex-col max-h-[92vh] sm:max-h-[85vh] animate-in zoom-in-95 duration-200 cursor-default"
         role="dialog"
         aria-modal="true"
       >
+        <BottomSheetHandle className="bg-red-50/80" {...dragHandleProps} />
         {/* Modal Header */}
-        <div className="bg-red-50/80 border-b border-red-100 px-6 py-4 flex items-center justify-between">
+        <div
+          {...dragHandleProps}
+          className="bg-red-50/80 border-b border-red-100 px-6 py-4 flex items-center justify-between touch-none sm:touch-auto select-none sm:select-auto"
+        >
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center text-red-600 shrink-0">
               <ShieldAlert className="w-5 h-5" />

@@ -17,6 +17,8 @@ import {
 } from 'lucide-react';
 import { usePortfolioStore } from '@/lib/store/usePortfolioStore';
 import { useModalBackdropDismiss } from '@/hooks/useModalBackdropDismiss';
+import { useBottomSheetDragToDismiss } from '@/hooks/useBottomSheetDragToDismiss';
+import BottomSheetHandle from '@/components/common/BottomSheetHandle';
 import { PropertyMeter, RentalProperty } from '@/types';
 
 interface PropertyMeterRegistryModalProps {
@@ -50,6 +52,7 @@ export default function PropertyMeterRegistryModal({
   const [formError, setFormError] = useState<string | null>(null);
 
   const backdropDismiss = useModalBackdropDismiss(onClose);
+  const { sheetStyle, dragHandleProps } = useBottomSheetDragToDismiss({ onClose });
 
   if (!isOpen || !property) return null;
 
@@ -137,14 +140,19 @@ export default function PropertyMeterRegistryModal({
   return (
     <div
       {...backdropDismiss}
-      className="fixed inset-0 z-60 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs overflow-y-auto cursor-pointer"
+      className="fixed inset-0 z-60 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/60 backdrop-blur-xs overflow-y-auto cursor-pointer"
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] flex flex-col border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95 duration-150 text-xs cursor-default"
+        style={sheetStyle}
+        className="bg-white rounded-t-3xl sm:rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] flex flex-col border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95 duration-150 text-xs cursor-default"
       >
+        <BottomSheetHandle className="bg-slate-50/80" {...dragHandleProps} />
         {/* Header */}
-        <div className="px-5 py-4 border-b border-slate-200 flex items-center justify-between bg-slate-50/80">
+        <div
+          {...dragHandleProps}
+          className="px-5 py-4 border-b border-slate-200 flex items-center justify-between bg-slate-50/80 touch-none sm:touch-auto select-none sm:select-auto"
+        >
           <div className="flex items-center gap-2.5 min-w-0">
             <div className="p-2 rounded-xl bg-cyan-100 text-cyan-800 shrink-0">
               <Gauge className="w-5 h-5" />

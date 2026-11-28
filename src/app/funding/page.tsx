@@ -3,6 +3,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import TopHeader from '@/components/navigation/TopHeader';
 import AddFundingModal from '@/components/funding/AddFundingModal';
+import BottomSheetHandle from '@/components/common/BottomSheetHandle';
+import { useBottomSheetDragToDismiss } from '@/hooks/useBottomSheetDragToDismiss';
 import { usePortfolioStore, usePortfolioSummary } from '@/lib/store/usePortfolioStore';
 import { formatZAR, formatPercent, formatDate } from '@/lib/formatters';
 import { FlipProject, FundingSource, FundingTranche, FundingType, ReturnTermType } from '@/types';
@@ -97,6 +99,12 @@ export default function FundingTrackerPage() {
   const [paymentReference, setPaymentReference] = useState<string>('');
   const [copyReceiptOnSave, setCopyReceiptOnSave] = useState<boolean>(true);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const syncSheetDrag = useBottomSheetDragToDismiss({
+    onClose: () => setSyncModalSource(null),
+  });
+  const repaymentSheetDrag = useBottomSheetDragToDismiss({
+    onClose: () => setRepaymentModalSource(null),
+  });
 
   // Auto-dismiss toast after 3.5 seconds
   useEffect(() => {
@@ -1221,10 +1229,14 @@ export default function FundingTrackerPage() {
         >
           <div
             onClick={(e) => e.stopPropagation()}
+            style={syncSheetDrag.sheetStyle}
             className="bg-white rounded-t-3xl sm:rounded-2xl max-w-lg w-full p-5 sm:p-6 shadow-xl border border-slate-200 max-h-[92vh] sm:max-h-none overflow-y-auto cursor-default"
           >
-            <div className="w-12 h-1.5 bg-slate-300 rounded-full mx-auto mb-3 sm:hidden" />
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+            <BottomSheetHandle className="-mt-2.5 mb-1.5" {...syncSheetDrag.dragHandleProps} />
+            <div
+              {...syncSheetDrag.dragHandleProps}
+              className="flex items-center justify-between pb-3 border-b border-slate-100 touch-none sm:touch-auto select-none sm:select-auto"
+            >
               <div className="flex items-center gap-2">
                 <Clock className="w-5 h-5 text-indigo-600" />
                 <h3 className="text-base font-bold text-slate-900">Sync Funding With Deal Delay</h3>
@@ -1399,13 +1411,16 @@ export default function FundingTrackerPage() {
         >
           <div
             onClick={(e) => e.stopPropagation()}
+            style={repaymentSheetDrag.sheetStyle}
             className="bg-white rounded-t-3xl sm:rounded-xl max-w-md w-full p-5 sm:p-6 shadow-xl border border-slate-200 max-h-[92vh] sm:max-h-none overflow-y-auto cursor-default"
           >
-            <div className="w-12 h-1.5 bg-slate-300 rounded-full mx-auto mb-3 sm:hidden" />
-            <h3 className="text-base font-bold text-slate-900 mb-2">Log Payment to Lender</h3>
-            <p className="text-xs text-slate-500 mb-4">
-              Record coupon payment or principal settlement for <strong>{repaymentModalSource.lenderName}</strong>.
-            </p>
+            <BottomSheetHandle className="-mt-2.5 mb-1.5" {...repaymentSheetDrag.dragHandleProps} />
+            <div {...repaymentSheetDrag.dragHandleProps} className="touch-none sm:touch-auto select-none sm:select-auto">
+              <h3 className="text-base font-bold text-slate-900 mb-2">Log Payment to Lender</h3>
+              <p className="text-xs text-slate-500 mb-4">
+                Record coupon payment or principal settlement for <strong>{repaymentModalSource.lenderName}</strong>.
+              </p>
+            </div>
 
             <form onSubmit={handleProcessRepayment} noValidate className="space-y-4 text-xs">
               <div>

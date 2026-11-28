@@ -21,6 +21,8 @@ import {
 } from 'lucide-react';
 import { usePortfolioStore } from '@/lib/store/usePortfolioStore';
 import { useModalBackdropDismiss } from '@/hooks/useModalBackdropDismiss';
+import { useBottomSheetDragToDismiss } from '@/hooks/useBottomSheetDragToDismiss';
+import BottomSheetHandle from '@/components/common/BottomSheetHandle';
 import {
   RentalProperty,
   MeterReading,
@@ -117,6 +119,10 @@ export default function DisputeLetterModal({
 
   const isBackdropDismissDisabled = photoProcessing || pdfGenerating;
   const backdropDismiss = useModalBackdropDismiss(onClose, isBackdropDismissDisabled);
+  const { sheetStyle, dragHandleProps } = useBottomSheetDragToDismiss({
+    onClose,
+    disabled: isBackdropDismissDisabled,
+  });
 
   // Initialize form whenever modal opens or props change
   useEffect(() => {
@@ -322,16 +328,21 @@ export default function DisputeLetterModal({
     <>
       <div
         {...backdropDismiss}
-        className={`fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-900/60 backdrop-blur-xs overflow-y-auto ${
+        className={`fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/60 backdrop-blur-xs overflow-y-auto ${
           isBackdropDismissDisabled ? 'cursor-wait' : 'cursor-pointer'
         }`}
       >
         <div
           onClick={(e) => e.stopPropagation()}
-          className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[94vh] flex flex-col border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95 duration-150 text-xs cursor-default"
+          style={sheetStyle}
+          className="bg-white rounded-t-3xl sm:rounded-2xl shadow-2xl max-w-4xl w-full max-h-[94vh] flex flex-col border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95 duration-150 text-xs cursor-default"
         >
+          <BottomSheetHandle className="bg-slate-50/80" {...dragHandleProps} />
           {/* Header */}
-          <div className="px-5 py-3.5 border-b border-slate-200 flex items-center justify-between bg-slate-50/80">
+          <div
+            {...dragHandleProps}
+            className="px-5 py-3.5 border-b border-slate-200 flex items-center justify-between bg-slate-50/80 touch-none sm:touch-auto select-none sm:select-auto"
+          >
             <div className="flex items-center gap-2.5 min-w-0">
               <div className="p-2 rounded-xl bg-amber-500 text-white shrink-0 shadow-xs">
                 <FileText className="w-5 h-5" />

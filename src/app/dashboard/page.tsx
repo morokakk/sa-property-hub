@@ -10,6 +10,8 @@ import ConsolidatedTaxCard from '@/components/dashboard/ConsolidatedTaxCard';
 import EquityExtractionCard from '@/components/dashboard/EquityExtractionCard';
 import { usePortfolioStore, usePortfolioSummary } from '@/lib/store/usePortfolioStore';
 import { useModalBackdropDismiss } from '@/hooks/useModalBackdropDismiss';
+import { useBottomSheetDragToDismiss } from '@/hooks/useBottomSheetDragToDismiss';
+import BottomSheetHandle from '@/components/common/BottomSheetHandle';
 import { formatZAR, formatPercent, formatDate } from '@/lib/formatters';
 import { calculateRentalCashflow } from '@/lib/calculations/propertyMetrics';
 import { calculatePropertyArrears } from '@/lib/calculations/arrears';
@@ -58,6 +60,9 @@ export default function GlobalDashboardPage() {
   const [showEditSeedModal, setShowEditSeedModal] = React.useState(false);
   const [seedAmount, setSeedAmount] = React.useState(summary.liquidCapitalReserve);
   const seedModalBackdropDismiss = useModalBackdropDismiss(() => setShowEditSeedModal(false));
+  const seedSheetDrag = useBottomSheetDragToDismiss({
+    onClose: () => setShowEditSeedModal(false),
+  });
 
   const equityRatio = summary.totalGrossAssetValue > 0
     ? (summary.netEquity / summary.totalGrossAssetValue) * 100
@@ -696,11 +701,15 @@ export default function GlobalDashboardPage() {
           >
             <div
               onClick={(e) => e.stopPropagation()}
+              style={seedSheetDrag.sheetStyle}
               className="bg-white rounded-t-3xl sm:rounded-2xl max-w-md w-full p-5 sm:p-6 shadow-2xl border border-slate-200 max-h-[92vh] sm:max-h-none overflow-y-auto cursor-default"
             >
               {/* Mobile Drag Indicator */}
-              <div className="w-12 h-1.5 bg-slate-300 rounded-full mx-auto mb-3 sm:hidden" />
-              <div className="flex items-center justify-between pb-3 sm:pb-4 border-b border-slate-100">
+              <BottomSheetHandle className="-mt-2.5 mb-1.5" {...seedSheetDrag.dragHandleProps} />
+              <div
+                {...seedSheetDrag.dragHandleProps}
+                className="flex items-center justify-between pb-3 sm:pb-4 border-b border-slate-100 touch-none sm:touch-auto select-none sm:select-auto"
+              >
                 <div className="flex items-center gap-2.5">
                   <div className="w-8 h-8 rounded-md bg-slate-100 border border-slate-200/80 text-slate-700 flex items-center justify-center shrink-0">
                     <Wallet className="w-4 h-4" />

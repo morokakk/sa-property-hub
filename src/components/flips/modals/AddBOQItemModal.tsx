@@ -5,6 +5,8 @@ import { BOQItem, LocalSupplier } from '@/types';
 import { formatZAR } from '@/lib/formatters';
 import { Plus, Gift } from 'lucide-react';
 import { usePortfolioStore } from '@/lib/store/usePortfolioStore';
+import { useBottomSheetDragToDismiss } from '@/hooks/useBottomSheetDragToDismiss';
+import BottomSheetHandle from '@/components/common/BottomSheetHandle';
 
 export interface AddBOQItemModalProps {
   isOpen: boolean;
@@ -131,6 +133,8 @@ export const AddBOQItemModal: React.FC<AddBOQItemModalProps> = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, onClose]);
 
+  const { sheetStyle, dragHandleProps } = useBottomSheetDragToDismiss({ onClose });
+
   if (!isOpen) return null;
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -179,10 +183,14 @@ export const AddBOQItemModal: React.FC<AddBOQItemModalProps> = ({
     >
       <div
         onClick={(e) => e.stopPropagation()}
+        style={sheetStyle}
         className="bg-white rounded-t-3xl sm:rounded-xl max-w-lg w-full p-5 sm:p-6 shadow-xl border border-slate-200 max-h-[92vh] sm:max-h-none overflow-y-auto cursor-default"
       >
-        <div className="w-12 h-1.5 bg-slate-300 rounded-full mx-auto mb-3 sm:hidden" />
-        <h3 className="text-base font-bold text-slate-900 mb-4 flex items-center gap-2">
+        <BottomSheetHandle className="-mt-2.5 mb-1.5" {...dragHandleProps} />
+        <h3
+          {...dragHandleProps}
+          className="text-base font-bold text-slate-900 mb-4 flex items-center gap-2 touch-none sm:touch-auto select-none sm:select-auto"
+        >
           <Plus className="w-5 h-5 text-emerald-600" />
           Add Bill of Quantities (BOQ) Line Item
         </h3>

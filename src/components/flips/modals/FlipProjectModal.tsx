@@ -22,6 +22,8 @@ import InvestmentNodeSelect, { InvestmentNodeBanner } from '@/components/common/
 import { getNodeComplianceProfile } from '@/lib/constants/investmentNodes';
 import AiApiKeyGuardrailBanner from '@/components/ai/AiApiKeyGuardrailBanner';
 import { ZONING_PRESETS, formatZoningTransitionLabel } from '@/lib/calculations/zoning';
+import { useBottomSheetDragToDismiss } from '@/hooks/useBottomSheetDragToDismiss';
+import BottomSheetHandle from '@/components/common/BottomSheetHandle';
 
 export interface FlipProjectModalProps {
   isOpen: boolean;
@@ -413,6 +415,10 @@ export const FlipProjectModal: React.FC<FlipProjectModalProps> = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen]);
 
+  const { sheetStyle, dragHandleProps } = useBottomSheetDragToDismiss({
+    onClose: handleClose,
+  });
+
   if (!isOpen) return null;
 
   const handlePdfUpload = async (files: File[], overrideAiSettings?: typeof aiSettings) => {
@@ -650,10 +656,14 @@ export const FlipProjectModal: React.FC<FlipProjectModalProps> = ({
     >
       <div
         onClick={(e) => e.stopPropagation()}
+        style={sheetStyle}
         className="bg-white rounded-t-3xl sm:rounded-xl max-w-lg w-full p-5 sm:p-6 shadow-xl border border-slate-200 max-h-[92vh] overflow-y-auto cursor-default"
       >
-        <div className="w-12 h-1.5 bg-slate-300 rounded-full mx-auto mb-3 sm:hidden" />
-        <div className="flex items-center justify-between mb-3">
+        <BottomSheetHandle className="-mt-2.5 mb-1.5" {...dragHandleProps} />
+        <div
+          {...dragHandleProps}
+          className="flex items-center justify-between mb-3 touch-none sm:touch-auto select-none sm:select-auto"
+        >
           <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
             {isEditing ? (
               <>

@@ -10,6 +10,8 @@ import { formatOpportunityForWhatsApp } from '@/lib/whatsappFormatter';
 import { formatZAR, formatPercent } from '@/lib/formatters';
 import { calculateDealDscr, evaluateDealCriteria } from '@/lib/calculations/propertyMetrics';
 import { useViewportDropdownPosition } from '@/hooks/useViewportDropdownPosition';
+import { useBottomSheetDragToDismiss } from '@/hooks/useBottomSheetDragToDismiss';
+import BottomSheetHandle from '@/components/common/BottomSheetHandle';
 import {
   TrendingUp,
   Target,
@@ -76,6 +78,9 @@ function PipelineDealCard({
   const [isPassModalOpen, setIsPassModalOpen] = useState(false);
   const [passReason, setPassReason] = useState<PassReason>('Yield Too Low');
   const [passNotes, setPassNotes] = useState('');
+  const passSheetDrag = useBottomSheetDragToDismiss({
+    onClose: () => setIsPassModalOpen(false),
+  });
 
   const menuRef = useRef<HTMLDivElement>(null);
   const proximityRef = useRef<HTMLDivElement>(null);
@@ -727,9 +732,15 @@ function PipelineDealCard({
       {isPassModalOpen && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-150">
           <div className="fixed inset-0" onClick={() => setIsPassModalOpen(false)} />
-          <div className="relative bg-white rounded-t-3xl sm:rounded-2xl max-w-sm w-full p-5 sm:p-6 shadow-2xl border border-slate-200 max-h-[90vh] overflow-y-auto z-10 animate-in slide-in-from-bottom duration-200 text-left">
-            <div className="w-12 h-1.5 bg-slate-300 rounded-full mx-auto mb-3 sm:hidden" />
-            <div className="flex items-center justify-between pb-2 mb-3 border-b border-slate-100">
+          <div
+            style={passSheetDrag.sheetStyle}
+            className="relative bg-white rounded-t-3xl sm:rounded-2xl max-w-sm w-full p-5 sm:p-6 shadow-2xl border border-slate-200 max-h-[90vh] overflow-y-auto z-10 animate-in slide-in-from-bottom duration-200 text-left"
+          >
+            <BottomSheetHandle className="-mt-2.5 mb-1.5" {...passSheetDrag.dragHandleProps} />
+            <div
+              {...passSheetDrag.dragHandleProps}
+              className="flex items-center justify-between pb-2 mb-3 border-b border-slate-100 touch-none sm:touch-auto select-none sm:select-auto"
+            >
               <div className="flex items-center gap-2">
                 <div className="p-1 rounded-lg bg-rose-100 text-rose-700">
                   <XCircle className="w-4 h-4" />

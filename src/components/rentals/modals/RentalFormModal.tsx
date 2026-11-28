@@ -31,6 +31,8 @@ import {
 } from '@/lib/calculations/rentalZoning';
 import { usePortfolioStore } from '@/lib/store/usePortfolioStore';
 import { useModalBackdropDismiss } from '@/hooks/useModalBackdropDismiss';
+import { useBottomSheetDragToDismiss } from '@/hooks/useBottomSheetDragToDismiss';
+import BottomSheetHandle from '@/components/common/BottomSheetHandle';
 import { TenantVettingDrawer } from './TenantVettingDrawer';
 import { LeaseInspectionDrawer } from './LeaseInspectionDrawer';
 import InvestmentNodeSelect, { InvestmentNodeBanner } from '@/components/common/InvestmentNodeSelect';
@@ -694,6 +696,7 @@ export const RentalFormModal: React.FC<RentalFormModalProps> = ({
   };
 
   const backdropDismiss = useModalBackdropDismiss(onClose);
+  const { sheetStyle, dragHandleProps } = useBottomSheetDragToDismiss({ onClose });
 
   if (!isOpen) return null;
 
@@ -704,14 +707,18 @@ export const RentalFormModal: React.FC<RentalFormModalProps> = ({
     >
       <div
         onClick={(e) => e.stopPropagation()}
+        style={sheetStyle}
         className="bg-white rounded-t-3xl sm:rounded-xl max-w-lg sm:max-w-2xl w-full shadow-xl border border-slate-200 max-h-[92vh] sm:max-h-[90vh] flex flex-col overflow-hidden cursor-default"
       >
         {/* Mobile Drag Handle */}
-        <div className="w-12 h-1.5 bg-slate-300 rounded-full mx-auto mt-2.5 mb-1 sm:hidden shrink-0" />
+        <BottomSheetHandle {...dragHandleProps} />
 
         <form onSubmit={handleSubmit} noValidate className="flex flex-col flex-1 min-h-0 overflow-hidden text-xs">
           {/* Sticky Header */}
-          <div className="shrink-0 sticky top-0 z-20 bg-white/95 backdrop-blur border-b border-slate-200 px-6 py-4 space-y-3">
+          <div
+            {...dragHandleProps}
+            className="shrink-0 sticky top-0 z-20 bg-white/95 backdrop-blur border-b border-slate-200 px-6 py-4 space-y-3 touch-none sm:touch-auto select-none sm:select-auto"
+          >
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Building2 className="w-5 h-5 text-emerald-600 shrink-0" />

@@ -17,6 +17,8 @@ import {
 } from 'lucide-react';
 import { usePortfolioStore } from '@/lib/store/usePortfolioStore';
 import { useModalBackdropDismiss } from '@/hooks/useModalBackdropDismiss';
+import { useBottomSheetDragToDismiss } from '@/hooks/useBottomSheetDragToDismiss';
+import BottomSheetHandle from '@/components/common/BottomSheetHandle';
 import { normalizeWhatsAppPhone } from '@/lib/calculations/inspections';
 import { exportSuppliersCSV } from '@/lib/export/csvExport';
 
@@ -102,6 +104,7 @@ export const SupplierDirectoryModal: React.FC<SupplierDirectoryModalProps> = ({
   const updateSupplier = propOnUpdateSupplier || storeUpdateSupplier;
 
   const backdropDismiss = useModalBackdropDismiss(onClose);
+  const { sheetStyle, dragHandleProps } = useBottomSheetDragToDismiss({ onClose });
 
   // Collapsible Add/Edit form & search/filter state
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -304,11 +307,15 @@ export const SupplierDirectoryModal: React.FC<SupplierDirectoryModalProps> = ({
     >
       <div
         onClick={(e) => e.stopPropagation()}
+        style={sheetStyle}
         className="bg-white rounded-t-3xl sm:rounded-xl max-w-2xl w-full shadow-xl border border-slate-200 max-h-[92vh] sm:max-h-[86vh] flex flex-col overflow-hidden cursor-default"
       >
+        <BottomSheetHandle {...dragHandleProps} />
         {/* Sticky Modal Header */}
-        <div className="sticky top-0 z-10 bg-white border-b border-slate-200 px-4 sm:px-6 pt-3 pb-3.5 shrink-0">
-          <div className="w-12 h-1.5 bg-slate-300 rounded-full mx-auto mb-3 sm:hidden" />
+        <div
+          {...dragHandleProps}
+          className="sticky top-0 z-10 bg-white border-b border-slate-200 px-4 sm:px-6 pt-1.5 sm:pt-3 pb-3.5 shrink-0 touch-none sm:touch-auto select-none sm:select-auto"
+        >
           <div className="grid grid-cols-[1fr_auto] sm:grid-cols-[1fr_auto_auto] items-center gap-x-2 gap-y-2.5 sm:gap-y-0">
             <div className="min-w-0">
               <h3 className="text-sm sm:text-base font-bold text-slate-900 flex items-center gap-2 min-w-0">

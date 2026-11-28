@@ -5,6 +5,8 @@ import { FlipProject } from '@/types';
 import { formatZAR } from '@/lib/formatters';
 import { ArrowRightLeft, RefreshCw, X } from 'lucide-react';
 import { calculateGrossYield } from '@/lib/calculations/rentals';
+import { useBottomSheetDragToDismiss } from '@/hooks/useBottomSheetDragToDismiss';
+import BottomSheetHandle from '@/components/common/BottomSheetHandle';
 
 export interface FlipToRentalModalProps {
   isOpen: boolean;
@@ -124,6 +126,8 @@ export const FlipToRentalModal: React.FC<FlipToRentalModalProps> = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, onClose]);
 
+  const { sheetStyle, dragHandleProps } = useBottomSheetDragToDismiss({ onClose });
+
   if (!isOpen || !flip) return null;
 
   const marketValue = propMarketValue !== undefined ? propMarketValue : localMarketValue;
@@ -222,10 +226,14 @@ export const FlipToRentalModal: React.FC<FlipToRentalModalProps> = ({
     >
       <div
         onClick={(e) => e.stopPropagation()}
+        style={sheetStyle}
         className="bg-white rounded-t-3xl sm:rounded-xl max-w-xl w-full p-5 sm:p-6 shadow-xl border border-slate-200 animate-in fade-in sm:my-8 max-h-[92vh] sm:max-h-[90vh] overflow-y-auto cursor-default"
       >
-        <div className="w-12 h-1.5 bg-slate-300 rounded-full mx-auto mb-3 sm:hidden" />
-        <div className="flex items-center justify-between pb-3 mb-4 border-b border-slate-100">
+        <BottomSheetHandle className="-mt-2.5 mb-1.5" {...dragHandleProps} />
+        <div
+          {...dragHandleProps}
+          className="flex items-center justify-between pb-3 mb-4 border-b border-slate-100 touch-none sm:touch-auto select-none sm:select-auto"
+        >
           <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
             <ArrowRightLeft className="w-5 h-5 text-indigo-600" />
             <span>Convert to Rental (BRRRR Transition)</span>

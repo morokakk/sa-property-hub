@@ -5,6 +5,8 @@ import { FlipProject } from '@/types';
 import { formatZAR } from '@/lib/formatters';
 import { CheckCircle2, X, FileText, AlertTriangle } from 'lucide-react';
 import { usePortfolioStore } from '@/lib/store/usePortfolioStore';
+import { useBottomSheetDragToDismiss } from '@/hooks/useBottomSheetDragToDismiss';
+import BottomSheetHandle from '@/components/common/BottomSheetHandle';
 
 export interface FlipExitModalProps {
   isOpen: boolean;
@@ -105,6 +107,8 @@ export const FlipExitModal: React.FC<FlipExitModalProps> = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, onClose]);
 
+  const { sheetStyle, dragHandleProps } = useBottomSheetDragToDismiss({ onClose });
+
   if (!isOpen || !flip) return null;
 
   const salePrice = propSalePrice !== undefined ? propSalePrice : localSalePrice;
@@ -202,10 +206,14 @@ export const FlipExitModal: React.FC<FlipExitModalProps> = ({
     >
       <div
         onClick={(e) => e.stopPropagation()}
+        style={sheetStyle}
         className="bg-white rounded-t-3xl sm:rounded-xl max-w-lg w-full p-5 sm:p-6 shadow-xl border border-slate-200 animate-in fade-in max-h-[92vh] sm:max-h-none overflow-y-auto cursor-default"
       >
-        <div className="w-12 h-1.5 bg-slate-300 rounded-full mx-auto mb-3 sm:hidden" />
-        <div className="flex items-center justify-between pb-3 mb-4 border-b border-slate-100">
+        <BottomSheetHandle className="-mt-2.5 mb-1.5" {...dragHandleProps} />
+        <div
+          {...dragHandleProps}
+          className="flex items-center justify-between pb-3 mb-4 border-b border-slate-100 touch-none sm:touch-auto select-none sm:select-auto"
+        >
           <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
             <CheckCircle2 className="w-5 h-5 text-emerald-600" />
             <span>Mark Project as Flipped &amp; Record Sale</span>

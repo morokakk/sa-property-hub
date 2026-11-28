@@ -6,6 +6,8 @@ import { formatZAR, formatDate } from '@/lib/formatters';
 import { Wrench, X, Share2, Trash2, UserCheck, CheckCircle2, RefreshCw } from 'lucide-react';
 import { usePortfolioStore } from '@/lib/store/usePortfolioStore';
 import { useModalBackdropDismiss } from '@/hooks/useModalBackdropDismiss';
+import { useBottomSheetDragToDismiss } from '@/hooks/useBottomSheetDragToDismiss';
+import BottomSheetHandle from '@/components/common/BottomSheetHandle';
 import { InlineEditableAmount } from '@/components/common/InlineEditableAmount';
 import { formatContractorDispatchForWhatsApp } from '@/lib/whatsappFormatter';
 import { normalizeWhatsAppPhone } from '@/lib/calculations/inspections';
@@ -170,6 +172,7 @@ export const MaintenanceModal: React.FC<MaintenanceModalProps> = ({
   };
 
   const backdropDismiss = useModalBackdropDismiss(onClose);
+  const { sheetStyle, dragHandleProps } = useBottomSheetDragToDismiss({ onClose });
 
   if (!isOpen || !property) return null;
 
@@ -266,10 +269,14 @@ export const MaintenanceModal: React.FC<MaintenanceModalProps> = ({
     >
       <div
         onClick={(e) => e.stopPropagation()}
+        style={sheetStyle}
         className="bg-white rounded-t-3xl sm:rounded-xl max-w-xl w-full p-5 sm:p-6 shadow-xl border border-slate-200 max-h-[92vh] sm:max-h-[85vh] overflow-y-auto cursor-default"
       >
-        <div className="w-12 h-1.5 bg-slate-300 rounded-full mx-auto mb-3 sm:hidden" />
-        <div className="flex items-center justify-between pb-3 border-b border-slate-200 mb-4">
+        <BottomSheetHandle className="-mt-2.5 mb-1.5" {...dragHandleProps} />
+        <div
+          {...dragHandleProps}
+          className="flex items-center justify-between pb-3 border-b border-slate-200 mb-4 touch-none sm:touch-auto select-none sm:select-auto"
+        >
           <div>
             <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
               <Wrench className="w-5 h-5 text-emerald-600" />
