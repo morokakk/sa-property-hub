@@ -35,7 +35,7 @@ test.describe('Welcome Landing Page (/) & /welcome Redirect', () => {
         tab: 'Vet a Deal Before You Sign',
         goalText: "Know your true Day-1 cash requirement and net return before committing your family's capital.",
         howText:
-          'Calculate instant SARS transfer duty, LPC conveyancing & bond tariffs, Section 118 arrears buffers, and your Maximum Allowable Offer (Max Bid).',
+          'Calculate instant SARS transfer duty, LSSA conveyancing & bond guidelines, Section 118 arrears buffers, and your Maximum Allowable Offer (Max Bid).',
         ctaText: 'Open Opportunity Analyzer',
         ctaHref: '/analyzer',
       },

@@ -69,6 +69,18 @@ import {
   captureSanitizedError,
   identifyAnalyticsUser,
 } from '@/lib/analytics/posthogClient';
+import { LSSA_FEE_GUIDELINE_2026_07 } from '@/lib/calculations/sarsTax';
+
+const SHORT_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'] as const;
+
+function formatEffectiveMonthYear(isoDate: string): string {
+  const [year, monthStr] = isoDate.split('-');
+  const monthIdx = Number(monthStr) - 1;
+  const shortMonth = SHORT_MONTHS[monthIdx];
+  return shortMonth && year ? `${shortMonth} ${year}` : isoDate;
+}
+
+const ACTIVE_LSSA_GUIDELINE_LABEL = formatEffectiveMonthYear(LSSA_FEE_GUIDELINE_2026_07.effectiveFrom);
 
 type SettingsTab = 'entity' | 'underwriting' | 'ai';
 
@@ -2135,6 +2147,13 @@ function SettingsContent() {
                       </span>
                     </label>
                   </div>
+
+                  <p
+                    data-testid="settings-statutory-provenance"
+                    className="pt-2 border-t border-slate-200/80 text-[11px] text-slate-500"
+                  >
+                    Statutory schedules active: SARS Transfer Duty (2026/27) • LSSA Conveyancing Guideline ({ACTIVE_LSSA_GUIDELINE_LABEL})
+                  </p>
                 </div>
               </div>
 

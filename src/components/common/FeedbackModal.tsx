@@ -58,7 +58,7 @@ const CATEGORIES: {
     id: 'data_math',
     label: 'SA Tax / Math',
     icon: Calculator,
-    description: 'SARS rates, LPC scale, municipal tariffs',
+    description: 'SARS rates, LSSA scale, municipal tariffs',
     placeholder: 'Which municipal tariff, transfer duty scale, or financial formula needs adjustment?',
   },
   {

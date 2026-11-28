@@ -65,8 +65,9 @@ describe('Root Welcome Landing Page (/) & /welcome Redirect', () => {
     expect(html).toContain('Guard the Kraal. Grow the Baobab.');
     expect(html).toContain('Guard Your Day-1 Cash');
     expect(html).not.toContain('Guard Your Day-1 Cash (The Kraal)');
-    expect(html).toContain('LPC legal fees');
-    expect(html).not.toContain('LSSA legal fees');
+    expect(html).toContain('LSSA legal fees');
+    expect(html).not.toContain('LPC legal fees');
+    expect(html).toContain('SARS &amp; Law Society (LSSA) guidelines');
     expect(html).toContain('Run Operations From Your Phone');
     expect(html).toContain('Pitch Lenders &amp; Partners Instantly');
     expect(html).not.toContain('Pitch Lenders &amp; Partners Instantly (The Baobab)');

@@ -152,7 +152,7 @@ export default function PrivacyNoticePage() {
               </div>
               <p className="text-slate-700">
                 All mathematical outputs—including progressive SARS Transfer Duty brackets, Section 13sex building
-                allowances, Legal Practice Council (LPC) conveyancing and bond registration tariff scales, Section 118
+                allowances, Law Society of South Africa (LSSA) conveyancing and bond registration guideline scales, Section 118
                 municipal clearance estimates, Inclining Block Tariff (IBT) utility dispute calculations, and PIE Act
                 eviction reserves—are automated underwriting approximations provided strictly for informational and
                 modeling purposes.{' '}

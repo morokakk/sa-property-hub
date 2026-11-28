@@ -32,12 +32,20 @@ describe('Sidebar Feedback Engine Triggers', () => {
     expect(sidebarSource).toContain('data-testid="sidebar-privacy-link"');
     expect(sidebarSource).toContain('data-testid="sidebar-mobile-privacy-link"');
     expect(sidebarSource).toContain('Moremela Properties (Pty) Ltd • POC Estimates Only');
+
+    // Removed decorative SARS Tax Engine widget must stay absent
+    for (const staleText of ['SARS Tax Engine', 'v2025/26', 'LPC sliding', 'Legal Practice Council', 'ZAR']) {
+      expect(sidebarSource).not.toContain(staleText);
+    }
   });
 
-  it('renders the Desktop feedback trigger button when rendered', () => {
+  it('renders the Desktop feedback trigger button without the removed SARS Tax Engine widget', () => {
     const html = renderToString(<Sidebar />);
 
     expect(html).toContain('data-testid="sidebar-feedback-trigger"');
     expect(html).toContain('Feedback &amp; Ideas');
+    for (const staleText of ['SARS Tax Engine', 'v2025/26', 'LPC sliding', 'Legal Practice Council', 'ZAR']) {
+      expect(html).not.toContain(staleText);
+    }
   });
 });

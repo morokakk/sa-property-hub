@@ -51,7 +51,7 @@ const LIFE_GOALS: LifeGoalOption[] = [
     icon: Calculator,
     humanGoal: "Know your true Day-1 cash requirement and net return before committing your family's capital.",
     howClearsWay:
-      'Calculate instant SARS transfer duty, LPC conveyancing & bond tariffs, Section 118 arrears buffers, and your Maximum Allowable Offer (Max Bid).',
+      'Calculate instant SARS transfer duty, LSSA conveyancing & bond guidelines, Section 118 arrears buffers, and your Maximum Allowable Offer (Max Bid).',
     ctaLabel: 'Open Opportunity Analyzer ➔',
     ctaHref: '/analyzer',
   },
@@ -259,11 +259,11 @@ export default function WelcomePage() {
                 </h3>
                 <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
                   Stop losing margin to hidden South African transaction traps. Automatically model SARS transfer duties,
-                  LPC legal fees, Section 118 municipal arrears, and provisional tax reserves.
+                  LSSA legal fees, Section 118 municipal arrears, and provisional tax reserves.
                 </p>
               </div>
               <div className="pt-2 border-t border-slate-100 text-xs font-semibold text-emerald-700 flex items-center gap-1">
-                <span>SARS &amp; Legal Practice Council tariffs</span>
+                <span>SARS &amp; Law Society (LSSA) guidelines</span>
               </div>
             </div>
 

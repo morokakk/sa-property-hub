@@ -29,7 +29,7 @@ describe('Official POPIA Privacy Policy (/privacy) & Legal Footers', () => {
     expect(html).toContain('Proof of Concept (POC) Pilot &amp; Financial / Statutory Estimate Disclaimer');
     expect(html).toContain('FAIS');
     expect(html).toContain('Section 13sex');
-    expect(html).toContain('Legal Practice Council (LPC)');
+    expect(html).toContain('Law Society of South Africa (LSSA)');
     expect(html).toContain('Section 118');
     expect(html).toContain('Inclining Block Tariff (IBT)');
     expect(html).toContain('PIE Act');
