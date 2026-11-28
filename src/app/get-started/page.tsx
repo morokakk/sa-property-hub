@@ -195,16 +195,9 @@ export default function GetStartedPage() {
               }`}
             >
               <div className="flex items-center justify-between mb-1.5">
-                <div className="flex items-center gap-2">
-                  <span
-                    className={`w-2 h-2 rounded-full ${
-                      foundationDone === foundationTotal ? 'bg-emerald-500' : 'bg-amber-500 animate-pulse'
-                    }`}
-                  />
-                  <span className="text-xs font-bold text-slate-800">
-                    Foundation Setup (5 mins)
-                  </span>
-                </div>
+                <span className="text-xs font-bold text-slate-800">
+                  Foundation Setup (5 mins)
+                </span>
                 <span
                   className={`text-xs font-bold ${
                     foundationDone === foundationTotal ? 'text-emerald-700' : 'text-amber-700'
@@ -231,12 +224,9 @@ export default function GetStartedPage() {
             {/* Tier 2: Feature Hub (Secondary / Self-Paced) */}
             <div className="p-3.5 rounded-xl border border-slate-200 bg-slate-50/70">
               <div className="flex items-center justify-between mb-1.5">
-                <div className="flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-slate-400" />
-                  <span className="text-xs font-bold text-slate-800">
-                    Feature Hub &amp; Reference
-                  </span>
-                </div>
+                <span className="text-xs font-bold text-slate-800">
+                  Feature Hub &amp; Reference
+                </span>
                 <span className="text-xs font-semibold text-slate-600">
                   {discoveryDone} of {discoveryTotal} explored
                 </span>

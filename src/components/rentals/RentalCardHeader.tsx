@@ -214,7 +214,7 @@ export function RentalCardHeader({
           className="bg-rose-50 border-y border-rose-200 px-4 py-2 flex items-center justify-between text-xs"
         >
           <span className="flex items-center gap-1.5 font-bold text-rose-700">
-            <AlertCircle className="w-3.5 h-3.5 text-rose-600 animate-pulse" />
+            <AlertCircle className="w-3.5 h-3.5 text-rose-600" />
             Tenant Default Risk: Arrears Accruing
           </span>
           <span className="font-extrabold text-rose-700 font-mono tabular-nums tracking-tight">

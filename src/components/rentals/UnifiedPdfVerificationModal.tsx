@@ -690,7 +690,7 @@ export default function UnifiedPdfVerificationModal({
             </div>
 
             {isReparsing ? (
-              <div className="bg-purple-50 border border-purple-200 rounded-xl p-4 flex items-center justify-center gap-2.5 text-xs text-purple-900 font-semibold animate-pulse">
+              <div className="bg-purple-50 border border-purple-200 rounded-xl p-4 flex items-center justify-center gap-2.5 text-xs text-purple-900 font-semibold">
                 <Loader2 className="w-4 h-4 animate-spin text-purple-600" />
                 <span>Re-parsing statement with newly saved API key...</span>
               </div>
@@ -827,7 +827,7 @@ export default function UnifiedPdfVerificationModal({
         <div className="p-4 sm:p-6 overflow-y-auto space-y-5 flex-1">
           {/* Active Re-parsing Loader */}
           {isReparsing && (
-            <div className="bg-purple-50 border border-purple-200 rounded-xl p-3.5 flex items-center justify-center gap-2 text-xs text-purple-900 font-semibold animate-pulse">
+            <div className="bg-purple-50 border border-purple-200 rounded-xl p-3.5 flex items-center justify-center gap-2 text-xs text-purple-900 font-semibold">
               <Loader2 className="w-4 h-4 animate-spin text-purple-600" />
               <span>Re-analyzing statement with newly saved AI credentials...</span>
             </div>

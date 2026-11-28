@@ -4982,12 +4982,9 @@ export default function OpportunityAnalyzerPage() {
                             : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
                         }`}
                       >
-                        <div className="font-bold flex items-center justify-between">
-                          <span className="flex items-center gap-1.5">
-                            <StrategyIcon className="w-3.5 h-3.5" />
-                            {st.label}
-                          </span>
-                          {strategy === st.id && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>}
+                        <div className="font-bold flex items-center gap-1.5">
+                          <StrategyIcon className="w-3.5 h-3.5" />
+                          <span>{st.label}</span>
                         </div>
                         <div className={`text-[10px] truncate mt-0.5 ${strategy === st.id ? 'text-slate-300' : 'text-slate-500'}`}>
                           {st.desc}

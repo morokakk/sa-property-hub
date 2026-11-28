@@ -858,7 +858,7 @@ function SettingsContent() {
             <span>Save Profile &amp; Settings</span>
             {isDirty && (
               <span
-                className="w-2 h-2 rounded-full bg-amber-400 animate-pulse ml-0.5"
+                className="w-2 h-2 rounded-full bg-amber-400 ml-0.5"
                 title="Unsaved changes pending"
               />
             )}
@@ -2622,10 +2622,7 @@ function SettingsContent() {
         {/* Adaptive Floating Save Dock for Dirty Changes (Guardrail 1: bottom-16 on mobile to avoid bottom navigation bar, md:bottom-4 on desktop) */}
         {isDirty && (
           <div className="fixed bottom-16 md:bottom-4 left-4 right-4 sm:left-auto sm:right-6 z-40 bg-slate-900/95 backdrop-blur-md text-white px-4 py-3 rounded-xl shadow-2xl border border-slate-700/80 flex items-center justify-between sm:justify-end gap-3.5 animate-in slide-in-from-bottom-5 duration-200">
-            <div className="flex items-center gap-2 text-xs">
-              <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span>
-              <span className="font-semibold text-slate-200">Unsaved Changes</span>
-            </div>
+            <span className="text-xs font-semibold text-slate-200">Unsaved Changes</span>
             <div className="flex items-center gap-2">
               <button
                 type="button"

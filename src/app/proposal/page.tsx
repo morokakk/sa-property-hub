@@ -1475,7 +1475,6 @@ function ProposalGeneratorContent() {
                 >
                   <Hammer className={`w-3.5 h-3.5 shrink-0 ${pitchStrategy === 'Flip' ? 'text-emerald-700' : 'text-slate-400'}`} />
                   <span className="truncate">Buy &amp; Flip</span>
-                  {pitchStrategy === 'Flip' && <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0"></span>}
                 </button>
                 <button
                   type="button"
@@ -1488,7 +1487,6 @@ function ProposalGeneratorContent() {
                 >
                   <Building2 className={`w-3.5 h-3.5 shrink-0 ${pitchStrategy === 'Rental' ? 'text-emerald-700' : 'text-slate-400'}`} />
                   <span className="truncate">Buy &amp; Hold</span>
-                  {pitchStrategy === 'Rental' && <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0"></span>}
                 </button>
                 <button
                   type="button"
@@ -1501,7 +1499,6 @@ function ProposalGeneratorContent() {
                 >
                   <RefreshCw className={`w-3.5 h-3.5 shrink-0 ${pitchStrategy === 'BRRRR' ? 'text-emerald-700' : 'text-slate-400'}`} />
                   <span className="truncate">BRRRR</span>
-                  {pitchStrategy === 'BRRRR' && <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0"></span>}
                 </button>
                 <button
                   type="button"
@@ -1514,7 +1511,6 @@ function ProposalGeneratorContent() {
                 >
                   <Layers className={`w-3.5 h-3.5 shrink-0 ${pitchStrategy === 'Development' ? 'text-emerald-700' : 'text-slate-400'}`} />
                   <span className="truncate">Development</span>
-                  {pitchStrategy === 'Development' && <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0"></span>}
                 </button>
               </div>
             </div>
